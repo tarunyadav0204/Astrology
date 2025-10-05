@@ -42,8 +42,8 @@ pkill -f "serve -s build" || true
 # Start backend
 cd backend
 source venv/bin/activate
-nohup python main.py > ../logs/backend.log 2>&1 &
-echo "✅ Backend started on port 8000"
+nohup python3 main.py > ../logs/backend.log 2>&1 &
+echo "✅ Backend started on port 8001"
 
 # Start frontend
 cd ../frontend
@@ -51,5 +51,5 @@ nohup npx serve -s build -l 3001 > ../logs/frontend.log 2>&1 &
 echo "✅ Frontend started on port 3001"
 
 echo "🎉 Deployment completed successfully!"
-echo "📊 Backend: http://localhost:8000"
-echo "🌐 Frontend: http://localhost:3000"
+echo "📊 Backend: http://localhost:8001"
+echo "🌐 Frontend: http://localhost:3001"
