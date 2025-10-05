@@ -22,25 +22,16 @@ sudo npm install -g serve
 git clone https://github.com/tarunyadav0204/Astrology.git AstrologyApp
 cd AstrologyApp
 
-# Install webhook dependencies
-npm install
-
-# Setup systemd services
+# Setup systemd service
 sudo cp systemd/astrology-app.service /etc/systemd/system/
-sudo cp systemd/astrology-webhook.service /etc/systemd/system/
 
-# Enable and start services
+# Enable service
 sudo systemctl daemon-reload
 sudo systemctl enable astrology-app
-sudo systemctl enable astrology-webhook
 
 # Initial deployment
 bash deploy.sh
 
-# Start webhook server
-sudo systemctl start astrology-webhook
-
 echo "✅ Server setup completed!"
-echo "🎣 Webhook server: http://your-server:9000/webhook"
 echo "📊 Backend API: http://your-server:8000"
 echo "🌐 Frontend: http://your-server:3000"
