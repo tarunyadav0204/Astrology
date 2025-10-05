@@ -35,9 +35,11 @@ echo "✅ Frontend built successfully"
 echo "🔄 Restarting services..."
 cd ..
 
-# Kill existing astrology app processes only
-pkill -f "AstrologyApp.*python.*main.py" || true
-pkill -f "AstrologyApp.*serve -s build" || true
+# Kill existing processes on ports 8001 and 3001
+echo "Stopping existing services..."
+lsof -ti:8001 | xargs kill -9 2>/dev/null || true
+lsof -ti:3001 | xargs kill -9 2>/dev/null || true
+sleep 2
 
 # Start backend
 cd backend
