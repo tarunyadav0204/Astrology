@@ -784,12 +784,21 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             planet_degree = planet_data['longitude'] % 30
             
             divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
-            divisional_longitude = divisional_sign * 30 + 15  # Middle of sign
+            
+            # Calculate the actual degree within the divisional sign
+            # Each division part represents 30/division_number degrees
+            part_size = 30.0 / division_number
+            part_index = int(planet_degree / part_size)
+            degree_within_part = planet_degree % part_size
+            # Scale the degree within part to full sign (0-30 degrees)
+            actual_degree = (degree_within_part / part_size) * 30.0
+            
+            divisional_longitude = divisional_sign * 30 + actual_degree
             
             divisional_data['planets'][planet] = {
                 'longitude': divisional_longitude,
                 'sign': divisional_sign,
-                'degree': 15.0
+                'degree': actual_degree
             }
     
     return {
