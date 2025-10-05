@@ -37,9 +37,9 @@ cd ..
 
 # Kill existing processes on ports 8001 and 3001
 echo "Stopping existing services..."
-lsof -ti:8001 | xargs kill -9 2>/dev/null || true
-lsof -ti:3001 | xargs kill -9 2>/dev/null || true
-sleep 2
+fuser -k 8001/tcp 2>/dev/null || true
+fuser -k 3001/tcp 2>/dev/null || true
+sleep 3
 
 # Start backend
 cd backend
