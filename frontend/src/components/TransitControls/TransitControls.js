@@ -41,20 +41,34 @@ const TransitControls = ({ date, onChange, onResetToToday }) => {
 
   return (
     <ControlsContainer>
-      <DateDisplay>{date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</DateDisplay>
+      <DateDisplay>{window.innerWidth <= 768 ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) : date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</DateDisplay>
       
       <ButtonGroup>
-        <NavButton onClick={() => handleDateChange('sub', 'year')}>‹‹Y</NavButton>
-        <NavButton onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
-        <NavButton onClick={() => handleDateChange('sub', 'week')}>‹W</NavButton>
-        <NavButton onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
-        
-        <NavButton onClick={resetToToday} primary>Now</NavButton>
-        
-        <NavButton onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
-        <NavButton onClick={() => handleDateChange('add', 'week')}>W›</NavButton>
-        <NavButton onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
-        <NavButton onClick={() => handleDateChange('add', 'year')}>Y››</NavButton>
+        {window.innerWidth <= 768 ? (
+          // Mobile - Only essential controls
+          <>
+            <NavButton onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
+            <NavButton onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
+            <NavButton onClick={resetToToday} primary>Now</NavButton>
+            <NavButton onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
+            <NavButton onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
+          </>
+        ) : (
+          // Desktop - Full controls
+          <>
+            <NavButton onClick={() => handleDateChange('sub', 'year')}>‹‹Y</NavButton>
+            <NavButton onClick={() => handleDateChange('sub', 'month')}>‹M</NavButton>
+            <NavButton onClick={() => handleDateChange('sub', 'week')}>‹W</NavButton>
+            <NavButton onClick={() => handleDateChange('sub', 'day')}>‹D</NavButton>
+            
+            <NavButton onClick={resetToToday} primary>Now</NavButton>
+            
+            <NavButton onClick={() => handleDateChange('add', 'day')}>D›</NavButton>
+            <NavButton onClick={() => handleDateChange('add', 'week')}>W›</NavButton>
+            <NavButton onClick={() => handleDateChange('add', 'month')}>M›</NavButton>
+            <NavButton onClick={() => handleDateChange('add', 'year')}>Y››</NavButton>
+          </>
+        )}
       </ButtonGroup>
     </ControlsContainer>
   );

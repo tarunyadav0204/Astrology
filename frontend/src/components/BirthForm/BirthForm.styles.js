@@ -8,21 +8,25 @@ export const TwoPanelContainer = styled.div`
   margin: 0 auto;
   padding: 2rem;
   
-  @media (max-width: ${APP_CONFIG.ui.breakpoints.tablet || '768px'}) {
+  @media (max-width: 768px) {
     flex-direction: column;
     gap: 1rem;
-    padding: 1rem;
+    padding: 0.5rem;
   }
 `;
 
 export const FormPanel = styled.div`
   flex: 1;
-  min-width: 400px;
+  min-width: 300px;
+  
+  @media (max-width: 768px) {
+    min-width: unset;
+  }
 `;
 
 export const ChartsPanel = styled.div`
   flex: 1;
-  min-width: 400px;
+  min-width: 300px;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 20px;
   padding: 1.5rem;
@@ -31,6 +35,12 @@ export const ChartsPanel = styled.div`
   border: 2px solid rgba(255, 255, 255, 0.3);
   position: relative;
   overflow: hidden;
+  
+  @media (max-width: 768px) {
+    min-width: unset;
+    padding: 1rem;
+    border-radius: 15px;
+  }
   
   &::before {
     content: '';
@@ -105,6 +115,13 @@ export const FormContainer = styled.div`
   position: relative;
   overflow: hidden;
   
+  @media (max-width: 768px) {
+    padding: 1rem;
+    margin: 0;
+    border-radius: 15px;
+    max-width: 100%;
+  }
+  
   &::before {
     content: '';
     position: absolute;
@@ -132,10 +149,7 @@ export const FormContainer = styled.div`
     }
   }
 
-  @media (max-width: ${APP_CONFIG.ui.breakpoints.mobile}) {
-    padding: 1.5rem;
-    margin: 1rem;
-  }
+
 `;
 
 export const FormField = styled.div`
@@ -165,6 +179,12 @@ export const Input = styled.input`
   font-size: 1rem;
   transition: all 0.3s ease;
   background: rgba(255, 255, 255, 0.8);
+  min-height: 44px;
+  
+  @media (max-width: 768px) {
+    font-size: 16px;
+    padding: 1rem;
+  }
   
   &:focus {
     outline: none;
@@ -227,6 +247,12 @@ export const Button = styled.button`
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 48px;
+  
+  @media (max-width: 768px) {
+    padding: 1.25rem;
+    font-size: 1rem;
+  }
   
   &::before {
     content: '🚀';
@@ -262,6 +288,17 @@ export const ChartItem = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    
+    > div:last-child {
+      align-self: stretch;
+      justify-content: center;
+    }
+  }
   
   &:hover {
     background: linear-gradient(135deg, rgba(233, 30, 99, 0.1) 0%, rgba(255, 111, 0, 0.1) 100%);

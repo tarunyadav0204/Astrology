@@ -14,11 +14,12 @@ function App() {
   return (
     <AstrologyProvider>
       <div style={{ 
-        padding: showDashboard ? '0' : '20px', 
+        padding: showDashboard ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
         maxWidth: showDashboard ? '100vw' : '1200px', 
         margin: showDashboard ? '0' : '0 auto',
         minHeight: '100vh',
-        background: showDashboard ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)'
+        background: showDashboard ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
+        overflowX: 'hidden'
       }}>
         {!showDashboard ? (
           <BirthForm onSubmit={() => setShowDashboard(true)} />

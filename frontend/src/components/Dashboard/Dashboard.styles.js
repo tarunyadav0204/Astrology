@@ -2,13 +2,19 @@ import styled from 'styled-components';
 import { APP_CONFIG } from '../../config/app.config';
 
 export const DashboardContainer = styled.div`
-  height: 100vh;
+  min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  
+  @media (max-width: 768px) {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
   
   &::before {
     content: '';
@@ -25,7 +31,7 @@ export const DashboardContainer = styled.div`
 export const GridContainer = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: 55vh 25vh;
+  grid-template-rows: 55vh auto;
   gap: 0.3rem;
   row-gap: 0.5rem;
   padding: 0.5rem;
@@ -33,11 +39,12 @@ export const GridContainer = styled.div`
   margin: 0;
   flex: 1;
 
-  @media (max-width: ${APP_CONFIG.ui.breakpoints.mobile}) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
-    grid-template-rows: auto;
+    grid-template-rows: repeat(4, 40vh) auto;
     height: auto;
     padding: 0.5rem 0.25rem;
+    gap: 0.5rem;
   }
 `;
 
@@ -75,6 +82,11 @@ export const GridItem = styled.div.withConfig({
     grid-column: span 1;
     grid-row: 1;
     height: 100%;
+    
+    @media (max-width: 768px) {
+      grid-column: 1;
+      height: 40vh;
+    }
   `}
   
   ${props => props.dasha && `
@@ -82,6 +94,12 @@ export const GridItem = styled.div.withConfig({
     grid-row: 2;
     height: 100%;
     overflow: hidden;
+    
+    @media (max-width: 768px) {
+      grid-column: 1;
+      height: 25vh;
+      margin-bottom: 0.5rem;
+    }
   `}
   
   ${props => props.chartSpan && `
@@ -93,29 +111,34 @@ export const Header = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.3rem 1rem;
+  padding: 0.5rem 1rem;
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin: 0;
   z-index: 100;
-  height: 40px;
+  min-height: 50px;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
 
-  @media (max-width: ${APP_CONFIG.ui.breakpoints.mobile}) {
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 1rem;
-    height: auto;
+  @media (max-width: 768px) {
+    padding: 0.5rem;
+    min-height: 44px;
+    
+    > div {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
   }
 `;
 
 export const BackButton = styled.button`
-  padding: 0.2rem 0.6rem;
+  padding: 0.4rem 0.8rem;
   background: linear-gradient(135deg, #ff8a65 0%, #e91e63 100%);
   color: white;
   border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 15px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 600;
@@ -123,7 +146,9 @@ export const BackButton = styled.button`
   box-shadow: 0 1px 4px rgba(255, 107, 107, 0.4);
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.3rem;
+  min-height: 36px;
+  flex-shrink: 0;
   
   &::before {
     content: '🏠';
@@ -135,22 +160,30 @@ export const BackButton = styled.button`
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(255, 107, 107, 0.6);
   }
+  
+  @media (max-width: 768px) {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+    min-height: 32px;
+  }
 `;
 
 export const Title = styled.h1`
   margin: 0;
   color: white;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 700;
   text-shadow: none;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.5rem;
+  flex: 1;
+  text-align: center;
   
   &::before {
     content: '✨';
-    font-size: 2.2rem;
+    font-size: 1.5rem;
     animation: sparkle 2s ease-in-out infinite alternate;
   }
   
@@ -159,8 +192,12 @@ export const Title = styled.h1`
     100% { transform: scale(1.1) rotate(5deg); }
   }
 
-  @media (max-width: ${APP_CONFIG.ui.breakpoints.mobile}) {
-    font-size: 1.6rem;
-    text-align: center;
+  @media (max-width: 768px) {
+    font-size: 0.9rem;
+    gap: 0.3rem;
+    
+    &::before {
+      font-size: 1.2rem;
+    }
   }
 `;

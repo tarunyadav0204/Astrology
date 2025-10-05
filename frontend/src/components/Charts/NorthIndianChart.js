@@ -329,7 +329,16 @@ const NorthIndianChart = ({ chartData, birthData }) => {
           )}
         </div>
       )}
-      <svg viewBox="0 0 400 400" style={{ width: '100%', height: '100%' }}>
+      <svg 
+        viewBox="0 0 400 400" 
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          minHeight: '280px',
+          maxWidth: '100%'
+        }}
+        preserveAspectRatio="xMidYMid meet"
+      >
       {/* Outer square border */}
       <rect x="20" y="20" width="360" height="360" 
             fill="url(#chartGradient)" stroke="#e91e63" strokeWidth="3"/>

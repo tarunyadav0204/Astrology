@@ -74,6 +74,7 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
   const [transitData, setTransitData] = useState(null);
   const [selectedDashas, setSelectedDashas] = useState({});
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [mobileSubTab, setMobileSubTab] = useState('lagna');
 
   useEffect(() => {
     // Load saved layout from localStorage
@@ -135,15 +136,15 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
   return (
     <DashboardContainer>
       <Header>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <BackButton onClick={onBack}>← Back</BackButton>
+          <Title>{window.innerWidth <= 768 ? birthData.name : `${birthData.name} - Birth Chart Dashboard`}</Title>
+          <TransitControls 
+            date={transitDate} 
+            onChange={handleTransitDateChange}
+            onResetToToday={resetToToday}
+          />
         </div>
-        <Title style={{ flex: 2, textAlign: 'center', fontSize: '1rem' }}>{birthData.name} - Birth Chart Dashboard</Title>
-        <TransitControls 
-          date={transitDate} 
-          onChange={handleTransitDateChange}
-          onResetToToday={resetToToday}
-        />
       </Header>
 
       {/* Tab Navigation */}
@@ -154,7 +155,11 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
         background: '#f8f9fa',
         borderRadius: '8px',
         padding: '0.3rem',
-        margin: '0 1rem'
+        margin: '0 0.5rem',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        WebkitOverflowScrolling: 'touch'
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
@@ -171,15 +176,18 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: '0.5rem 1rem',
+              padding: window.innerWidth <= 768 ? '0.4rem 0.8rem' : '0.5rem 1rem',
               background: activeTab === tab.id ? '#e91e63' : 'transparent',
               color: activeTab === tab.id ? 'white' : '#e91e63',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '0.8rem',
+              fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.8rem',
               fontWeight: '600',
-              marginRight: '0.2rem'
+              marginRight: '0.2rem',
+              whiteSpace: 'nowrap',
+              minWidth: 'fit-content',
+              flexShrink: 0
             }}
           >
             {tab.label}
@@ -189,114 +197,303 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
 
       {/* Tab Content */}
       {activeTab === 'dashboard' && (
-        <GridContainer>
-          {/* First row - 4 charts */}
-          <GridItem chart>
-            <ChartWidget
-              title="Lagna Chart"
-              chartType="lagna"
-              chartData={chartData}
-              birthData={birthData}
-            />
-          </GridItem>
-          
-          <GridItem chart>
-            <ChartWidget
-              title="Navamsa Chart"
-              chartType="navamsa"
-              chartData={chartData}
-              birthData={birthData}
-            />
-          </GridItem>
-          
-          <GridItem chart>
-            <ChartWidget
-              title="Transit Chart"
-              chartType="transit"
-              chartData={transitData || chartData}
-              birthData={birthData}
-              transitDate={transitDate}
-            />
-          </GridItem>
-          
-          <GridItem chart>
-            <DivisionalChartSelector
-              chartData={chartData}
-              birthData={birthData}
-            />
-          </GridItem>
-          
-          {/* Second row - 7 items (5 dashas + yogi + panchang) */}
-          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.3rem', height: '30vh' }}>
-            <GridItem dasha>
-              <DashaWidget
-                title="Maha Dasha"
-                dashaType="maha"
-                birthData={birthData}
-                onDashaClick={handleDashaClick}
-                selectedDashas={selectedDashas}
-                onDashaSelection={handleDashaSelection}
-                transitDate={transitDate}
-              />
-            </GridItem>
+        window.innerWidth <= 768 ? (
+          // Mobile Layout - Bottom Tabs
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)' }}>
+            {/* Main Content Area */}
+            <div style={{ flex: 1, padding: '0.5rem', overflow: 'hidden' }}>
+              {mobileSubTab === 'lagna' && (
+                <div style={{ height: '100%' }}>
+                  <ChartWidget
+                    title="Lagna Chart"
+                    chartType="lagna"
+                    chartData={chartData}
+                    birthData={birthData}
+                  />
+                </div>
+              )}
+              {mobileSubTab === 'navamsa' && (
+                <div style={{ height: '100%' }}>
+                  <ChartWidget
+                    title="Navamsa Chart"
+                    chartType="navamsa"
+                    chartData={chartData}
+                    birthData={birthData}
+                  />
+                </div>
+              )}
+              {mobileSubTab === 'transit' && (
+                <div style={{ height: '100%' }}>
+                  <ChartWidget
+                    title="Transit Chart"
+                    chartType="transit"
+                    chartData={transitData || chartData}
+                    birthData={birthData}
+                    transitDate={transitDate}
+                  />
+                </div>
+              )}
+              {mobileSubTab === 'divisional' && (
+                <div style={{ height: '100%' }}>
+                  <DivisionalChartSelector
+                    chartData={chartData}
+                    birthData={birthData}
+                  />
+                </div>
+              )}
+              {mobileSubTab === 'dashas' && (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap: '0.5rem', 
+                  height: '100%', 
+                  overflow: 'auto' 
+                }}>
+                  <div>
+                    <DashaWidget
+                      title="Maha"
+                      dashaType="maha"
+                      birthData={birthData}
+                      onDashaClick={handleDashaClick}
+                      selectedDashas={selectedDashas}
+                      onDashaSelection={handleDashaSelection}
+                      transitDate={transitDate}
+                    />
+                  </div>
+                  <div>
+                    <DashaWidget
+                      title="Antar"
+                      dashaType="antar"
+                      birthData={birthData}
+                      onDashaClick={handleDashaClick}
+                      selectedDashas={selectedDashas}
+                      onDashaSelection={handleDashaSelection}
+                      transitDate={transitDate}
+                    />
+                  </div>
+                  <div>
+                    <DashaWidget
+                      title="Pratyantar"
+                      dashaType="pratyantar"
+                      birthData={birthData}
+                      onDashaClick={handleDashaClick}
+                      selectedDashas={selectedDashas}
+                      onDashaSelection={handleDashaSelection}
+                      transitDate={transitDate}
+                    />
+                  </div>
+                  <div>
+                    <DashaWidget
+                      title="Sookshma"
+                      dashaType="sookshma"
+                      birthData={birthData}
+                      onDashaClick={handleDashaClick}
+                      selectedDashas={selectedDashas}
+                      onDashaSelection={handleDashaSelection}
+                      transitDate={transitDate}
+                    />
+                  </div>
+                  <div>
+                    <DashaWidget
+                      title="Prana"
+                      dashaType="prana"
+                      birthData={birthData}
+                      onDashaClick={handleDashaClick}
+                      selectedDashas={selectedDashas}
+                      onDashaSelection={handleDashaSelection}
+                      transitDate={transitDate}
+                    />
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.25rem' 
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <YogiWidget />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <PanchangWidget transitDate={transitDate} />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {mobileSubTab === 'yogi' && (
+                <div style={{ height: '100%' }}>
+                  <YogiWidget />
+                </div>
+              )}
+              {mobileSubTab === 'panchang' && (
+                <div style={{ height: '100%' }}>
+                  <PanchangWidget transitDate={transitDate} />
+                </div>
+              )}
+            </div>
             
-            <GridItem dasha>
-              <DashaWidget
-                title="Antar Dasha"
-                dashaType="antar"
-                birthData={birthData}
-                onDashaClick={handleDashaClick}
-                selectedDashas={selectedDashas}
-                onDashaSelection={handleDashaSelection}
-                transitDate={transitDate}
-              />
-            </GridItem>
-            
-            <GridItem dasha>
-              <DashaWidget
-                title="Pratyantar Dasha"
-                dashaType="pratyantar"
-                birthData={birthData}
-                onDashaClick={handleDashaClick}
-                selectedDashas={selectedDashas}
-                onDashaSelection={handleDashaSelection}
-                transitDate={transitDate}
-              />
-            </GridItem>
-            
-            <GridItem dasha>
-              <DashaWidget
-                title="Sookshma Dasha"
-                dashaType="sookshma"
-                birthData={birthData}
-                onDashaClick={handleDashaClick}
-                selectedDashas={selectedDashas}
-                onDashaSelection={handleDashaSelection}
-                transitDate={transitDate}
-              />
-            </GridItem>
-            
-            <GridItem dasha>
-              <DashaWidget
-                title="Prana Dasha"
-                dashaType="prana"
-                birthData={birthData}
-                onDashaClick={handleDashaClick}
-                selectedDashas={selectedDashas}
-                onDashaSelection={handleDashaSelection}
-                transitDate={transitDate}
-              />
-            </GridItem>
-            
-            <GridItem dasha>
-              <YogiWidget />
-            </GridItem>
-            
-            <GridItem dasha>
-              <PanchangWidget transitDate={transitDate} />
-            </GridItem>
+            {/* Bottom Tab Navigation */}
+            <div style={{
+              display: 'flex',
+              background: 'rgba(255, 255, 255, 0.95)',
+              borderTop: '2px solid #e91e63',
+              padding: '0.5rem 0.25rem',
+              gap: '0.25rem',
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch'
+            }}>
+              {[
+                { id: 'lagna', label: '📊 Lagna', icon: '📊' },
+                { id: 'navamsa', label: '🌙 Navamsa', icon: '🌙' },
+                { id: 'transit', label: '🔄 Transit', icon: '🔄' },
+                { id: 'divisional', label: '📈 Divisional', icon: '📈' },
+                { id: 'dashas', label: '⏰ Dashas', icon: '⏰' },
+                { id: 'yogi', label: '🧘 Yogi', icon: '🧘' },
+                { id: 'panchang', label: '📅 Panchang', icon: '📅' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setMobileSubTab(tab.id)}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 0.25rem',
+                    background: mobileSubTab === tab.id ? '#e91e63' : 'transparent',
+                    color: mobileSubTab === tab.id ? 'white' : '#e91e63',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.6rem',
+                    fontWeight: '600',
+                    whiteSpace: 'nowrap',
+                    minWidth: 'fit-content',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.1rem'
+                  }}
+                >
+                  <span style={{ fontSize: '0.8rem' }}>{tab.icon}</span>
+                  <span>{tab.label.split(' ')[1]}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </GridContainer>
+        ) : (
+          // Desktop Layout - Grid
+          <GridContainer>
+            <GridItem chart>
+              <ChartWidget
+                title="Lagna Chart"
+                chartType="lagna"
+                chartData={chartData}
+                birthData={birthData}
+              />
+            </GridItem>
+            
+            <GridItem chart>
+              <ChartWidget
+                title="Navamsa Chart"
+                chartType="navamsa"
+                chartData={chartData}
+                birthData={birthData}
+              />
+            </GridItem>
+            
+            <GridItem chart>
+              <ChartWidget
+                title="Transit Chart"
+                chartType="transit"
+                chartData={transitData || chartData}
+                birthData={birthData}
+                transitDate={transitDate}
+              />
+            </GridItem>
+            
+            <GridItem chart>
+              <DivisionalChartSelector
+                chartData={chartData}
+                birthData={birthData}
+              />
+            </GridItem>
+            
+            <div style={{ 
+              gridColumn: '1 / -1', 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(7, 1fr)', 
+              gap: '0.3rem', 
+              height: '30vh' 
+            }}>
+              <GridItem dasha>
+                <DashaWidget
+                  title="Maha Dasha"
+                  dashaType="maha"
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+              </GridItem>
+              
+              <GridItem dasha>
+                <DashaWidget
+                  title="Antar Dasha"
+                  dashaType="antar"
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+              </GridItem>
+              
+              <GridItem dasha>
+                <DashaWidget
+                  title="Pratyantar Dasha"
+                  dashaType="pratyantar"
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+              </GridItem>
+              
+              <GridItem dasha>
+                <DashaWidget
+                  title="Sookshma Dasha"
+                  dashaType="sookshma"
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+              </GridItem>
+              
+              <GridItem dasha>
+                <DashaWidget
+                  title="Prana Dasha"
+                  dashaType="prana"
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+              </GridItem>
+              
+              <GridItem dasha>
+                <YogiWidget />
+              </GridItem>
+              
+              <GridItem dasha>
+                <PanchangWidget transitDate={transitDate} />
+              </GridItem>
+            </div>
+          </GridContainer>
+        )
       )}
       
       {activeTab !== 'dashboard' && (

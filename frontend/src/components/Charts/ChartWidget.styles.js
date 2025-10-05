@@ -7,6 +7,10 @@ export const WidgetContainer = styled.div`
   background: white;
   border-radius: 8px;
   overflow: hidden;
+  
+  @media (max-width: 768px) {
+    min-height: 350px;
+  }
 `;
 
 export const WidgetHeader = styled.div`
@@ -17,6 +21,11 @@ export const WidgetHeader = styled.div`
   border-bottom: 1px solid rgba(225, 112, 85, 0.15);
   background: linear-gradient(135deg, #ffb3a7 0%, #ffa094 100%);
   border-radius: 15px 15px 0 0;
+  flex-shrink: 0;
+  
+  @media (max-width: 768px) {
+    padding: 0.6rem 1rem;
+  }
 `;
 
 export const WidgetTitle = styled.h3`
@@ -25,6 +34,10 @@ export const WidgetTitle = styled.h3`
   font-weight: 600;
   color: #8b4513;
   text-shadow: none;
+  
+  @media (max-width: 768px) {
+    font-size: 1rem;
+  }
 `;
 
 export const StyleToggle = styled.button`
@@ -38,11 +51,18 @@ export const StyleToggle = styled.button`
   font-weight: 500;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
+  min-height: 32px;
 
   &:hover {
     background: rgba(255, 255, 255, 1);
     transform: translateY(-1px);
     box-shadow: 0 3px 12px rgba(255, 255, 255, 0.5);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    min-height: 36px;
   }
 `;
 
@@ -54,11 +74,24 @@ export const ChartContainer = styled.div`
   justify-content: center;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 0 0 15px 15px;
+  position: relative;
   
   svg {
     width: 100%;
     height: 100%;
     max-width: 100%;
     max-height: 100%;
+    min-height: 300px;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 0.5rem;
+    
+    svg {
+      min-height: 280px;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+    }
   }
 `;
