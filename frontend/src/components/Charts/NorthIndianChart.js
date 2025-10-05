@@ -1,0 +1,622 @@
+import React, { useState, useEffect } from 'react';
+import { CHART_CONFIG } from '../../config/dashboard.config';
+import { apiService } from '../../services/apiService';
+
+/**
+ * NORTH INDIAN CHART POSITIONING REFERENCE
+ * ========================================
+ * 
+ * Chart Structure: 400x400 SVG viewBox, 12 houses (8 triangular + 4 diamond)
+ * Geometry: outer square + inner diamond + 2 diagonals
+ * 
+ * HOUSE CENTERS:
+ * House 1: (200, 110) - Top diamond
+ * House 2: (110, 70) - Top-left triangle  
+ * House 3: (70, 110) - Left triangle
+ * House 4: (110, 200) - Left diamond
+ * House 5: (70, 290) - Left triangle
+ * House 6: (110, 330) - Bottom-left triangle
+ * House 7: (200, 290) - Bottom diamond
+ * House 8: (290, 330) - Bottom-right triangle
+ * House 9: (330, 290) - Right triangle
+ * House 10: (290, 200) - Right diamond
+ * House 11: (330, 110) - Right triangle
+ * House 12: (290, 70) - Top-right triangle
+ * 
+ * RASHI POSITIONING (X, Y offsets from center):
+ * House 1: (-5, -5) - moved up
+ * House 2: (-5, +35) - bottom of inverted triangle
+ * House 3: (+10, +5) - moved right
+ * House 4: (+40, +5) - moved far right
+ * House 5: (+10, +5) - moved right
+ * House 6: (-5, -10) - moved up
+ * House 7: (-5, -10) - moved up
+ * House 8: (-5, -10) - moved up
+ * House 9: (-20, +5) - moved left
+ * House 10: (-40, +5) - moved far left
+ * House 11: (-15, +5) - moved left
+ * House 12: (-5, +35) - bottom of inverted triangle
+ * 
+ * PLANET POSITIONING RULES:
+ * - Houses 2,12: Inverted triangles - planets above rashi
+ * - Houses 3,4,5: Left side - planets left of rashi  
+ * - Houses 9,10,11: Right side - planets right of rashi
+ * - Houses 1,6,7,8: Standard - planets below rashi
+ * - Spacing: Use (col === 0 ? -spacing : spacing) NOT (col * spacing)
+ * - 2-4 planets: 16px horizontal, 18px vertical spacing
+ * - 5+ planets: 3-column grid, 12px horizontal, 15px vertical
+ * 
+ * See: docs/NORTH_INDIAN_CHART_POSITIONING.md for complete reference
+ */
+
+const NorthIndianChart = ({ chartData, birthData }) => {
+  const { signs, planets } = CHART_CONFIG;
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
+  const [friendshipData, setFriendshipData] = useState(null);
+  const [highlightedPlanet, setHighlightedPlanet] = useState(null);
+  const [highlightMode, setHighlightMode] = useState(null);
+  const [customAscendant, setCustomAscendant] = useState(null);
+  
+
+  
+  // House positions and shapes within the existing North Indian chart structure
+  const getHouseData = (houseNum) => {
+    const houseData = {
+      1: { center: { x: 200, y: 110 } },  // Top center diamond
+      2: { center: { x: 110, y: 70 } },   // Top-left triangle
+      3: { center: { x: 70, y: 110 } },   // Left-top triangle
+      4: { center: { x: 110, y: 200 } },  // Left center diamond
+      5: { center: { x: 70, y: 290 } },   // Left-bottom triangle
+      6: { center: { x: 110, y: 330 } },  // Bottom-left triangle
+      7: { center: { x: 200, y: 290 } },  // Bottom center diamond
+      8: { center: { x: 290, y: 330 } },  // Bottom-right triangle
+      9: { center: { x: 330, y: 290 } },  // Right-bottom triangle
+      10: { center: { x: 290, y: 200 } }, // Right center diamond
+      11: { center: { x: 330, y: 110 } }, // Right-top triangle
+      12: { center: { x: 290, y: 70 } }   // Top-right triangle
+    };
+    return houseData[houseNum];
+  };
+
+  const getRashiForHouse = (houseIndex) => {
+    if (!chartData.houses || !chartData.houses[houseIndex]) return houseIndex;
+    
+    if (customAscendant !== null) {
+      // Recalculate house-rashi mapping based on custom ascendant
+      return (customAscendant + houseIndex) % 12;
+    }
+    
+    // Default: use original chart data
+    return chartData.houses[houseIndex].sign;
+  };
+
+  useEffect(() => {
+    if (birthData) {
+      loadFriendshipData();
+    }
+  }, [birthData]);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setContextMenu({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
+    };
+
+    if (contextMenu.show) {
+      document.addEventListener('click', handleOutsideClick);
+      return () => document.removeEventListener('click', handleOutsideClick);
+    }
+  }, [contextMenu.show]);
+
+  const loadFriendshipData = async () => {
+    try {
+      const data = await apiService.calculateFriendship(birthData);
+      setFriendshipData(data);
+    } catch (error) {
+      console.error('Failed to load friendship data:', error);
+    }
+  };
+
+  const handlePlanetRightClick = (e, planet) => {
+    e.preventDefault();
+    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+    setContextMenu({
+      show: true,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      planet: planet.name,
+      rashi: null,
+      type: 'planet'
+    });
+  };
+
+  const handleRashiRightClick = (e, rashiIndex) => {
+    e.preventDefault();
+    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+    const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    setContextMenu({
+      show: true,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      planet: null,
+      rashi: rashiIndex,
+      rashiName: rashiNames[rashiIndex],
+      type: 'rashi'
+    });
+  };
+
+  const handleContextMenuAction = (action) => {
+    if (contextMenu.type === 'planet') {
+      setHighlightedPlanet(contextMenu.planet);
+      setHighlightMode(action);
+    } else if (contextMenu.type === 'rashi' && action === 'setAscendant') {
+      setCustomAscendant(contextMenu.rashi);
+    }
+    setContextMenu({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
+  };
+
+  const clearHighlight = () => {
+    setHighlightedPlanet(null);
+    setHighlightMode(null);
+  };
+
+  const resetAscendant = () => {
+    setCustomAscendant(null);
+  };
+
+  const isCombusted = (planet) => {
+    if (planet.name === 'Sun' || !chartData.planets?.Sun) return false;
+    
+    const planetData = chartData.planets[planet.name];
+    const sunData = chartData.planets.Sun;
+    
+    if (!planetData) return false;
+    
+    // Calculate angular distance
+    let distance = Math.abs(planetData.longitude - sunData.longitude);
+    if (distance > 180) distance = 360 - distance;
+    
+    // Combustion distances in degrees
+    const combustionDistances = {
+      'Moon': 12, 'Mars': 17, 'Mercury': 14, 'Jupiter': 11, 'Venus': 10, 'Saturn': 15
+    };
+    
+    return distance <= (combustionDistances[planet.name] || 0);
+  };
+
+  const getPlanetStatus = (planet) => {
+    // Check combustion first
+    if (isCombusted(planet)) return 'combusted';
+    
+    // Only main planets have exaltation/debilitation - exclude Rahu, Ketu, Gulika, Mandi
+    if (['Rahu', 'Ketu', 'Gulika', 'Mandi'].includes(planet.name)) {
+      return 'normal';
+    }
+    
+    // Get the actual sign from chartData
+    const planetData = chartData.planets?.[planet.name];
+    if (!planetData) return 'normal';
+    
+    const planetSign = planetData.sign;
+    
+    const exaltationSigns = {
+      'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5, 'Jupiter': 3, 'Venus': 11, 'Saturn': 6
+    };
+    const debilitationSigns = {
+      'Sun': 6, 'Moon': 7, 'Mars': 3, 'Mercury': 11, 'Jupiter': 9, 'Venus': 5, 'Saturn': 0
+    };
+    
+    if (exaltationSigns[planet.name] === planetSign) return 'exalted';
+    if (debilitationSigns[planet.name] === planetSign) return 'debilitated';
+    return 'normal';
+  };
+
+  const getPlanetHighlight = (planetName) => {
+    if (!highlightedPlanet || !friendshipData || highlightedPlanet === planetName) return null;
+    
+    if (highlightMode === 'friendship') {
+      const relationship = friendshipData.friendship_matrix[highlightedPlanet][planetName];
+      switch (relationship) {
+        case 'great_friend': return '#00ff00';
+        case 'friend': return '#90ee90';
+        case 'enemy': return '#ff6b6b';
+        case 'great_enemy': return '#ff0000';
+        default: return null;
+      }
+    } else if (highlightMode === 'aspects') {
+      const aspect = friendshipData.aspects_matrix[highlightedPlanet][planetName];
+      if (aspect && aspect.type !== 'none') {
+        switch (aspect.type) {
+          case 'conjunction': return '#ff00ff';
+          case 'trine': return '#00ff00';
+          case 'sextile': return '#90ee90';
+          case 'square': return '#ff6b6b';
+          case 'opposition': return '#ff0000';
+          default: return null;
+        }
+      }
+    }
+    return null;
+  };
+
+  const getPlanetColor = (planet) => {
+    const highlight = getPlanetHighlight(planet.name);
+    if (highlight) return highlight;
+    
+    const status = getPlanetStatus(planet);
+    if (status === 'combusted') return '#ff8c00';
+    if (status === 'exalted') return '#22c55e';
+    if (status === 'debilitated') return '#ef4444';
+    return '#2d3436';
+  };
+
+  const getPlanetSymbolWithStatus = (planet) => {
+    const status = getPlanetStatus(planet);
+    if (status === 'combusted') return planet.symbol + '(c)';
+    if (status === 'exalted') return planet.symbol + '↑';
+    if (status === 'debilitated') return planet.symbol + '↓';
+    return planet.symbol;
+  };
+
+  const getNakshatra = (longitude) => {
+    const nakshatras = [
+      'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+      'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+      'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+      'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+      'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
+    ];
+    const nakshatraIndex = Math.floor(longitude / 13.333333);
+    return nakshatras[nakshatraIndex] || 'Unknown';
+  };
+
+  const getPlanetsInHouse = (houseIndex) => {
+    if (!chartData.planets) return [];
+    
+    const rashiForThisHouse = getRashiForHouse(houseIndex);
+    
+    return Object.entries(chartData.planets)
+      .filter(([name, data]) => {
+        return data.sign === rashiForThisHouse;
+      })
+      .map(([name, data]) => {
+        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
+        const planetIndex = planetNames.indexOf(name);
+        return {
+          symbol: planets[planetIndex] || name.substring(0, 2),
+          name: name,
+          degree: data.degree.toFixed(2),
+          nakshatra: getNakshatra(data.longitude)
+        };
+      });
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {(highlightedPlanet || customAscendant !== null) && (
+        <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10, display: 'flex', gap: '4px' }}>
+          {highlightedPlanet && (
+            <button
+              onClick={clearHighlight}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                background: '#e91e63',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Clear
+            </button>
+          )}
+          {customAscendant !== null && (
+            <button
+              onClick={resetAscendant}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                background: '#ff6f00',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      )}
+      <svg viewBox="0 0 400 400" style={{ width: '100%', height: '100%' }}>
+      {/* Outer square border */}
+      <rect x="20" y="20" width="360" height="360" 
+            fill="url(#chartGradient)" stroke="#e91e63" strokeWidth="3"/>
+      
+      {/* Inner diamond border */}
+      <polygon points="200,20 380,200 200,380 20,200" 
+               fill="none" stroke="#ff6f00" strokeWidth="3"/>
+      
+      {/* Diagonal lines creating 12 houses */}
+      <line x1="20" y1="20" x2="380" y2="380" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="380" y1="20" x2="20" y2="380" stroke="#ff8a65" strokeWidth="2"/>
+      
+
+      
+
+
+
+
+      
+
+      
+
+      
+
+      
+      {/* Gradient definitions */}
+      <defs>
+        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgba(233, 30, 99, 0.1)" />
+          <stop offset="50%" stopColor="rgba(255, 111, 0, 0.1)" />
+          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.2)" />
+        </linearGradient>
+      </defs>
+
+
+      
+      {/* Houses */}
+      {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
+        const houseIndex = houseNumber - 1;
+        const rashiIndex = getRashiForHouse(houseIndex);
+        const planetsInHouse = getPlanetsInHouse(houseIndex);
+        const houseData = getHouseData(houseNumber);
+        
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b',
+                        '#6c5ce7', '#a29bfe', '#fd79a8', '#00b894', '#00cec9', '#74b9ff'];
+        
+        return (
+          <g key={houseNumber}>
+
+
+            
+            {/* Rashi number (Aries=1, Taurus=2, etc.) */}
+            <text x={houseNumber === 1 ? houseData.center.x - 5 :
+                     houseNumber === 3 ? houseData.center.x + 10 :
+                     houseNumber === 4 ? houseData.center.x + 40 :
+                     houseNumber === 5 ? houseData.center.x + 10 :
+                     houseNumber === 6 ? houseData.center.x - 5 :
+                     houseNumber === 7 ? houseData.center.x - 5 :
+                     houseNumber === 8 ? houseData.center.x - 5 :
+                     houseNumber === 9 ? houseData.center.x - 20 :
+                     houseNumber === 10 ? houseData.center.x - 40 :
+                     houseNumber === 11 ? houseData.center.x - 15 :
+                     houseData.center.x - 5} 
+                  y={houseNumber === 1 ? houseData.center.y - 5 :
+                     houseNumber === 6 ? houseData.center.y - 10 :
+                     houseNumber === 7 ? houseData.center.y - 10 :
+                     houseNumber === 8 ? houseData.center.y - 10 :
+                     [2, 12].includes(houseNumber) ? houseData.center.y + 35 : houseData.center.y + 5} 
+                  fontSize="18" 
+                  fill={customAscendant === rashiIndex ? "#e91e63" : "#333"} 
+                  fontWeight={customAscendant === rashiIndex ? "900" : "bold"}
+                  style={{ cursor: 'pointer' }}
+                  onContextMenu={(e) => handleRashiRightClick(e, rashiIndex)}>
+              {rashiIndex + 1}
+            </text>
+            
+
+            {/* Planets */}
+            {planetsInHouse.map((planet, pIndex) => {
+              const totalPlanets = planetsInHouse.length;
+              let planetX, planetY;
+              
+              if (totalPlanets === 1) {
+                if (houseNumber === 1) {
+                  planetX = houseData.center.x;
+                  planetY = houseData.center.y + 20;
+                } else if ([3, 4, 5].includes(houseNumber)) {
+                  planetX = houseData.center.x - 15;
+                  planetY = houseData.center.y + 5;
+                } else if ([6, 7, 8].includes(houseNumber)) {
+                  planetX = houseData.center.x;
+                  planetY = houseData.center.y + 25;
+                } else if (houseNumber === 9) {
+                  planetX = houseData.center.x + 15;
+                  planetY = houseData.center.y + 5;
+                } else if (houseNumber === 10) {
+                  planetX = houseData.center.x + 15;
+                  planetY = houseData.center.y + 5;
+                } else if (houseNumber === 11) {
+                  planetX = houseData.center.x + 15;
+                  planetY = houseData.center.y + 5;
+                } else if (houseNumber === 12) {
+                  planetX = houseData.center.x;
+                  planetY = houseData.center.y + 15;
+                } else {
+                  planetX = houseData.center.x;
+                  planetY = houseData.center.y - 15;
+                }
+              } else if (totalPlanets <= 4) {
+                const row = Math.floor(pIndex / 2);
+                const col = pIndex % 2;
+                const spacing = 16; // Standard horizontal spacing
+                const rowSpacing = 18; // Standard vertical spacing
+                
+                if (houseNumber === 1) {
+                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + 15 + (row * rowSpacing);
+                } else if (houseNumber === 3) {
+                  planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + (row * rowSpacing);
+                } else if (houseNumber === 4) {
+                  planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + (row * rowSpacing);
+                } else if (houseNumber === 5) {
+                  planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + (row * rowSpacing);
+                } else if ([6, 7, 8].includes(houseNumber)) {
+                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + 20 + (row * rowSpacing);
+                } else if (houseNumber === 9) {
+                  planetX = houseData.center.x + 25 + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + (row * rowSpacing);
+                } else if (houseNumber === 10) {
+                  planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + (row * rowSpacing);
+                } else if (houseNumber === 11) {
+                  planetX = houseData.center.x + 20 + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y + (row * rowSpacing);
+                } else if (houseNumber === 12) {
+                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y - 5 + (row * rowSpacing);
+                } else {
+                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                  planetY = houseData.center.y - 30 + (row * rowSpacing);
+                }
+              } else {
+                // For 5+ planets
+                const row = Math.floor(pIndex / 3);
+                const col = pIndex % 3;
+                const spacing = 12; // Standard horizontal spacing for 5+ planets
+                const rowSpacing = 15; // Standard vertical spacing for 5+ planets
+                
+                if (houseNumber === 1) {
+                  planetX = houseData.center.x + (col - 1) * spacing;
+                  planetY = houseData.center.y + 10 + (row * rowSpacing);
+                } else if ([3, 4, 5].includes(houseNumber)) {
+                  planetX = houseData.center.x - 30 + (col * spacing);
+                  planetY = houseData.center.y - 5 + (row * rowSpacing);
+                } else if ([6, 7, 8].includes(houseNumber)) {
+                  planetX = houseData.center.x + (col - 1) * spacing;
+                  planetY = houseData.center.y + 15 + (row * rowSpacing);
+                } else if (houseNumber === 9) {
+                  planetX = houseData.center.x + 5 + (col * spacing);
+                  planetY = houseData.center.y - 5 + (row * rowSpacing);
+                } else if (houseNumber === 10) {
+                  planetX = houseData.center.x + 10 + (col * spacing);
+                  planetY = houseData.center.y - 5 + (row * rowSpacing);
+                } else if (houseNumber === 11) {
+                  planetX = houseData.center.x + 15 + (col * spacing);
+                  planetY = houseData.center.y - 5 + (row * rowSpacing);
+                } else if (houseNumber === 12) {
+                  planetX = houseData.center.x + (col - 1) * spacing;
+                  planetY = houseData.center.y - 10 + (row * rowSpacing);
+                } else {
+                  planetX = houseData.center.x + (col - 1) * spacing;
+                  planetY = houseData.center.y - 35 + (row * rowSpacing);
+                }
+              }
+              const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+              return (
+                <text key={pIndex} 
+                      x={planetX} 
+                      y={planetY} 
+                      fontSize={totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14"} 
+                      fill={getPlanetColor(planet)}
+                      fontWeight="900"
+                      textAnchor="middle"
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+                        const isRightSide = [9, 10, 11, 12].includes(houseNumber);
+                        const offsetX = isRightSide ? -120 : 10;
+                        setTooltip({ show: true, x: e.clientX - rect.left + offsetX, y: e.clientY - rect.top - 10, text: tooltipText });
+                      }}
+                      onMouseLeave={() => setTooltip({ show: false, x: 0, y: 0, text: '' })}
+                      onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
+                  {getPlanetSymbolWithStatus(planet)}
+                </text>
+              );
+            })}
+          </g>
+        );
+      })}
+      </svg>
+      
+      {tooltip.show && (
+        <div style={{
+          position: 'absolute',
+          left: tooltip.x,
+          top: tooltip.y,
+          background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '12px',
+          fontSize: '13px',
+          zIndex: 1000,
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          {tooltip.text}
+        </div>
+      )}
+      
+      {contextMenu.show && (
+        <div style={{
+          position: 'absolute',
+          left: contextMenu.x,
+          top: contextMenu.y,
+          background: 'white',
+          border: '2px solid #e91e63',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          zIndex: 1001,
+          minWidth: '140px'
+        }}>
+          {contextMenu.type === 'planet' ? (
+            <>
+              <div 
+                onClick={() => handleContextMenuAction('friendship')}
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #eee',
+                  fontSize: '12px',
+                  color: '#333'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                onMouseLeave={(e) => e.target.style.background = 'white'}
+              >
+                🤝 Friendship
+              </div>
+              <div 
+                onClick={() => handleContextMenuAction('aspects')}
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: '#333'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                onMouseLeave={(e) => e.target.style.background = 'white'}
+              >
+                📐 Aspects
+              </div>
+            </>
+          ) : (
+            <div 
+              onClick={() => handleContextMenuAction('setAscendant')}
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#333'
+              }}
+              onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+              onMouseLeave={(e) => e.target.style.background = 'white'}
+            >
+              🏠 Set {contextMenu.rashiName} as Ascendant
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NorthIndianChart;

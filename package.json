@@ -1,0 +1,13 @@
+{
+  "name": "astrology-app",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev:frontend": "cd frontend && npm start",
+    "dev:backend": "cd backend && python main.py",
+    "install:frontend": "cd frontend && npm install"
+  }
+}
