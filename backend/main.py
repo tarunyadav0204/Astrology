@@ -1114,6 +1114,10 @@ async def calculate_sub_dashas(request: dict):
     
     return {'sub_dashas': sub_dashas}
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "message": "Astrology API is running"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)

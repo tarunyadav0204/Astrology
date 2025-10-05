@@ -42,8 +42,27 @@ pkill -f "AstrologyApp.*serve -s build" || true
 # Start backend
 cd backend
 source venv/bin/activate
+
+# Create logs directory if it doesn't exist
+mkdir -p ../logs
+
+# Start backend with better error handling
+echo "Starting backend..."
 nohup python3 main.py > ../logs/backend.log 2>&1 &
-echo "✅ Backend started on port 8001"
+BACKEND_PID=$!
+echo "Backend PID: $BACKEND_PID"
+sleep 3
+
+# Check if backend is running
+if ps -p $BACKEND_PID > /dev/null; then
+    echo "✅ Backend started successfully on port 8001"
+    # Test health endpoint
+    curl -f http://localhost:8001/health || echo "⚠️ Health check failed"
+else
+    echo "❌ Backend failed to start. Check logs:"
+    tail -20 ../logs/backend.log
+    exit 1
+fi
 
 # Start frontend
 cd ../frontend
