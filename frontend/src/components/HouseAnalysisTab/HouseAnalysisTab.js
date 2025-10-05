@@ -319,6 +319,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
       height: '100%' 
     }}>
       {/* Main Grid - Houses Overview */}
+      {(!selectedHouse || window.innerWidth > 768) && (
       <div>
         <h3 style={{ color: '#e91e63', marginBottom: '1rem', fontSize: '1.1rem' }}>
           🏠 House Analysis Overview
@@ -330,7 +331,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
             ? '1fr' 
             : 'repeat(auto-fit, minmax(300px, 1fr))', 
           gap: '1rem',
-          maxHeight: window.innerWidth <= 768 ? '60vh' : '70vh',
+          maxHeight: window.innerWidth <= 768 ? '75vh' : '70vh',
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch'
         }}>
@@ -384,7 +385,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.2rem'
-                        }}
+                        }}>
                           {planet.name}
                           {status && (
                             <span style={{ color: status.color }} title={status.title}>
@@ -413,10 +414,13 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
           ))}
         </div>
       </div>
+      )}
 
       {/* Right Panel - Detailed House Analysis */}
       {selectedHouse && (
-        <div>
+        <div style={{ 
+          gridColumn: window.innerWidth <= 768 ? '1' : 'auto'
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ color: '#e91e63', fontSize: '1.1rem', margin: 0 }}>
               🏠 {selectedHouse.number}th House Details
@@ -439,14 +443,14 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
           </div>
           
           <div style={{ 
-            maxHeight: window.innerWidth <= 768 ? '55vh' : '65vh', 
+            maxHeight: window.innerWidth <= 768 ? '70vh' : '65vh', 
             overflowY: 'auto',
             border: '1px solid #e91e63',
             borderRadius: '8px',
             padding: window.innerWidth <= 768 ? '0.75rem' : '1rem',
             background: 'white',
             WebkitOverflowScrolling: 'touch'
-          }}
+          }}>
             <div style={{ marginBottom: '1rem' }}>
               <h4 style={{ color: '#e91e63', fontSize: '1rem', marginBottom: '0.5rem' }}>
                 {selectedHouse.name}
@@ -456,7 +460,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                 gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', 
                 gap: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', 
                 marginBottom: '1rem' 
-              }}
+              }}>
                 <div><strong>House:</strong> {selectedHouse.number}th</div>
                 <div><strong>Sign:</strong> {selectedHouse.signName}</div>
                 <div><strong>Strength:</strong> 
@@ -493,7 +497,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                       border: '1px solid #eee',
                       borderRadius: '4px',
                       marginBottom: '0.5rem'
-                    }}
+                    }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong style={{ color: '#1f2937' }}>{planet.name}</strong>
                         {status && (
@@ -576,7 +580,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
         </div>
       )}
       
-      {!selectedHouse && (
+      {!selectedHouse && window.innerWidth > 768 && (
         <div style={{ 
           padding: '2rem',
           textAlign: 'center',

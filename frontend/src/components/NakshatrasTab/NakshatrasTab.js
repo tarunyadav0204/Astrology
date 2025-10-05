@@ -320,7 +320,7 @@ const NakshatrasTab = ({ chartData, birthData }) => {
         </h3>
         <div style={{ 
           maxHeight: window.innerWidth <= 768 
-            ? selectedNakshatra ? '30vh' : '25vh'
+            ? selectedNakshatra ? '35vh' : '30vh'
             : selectedNakshatra ? '25vh' : '20vh', 
           overflowY: 'auto',
           overflowX: 'auto',
@@ -422,7 +422,7 @@ const NakshatrasTab = ({ chartData, birthData }) => {
             </div>
             
             <div style={{ 
-              maxHeight: window.innerWidth <= 768 ? '50vh' : '60vh', 
+              maxHeight: window.innerWidth <= 768 ? '65vh' : '60vh', 
               overflowY: 'auto',
               border: '1px solid #e91e63',
               borderRadius: '8px',

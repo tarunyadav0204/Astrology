@@ -271,18 +271,27 @@ const YogasTab = ({ chartData, birthData }) => {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selectedYoga ? '300px 1fr' : '1fr', gap: '1rem', height: '100%' }}>
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateColumns: window.innerWidth <= 768 
+        ? '1fr' 
+        : selectedYoga ? '300px 1fr' : '1fr', 
+      gap: '1rem', 
+      height: '100%' 
+    }}>
       {/* Left side - Yogas List */}
+      {(!selectedYoga || window.innerWidth > 768) && (
       <div>
         <h3 style={{ color: '#e91e63', marginBottom: '1rem', fontSize: '1.1rem' }}>
           🔮 Detected Yogas ({yogas.length})
         </h3>
         
         <div style={{ 
-          maxHeight: '70vh', 
+          maxHeight: window.innerWidth <= 768 ? '75vh' : '70vh', 
           overflowY: 'auto',
           border: '1px solid #e91e63',
-          borderRadius: '8px'
+          borderRadius: '8px',
+          WebkitOverflowScrolling: 'touch'
         }}>
           {yogas.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
@@ -358,10 +367,13 @@ const YogasTab = ({ chartData, birthData }) => {
           )}
         </div>
       </div>
+      )}
 
       {/* Right side - Detailed Yoga Information */}
       {selectedYoga && (
-        <div>
+        <div style={{ 
+          gridColumn: window.innerWidth <= 768 ? '1' : 'auto'
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ color: '#e91e63', fontSize: '1.2rem', margin: 0 }}>
               🔮 {selectedYoga.name}
@@ -384,15 +396,21 @@ const YogasTab = ({ chartData, birthData }) => {
           </div>
           
           <div style={{ 
-            maxHeight: '65vh', 
+            maxHeight: window.innerWidth <= 768 ? '70vh' : '65vh', 
             overflowY: 'auto',
             border: '1px solid #e91e63',
             borderRadius: '8px',
-            padding: '1rem',
-            background: 'white'
+            padding: window.innerWidth <= 768 ? '0.75rem' : '1rem',
+            background: 'white',
+            WebkitOverflowScrolling: 'touch'
           }}>
             <div style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', 
+                gap: window.innerWidth <= 768 ? '0.5rem' : '1rem', 
+                marginBottom: '1rem' 
+              }}>
                 <div>
                   <strong>Type:</strong> 
                   <span style={{ 
@@ -429,23 +447,23 @@ const YogasTab = ({ chartData, birthData }) => {
             </div>
             
             <div style={{ marginBottom: '1rem' }}>
-              <h4 style={{ color: '#ff6f00', fontSize: '1rem', marginBottom: '0.5rem' }}>📖 Description</h4>
-              <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+              <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>📖 Description</h4>
+              <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                 {selectedYoga.description}
               </p>
             </div>
             
             <div style={{ marginBottom: '1rem' }}>
-              <h4 style={{ color: '#22c55e', fontSize: '1rem', marginBottom: '0.5rem' }}>✨ Effects</h4>
-              <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+              <h4 style={{ color: '#22c55e', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>✨ Effects</h4>
+              <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                 {selectedYoga.effects}
               </p>
             </div>
             
             {selectedYoga.remedies && (
               <div>
-                <h4 style={{ color: '#ef4444', fontSize: '1rem', marginBottom: '0.5rem' }}>💎 Remedies</h4>
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                <h4 style={{ color: '#ef4444', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>💎 Remedies</h4>
+                <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                   {selectedYoga.remedies}
                 </p>
               </div>
@@ -454,7 +472,7 @@ const YogasTab = ({ chartData, birthData }) => {
         </div>
       )}
       
-      {!selectedYoga && (
+      {!selectedYoga && window.innerWidth > 768 && (
         <div style={{ 
           padding: '2rem',
           textAlign: 'center',

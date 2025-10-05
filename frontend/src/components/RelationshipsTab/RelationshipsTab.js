@@ -109,13 +109,25 @@ const RelationshipsTab = ({ chartData, birthData }) => {
 
   const getRelationshipColor = (relationship) => {
     switch (relationship) {
-      case 'BF': return '#22c55e'; // Best Friend - Green
-      case 'F': return '#3b82f6';  // Friend - Blue
-      case 'N': return '#f59e0b';  // Neutral - Orange
-      case 'E': return '#ef4444';  // Enemy - Red
-      case 'GE': return '#7c2d12'; // Great Enemy - Dark Red
-      case '-': return '#e5e7eb'; // Self - Gray
-      default: return '#6b7280';
+      case 'BF': return '#d1fae5'; // Best Friend - Light Green
+      case 'F': return '#dbeafe';  // Friend - Light Blue
+      case 'N': return '#fef3c7';  // Neutral - Light Yellow
+      case 'E': return '#fee2e2';  // Enemy - Light Red
+      case 'GE': return '#fecaca'; // Great Enemy - Light Pink
+      case '-': return '#f3f4f6'; // Self - Light Gray
+      default: return '#f9fafb';
+    }
+  };
+
+  const getRelationshipTextColor = (relationship) => {
+    switch (relationship) {
+      case 'BF': return '#065f46'; // Best Friend - Dark Green
+      case 'F': return '#1e40af';  // Friend - Dark Blue
+      case 'N': return '#92400e';  // Neutral - Dark Yellow
+      case 'E': return '#991b1b';  // Enemy - Dark Red
+      case 'GE': return '#7f1d1d'; // Great Enemy - Darker Red
+      case '-': return '#6b7280'; // Self - Gray
+      default: return '#374151';
     }
   };
 
@@ -137,30 +149,36 @@ const RelationshipsTab = ({ chartData, birthData }) => {
         <h4 style={{ color: '#e91e63', marginBottom: '1rem', fontSize: '1rem' }}>
           {title}
         </h4>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ 
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}>
           <table style={{ 
             width: '100%', 
             borderCollapse: 'collapse',
-            fontSize: '0.8rem',
-            border: '1px solid #e91e63'
+            fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.8rem',
+            border: '1px solid #e5e7eb',
+            minWidth: window.innerWidth <= 768 ? '400px' : 'auto'
           }}>
             <thead>
               <tr>
                 <th style={{ 
-                  padding: '0.5rem', 
-                  background: '#e91e63', 
-                  color: 'white',
-                  border: '1px solid #e91e63',
-                  minWidth: '60px'
+                  padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', 
+                  background: 'white', 
+                  color: '#e91e63',
+                  border: '1px solid #e5e7eb',
+                  minWidth: window.innerWidth <= 768 ? '45px' : '60px',
+                  fontWeight: '600'
                 }}></th>
                 {planets.map(planet => (
                   <th key={planet} style={{ 
-                    padding: '0.5rem', 
-                    background: '#e91e63', 
-                    color: 'white',
-                    border: '1px solid #e91e63',
-                    minWidth: '60px',
-                    fontSize: '0.7rem'
+                    padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', 
+                    background: 'white', 
+                    color: '#e91e63',
+                    border: '1px solid #e5e7eb',
+                    minWidth: window.innerWidth <= 768 ? '45px' : '60px',
+                    fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.7rem',
+                    fontWeight: '600'
                   }}>
                     {planet}
                   </th>
@@ -171,12 +189,12 @@ const RelationshipsTab = ({ chartData, birthData }) => {
               {planets.map(planet1 => (
                 <tr key={planet1}>
                   <td style={{ 
-                    padding: '0.5rem', 
-                    background: '#e91e63', 
-                    color: 'white',
-                    border: '1px solid #e91e63',
+                    padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', 
+                    background: 'white', 
+                    color: '#e91e63',
+                    border: '1px solid #e5e7eb',
                     fontWeight: '600',
-                    fontSize: '0.7rem'
+                    fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.7rem'
                   }}>
                     {planet1}
                   </td>
@@ -184,13 +202,13 @@ const RelationshipsTab = ({ chartData, birthData }) => {
                     const relationship = matrix[planet1]?.[planet2] || 'N';
                     return (
                       <td key={planet2} style={{ 
-                        padding: '0.3rem', 
+                        padding: window.innerWidth <= 768 ? '0.2rem' : '0.3rem', 
                         textAlign: 'center',
                         background: getRelationshipColor(relationship),
-                        color: 'white',
-                        border: '1px solid #ddd',
+                        color: getRelationshipTextColor(relationship),
+                        border: '1px solid #e5e7eb',
                         fontWeight: '600',
-                        fontSize: '0.7rem'
+                        fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.7rem'
                       }}>
                         {relationship}
                       </td>
@@ -250,48 +268,48 @@ const RelationshipsTab = ({ chartData, birthData }) => {
       {/* Legend */}
       <div style={{ 
         display: 'flex', 
-        gap: '1rem', 
+        gap: window.innerWidth <= 768 ? '0.5rem' : '1rem', 
         marginBottom: '1rem',
         flexWrap: 'wrap',
-        padding: '0.5rem',
+        padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem',
         background: '#f8f9fa',
         borderRadius: '4px'
       }}>
         {selectedMatrix === 'fiveFold' ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#22c55e' }}></div>
-              <span style={{ fontSize: '0.7rem' }}>BF - Best Friend</span>
+              <div style={{ width: '15px', height: '15px', background: '#d1fae5', border: '1px solid #065f46' }}></div>
+              <span style={{ fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem' }}>BF - Best Friend</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#3b82f6' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#dbeafe', border: '1px solid #1e40af' }}></div>
               <span style={{ fontSize: '0.7rem' }}>F - Friend</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#f59e0b' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#fef3c7', border: '1px solid #92400e' }}></div>
               <span style={{ fontSize: '0.7rem' }}>N - Neutral</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#ef4444' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#fee2e2', border: '1px solid #991b1b' }}></div>
               <span style={{ fontSize: '0.7rem' }}>E - Enemy</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#7c2d12' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#fecaca', border: '1px solid #7f1d1d' }}></div>
               <span style={{ fontSize: '0.7rem' }}>GE - Great Enemy</span>
             </div>
           </>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#3b82f6' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#dbeafe', border: '1px solid #1e40af' }}></div>
               <span style={{ fontSize: '0.7rem' }}>F - Friend</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#f59e0b' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#fef3c7', border: '1px solid #92400e' }}></div>
               <span style={{ fontSize: '0.7rem' }}>N - Neutral</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{ width: '15px', height: '15px', background: '#ef4444' }}></div>
+              <div style={{ width: '15px', height: '15px', background: '#fee2e2', border: '1px solid #991b1b' }}></div>
               <span style={{ fontSize: '0.7rem' }}>E - Enemy</span>
             </div>
           </>
@@ -300,18 +318,19 @@ const RelationshipsTab = ({ chartData, birthData }) => {
 
       {/* Matrix Display */}
       <div style={{ 
-        maxHeight: '60vh', 
+        maxHeight: window.innerWidth <= 768 ? '65vh' : '60vh', 
         overflowY: 'auto',
-        border: '1px solid #e91e63',
+        border: '1px solid #e5e7eb',
         borderRadius: '8px',
-        padding: '1rem',
-        background: 'white'
+        padding: window.innerWidth <= 768 ? '0.5rem' : '1rem',
+        background: 'white',
+        WebkitOverflowScrolling: 'touch'
       }}>
         {selectedMatrix === 'permanent' && renderMatrix(matrices.permanent, '🤝 Permanent Friendship Matrix')}
         {selectedMatrix === 'temporal' && renderMatrix(matrices.temporal, '⏰ Temporal Friendship Matrix (Based on Chart Positions)')}
         {selectedMatrix === 'fiveFold' && renderMatrix(matrices.fiveFold, '🌟 Five Fold Friendship Matrix (Combined Result)')}
         
-        <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#666' }}>
+        <div style={{ marginTop: '1rem', fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem', color: '#666' }}>
           <p><strong>Note:</strong> Relationships are shown from row planet to column planet.</p>
           {selectedMatrix === 'temporal' && (
             <p><strong>Temporal Friendship:</strong> Based on house positions in the birth chart. Houses 2,3,4,10,11,12 from a planet are friends.</p>
