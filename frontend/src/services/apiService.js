@@ -102,5 +102,13 @@ export const apiService = {
   predictYearEvents: async (data) => {
     const response = await apiClient.post('/predict-year-events', data);
     return response.data;
+  },
+  
+  calculateDivisionalChart: async (birthData, division) => {
+    const response = await apiClient.post('/calculate-divisional-chart', {
+      birth_data: birthData,
+      division: division
+    });
+    return response.data;
   }
 };
