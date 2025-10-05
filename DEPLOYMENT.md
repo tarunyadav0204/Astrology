@@ -34,8 +34,8 @@ bash deploy.sh
 
 ## Services
 
-- **Backend**: Port 8000 (systemd: astrology-app)
-- **Frontend**: Port 3000 (served via deploy.sh)
+- **Backend**: Port 8001 (systemd: astrology-app)
+- **Frontend**: Port 3001 (served via deploy.sh)
 
 ## Commands
 

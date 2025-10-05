@@ -46,8 +46,8 @@ echo "✅ Backend started on port 8000"
 
 # Start frontend
 cd ../frontend
-nohup npx serve -s build -l 3000 > ../logs/frontend.log 2>&1 &
-echo "✅ Frontend started on port 3000"
+nohup npx serve -s build -l 3001 > ../logs/frontend.log 2>&1 &
+echo "✅ Frontend started on port 3001"
 
 echo "🎉 Deployment completed successfully!"
 echo "📊 Backend: http://localhost:8000"

@@ -33,5 +33,5 @@ sudo systemctl enable astrology-app
 bash deploy.sh
 
 echo "✅ Server setup completed!"
-echo "📊 Backend API: http://your-server:8000"
-echo "🌐 Frontend: http://your-server:3000"
+echo "📊 Backend API: http://your-server:8001"
+echo "🌐 Frontend: http://your-server:3001"
