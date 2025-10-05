@@ -35,9 +35,9 @@ echo "✅ Frontend built successfully"
 echo "🔄 Restarting services..."
 cd ..
 
-# Kill existing processes
-pkill -f "python main.py" || true
-pkill -f "serve -s build" || true
+# Kill existing astrology app processes only
+pkill -f "AstrologyApp.*python.*main.py" || true
+pkill -f "AstrologyApp.*serve -s build" || true
 
 # Start backend
 cd backend
