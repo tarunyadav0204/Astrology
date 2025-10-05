@@ -57,6 +57,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
   const [highlightedPlanet, setHighlightedPlanet] = useState(null);
   const [highlightMode, setHighlightMode] = useState(null);
   const [customAscendant, setCustomAscendant] = useState(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   
 
   
@@ -375,6 +376,11 @@ const NorthIndianChart = ({ chartData, birthData }) => {
 
 
       
+      {/* Instruction text */}
+      <text x="200" y="390" fontSize="10" fill="#666" textAnchor="middle" fontStyle="italic">
+        Hover or touch planets to see Nakshatra and degree
+      </text>
+      
       {/* Houses */}
       {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
         const houseIndex = houseNumber - 1;
@@ -528,12 +534,25 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                       textAnchor="middle"
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={(e) => {
+                        if (isTouchDevice) return;
                         const rect = e.currentTarget.closest('svg').getBoundingClientRect();
                         const isRightSide = [8, 9, 10, 11, 12].includes(houseNumber);
                         const offsetX = isRightSide ? -120 : 10;
                         setTooltip({ show: true, x: planetX + offsetX, y: planetY - 30, text: tooltipText });
                       }}
-                      onMouseLeave={() => setTooltip({ show: false, x: 0, y: 0, text: '' })}
+                      onMouseLeave={(e) => {
+                        if (isTouchDevice) return;
+                        setTooltip({ show: false, x: 0, y: 0, text: '' });
+                      }}
+                      onTouchStart={(e) => {
+                        setIsTouchDevice(true);
+                        e.preventDefault();
+                        const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+                        const isRightSide = [8, 9, 10, 11, 12].includes(houseNumber);
+                        const offsetX = isRightSide ? -120 : 10;
+                        setTooltip({ show: true, x: e.touches[0].clientX - rect.left + offsetX, y: e.touches[0].clientY - rect.top - 30, text: tooltipText });
+                        setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 2000);
+                      }}
                       onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
                   {getPlanetSymbolWithStatus(planet)}
                 </text>
@@ -624,6 +643,8 @@ const NorthIndianChart = ({ chartData, birthData }) => {
           )}
         </div>
       )}
+      
+
     </div>
   );
 };

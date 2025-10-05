@@ -10,6 +10,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
   const [highlightedPlanet, setHighlightedPlanet] = useState(null);
   const [highlightMode, setHighlightMode] = useState(null);
   const [customAscendant, setCustomAscendant] = useState(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   
   // South Indian chart - fixed 4x4 grid positions (signs don't rotate)
   const gridPositions = [
@@ -272,8 +273,8 @@ const SouthIndianChart = ({ chartData, birthData }) => {
       )}
       <svg 
         width="300" 
-        height="300" 
-        viewBox="0 0 300 300"
+        height="320" 
+        viewBox="0 0 300 320"
         style={{ 
           width: '100%', 
           height: '100%',
@@ -318,6 +319,11 @@ const SouthIndianChart = ({ chartData, birthData }) => {
       <line x1="75" y1="0" x2="75" y2="300" stroke="#ff6f00" strokeWidth="3"/>
       <line x1="225" y1="0" x2="225" y2="300" stroke="#ff6f00" strokeWidth="3"/>
 
+      {/* Instruction text */}
+      <text x="150" y="310" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
+        Hover or touch planets to see Nakshatra and degree
+      </text>
+      
       {/* Grid cells */}
       {gridPositions.map((pos, index) => {
         const planetsInSign = getPlanetsInSign(pos.sign);
@@ -371,12 +377,30 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                           textAnchor="middle"
                           style={{ cursor: 'pointer' }}
                           onMouseEnter={(e) => {
+                            if (isTouchDevice) return;
                             const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
                             const isRightSide = pos.x >= 150; // Right side houses (including middle-right)
                             const offsetX = isRightSide ? -120 : 10;
-                            setTooltip({ show: true, x: planetX + offsetX, y: planetY - 12, text: tooltipText });
+                            const fontSize = totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 11 : 14;
+                            const offsetY = fontSize + 2; // Dynamic offset based on font size
+                            setTooltip({ show: true, x: planetX + offsetX, y: planetY - offsetY, text: tooltipText });
                           }}
-                          onMouseLeave={() => setTooltip({ show: false, x: 0, y: 0, text: '' })}
+                          onMouseLeave={(e) => {
+                            if (isTouchDevice) return;
+                            setTooltip({ show: false, x: 0, y: 0, text: '' });
+                          }}
+                          onTouchStart={(e) => {
+                            setIsTouchDevice(true);
+                            e.preventDefault();
+                            const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+                            const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+                            const isRightSide = pos.x >= 150;
+                            const offsetX = isRightSide ? -120 : 10;
+                            const fontSize = totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 11 : 14;
+                            const offsetY = fontSize + 2;
+                            setTooltip({ show: true, x: e.touches[0].clientX - rect.left + offsetX, y: e.touches[0].clientY - rect.top - offsetY, text: tooltipText });
+                            setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 2000);
+                          }}
                           onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
                       {getPlanetSymbolWithStatus(planet)}
                     </text>
@@ -469,6 +493,8 @@ const SouthIndianChart = ({ chartData, birthData }) => {
           )}
         </div>
       )}
+      
+
     </div>
   );
 };
