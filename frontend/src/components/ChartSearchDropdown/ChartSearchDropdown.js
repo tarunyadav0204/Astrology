@@ -67,16 +67,16 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
   };
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative', minWidth: '200px' }}>
+    <div ref={dropdownRef} style={{ position: 'relative', minWidth: window.innerWidth <= 768 ? '120px' : '200px' }}>
       <div
         onClick={handleToggle}
         style={{
-          padding: '8px 12px',
+          padding: window.innerWidth <= 768 ? '6px 8px' : '8px 12px',
           border: '2px solid #e91e63',
           borderRadius: '8px',
           background: 'white',
           color: '#e91e63',
-          fontSize: '14px',
+          fontSize: window.innerWidth <= 768 ? '12px' : '14px',
           fontWeight: '600',
           cursor: 'pointer',
           display: 'flex',
@@ -84,7 +84,14 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
           justifyContent: 'space-between'
         }}
       >
-        <span>{currentChart?.name || 'Select Chart'}</span>
+        <span style={{ 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis', 
+          whiteSpace: 'nowrap',
+          maxWidth: window.innerWidth <= 768 ? '80px' : 'none'
+        }}>
+          {currentChart?.name || 'Select Chart'}
+        </span>
         <span style={{ marginLeft: '8px' }}>{isOpen ? '▲' : '▼'}</span>
       </div>
 
