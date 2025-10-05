@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard/Dashboard';
 import PredictionsPage from './components/PredictionsPage/PredictionsPage';
 import LandingPage from './components/LandingPage/LandingPage';
 import ChartSelector from './components/ChartSelector/ChartSelector';
+import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -59,9 +60,9 @@ function App() {
   return (
     <AstrologyProvider>
       <div style={{ 
-        padding: currentView === 'dashboard' || currentView === 'predictions' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
-        maxWidth: currentView === 'dashboard' || currentView === 'predictions' ? '100vw' : '1200px', 
-        margin: currentView === 'dashboard' || currentView === 'predictions' ? '0' : '0 auto',
+        padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
+        maxWidth: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' ? '100vw' : '1200px', 
+        margin: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' ? '0' : '0 auto',
         minHeight: '100vh',
         background: currentView === 'dashboard' || currentView === 'predictions' ? 'transparent' : 
                    currentView === 'selector' ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
@@ -75,10 +76,25 @@ function App() {
           />
         )}
         {currentView === 'form' && (
-          <BirthForm onSubmit={() => setCurrentView('dashboard')} onLogout={handleLogout} />
+          <div>
+            <UnifiedHeader
+              onViewAllCharts={() => setCurrentView('selector')}
+              onNewChart={() => setCurrentView('form')}
+              onLogout={handleLogout}
+              user={user}
+            />
+            <BirthForm onSubmit={() => setCurrentView('dashboard')} onLogout={handleLogout} />
+          </div>
         )}
         {currentView === 'dashboard' && (
-          <Dashboard onBack={() => setCurrentView('selector')} currentView={currentView} setCurrentView={setCurrentView} onLogout={handleLogout} />
+          <Dashboard 
+            onBack={() => setCurrentView('selector')} 
+            onViewAllCharts={() => setCurrentView('selector')}
+            currentView={currentView} 
+            setCurrentView={setCurrentView} 
+            onLogout={handleLogout}
+            user={user} 
+          />
         )}
         {currentView === 'predictions' && (
           <PredictionsPage onBack={() => setCurrentView('selector')} currentView={currentView} setCurrentView={setCurrentView} onLogout={handleLogout} />

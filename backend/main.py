@@ -33,6 +33,7 @@ class TransitRequest(BaseModel):
     transit_date: str
 
 class UserCreate(BaseModel):
+    name: str
     phone: str
     password: str
     role: str = "user"
@@ -43,6 +44,7 @@ class UserLogin(BaseModel):
 
 class User(BaseModel):
     userid: int
+    name: str
     phone: str
     role: str
 
@@ -64,6 +66,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             userid INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
             phone TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             role TEXT DEFAULT 'user',
@@ -123,14 +126,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT userid, phone, role FROM users WHERE phone = ?", (phone,))
+    cursor.execute("SELECT userid, name, phone, role FROM users WHERE phone = ?", (phone,))
     user = cursor.fetchone()
     conn.close()
     
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     
-    return User(userid=user[0], phone=user[1], role=user[2])
+    return User(userid=user[0], name=user[1], phone=user[2], role=user[3])
 
 @app.post("/register")
 async def register(user_data: UserCreate):
@@ -144,12 +147,12 @@ async def register(user_data: UserCreate):
     
     hashed_password = hash_password(user_data.password)
     cursor.execute(
-        "INSERT INTO users (phone, password, role) VALUES (?, ?, ?)",
-        (user_data.phone, hashed_password, user_data.role)
+        "INSERT INTO users (name, phone, password, role) VALUES (?, ?, ?, ?)",
+        (user_data.name, user_data.phone, hashed_password, user_data.role)
     )
     conn.commit()
     
-    cursor.execute("SELECT userid, phone, role FROM users WHERE phone = ?", (user_data.phone,))
+    cursor.execute("SELECT userid, name, phone, role FROM users WHERE phone = ?", (user_data.phone,))
     user = cursor.fetchone()
     conn.close()
     
@@ -158,18 +161,18 @@ async def register(user_data: UserCreate):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {"userid": user[0], "phone": user[1], "role": user[2]}
+        "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[3]}
     }
 
 @app.post("/login")
 async def login(user_data: UserLogin):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT userid, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
+    cursor.execute("SELECT userid, name, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
     user = cursor.fetchone()
     conn.close()
     
-    if not user or not verify_password(user_data.password, user[2]):
+    if not user or not verify_password(user_data.password, user[3]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     access_token = create_access_token(data={"sub": user_data.phone})
@@ -177,7 +180,7 @@ async def login(user_data: UserLogin):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {"userid": user[0], "phone": user[1], "role": user[3]}
+        "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[4]}
     }
 
 @app.get("/me")

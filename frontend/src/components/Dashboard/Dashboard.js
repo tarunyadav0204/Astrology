@@ -11,6 +11,8 @@ import NakshatrasTab from '../NakshatrasTab/NakshatrasTab';
 import YogasTab from '../YogasTab/YogasTab';
 import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
+import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
+import UnifiedHeader from '../UnifiedHeader/UnifiedHeader';
 import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem } from './Dashboard.styles';
 
 
@@ -67,7 +69,7 @@ const DivisionalChartSelector = ({ chartData, birthData }) => {
   );
 };
 
-const Dashboard = ({ onBack, currentView, setCurrentView }) => {
+const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLogout, user }) => {
   const { birthData, chartData, setBirthData, setChartData } = useAstrology();
   const [layouts, setLayouts] = useState(DASHBOARD_CONFIG.defaultLayout);
   const [transitDate, setTransitDate] = useState(new Date());
@@ -75,7 +77,7 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
   const [selectedDashas, setSelectedDashas] = useState({});
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileSubTab, setMobileSubTab] = useState('lagna');
-  const [availableCharts, setAvailableCharts] = useState([]);
+
 
   useEffect(() => {
     // Load saved layout from localStorage
@@ -85,19 +87,10 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
     }
     // Load today's transit data on component mount
     handleTransitDateChange(new Date());
-    // Load available charts
-    loadAvailableCharts();
+
   }, []);
 
-  const loadAvailableCharts = async () => {
-    try {
-      const { apiService } = await import('../../services/apiService');
-      const response = await apiService.getExistingCharts();
-      setAvailableCharts(response.charts || []);
-    } catch (error) {
-      console.error('Failed to load charts:', error);
-    }
-  };
+
 
   const selectExistingChart = async (chart) => {
     try {
@@ -173,44 +166,18 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
 
   return (
     <DashboardContainer>
-      <Header>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <select 
-            onChange={(e) => {
-              if (e.target.value === 'new') {
-                onBack();
-              } else {
-                selectExistingChart(JSON.parse(e.target.value));
-              }
-            }}
-            style={{
-              padding: '8px 12px',
-              border: '2px solid #e91e63',
-              borderRadius: '8px',
-              background: 'white',
-              color: '#e91e63',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              minWidth: '150px'
-            }}
-          >
-            <option value="">{birthData.name}</option>
-            {availableCharts.filter(chart => chart.name !== birthData.name).map(chart => (
-              <option key={chart.id} value={JSON.stringify(chart)}>
-                {chart.name}
-              </option>
-            ))}
-            <option value="new">+ New Chart</option>
-          </select>
-          <Title>{window.innerWidth <= 768 ? birthData.name : `${birthData.name} - Birth Chart Dashboard`}</Title>
-          <TransitControls 
-            date={transitDate} 
-            onChange={handleTransitDateChange}
-            onResetToToday={resetToToday}
-          />
-        </div>
-      </Header>
+      <UnifiedHeader
+        currentChart={birthData}
+        onSelectChart={selectExistingChart}
+        onViewAllCharts={onViewAllCharts}
+        onNewChart={onBack}
+        onLogout={onLogout}
+        user={user}
+        showTransitControls={true}
+        transitDate={transitDate}
+        onTransitDateChange={handleTransitDateChange}
+        onResetToToday={resetToToday}
+      />
 
       {/* Tab Navigation */}
       <div style={{ 

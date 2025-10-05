@@ -4,6 +4,7 @@ import { authService } from '../../services/authService';
 
 const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
+    name: '',
     phone: '',
     password: '',
     confirmPassword: '',
@@ -35,6 +36,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
 
     try {
       const response = await authService.register({
+        name: formData.name,
         phone: formData.phone,
         password: formData.password,
         role: formData.role
@@ -71,6 +73,33 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       </h2>
 
       <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '0.5rem',
+            color: '#e91e63',
+            fontWeight: '600'
+          }}>
+            Full Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder="Enter your full name"
+            required
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              border: '2px solid rgba(233, 30, 99, 0.2)',
+              borderRadius: '12px',
+              fontSize: '1rem',
+              background: 'rgba(255, 255, 255, 0.8)'
+            }}
+          />
+        </div>
+
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{
             display: 'block',
