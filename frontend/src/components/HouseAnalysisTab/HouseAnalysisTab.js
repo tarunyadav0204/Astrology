@@ -44,7 +44,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
 
     for (let house = 1; house <= 12; house++) {
       const occupants = [];
-      const houseSign = (ascendant + house - 2) % 12;
+      const houseSign = (ascendant + house - 1) % 12;
       
       // Find planets in this house
       Object.entries(planets).forEach(([planet, data]) => {
@@ -101,6 +101,12 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
   const getSignName = (sign) => {
     const signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     return signs[sign];
+  };
+
+  const getOrdinal = (num) => {
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = num % 100;
+    return num + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
   };
 
   const getFunctionalNature = (planetName, ascendantSign) => {
@@ -350,7 +356,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <h4 style={{ margin: 0, color: '#1f2937', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem' }}>
-                  {house.number}th House - {house.name}
+                  {getOrdinal(house.number)} House - {house.name}
                 </h4>
                 <span style={{ 
                   fontSize: '0.7rem',
@@ -423,7 +429,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ color: '#e91e63', fontSize: '1.1rem', margin: 0 }}>
-              🏠 {selectedHouse.number}th House Details
+              🏠 {getOrdinal(selectedHouse.number)} House Details
             </h3>
             <button 
               onClick={() => setSelectedHouse(null)}
@@ -461,7 +467,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                 gap: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', 
                 marginBottom: '1rem' 
               }}>
-                <div><strong>House:</strong> {selectedHouse.number}th</div>
+                <div><strong>House:</strong> {getOrdinal(selectedHouse.number)}</div>
                 <div><strong>Sign:</strong> {selectedHouse.signName}</div>
                 <div><strong>Strength:</strong> 
                   <span style={{ 

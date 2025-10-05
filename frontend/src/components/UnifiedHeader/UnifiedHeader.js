@@ -62,26 +62,29 @@ const UnifiedHeader = ({
     background: 'rgba(255, 255, 255, 0.2)',
     color: 'white',
     border: '1px solid rgba(255, 255, 255, 0.3)',
-    padding: '4px 6px',
+    padding: isMobile ? '3px 4px' : '4px 6px',
     borderRadius: '3px',
     cursor: 'pointer',
-    fontSize: '11px',
+    fontSize: isMobile ? '10px' : '11px',
     fontWeight: '600',
-    minWidth: '28px'
+    minWidth: isMobile ? '22px' : '28px',
+    flexShrink: 0
   };
 
   return (
     <div style={{
       background: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)',
       borderBottom: '3px solid #d4691a',
-      padding: '12px 16px',
+      padding: isMobile ? '8px 12px' : '12px 16px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       position: 'sticky',
       top: 0,
       zIndex: 100,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      overflow: 'hidden',
+      minHeight: isMobile ? '50px' : '60px'
     }}>
       {/* Left Side */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -242,20 +245,33 @@ const UnifiedHeader = ({
       )}
 
       {/* Right Side */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: isMobile ? '8px' : '12px',
+        flexShrink: 0,
+        minWidth: 0
+      }}>
         {/* Transit Controls */}
         {showTransitControls && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: isMobile ? '2px' : '4px',
+            flexShrink: 0,
+            overflow: 'hidden'
+          }}>
             {/* Date Display */}
             <div style={{
               color: 'white',
-              fontSize: '12px',
+              fontSize: isMobile ? '10px' : '12px',
               fontWeight: '600',
-              padding: '4px 8px',
+              padding: isMobile ? '3px 6px' : '4px 8px',
               background: 'rgba(255, 255, 255, 0.1)',
               borderRadius: '4px',
-              minWidth: isMobile ? '60px' : '80px',
-              textAlign: 'center'
+              minWidth: isMobile ? '50px' : '80px',
+              textAlign: 'center',
+              flexShrink: 0
             }}>
               {isMobile 
                 ? transitDate?.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
