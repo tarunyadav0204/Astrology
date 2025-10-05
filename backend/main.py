@@ -656,13 +656,40 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             return (sign + part) % 12
         
         elif division == 16:  # Shodasamsa (D16)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
+            # For movable signs: start from Aries
+            # For fixed signs: start from Leo  
+            # For dual signs: start from Sagittarius
+            if sign in [0, 3, 6, 9]:  # Movable signs (Aries, Cancer, Libra, Capricorn)
+                d16_start = 0  # Aries
+            elif sign in [1, 4, 7, 10]:  # Fixed signs (Taurus, Leo, Scorpio, Aquarius)
+                d16_start = 4  # Leo
+            else:  # Dual signs (Gemini, Virgo, Sagittarius, Pisces)
+                d16_start = 8  # Sagittarius
+            return (d16_start + part) % 12
         
         elif division == 20:  # Vimsamsa (D20)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
+            # For movable signs: start from Aries
+            # For fixed signs: start from Sagittarius
+            # For dual signs: start from Leo
+            if sign in [0, 3, 6, 9]:  # Movable signs
+                d20_start = 0  # Aries
+            elif sign in [1, 4, 7, 10]:  # Fixed signs
+                d20_start = 8  # Sagittarius
+            else:  # Dual signs
+                d20_start = 4  # Leo
+            return (d20_start + part) % 12
         
         elif division == 24:  # Chaturvimsamsa (D24)
-            return ((sign + 4) + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
+            # For movable signs: start from Leo
+            # For fixed signs: start from Aries
+            # For dual signs: start from Sagittarius
+            if sign in [0, 3, 6, 9]:  # Movable signs
+                d24_start = 4  # Leo
+            elif sign in [1, 4, 7, 10]:  # Fixed signs
+                d24_start = 0  # Aries
+            else:  # Dual signs
+                d24_start = 8  # Sagittarius
+            return (d24_start + part) % 12
         
         elif division == 27:  # Nakshatramsa (D27)
             # Fire signs start from Aries, Earth from Capricorn, Air from Libra, Water from Cancer
@@ -692,13 +719,40 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
                 else: return 3  # Mars (25-30 degrees)
         
         elif division == 40:  # Khavedamsa (D40)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
+            # For movable signs: start from Aries
+            # For fixed signs: start from Leo
+            # For dual signs: start from Sagittarius
+            if sign in [0, 3, 6, 9]:  # Movable signs
+                d40_start = 0  # Aries
+            elif sign in [1, 4, 7, 10]:  # Fixed signs
+                d40_start = 4  # Leo
+            else:  # Dual signs
+                d40_start = 8  # Sagittarius
+            return (d40_start + part) % 12
         
         elif division == 45:  # Akshavedamsa (D45)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
+            # For movable signs: start from Aries
+            # For fixed signs: start from Leo
+            # For dual signs: start from Sagittarius
+            if sign in [0, 3, 6, 9]:  # Movable signs
+                d45_start = 0  # Aries
+            elif sign in [1, 4, 7, 10]:  # Fixed signs
+                d45_start = 4  # Leo
+            else:  # Dual signs
+                d45_start = 8  # Sagittarius
+            return (d45_start + part) % 12
         
         elif division == 60:  # Shashtyamsa (D60)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
+            # For movable signs: start from Aries
+            # For fixed signs: start from Leo
+            # For dual signs: start from Sagittarius
+            if sign in [0, 3, 6, 9]:  # Movable signs
+                d60_start = 0  # Aries
+            elif sign in [1, 4, 7, 10]:  # Fixed signs
+                d60_start = 4  # Leo
+            else:  # Dual signs
+                d60_start = 8  # Sagittarius
+            return (d60_start + part) % 12
         
         else:
             # Default calculation for other divisions
