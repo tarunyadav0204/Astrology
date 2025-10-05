@@ -68,13 +68,14 @@ const DivisionalChartSelector = ({ chartData, birthData }) => {
 };
 
 const Dashboard = ({ onBack, currentView, setCurrentView }) => {
-  const { birthData, chartData } = useAstrology();
+  const { birthData, chartData, setBirthData, setChartData } = useAstrology();
   const [layouts, setLayouts] = useState(DASHBOARD_CONFIG.defaultLayout);
   const [transitDate, setTransitDate] = useState(new Date());
   const [transitData, setTransitData] = useState(null);
   const [selectedDashas, setSelectedDashas] = useState({});
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileSubTab, setMobileSubTab] = useState('lagna');
+  const [availableCharts, setAvailableCharts] = useState([]);
 
   useEffect(() => {
     // Load saved layout from localStorage
@@ -84,7 +85,48 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
     }
     // Load today's transit data on component mount
     handleTransitDateChange(new Date());
+    // Load available charts
+    loadAvailableCharts();
   }, []);
+
+  const loadAvailableCharts = async () => {
+    try {
+      const { apiService } = await import('../../services/apiService');
+      const response = await apiService.getExistingCharts();
+      setAvailableCharts(response.charts || []);
+    } catch (error) {
+      console.error('Failed to load charts:', error);
+    }
+  };
+
+  const selectExistingChart = async (chart) => {
+    try {
+      const { apiService } = await import('../../services/apiService');
+      const chartData = await apiService.calculateChart({
+        name: chart.name,
+        date: chart.date,
+        time: chart.time,
+        latitude: chart.latitude,
+        longitude: chart.longitude,
+        timezone: chart.timezone
+      });
+      
+      setBirthData({
+        name: chart.name,
+        date: chart.date,
+        time: chart.time,
+        place: `${chart.latitude}, ${chart.longitude}`,
+        latitude: chart.latitude,
+        longitude: chart.longitude,
+        timezone: chart.timezone
+      });
+      
+      setChartData(chartData);
+      handleTransitDateChange(new Date());
+    } catch (error) {
+      console.error('Failed to load chart:', error);
+    }
+  };
 
   const handleLayoutChange = (layout, layouts) => {
     setLayouts(layouts);
@@ -95,15 +137,11 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
     setTransitDate(newDate);
     setSelectedDashas({}); // Clear selected dashas to force recalculation
     try {
-      const response = await fetch('http://localhost:8001/calculate-transits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          birth_data: birthData,
-          transit_date: newDate.toISOString().split('T')[0]
-        })
+      const { apiService } = await import('../../services/apiService');
+      const data = await apiService.calculateTransits({
+        birth_data: birthData,
+        transit_date: newDate.toISOString().split('T')[0]
       });
-      const data = await response.json();
       setTransitData(data);
     } catch (error) {
       console.error('Error fetching transit data:', error);
@@ -137,7 +175,34 @@ const Dashboard = ({ onBack, currentView, setCurrentView }) => {
     <DashboardContainer>
       <Header>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <BackButton onClick={onBack}>← Back</BackButton>
+          <select 
+            onChange={(e) => {
+              if (e.target.value === 'new') {
+                onBack();
+              } else {
+                selectExistingChart(JSON.parse(e.target.value));
+              }
+            }}
+            style={{
+              padding: '8px 12px',
+              border: '2px solid #e91e63',
+              borderRadius: '8px',
+              background: 'white',
+              color: '#e91e63',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              minWidth: '150px'
+            }}
+          >
+            <option value="">{birthData.name}</option>
+            {availableCharts.filter(chart => chart.name !== birthData.name).map(chart => (
+              <option key={chart.id} value={JSON.stringify(chart)}>
+                {chart.name}
+              </option>
+            ))}
+            <option value="new">+ New Chart</option>
+          </select>
           <Title>{window.innerWidth <= 768 ? birthData.name : `${birthData.name} - Birth Chart Dashboard`}</Title>
           <TransitControls 
             date={transitDate} 

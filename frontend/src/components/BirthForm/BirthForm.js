@@ -7,7 +7,7 @@ import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
 import { TwoPanelContainer, FormPanel, ChartsPanel, FormContainer, FormField, Input, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem } from './BirthForm.styles';
 
-const BirthForm = ({ onSubmit }) => {
+const BirthForm = ({ onSubmit, onLogout }) => {
   const { setBirthData, setChartData, setLoading, setError } = useAstrology();
   
   const [formData, setFormData] = useState({
@@ -30,10 +30,11 @@ const BirthForm = ({ onSubmit }) => {
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      if (formData.place.length >= APP_CONFIG.location.minSearchLength) {
+      if (formData.place.length >= APP_CONFIG.location.minSearchLength && !formData.latitude) {
         searchPlaces(formData.place);
       } else {
         setSuggestions([]);
+        setShowSuggestions(false);
       }
     }, APP_CONFIG.location.debounceMs);
 
@@ -182,7 +183,19 @@ const BirthForm = ({ onSubmit }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (name === 'place') {
+      // Clear coordinates when manually typing
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: value,
+        latitude: null,
+        longitude: null,
+        timezone: ''
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
     
     const error = validateField(name, value);
     setErrors(prev => ({ ...prev, [name]: error }));
@@ -198,6 +211,9 @@ const BirthForm = ({ onSubmit }) => {
     }));
     setShowSuggestions(false);
     setSuggestions([]);
+    
+    // Clear any place validation errors
+    setErrors(prev => ({ ...prev, place: '' }));
   };
 
   const validateForm = () => {
@@ -248,7 +264,7 @@ const BirthForm = ({ onSubmit }) => {
     <TwoPanelContainer>
       <FormPanel>
         <FormContainer>
-          <h2>Birth Details</h2>
+          <h2 style={{ marginBottom: '20px' }}>Birth Details</h2>
       
 
       <form onSubmit={handleSubmit}>
@@ -301,6 +317,10 @@ const BirthForm = ({ onSubmit }) => {
               onChange={handleInputChange}
               placeholder={FORM_FIELDS.place.placeholder}
               error={errors.place}
+              autoComplete="off"
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
             />
             {showSuggestions && suggestions.length > 0 && (
               <SuggestionList>

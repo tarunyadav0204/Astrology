@@ -1,11 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import swisseph as swe
 import sqlite3
 import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+import bcrypt
+import jwt
 
 app = FastAPI()
 
@@ -29,25 +32,57 @@ class TransitRequest(BaseModel):
     birth_data: BirthData
     transit_date: str
 
+class UserCreate(BaseModel):
+    phone: str
+    password: str
+    role: str = "user"
+
+class UserLogin(BaseModel):
+    phone: str
+    password: str
+
+class User(BaseModel):
+    userid: int
+    phone: str
+    role: str
+
 # Lahiri Ayanamsa
 swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+# JWT Configuration
+SECRET_KEY = "astrology-app-secret-key-2024"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
+security = HTTPBearer()
 
 # Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
-    # Check if table exists and has unique constraint
+    # Create users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            userid INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Check if birth_charts table exists and has userid column
     cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='birth_charts'")
     result = cursor.fetchone()
     
-    if result and 'UNIQUE' not in result[0]:
-        # Drop existing table and recreate with unique constraint
+    if result and 'userid' not in result[0]:
+        # Drop existing table and recreate with userid column
         cursor.execute('DROP TABLE birth_charts')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS birth_charts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            userid INTEGER NOT NULL,
             name TEXT NOT NULL,
             date TEXT NOT NULL,
             time TEXT NOT NULL,
@@ -55,7 +90,8 @@ def init_db():
             longitude REAL NOT NULL,
             timezone TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(date, time, latitude, longitude)
+            FOREIGN KEY (userid) REFERENCES users (userid),
+            UNIQUE(userid, date, time, latitude, longitude)
         )
     ''')
     conn.commit()
@@ -63,15 +99,100 @@ def init_db():
 
 init_db()
 
+# Authentication functions
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        phone: str = payload.get("sub")
+        if phone is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT userid, phone, role FROM users WHERE phone = ?", (phone,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return User(userid=user[0], phone=user[1], role=user[2])
+
+@app.post("/register")
+async def register(user_data: UserCreate):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT phone FROM users WHERE phone = ?", (user_data.phone,))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+    
+    hashed_password = hash_password(user_data.password)
+    cursor.execute(
+        "INSERT INTO users (phone, password, role) VALUES (?, ?, ?)",
+        (user_data.phone, hashed_password, user_data.role)
+    )
+    conn.commit()
+    
+    cursor.execute("SELECT userid, phone, role FROM users WHERE phone = ?", (user_data.phone,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    access_token = create_access_token(data={"sub": user_data.phone})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {"userid": user[0], "phone": user[1], "role": user[2]}
+    }
+
+@app.post("/login")
+async def login(user_data: UserLogin):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT userid, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user or not verify_password(user_data.password, user[2]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    access_token = create_access_token(data={"sub": user_data.phone})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {"userid": user[0], "phone": user[1], "role": user[3]}
+    }
+
+@app.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
 @app.post("/calculate-chart")
-async def calculate_chart(birth_data: BirthData):
+async def calculate_chart(birth_data: BirthData, current_user: User = Depends(get_current_user)):
     # Store birth data in database (update if exists)
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO birth_charts (name, date, time, latitude, longitude, timezone)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (birth_data.name, birth_data.date, birth_data.time, 
+        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
           birth_data.latitude, birth_data.longitude, birth_data.timezone))
     conn.commit()
     conn.close()
@@ -211,7 +332,7 @@ async def calculate_chart(birth_data: BirthData):
     }
 
 @app.post("/calculate-transits")
-async def calculate_transits(request: TransitRequest):
+async def calculate_transits(request: TransitRequest, current_user: User = Depends(get_current_user)):
     jd = swe.julday(
         int(request.transit_date.split('-')[0]),
         int(request.transit_date.split('-')[1]),
@@ -238,18 +359,54 @@ async def calculate_transits(request: TransitRequest):
             'degree': pos[0] % 30
         }
     
-    # Use birth chart houses for transit display
-    birth_chart = await calculate_chart(request.birth_data)
+    # Calculate birth chart houses for transit display
+    birth_data = request.birth_data
+    time_parts = birth_data.time.split(':')
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+    
+    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+        tz_offset = 5.5
+    else:
+        tz_offset = 0
+        if birth_data.timezone.startswith('UTC'):
+            tz_str = birth_data.timezone[3:]
+            if tz_str and ':' in tz_str:
+                sign = 1 if tz_str[0] == '+' else -1
+                parts = tz_str[1:].split(':')
+                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    
+    utc_hour = hour - tz_offset
+    birth_jd = swe.julday(
+        int(birth_data.date.split('-')[0]),
+        int(birth_data.date.split('-')[1]),
+        int(birth_data.date.split('-')[2]),
+        utc_hour
+    )
+    
+    birth_houses_data = swe.houses(birth_jd, birth_data.latitude, birth_data.longitude, b'P')
+    birth_ayanamsa = swe.get_ayanamsa_ut(birth_jd)
+    birth_ascendant_tropical = birth_houses_data[1][0]
+    birth_ascendant_sidereal = (birth_ascendant_tropical - birth_ayanamsa) % 360
+    
+    ascendant_sign = int(birth_ascendant_sidereal / 30)
+    houses = []
+    for i in range(12):
+        house_sign = (ascendant_sign + i) % 12
+        house_longitude = (house_sign * 30) + (birth_ascendant_sidereal % 30)
+        houses.append({
+            'longitude': house_longitude % 360,
+            'sign': house_sign
+        })
     
     return {
         "planets": planets,
-        "houses": birth_chart["houses"],
-        "ayanamsa": birth_chart["ayanamsa"],
-        "ascendant": birth_chart["ascendant"]
+        "houses": houses,
+        "ayanamsa": birth_ayanamsa,
+        "ascendant": birth_ascendant_sidereal
     }
 
 @app.get("/birth-charts")
-async def get_birth_charts(search: str = "", limit: int = 50):
+async def get_birth_charts(search: str = "", limit: int = 50, current_user: User = Depends(get_current_user)):
     print(f"Search query: '{search}', Limit: {limit}")
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -259,13 +416,13 @@ async def get_birth_charts(search: str = "", limit: int = 50):
         print(f"Using search pattern: {search_pattern}")
         cursor.execute('''
             SELECT * FROM birth_charts 
-            WHERE name LIKE ? 
+            WHERE userid = ? AND name LIKE ? 
             ORDER BY created_at DESC 
             LIMIT ?
-        ''', (search_pattern, limit))
+        ''', (current_user.userid, search_pattern, limit))
     else:
         print("No search query, returning all charts")
-        cursor.execute('SELECT * FROM birth_charts ORDER BY created_at DESC LIMIT ?', (limit,))
+        cursor.execute('SELECT * FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
     
     rows = cursor.fetchall()
     print(f"Found {len(rows)} charts")
@@ -275,13 +432,14 @@ async def get_birth_charts(search: str = "", limit: int = 50):
     for row in rows:
         charts.append({
             'id': row[0],
-            'name': row[1],
-            'date': row[2],
-            'time': row[3],
-            'latitude': row[4],
-            'longitude': row[5],
-            'timezone': row[6],
-            'created_at': row[7]
+            'userid': row[1],
+            'name': row[2],
+            'date': row[3],
+            'time': row[4],
+            'latitude': row[5],
+            'longitude': row[6],
+            'timezone': row[7],
+            'created_at': row[8]
         })
     
     return {"charts": charts}
