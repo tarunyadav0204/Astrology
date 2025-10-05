@@ -529,9 +529,9 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={(e) => {
                         const rect = e.currentTarget.closest('svg').getBoundingClientRect();
-                        const isRightSide = [9, 10, 11, 12].includes(houseNumber);
+                        const isRightSide = [8, 9, 10, 11, 12].includes(houseNumber);
                         const offsetX = isRightSide ? -120 : 10;
-                        setTooltip({ show: true, x: e.clientX - rect.left + offsetX, y: e.clientY - rect.top - 10, text: tooltipText });
+                        setTooltip({ show: true, x: planetX + offsetX, y: planetY - 30, text: tooltipText });
                       }}
                       onMouseLeave={() => setTooltip({ show: false, x: 0, y: 0, text: '' })}
                       onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
