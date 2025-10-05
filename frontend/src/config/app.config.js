@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
   api: {
     dev: 'http://localhost:8001',
-    prod: 'https://api.astrologyapp.com',
+    prod: 'http://34.126.214.249:8001',
     timeout: 30000,
     retries: 3
   },
