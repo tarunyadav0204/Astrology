@@ -1,13 +1,13 @@
 {
-  "name": "astrology-app",
+  "name": "astrology-app-deployment",
   "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "frontend"
-  ],
+  "description": "Deployment automation for Astrology App",
+  "main": "webhook-deploy.js",
   "scripts": {
-    "dev:frontend": "cd frontend && npm start",
-    "dev:backend": "cd backend && python main.py",
-    "install:frontend": "cd frontend && npm install"
+    "start": "node webhook-deploy.js",
+    "deploy": "bash deploy.sh"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
   }
 }

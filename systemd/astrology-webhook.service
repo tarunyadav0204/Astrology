@@ -1,0 +1,15 @@
+[Unit]
+Description=Astrology App Webhook Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/AstrologyApp
+ExecStart=/usr/bin/node webhook-deploy.js
+Restart=always
+RestartSec=10
+Environment=WEBHOOK_SECRET=your-webhook-secret
+
+[Install]
+WantedBy=multi-user.target
