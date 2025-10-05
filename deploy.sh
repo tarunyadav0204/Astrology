@@ -12,6 +12,14 @@ git pull origin main
 # Backend deployment
 echo "🐍 Setting up backend..."
 cd backend
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+  python3 -m venv venv
+fi
+
+# Activate virtual environment and install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 echo "✅ Backend dependencies installed"
 
@@ -32,6 +40,7 @@ pkill -f "serve -s build" || true
 
 # Start backend
 cd backend
+source venv/bin/activate
 nohup python main.py > ../logs/backend.log 2>&1 &
 echo "✅ Backend started on port 8000"
 

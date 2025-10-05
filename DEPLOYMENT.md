@@ -2,10 +2,13 @@
 
 ## Quick Setup
 
-### 1. Server Setup (One-time)
+### 1. Server Setup (Only if needed)
 ```bash
-# On your GCP server
+# If server doesn't have Node.js/Python/repo:
 curl -sSL https://raw.githubusercontent.com/tarunyadav0204/Astrology/main/setup-server.sh | bash
+
+# OR manually clone if server is ready:
+git clone https://github.com/tarunyadav0204/Astrology.git AstrologyApp
 ```
 
 ### 2. GitHub Secrets (One-time)
