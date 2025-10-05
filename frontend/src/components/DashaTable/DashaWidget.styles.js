@@ -9,21 +9,32 @@ export const WidgetContainer = styled.div`
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border: 1px solid #e9ecef;
+  min-height: 0;
+  
+  @media (max-width: 768px) {
+    height: auto;
+    min-height: 300px;
+    max-height: 400px;
+  }
 `;
 
 export const WidgetHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.3rem 0.6rem;
+  padding: 0.25rem 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   background: linear-gradient(135deg, #ffcc80 0%, #ff8a65 100%);
   border-radius: 16px 16px 0 0;
+  
+  @media (max-width: 768px) {
+    padding: 0.2rem 0.4rem;
+  }
 `;
 
 export const WidgetTitle = styled.h3`
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: white;
   text-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -33,7 +44,15 @@ export const WidgetTitle = styled.h3`
   
   &::before {
     content: '🌟';
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+  }
+  
+  @media (max-width: 768px) {
+    font-size: 0.65rem;
+    
+    &::before {
+      font-size: 0.7rem;
+    }
   }
 `;
 
@@ -41,29 +60,38 @@ export const DashaContainer = styled.div`
   flex: 1;
   padding: 0.4rem;
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 0 0 16px 16px;
   backdrop-filter: blur(10px);
   -webkit-overflow-scrolling: touch;
   
+  /* Hide scrollbars on desktop */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  
   @media (max-width: 768px) {
-    padding: 0.2rem;
+    padding: 0.1rem;
+    overflow-x: hidden;
   }
 `;
 
 export const DashaTable = styled.table`
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  min-width: 280px;
+  table-layout: fixed;
   
   @media (max-width: 768px) {
-    font-size: 0.65rem;
-    min-width: 260px;
+    font-size: 0.55rem;
+    table-layout: fixed;
+    width: 100%;
   }
 `;
 
@@ -77,13 +105,16 @@ export const DashaRow = styled.tr.withConfig({
     return 'transparent';
   }};
   color: #2d3436;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   
   &:hover {
     background: rgba(255, 171, 145, 0.2);
     color: #2d3436;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    
+    @media (min-width: 769px) {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
   }
   
   &:nth-child(even) {
@@ -96,17 +127,16 @@ export const DashaRow = styled.tr.withConfig({
 `;
 
 export const DashaCell = styled.td`
-  padding: 0.4rem 0.6rem;
+  padding: 0.3rem 0.4rem;
   border: 1px solid rgba(116, 185, 255, 0.2);
   text-align: left;
   font-weight: 500;
-  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
-  @media (max-width: 768px) {
-    padding: 0.3rem 0.4rem;
-  }
-  
+  /* Fixed column widths for desktop */
   &:first-child {
+    width: 35%;
     font-weight: 700;
     color: inherit;
     
@@ -117,7 +147,25 @@ export const DashaCell = styled.td`
   }
   
   &:nth-child(2), &:nth-child(3) {
+    width: 32.5%;
     color: #000;
+    white-space: nowrap;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 0.2rem 0.15rem;
+    font-size: 0.5rem;
+    
+    &:first-child {
+      width: 40%;
+    }
+    
+    &:nth-child(2), &:nth-child(3) {
+      width: 30%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   }
   
   th& {
@@ -125,7 +173,7 @@ export const DashaCell = styled.td`
     color: #495057;
     font-weight: 700;
     text-transform: uppercase;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     letter-spacing: 0.3px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     

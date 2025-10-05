@@ -154,6 +154,8 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
     onDashaSelection(dashaType, dasha);
   };
 
+  const isMobile = window.innerWidth <= 768;
+  
   return (
     <WidgetContainer data-dasha-type={dashaType}>
       <WidgetHeader>
@@ -161,29 +163,62 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
       </WidgetHeader>
       
       <DashaContainer className="dasha-container">
-        <DashaTable>
-          <thead>
-            <tr>
-              <DashaCell as="th">Planet</DashaCell>
-              <DashaCell as="th">Start</DashaCell>
-              <DashaCell as="th">End</DashaCell>
-            </tr>
-          </thead>
-          <tbody>
+        {isMobile ? (
+          // Mobile card layout
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             {dashaData.map((dasha, idx) => (
-              <DashaRow 
-                key={idx} 
-                current={dasha.current}
-                selected={selectedDasha && selectedDasha.planet === dasha.planet && selectedDasha.start === dasha.start}
+              <div
+                key={idx}
                 onClick={() => handleDashaClick(dasha)}
+                style={{
+                  background: dasha.selected ? 'rgba(233, 30, 99, 0.15)' : 
+                             dasha.current ? 'rgba(255, 111, 0, 0.15)' : 
+                             idx % 2 === 0 ? 'rgba(255, 243, 224, 0.3)' : 'white',
+                  border: '1px solid rgba(116, 185, 255, 0.2)',
+                  borderRadius: '8px',
+                  padding: '0.4rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: dasha.current ? '0 2px 8px rgba(255, 111, 0, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)'
+                }}
               >
-                <DashaCell>{dasha.planet}</DashaCell>
-                <DashaCell>{new Date(dasha.start).getDate()}/{(new Date(dasha.start).getMonth() + 1).toString().padStart(2, '0')}/{new Date(dasha.start).getFullYear().toString().slice(-2)}</DashaCell>
-                <DashaCell>{new Date(dasha.end).getDate()}/{(new Date(dasha.end).getMonth() + 1).toString().padStart(2, '0')}/{new Date(dasha.end).getFullYear().toString().slice(-2)}</DashaCell>
-              </DashaRow>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: '700', fontSize: '0.7rem', color: '#2d3436' }}>
+                    🪐 {dasha.planet}
+                  </div>
+                  <div style={{ fontSize: '0.55rem', color: '#636e72' }}>
+                    {new Date(dasha.start).getDate()}/{(new Date(dasha.start).getMonth() + 1).toString().padStart(2, '0')}/{new Date(dasha.start).getFullYear().toString().slice(-2)} - {new Date(dasha.end).getDate()}/{(new Date(dasha.end).getMonth() + 1).toString().padStart(2, '0')}/{new Date(dasha.end).getFullYear().toString().slice(-2)}
+                  </div>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </DashaTable>
+          </div>
+        ) : (
+          // Desktop table layout
+          <DashaTable>
+            <thead>
+              <tr>
+                <DashaCell as="th">Planet</DashaCell>
+                <DashaCell as="th">Start</DashaCell>
+                <DashaCell as="th">End</DashaCell>
+              </tr>
+            </thead>
+            <tbody>
+              {dashaData.map((dasha, idx) => (
+                <DashaRow 
+                  key={idx} 
+                  current={dasha.current}
+                  selected={selectedDasha && selectedDasha.planet === dasha.planet && selectedDasha.start === dasha.start}
+                  onClick={() => handleDashaClick(dasha)}
+                >
+                  <DashaCell>{dasha.planet}</DashaCell>
+                  <DashaCell>{new Date(dasha.start).getDate()}/{(new Date(dasha.start).getMonth() + 1).toString().padStart(2, '0')}/{new Date(dasha.start).getFullYear().toString().slice(-2)}</DashaCell>
+                  <DashaCell>{new Date(dasha.end).getDate()}/{(new Date(dasha.end).getMonth() + 1).toString().padStart(2, '0')}/{new Date(dasha.end).getFullYear().toString().slice(-2)}</DashaCell>
+                </DashaRow>
+              ))}
+            </tbody>
+          </DashaTable>
+        )}
       </DashaContainer>
     </WidgetContainer>
   );

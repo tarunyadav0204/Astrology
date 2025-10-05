@@ -337,18 +337,6 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       transitDate={transitDate}
                     />
                   </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '0.25rem' 
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <YogiWidget />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <PanchangWidget transitDate={transitDate} />
-                    </div>
-                  </div>
                 </div>
               )}
               {mobileSubTab === 'yogi' && (

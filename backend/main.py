@@ -680,27 +680,22 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             return (d20_start + part) % 12
         
         elif division == 24:  # Chaturvimsamsa (D24)
-            # For movable signs: start from Leo
-            # For fixed signs: start from Aries
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d24_start = 4  # Leo
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d24_start = 0  # Aries
-            else:  # Dual signs
-                d24_start = 8  # Sagittarius
-            return (d24_start + part) % 12
+            # All signs start from Cancer
+            return (3 + part) % 12  # Cancer
         
-        elif division == 27:  # Nakshatramsa (D27)
-            # Fire signs start from Aries, Earth from Capricorn, Air from Libra, Water from Cancer
+        elif division == 27:  # Saptavimsamsa (D27)
+            # Fire signs (Aries, Leo, Sagittarius): start from Aries
+            # Earth signs (Taurus, Virgo, Capricorn): start from Cancer  
+            # Air signs (Gemini, Libra, Aquarius): start from Libra
+            # Water signs (Cancer, Scorpio, Pisces): start from Capricorn
             if sign in [0, 4, 8]:  # Fire signs
                 d27_start = 0  # Aries
             elif sign in [1, 5, 9]:  # Earth signs
-                d27_start = 9  # Capricorn
+                d27_start = 3  # Cancer
             elif sign in [2, 6, 10]:  # Air signs
                 d27_start = 6  # Libra
             else:  # Water signs [3, 7, 11]
-                d27_start = 3  # Cancer
+                d27_start = 9  # Capricorn
             return (d27_start + part) % 12
         
         elif division == 30:  # Trimsamsa (D30)
