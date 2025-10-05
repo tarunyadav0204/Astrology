@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { apiService } from '../../services/apiService';
 
 const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
@@ -6,6 +7,7 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 200 });
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -40,6 +42,18 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
     }
   };
 
+  const handleToggle = () => {
+    if (!isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
   const handleSelect = (chart) => {
     onSelectChart(chart);
     setIsOpen(false);
@@ -55,7 +69,7 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
   return (
     <div ref={dropdownRef} style={{ position: 'relative', minWidth: '200px' }}>
       <div
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         style={{
           padding: '8px 12px',
           border: '2px solid #e91e63',
@@ -74,18 +88,18 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
         <span style={{ marginLeft: '8px' }}>{isOpen ? '▲' : '▼'}</span>
       </div>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
+          position: 'fixed',
+          top: dropdownPosition.top,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
           background: 'white',
           border: '2px solid #e91e63',
           borderTop: 'none',
           borderRadius: '0 0 8px 8px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 1000,
+          zIndex: 9999,
           maxHeight: '300px',
           overflow: 'hidden'
         }}>
@@ -164,7 +178,8 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
               📊 View All Charts
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

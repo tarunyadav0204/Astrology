@@ -83,7 +83,7 @@ const UnifiedHeader = ({
       top: 0,
       zIndex: 100,
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      overflow: 'hidden',
+      overflowX: 'hidden',
       minHeight: isMobile ? '50px' : '60px'
     }}>
       {/* Left Side */}
