@@ -310,7 +310,14 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selectedHouse ? '1fr 400px' : '1fr', gap: '1rem', height: '100%' }}>
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateColumns: window.innerWidth <= 768 
+        ? '1fr' 
+        : selectedHouse ? '1fr 400px' : '1fr', 
+      gap: '1rem', 
+      height: '100%' 
+    }}>
       {/* Main Grid - Houses Overview */}
       <div>
         <h3 style={{ color: '#e91e63', marginBottom: '1rem', fontSize: '1.1rem' }}>
@@ -319,10 +326,13 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
         
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gridTemplateColumns: window.innerWidth <= 768 
+            ? '1fr' 
+            : 'repeat(auto-fit, minmax(300px, 1fr))', 
           gap: '1rem',
-          maxHeight: '70vh',
-          overflowY: 'auto'
+          maxHeight: window.innerWidth <= 768 ? '60vh' : '70vh',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
         }}>
           {houseData.map(house => (
             <div 
@@ -331,14 +341,14 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
               style={{ 
                 border: '1px solid #e91e63',
                 borderRadius: '8px',
-                padding: '1rem',
+                padding: window.innerWidth <= 768 ? '0.75rem' : '1rem',
                 cursor: 'pointer',
                 background: selectedHouse?.number === house.number ? '#f0f9ff' : 'white',
                 borderLeft: selectedHouse?.number === house.number ? '4px solid #e91e63' : '1px solid #e91e63'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <h4 style={{ margin: 0, color: '#1f2937', fontSize: '0.9rem' }}>
+                <h4 style={{ margin: 0, color: '#1f2937', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem' }}>
                   {house.number}th House - {house.name}
                 </h4>
                 <span style={{ 
@@ -353,7 +363,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                 </span>
               </div>
               
-              <div style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem', color: '#666', marginBottom: '0.5rem' }}>
                 Sign: {house.signName}
               </div>
               
@@ -366,15 +376,15 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                       const status = getPlanetStatus(planet);
                       return (
                         <span key={idx} style={{ 
-                          fontSize: '0.7rem',
-                          padding: '0.1rem 0.3rem',
+                          fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem',
+                          padding: window.innerWidth <= 768 ? '0.1rem 0.25rem' : '0.1rem 0.3rem',
                           background: '#e91e63',
                           color: 'white',
                           borderRadius: '4px',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.2rem'
-                        }}>
+                        }}
                           {planet.name}
                           {status && (
                             <span style={{ color: status.color }} title={status.title}>
@@ -389,7 +399,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
               </div>
               
               <p style={{ 
-                fontSize: '0.7rem', 
+                fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem', 
                 color: '#666', 
                 margin: 0,
                 lineHeight: '1.3'
@@ -429,18 +439,24 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
           </div>
           
           <div style={{ 
-            maxHeight: '65vh', 
+            maxHeight: window.innerWidth <= 768 ? '55vh' : '65vh', 
             overflowY: 'auto',
             border: '1px solid #e91e63',
             borderRadius: '8px',
-            padding: '1rem',
-            background: 'white'
-          }}>
+            padding: window.innerWidth <= 768 ? '0.75rem' : '1rem',
+            background: 'white',
+            WebkitOverflowScrolling: 'touch'
+          }}
             <div style={{ marginBottom: '1rem' }}>
               <h4 style={{ color: '#e91e63', fontSize: '1rem', marginBottom: '0.5rem' }}>
                 {selectedHouse.name}
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', 
+                gap: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', 
+                marginBottom: '1rem' 
+              }}
                 <div><strong>House:</strong> {selectedHouse.number}th</div>
                 <div><strong>Sign:</strong> {selectedHouse.signName}</div>
                 <div><strong>Strength:</strong> 
@@ -460,24 +476,24 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
             </div>
             
             <div style={{ marginBottom: '1rem' }}>
-              <h4 style={{ color: '#3b82f6', fontSize: '0.9rem', marginBottom: '0.5rem' }}>📖 Significations</h4>
-              <p style={{ fontSize: '0.8rem', lineHeight: '1.4', color: '#333' }}>
+              <h4 style={{ color: '#3b82f6', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', marginBottom: '0.5rem' }}>📖 Significations</h4>
+              <p style={{ fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem', lineHeight: '1.4', color: '#333' }}>
                 {selectedHouse.significations}
               </p>
             </div>
             
             {selectedHouse.occupants.length > 0 && (
               <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ color: '#22c55e', fontSize: '0.9rem', marginBottom: '0.5rem' }}>🪐 Planetary Occupants</h4>
+                <h4 style={{ color: '#22c55e', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', marginBottom: '0.5rem' }}>🪐 Planetary Occupants</h4>
                 {selectedHouse.occupants.map((planet, idx) => {
                   const status = getPlanetStatus(planet);
                   return (
                     <div key={idx} style={{ 
-                      padding: '0.5rem',
+                      padding: window.innerWidth <= 768 ? '0.4rem' : '0.5rem',
                       border: '1px solid #eee',
                       borderRadius: '4px',
                       marginBottom: '0.5rem'
-                    }}>
+                    }}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong style={{ color: '#1f2937' }}>{planet.name}</strong>
                         {status && (
@@ -490,7 +506,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#666' }}>
+                      <div style={{ fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem', color: '#666' }}>
                         Degree: {planet.degree?.toFixed(2)}° in {getSignName(planet.sign)}
                       </div>
                     </div>
@@ -506,16 +522,16 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                 borderRadius: '4px',
                 textAlign: 'center'
               }}>
-                <h4 style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Empty House</h4>
-                <p style={{ fontSize: '0.8rem', color: '#666', margin: 0 }}>
+                <h4 style={{ color: '#666', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', marginBottom: '0.5rem' }}>Empty House</h4>
+                <p style={{ fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem', color: '#666', margin: 0 }}>
                   This house has no planetary occupants. Its results depend on the house lord's placement and aspects received.
                 </p>
               </div>
             )}
             
             <div style={{ marginTop: '1rem' }}>
-              <h4 style={{ color: '#f59e0b', fontSize: '0.9rem', marginBottom: '0.5rem' }}>👁️ Aspects Received</h4>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>
+              <h4 style={{ color: '#f59e0b', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', marginBottom: '0.5rem' }}>👁️ Aspects Received</h4>
+              <div style={{ fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem', color: '#666' }}>
                 {getAspectsToHouse(selectedHouse.number).length === 0 ? (
                   <p>No major aspects to this house.</p>
                 ) : (
@@ -535,19 +551,19 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
             </div>
             
             <div style={{ marginTop: '1rem' }}>
-              <h4 style={{ color: '#8b5cf6', fontSize: '0.9rem', marginBottom: '0.5rem' }}>⚖️ Strength Analysis</h4>
+              <h4 style={{ color: '#8b5cf6', fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', marginBottom: '0.5rem' }}>⚖️ Strength Analysis</h4>
               <div style={{ 
                 padding: '0.5rem',
                 background: '#f8f9fa',
                 borderRadius: '4px',
                 marginBottom: '0.5rem'
               }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.3rem' }}>
+                <div style={{ fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem', fontWeight: '600', marginBottom: '0.3rem' }}>
                   Score: {selectedHouse.strengthScore?.toFixed(1)} → {selectedHouse.strength}
                 </div>
                 {selectedHouse.strengthReasons?.map((reason, idx) => (
                   <div key={idx} style={{ 
-                    fontSize: '0.7rem',
+                    fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem',
                     color: '#666',
                     marginBottom: '0.2rem'
                   }}>

@@ -305,25 +305,40 @@ const NakshatrasTab = ({ chartData, birthData }) => {
   const planetaryPositions = getPlanetaryPositions();
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selectedNakshatra ? '300px 1fr' : '1fr 1fr', gap: '1rem', height: '100%' }}>
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateColumns: window.innerWidth <= 768 
+        ? '1fr' 
+        : selectedNakshatra ? '300px 1fr' : '1fr 1fr', 
+      gap: '1rem', 
+      height: '100%' 
+    }}>
       {/* Left side - Planetary Positions */}
       <div>
         <h3 style={{ color: '#e91e63', marginBottom: '1rem', fontSize: '1.1rem' }}>
           🌟 Planetary Positions in Nakshatras
         </h3>
         <div style={{ 
-          maxHeight: selectedNakshatra ? '25vh' : '20vh', 
+          maxHeight: window.innerWidth <= 768 
+            ? selectedNakshatra ? '30vh' : '25vh'
+            : selectedNakshatra ? '25vh' : '20vh', 
           overflowY: 'auto',
+          overflowX: 'auto',
           border: '1px solid #e91e63',
-          borderRadius: '8px'
+          borderRadius: '8px',
+          WebkitOverflowScrolling: 'touch'
         }}>
-          <table style={{ width: '100%', fontSize: '0.8rem' }}>
+          <table style={{ 
+            width: '100%', 
+            fontSize: window.innerWidth <= 768 ? '0.7rem' : '0.8rem',
+            minWidth: window.innerWidth <= 768 ? '280px' : 'auto'
+          }}>
             <thead style={{ background: '#e91e63', color: 'white', position: 'sticky', top: 0 }}>
               <tr>
-                <th style={{ padding: '0.5rem', textAlign: 'left' }}>Planet</th>
-                <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nakshatra</th>
-                <th style={{ padding: '0.5rem', textAlign: 'center' }}>Pada</th>
-                <th style={{ padding: '0.5rem', textAlign: 'left' }}>Lord</th>
+                <th style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', textAlign: 'left' }}>Planet</th>
+                <th style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', textAlign: 'left' }}>Nakshatra</th>
+                <th style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', textAlign: 'center' }}>Pada</th>
+                <th style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.5rem', textAlign: 'left' }}>Lord</th>
               </tr>
             </thead>
             <tbody>
@@ -334,14 +349,14 @@ const NakshatrasTab = ({ chartData, birthData }) => {
                   cursor: 'pointer'
                 }}
                 onClick={() => setSelectedNakshatra(nakshatras.find(n => n.name === pos.nakshatra))}>
-                  <td style={{ padding: '0.4rem', fontWeight: '600', color: '#e91e63' }}>
+                  <td style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.4rem', fontWeight: '600', color: '#e91e63' }}>
                     {pos.planet}
                   </td>
-                  <td style={{ padding: '0.4rem', color: '#0066cc', textDecoration: 'underline' }}>{pos.nakshatra}</td>
-                  <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: '600' }}>
+                  <td style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.4rem', color: '#0066cc', textDecoration: 'underline' }}>{pos.nakshatra}</td>
+                  <td style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.4rem', textAlign: 'center', fontWeight: '600' }}>
                     {pos.pada}
                   </td>
-                  <td style={{ padding: '0.4rem', color: '#666' }}>{pos.lord}</td>
+                  <td style={{ padding: window.innerWidth <= 768 ? '0.3rem' : '0.4rem', color: '#666' }}>{pos.lord}</td>
                 </tr>
               ))}
             </tbody>
@@ -407,15 +422,21 @@ const NakshatrasTab = ({ chartData, birthData }) => {
             </div>
             
             <div style={{ 
-              maxHeight: '60vh', 
+              maxHeight: window.innerWidth <= 768 ? '50vh' : '60vh', 
               overflowY: 'auto',
               border: '1px solid #e91e63',
               borderRadius: '8px',
-              padding: '1rem',
-              background: 'white'
+              padding: window.innerWidth <= 768 ? '0.5rem' : '1rem',
+              background: 'white',
+              WebkitOverflowScrolling: 'touch'
             }}>
               <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', 
+                  gap: window.innerWidth <= 768 ? '0.5rem' : '1rem', 
+                  marginBottom: '1rem' 
+                }}>
                   <div><strong>Lord:</strong> {selectedNakshatra.lord}</div>
                   <div><strong>Deity:</strong> {selectedNakshatra.deity}</div>
                   <div><strong>Nature:</strong> {selectedNakshatra.nature}</div>
@@ -424,23 +445,23 @@ const NakshatrasTab = ({ chartData, birthData }) => {
               </div>
               
               <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ color: '#ff6f00', fontSize: '1rem', marginBottom: '0.5rem' }}>📖 Basic Information</h4>
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>📖 Basic Information</h4>
+                <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                   {selectedNakshatra.description}
                 </p>
               </div>
               
               <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ color: '#ff6f00', fontSize: '1rem', marginBottom: '0.5rem' }}>✨ General Characteristics</h4>
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>✨ General Characteristics</h4>
+                <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                   {selectedNakshatra.characteristics}
                 </p>
               </div>
               
               {selectedNakshatra.behavioral && (
                 <div style={{ marginBottom: '1rem' }}>
-                  <h4 style={{ color: '#ff6f00', fontSize: '1rem', marginBottom: '0.5rem' }}>🎭 Behavioral Characteristics</h4>
-                  <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                  <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>🎭 Behavioral Characteristics</h4>
+                  <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                     {selectedNakshatra.behavioral}
                   </p>
                 </div>
@@ -448,8 +469,8 @@ const NakshatrasTab = ({ chartData, birthData }) => {
               
               {selectedNakshatra.positiveTraits && (
                 <div style={{ marginBottom: '1rem' }}>
-                  <h4 style={{ color: '#22c55e', fontSize: '1rem', marginBottom: '0.5rem' }}>✅ Positive Traits</h4>
-                  <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                  <h4 style={{ color: '#22c55e', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>✅ Positive Traits</h4>
+                  <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                     {selectedNakshatra.positiveTraits}
                   </p>
                 </div>
@@ -457,23 +478,23 @@ const NakshatrasTab = ({ chartData, birthData }) => {
               
               {selectedNakshatra.negativeTraits && (
                 <div style={{ marginBottom: '1rem' }}>
-                  <h4 style={{ color: '#ef4444', fontSize: '1rem', marginBottom: '0.5rem' }}>⚠️ Negative Traits</h4>
-                  <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                  <h4 style={{ color: '#ef4444', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>⚠️ Negative Traits</h4>
+                  <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                     {selectedNakshatra.negativeTraits}
                   </p>
                 </div>
               )}
               
               <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ color: '#ff6f00', fontSize: '1rem', marginBottom: '0.5rem' }}>💼 Career Options</h4>
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>💼 Career Options</h4>
+                <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                   {selectedNakshatra.careers}
                 </p>
               </div>
               
               <div>
-                <h4 style={{ color: '#ff6f00', fontSize: '1rem', marginBottom: '0.5rem' }}>🤝 Compatibility and Incompatibility</h4>
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
+                <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>🤝 Compatibility and Incompatibility</h4>
+                <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                   {selectedNakshatra.compatibility}
                 </p>
               </div>
