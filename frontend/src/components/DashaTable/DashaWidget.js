@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DASHA_CONFIG } from '../../config/dashboard.config';
+import { APP_CONFIG } from '../../config/app.config';
 import { WidgetContainer, WidgetHeader, WidgetTitle, DashaContainer, DashaTable, DashaRow, DashaCell } from './DashaWidget.styles';
 
 const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas, onDashaSelection, transitDate }) => {
@@ -14,9 +15,16 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
 
   const fetchDashaData = async () => {
     try {
-      const response = await fetch('http://localhost:8001/calculate-dasha', {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/calculate-dasha`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
         body: JSON.stringify(birthData)
       });
       const data = await response.json();
@@ -109,9 +117,16 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
         requestData.pratyantar_lord = selectedDashas.pratyantar.planet;
       }
       
-      const response = await fetch('http://localhost:8001/calculate-sub-dashas', {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/calculate-sub-dashas`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
         body: JSON.stringify(requestData)
       });
       

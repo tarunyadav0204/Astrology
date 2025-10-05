@@ -41,9 +41,15 @@ export const DashaContainer = styled.div`
   flex: 1;
   padding: 0.4rem;
   overflow-y: auto;
+  overflow-x: auto;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 0 0 16px 16px;
   backdrop-filter: blur(10px);
+  -webkit-overflow-scrolling: touch;
+  
+  @media (max-width: 768px) {
+    padding: 0.2rem;
+  }
 `;
 
 export const DashaTable = styled.table`
@@ -53,6 +59,12 @@ export const DashaTable = styled.table`
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  min-width: 280px;
+  
+  @media (max-width: 768px) {
+    font-size: 0.65rem;
+    min-width: 260px;
+  }
 `;
 
 export const DashaRow = styled.tr.withConfig({
@@ -88,6 +100,11 @@ export const DashaCell = styled.td`
   border: 1px solid rgba(116, 185, 255, 0.2);
   text-align: left;
   font-weight: 500;
+  white-space: nowrap;
+  
+  @media (max-width: 768px) {
+    padding: 0.3rem 0.4rem;
+  }
   
   &:first-child {
     font-weight: 700;

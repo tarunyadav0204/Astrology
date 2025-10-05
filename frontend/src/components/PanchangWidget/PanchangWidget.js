@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAstrology } from '../../context/AstrologyContext';
 import { apiService } from '../../services/apiService';
+import { APP_CONFIG } from '../../config/app.config';
 import styled from 'styled-components';
 
 const PanchangContainer = styled.div`
@@ -66,9 +67,16 @@ const PanchangWidget = ({ transitDate }) => {
     
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/calculate-panchang', {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/calculate-panchang`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
         body: JSON.stringify({
           birth_data: birthData,
           transit_date: transitDate.toISOString().split('T')[0]
