@@ -7,8 +7,8 @@ echo "🚀 Starting deployment..."
 
 # Pull latest changes
 echo "📥 Pulling latest changes from Git..."
-git config pull.rebase false
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 # Backend deployment
 echo "🐍 Setting up backend..."
