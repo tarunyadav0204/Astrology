@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CHART_CONFIG } from '../../config/dashboard.config';
 import { apiService } from '../../services/apiService';
 
@@ -120,11 +121,10 @@ const NorthIndianChart = ({ chartData, birthData }) => {
 
   const handlePlanetRightClick = (e, planet) => {
     e.preventDefault();
-    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
     setContextMenu({
       show: true,
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       planet: planet.name,
       rashi: null,
       type: 'planet'
@@ -133,12 +133,11 @@ const NorthIndianChart = ({ chartData, birthData }) => {
 
   const handleRashiRightClick = (e, rashiIndex) => {
     e.preventDefault();
-    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     setContextMenu({
       show: true,
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       planet: null,
       rashi: rashiIndex,
       rashiName: rashiNames[rashiIndex],
@@ -584,16 +583,16 @@ const NorthIndianChart = ({ chartData, birthData }) => {
         </div>
       )}
       
-      {contextMenu.show && (
+      {contextMenu.show && createPortal(
         <div style={{
-          position: 'absolute',
+          position: 'fixed',
           left: contextMenu.x,
           top: contextMenu.y,
           background: 'white',
           border: '2px solid #e91e63',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-          zIndex: 1001,
+          zIndex: 2147483647,
           minWidth: '140px'
         }}>
           {contextMenu.type === 'planet' ? (
@@ -641,7 +640,8 @@ const NorthIndianChart = ({ chartData, birthData }) => {
               🏠 Set {contextMenu.rashiName} as Ascendant
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
       
 

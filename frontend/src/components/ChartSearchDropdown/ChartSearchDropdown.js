@@ -12,6 +12,10 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Don't close if clicking on the View All Charts button
+      if (event.target.textContent?.includes('View All Charts')) {
+        return;
+      }
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
         setSearchQuery('');
@@ -61,7 +65,14 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
   };
 
   const handleViewAll = () => {
-    onViewAll();
+    console.log('View All Charts clicked');
+    console.log('onViewAll prop:', onViewAll);
+    if (onViewAll) {
+      console.log('Calling onViewAll function');
+      onViewAll();
+    } else {
+      console.error('onViewAll function not provided');
+    }
     setIsOpen(false);
     setSearchQuery('');
   };
@@ -160,31 +171,25 @@ const ChartSearchDropdown = ({ currentChart, onSelectChart, onViewAll }) => {
                 </div>
               ))
             )}
-
-            <div
-              onClick={handleViewAll}
-              style={{
-                padding: '12px',
-                cursor: 'pointer',
-                borderTop: '2px solid #e91e63',
-                background: '#f8f9fa',
-                color: '#e91e63',
-                fontWeight: '600',
-                textAlign: 'center',
-                fontSize: '13px'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = '#e91e63';
-                e.target.style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#f8f9fa';
-                e.target.style.color = '#e91e63';
-              }}
-            >
-              📊 View All Charts
-            </div>
           </div>
+
+          <button
+            onClick={handleViewAll}
+            style={{
+              width: '100%',
+              padding: '12px',
+              cursor: 'pointer',
+              borderTop: '2px solid #e91e63',
+              border: 'none',
+              background: '#f8f9fa',
+              color: '#e91e63',
+              fontWeight: '600',
+              textAlign: 'center',
+              fontSize: '13px'
+            }}
+          >
+            📊 View All Charts
+          </button>
         </div>,
         document.body
       )}

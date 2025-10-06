@@ -46,8 +46,8 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
-  calculateChart: async (birthData) => {
-    const response = await apiClient.post('/calculate-chart', birthData);
+  calculateChart: async (birthData, nodeType = 'mean') => {
+    const response = await apiClient.post(`/calculate-chart?node_type=${nodeType}`, birthData);
     return response.data;
   },
   
@@ -109,6 +109,56 @@ export const apiService = {
       birth_data: birthData,
       division: division
     });
+    return response.data;
+  },
+  
+  // Rule Engine APIs
+  getRules: async () => {
+    const response = await apiClient.get('/rule-engine/rules');
+    return response.data;
+  },
+  
+  createRule: async (rule) => {
+    const response = await apiClient.post('/rule-engine/rules', rule);
+    return response.data;
+  },
+  
+  updateRule: async (ruleId, rule) => {
+    const response = await apiClient.put(`/rule-engine/rules/${ruleId}`, rule);
+    return response.data;
+  },
+  
+  deleteRule: async (ruleId) => {
+    const response = await apiClient.delete(`/rule-engine/rules/${ruleId}`);
+    return response.data;
+  },
+  
+  analyzeEvent: async (birthChart, eventDate, eventType) => {
+    const response = await apiClient.post('/rule-engine/analyze-event', {
+      birth_chart: birthChart,
+      event_date: eventDate,
+      event_type: eventType
+    });
+    return response.data;
+  },
+  
+  getEventTypes: async () => {
+    const response = await apiClient.get('/rule-engine/event-types');
+    return response.data;
+  },
+  
+  searchRules: async (query) => {
+    const response = await apiClient.get(`/rule-engine/search?q=${encodeURIComponent(query)}`);
+    return response.data;
+  },
+  
+  getUserSettings: async (phone) => {
+    const response = await apiClient.get(`/user-settings/settings/${phone}`);
+    return response.data;
+  },
+  
+  updateUserSettings: async (phone, settings) => {
+    const response = await apiClient.put(`/user-settings/settings/${phone}`, settings);
     return response.data;
   }
 };

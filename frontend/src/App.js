@@ -10,6 +10,7 @@ import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
+import InstallPrompt from './components/InstallPrompt';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -89,7 +90,10 @@ function App() {
         {currentView === 'dashboard' && (
           <Dashboard 
             onBack={() => setCurrentView('selector')} 
-            onViewAllCharts={() => setCurrentView('selector')}
+            onViewAllCharts={() => {
+              console.log('onViewAllCharts called in App.js');
+              setCurrentView('selector');
+            }}
             currentView={currentView} 
             setCurrentView={setCurrentView} 
             onLogout={handleLogout}
@@ -110,6 +114,7 @@ function App() {
           draggable
           pauseOnHover
         />
+        <InstallPrompt />
       </div>
     </AstrologyProvider>
   );

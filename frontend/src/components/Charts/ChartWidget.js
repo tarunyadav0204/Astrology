@@ -5,8 +5,15 @@ import SouthIndianChart from './SouthIndianChart';
 import { apiService } from '../../services/apiService';
 import { WidgetContainer, WidgetHeader, WidgetTitle, StyleToggle, ChartContainer } from './ChartWidget.styles';
 
-const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, division }) => {
-  const [chartStyle, setChartStyle] = useState('north');
+const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, division, defaultStyle }) => {
+  const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
+
+  // Update chart style when defaultStyle prop changes
+  useEffect(() => {
+    if (defaultStyle) {
+      setChartStyle(defaultStyle);
+    }
+  }, [defaultStyle]);
   const [divisionalData, setDivisionalData] = useState(null);
   const [loading, setLoading] = useState(false);
 

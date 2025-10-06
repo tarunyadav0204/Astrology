@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
 
 const UnifiedHeader = ({ 
@@ -14,6 +15,7 @@ const UnifiedHeader = ({
   onResetToToday
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -92,7 +94,16 @@ const UnifiedHeader = ({
           // Mobile: Hamburger Menu
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={() => {
+                if (!showMenu && menuRef.current) {
+                  const rect = menuRef.current.getBoundingClientRect();
+                  setMenuPosition({
+                    top: rect.bottom,
+                    left: rect.left
+                  });
+                }
+                setShowMenu(!showMenu);
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -106,17 +117,17 @@ const UnifiedHeader = ({
               ☰
             </button>
             
-            {showMenu && (
+            {showMenu && createPortal(
               <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
+                position: 'fixed',
+                top: menuPosition.top,
+                left: menuPosition.left,
                 background: 'white',
                 border: '2px solid #e91e63',
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 minWidth: '180px',
-                zIndex: 1000
+                zIndex: 99999
               }}>
                 <div
                   onClick={() => { onViewAllCharts(); setShowMenu(false); }}
@@ -174,7 +185,8 @@ const UnifiedHeader = ({
                 >
                   🚪 Logout
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         ) : (

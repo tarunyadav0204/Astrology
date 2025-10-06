@@ -13,11 +13,14 @@ import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
 import UnifiedHeader from '../UnifiedHeader/UnifiedHeader';
+import RuleManager from '../RuleEngine/RuleManager';
+import EventAnalyzer from '../RuleEngine/EventAnalyzer';
+import UserSettings from '../UserSettings';
 import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem } from './Dashboard.styles';
 
 
 
-const DivisionalChartSelector = ({ chartData, birthData }) => {
+const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
   const [selectedChart, setSelectedChart] = useState('navamsa');
   
   const divisionalCharts = [
@@ -65,6 +68,7 @@ const DivisionalChartSelector = ({ chartData, birthData }) => {
       chartData={chartData}
       birthData={birthData}
       division={divisionalCharts.find(c => c.value === selectedChart)?.division || 9}
+      defaultStyle={defaultStyle}
     />
   );
 };
@@ -77,7 +81,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
   const [selectedDashas, setSelectedDashas] = useState({});
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileSubTab, setMobileSubTab] = useState('lagna');
-
+  const [userSettings, setUserSettings] = useState({ node_type: 'mean', default_chart_style: 'north' });
 
   useEffect(() => {
     // Load saved layout from localStorage
@@ -87,14 +91,52 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
     }
     // Load today's transit data on component mount
     handleTransitDateChange(new Date());
-
+    // Load user settings
+    loadUserSettings();
   }, []);
+
+  const loadUserSettings = async () => {
+    if (!user?.phone) return;
+    try {
+      const { apiService } = await import('../../services/apiService');
+      const settings = await apiService.getUserSettings(user.phone);
+      setUserSettings(settings);
+    } catch (error) {
+      console.log('Using default settings');
+    }
+  };
+
+  const refreshChartWithSettings = async () => {
+    if (!birthData) return;
+    try {
+      const { apiService } = await import('../../services/apiService');
+      const chartData = await apiService.calculateChart({
+        name: birthData.name,
+        date: birthData.date,
+        time: birthData.time,
+        latitude: birthData.latitude,
+        longitude: birthData.longitude,
+        timezone: birthData.timezone
+      }, userSettings.node_type);
+      
+      setChartData(chartData);
+      handleTransitDateChange(transitDate);
+    } catch (error) {
+      console.error('Failed to refresh chart:', error);
+    }
+  };
+
+  const handleSettingsUpdate = async () => {
+    await loadUserSettings();
+    await refreshChartWithSettings();
+  };
 
 
 
   const selectExistingChart = async (chart) => {
     try {
       const { apiService } = await import('../../services/apiService');
+      
       const chartData = await apiService.calculateChart({
         name: chart.name,
         date: chart.date,
@@ -102,7 +144,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         latitude: chart.latitude,
         longitude: chart.longitude,
         timezone: chart.timezone
-      });
+      }, userSettings.node_type);
       
       setBirthData({
         name: chart.name,
@@ -202,7 +244,13 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           { id: 'yogas', label: '🔮 Yogas', icon: '🔮' },
           { id: 'timing', label: '📅 Timing', icon: '📅' },
           { id: 'predictions', label: '🔮 Predictions', icon: '🔮' },
-          { id: 'remedies', label: '💎 Remedies', icon: '💎' }
+          { id: 'remedies', label: '💎 Remedies', icon: '💎' },
+          { id: 'settings', label: '⚙️ Settings', icon: '⚙️' },
+          ...(user?.role === 'admin' ? [
+            { id: 'rule-engine', label: '⚙️ Rule Engine', icon: '⚙️' },
+            { id: 'event-analyzer', label: '🔍 Event Analyzer', icon: '🔍' },
+            { id: 'rule-search', label: '🔍 Rule Search', icon: '🔍' }
+          ] : [])
         ].map(tab => (
           <button
             key={tab.id}
@@ -241,6 +289,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     chartType="lagna"
                     chartData={chartData}
                     birthData={birthData}
+                    defaultStyle={userSettings.default_chart_style}
                   />
                 </div>
               )}
@@ -251,6 +300,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     chartType="navamsa"
                     chartData={chartData}
                     birthData={birthData}
+                    defaultStyle={userSettings.default_chart_style}
                   />
                 </div>
               )}
@@ -262,6 +312,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     chartData={transitData || chartData}
                     birthData={birthData}
                     transitDate={transitDate}
+                    defaultStyle={userSettings.default_chart_style}
                   />
                 </div>
               )}
@@ -270,6 +321,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   <DivisionalChartSelector
                     chartData={chartData}
                     birthData={birthData}
+                    defaultStyle={userSettings.default_chart_style}
                   />
                 </div>
               )}
@@ -408,6 +460,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 chartType="lagna"
                 chartData={chartData}
                 birthData={birthData}
+                defaultStyle={userSettings.default_chart_style}
               />
             </GridItem>
             
@@ -417,6 +470,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 chartType="navamsa"
                 chartData={chartData}
                 birthData={birthData}
+                defaultStyle={userSettings.default_chart_style}
               />
             </GridItem>
             
@@ -427,6 +481,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 chartData={transitData || chartData}
                 birthData={birthData}
                 transitDate={transitDate}
+                defaultStyle={userSettings.default_chart_style}
               />
             </GridItem>
             
@@ -434,6 +489,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               <DivisionalChartSelector
                 chartData={chartData}
                 birthData={birthData}
+                defaultStyle={userSettings.default_chart_style}
               />
             </GridItem>
             
@@ -533,6 +589,10 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           {activeTab === 'timing' && <div>Timing - Coming Soon</div>}
           {activeTab === 'predictions' && <div>Predictions - Coming Soon</div>}
           {activeTab === 'remedies' && <div>Remedies - Coming Soon</div>}
+          {activeTab === 'settings' && <UserSettings user={user} onSettingsUpdate={handleSettingsUpdate} />}
+          {activeTab === 'rule-engine' && user?.role === 'admin' && <RuleManager />}
+          {activeTab === 'event-analyzer' && user?.role === 'admin' && <EventAnalyzer birthChart={chartData} />}
+          {activeTab === 'rule-search' && user?.role === 'admin' && <RuleSearch />}
         </div>
       )}
     </DashboardContainer>

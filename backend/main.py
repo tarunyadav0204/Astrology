@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import bcrypt
 import jwt
+from rule_engine.api import router as rule_engine_router
+from user_settings import router as settings_router
 
 app = FastAPI()
 
@@ -19,6 +21,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include rule engine router
+app.include_router(rule_engine_router)
+app.include_router(settings_router)
 
 class BirthData(BaseModel):
     name: str
@@ -188,7 +194,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 @app.post("/calculate-chart")
-async def calculate_chart(birth_data: BirthData, current_user: User = Depends(get_current_user)):
+async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     # Store birth data in database (update if exists)
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -240,7 +246,8 @@ async def calculate_chart(birth_data: BirthData, current_user: User = Depends(ge
         if planet <= 6:  # Regular planets
             pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
         else:  # Lunar nodes
-            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)[0]
+            node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
+            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL)[0]
             if planet == 12:  # Ketu
                 pos = list(pos)
                 pos[0] = (pos[0] + 180) % 360
@@ -350,7 +357,7 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
     for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
         if planet <= 6:  # Regular planets
             pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
-        else:  # Lunar nodes
+        else:  # Lunar nodes - always use mean for transits
             pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)[0]
             if planet == 12:  # Ketu
                 pos = list(pos)
@@ -631,7 +638,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
     division_number = request.get('division', 9)
     
     # First get the basic chart
-    chart_data = await calculate_chart(birth_data, current_user)
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
     
     def get_divisional_sign(sign, degree_in_sign, division):
         """Calculate divisional sign using proper Vedic formulas"""
@@ -950,7 +957,7 @@ async def predict_house7_events(birth_data: BirthData):
     from event_prediction.house7_analyzer import House7Analyzer
     
     # First calculate chart data
-    chart_data = await calculate_chart(birth_data)
+    chart_data = await calculate_chart(birth_data, 'mean')
     
     # Initialize House 7 analyzer
     analyzer = House7Analyzer(birth_data, chart_data)
@@ -981,7 +988,7 @@ async def analyze_transits(request: TransitRequest):
     from event_prediction.transit_analyzer import TransitAnalyzer
     
     # Calculate chart
-    chart_data = await calculate_chart(request.birth_data)
+    chart_data = await calculate_chart(request.birth_data, 'mean')
     
     # Initialize transit analyzer
     transit_analyzer = TransitAnalyzer(request.birth_data, chart_data)
@@ -1005,7 +1012,7 @@ async def calculate_yogi_impact(birth_data: BirthData):
     from event_prediction.yogi_analyzer import YogiAnalyzer
     
     # Calculate chart
-    chart_data = await calculate_chart(birth_data)
+    chart_data = await calculate_chart(birth_data, 'mean')
     
     # Initialize Yogi analyzer
     yogi_analyzer = YogiAnalyzer(birth_data, chart_data)
@@ -1031,7 +1038,7 @@ async def predict_year_events(request: dict):
     year = request['year']
     
     # Calculate chart
-    chart_data = await calculate_chart(birth_data)
+    chart_data = await calculate_chart(birth_data, 'mean')
     
     # Initialize universal predictor
     predictor = UniversalPredictor(birth_data, chart_data)
@@ -1055,7 +1062,7 @@ async def predict_marriage_complete(birth_data: BirthData):
     from event_prediction.yogi_analyzer import YogiAnalyzer
     
     # Calculate chart first
-    chart_data = await calculate_chart(birth_data)
+    chart_data = await calculate_chart(birth_data, 'mean')
     
     # Initialize all analyzers
     house7_analyzer = House7Analyzer(birth_data, chart_data)
