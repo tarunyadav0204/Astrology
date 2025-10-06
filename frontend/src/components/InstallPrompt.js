@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 const InstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -12,19 +13,48 @@ const InstallPrompt = () => {
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
+    
+    // Show fallback install prompt after 3 seconds if no PWA prompt
+    const timer = setTimeout(() => {
+      if (!deferredPrompt && !dismissed) {
+        setShowInstall(true);
+      }
+    }, 3000);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      clearTimeout(timer);
+    };
+  }, [deferredPrompt, dismissed]);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        setShowInstall(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // Fallback: Show manual instructions
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        alert('To install: Tap the Share button (⬆️) at the bottom, then "Add to Home Screen"');
+      } else if (isAndroid) {
+        alert('To install: Tap the menu (⋮) in your browser, then "Add to Home screen" or "Install app"');
+      } else {
+        alert('To install: Look for the install icon in your browser\'s address bar or menu');
+      }
       setShowInstall(false);
     }
-    setDeferredPrompt(null);
+  };
+  
+  const handleDismiss = () => {
+    setShowInstall(false);
+    setDismissed(true);
   };
 
   if (!showInstall) return null;
@@ -62,7 +92,7 @@ const InstallPrompt = () => {
           Install
         </button>
         <button 
-          onClick={() => setShowInstall(false)}
+          onClick={handleDismiss}
           style={{
             background: 'transparent',
             color: 'white',
