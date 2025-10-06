@@ -82,9 +82,16 @@ const RuleManager = () => {
   if (loading) return <div>Loading rules...</div>;
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>Rule Engine Management</h2>
+    <div style={{ padding: window.innerWidth <= 768 ? '10px' : '20px', fontSize: window.innerWidth <= 768 ? '14px' : '16px' }}>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: window.innerWidth <= 768 ? 'column' : 'row',
+        justifyContent: 'space-between', 
+        alignItems: window.innerWidth <= 768 ? 'stretch' : 'center', 
+        marginBottom: '20px',
+        gap: '10px'
+      }}>
+        <h2 style={{ margin: 0, fontSize: window.innerWidth <= 768 ? '1.2rem' : '1.5rem' }}>Rule Engine Management</h2>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={() => setActiveView('manage')}

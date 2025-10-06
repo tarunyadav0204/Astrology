@@ -40,10 +40,21 @@ const EventAnalyzer = ({ birthChart }) => {
   };
 
   return (
-    <div style={{ padding: '20px', background: 'white', borderRadius: '10px', margin: '20px 0' }}>
+    <div style={{ 
+      padding: window.innerWidth <= 768 ? '10px' : '20px', 
+      background: 'white', 
+      borderRadius: '10px', 
+      margin: window.innerWidth <= 768 ? '10px 0' : '20px 0',
+      fontSize: window.innerWidth <= 768 ? '14px' : '16px'
+    }}>
       <h3>Event Analysis</h3>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr 1fr', 
+        gap: '15px', 
+        marginBottom: '20px' 
+      }}>
         <div>
           <label>Event Type:</label>
           <select
