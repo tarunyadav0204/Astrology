@@ -248,8 +248,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           { id: 'settings', label: '⚙️ Settings', icon: '⚙️' },
           ...(user?.role === 'admin' ? [
             { id: 'rule-engine', label: '⚙️ Rule Engine', icon: '⚙️' },
-            { id: 'event-analyzer', label: '🔍 Event Analyzer', icon: '🔍' },
-            { id: 'rule-search', label: '🔍 Rule Search', icon: '🔍' }
+            { id: 'event-analyzer', label: '🔍 Event Analyzer', icon: '🔍' }
           ] : [])
         ].map(tab => (
           <button
@@ -279,9 +278,23 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       {activeTab === 'dashboard' && (
         window.innerWidth <= 768 ? (
           // Mobile Layout - Bottom Tabs
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: 'calc(100vh - 140px)',
+            position: 'fixed',
+            top: '140px',
+            left: '0',
+            right: '0',
+            bottom: '0'
+          }}>
             {/* Main Content Area */}
-            <div style={{ flex: 1, padding: '0.5rem', overflow: 'hidden' }}>
+            <div style={{ 
+              flex: 1, 
+              padding: '0.5rem', 
+              overflow: 'hidden',
+              paddingBottom: '80px'
+            }}>
               {mobileSubTab === 'lagna' && (
                 <div style={{ height: '100%' }}>
                   <ChartWidget
@@ -413,7 +426,12 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               overflowX: 'auto',
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              position: 'fixed',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              zIndex: 100
             }}>
               {[
                 { id: 'lagna', label: '📊 Lagna', icon: '📊' },
@@ -592,7 +610,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           {activeTab === 'settings' && <UserSettings user={user} onSettingsUpdate={handleSettingsUpdate} />}
           {activeTab === 'rule-engine' && user?.role === 'admin' && <RuleManager />}
           {activeTab === 'event-analyzer' && user?.role === 'admin' && <EventAnalyzer birthChart={chartData} />}
-          {activeTab === 'rule-search' && user?.role === 'admin' && <RuleSearch />}
+
         </div>
       )}
     </DashboardContainer>
