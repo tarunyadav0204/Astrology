@@ -70,13 +70,18 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             onChange={handleInputChange}
             placeholder="Enter your phone number"
             required
+            autoComplete="tel"
+            inputMode="numeric"
             style={{
               width: '100%',
               padding: '0.75rem',
               border: '2px solid rgba(233, 30, 99, 0.2)',
               borderRadius: '12px',
-              fontSize: '1rem',
-              background: 'rgba(255, 255, 255, 0.8)'
+              fontSize: '16px',
+              background: 'rgba(255, 255, 255, 0.8)',
+              WebkitAppearance: 'none',
+              WebkitUserSelect: 'text',
+              WebkitTouchCallout: 'default'
             }}
           />
         </div>
@@ -97,13 +102,17 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             onChange={handleInputChange}
             placeholder="Enter your password"
             required
+            autoComplete="current-password"
             style={{
               width: '100%',
               padding: '0.75rem',
               border: '2px solid rgba(233, 30, 99, 0.2)',
               borderRadius: '12px',
-              fontSize: '1rem',
-              background: 'rgba(255, 255, 255, 0.8)'
+              fontSize: '16px',
+              background: 'rgba(255, 255, 255, 0.8)',
+              WebkitAppearance: 'none',
+              WebkitUserSelect: 'text',
+              WebkitTouchCallout: 'default'
             }}
           />
         </div>

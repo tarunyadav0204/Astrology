@@ -2,10 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#e91e63" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-touch-fullscreen" content="yes" />
+  <style>
+    /* iOS PWA keyboard fix */
+    input, textarea, select {
+      -webkit-user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
+    
+    /* Prevent zoom on input focus */
+    input[type="text"], input[type="tel"], input[type="password"] {
+      font-size: 16px !important;
+    }
+  </style>
   <meta name="apple-mobile-web-app-title" content="Astrology App" />
   <link rel="manifest" href="/manifest.json" />
   <title>Astrology App</title>
