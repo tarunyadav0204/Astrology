@@ -244,17 +244,18 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     
     for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
         if planet <= 6:  # Regular planets
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)
+            # Try with speed flag to get accurate velocity data
+            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED)
         else:  # Lunar nodes
             node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
-            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL)
+            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL | swe.FLG_SPEED)
         
         # pos is a tuple: (position_array, return_flag)
         pos_array = pos[0]
         longitude = pos_array[0]
         
-        # Speed is at index 1 (daily motion in longitude)
-        speed = pos_array[1] if len(pos_array) > 1 else 0.0
+        # Speed is at index 3 (daily motion in longitude)
+        speed = pos_array[3] if len(pos_array) > 3 else 0.0
         
         if planet == 12:  # Ketu - add 180 degrees to Rahu
             longitude = (longitude + 180) % 360
@@ -366,15 +367,15 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
     
     for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
         if planet <= 6:  # Regular planets
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)
+            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED)
         else:  # Lunar nodes - always use mean for transits
-            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)
+            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED)
         
         pos_array = pos[0]
         longitude = pos_array[0]
         
-        # Speed is at index 1 (daily motion in longitude)
-        speed = pos_array[1] if len(pos_array) > 1 else 0.0
+        # Use index 3 for speed (standard Swiss Ephemeris)
+        speed = pos_array[3] if len(pos_array) > 3 else 0.0
         
         if planet == 12:  # Ketu - add 180 degrees to Rahu
             longitude = (longitude + 180) % 360
