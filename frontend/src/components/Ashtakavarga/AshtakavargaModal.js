@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AshtakavargaModal.css';
+import { API_BASE_URL } from '../../config';
 
 const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
   const [ashtakavargaData, setAshtakavargaData] = useState(null);
@@ -10,6 +11,14 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
   useEffect(() => {
+    // Add mobile console for debugging
+    if (window.innerWidth <= 768 && !window.eruda) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      script.onload = () => window.eruda.init();
+      document.head.appendChild(script);
+    }
+    
     if (isOpen && birthData) {
       fetchAshtakavarga();
     }
@@ -17,9 +26,11 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
 
   const fetchAshtakavarga = async () => {
     setLoading(true);
+    const apiUrl = `${API_BASE_URL}/calculate-ashtakavarga`;
+    console.log('Fetching Ashtakavarga data...', { birthData, chartType, apiUrl });
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/calculate-ashtakavarga', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,14 +42,20 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
         })
       });
       
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Ashtakavarga data received:', data);
       setAshtakavargaData(data);
     } catch (error) {
       console.error('Error fetching Ashtakavarga:', error);
+      setAshtakavargaData(null);
     } finally {
       setLoading(false);
     }
@@ -183,7 +200,12 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
           {loading ? (
             <div className="loading">Calculating Ashtakavarga...</div>
           ) : !ashtakavargaData ? (
-            <div className="loading">Failed to load Ashtakavarga data. Please try again.</div>
+            <div className="loading">
+              <p>Failed to load Ashtakavarga data. Please try again.</p>
+              <p style={{fontSize: '0.8rem', color: '#666', marginTop: '10px'}}>
+                Debug: Check browser console for errors
+              </p>
+            </div>
           ) : (
             <>
               {activeTab === 'sarva' && renderSarvashtakavarga()}

@@ -110,10 +110,11 @@
 
 .modal-content {
   padding: 20px;
-  height: calc(80vh - 220px);
-  overflow-y: scroll;
+  height: calc(80vh - 120px);
+  overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
 }
 
 .loading {
@@ -271,48 +272,78 @@
 
 @media (max-width: 768px) {
   .ashtakavarga-modal-overlay {
-    padding-top: 10vh;
+    padding: 5vh 5px;
+    align-items: center;
   }
   
   .ashtakavarga-modal {
     width: 95vw;
-    height: 85vh;
+    height: 90vh;
+    max-height: 90vh;
   }
   
   .modal-content {
-    height: calc(85vh - 140px);
-    padding: 15px;
+    height: calc(90vh - 120px);
+    padding: 10px;
+    -webkit-overflow-scrolling: touch;
   }
   
   .modal-header {
     height: 50px;
-    padding: 10px 16px;
+    padding: 8px 12px;
+    flex-shrink: 0;
   }
   
   .modal-header h2 {
-    font-size: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.2;
   }
   
   .modal-tabs {
-    height: 60px;
-    flex-wrap: wrap;
+    height: 50px;
+    flex-shrink: 0;
   }
   
   .tab-btn {
-    height: 30px;
-    padding: 6px 12px;
-    font-size: 0.9rem;
+    height: 50px;
+    padding: 8px 6px;
+    font-size: 0.8rem;
   }
   
   .bindu-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  
+  .bindu-cell {
+    padding: 6px 4px;
+  }
+  
+  .sign-name {
+    font-size: 0.8rem;
+  }
+  
+  .bindu-count {
+    font-size: 1rem;
   }
   
   .strength-analysis {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
   
   .bindu-row {
     justify-content: center;
+    gap: 3px;
+  }
+  
+  .mini-bindu {
+    min-width: 40px;
+    padding: 3px;
+  }
+  
+  .planet-chart {
+    padding: 10px;
+    margin-bottom: 15px;
   }
 }
