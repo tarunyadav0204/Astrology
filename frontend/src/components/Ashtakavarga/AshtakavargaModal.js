@@ -31,6 +31,10 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       setAshtakavargaData(data);
     } catch (error) {
@@ -178,6 +182,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
         <div className="modal-content">
           {loading ? (
             <div className="loading">Calculating Ashtakavarga...</div>
+          ) : !ashtakavargaData ? (
+            <div className="loading">Failed to load Ashtakavarga data. Please try again.</div>
           ) : (
             <>
               {activeTab === 'sarva' && renderSarvashtakavarga()}
