@@ -255,8 +255,10 @@ const NorthIndianChart = ({ chartData, birthData }) => {
     const planetData = chartData.planets?.[planet.name];
     const isRetrograde = planetData?.retrograde;
     
+    console.log(`Planet ${planet.name}: retrograde=${isRetrograde}, data=`, planetData);
+    
     let symbol = planet.symbol;
-    if (isRetrograde) symbol += 'R';
+    if (isRetrograde) symbol += '(R)';
     if (status === 'combusted') symbol += '(c)';
     if (status === 'exalted') symbol += '↑';
     if (status === 'debilitated') symbol += '↓';

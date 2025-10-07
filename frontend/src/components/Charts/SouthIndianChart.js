@@ -150,7 +150,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
     const isRetrograde = planetData?.retrograde;
     
     let symbol = planet.symbol;
-    if (isRetrograde) symbol += 'R';
+    if (isRetrograde) symbol += '(R)';
     if (status === 'combusted') symbol += '(c)';
     if (status === 'exalted') symbol += '↑';
     if (status === 'debilitated') symbol += '↓';

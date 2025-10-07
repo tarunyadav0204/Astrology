@@ -248,15 +248,24 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
         else:  # Lunar nodes
             node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
             pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL)
-            if planet == 12:  # Ketu
-                pos = list(pos)
-                pos[0] = (pos[0] + 180) % 360
+        
+        # pos is a tuple: (position_array, return_flag)
+        pos_array = pos[0]
+        longitude = pos_array[0]
+        
+        # Speed is at index 1 (daily motion in longitude)
+        speed = pos_array[1] if len(pos_array) > 1 else 0.0
+        
+        if planet == 12:  # Ketu - add 180 degrees to Rahu
+            longitude = (longitude + 180) % 360
+        
+        is_retrograde = speed < 0 if planet <= 6 else False
         
         planets[planet_names[i]] = {
-            'longitude': pos[0],
-            'sign': int(pos[0] / 30),
-            'degree': pos[0] % 30,
-            'retrograde': pos[3] < 0 if planet <= 6 else False  # Only regular planets can be retrograde
+            'longitude': longitude,
+            'sign': int(longitude / 30),
+            'degree': longitude % 30,
+            'retrograde': is_retrograde
         }
     
     # Calculate ascendant and houses
@@ -360,15 +369,23 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
             pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)
         else:  # Lunar nodes - always use mean for transits
             pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)
-            if planet == 12:  # Ketu
-                pos = list(pos)
-                pos[0] = (pos[0] + 180) % 360
+        
+        pos_array = pos[0]
+        longitude = pos_array[0]
+        
+        # Speed is at index 1 (daily motion in longitude)
+        speed = pos_array[1] if len(pos_array) > 1 else 0.0
+        
+        if planet == 12:  # Ketu - add 180 degrees to Rahu
+            longitude = (longitude + 180) % 360
+        
+        is_retrograde = speed < 0 if planet <= 6 else False
         
         planets[planet_names[i]] = {
-            'longitude': pos[0],
-            'sign': int(pos[0] / 30),
-            'degree': pos[0] % 30,
-            'retrograde': pos[3] < 0 if planet <= 6 else False
+            'longitude': longitude,
+            'sign': int(longitude / 30),
+            'degree': longitude % 30,
+            'retrograde': is_retrograde
         }
     
     # Calculate birth chart houses for transit display
@@ -807,7 +824,8 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             divisional_data['planets'][planet] = {
                 'longitude': divisional_longitude,
                 'sign': divisional_sign,
-                'degree': actual_degree
+                'degree': actual_degree,
+                'retrograde': planet_data.get('retrograde', False)
             }
     
     return {
