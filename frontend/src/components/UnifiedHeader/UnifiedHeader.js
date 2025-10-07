@@ -117,48 +117,60 @@ const UnifiedHeader = ({
               ☰
             </button>
             
-            {showMenu && createPortal(
+            {showMenu && (
               <div style={{
                 position: 'fixed',
-                top: menuPosition.top,
-                left: menuPosition.left,
+                top: '60px',
+                left: '10px',
                 background: 'white',
                 border: '2px solid #e91e63',
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 minWidth: '180px',
-                zIndex: 99999
+                zIndex: 999999
               }}>
-                <div
-                  onClick={() => { onViewAllCharts(); setShowMenu(false); }}
+                <button
+                  onClick={() => {
+                    console.log('Home clicked');
+                    onViewAllCharts();
+                    setShowMenu(false);
+                  }}
                   style={{
+                    width: '100%',
                     padding: '12px 16px',
-                    cursor: 'pointer',
+                    background: 'white',
+                    border: 'none',
                     borderBottom: '1px solid #f0f0f0',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
                   }}
-                  onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
-                  onMouseLeave={(e) => e.target.style.background = 'white'}
                 >
                   🏠 Home
-                </div>
-                <div
-                  onClick={() => { onNewChart(); setShowMenu(false); }}
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('New Chart clicked');
+                    onNewChart();
+                    setShowMenu(false);
+                  }}
                   style={{
+                    width: '100%',
                     padding: '12px 16px',
-                    cursor: 'pointer',
+                    background: 'white',
+                    border: 'none',
                     borderBottom: '1px solid #f0f0f0',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
                   }}
-                  onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
-                  onMouseLeave={(e) => e.target.style.background = 'white'}
                 >
                   ➕ New Chart
-                </div>
+                </button>
                 <div
                   style={{
                     padding: '12px 16px',
@@ -169,24 +181,29 @@ const UnifiedHeader = ({
                 >
                   👤 {user?.name || 'Profile'}
                 </div>
-                <div
-                  onClick={() => { onLogout(); setShowMenu(false); }}
+                <button
+                  onClick={() => {
+                    console.log('Logout clicked');
+                    onLogout();
+                    setShowMenu(false);
+                  }}
                   style={{
+                    width: '100%',
                     padding: '12px 16px',
-                    cursor: 'pointer',
+                    background: 'white',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     color: '#dc3545',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    textAlign: 'left'
                   }}
-                  onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
-                  onMouseLeave={(e) => e.target.style.background = 'white'}
                 >
                   🚪 Logout
-                </div>
-              </div>,
-              document.body
+                </button>
+              </div>
             )}
           </div>
         ) : (
