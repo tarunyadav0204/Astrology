@@ -294,37 +294,26 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     # Get day of week (0=Sunday, 1=Monday, etc.)
     weekday = int((jd + 1.5) % 7)
     
-    # Calculate sunrise and sunset for the location
-    sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
+    # Gulika calculation - Saturn's portion during day
+    # Saturn's portion for each weekday (in hours from sunrise)
+    gulika_portions = [10.5, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0]  # Sun-Sat
+    gulika_time = gulika_portions[weekday]
     
-    # Approximate day/night duration (12 hours each for simplicity)
-    day_duration = 12.0  # hours
-    night_duration = 12.0  # hours
+    # Calculate Gulika longitude based on time from sunrise
+    # Each hour = 15 degrees (360/24)
+    gulika_longitude = (gulika_time * 15) % 360
     
-    # Gulika calculation - Saturn's portion of the day
-    # Day rulers: Sun, Venus, Mars, Rahu, Jupiter, Mercury, Saturn
-    # Night rulers: Moon, Saturn, Jupiter, Mars, Sun, Venus, Mercury
-    
-    # Saturn's portion during day (in hours from sunrise)
-    saturn_day_portions = [10.5, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0]  # For Sun-Sat
-    gulika_time_from_sunrise = saturn_day_portions[weekday]
-    
-    # Convert to longitude based on birth time
-    birth_hour = hour  # Local birth time
-    
-    # Calculate Gulika longitude
-    # Gulika moves 1 degree per 2 minutes (30 degrees per hour)
-    gulika_degrees = (gulika_time_from_sunrise * 30) % 360
-    gulika_longitude = (gulika_degrees - ayanamsa) % 360
-    
-    # Mandi calculation - Saturn's portion during night
-    # Mandi is calculated from Saturn's portion of the night
-    saturn_night_portions = [22.5, 13.5, 15.0, 16.5, 18.0, 19.5, 21.0]  # For Sun-Sat
-    mandi_time_from_sunrise = saturn_night_portions[weekday]
+    # Mandi calculation - Mars' portion during day (different from Gulika)
+    # Mars portions for each weekday (in hours from sunrise)
+    mandi_portions = [7.5, 15.0, 22.5, 6.0, 13.5, 21.0, 4.5]  # Sun-Sat
+    mandi_time = mandi_portions[weekday]
     
     # Calculate Mandi longitude
-    mandi_degrees = (mandi_time_from_sunrise * 30) % 360
-    mandi_longitude = (mandi_degrees - ayanamsa) % 360
+    mandi_longitude = (mandi_time * 15) % 360
+    
+    # Apply ayanamsa correction
+    gulika_longitude = (gulika_longitude - ayanamsa) % 360
+    mandi_longitude = (mandi_longitude - ayanamsa) % 360
     
     # Ensure positive longitudes
     if gulika_longitude < 0:
@@ -344,6 +333,8 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
         'sign': int(mandi_longitude / 30),
         'degree': mandi_longitude % 30
     }
+    
+
     
     return {
         "planets": planets,
@@ -657,6 +648,8 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
     birth_data = BirthData(**request['birth_data'])
     division_number = request.get('division', 9)
     
+
+    
     # First get the basic chart
     chart_data = await calculate_chart(birth_data, 'mean', current_user)
     
@@ -801,33 +794,46 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             'sign': house_sign
         })
     
-    # Calculate divisional positions for planets (exclude Gulika/Mandi for divisional charts)
-    main_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
+    # Calculate divisional positions for planets
+    # Include Gulika/Mandi in all charts
+    planets_to_process = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi']
     
-    for planet in main_planets:
+    for planet in planets_to_process:
         if planet in chart_data['planets']:
             planet_data = chart_data['planets'][planet]
-            planet_sign = int(planet_data['longitude'] / 30)
-            planet_degree = planet_data['longitude'] % 30
             
-            divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
-            
-            # Calculate the actual degree within the divisional sign
-            # Each division part represents 30/division_number degrees
-            part_size = 30.0 / division_number
-            part_index = int(planet_degree / part_size)
-            degree_within_part = planet_degree % part_size
-            # Scale the degree within part to full sign (0-30 degrees)
-            actual_degree = (degree_within_part / part_size) * 30.0
-            
-            divisional_longitude = divisional_sign * 30 + actual_degree
-            
-            divisional_data['planets'][planet] = {
-                'longitude': divisional_longitude,
-                'sign': divisional_sign,
-                'degree': actual_degree,
-                'retrograde': planet_data.get('retrograde', False)
-            }
+            # For Gulika and Mandi, keep original positions (don't apply divisional transformation)
+            if planet in ['Gulika', 'Mandi']:
+                divisional_data['planets'][planet] = {
+                    'longitude': planet_data['longitude'],
+                    'sign': planet_data['sign'],
+                    'degree': planet_data['degree']
+                }
+            else:
+                # Regular planetary divisional calculation
+                planet_sign = int(planet_data['longitude'] / 30)
+                planet_degree = planet_data['longitude'] % 30
+                
+                divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
+                
+                # Calculate the actual degree within the divisional sign
+                # Each division part represents 30/division_number degrees
+                part_size = 30.0 / division_number
+                part_index = int(planet_degree / part_size)
+                degree_within_part = planet_degree % part_size
+                # Scale the degree within part to full sign (0-30 degrees)
+                actual_degree = (degree_within_part / part_size) * 30.0
+                
+                divisional_longitude = divisional_sign * 30 + actual_degree
+                
+                divisional_data['planets'][planet] = {
+                    'longitude': divisional_longitude,
+                    'sign': divisional_sign,
+                    'degree': actual_degree,
+                    'retrograde': planet_data.get('retrograde', False)
+                }
+    
+
     
     return {
         'divisional_chart': divisional_data,
@@ -1327,6 +1333,25 @@ async def calculate_sub_dashas(request: dict):
             break
     
     return {'sub_dashas': sub_dashas}
+
+@app.post("/calculate-ashtakavarga")
+async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
+    from ashtakavarga import AshtakavargaCalculator
+    
+    birth_data = BirthData(**request['birth_data'])
+    chart_type = request.get('chart_type', 'lagna')
+    
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    calculator = AshtakavargaCalculator(birth_data, chart_data)
+    
+    sarva = calculator.calculate_sarvashtakavarga()
+    analysis = calculator.get_ashtakavarga_analysis(chart_type)
+    
+    return {
+        "ashtakavarga": sarva,
+        "analysis": analysis,
+        "chart_type": chart_type
+    }
 
 @app.get("/health")
 async def health_check():

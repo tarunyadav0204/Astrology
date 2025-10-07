@@ -225,7 +225,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
         return {
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
-          degree: data.degree.toFixed(2),
+          degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude)
         };
       });

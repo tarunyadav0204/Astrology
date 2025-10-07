@@ -255,7 +255,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
     const planetData = chartData.planets?.[planet.name];
     const isRetrograde = planetData?.retrograde;
     
-    console.log(`Planet ${planet.name}: retrograde=${isRetrograde}, data=`, planetData);
+
     
     let symbol = planet.symbol;
     if (isRetrograde) symbol += '(R)';
@@ -292,7 +292,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
         return {
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
-          degree: data.degree.toFixed(2),
+          degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude)
         };
       });

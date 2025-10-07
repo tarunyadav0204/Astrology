@@ -4,9 +4,11 @@ import NorthIndianChart from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import { apiService } from '../../services/apiService';
 import { WidgetContainer, WidgetHeader, WidgetTitle, StyleToggle, ChartContainer } from './ChartWidget.styles';
+import AshtakavargaModal from '../Ashtakavarga/AshtakavargaModal';
 
 const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, division, defaultStyle }) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
+  const [showAshtakavarga, setShowAshtakavarga] = useState(false);
 
   // Update chart style when defaultStyle prop changes
   useEffect(() => {
@@ -60,19 +62,11 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
 
   const processedData = getChartData();
   
-  // For divisional charts, exclude Gulika and Mandi as they are not calculated in divisional charts
-  if (chartType === 'navamsa' || chartType === 'divisional') {
-    if (processedData.planets) {
-      delete processedData.planets.Gulika;
-      delete processedData.planets.Mandi;
-    }
-  } else {
-    // Ensure Gulika and Mandi are included in Rashi chart
-    if (chartData && chartData.planets && !processedData.planets?.Gulika && chartData.planets.Gulika) {
-      processedData.planets = processedData.planets || {};
-      processedData.planets.Gulika = chartData.planets.Gulika;
-      processedData.planets.Mandi = chartData.planets.Mandi;
-    }
+  // Ensure Gulika and Mandi are included in all charts
+  if (chartData && chartData.planets && !processedData.planets?.Gulika && chartData.planets.Gulika) {
+    processedData.planets = processedData.planets || {};
+    processedData.planets.Gulika = chartData.planets.Gulika;
+    processedData.planets.Mandi = chartData.planets.Mandi;
   }
 
   const isMobile = window.innerWidth <= 768;
@@ -81,9 +75,25 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
     <WidgetContainer>
       <WidgetHeader>
         <WidgetTitle>{title}</WidgetTitle>
-        <StyleToggle onClick={toggleStyle}>
-          {isMobile ? (chartStyle === 'north' ? 'N' : 'S') : CHART_CONFIG.styles[chartStyle]}
-        </StyleToggle>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={() => setShowAshtakavarga(true)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '12px',
+              background: '#e91e63',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Ashtakavarga
+          </button>
+          <StyleToggle onClick={toggleStyle}>
+            {isMobile ? (chartStyle === 'north' ? 'N' : 'S') : CHART_CONFIG.styles[chartStyle]}
+          </StyleToggle>
+        </div>
       </WidgetHeader>
       
       <ChartContainer>
@@ -109,6 +119,13 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
           />
         )}
       </ChartContainer>
+      
+      <AshtakavargaModal 
+        isOpen={showAshtakavarga}
+        onClose={() => setShowAshtakavarga(false)}
+        birthData={birthData}
+        chartType={chartType}
+      />
     </WidgetContainer>
   );
 };
