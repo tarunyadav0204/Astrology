@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAstrology } from '../../context/AstrologyContext';
 import { DASHBOARD_CONFIG } from '../../config/dashboard.config';
 import ChartWidget from '../Charts/ChartWidget';
@@ -22,6 +22,8 @@ import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem 
 
 const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
   const [selectedChart, setSelectedChart] = useState('navamsa');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const isMobile = window.innerWidth <= 768;
   
   const divisionalCharts = [
     { value: 'navamsa', label: 'Navamsa (D9)', division: 9 },
@@ -37,24 +39,106 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
     { value: 'shashtyamsa', label: 'Shashtyamsa (D60)', division: 60 }
   ];
   
-  const titleWithDropdown = (
+  const currentChart = divisionalCharts.find(c => c.value === selectedChart);
+  
+
+  
+  const titleWithDropdown = `Divisional Chart (D${currentChart?.division || 9})`;
+  
+  if (isMobile) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '0.5rem', background: '#f8f9fa', borderBottom: '1px solid #ddd', position: 'relative' }}>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            style={{
+              padding: '0.3rem 0.5rem',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '0.8rem',
+              background: 'white',
+              width: '100%',
+              textAlign: 'left',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <span>{currentChart?.label}</span>
+            <span>▼</span>
+          </button>
+          {showDropdown && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: '0.5rem',
+              right: '0.5rem',
+              background: 'white',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}>
+              {divisionalCharts.map(chart => (
+                <button
+                  key={chart.value}
+                  onClick={() => {
+                    setSelectedChart(chart.value);
+                    setShowDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    background: selectedChart === chart.value ? '#f0f0f0' : 'white',
+                    border: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  {chart.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: 1 }}>
+          <ChartWidget
+            title={titleWithDropdown}
+            chartType="divisional"
+            chartData={chartData}
+            birthData={birthData}
+            division={currentChart?.division || 9}
+            defaultStyle={defaultStyle}
+          />
+        </div>
+      </div>
+    );
+  }
+  
+  // Desktop: Use original ChartWidget with title dropdown
+  const titleWithDesktopDropdown = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
-      <span>Divisional Chart</span>
+      <span>Divisional</span>
       <select 
         value={selectedChart} 
         onChange={(e) => setSelectedChart(e.target.value)}
         style={{
-          padding: '0.2rem 0.4rem',
+          padding: '0.2rem',
           border: '1px solid #ddd',
           borderRadius: '4px',
-          fontSize: '0.7rem',
+          fontSize: '0.6rem',
           background: 'white',
-          minWidth: '120px'
+          minWidth: '60px',
+          maxWidth: '80px'
         }}
       >
         {divisionalCharts.map(chart => (
           <option key={chart.value} value={chart.value}>
-            {chart.label}
+            D{chart.division}
           </option>
         ))}
       </select>
@@ -63,11 +147,11 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
   
   return (
     <ChartWidget
-      title={titleWithDropdown}
+      title={titleWithDesktopDropdown}
       chartType="divisional"
       chartData={chartData}
       birthData={birthData}
-      division={divisionalCharts.find(c => c.value === selectedChart)?.division || 9}
+      division={currentChart?.division || 9}
       defaultStyle={defaultStyle}
     />
   );

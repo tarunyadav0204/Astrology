@@ -75,12 +75,14 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
     }
   }
 
+  const isMobile = window.innerWidth <= 768;
+  
   return (
     <WidgetContainer>
       <WidgetHeader>
         <WidgetTitle>{title}</WidgetTitle>
         <StyleToggle onClick={toggleStyle}>
-          {CHART_CONFIG.styles[chartStyle]}
+          {isMobile ? (chartStyle === 'north' ? 'N' : 'S') : CHART_CONFIG.styles[chartStyle]}
         </StyleToggle>
       </WidgetHeader>
       
