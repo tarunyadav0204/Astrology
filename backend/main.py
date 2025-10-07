@@ -244,10 +244,10 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     
     for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
         if planet <= 6:  # Regular planets
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
+            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)
         else:  # Lunar nodes
             node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
-            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL)[0]
+            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL)
             if planet == 12:  # Ketu
                 pos = list(pos)
                 pos[0] = (pos[0] + 180) % 360
@@ -255,7 +255,8 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
         planets[planet_names[i]] = {
             'longitude': pos[0],
             'sign': int(pos[0] / 30),
-            'degree': pos[0] % 30
+            'degree': pos[0] % 30,
+            'retrograde': pos[3] < 0 if planet <= 6 else False  # Only regular planets can be retrograde
         }
     
     # Calculate ascendant and houses
@@ -356,9 +357,9 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
     
     for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
         if planet <= 6:  # Regular planets
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
+            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)
         else:  # Lunar nodes - always use mean for transits
-            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)[0]
+            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)
             if planet == 12:  # Ketu
                 pos = list(pos)
                 pos[0] = (pos[0] + 180) % 360
@@ -366,7 +367,8 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
         planets[planet_names[i]] = {
             'longitude': pos[0],
             'sign': int(pos[0] / 30),
-            'degree': pos[0] % 30
+            'degree': pos[0] % 30,
+            'retrograde': pos[3] < 0 if planet <= 6 else False
         }
     
     # Calculate birth chart houses for transit display

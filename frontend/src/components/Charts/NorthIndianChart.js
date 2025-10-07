@@ -252,10 +252,15 @@ const NorthIndianChart = ({ chartData, birthData }) => {
 
   const getPlanetSymbolWithStatus = (planet) => {
     const status = getPlanetStatus(planet);
-    if (status === 'combusted') return planet.symbol + '(c)';
-    if (status === 'exalted') return planet.symbol + '↑';
-    if (status === 'debilitated') return planet.symbol + '↓';
-    return planet.symbol;
+    const planetData = chartData.planets?.[planet.name];
+    const isRetrograde = planetData?.retrograde;
+    
+    let symbol = planet.symbol;
+    if (isRetrograde) symbol += 'R';
+    if (status === 'combusted') symbol += '(c)';
+    if (status === 'exalted') symbol += '↑';
+    if (status === 'debilitated') symbol += '↓';
+    return symbol;
   };
 
   const getNakshatra = (longitude) => {
