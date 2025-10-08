@@ -340,9 +340,10 @@ const NorthIndianChart = ({ chartData, birthData }) => {
         viewBox="0 0 400 400" 
         style={{ 
           width: '100%', 
-          height: '100%',
-          minHeight: '280px',
-          maxWidth: '100%'
+          height: window.innerWidth <= 768 ? 'auto' : '100%',
+          minHeight: window.innerWidth <= 768 ? '350px' : '280px',
+          maxWidth: '100%',
+          aspectRatio: '1/1'
         }}
         preserveAspectRatio="xMidYMid meet"
       >

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './styles/mobile-fixes.css';
 import BirthForm from './components/BirthForm/BirthForm';
 import Dashboard from './components/Dashboard/Dashboard';
 import PredictionsPage from './components/PredictionsPage/PredictionsPage';
@@ -10,7 +11,7 @@ import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
-import InstallPrompt from './components/InstallPrompt';
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -114,7 +115,7 @@ function App() {
           draggable
           pauseOnHover
         />
-        <InstallPrompt />
+
       </div>
     </AstrologyProvider>
   );

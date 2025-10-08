@@ -11,14 +11,6 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
   useEffect(() => {
-    // Add mobile console for debugging
-    if (window.innerWidth <= 768 && !window.eruda) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/eruda';
-      script.onload = () => window.eruda.init();
-      document.head.appendChild(script);
-    }
-    
     if (isOpen && birthData) {
       fetchAshtakavarga();
     }

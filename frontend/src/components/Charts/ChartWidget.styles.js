@@ -100,7 +100,7 @@ export const ChartContainer = styled.div`
   }
   
   @media (max-width: 768px) {
-    padding: 0.5rem;
+    padding: 0;
     
     svg {
       min-height: 280px;

@@ -1,0 +1,51 @@
+/* Mobile Safari viewport fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific fixes */
+  .mobile-fixed-header {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+  }
+  
+  .mobile-fixed-tabs {
+    position: fixed !important;
+    top: 50px !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 999 !important;
+  }
+  
+  /* Prevent viewport height changes */
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* General mobile fixes */
+@media (max-width: 768px) {
+  /* Prevent horizontal scroll */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Smooth scrolling for touch devices */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Fix for sticky elements on mobile */
+  .sticky-mobile {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+}

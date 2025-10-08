@@ -16,6 +16,7 @@ import UnifiedHeader from '../UnifiedHeader/UnifiedHeader';
 import RuleManager from '../RuleEngine/RuleManager';
 import EventAnalyzer from '../RuleEngine/EventAnalyzer';
 import UserSettings from '../UserSettings';
+import TransitDateControls from '../TransitDateControls/TransitDateControls';
 import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem } from './Dashboard.styles';
 
 
@@ -299,7 +300,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         onNewChart={onBack}
         onLogout={onLogout}
         user={user}
-        showTransitControls={true}
+        showTransitControls={window.innerWidth > 768}
         transitDate={transitDate}
         onTransitDateChange={handleTransitDateChange}
         onResetToToday={resetToToday}
@@ -311,13 +312,18 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         borderBottom: '3px solid #e91e63',
         marginBottom: '0.5rem',
         background: '#f8f9fa',
-        borderRadius: '8px',
+        borderRadius: window.innerWidth <= 768 ? '0' : '8px',
         padding: '0.3rem',
-        margin: '0 0.5rem',
+        margin: window.innerWidth <= 768 ? '0' : '0 0.5rem',
         overflowX: 'auto',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
+        position: window.innerWidth <= 768 ? 'fixed' : 'static',
+        top: window.innerWidth <= 768 ? '60px' : 'auto',
+        left: window.innerWidth <= 768 ? '0' : 'auto',
+        right: window.innerWidth <= 768 ? '0' : 'auto',
+        zIndex: window.innerWidth <= 768 ? 999 : 'auto'
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
@@ -367,7 +373,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
             flexDirection: 'column', 
             height: 'calc(100vh - 140px)',
             position: 'fixed',
-            top: '140px',
+            top: '110px',
             left: '0',
             right: '0',
             bottom: '0'
@@ -402,15 +408,22 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 </div>
               )}
               {mobileSubTab === 'transit' && (
-                <div style={{ height: '100%' }}>
-                  <ChartWidget
-                    title="Transit Chart"
-                    chartType="transit"
-                    chartData={transitData || chartData}
-                    birthData={birthData}
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <TransitDateControls
                     transitDate={transitDate}
-                    defaultStyle={userSettings.default_chart_style}
+                    onTransitDateChange={handleTransitDateChange}
+                    onResetToToday={resetToToday}
                   />
+                  <div style={{ flex: 1 }}>
+                    <ChartWidget
+                      title="Transit Chart"
+                      chartType="transit"
+                      chartData={transitData || chartData}
+                      birthData={birthData}
+                      transitDate={transitDate}
+                      defaultStyle={userSettings.default_chart_style}
+                    />
+                  </div>
                 </div>
               )}
               {mobileSubTab === 'divisional' && (
@@ -423,14 +436,20 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 </div>
               )}
               {mobileSubTab === 'dashas' && (
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '1fr 1fr', 
-                  gridTemplateRows: 'repeat(3, 1fr)',
-                  gap: '0.5rem', 
-                  height: '100%', 
-                  overflow: 'auto' 
-                }}>
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <TransitDateControls
+                    transitDate={transitDate}
+                    onTransitDateChange={handleTransitDateChange}
+                    onResetToToday={resetToToday}
+                  />
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr', 
+                    gridTemplateRows: 'repeat(3, 1fr)',
+                    gap: '0.5rem', 
+                    flex: 1, 
+                    overflow: 'auto' 
+                  }}>
                   <div>
                     <DashaWidget
                       title="Maha"
@@ -486,6 +505,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       transitDate={transitDate}
                     />
                   </div>
+                </div>
                 </div>
               )}
               {mobileSubTab === 'yogi' && (

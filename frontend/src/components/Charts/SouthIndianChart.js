@@ -276,14 +276,13 @@ const SouthIndianChart = ({ chartData, birthData }) => {
         </div>
       )}
       <svg 
-        width="300" 
-        height="320" 
         viewBox="0 0 300 320"
         style={{ 
           width: '100%', 
-          height: '100%',
-          minHeight: '280px',
-          maxWidth: '100%'
+          height: window.innerWidth <= 768 ? 'auto' : '100%',
+          minHeight: window.innerWidth <= 768 ? '350px' : '280px',
+          maxWidth: '100%',
+          aspectRatio: window.innerWidth <= 768 ? '300/320' : 'auto'
         }}
         preserveAspectRatio="xMidYMid meet"
       >

@@ -81,9 +81,11 @@ const UnifiedHeader = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      position: 'sticky',
+      position: window.innerWidth <= 768 ? 'fixed' : 'sticky',
       top: 0,
-      zIndex: 100,
+      left: 0,
+      right: 0,
+      zIndex: 1000,
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       overflowX: 'hidden',
       minHeight: isMobile ? '50px' : '60px'
