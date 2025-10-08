@@ -12,7 +12,8 @@ const UnifiedHeader = ({
   showTransitControls = false,
   transitDate,
   onTransitDateChange,
-  onResetToToday
+  onResetToToday,
+  onSettings
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -81,9 +82,10 @@ const UnifiedHeader = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      position: 'sticky',
+      position: window.innerWidth <= 768 ? 'fixed' : 'sticky',
       top: 0,
       zIndex: 100,
+      width: window.innerWidth <= 768 ? '100%' : 'auto',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       overflowX: 'hidden',
       minHeight: isMobile ? '50px' : '60px'
@@ -170,6 +172,27 @@ const UnifiedHeader = ({
                   }}
                 >
                   ➕ New Chart
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('Settings clicked');
+                    if (onSettings) onSettings();
+                    setShowMenu(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'white',
+                    border: 'none',
+                    borderBottom: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  ⚙️ Settings
                 </button>
                 <div
                   style={{

@@ -304,6 +304,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         transitDate={transitDate}
         onTransitDateChange={handleTransitDateChange}
         onResetToToday={resetToToday}
+        onSettings={() => setActiveTab('settings')}
       />
 
       {/* Tab Navigation */}
@@ -319,7 +320,11 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
-        position: 'static'
+        position: window.innerWidth <= 768 ? 'fixed' : 'static',
+        top: window.innerWidth <= 768 ? '60px' : 'auto',
+        left: window.innerWidth <= 768 ? '0' : 'auto',
+        right: window.innerWidth <= 768 ? '0' : 'auto',
+        zIndex: window.innerWidth <= 768 ? 200 : 'auto'
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
@@ -367,9 +372,8 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           <div style={{ 
             display: 'flex', 
             flexDirection: 'column', 
-            height: 'calc(100vh - 140px)',
             position: 'fixed',
-            top: '110px',
+            top: '120px',
             left: '0',
             right: '0',
             bottom: '0'
@@ -379,7 +383,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               flex: 1, 
               padding: '0.5rem', 
               overflow: 'hidden',
-              paddingBottom: '80px'
+              marginBottom: '80px'
             }}>
               {mobileSubTab === 'lagna' && (
                 <div style={{ height: '100%' }}>
@@ -531,7 +535,8 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               bottom: '0',
               left: '0',
               right: '0',
-              zIndex: 100
+              zIndex: 1000,
+              width: '100%'
             }}>
               {[
                 { id: 'lagna', label: '📊 Lagna', icon: '📊' },

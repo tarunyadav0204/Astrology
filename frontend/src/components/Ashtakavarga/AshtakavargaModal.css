@@ -9,7 +9,7 @@
   justify-content: center;
   align-items: flex-start;
   padding-top: 2vh;
-  z-index: 9999;
+  z-index: 1000000;
 }
 
 .ashtakavarga-modal {
@@ -272,8 +272,8 @@
 
 @media (max-width: 768px) {
   .ashtakavarga-modal-overlay {
-    padding: 5vh 5px;
-    align-items: center;
+    padding: 120px 5px 5px 5px;
+    align-items: flex-start;
   }
   
   .ashtakavarga-modal {
