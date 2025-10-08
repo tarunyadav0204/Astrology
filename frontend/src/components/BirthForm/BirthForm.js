@@ -69,14 +69,25 @@ const BirthForm = ({ onSubmit, onLogout }) => {
 
   const selectExistingChart = async (chart) => {
     try {
-      const chartData = await apiService.calculateChart({
+      const birthData = {
         name: chart.name,
         date: chart.date,
         time: chart.time,
         latitude: chart.latitude,
         longitude: chart.longitude,
         timezone: chart.timezone
-      });
+      };
+      
+      const [chartData, yogiData] = await Promise.all([
+        apiService.calculateChart(birthData),
+        apiService.calculateYogi(birthData)
+      ]);
+      
+      // Merge Yogi data into chart data
+      const enhancedChartData = {
+        ...chartData,
+        yogiData: yogiData
+      };
       
       setBirthData({
         name: chart.name,
@@ -88,7 +99,7 @@ const BirthForm = ({ onSubmit, onLogout }) => {
         timezone: chart.timezone
       });
       
-      setChartData(chartData);
+      setChartData(enhancedChartData);
       toast.success('Chart loaded successfully!');
       onSubmit();
     } catch (error) {
@@ -248,9 +259,19 @@ const BirthForm = ({ onSubmit, onLogout }) => {
         loadExistingCharts(searchQuery);
         cancelEdit();
       } else {
-        const chartData = await apiService.calculateChart(formData);
+        const [chartData, yogiData] = await Promise.all([
+          apiService.calculateChart(formData),
+          apiService.calculateYogi(formData)
+        ]);
+        
+        // Merge Yogi data into chart data
+        const enhancedChartData = {
+          ...chartData,
+          yogiData: yogiData
+        };
+        
         setBirthData(formData);
-        setChartData(chartData);
+        setChartData(enhancedChartData);
         toast.success('Birth chart calculated successfully!');
         onSubmit();
       }

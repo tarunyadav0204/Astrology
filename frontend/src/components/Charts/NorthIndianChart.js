@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CHART_CONFIG } from '../../config/dashboard.config';
 import { apiService } from '../../services/apiService';
+import HouseContextMenu from './HouseContextMenu';
+import HouseAnalysisModal from './HouseAnalysisModal';
 
 /**
  * NORTH INDIAN CHART POSITIONING REFERENCE
@@ -54,11 +56,16 @@ const NorthIndianChart = ({ chartData, birthData }) => {
   const { signs, planets } = CHART_CONFIG;
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
+  const [houseContextMenu, setHouseContextMenu] = useState({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
   const [friendshipData, setFriendshipData] = useState(null);
   const [highlightedPlanet, setHighlightedPlanet] = useState(null);
   const [highlightMode, setHighlightMode] = useState(null);
   const [customAscendant, setCustomAscendant] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [houseAnalysisModal, setHouseAnalysisModal] = useState({ show: false, houseNumber: null, signName: null });
+  const [houseSignificationsModal, setHouseSignificationsModal] = useState({ show: false, houseNumber: null, signName: null });
+  const [aspectsHighlight, setAspectsHighlight] = useState({ show: false, houseNumber: null });
+  const [houseStrengthModal, setHouseStrengthModal] = useState({ show: false, houseNumber: null, signName: null });
   
 
   
@@ -131,17 +138,23 @@ const NorthIndianChart = ({ chartData, birthData }) => {
     });
   };
 
-  const handleRashiRightClick = (e, rashiIndex) => {
-    e.preventDefault();
+  const handleRashiClick = (e, rashiIndex, houseNumber) => {
+    e.stopPropagation();
+    if (e.type === 'contextmenu') {
+      e.preventDefault();
+    }
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
-    setContextMenu({
+    
+    // For mobile, use touch coordinates; for desktop, use mouse coordinates
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    setHouseContextMenu({
       show: true,
-      x: e.clientX,
-      y: e.clientY,
-      planet: null,
-      rashi: rashiIndex,
-      rashiName: rashiNames[rashiIndex],
-      type: 'rashi'
+      x: clientX,
+      y: clientY,
+      houseNumber: houseNumber,
+      signName: rashiNames[rashiIndex]
     });
   };
 
@@ -162,6 +175,65 @@ const NorthIndianChart = ({ chartData, birthData }) => {
 
   const resetAscendant = () => {
     setCustomAscendant(null);
+  };
+
+  const handleMakeAscendant = (houseNumber, signName) => {
+    const rashiIndex = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'].indexOf(signName);
+    setCustomAscendant(rashiIndex);
+  };
+
+  const handleShowAspects = (houseNumber, signName) => {
+    // Calculate which houses aspect this house
+    const aspectingHouses = [];
+    const aspectedHouses = [];
+    
+    // 4th and 8th aspects from this house
+    aspectedHouses.push((houseNumber + 3) % 12 || 12); // 4th house
+    aspectedHouses.push((houseNumber + 7) % 12 || 12); // 8th house
+    
+    // Houses that aspect this house (reverse calculation)
+    aspectingHouses.push((houseNumber + 8) % 12 || 12); // 4th aspect to this house
+    aspectingHouses.push((houseNumber + 4) % 12 || 12); // 8th aspect to this house
+    
+    // Mars aspects (4th, 7th, 8th)
+    const marsHouse = chartData.planets?.Mars ? Math.floor(chartData.planets.Mars.longitude / 30) + 1 : null;
+    if (marsHouse) {
+      const marsAspects = [(marsHouse + 3) % 12 || 12, (marsHouse + 6) % 12 || 12, (marsHouse + 7) % 12 || 12];
+      if (marsAspects.includes(houseNumber)) aspectingHouses.push(marsHouse);
+    }
+    
+    // Jupiter aspects (5th, 7th, 9th)
+    const jupiterHouse = chartData.planets?.Jupiter ? Math.floor(chartData.planets.Jupiter.longitude / 30) + 1 : null;
+    if (jupiterHouse) {
+      const jupiterAspects = [(jupiterHouse + 4) % 12 || 12, (jupiterHouse + 6) % 12 || 12, (jupiterHouse + 8) % 12 || 12];
+      if (jupiterAspects.includes(houseNumber)) aspectingHouses.push(jupiterHouse);
+    }
+    
+    // Saturn aspects (3rd, 7th, 10th)
+    const saturnHouse = chartData.planets?.Saturn ? Math.floor(chartData.planets.Saturn.longitude / 30) + 1 : null;
+    if (saturnHouse) {
+      const saturnAspects = [(saturnHouse + 2) % 12 || 12, (saturnHouse + 6) % 12 || 12, (saturnHouse + 9) % 12 || 12];
+      if (saturnAspects.includes(houseNumber)) aspectingHouses.push(saturnHouse);
+    }
+    
+    setAspectsHighlight({ 
+      show: true, 
+      houseNumber, 
+      aspectingHouses: [...new Set(aspectingHouses)], 
+      aspectedHouses: [...new Set(aspectedHouses)] 
+    });
+  };
+
+  const handleHouseAnalysis = (houseNumber, signName) => {
+    setHouseAnalysisModal({ show: true, houseNumber, signName });
+  };
+
+  const handleHouseSignifications = (houseNumber, signName) => {
+    setHouseSignificationsModal({ show: true, houseNumber, signName });
+  };
+
+  const handleHouseStrength = (houseNumber, signName) => {
+    setHouseStrengthModal({ show: true, houseNumber, signName });
   };
 
   const isCombusted = (planet) => {
@@ -300,7 +372,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {(highlightedPlanet || customAscendant !== null) && (
+      {(highlightedPlanet || customAscendant !== null || aspectsHighlight.show) && (
         <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10, display: 'flex', gap: '4px' }}>
           {highlightedPlanet && (
             <button
@@ -332,6 +404,22 @@ const NorthIndianChart = ({ chartData, birthData }) => {
               }}
             >
               Reset
+            </button>
+          )}
+          {aspectsHighlight.show && (
+            <button
+              onClick={() => setAspectsHighlight({ show: false, houseNumber: null })}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                background: '#2196f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Clear Aspects
             </button>
           )}
         </div>
@@ -385,7 +473,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
       
       {/* Instruction text */}
       <text x="200" y="390" fontSize="10" fill="#666" textAnchor="middle" fontStyle="italic">
-        Hover or touch planets to see Nakshatra and degree
+        {aspectsHighlight.show ? 'Pink: Selected House | Green: Aspecting Houses | Orange: Aspected Houses' : 'Hover or touch planets to see Nakshatra and degree'}
       </text>
       
       {/* Houses */}
@@ -402,6 +490,20 @@ const NorthIndianChart = ({ chartData, birthData }) => {
           <g key={houseNumber}>
 
 
+            
+            {/* House highlighting for aspects */}
+            {aspectsHighlight.show && aspectsHighlight.houseNumber === houseNumber && (
+              <circle cx={houseData.center.x} cy={houseData.center.y} r="35" 
+                      fill="rgba(233, 30, 99, 0.2)" stroke="#e91e63" strokeWidth="3" strokeDasharray="5,5"/>
+            )}
+            {aspectsHighlight.show && aspectsHighlight.aspectingHouses?.includes(houseNumber) && (
+              <circle cx={houseData.center.x} cy={houseData.center.y} r="30" 
+                      fill="rgba(76, 175, 80, 0.2)" stroke="#4caf50" strokeWidth="2"/>
+            )}
+            {aspectsHighlight.show && aspectsHighlight.aspectedHouses?.includes(houseNumber) && (
+              <circle cx={houseData.center.x} cy={houseData.center.y} r="25" 
+                      fill="rgba(255, 152, 0, 0.2)" stroke="#ff9800" strokeWidth="2"/>
+            )}
             
             {/* Rashi number (Aries=1, Taurus=2, etc.) */}
             <text x={houseNumber === 1 ? houseData.center.x - 5 :
@@ -424,7 +526,17 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                   fill={customAscendant === rashiIndex ? "#e91e63" : "#333"} 
                   fontWeight={customAscendant === rashiIndex ? "900" : "bold"}
                   style={{ cursor: 'pointer' }}
-                  onContextMenu={(e) => handleRashiRightClick(e, rashiIndex)}>
+                  onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
+                  onClick={(e) => {
+                    if (window.innerWidth <= 768) {
+                      handleRashiClick(e, rashiIndex, houseNumber);
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (window.innerWidth <= 768) {
+                      handleRashiClick(e, rashiIndex, houseNumber);
+                    }
+                  }}>
               {rashiIndex + 1}
             </text>
             
@@ -553,7 +665,6 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                       }}
                       onTouchStart={(e) => {
                         setIsTouchDevice(true);
-                        e.preventDefault();
                         const rect = e.currentTarget.closest('svg').getBoundingClientRect();
                         const isRightSide = [8, 9, 10, 11, 12].includes(houseNumber);
                         const offsetX = isRightSide ? -120 : 10;
@@ -590,6 +701,19 @@ const NorthIndianChart = ({ chartData, birthData }) => {
           {tooltip.text}
         </div>
       )}
+      
+      <HouseContextMenu
+        isOpen={houseContextMenu.show}
+        position={{ x: houseContextMenu.x, y: houseContextMenu.y }}
+        houseNumber={houseContextMenu.houseNumber}
+        signName={houseContextMenu.signName}
+        onClose={() => setHouseContextMenu({ show: false, x: 0, y: 0, houseNumber: null, signName: null })}
+        onMakeAscendant={handleMakeAscendant}
+        onShowAspects={handleShowAspects}
+        onHouseAnalysis={handleHouseAnalysis}
+        onHouseSignifications={handleHouseSignifications}
+        onHouseStrength={handleHouseStrength}
+      />
       
       {contextMenu.show && createPortal(
         <div style={{
@@ -652,6 +776,68 @@ const NorthIndianChart = ({ chartData, birthData }) => {
         document.body
       )}
       
+      <HouseAnalysisModal
+        isOpen={houseAnalysisModal.show}
+        onClose={() => setHouseAnalysisModal({ show: false, houseNumber: null, signName: null })}
+        houseNumber={houseAnalysisModal.houseNumber}
+        signName={houseAnalysisModal.signName}
+        chartData={chartData}
+        getPlanetsInHouse={getPlanetsInHouse}
+        getRashiForHouse={getRashiForHouse}
+      />
+
+      {/* House Significations Modal */}
+      {houseSignificationsModal.show && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} onClick={() => setHouseSignificationsModal({ show: false, houseNumber: null, signName: null })}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '12px', padding: '20px',
+            maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto'
+          }} onClick={e => e.stopPropagation()}>
+            <h3>House {houseSignificationsModal.houseNumber} Significations ({houseSignificationsModal.signName})</h3>
+            <p>{{
+              1: "Self, personality, appearance, health, vitality, general well-being",
+              2: "Wealth, family, speech, food, values, accumulated resources",
+              3: "Siblings, courage, communication, short journeys, skills",
+              4: "Mother, home, property, education, happiness, emotional foundation",
+              5: "Children, creativity, intelligence, romance, speculation",
+              6: "Enemies, diseases, debts, service, obstacles, daily work",
+              7: "Spouse, partnerships, business, public relations, marriage",
+              8: "Longevity, transformation, occult, inheritance, sudden events",
+              9: "Father, guru, dharma, fortune, higher learning, spirituality",
+              10: "Career, reputation, authority, social status, achievements",
+              11: "Gains, friends, elder siblings, aspirations, income",
+              12: "Losses, expenses, foreign lands, spirituality, liberation"
+            }[houseSignificationsModal.houseNumber]}</p>
+            <button onClick={() => setHouseSignificationsModal({ show: false, houseNumber: null, signName: null })} 
+                    style={{ marginTop: '15px', padding: '8px 16px', backgroundColor: '#e91e63', color: 'white', border: 'none', borderRadius: '6px' }}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* House Strength Modal */}
+      {houseStrengthModal.show && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} onClick={() => setHouseStrengthModal({ show: false, houseNumber: null, signName: null })}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '12px', padding: '20px',
+            maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto'
+          }} onClick={e => e.stopPropagation()}>
+            <h3>House {houseStrengthModal.houseNumber} Strength ({houseStrengthModal.signName})</h3>
+            <p><strong>Occupancy:</strong> {getPlanetsInHouse(houseStrengthModal.houseNumber - 1).length} planets</p>
+            <p><strong>Aspects:</strong> Analyzing planetary aspects...</p>
+            <p><strong>House Lord:</strong> {['Mars', 'Venus', 'Mercury', 'Moon', 'Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Saturn', 'Jupiter'][houseStrengthModal.houseNumber - 1]} strength analysis</p>
+            <button onClick={() => setHouseStrengthModal({ show: false, houseNumber: null, signName: null })} 
+                    style={{ marginTop: '15px', padding: '8px 16px', backgroundColor: '#e91e63', color: 'white', border: 'none', borderRadius: '6px' }}>Close</button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
