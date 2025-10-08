@@ -700,7 +700,8 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           background: 'rgba(255,255,255,0.95)',
           borderRadius: '12px',
           padding: '1rem',
-          margin: '0 1rem',
+          margin: window.innerWidth <= 768 ? '0 0.5rem' : '0 1rem',
+          marginTop: window.innerWidth <= 768 ? '110px' : '0',
           minHeight: '70vh',
           boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
         }}>

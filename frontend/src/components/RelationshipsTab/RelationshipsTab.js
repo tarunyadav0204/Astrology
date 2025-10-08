@@ -6,6 +6,7 @@ const RelationshipsTab = ({ chartData, birthData }) => {
   const [matrices, setMatrices] = useState(null);
 
   const planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
+  const planetAbbr = { 'Sun': 'Su', 'Moon': 'Mo', 'Mars': 'Ma', 'Mercury': 'Me', 'Jupiter': 'Ju', 'Venus': 'Ve', 'Saturn': 'Sa' };
 
   useEffect(() => {
     if (chartData && birthData) {
@@ -158,7 +159,7 @@ const RelationshipsTab = ({ chartData, birthData }) => {
             borderCollapse: 'collapse',
             fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.8rem',
             border: '1px solid #e5e7eb',
-            minWidth: window.innerWidth <= 768 ? '400px' : 'auto'
+            minWidth: window.innerWidth <= 768 ? '280px' : 'auto'
           }}>
             <thead>
               <tr>
@@ -176,11 +177,11 @@ const RelationshipsTab = ({ chartData, birthData }) => {
                     background: 'white', 
                     color: '#e91e63',
                     border: '1px solid #e5e7eb',
-                    minWidth: window.innerWidth <= 768 ? '45px' : '60px',
+                    minWidth: window.innerWidth <= 768 ? '30px' : '60px',
                     fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.7rem',
                     fontWeight: '600'
                   }}>
-                    {planet}
+                    {window.innerWidth <= 768 ? planetAbbr[planet] : planet}
                   </th>
                 ))}
               </tr>
@@ -196,7 +197,7 @@ const RelationshipsTab = ({ chartData, birthData }) => {
                     fontWeight: '600',
                     fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.7rem'
                   }}>
-                    {planet1}
+                    {window.innerWidth <= 768 ? planetAbbr[planet1] : planet1}
                   </td>
                   {planets.map(planet2 => {
                     const relationship = matrix[planet1]?.[planet2] || 'N';
