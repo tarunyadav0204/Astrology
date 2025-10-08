@@ -282,7 +282,7 @@ const BirthForm = ({ onSubmit, onLogout }) => {
   };
 
   return (
-    <TwoPanelContainer>
+    <TwoPanelContainer style={{ overflow: 'visible' }}>
       <FormPanel>
         <FormContainer>
           <h2 style={{ marginBottom: '20px' }}>Birth Details</h2>

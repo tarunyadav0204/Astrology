@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 const HouseContextMenu = ({ 
   isOpen, 
@@ -62,12 +63,7 @@ const HouseContextMenu = ({
       action: onHouseSignifications,
       description: 'What this house represents'
     },
-    {
-      icon: '⚡',
-      label: 'House Strength',
-      action: onHouseStrength,
-      description: 'Strength and influences'
-    }
+
   ];
 
   const handleItemClick = (action) => {
@@ -76,12 +72,38 @@ const HouseContextMenu = ({
   };
 
   // Adjust position to keep menu within viewport
+  const menuWidth = 220;
+  const menuHeight = 300;
+  
+  let adjustedLeft = position.x;
+  let adjustedTop = position.y;
+  
+  // Keep menu within right boundary
+  if (adjustedLeft + menuWidth > window.innerWidth) {
+    adjustedLeft = position.x - menuWidth;
+  }
+  
+  // Keep menu within bottom boundary
+  if (adjustedTop + menuHeight > window.innerHeight) {
+    adjustedTop = position.y - menuHeight;
+  }
+  
+  // Ensure menu doesn't go off left edge
+  if (adjustedLeft < 10) {
+    adjustedLeft = 10;
+  }
+  
+  // Ensure menu doesn't go off top edge
+  if (adjustedTop < 10) {
+    adjustedTop = 10;
+  }
+  
   const adjustedPosition = {
-    left: Math.min(position.x, window.innerWidth - 220),
-    top: Math.min(position.y, window.innerHeight - 300)
+    left: adjustedLeft,
+    top: adjustedTop
   };
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div 
@@ -102,14 +124,14 @@ const HouseContextMenu = ({
         ref={menuRef}
         style={{
           position: 'fixed',
-          left: adjustedPosition.left,
-          top: adjustedPosition.top,
+          left: Math.max(10, Math.min(position.x, window.innerWidth - 220)),
+          top: Math.max(10, Math.min(position.y, window.innerHeight - 280)),
           backgroundColor: 'white',
           borderRadius: '12px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
           border: '1px solid rgba(0, 0, 0, 0.08)',
           minWidth: '200px',
-          zIndex: 9999,
+          zIndex: 99999,
           overflow: 'hidden',
           animation: 'contextMenuSlideIn 0.15s ease-out'
         }}
@@ -202,7 +224,8 @@ const HouseContextMenu = ({
           }
         }
       `}</style>
-    </>
+    </>,
+    document.body
   );
 };
 

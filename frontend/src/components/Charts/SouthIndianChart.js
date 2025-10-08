@@ -198,10 +198,14 @@ const SouthIndianChart = ({ chartData, birthData }) => {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
+    const isMobile = window.innerWidth <= 768;
+    const relativeX = Math.min(clientX, window.innerWidth - 220);
+    const relativeY = isMobile ? Math.max(200, clientY) : Math.max(50, clientY);
+    
     setHouseContextMenu({
       show: true,
-      x: clientX,
-      y: clientY,
+      x: relativeX,
+      y: relativeY,
       houseNumber: houseNumber,
       signName: rashiNames[rashiIndex]
     });
@@ -232,38 +236,66 @@ const SouthIndianChart = ({ chartData, birthData }) => {
   };
 
   const handleShowAspects = (houseNumber, signName) => {
-    const aspectingHouses = [];
-    const aspectedHouses = [];
+    const aspectingPlanets = [];
     
-    aspectedHouses.push((houseNumber + 3) % 12 || 12);
-    aspectedHouses.push((houseNumber + 7) % 12 || 12);
-    
-    aspectingHouses.push((houseNumber + 8) % 12 || 12);
-    aspectingHouses.push((houseNumber + 4) % 12 || 12);
-    
-    const marsHouse = chartData.planets?.Mars ? getHouseNumber(chartData.planets.Mars.sign) : null;
-    if (marsHouse) {
-      const marsAspects = [(marsHouse + 3) % 12 || 12, (marsHouse + 6) % 12 || 12, (marsHouse + 7) % 12 || 12];
-      if (marsAspects.includes(houseNumber)) aspectingHouses.push(marsHouse);
-    }
-    
-    const jupiterHouse = chartData.planets?.Jupiter ? getHouseNumber(chartData.planets.Jupiter.sign) : null;
-    if (jupiterHouse) {
-      const jupiterAspects = [(jupiterHouse + 4) % 12 || 12, (jupiterHouse + 6) % 12 || 12, (jupiterHouse + 8) % 12 || 12];
-      if (jupiterAspects.includes(houseNumber)) aspectingHouses.push(jupiterHouse);
-    }
-    
-    const saturnHouse = chartData.planets?.Saturn ? getHouseNumber(chartData.planets.Saturn.sign) : null;
-    if (saturnHouse) {
-      const saturnAspects = [(saturnHouse + 2) % 12 || 12, (saturnHouse + 6) % 12 || 12, (saturnHouse + 9) % 12 || 12];
-      if (saturnAspects.includes(houseNumber)) aspectingHouses.push(saturnHouse);
-    }
+    // Find planets that aspect this house
+    Object.entries(chartData.planets || {}).forEach(([planetName, planetData]) => {
+      const planetSign = planetData.sign;
+      const ascendantSign = chartData.houses?.[0]?.sign || 0;
+      const planetHouse = ((planetSign - ascendantSign + 12) % 12) + 1;
+      
+      let isAspecting = false;
+      let aspectType = '';
+      
+      // 7th aspect (all planets)
+      const seventhAspect = (planetHouse + 6) % 12 || 12;
+      if (seventhAspect === houseNumber) {
+        isAspecting = true;
+        aspectType = '7th';
+      }
+      
+      // Special aspects
+      if (planetName === 'Mars') {
+        const marsAspects = [(planetHouse + 3) % 12 || 12, (planetHouse + 7) % 12 || 12];
+        if (marsAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = marsAspects[0] === houseNumber ? '4th' : '8th';
+        }
+      } else if (planetName === 'Jupiter') {
+        const jupiterAspects = [(planetHouse + 4) % 12 || 12, (planetHouse + 8) % 12 || 12];
+        if (jupiterAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = jupiterAspects[0] === houseNumber ? '5th' : '9th';
+        }
+      } else if (planetName === 'Saturn') {
+        const saturnAspects = [(planetHouse + 2) % 12 || 12, (planetHouse + 9) % 12 || 12];
+        if (saturnAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = saturnAspects[0] === houseNumber ? '3rd' : '10th';
+        }
+      } else if (['Rahu', 'Ketu'].includes(planetName)) {
+        const rahuKetuAspects = [(planetHouse + 2) % 12 || 12, (planetHouse + 10) % 12 || 12];
+        if (rahuKetuAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = rahuKetuAspects[0] === houseNumber ? '3rd' : '11th';
+        }
+      }
+      
+      if (isAspecting) {
+        const isNaturalBenefic = ['Jupiter', 'Venus', 'Moon'].includes(planetName);
+        aspectingPlanets.push({
+          name: planetName,
+          house: planetHouse,
+          aspectType,
+          isPositive: isNaturalBenefic
+        });
+      }
+    });
     
     setAspectsHighlight({ 
       show: true, 
       houseNumber, 
-      aspectingHouses: [...new Set(aspectingHouses)], 
-      aspectedHouses: [...new Set(aspectedHouses)] 
+      aspectingPlanets
     });
   };
 
@@ -461,15 +493,24 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                     planetY = startY + (pIndex * lineHeight);
                   }
                   
+                  const aspectingPlanet = aspectsHighlight.show && aspectsHighlight.aspectingPlanets?.find(p => p.name === planet.name);
+                  
                   return (
-                    <text key={pIndex} 
-                          x={planetX} 
-                          y={planetY} 
-                          fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : totalPlanets > 1 ? "11" : "14"} 
-                          fill={getPlanetColor(planet)}
-                          fontWeight="900"
-                          textAnchor="middle"
-                          style={{ cursor: 'pointer' }}
+                    <g key={pIndex}>
+                      {aspectingPlanet && (
+                        <circle cx={planetX} cy={planetY} r="8" 
+                                fill="none" 
+                                stroke={aspectingPlanet.isPositive ? '#4caf50' : '#f44336'} 
+                                strokeWidth="1.5" 
+                                strokeDasharray="2,1"/>
+                      )}
+                      <text x={planetX} 
+                            y={planetY} 
+                            fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : totalPlanets > 1 ? "11" : "14"} 
+                            fill={getPlanetColor(planet)}
+                            fontWeight="900"
+                            textAnchor="middle"
+                            style={{ cursor: 'pointer' }}
                           onMouseEnter={(e) => {
                             if (isTouchDevice) return;
                             const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
@@ -495,8 +536,9 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                             setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 2000);
                           }}
                           onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
-                      {getPlanetSymbolWithStatus(planet)}
-                    </text>
+                        {getPlanetSymbolWithStatus(planet)}
+                      </text>
+                    </g>
                   );
                 })}
               </>

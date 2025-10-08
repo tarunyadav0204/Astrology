@@ -149,10 +149,14 @@ const NorthIndianChart = ({ chartData, birthData }) => {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
+    const isMobile = window.innerWidth <= 768;
+    const relativeX = Math.min(clientX, window.innerWidth - 220);
+    const relativeY = isMobile ? Math.max(200, clientY) : Math.max(50, clientY);
+    
     setHouseContextMenu({
       show: true,
-      x: clientX,
-      y: clientY,
+      x: relativeX,
+      y: relativeY,
       houseNumber: houseNumber,
       signName: rashiNames[rashiIndex]
     });
@@ -183,44 +187,66 @@ const NorthIndianChart = ({ chartData, birthData }) => {
   };
 
   const handleShowAspects = (houseNumber, signName) => {
-    // Calculate which houses aspect this house
-    const aspectingHouses = [];
-    const aspectedHouses = [];
+    const aspectingPlanets = [];
     
-    // 4th and 8th aspects from this house
-    aspectedHouses.push((houseNumber + 3) % 12 || 12); // 4th house
-    aspectedHouses.push((houseNumber + 7) % 12 || 12); // 8th house
-    
-    // Houses that aspect this house (reverse calculation)
-    aspectingHouses.push((houseNumber + 8) % 12 || 12); // 4th aspect to this house
-    aspectingHouses.push((houseNumber + 4) % 12 || 12); // 8th aspect to this house
-    
-    // Mars aspects (4th, 7th, 8th)
-    const marsHouse = chartData.planets?.Mars ? Math.floor(chartData.planets.Mars.longitude / 30) + 1 : null;
-    if (marsHouse) {
-      const marsAspects = [(marsHouse + 3) % 12 || 12, (marsHouse + 6) % 12 || 12, (marsHouse + 7) % 12 || 12];
-      if (marsAspects.includes(houseNumber)) aspectingHouses.push(marsHouse);
-    }
-    
-    // Jupiter aspects (5th, 7th, 9th)
-    const jupiterHouse = chartData.planets?.Jupiter ? Math.floor(chartData.planets.Jupiter.longitude / 30) + 1 : null;
-    if (jupiterHouse) {
-      const jupiterAspects = [(jupiterHouse + 4) % 12 || 12, (jupiterHouse + 6) % 12 || 12, (jupiterHouse + 8) % 12 || 12];
-      if (jupiterAspects.includes(houseNumber)) aspectingHouses.push(jupiterHouse);
-    }
-    
-    // Saturn aspects (3rd, 7th, 10th)
-    const saturnHouse = chartData.planets?.Saturn ? Math.floor(chartData.planets.Saturn.longitude / 30) + 1 : null;
-    if (saturnHouse) {
-      const saturnAspects = [(saturnHouse + 2) % 12 || 12, (saturnHouse + 6) % 12 || 12, (saturnHouse + 9) % 12 || 12];
-      if (saturnAspects.includes(houseNumber)) aspectingHouses.push(saturnHouse);
-    }
+    // Find planets that aspect this house
+    Object.entries(chartData.planets || {}).forEach(([planetName, planetData]) => {
+      const planetSign = planetData.sign;
+      const ascendantSign = chartData.houses?.[0]?.sign || 0;
+      const planetHouse = ((planetSign - ascendantSign + 12) % 12) + 1;
+      
+      let isAspecting = false;
+      let aspectType = '';
+      
+      // 7th aspect (all planets)
+      const seventhAspect = (planetHouse + 6) % 12 || 12;
+      if (seventhAspect === houseNumber) {
+        isAspecting = true;
+        aspectType = '7th';
+      }
+      
+      // Special aspects
+      if (planetName === 'Mars') {
+        const marsAspects = [(planetHouse + 3) % 12 || 12, (planetHouse + 7) % 12 || 12];
+        if (marsAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = marsAspects[0] === houseNumber ? '4th' : '8th';
+        }
+      } else if (planetName === 'Jupiter') {
+        const jupiterAspects = [(planetHouse + 4) % 12 || 12, (planetHouse + 8) % 12 || 12];
+        if (jupiterAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = jupiterAspects[0] === houseNumber ? '5th' : '9th';
+        }
+      } else if (planetName === 'Saturn') {
+        const saturnAspects = [(planetHouse + 2) % 12 || 12, (planetHouse + 9) % 12 || 12];
+        if (saturnAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = saturnAspects[0] === houseNumber ? '3rd' : '10th';
+        }
+      } else if (['Rahu', 'Ketu'].includes(planetName)) {
+        const rahuKetuAspects = [(planetHouse + 2) % 12 || 12, (planetHouse + 10) % 12 || 12];
+        if (rahuKetuAspects.includes(houseNumber)) {
+          isAspecting = true;
+          aspectType = rahuKetuAspects[0] === houseNumber ? '3rd' : '11th';
+        }
+      }
+      
+      if (isAspecting) {
+        const isNaturalBenefic = ['Jupiter', 'Venus', 'Moon'].includes(planetName);
+        aspectingPlanets.push({
+          name: planetName,
+          house: planetHouse,
+          aspectType,
+          isPositive: isNaturalBenefic
+        });
+      }
+    });
     
     setAspectsHighlight({ 
       show: true, 
       houseNumber, 
-      aspectingHouses: [...new Set(aspectingHouses)], 
-      aspectedHouses: [...new Set(aspectedHouses)] 
+      aspectingPlanets
     });
   };
 
@@ -371,7 +397,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
   };
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'visible', zIndex: 1 }}>
       {(highlightedPlanet || customAscendant !== null || aspectsHighlight.show) && (
         <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10, display: 'flex', gap: '4px' }}>
           {highlightedPlanet && (
@@ -473,7 +499,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
       
       {/* Instruction text */}
       <text x="200" y="390" fontSize="10" fill="#666" textAnchor="middle" fontStyle="italic">
-        {aspectsHighlight.show ? 'Pink: Selected House | Green: Aspecting Houses | Orange: Aspected Houses' : 'Hover or touch planets to see Nakshatra and degree'}
+        {aspectsHighlight.show ? 'Pink: Selected House | Green Circles: Benefic Aspects | Red Circles: Malefic Aspects' : 'Hover or touch planets to see Nakshatra and degree'}
       </text>
       
       {/* Houses */}
@@ -495,14 +521,6 @@ const NorthIndianChart = ({ chartData, birthData }) => {
             {aspectsHighlight.show && aspectsHighlight.houseNumber === houseNumber && (
               <circle cx={houseData.center.x} cy={houseData.center.y} r="35" 
                       fill="rgba(233, 30, 99, 0.2)" stroke="#e91e63" strokeWidth="3" strokeDasharray="5,5"/>
-            )}
-            {aspectsHighlight.show && aspectsHighlight.aspectingHouses?.includes(houseNumber) && (
-              <circle cx={houseData.center.x} cy={houseData.center.y} r="30" 
-                      fill="rgba(76, 175, 80, 0.2)" stroke="#4caf50" strokeWidth="2"/>
-            )}
-            {aspectsHighlight.show && aspectsHighlight.aspectedHouses?.includes(houseNumber) && (
-              <circle cx={houseData.center.x} cy={houseData.center.y} r="25" 
-                      fill="rgba(255, 152, 0, 0.2)" stroke="#ff9800" strokeWidth="2"/>
             )}
             
             {/* Rashi number (Aries=1, Taurus=2, etc.) */}
@@ -528,11 +546,6 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                   style={{ cursor: 'pointer' }}
                   onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
                   onClick={(e) => {
-                    if (window.innerWidth <= 768) {
-                      handleRashiClick(e, rashiIndex, houseNumber);
-                    }
-                  }}
-                  onTouchStart={(e) => {
                     if (window.innerWidth <= 768) {
                       handleRashiClick(e, rashiIndex, houseNumber);
                     }
@@ -643,15 +656,24 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                 }
               }
               const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+              const aspectingPlanet = aspectsHighlight.show && aspectsHighlight.aspectingPlanets?.find(p => p.name === planet.name);
+              
               return (
-                <text key={pIndex} 
-                      x={planetX} 
-                      y={planetY} 
-                      fontSize={totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14"} 
-                      fill={getPlanetColor(planet)}
-                      fontWeight="900"
-                      textAnchor="middle"
-                      style={{ cursor: 'pointer' }}
+                <g key={pIndex}>
+                  {aspectingPlanet && (
+                    <circle cx={planetX} cy={planetY} r="12" 
+                            fill="none" 
+                            stroke={aspectingPlanet.isPositive ? '#4caf50' : '#f44336'} 
+                            strokeWidth="2" 
+                            strokeDasharray="3,2"/>
+                  )}
+                  <text x={planetX} 
+                        y={planetY} 
+                        fontSize={totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14"} 
+                        fill={getPlanetColor(planet)}
+                        fontWeight="900"
+                        textAnchor="middle"
+                        style={{ cursor: 'pointer' }}
                       onMouseEnter={(e) => {
                         if (isTouchDevice) return;
                         const rect = e.currentTarget.closest('svg').getBoundingClientRect();
@@ -672,8 +694,9 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                         setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 2000);
                       }}
                       onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
-                  {getPlanetSymbolWithStatus(planet)}
-                </text>
+                    {getPlanetSymbolWithStatus(planet)}
+                  </text>
+                </g>
               );
             })}
           </g>

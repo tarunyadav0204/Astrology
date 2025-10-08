@@ -292,7 +292,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
   }
 
   return (
-    <DashboardContainer>
+    <DashboardContainer style={{ overflow: 'visible' }}>
       <UnifiedHeader
         currentChart={birthData}
         onSelectChart={selectExistingChart}
