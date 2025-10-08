@@ -319,11 +319,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
-        position: window.innerWidth <= 768 ? 'fixed' : 'static',
-        top: window.innerWidth <= 768 ? '60px' : 'auto',
-        left: window.innerWidth <= 768 ? '0' : 'auto',
-        right: window.innerWidth <= 768 ? '0' : 'auto',
-        zIndex: window.innerWidth <= 768 ? 999 : 'auto'
+        position: 'static'
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
