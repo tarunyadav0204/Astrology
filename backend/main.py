@@ -231,6 +231,10 @@ async def login(user_data: UserLogin):
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+@api_router.get("/health")
+async def api_health():
+    return {"status": "healthy", "message": "Astrology API is running"}
+
 @api_router.post("/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     # Store birth data in database (update if exists)

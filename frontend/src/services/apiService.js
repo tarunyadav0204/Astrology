@@ -160,5 +160,18 @@ export const apiService = {
   updateUserSettings: async (phone, settings) => {
     const response = await apiClient.put(`/user-settings/settings/${phone}`, settings);
     return response.data;
+  },
+  
+  analyzeHouses: async (birthData) => {
+    const response = await apiClient.post('/analyze-houses', birthData);
+    return response.data;
+  },
+  
+  analyzeSingleHouse: async (birthData, houseNumber) => {
+    const response = await apiClient.post('/analyze-single-house', {
+      birth_data: birthData,
+      house_number: houseNumber
+    });
+    return response.data;
   }
 };

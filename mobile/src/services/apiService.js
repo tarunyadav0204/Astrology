@@ -1,7 +1,9 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { reset } from './navigationService';
 
 // Configure base URL - update this to match your backend
-const API_BASE_URL = 'http://localhost:8000'; // Change to your backend URL
+const API_BASE_URL = 'https://astroclick.net/api'; // GCP backend URL with HTTPS and /api prefix
 
 class ApiService {
   constructor() {
@@ -12,11 +14,87 @@ class ApiService {
         'Content-Type': 'application/json',
       },
     });
+    
+    // Add auth token to requests
+    this.api.interceptors.request.use(async (config) => {
+      const token = await AsyncStorage.getItem('authToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+    
+    // Handle 401 responses
+    this.api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401) {
+          await AsyncStorage.removeItem('authToken');
+          await AsyncStorage.removeItem('userData');
+          reset('Landing');
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
-  async calculateChart(birthData) {
+  async login(credentials) {
     try {
-      const response = await this.api.post('/calculate-chart', {
+      console.log('Attempting login with:', { phone: credentials.phone });
+      const response = await this.api.post('/login', credentials);
+      console.log('Login successful:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Login error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      if (error.response?.status === 401) {
+        throw new Error('Invalid phone number or password');
+      }
+      
+      throw new Error(error.response?.data?.detail || error.response?.data?.message || 'Login failed');
+    }
+  }
+
+  async register(userData) {
+    try {
+      const response = await this.api.post('/register', userData);
+      return response.data;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw new Error(error.response?.data?.message || 'Registration failed');
+    }
+  }
+
+  async calculateChart(birthData, userPhone = null) {
+    try {
+      let nodeType = 'mean';
+      if (userPhone) {
+        const settings = await this.getUserSettings(userPhone);
+        nodeType = settings.node_type || 'mean';
+      }
+      
+      const response = await this.api.post(`/calculate-chart?node_type=${nodeType}`, {
+        name: birthData.name,
+        date: birthData.date,
+        time: birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        timezone: birthData.timezone || 'UTC+5:30',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error calculating chart:', error);
+      throw new Error('Failed to calculate chart');
+    }
+  }
+
+  async calculateYogi(birthData) {
+    try {
+      const response = await this.api.post('/calculate-yogi', {
         name: birthData.name,
         date: birthData.date,
         time: birthData.time,
@@ -26,8 +104,8 @@ class ApiService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error calculating chart:', error);
-      throw new Error('Failed to calculate birth chart');
+      console.error('Error calculating yogi:', error);
+      throw new Error('Failed to calculate yogi');
     }
   }
 
@@ -68,7 +146,7 @@ class ApiService {
 
   async calculateDashas(birthData) {
     try {
-      const response = await this.api.post('/calculate-dashas', {
+      const response = await this.api.post('/calculate-dasha', {
         name: birthData.name,
         date: birthData.date,
         time: birthData.time,
@@ -80,6 +158,16 @@ class ApiService {
     } catch (error) {
       console.error('Error calculating dashas:', error);
       throw new Error('Failed to calculate dasha periods');
+    }
+  }
+
+  async calculateSubDashas(requestData) {
+    try {
+      const response = await this.api.post('/calculate-sub-dashas', requestData);
+      return response.data;
+    } catch (error) {
+      console.error('Error calculating sub-dashas:', error);
+      throw new Error('Failed to calculate sub-dashas');
     }
   }
 
@@ -125,11 +213,93 @@ class ApiService {
 
   async getExistingCharts(search = '') {
     try {
-      const response = await this.api.get(`/existing-charts?search=${encodeURIComponent(search)}`);
+      const response = await this.api.get(`/birth-charts?search=${encodeURIComponent(search)}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching charts:', error);
       throw new Error('Failed to fetch existing charts');
+    }
+  }
+
+  async getUserSettings(phone) {
+    try {
+      const response = await this.api.get(`/user-settings/settings/${phone}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+      return {
+        node_type: 'mean',
+        default_chart_style: 'north'
+      };
+    }
+  }
+
+  async updateUserSettings(phone, settings) {
+    try {
+      const response = await this.api.put(`/user-settings/settings/${phone}`, settings);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating user settings:', error);
+      throw new Error('Failed to update user settings');
+    }
+  }
+
+
+
+  async getPlanetNakshatraInterpretation(planet, nakshatra, house) {
+    try {
+      const response = await this.api.get(`/interpretations/planet-nakshatra?planet=${planet}&nakshatra=${nakshatra}&house=${house}`);
+      return response.data.interpretation;
+    } catch (error) {
+      console.error('Error fetching interpretation:', error);
+      return null;
+    }
+  }
+  
+  async analyzeHouses(birthData) {
+    try {
+      const response = await this.api.post('/analyze-houses', {
+        name: birthData.name,
+        date: birthData.date,
+        time: birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        timezone: birthData.timezone || 'UTC+5:30',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing houses:', error);
+      throw new Error('Failed to analyze houses');
+    }
+  }
+  
+  async analyzeSingleHouse(birthData, houseNumber) {
+    try {
+      const response = await this.api.post('/analyze-single-house', {
+        birth_data: {
+          name: birthData.name,
+          date: birthData.date,
+          time: birthData.time,
+          latitude: parseFloat(birthData.latitude),
+          longitude: parseFloat(birthData.longitude),
+          timezone: birthData.timezone || 'UTC+5:30',
+        },
+        house_number: houseNumber
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing single house:', error);
+      throw new Error(`Failed to analyze house ${houseNumber}`);
+    }
+  }
+
+  async calculateAshtakavarga(data) {
+    try {
+      const response = await this.api.post('/calculate-ashtakavarga', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error calculating Ashtakavarga:', error);
+      throw new Error('Failed to calculate Ashtakavarga');
     }
   }
 }

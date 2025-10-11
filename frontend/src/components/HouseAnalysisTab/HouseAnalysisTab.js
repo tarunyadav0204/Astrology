@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { apiService } from '../services/apiService';
 
 const HouseAnalysisTab = ({ chartData, birthData }) => {
   const [houseData, setHouseData] = useState([]);
   const [selectedHouse, setSelectedHouse] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [detailedAnalysis, setDetailedAnalysis] = useState(null);
 
   const houseSignifications = {
     1: { name: 'Ascendant/Self', significations: 'Personality, appearance, health, vitality, general life path' },
@@ -22,33 +24,205 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
 
   useEffect(() => {
     if (chartData && birthData) {
-      analyzeHouses();
+      fetchHouseAnalysis();
     }
   }, [chartData, birthData]);
 
-  const analyzeHouses = () => {
+  const fetchHouseAnalysis = async () => {
     setLoading(true);
-    
+    try {
+      analyzeHousesDetailed();
+    } catch (error) {
+      console.error('Error analyzing houses:', error);
+      analyzeHousesBasic();
+    }
+    setLoading(false);
+  };
+  
+  const analyzeHousesDetailed = () => {
     if (!chartData?.planets || !chartData?.ascendant) {
       setHouseData([]);
-      setLoading(false);
+      return;
+    }
+
+    const houseLords = ['Mars', 'Venus', 'Mercury', 'Moon', 'Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Saturn', 'Jupiter'];
+    const houses = [];
+    const ascendant = Math.floor(chartData.ascendant / 30);
+    
+    for (let house = 1; house <= 12; house++) {
+      const houseIndex = house - 1;
+      const rashiIndex = (ascendant + houseIndex) % 12;
+      const houseLord = houseLords[rashiIndex];
+      const planetsInHouse = getPlanetsInHouse(house, ascendant);
+      
+      let positiveFactors = 0;
+      let negativeFactors = 0;
+      
+      planetsInHouse.forEach(planet => {
+        const lordships = getHouseLordship(planet.name, ascendant);
+        const isNaturalBenefic = ['Jupiter', 'Venus', 'Moon'].includes(planet.name);
+        const hasTrikonaLordship = lordships.some(h => [1, 5, 9].includes(h));
+        const hasKendraLordship = lordships.some(h => [1, 4, 7, 10].includes(h));
+        
+        if (lordships.includes(6) || lordships.includes(8)) {
+          negativeFactors++;
+        } else if (isNaturalBenefic && (hasTrikonaLordship || hasKendraLordship)) {
+          positiveFactors++;
+        } else if (['Mars', 'Saturn', 'Sun', 'Rahu', 'Ketu'].includes(planet.name)) {
+          negativeFactors++;
+        }
+      });
+      
+      // Add aspects analysis
+      const aspectingPlanets = getAspectingPlanets(house, ascendant);
+      aspectingPlanets.forEach(aspect => {
+        const lordships = getHouseLordship(aspect.planet, ascendant);
+        const isNaturalBenefic = ['Jupiter', 'Venus', 'Moon'].includes(aspect.planet);
+        const isMaleficLord = lordships.some(h => [6, 8, 12].includes(h));
+        
+        if (isNaturalBenefic && !isMaleficLord) {
+          positiveFactors++;
+        } else if (!isNaturalBenefic || isMaleficLord) {
+          negativeFactors++;
+        }
+      });
+      
+      let overallStatus = 'Medium';
+      let strengthScore = 50;
+      
+      if (positiveFactors > negativeFactors) {
+        overallStatus = 'Strong';
+        strengthScore = 70 + (positiveFactors * 5);
+      } else if (negativeFactors > positiveFactors) {
+        overallStatus = 'Weak';
+        strengthScore = 30 - (negativeFactors * 5);
+      }
+      
+      houses.push({
+        number: house,
+        ...houseSignifications[house],
+        sign: rashiIndex,
+        signName: getSignName(rashiIndex),
+        lord: houseLord,
+        occupants: planetsInHouse,
+        strength: overallStatus,
+        strengthScore: Math.max(0, Math.min(100, strengthScore)),
+        strengthReasons: [`${positiveFactors} positive factors`, `${negativeFactors} negative factors`],
+        isEmpty: planetsInHouse.length === 0,
+        positiveFactors,
+        negativeFactors,
+        aspectingPlanets
+      });
+    }
+
+    setHouseData(houses);
+  };
+  
+  const getPlanetsInHouse = (houseNumber, ascendant) => {
+    const planets = chartData.planets;
+    const occupants = [];
+    
+    Object.entries(planets).forEach(([planet, data]) => {
+      let planetHouse = data.sign - ascendant + 1;
+      if (planetHouse <= 0) planetHouse += 12;
+      
+      if (planetHouse === houseNumber) {
+        occupants.push({
+          name: planet,
+          sign: data.sign,
+          degree: data.degree,
+          isExalted: isExalted(planet, data.sign),
+          isDebilitated: isDebilitated(planet, data.sign),
+          isOwnSign: isOwnSign(planet, data.sign)
+        });
+      }
+    });
+    
+    return occupants;
+  };
+  
+  const getHouseLordship = (planet, ascendant) => {
+    const signLordships = {
+      'Sun': [4], 'Moon': [3], 'Mars': [0, 7], 'Mercury': [2, 5], 
+      'Jupiter': [8, 11], 'Venus': [1, 6], 'Saturn': [9, 10]
+    };
+    const planetSigns = signLordships[planet] || [];
+    return planetSigns.map(sign => {
+      let house = sign - ascendant + 1;
+      if (house <= 0) house += 12;
+      return house;
+    });
+  };
+  
+  const getAspectingPlanets = (houseNumber, ascendant) => {
+    const aspectingPlanets = [];
+    const planets = chartData.planets;
+    
+    Object.entries(planets).forEach(([name, data]) => {
+      const planetSign = data.sign;
+      let planetHouse = planetSign - ascendant + 1;
+      if (planetHouse <= 0) planetHouse += 12;
+      
+      let aspects = [];
+      
+      if (!['Rahu', 'Ketu'].includes(name)) {
+        const seventhHouse = (planetHouse + 6) % 12 || 12;
+        if (seventhHouse === houseNumber) aspects.push('7th');
+      }
+      
+      if (['Rahu', 'Ketu'].includes(name)) {
+        const rahuKetuAspects = [(planetHouse + 2) % 12 || 12, (planetHouse + 10) % 12 || 12];
+        if (rahuKetuAspects.includes(houseNumber)) {
+          aspects.push(houseNumber === rahuKetuAspects[0] ? '3rd' : '11th');
+        }
+      }
+      
+      if (name === 'Mars') {
+        const marsAspects = [(planetHouse + 3) % 12 || 12, (planetHouse + 7) % 12 || 12];
+        if (marsAspects.includes(houseNumber)) {
+          aspects.push(houseNumber === marsAspects[0] ? '4th' : '8th');
+        }
+      }
+      
+      if (name === 'Jupiter') {
+        const jupiterAspects = [(planetHouse + 4) % 12 || 12, (planetHouse + 8) % 12 || 12];
+        if (jupiterAspects.includes(houseNumber)) {
+          aspects.push(houseNumber === jupiterAspects[0] ? '5th' : '9th');
+        }
+      }
+      
+      if (name === 'Saturn') {
+        const saturnAspects = [(planetHouse + 2) % 12 || 12, (planetHouse + 9) % 12 || 12];
+        if (saturnAspects.includes(houseNumber)) {
+          aspects.push(houseNumber === saturnAspects[0] ? '3rd' : '10th');
+        }
+      }
+      
+      if (aspects.length > 0) {
+        const lordships = getHouseLordship(name, ascendant);
+        aspectingPlanets.push({ planet: name, aspects, lordships });
+      }
+    });
+    
+    return aspectingPlanets;
+  };
+  
+  const analyzeHousesBasic = () => {
+    if (!chartData?.planets || !chartData?.ascendant) {
+      setHouseData([]);
       return;
     }
 
     const houses = [];
     const planets = chartData.planets;
     const ascendantDegree = chartData.ascendant;
-    const ascendant = Math.floor(ascendantDegree / 30); // Convert degree to sign (0-11)
-    
-    console.log('Ascendant degree:', ascendantDegree, 'Ascendant sign:', ascendant);
+    const ascendant = Math.floor(ascendantDegree / 30);
 
     for (let house = 1; house <= 12; house++) {
       const occupants = [];
       const houseSign = (ascendant + house - 1) % 12;
       
-      // Find planets in this house
       Object.entries(planets).forEach(([planet, data]) => {
-        // Calculate house position from planet's sign and ascendant
         let planetHouse = data.sign - ascendant + 1;
         if (planetHouse <= 0) planetHouse += 12;
         
@@ -80,7 +254,6 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
     }
 
     setHouseData(houses);
-    setLoading(false);
   };
 
   const isExalted = (planet, sign) => {
@@ -224,12 +397,17 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
   };
 
   const getStrengthColor = (strength) => {
-    switch (strength) {
-      case 'Strong': return '#22c55e';
-      case 'Medium': return '#f59e0b';
-      case 'Weak': return '#ef4444';
-      default: return '#6b7280';
+    if (typeof strength === 'string') {
+      switch (strength) {
+        case 'Strong': return '#22c55e';
+        case 'Medium': return '#f59e0b';
+        case 'Weak': return '#ef4444';
+        default: return '#6b7280';
+      }
     }
+    if (strength >= 70) return '#22c55e';
+    if (strength >= 40) return '#f59e0b';
+    return '#ef4444';
   };
 
   const getPlanetStatus = (planet) => {
