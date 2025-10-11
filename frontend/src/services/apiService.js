@@ -21,6 +21,9 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Add headers to help with load balancer debugging
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
+    config.headers['Cache-Control'] = 'no-cache';
     return config;
   },
   (error) => {

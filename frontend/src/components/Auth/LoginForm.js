@@ -8,6 +8,9 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetData, setResetData] = useState({ phone: '', newPassword: '' });
+  const [resetStep, setResetStep] = useState(1);
 
   const handleInputChange = (e) => {
     setFormData(prev => ({
@@ -32,6 +35,182 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       setLoading(false);
     }
   };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await authService.forgotPassword({ phone: resetData.phone });
+      toast.success(`Password reset available for ${response.user_name}`);
+      setResetStep(2);
+    } catch (error) {
+      toast.error(error.message || 'Phone number not found');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await authService.resetPassword({
+        phone: resetData.phone,
+        new_password: resetData.newPassword
+      });
+      toast.success('Password reset successfully!');
+      setShowForgotPassword(false);
+      setResetStep(1);
+      setResetData({ phone: '', newPassword: '' });
+    } catch (error) {
+      toast.error(error.message || 'Password reset failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showForgotPassword) {
+    return (
+      <div style={{
+        maxWidth: '400px',
+        margin: '0 auto',
+        padding: '2rem',
+        background: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '20px',
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)',
+        backdropFilter: 'blur(20px)',
+        border: '2px solid rgba(255, 255, 255, 0.3)'
+      }}>
+        <h2 style={{
+          textAlign: 'center',
+          color: '#e91e63',
+          marginBottom: '2rem',
+          fontWeight: '700'
+        }}>
+          🔐 Reset Password
+        </h2>
+
+        {resetStep === 1 ? (
+          <form onSubmit={handleForgotPassword}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: '#e91e63',
+                fontWeight: '600'
+              }}>
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={resetData.phone}
+                onChange={(e) => setResetData(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="Enter your phone number"
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '2px solid rgba(233, 30, 99, 0.2)',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  background: 'rgba(255, 255, 255, 0.8)'
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1.1rem',
+                fontWeight: '700',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                marginBottom: '1rem'
+              }}
+            >
+              {loading ? 'Checking...' : 'Verify Phone'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleResetPassword}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: '#e91e63',
+                fontWeight: '600'
+              }}>
+                New Password
+              </label>
+              <input
+                type="password"
+                value={resetData.newPassword}
+                onChange={(e) => setResetData(prev => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="Enter new password"
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '2px solid rgba(233, 30, 99, 0.2)',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  background: 'rgba(255, 255, 255, 0.8)'
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1.1rem',
+                fontWeight: '700',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                marginBottom: '1rem'
+              }}
+            >
+              {loading ? 'Resetting...' : 'Reset Password'}
+            </button>
+          </form>
+        )}
+
+        <p style={{ textAlign: 'center', color: '#666' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowForgotPassword(false);
+              setResetStep(1);
+              setResetData({ phone: '', newPassword: '' });
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#e91e63',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              fontWeight: '600'
+            }}
+          >
+            Back to Login
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -136,6 +315,24 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         >
           {loading ? 'Logging in...' : '🚀 Login'}
         </button>
+
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => setShowForgotPassword(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#e91e63',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}
+          >
+            Forgot Password?
+          </button>
+        </div>
 
         <p style={{ textAlign: 'center', color: '#666' }}>
           Don't have an account?{' '}

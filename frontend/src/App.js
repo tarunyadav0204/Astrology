@@ -20,17 +20,29 @@ function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      authService.getCurrentUser()
-        .then(userData => {
-          setUser(userData);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+    const savedUser = localStorage.getItem('user');
+    
+    if (token && savedUser) {
+      try {
+        // Try to use saved user data first
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        setLoading(false);
+        
+        // Verify token in background
+        authService.getCurrentUser()
+          .catch(() => {
+            // If verification fails, clear auth and redirect to login
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+          });
+      } catch {
+        // If saved user data is corrupted, clear everything
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }

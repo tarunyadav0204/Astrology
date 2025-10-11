@@ -58,6 +58,13 @@ class UserLogin(BaseModel):
     phone: str
     password: str
 
+class ForgotPassword(BaseModel):
+    phone: str
+
+class ResetPassword(BaseModel):
+    phone: str
+    new_password: str
+
 class User(BaseModel):
     userid: int
     name: str
@@ -215,6 +222,38 @@ async def login(user_data: UserLogin):
 @app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@app.post("/api/forgot-password")
+async def forgot_password(request: ForgotPassword):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT userid, name FROM users WHERE phone = ?", (request.phone,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Phone number not found")
+    
+    return {"message": "Password reset available", "user_name": user[1]}
+
+@app.post("/api/reset-password")
+async def reset_password(request: ResetPassword):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT userid FROM users WHERE phone = ?", (request.phone,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Phone number not found")
+    
+    hashed_password = hash_password(request.new_password)
+    cursor.execute("UPDATE users SET password = ? WHERE phone = ?", (hashed_password, request.phone))
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Password reset successfully"}
 
 @app.get("/api/health")
 async def api_health():

@@ -11,7 +11,18 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
     if (birthData) {
       fetchDashaData();
     }
-  }, [birthData, dashaType, selectedDashas, transitDate]);
+  }, [birthData, dashaType, transitDate]);
+  
+  useEffect(() => {
+    if (birthData) {
+      // Only fetch when relevant parent dasha changes
+      if (dashaType === 'maha') return; // Maha doesn't depend on selections
+      if (dashaType === 'antar' && selectedDashas.maha) fetchDashaData();
+      if (dashaType === 'pratyantar' && selectedDashas.antar) fetchDashaData();
+      if (dashaType === 'sookshma' && selectedDashas.pratyantar) fetchDashaData();
+      if (dashaType === 'prana' && selectedDashas.sookshma) fetchDashaData();
+    }
+  }, [selectedDashas.maha, selectedDashas.antar, selectedDashas.pratyantar, selectedDashas.sookshma]);
 
   const fetchDashaData = async () => {
     try {
