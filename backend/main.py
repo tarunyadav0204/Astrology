@@ -12,7 +12,7 @@ import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 
-app = FastAPI()
+app = FastAPI(root_path="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -101,6 +101,19 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (userid) REFERENCES users (userid),
             UNIQUE(userid, date, time, latitude, longitude)
+        )
+    ''')
+    
+    # Create planet nakshatra interpretations table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS planet_nakshatra_interpretations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            planet TEXT NOT NULL,
+            nakshatra TEXT NOT NULL,
+            house INTEGER NOT NULL,
+            interpretation TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(planet, nakshatra, house)
         )
     ''')
     conn.commit()
@@ -268,7 +281,7 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
             'degree': longitude % 30,
             'retrograde': is_retrograde
         }
-    
+
     # Calculate ascendant and houses
     houses_data = swe.houses(jd, birth_data.latitude, birth_data.longitude, b'P')
     ayanamsa = swe.get_ayanamsa_ut(jd)
@@ -276,8 +289,6 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     # Get sidereal ascendant (houses_data[1][0] is the ascendant)
     ascendant_tropical = houses_data[1][0]  # Tropical ascendant
     ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
-    
-
     
     # For Vedic astrology, use Whole Sign houses based on sidereal ascendant
     ascendant_sign = int(ascendant_sidereal / 30)
@@ -321,20 +332,57 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     if mandi_longitude < 0:
         mandi_longitude += 360
     
-    # Add Gulika and Mandi to planets
+    # Add Gulika and Mandi to planets with house positions
+    gulika_house = 1
+    for house_num in range(12):
+        house_start = houses[house_num]['longitude']
+        house_end = (house_start + 30) % 360
+        if house_start <= house_end:
+            if house_start <= gulika_longitude < house_end:
+                gulika_house = house_num + 1
+                break
+        else:
+            if gulika_longitude >= house_start or gulika_longitude < house_end:
+                gulika_house = house_num + 1
+                break
+    
+    mandi_house = 1
+    for house_num in range(12):
+        house_start = houses[house_num]['longitude']
+        house_end = (house_start + 30) % 360
+        if house_start <= house_end:
+            if house_start <= mandi_longitude < house_end:
+                mandi_house = house_num + 1
+                break
+        else:
+            if mandi_longitude >= house_start or mandi_longitude < house_end:
+                mandi_house = house_num + 1
+                break
+    
     planets['Gulika'] = {
         'longitude': gulika_longitude,
         'sign': int(gulika_longitude / 30),
-        'degree': gulika_longitude % 30
+        'degree': gulika_longitude % 30,
+        'house': gulika_house
     }
     
     planets['Mandi'] = {
         'longitude': mandi_longitude,
         'sign': int(mandi_longitude / 30),
-        'degree': mandi_longitude % 30
+        'degree': mandi_longitude % 30,
+        'house': mandi_house
     }
     
-
+    # Calculate house positions for all planets using Whole Sign system
+    # In Whole Sign houses, each house is exactly 30 degrees starting from ascendant sign
+    for planet_name in planets:
+        planet_longitude = planets[planet_name]['longitude']
+        planet_sign = int(planet_longitude / 30)
+        
+        # Calculate house number using Whole Sign system
+        # House 1 starts from ascendant sign
+        house_number = ((planet_sign - ascendant_sign) % 12) + 1
+        planets[planet_name]['house'] = house_number
     
     return {
         "planets": planets,
@@ -1244,8 +1292,11 @@ async def calculate_sub_dashas(request: dict):
     
     # Calculate sub-dashas using proper Vimshottari method
     parent_start = datetime.strptime(parent_dasha['start'], '%Y-%m-%d')
-    parent_end = datetime.strptime(parent_dasha['end'], '%Y-%m-%d') + timedelta(days=1)  # Make end inclusive
+    parent_end = datetime.strptime(parent_dasha['end'], '%Y-%m-%d')
     parent_planet = parent_dasha['planet']
+    
+    # Calculate parent period in days
+    parent_total_days = (parent_end - parent_start).days + 1  # Include end date
     
     # Get planet order starting from parent planet
     start_index = PLANET_ORDER.index(parent_planet)
@@ -1280,9 +1331,7 @@ async def calculate_sub_dashas(request: dict):
         
         total_period += period
     
-    # Calculate actual periods
-    parent_total_days = (parent_end - parent_start).days
-    
+    # Calculate actual sub-dasha periods
     for i in range(9):
         planet = PLANET_ORDER[(start_index + i) % 9]
         
@@ -1315,8 +1364,8 @@ async def calculate_sub_dashas(request: dict):
         if end_date > parent_end:
             end_date = parent_end
         
-        # For display, make end date inclusive
-        display_end = (end_date - timedelta(seconds=1)).date()
+        # For display, make end date inclusive but not beyond parent end
+        display_end = min(end_date.date(), parent_end.date())
         
         is_current = current_date.date() <= target_date.date() <= display_end
         
@@ -1351,6 +1400,77 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
         "ashtakavarga": sarva,
         "analysis": analysis,
         "chart_type": chart_type
+    }
+
+@app.get("/interpretations/planet-nakshatra")
+async def get_planet_nakshatra_interpretation(
+    planet: str, 
+    nakshatra: str, 
+    house: int,
+    current_user: User = Depends(get_current_user)
+):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "SELECT interpretation FROM planet_nakshatra_interpretations WHERE planet = ? AND nakshatra = ? AND house = ?",
+        (planet, nakshatra, house)
+    )
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result:
+        return {"interpretation": result[0]}
+    else:
+        raise HTTPException(status_code=404, detail="Interpretation not found")
+
+@app.post("/analyze-houses")
+async def analyze_houses(birth_data: BirthData, current_user: User = Depends(get_current_user)):
+    """Comprehensive analysis of all 12 houses"""
+    from event_prediction.universal_house_analyzer import UniversalHouseAnalyzer
+    
+    # Calculate chart data
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    
+    # Initialize house analyzer
+    house_analyzer = UniversalHouseAnalyzer(birth_data, chart_data)
+    
+    # Analyze all houses
+    house_analyses = house_analyzer.analyze_all_houses()
+    
+    return {
+        "birth_info": {
+            "name": birth_data.name,
+            "date": birth_data.date,
+            "time": birth_data.time
+        },
+        "house_analyses": house_analyses
+    }
+
+@app.post("/analyze-single-house")
+async def analyze_single_house(request: dict, current_user: User = Depends(get_current_user)):
+    """Detailed analysis of a single house"""
+    from event_prediction.universal_house_analyzer import UniversalHouseAnalyzer
+    
+    birth_data = BirthData(**request['birth_data'])
+    house_number = request['house_number']
+    
+    # Calculate chart data
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    
+    # Initialize house analyzer
+    house_analyzer = UniversalHouseAnalyzer(birth_data, chart_data)
+    
+    # Analyze specific house
+    house_analysis = house_analyzer.analyze_house(house_number)
+    
+    return {
+        "birth_info": {
+            "name": birth_data.name,
+            "date": birth_data.date,
+            "time": birth_data.time
+        },
+        "house_analysis": house_analysis
     }
 
 @app.get("/health")
