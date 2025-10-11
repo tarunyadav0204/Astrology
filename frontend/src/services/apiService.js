@@ -5,6 +5,31 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? APP_CONFIG.api.prod 
   : APP_CONFIG.api.dev;
 
+// Simple request caching to prevent duplicate calls
+const requestCache = new Map();
+const CACHE_DURATION = 5000; // 5 seconds
+
+const getCacheKey = (url, data) => {
+  return `${url}-${JSON.stringify(data)}`;
+};
+
+const cachedRequest = async (config) => {
+  const cacheKey = getCacheKey(config.url, config.data);
+  const cached = requestCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  
+  const response = await apiClient(config);
+  requestCache.set(cacheKey, {
+    data: response,
+    timestamp: Date.now()
+  });
+  
+  return response;
+};
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: APP_CONFIG.api.timeout,
@@ -12,6 +37,8 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   }
 });
+
+
 
 // Request interceptor to add JWT token
 apiClient.interceptors.request.use(
@@ -174,6 +201,24 @@ export const apiService = {
     const response = await apiClient.post('/analyze-single-house', {
       birth_data: birthData,
       house_number: houseNumber
+    });
+    return response.data;
+  },
+  
+  calculateDasha: async (birthData) => {
+    const response = await cachedRequest({
+      method: 'post',
+      url: '/calculate-dasha',
+      data: birthData
+    });
+    return response.data;
+  },
+  
+  calculateSubDashas: async (requestData) => {
+    const response = await cachedRequest({
+      method: 'post',
+      url: '/calculate-sub-dashas',
+      data: requestData
     });
     return response.data;
   }

@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { DASHA_CONFIG } from '../../config/dashboard.config';
 import { APP_CONFIG } from '../../config/app.config';
+import { apiService } from '../../services/apiService';
 import { WidgetContainer, WidgetHeader, WidgetTitle, DashaContainer, DashaTable, DashaRow, DashaCell } from './DashaWidget.styles';
 
 const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas, onDashaSelection, transitDate }) => {
   const [selectedDasha, setSelectedDasha] = useState(null);
   const [dashaData, setDashaData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Debounce dasha clicks to prevent rapid API calls
+  const debounceTimeout = React.useRef(null);
 
   useEffect(() => {
     if (birthData) {
@@ -26,19 +31,7 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
 
   const fetchDashaData = async () => {
     try {
-      const API_BASE_URL = process.env.NODE_ENV === 'production' 
-        ? APP_CONFIG.api.prod 
-        : APP_CONFIG.api.dev;
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/calculate-dasha`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify(birthData)
-      });
-      const data = await response.json();
+      const data = await apiService.calculateDasha(birthData);
       
       if (dashaType === 'maha') {
         const targetDate = transitDate || new Date();
@@ -128,20 +121,7 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
         requestData.pratyantar_lord = selectedDashas.pratyantar.planet;
       }
       
-      const API_BASE_URL = process.env.NODE_ENV === 'production' 
-        ? APP_CONFIG.api.prod 
-        : APP_CONFIG.api.dev;
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/calculate-sub-dashas`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify(requestData)
-      });
-      
-      const data = await response.json();
+      const data = await apiService.calculateSubDashas(requestData);
       return data.sub_dashas || [];
     } catch (error) {
       console.error('Error calculating sub-dashas:', error);
@@ -160,9 +140,23 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
   };
 
   const handleDashaClick = (dasha) => {
+    if (isLoading) return; // Prevent clicks while loading
+    
+    // Clear existing timeout
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
+    }
+    
+    // Immediate UI update
     setSelectedDasha(dasha);
-    onDashaClick(dasha.start);
-    onDashaSelection(dashaType, dasha);
+    
+    // Debounced API calls
+    debounceTimeout.current = setTimeout(() => {
+      setIsLoading(true);
+      onDashaClick(dasha.start);
+      onDashaSelection(dashaType, dasha);
+      setTimeout(() => setIsLoading(false), 500); // Reset loading after 500ms
+    }, 200); // 200ms debounce
   };
 
   const isMobile = window.innerWidth <= 768;
