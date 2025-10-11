@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -12,7 +12,8 @@ import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 
-app = FastAPI(root_path="/api")
+app = FastAPI()
+api_router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,8 +24,16 @@ app.add_middleware(
 )
 
 # Include rule engine router
-app.include_router(rule_engine_router)
-app.include_router(settings_router)
+api_router.include_router(rule_engine_router)
+api_router.include_router(settings_router)
+
+# Include API router in main app
+app.include_router(api_router)
+
+# Root endpoint for health check
+@app.get("/")
+async def root():
+    return {"message": "Astrology API", "docs": "/api/docs"}
 
 class BirthData(BaseModel):
     name: str
@@ -154,7 +163,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
     return User(userid=user[0], name=user[1], phone=user[2], role=user[3])
 
-@app.post("/register")
+@api_router.post("/register")
 async def register(user_data: UserCreate):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -183,7 +192,7 @@ async def register(user_data: UserCreate):
         "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[3]}
     }
 
-@app.post("/login")
+@api_router.post("/login")
 async def login(user_data: UserLogin):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -202,11 +211,11 @@ async def login(user_data: UserLogin):
         "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[4]}
     }
 
-@app.get("/me")
+@api_router.get("/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
-@app.post("/calculate-chart")
+@api_router.post("/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     # Store birth data in database (update if exists)
     conn = sqlite3.connect('astrology.db')
@@ -391,7 +400,7 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
         "ascendant": ascendant_sidereal
     }
 
-@app.post("/calculate-transits")
+@api_router.post("/calculate-transits")
 async def calculate_transits(request: TransitRequest, current_user: User = Depends(get_current_user)):
     jd = swe.julday(
         int(request.transit_date.split('-')[0]),
@@ -474,7 +483,7 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
         "ascendant": birth_ascendant_sidereal
     }
 
-@app.get("/birth-charts")
+@api_router.get("/birth-charts")
 async def get_birth_charts(search: str = "", limit: int = 50, current_user: User = Depends(get_current_user)):
     print(f"Search query: '{search}', Limit: {limit}")
     conn = sqlite3.connect('astrology.db')
@@ -513,7 +522,7 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
     
     return {"charts": charts}
 
-@app.put("/birth-charts/{chart_id}")
+@api_router.put("/birth-charts/{chart_id}")
 async def update_birth_chart(chart_id: int, birth_data: BirthData):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -527,7 +536,7 @@ async def update_birth_chart(chart_id: int, birth_data: BirthData):
     conn.close()
     return {"message": "Chart updated successfully"}
 
-@app.delete("/birth-charts/{chart_id}")
+@api_router.delete("/birth-charts/{chart_id}")
 async def delete_birth_chart(chart_id: int):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -536,7 +545,7 @@ async def delete_birth_chart(chart_id: int):
     conn.close()
     return {"message": "Chart deleted successfully"}
 
-@app.post("/calculate-yogi")
+@api_router.post("/calculate-yogi")
 async def calculate_yogi(birth_data: BirthData):
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
@@ -620,11 +629,11 @@ async def calculate_yogi(birth_data: BirthData):
 
 
 
-@app.post("/calculate-dasha")
+@api_router.post("/calculate-dasha")
 async def calculate_dasha(birth_data: BirthData):
     return await calculate_accurate_dasha(birth_data)
 
-@app.post("/calculate-panchang")
+@api_router.post("/calculate-panchang")
 async def calculate_panchang(request: TransitRequest):
     jd = swe.julday(
         int(request.transit_date.split('-')[0]),
@@ -681,7 +690,7 @@ async def calculate_panchang(request: TransitRequest):
         }
     }
 
-@app.post("/calculate-birth-panchang")
+@api_router.post("/calculate-birth-panchang")
 async def calculate_birth_panchang(birth_data: BirthData):
     # Use existing calculate_panchang with birth date as transit date
     request = TransitRequest(
@@ -690,7 +699,7 @@ async def calculate_birth_panchang(birth_data: BirthData):
     )
     return await calculate_panchang(request)
 
-@app.post("/calculate-divisional-chart")
+@api_router.post("/calculate-divisional-chart")
 async def calculate_divisional_chart(request: dict, current_user: User = Depends(get_current_user)):
     """Calculate accurate divisional charts using proper Vedic formulas"""
     birth_data = BirthData(**request['birth_data'])
@@ -889,7 +898,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         'chart_name': f'D{division_number}'
     }
 
-@app.post("/calculate-friendship")
+@api_router.post("/calculate-friendship")
 async def calculate_friendship(birth_data: BirthData):
     from event_prediction.config import NATURAL_FRIENDS, NATURAL_ENEMIES
     
@@ -1027,7 +1036,7 @@ async def calculate_friendship(birth_data: BirthData):
         "planet_positions": planets
     }
 
-@app.post("/predict-house7-events")
+@api_router.post("/predict-house7-events")
 async def predict_house7_events(birth_data: BirthData):
     from event_prediction.house7_analyzer import House7Analyzer
     
@@ -1058,7 +1067,7 @@ async def predict_house7_events(birth_data: BirthData):
         }
     }
 
-@app.post("/analyze-transits")
+@api_router.post("/analyze-transits")
 async def analyze_transits(request: TransitRequest):
     from event_prediction.transit_analyzer import TransitAnalyzer
     
@@ -1082,7 +1091,7 @@ async def analyze_transits(request: TransitRequest):
         "activations": activations
     }
 
-@app.post("/calculate-yogi-impact")
+@api_router.post("/calculate-yogi-impact")
 async def calculate_yogi_impact(birth_data: BirthData):
     from event_prediction.yogi_analyzer import YogiAnalyzer
     
@@ -1105,7 +1114,7 @@ async def calculate_yogi_impact(birth_data: BirthData):
         "house_impacts": house_impacts
     }
 
-@app.post("/predict-year-events")
+@api_router.post("/predict-year-events")
 async def predict_year_events(request: dict):
     from event_prediction.universal_predictor import UniversalPredictor
     
@@ -1130,7 +1139,7 @@ async def predict_year_events(request: dict):
         }
     }
 
-@app.post("/predict-marriage-complete")
+@api_router.post("/predict-marriage-complete")
 async def predict_marriage_complete(birth_data: BirthData):
     from event_prediction.house7_analyzer import House7Analyzer
     from event_prediction.transit_analyzer import TransitAnalyzer
@@ -1209,7 +1218,7 @@ async def predict_marriage_complete(birth_data: BirthData):
         ]
     }
 
-@app.post("/calculate-accurate-dasha")
+@api_router.post("/calculate-accurate-dasha")
 async def calculate_accurate_dasha(birth_data: BirthData):
     """Calculate accurate Vimshottari Dasha using standard method"""
     time_parts = birth_data.time.split(':')
@@ -1280,7 +1289,7 @@ async def calculate_accurate_dasha(birth_data: BirthData):
         "moon_lord": moon_lord
     }
 
-@app.post("/calculate-sub-dashas")
+@api_router.post("/calculate-sub-dashas")
 async def calculate_sub_dashas(request: dict):
     """Calculate sub-dashas (Antar, Pratyantar, Sookshma, Prana) for given parent dasha"""
     from event_prediction.config import DASHA_PERIODS, PLANET_ORDER
@@ -1383,7 +1392,7 @@ async def calculate_sub_dashas(request: dict):
     
     return {'sub_dashas': sub_dashas}
 
-@app.post("/calculate-ashtakavarga")
+@api_router.post("/calculate-ashtakavarga")
 async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
     from ashtakavarga import AshtakavargaCalculator
     
@@ -1402,7 +1411,7 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
         "chart_type": chart_type
     }
 
-@app.get("/interpretations/planet-nakshatra")
+@api_router.get("/interpretations/planet-nakshatra")
 async def get_planet_nakshatra_interpretation(
     planet: str, 
     nakshatra: str, 
@@ -1424,7 +1433,7 @@ async def get_planet_nakshatra_interpretation(
     else:
         raise HTTPException(status_code=404, detail="Interpretation not found")
 
-@app.post("/analyze-houses")
+@api_router.post("/analyze-houses")
 async def analyze_houses(birth_data: BirthData, current_user: User = Depends(get_current_user)):
     """Comprehensive analysis of all 12 houses"""
     from event_prediction.universal_house_analyzer import UniversalHouseAnalyzer
@@ -1447,7 +1456,7 @@ async def analyze_houses(birth_data: BirthData, current_user: User = Depends(get
         "house_analyses": house_analyses
     }
 
-@app.post("/analyze-single-house")
+@api_router.post("/analyze-single-house")
 async def analyze_single_house(request: dict, current_user: User = Depends(get_current_user)):
     """Detailed analysis of a single house"""
     from event_prediction.universal_house_analyzer import UniversalHouseAnalyzer
@@ -1473,7 +1482,7 @@ async def analyze_single_house(request: dict, current_user: User = Depends(get_c
         "house_analysis": house_analysis
     }
 
-@app.get("/health")
+@api_router.get("/health")
 async def health_check():
     return {"status": "healthy", "message": "Astrology API is running"}
 
