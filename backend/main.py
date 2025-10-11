@@ -12,8 +12,19 @@ import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 
-app = FastAPI()
+app = FastAPI(docs_url=None, redoc_url=None)
 api_router = APIRouter(prefix="/api")
+
+# Add docs endpoints to API router
+@api_router.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    from fastapi.openapi.docs import get_swagger_ui_html
+    return get_swagger_ui_html(openapi_url="/api/openapi.json", title="Astrology API")
+
+@api_router.get("/openapi.json", include_in_schema=False)
+async def get_openapi():
+    from fastapi.openapi.utils import get_openapi
+    return get_openapi(title="Astrology API", version="1.0.0", routes=api_router.routes)
 
 app.add_middleware(
     CORSMiddleware,
