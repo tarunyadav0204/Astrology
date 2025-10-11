@@ -46,6 +46,11 @@ app.include_router(api_router)
 async def root():
     return {"message": "Astrology API", "docs": "/api/docs"}
 
+# Health check endpoint for load balancer
+@app.get("/docs")
+async def health_docs():
+    return {"status": "healthy", "message": "Astrology API is running"}
+
 class BirthData(BaseModel):
     name: str
     date: str
