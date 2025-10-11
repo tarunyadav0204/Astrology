@@ -12,19 +12,7 @@ import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 
-app = FastAPI(docs_url=None, redoc_url=None)
-api_router = APIRouter(prefix="/api")
-
-# Add docs endpoints to API router
-@api_router.get("/docs", include_in_schema=False)
-async def custom_swagger_ui_html():
-    from fastapi.openapi.docs import get_swagger_ui_html
-    return get_swagger_ui_html(openapi_url="/api/openapi.json", title="Astrology API")
-
-@api_router.get("/openapi.json", include_in_schema=False)
-async def get_openapi():
-    from fastapi.openapi.utils import get_openapi
-    return get_openapi(title="Astrology API", version="1.0.0", routes=api_router.routes)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,12 +22,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include rule engine router
-api_router.include_router(rule_engine_router)
-api_router.include_router(settings_router)
-
-# Include API router in main app
-app.include_router(api_router)
+# Include rule engine router with /api prefix
+app.include_router(rule_engine_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
 
 # Root endpoint for health check
 @app.get("/")
@@ -179,7 +164,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
     return User(userid=user[0], name=user[1], phone=user[2], role=user[3])
 
-@api_router.post("/register")
+@app.post("/api/register")
 async def register(user_data: UserCreate):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -208,7 +193,7 @@ async def register(user_data: UserCreate):
         "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[3]}
     }
 
-@api_router.post("/login")
+@app.post("/api/login")
 async def login(user_data: UserLogin):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -227,15 +212,15 @@ async def login(user_data: UserLogin):
         "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[4]}
     }
 
-@api_router.get("/me")
+@app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
-@api_router.get("/health")
+@app.get("/api/health")
 async def api_health():
     return {"status": "healthy", "message": "Astrology API is running"}
 
-@api_router.post("/calculate-chart")
+@app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     # Store birth data in database (update if exists)
     conn = sqlite3.connect('astrology.db')
