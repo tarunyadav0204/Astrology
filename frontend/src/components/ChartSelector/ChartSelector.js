@@ -267,14 +267,14 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout }) => {
                 WebkitTextFillColor: 'transparent',
                 textShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
-                🌌 Welcome to Your Cosmic Journey
+                🌌 Welcome to AstroClick
               </h1>
               <p style={{ 
                 margin: '10px 0 0 0', 
                 fontSize: '1.2rem',
                 color: '#666',
                 fontWeight: '500'
-              }}>Discover the secrets written in the stars</p>
+              }}>Professional Vedic Astrology Platform</p>
             </div>
           </div>
           <button 

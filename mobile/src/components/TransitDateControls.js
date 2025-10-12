@@ -1,11 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function TransitDateControls({
   transitDate,
   onTransitDateChange,
   onResetToToday
 }) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -20,15 +23,25 @@ export default function TransitDateControls({
     onTransitDateChange(newDate);
   };
 
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || transitDate;
+    setShowDatePicker(Platform.OS === 'ios');
+    onTransitDateChange(currentDate);
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.button} onPress={() => changeDate(-1)}>
         <Text style={styles.buttonText}>◀</Text>
       </TouchableOpacity>
       
-      <View style={styles.dateContainer}>
+      <TouchableOpacity 
+        style={styles.dateContainer} 
+        onPress={() => setShowDatePicker(true)}
+      >
         <Text style={styles.dateText}>{formatDate(transitDate)}</Text>
-      </View>
+        <Text style={styles.tapHint}>📅 Tap to select date</Text>
+      </TouchableOpacity>
       
       <TouchableOpacity style={styles.button} onPress={() => changeDate(1)}>
         <Text style={styles.buttonText}>▶</Text>
@@ -37,6 +50,17 @@ export default function TransitDateControls({
       <TouchableOpacity style={styles.todayButton} onPress={onResetToToday}>
         <Text style={styles.todayButtonText}>Today</Text>
       </TouchableOpacity>
+      
+      {showDatePicker && (
+        <DateTimePicker
+          testID="dateTimePicker"
+          value={transitDate}
+          mode="date"
+          is24Hour={true}
+          display="default"
+          onChange={onDateChange}
+        />
+      )}
     </View>
   );
 }
@@ -73,11 +97,21 @@ const styles = StyleSheet.create({
   dateContainer: {
     flex: 1,
     alignItems: 'center',
+    padding: 8,
+    backgroundColor: 'rgba(233, 30, 99, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e91e63',
   },
   dateText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  tapHint: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
   },
   todayButton: {
     backgroundColor: '#ff6f00',

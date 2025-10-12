@@ -69,7 +69,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        🌟 Create Account
+        🌟 Join AstroClick
       </h2>
 
       <form onSubmit={handleSubmit}>

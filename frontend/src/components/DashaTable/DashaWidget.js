@@ -13,6 +13,7 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
   const debounceTimeout = React.useRef(null);
 
   useEffect(() => {
+    console.log(`DashaWidget ${dashaType} - transitDate changed:`, transitDate);
     if (birthData) {
       fetchDashaData();
     }

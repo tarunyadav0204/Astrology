@@ -292,7 +292,7 @@ const UnifiedHeader = ({
           margin: '0 20px',
           textShadow: '0 1px 2px rgba(0,0,0,0.2)'
         }}>
-          {showTransitControls ? 'Dashboard' : 'Birth Chart Dashboard'}
+          {showTransitControls ? 'Your Cosmic Portal' : 'AstroClick - Vedic Astrology'}
         </div>
       )}
 
@@ -313,23 +313,29 @@ const UnifiedHeader = ({
             flexShrink: 0,
             overflow: 'hidden'
           }}>
-            {/* Date Display */}
-            <div style={{
-              color: 'white',
-              fontSize: isMobile ? '10px' : '12px',
-              fontWeight: '600',
-              padding: isMobile ? '3px 6px' : '4px 8px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '4px',
-              minWidth: isMobile ? '50px' : '80px',
-              textAlign: 'center',
-              flexShrink: 0
-            }}>
-              {isMobile 
-                ? transitDate?.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
-                : transitDate?.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-              }
-            </div>
+            {/* Date Picker */}
+            <input
+              type="date"
+              value={transitDate?.toISOString().split('T')[0] || ''}
+              onChange={(e) => {
+                const newDate = new Date(e.target.value);
+                onTransitDateChange(newDate);
+              }}
+              style={{
+                color: 'white',
+                fontSize: isMobile ? '10px' : '12px',
+                fontWeight: '600',
+                padding: isMobile ? '3px 6px' : '4px 8px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '4px',
+                minWidth: isMobile ? '90px' : '120px',
+                textAlign: 'center',
+                flexShrink: 0,
+                cursor: 'pointer',
+                colorScheme: 'dark'
+              }}
+            />
             
             {/* Navigation Buttons */}
             {isMobile ? (

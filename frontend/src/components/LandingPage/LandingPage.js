@@ -14,9 +14,7 @@ const LandingPage = ({ onLogin, onRegister }) => {
         <div className="hero-content">
           <div className="hero-text">
             <h1 className="hero-title">
-              <span className="mystical">✨</span>
-              Discover Your Cosmic Journey
-              <span className="mystical">🌟</span>
+              ✨ Welcome to AstroClick 🌟
             </h1>
             <p className="hero-subtitle">
               Unlock the secrets of your birth chart with authentic Vedic astrology
@@ -76,7 +74,7 @@ const LandingPage = ({ onLogin, onRegister }) => {
               ×
             </button>
             <div className="auth-header">
-              <h2>Welcome to Your Cosmic Journey</h2>
+              <h2>Access Your Account</h2>
               <div className="auth-tabs">
                 <button 
                   className={`tab ${authView === 'login' ? 'active' : ''}`}

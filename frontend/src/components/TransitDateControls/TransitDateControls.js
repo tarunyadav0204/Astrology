@@ -58,24 +58,28 @@ const TransitDateControls = ({ transitDate, onTransitDateChange, onResetToToday 
       flexWrap: 'wrap',
       justifyContent: 'center'
     }}>
-      {/* Date Display */}
-      <div style={{
-        color: '#e91e63',
-        fontSize: isMobile ? '12px' : '14px',
-        fontWeight: '600',
-        padding: isMobile ? '4px 8px' : '6px 10px',
-        background: 'white',
-        borderRadius: '4px',
-        border: '1px solid #e91e63',
-        minWidth: isMobile ? '80px' : '120px',
-        textAlign: 'center',
-        flexShrink: 0
-      }}>
-        {isMobile 
-          ? transitDate?.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' })
-          : transitDate?.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-        }
-      </div>
+      {/* Date Picker */}
+      <input
+        type="date"
+        value={transitDate?.toISOString().split('T')[0] || ''}
+        onChange={(e) => {
+          const newDate = new Date(e.target.value);
+          onTransitDateChange(newDate);
+        }}
+        style={{
+          color: '#e91e63',
+          fontSize: isMobile ? '12px' : '14px',
+          fontWeight: '600',
+          padding: isMobile ? '4px 8px' : '6px 10px',
+          background: 'white',
+          borderRadius: '4px',
+          border: '1px solid #e91e63',
+          minWidth: isMobile ? '120px' : '140px',
+          textAlign: 'center',
+          flexShrink: 0,
+          cursor: 'pointer'
+        }}
+      />
       
       {/* Navigation Buttons */}
       {isMobile ? (
