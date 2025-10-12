@@ -12,6 +12,15 @@ import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 
+# Load environment variables explicitly
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("Loaded environment variables from .env file")
+except ImportError:
+    print("python-dotenv not installed, using system environment variables")
+    pass
+
 app = FastAPI()
 
 app.add_middleware(
@@ -287,6 +296,11 @@ async def send_reset_code(request: SendResetCode):
     )
     conn.commit()
     conn.close()
+    
+    # Debug: Print environment variables
+    print(f"Twilio SID: {os.getenv('TWILIO_ACCOUNT_SID')[:10] if os.getenv('TWILIO_ACCOUNT_SID') else 'None'}...")
+    print(f"Twilio Token: {os.getenv('TWILIO_AUTH_TOKEN')[:10] if os.getenv('TWILIO_AUTH_TOKEN') else 'None'}...")
+    print(f"Twilio Phone: {os.getenv('TWILIO_PHONE_NUMBER')}")
     
     # Send SMS with code
     from sms_service import sms_service
