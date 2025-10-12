@@ -65,6 +65,17 @@ class ResetPassword(BaseModel):
     phone: str
     new_password: str
 
+class SendResetCode(BaseModel):
+    phone: str
+
+class VerifyResetCode(BaseModel):
+    phone: str
+    code: str
+
+class ResetPasswordWithToken(BaseModel):
+    token: str
+    new_password: str
+
 class User(BaseModel):
     userid: int
     name: str
@@ -131,6 +142,19 @@ def init_db():
             interpretation TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(planet, nakshatra, house)
+        )
+    ''')
+    
+    # Create password reset codes table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT NOT NULL,
+            code TEXT NOT NULL,
+            token TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     conn.commit()
@@ -235,6 +259,104 @@ async def forgot_password(request: ForgotPassword):
         raise HTTPException(status_code=404, detail="Phone number not found")
     
     return {"message": "Password reset available", "user_name": user[1]}
+
+@app.post("/api/send-reset-code")
+async def send_reset_code(request: SendResetCode):
+    import random
+    import secrets
+    from datetime import datetime, timedelta
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT userid, name FROM users WHERE phone = ?", (request.phone,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Phone number not found")
+    
+    # Generate 6-digit code and secure token
+    code = str(random.randint(100000, 999999))
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
+    
+    # Store reset code
+    cursor.execute(
+        "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (?, ?, ?, ?)",
+        (request.phone, code, token, expires_at)
+    )
+    conn.commit()
+    conn.close()
+    
+    # Send SMS with code
+    from sms_service import sms_service
+    sms_sent = sms_service.send_reset_code(request.phone, code)
+    
+    response_data = {
+        "message": f"Reset code sent to {request.phone}",
+        "user_name": user[1]
+    }
+    
+    # Include code in response only if SMS failed (for testing)
+    if not sms_sent:
+        response_data["code"] = code
+        response_data["message"] += " (SMS service unavailable - code shown for testing)"
+    
+    return response_data
+
+@app.post("/api/verify-reset-code")
+async def verify_reset_code(request: VerifyResetCode):
+    from datetime import datetime
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "SELECT token FROM password_reset_codes WHERE phone = ? AND code = ? AND expires_at > ? AND used = FALSE",
+        (request.phone, request.code, datetime.utcnow())
+    )
+    result = cursor.fetchone()
+    
+    if not result:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    
+    token = result[0]
+    conn.close()
+    
+    return {"message": "Code verified", "reset_token": token}
+
+@app.post("/api/reset-password-with-token")
+async def reset_password_with_token(request: ResetPasswordWithToken):
+    from datetime import datetime
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    # Verify token is valid and not used
+    cursor.execute(
+        "SELECT phone FROM password_reset_codes WHERE token = ? AND expires_at > ? AND used = FALSE",
+        (request.token, datetime.utcnow())
+    )
+    result = cursor.fetchone()
+    
+    if not result:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    phone = result[0]
+    
+    # Update password
+    hashed_password = hash_password(request.new_password)
+    cursor.execute("UPDATE users SET password = ? WHERE phone = ?", (hashed_password, phone))
+    
+    # Mark token as used
+    cursor.execute("UPDATE password_reset_codes SET used = TRUE WHERE token = ?", (request.token,))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Password reset successfully"}
 
 @app.post("/api/reset-password")
 async def reset_password(request: ResetPassword):

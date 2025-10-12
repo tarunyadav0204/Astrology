@@ -9,8 +9,9 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   });
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetData, setResetData] = useState({ phone: '', newPassword: '' });
+  const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
+  const [resetToken, setResetToken] = useState('');
 
   const handleInputChange = (e) => {
     setFormData(prev => ({
@@ -36,16 +37,40 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     }
   };
 
-  const handleForgotPassword = async (e) => {
+  const handleSendCode = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await authService.forgotPassword({ phone: resetData.phone });
-      toast.success(`Password reset available for ${response.user_name}`);
+      const response = await authService.sendResetCode({ phone: resetData.phone });
+      toast.success(response.message);
+      // Show code if SMS service is unavailable (testing mode)
+      if (response.code) {
+        console.log('Reset code:', response.code);
+        toast.info(`Code: ${response.code}`, { autoClose: 10000 });
+      }
       setResetStep(2);
     } catch (error) {
       toast.error(error.message || 'Phone number not found');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await authService.verifyResetCode({
+        phone: resetData.phone,
+        code: resetData.code
+      });
+      setResetToken(response.reset_token);
+      toast.success('Code verified! Enter new password.');
+      setResetStep(3);
+    } catch (error) {
+      toast.error(error.message || 'Invalid or expired code');
     } finally {
       setLoading(false);
     }
@@ -56,14 +81,15 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      await authService.resetPassword({
-        phone: resetData.phone,
+      await authService.resetPasswordWithToken({
+        token: resetToken,
         new_password: resetData.newPassword
       });
       toast.success('Password reset successfully!');
       setShowForgotPassword(false);
       setResetStep(1);
-      setResetData({ phone: '', newPassword: '' });
+      setResetData({ phone: '', code: '', newPassword: '' });
+      setResetToken('');
     } catch (error) {
       toast.error(error.message || 'Password reset failed');
     } finally {
@@ -93,7 +119,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         </h2>
 
         {resetStep === 1 ? (
-          <form onSubmit={handleForgotPassword}>
+          <form onSubmit={handleSendCode}>
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{
                 display: 'block',
@@ -136,7 +162,57 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
                 marginBottom: '1rem'
               }}
             >
-              {loading ? 'Checking...' : 'Verify Phone'}
+              {loading ? 'Sending...' : 'Send Code'}
+            </button>
+          </form>
+        ) : resetStep === 2 ? (
+          <form onSubmit={handleVerifyCode}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: '#e91e63',
+                fontWeight: '600'
+              }}>
+                Enter 6-digit Code
+              </label>
+              <input
+                type="text"
+                value={resetData.code}
+                onChange={(e) => setResetData(prev => ({ ...prev, code: e.target.value }))}
+                placeholder="Enter verification code"
+                maxLength="6"
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '2px solid rgba(233, 30, 99, 0.2)',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  textAlign: 'center',
+                  letterSpacing: '0.2em'
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1.1rem',
+                fontWeight: '700',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                marginBottom: '1rem'
+              }}
+            >
+              {loading ? 'Verifying...' : 'Verify Code'}
             </button>
           </form>
         ) : (
@@ -194,7 +270,8 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
             onClick={() => {
               setShowForgotPassword(false);
               setResetStep(1);
-              setResetData({ phone: '', newPassword: '' });
+              setResetData({ phone: '', code: '', newPassword: '' });
+              setResetToken('');
             }}
             style={{
               background: 'none',
