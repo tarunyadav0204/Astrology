@@ -302,6 +302,16 @@ class ApiService {
       throw new Error('Failed to calculate Ashtakavarga');
     }
   }
+  
+  async getNakshatrasPublic() {
+    try {
+      const response = await this.api.get('/nakshatras-public');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching nakshatras:', error);
+      throw new Error('Failed to fetch nakshatra details');
+    }
+  }
 }
 
 export const apiService = new ApiService();

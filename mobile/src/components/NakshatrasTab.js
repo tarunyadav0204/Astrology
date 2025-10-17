@@ -36,8 +36,21 @@ const getPlanetNakshatraSignificance = async (planet, nakshatra, house) => {
 export default function NakshatrasTab({ chartData, birthData }) {
   const [selectedNakshatra, setSelectedNakshatra] = useState(null);
   const [selectedPlanetPosition, setSelectedPlanetPosition] = useState(null);
+  const [nakshatras, setNakshatras] = useState([]);
+  const [loading, setLoading] = useState(true);
   
-  const nakshatras = [
+  useEffect(() => {
+    loadNakshatras();
+  }, []);
+  
+  const loadNakshatras = async () => {
+    try {
+      const response = await apiService.getNakshatrasPublic();
+      setNakshatras(response.nakshatras || []);
+    } catch (error) {
+      console.error('Failed to load nakshatras:', error);
+      // Fallback to basic data
+      setNakshatras([
     { name: 'Ashwini', lord: 'Ketu', deity: 'Ashwini Kumaras', nature: 'Light/Swift', guna: 'Rajas', description: 'Ashwini nakshatra is the first among the twenty-seven nakshatras and comes under the domain of planet Ketu.', characteristics: 'People born under Ashwini nakshatra are known for their pioneering spirit and dynamic nature.', positiveTraits: 'Healing abilities, leadership qualities, pioneering spirit.', negativeTraits: 'Impatience, impulsiveness, overly aggressive.', careers: 'Medicine, healing arts, emergency services.', compatibility: 'Most compatible with Bharani and Krittika nakshatras.' },
     { name: 'Bharani', lord: 'Venus', deity: 'Yama', nature: 'Fierce/Ugra', guna: 'Rajas', description: 'Bharani nakshatra is ruled by Venus and presided over by Yama, the god of death and dharma.', characteristics: 'Bharani natives are known for their strong willpower and determination.', positiveTraits: 'Strong responsibility, creative abilities, natural leadership.', negativeTraits: 'Stubbornness, jealousy, overly critical nature.', careers: 'Law, justice, administration, creative arts.', compatibility: 'Most compatible with Ashwini and Rohini nakshatras.' },
     { name: 'Krittika', lord: 'Sun', deity: 'Agni', nature: 'Mixed', guna: 'Rajas', description: 'Krittika nakshatra is ruled by the Sun and presided over by Agni, the fire god.', characteristics: 'Krittika natives are known for their sharp intellect and determination.', positiveTraits: 'Sharp intellect, leadership abilities, strong justice sense.', negativeTraits: 'Overly critical, harsh speech, cruel judgments.', careers: 'Teaching, criticism, editing, research.', compatibility: 'Most compatible with Rohini and Mrigashira nakshatras.' },
@@ -65,7 +78,11 @@ export default function NakshatrasTab({ chartData, birthData }) {
     { name: 'Purva Bhadrapada', lord: 'Jupiter', deity: 'Aja Ekapada', nature: 'Fierce/Ugra', guna: 'Rajas', description: 'Purva Bhadrapada nakshatra is ruled by Jupiter and presided over by Aja Ekapada.', characteristics: 'Purva Bhadrapada natives are transformative, spiritual, and intense individuals.', positiveTraits: 'Transformative abilities, spiritual wisdom, philosophical nature.', negativeTraits: 'Tendency towards extremes, unpredictable behavior, overly intense.', careers: 'Spirituality, philosophy, transformation.', compatibility: 'Most compatible with Uttara Bhadrapada and Revati nakshatras.' },
     { name: 'Uttara Bhadrapada', lord: 'Saturn', deity: 'Ahir Budhnya', nature: 'Fixed/Dhruva', guna: 'Tamas', description: 'Uttara Bhadrapada nakshatra is ruled by Saturn and presided over by Ahir Budhnya.', characteristics: 'Uttara Bhadrapada natives are deep, stable, and wise individuals.', positiveTraits: 'Depth, stability, wisdom.', negativeTraits: 'Overly serious, pessimistic outlook, too slow to act.', careers: 'Planning, spirituality, depth work.', compatibility: 'Most compatible with Revati and Ashwini nakshatras.' },
     { name: 'Revati', lord: 'Mercury', deity: 'Pushan', nature: 'Soft/Mridu', guna: 'Sattva', description: 'Revati nakshatra is ruled by Mercury and presided over by Pushan.', characteristics: 'Revati natives are nourishing, prosperous, and protective individuals.', positiveTraits: 'Nourishing nature, prosperity consciousness, protective instincts.', negativeTraits: 'Overly protective, possessive nature, too giving.', careers: 'Nourishment, travel, completion work.', compatibility: 'Most compatible with Ashwini and Bharani nakshatras.' }
-  ];
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getNakshatra = (longitude) => {
     const nakshatraIndex = Math.floor(longitude / 13.333333);
@@ -215,12 +232,12 @@ export default function NakshatrasTab({ chartData, birthData }) {
             
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, {color: '#22c55e'}]}>✅ Positive Traits</Text>
-              <Text style={styles.sectionText}>{selectedNakshatra.positiveTraits}</Text>
+              <Text style={styles.sectionText}>{selectedNakshatra.positive_traits}</Text>
             </View>
             
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, {color: '#ef4444'}]}>⚠️ Negative Traits</Text>
-              <Text style={styles.sectionText}>{selectedNakshatra.negativeTraits}</Text>
+              <Text style={styles.sectionText}>{selectedNakshatra.negative_traits}</Text>
             </View>
             
             <View style={styles.section}>
@@ -238,6 +255,14 @@ export default function NakshatrasTab({ chartData, birthData }) {
     );
   }
 
+  if (loading) {
+    return (
+      <View style={[styles.container, {justifyContent: 'center', alignItems: 'center'}]}>
+        <Text style={styles.title}>Loading Nakshatra details...</Text>
+      </View>
+    );
+  }
+  
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>🌟 Nakshatra Analysis</Text>
