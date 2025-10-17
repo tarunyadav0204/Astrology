@@ -11,11 +11,12 @@ import NakshatrasTab from '../NakshatrasTab/NakshatrasTab';
 import YogasTab from '../YogasTab/YogasTab';
 import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
+
+import ClassicalPrediction from '../ClassicalPrediction/ClassicalPrediction';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
 import UnifiedHeader from '../UnifiedHeader/UnifiedHeader';
-import RuleManager from '../RuleEngine/RuleManager';
-import EventAnalyzer from '../RuleEngine/EventAnalyzer';
 import UserSettings from '../UserSettings';
+import AdminTab from '../AdminTab/AdminTab';
 import TransitDateControls from '../TransitDateControls/TransitDateControls';
 import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem } from './Dashboard.styles';
 
@@ -328,18 +329,14 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
+          { id: 'classical', label: '🔮 Classical', icon: '🔮' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
           { id: 'houses', label: '🏠 House Analysis', icon: '🏠' },
           { id: 'relationships', label: '🤝 Relationships', icon: '🤝' },
-          { id: 'strengths', label: '⚡ Strengths', icon: '⚡' },
           { id: 'yogas', label: '🔮 Yogas', icon: '🔮' },
-          { id: 'timing', label: '📅 Timing', icon: '📅' },
-          { id: 'predictions', label: '🔮 Predictions', icon: '🔮' },
-          { id: 'remedies', label: '💎 Remedies', icon: '💎' },
           { id: 'settings', label: '⚙️ Settings', icon: '⚙️' },
           ...(user?.role === 'admin' ? [
-            { id: 'rule-engine', label: '⚙️ Rule Engine', icon: '⚙️' },
-            { id: 'event-analyzer', label: '🔍 Event Analyzer', icon: '🔍' }
+            { id: 'admin', label: '🛠️ Admin', icon: '🛠️' }
           ] : [])
         ].map(tab => (
           <button
@@ -705,17 +702,13 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           minHeight: '70vh',
           boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
         }}>
+          {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
           {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
           {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
           {activeTab === 'relationships' && <RelationshipsTab chartData={chartData} birthData={birthData} />}
-          {activeTab === 'strengths' && <div>Strengths - Coming Soon</div>}
           {activeTab === 'yogas' && <YogasTab chartData={chartData} birthData={birthData} />}
-          {activeTab === 'timing' && <div>Timing - Coming Soon</div>}
-          {activeTab === 'predictions' && <div>Predictions - Coming Soon</div>}
-          {activeTab === 'remedies' && <div>Remedies - Coming Soon</div>}
           {activeTab === 'settings' && <UserSettings user={user} onSettingsUpdate={handleSettingsUpdate} />}
-          {activeTab === 'rule-engine' && user?.role === 'admin' && <RuleManager />}
-          {activeTab === 'event-analyzer' && user?.role === 'admin' && <EventAnalyzer birthChart={chartData} />}
+          {activeTab === 'admin' && user?.role === 'admin' && <AdminTab chartData={chartData} birthData={birthData} />}
 
         </div>
       )}

@@ -10,10 +10,16 @@ const RuleManager = () => {
   const [searchResults, setSearchResults] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [activeView, setActiveView] = useState('manage');
+  const [ruleType, setRuleType] = useState('event'); // 'event' or 'daily'
+  const [dailyRules, setDailyRules] = useState([]);
 
   useEffect(() => {
-    loadRules();
-  }, []);
+    if (ruleType === 'event') {
+      loadRules();
+    } else {
+      loadDailyRules();
+    }
+  }, [ruleType]);
 
   const loadRules = async () => {
     try {
@@ -21,6 +27,18 @@ const RuleManager = () => {
       setRules(response);
     } catch (error) {
       console.error('Failed to load rules:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const loadDailyRules = async () => {
+    setLoading(true);
+    try {
+      const response = await apiService.getDailyPredictionRules();
+      setDailyRules(response.rules);
+    } catch (error) {
+      console.error('Failed to load daily rules:', error);
     } finally {
       setLoading(false);
     }
@@ -78,6 +96,37 @@ const RuleManager = () => {
       }
     }
   };
+  
+  const handleCreateDailyRule = () => {
+    setSelectedRule({
+      id: '',
+      rule_type: 'general',
+      conditions: {},
+      prediction_template: '',
+      confidence_base: 50,
+      life_areas: [],
+      timing_advice: '',
+      colors: [],
+      is_active: true
+    });
+    setShowEditor(true);
+  };
+  
+  const handleEditDailyRule = (rule) => {
+    setSelectedRule(rule);
+    setShowEditor(true);
+  };
+  
+  const handleDeleteDailyRule = async (ruleId) => {
+    if (window.confirm('Are you sure you want to delete this daily rule?')) {
+      try {
+        await apiService.deleteDailyPredictionRule(ruleId);
+        loadDailyRules();
+      } catch (error) {
+        console.error('Failed to delete daily rule:', error);
+      }
+    }
+  };
 
   if (loading) return <div>Loading rules...</div>;
 
@@ -92,6 +141,38 @@ const RuleManager = () => {
         gap: '10px'
       }}>
         <h2 style={{ margin: 0, fontSize: window.innerWidth <= 768 ? '1.2rem' : '1.5rem' }}>Rule Engine Management</h2>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <button
+            onClick={() => setRuleType('event')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: ruleType === 'event' ? '#ff9800' : 'transparent',
+              color: ruleType === 'event' ? 'white' : '#ff9800',
+              border: '2px solid #ff9800',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '600'
+            }}
+          >
+            Event Rules
+          </button>
+          <button
+            onClick={() => setRuleType('daily')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: ruleType === 'daily' ? '#ff9800' : 'transparent',
+              color: ruleType === 'daily' ? 'white' : '#ff9800',
+              border: '2px solid #ff9800',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '600'
+            }}
+          >
+            Daily Prediction Rules
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={() => setActiveView('manage')}
@@ -123,7 +204,7 @@ const RuleManager = () => {
           </button>
           {activeView === 'manage' && (
             <button
-              onClick={handleCreateRule}
+              onClick={ruleType === 'event' ? handleCreateRule : handleCreateDailyRule}
               style={{
                 padding: '8px 16px',
                 backgroundColor: '#4caf50',
@@ -134,7 +215,7 @@ const RuleManager = () => {
                 fontWeight: '600'
               }}
             >
-              Create New Rule
+              Create New {ruleType === 'event' ? 'Event' : 'Daily'} Rule
             </button>
           )}
         </div>
@@ -142,53 +223,104 @@ const RuleManager = () => {
 
       {activeView === 'manage' ? (
         <div style={{ display: 'grid', gap: '15px' }}>
-          {rules.map(rule => (
-            <div key={rule.id} style={{
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              padding: '15px',
-              background: 'white'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                <div>
-                  <h3 style={{ margin: '0 0 10px 0', color: '#e91e63' }}>
-                    {rule.event_type.replace('_', ' ').toUpperCase()}
-                  </h3>
-                  <p><strong>Primary Karaka:</strong> {rule.primary_karaka}</p>
-                  <p><strong>Houses:</strong> {rule.house_significations.join(', ')}</p>
-                  <p><strong>Status:</strong> {rule.is_active ? '✅ Active' : '❌ Inactive'}</p>
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => handleEditRule(rule)}
-                    style={{
-                      padding: '5px 10px',
-                      background: '#2196f3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteRule(rule.id)}
-                    style={{
-                      padding: '5px 10px',
-                      background: '#f44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Delete
-                  </button>
+          {ruleType === 'event' ? (
+            rules.map(rule => (
+              <div key={rule.id} style={{
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '15px',
+                background: 'white'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#e91e63' }}>
+                      {rule.event_type.replace('_', ' ').toUpperCase()}
+                    </h3>
+                    <p><strong>Primary Karaka:</strong> {rule.primary_karaka}</p>
+                    <p><strong>Houses:</strong> {rule.house_significations.join(', ')}</p>
+                    <p><strong>Status:</strong> {rule.is_active ? '✅ Active' : '❌ Inactive'}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => handleEditRule(rule)}
+                      style={{
+                        padding: '5px 10px',
+                        background: '#2196f3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRule(rule.id)}
+                      style={{
+                        padding: '5px 10px',
+                        background: '#f44336',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            dailyRules.map(rule => (
+              <div key={rule.id} style={{
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '15px',
+                background: 'white'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#e91e63' }}>
+                      {rule.id.replace('_', ' ').toUpperCase()}
+                    </h3>
+                    <p><strong>Type:</strong> {rule.rule_type.replace('_', ' ')}</p>
+                    <p><strong>Confidence:</strong> {rule.confidence_base}%</p>
+                    <p><strong>Prediction:</strong> {rule.prediction_template.substring(0, 100)}...</p>
+                    <p><strong>Status:</strong> {rule.is_active ? '✅ Active' : '❌ Inactive'}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => handleEditDailyRule(rule)}
+                      style={{
+                        padding: '5px 10px',
+                        background: '#2196f3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDailyRule(rule.id)}
+                      style={{
+                        padding: '5px 10px',
+                        background: '#f44336',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       ) : (
         <div>
@@ -353,23 +485,17 @@ const RuleManager = () => {
       {showEditor && (
         <RuleEditor
           rule={selectedRule}
+          ruleType={ruleType}
           onSave={() => {
             setShowEditor(false);
-            loadRules();
+            if (ruleType === 'event') {
+              loadRules();
+            } else {
+              loadDailyRules();
+            }
             if (searchResults) {
               handleSearch();
             }
-          }}
-          onCancel={() => setShowEditor(false)}
-        />
-      )}
-
-      {showEditor && (
-        <RuleEditor
-          rule={selectedRule}
-          onSave={() => {
-            setShowEditor(false);
-            loadRules();
           }}
           onCancel={() => setShowEditor(false)}
         />
@@ -378,7 +504,7 @@ const RuleManager = () => {
   );
 };
 
-const RuleEditor = ({ rule, onSave, onCancel }) => {
+const RuleEditor = ({ rule, ruleType, onSave, onCancel }) => {
   const [formData, setFormData] = useState(rule);
 
   const planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
@@ -398,11 +524,20 @@ const RuleEditor = ({ rule, onSave, onCancel }) => {
 
   const handleSave = async () => {
     try {
-      if (formData.id) {
-        await apiService.updateRule(formData.id, formData);
+      if (ruleType === 'event') {
+        if (formData.id) {
+          await apiService.updateRule(formData.id, formData);
+        } else {
+          formData.id = `${formData.event_type}_rule`;
+          await apiService.createRule(formData);
+        }
       } else {
-        formData.id = `${formData.event_type}_rule`;
-        await apiService.createRule(formData);
+        if (formData.id && formData.created_at) {
+          await apiService.updateDailyPredictionRule(formData.id, formData);
+        } else {
+          formData.id = `${formData.rule_type}_${Date.now()}`;
+          await apiService.createDailyPredictionRule(formData);
+        }
       }
       onSave();
     } catch (error) {
@@ -432,86 +567,163 @@ const RuleEditor = ({ rule, onSave, onCancel }) => {
         maxHeight: '80vh',
         overflow: 'auto'
       }}>
-        <h3>Rule Editor</h3>
+        <h3>{ruleType === 'event' ? 'Event' : 'Daily Prediction'} Rule Editor</h3>
         
-        <div style={{ marginBottom: '15px' }}>
-          <label>Event Type:</label>
-          <input
-            type="text"
-            value={formData.event_type}
-            onChange={(e) => setFormData({...formData, event_type: e.target.value})}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
+        {ruleType === 'event' ? (
+          <>
+            <div style={{ marginBottom: '15px' }}>
+              <label>Event Type:</label>
+              <input
+                type="text"
+                value={formData.event_type}
+                onChange={(e) => setFormData({...formData, event_type: e.target.value})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+              />
+            </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label>Primary Karaka:</label>
-          <select
-            value={formData.primary_karaka}
-            onChange={(e) => setFormData({...formData, primary_karaka: e.target.value})}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          >
-            {planets.map(planet => (
-              <option key={planet} value={planet}>{planet}</option>
-            ))}
-          </select>
-        </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label>Primary Karaka:</label>
+              <select
+                value={formData.primary_karaka}
+                onChange={(e) => setFormData({...formData, primary_karaka: e.target.value})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+              >
+                {planets.map(planet => (
+                  <option key={planet} value={planet}>{planet}</option>
+                ))}
+              </select>
+            </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label>House Significations:</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '5px' }}>
-            {houses.map(house => (
-              <label key={house} style={{ display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={formData.house_significations.includes(house)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setFormData({
-                        ...formData,
-                        house_significations: [...formData.house_significations, house]
-                      });
-                    } else {
-                      setFormData({
-                        ...formData,
-                        house_significations: formData.house_significations.filter(h => h !== house)
-                      });
-                    }
-                  }}
-                />
-                <span style={{ marginLeft: '5px' }}>{house}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label>House Significations:</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '5px' }}>
+                {houses.map(house => (
+                  <label key={house} style={{ display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.house_significations.includes(house)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            house_significations: [...formData.house_significations, house]
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            house_significations: formData.house_significations.filter(h => h !== house)
+                          });
+                        }
+                      }}
+                    />
+                    <span style={{ marginLeft: '5px' }}>{house}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label>Activation Methods:</label>
-          <div style={{ marginTop: '5px' }}>
-            {activationMethods.map(method => (
-              <label key={method} style={{ display: 'block', marginBottom: '5px' }}>
-                <input
-                  type="checkbox"
-                  checked={formData.activation_methods.includes(method)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setFormData({
-                        ...formData,
-                        activation_methods: [...formData.activation_methods, method]
-                      });
-                    } else {
-                      setFormData({
-                        ...formData,
-                        activation_methods: formData.activation_methods.filter(m => m !== method)
-                      });
-                    }
-                  }}
-                />
-                <span style={{ marginLeft: '5px' }}>{method.replace(/_/g, ' ')}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label>Activation Methods:</label>
+              <div style={{ marginTop: '5px' }}>
+                {activationMethods.map(method => (
+                  <label key={method} style={{ display: 'block', marginBottom: '5px' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.activation_methods.includes(method)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            activation_methods: [...formData.activation_methods, method]
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            activation_methods: formData.activation_methods.filter(m => m !== method)
+                          });
+                        }
+                      }}
+                    />
+                    <span style={{ marginLeft: '5px' }}>{method.replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: '15px' }}>
+              <label>Rule Type:</label>
+              <select
+                value={formData.rule_type}
+                onChange={(e) => setFormData({...formData, rule_type: e.target.value})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+              >
+                <option value="general">General</option>
+                <option value="dasha_nakshatra_combo">Dasha + Nakshatra</option>
+                <option value="antar_dasha">Antar Dasha</option>
+                <option value="transit_aspect">Transit Aspect</option>
+                <option value="dasha_energy">Dasha Energy</option>
+                <option value="moon_influence">Moon Influence</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label>Prediction Text:</label>
+              <textarea
+                value={formData.prediction_template}
+                onChange={(e) => setFormData({...formData, prediction_template: e.target.value})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px', minHeight: '80px' }}
+                placeholder="Enter the prediction text that will be shown to users..."
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label>Confidence Base (%):</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={formData.confidence_base}
+                onChange={(e) => setFormData({...formData, confidence_base: parseInt(e.target.value)})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label>Life Areas (comma-separated):</label>
+              <input
+                type="text"
+                value={formData.life_areas.join(', ')}
+                onChange={(e) => setFormData({...formData, life_areas: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                placeholder="relationships, career, health, wealth"
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label>Timing Advice:</label>
+              <input
+                type="text"
+                value={formData.timing_advice}
+                onChange={(e) => setFormData({...formData, timing_advice: e.target.value})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                placeholder="Best time: 10 AM - 2 PM"
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label>Lucky Colors (comma-separated):</label>
+              <input
+                type="text"
+                value={formData.colors.join(', ')}
+                onChange={(e) => setFormData({...formData, colors: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                placeholder="red, blue, green, yellow"
+              />
+            </div>
+          </>
+        )}
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
           <button
@@ -537,7 +749,7 @@ const RuleEditor = ({ rule, onSave, onCancel }) => {
               cursor: 'pointer'
             }}
           >
-            Save Rule
+            Save {ruleType === 'event' ? 'Event' : 'Daily'} Rule
           </button>
         </div>
       </div>

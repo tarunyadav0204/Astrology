@@ -74,6 +74,23 @@ const UnifiedHeader = ({
     flexShrink: 0
   };
 
+  // Add CSS animations
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { opacity: 0.7; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.1); }
+      }
+      @keyframes shimmer {
+        0% { background-position: -200px 0; }
+        100% { background-position: calc(200px + 100%) 0; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   return (
     <div style={{
       background: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)',
@@ -93,33 +110,43 @@ const UnifiedHeader = ({
       {/* Left Side */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {isMobile ? (
-          // Mobile: Hamburger Menu
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => {
-                if (!showMenu && menuRef.current) {
-                  const rect = menuRef.current.getBoundingClientRect();
-                  setMenuPosition({
-                    top: rect.bottom,
-                    left: rect.left
-                  });
-                }
-                setShowMenu(!showMenu);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '20px',
-                cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '4px',
-                color: 'white'
-              }}
-            >
-              ☰
-            </button>
+          // Mobile: Enhanced Header with mystical elements
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Mystical decoration */}
+            <div style={{ 
+              fontSize: '16px', 
+              animation: 'pulse 2s infinite',
+              filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.8))'
+            }}>✨</div>
             
-            {showMenu && (
+            <div ref={menuRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => {
+                  if (!showMenu && menuRef.current) {
+                    const rect = menuRef.current.getBoundingClientRect();
+                    setMenuPosition({
+                      top: rect.bottom,
+                      left: rect.left
+                    });
+                  }
+                  setShowMenu(!showMenu);
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  color: 'white',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                }}
+              >
+                ☰
+              </button>
+            
+              {showMenu && (
               <div style={{
                 position: 'fixed',
                 top: '60px',
@@ -227,7 +254,8 @@ const UnifiedHeader = ({
                   🚪 Logout
                 </button>
               </div>
-            )}
+              )}
+            </div>
           </div>
         ) : (
           // Desktop: Full Navigation
@@ -271,8 +299,44 @@ const UnifiedHeader = ({
           </>
         )}
 
-        {/* Chart Selector - Always Visible */}
-        {currentChart && (
+        {/* Mobile Chart Info */}
+        {isMobile && currentChart && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            flex: 1,
+            minWidth: 0
+          }}>
+            <div style={{
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: '700',
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '150px'
+            }}>
+              🌟 {currentChart.name}
+            </div>
+            <div style={{
+              color: 'rgba(255,255,255,0.9)',
+              fontSize: '10px',
+              fontWeight: '500',
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+            }}>
+              {new Date(currentChart.date).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Desktop Chart Selector */}
+        {!isMobile && currentChart && (
           <ChartSearchDropdown
             currentChart={currentChart}
             onSelectChart={onSelectChart}
@@ -300,10 +364,19 @@ const UnifiedHeader = ({
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: isMobile ? '8px' : '12px',
+        gap: isMobile ? '6px' : '12px',
         flexShrink: 0,
         minWidth: 0
       }}>
+        {/* Mobile mystical decoration */}
+        {isMobile && (
+          <div style={{ 
+            fontSize: '14px', 
+            animation: 'pulse 2.5s infinite',
+            filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.8))',
+            animationDelay: '1s'
+          }}>🔮</div>
+        )}
         {/* Transit Controls */}
         {showTransitControls && (
           <div style={{ 

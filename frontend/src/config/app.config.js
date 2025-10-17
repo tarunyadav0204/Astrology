@@ -1,6 +1,6 @@
 export const APP_CONFIG = {
   api: {
-    dev: 'https://astroclick.net/api',
+    dev: 'http://localhost:8001',
     prod: 'https://astroclick.net/api',
     timeout: 30000,
     retries: 3

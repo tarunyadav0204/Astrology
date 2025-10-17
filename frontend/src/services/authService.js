@@ -4,9 +4,17 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? APP_CONFIG.api.prod 
   : APP_CONFIG.api.dev;
 
+// Helper function to add /api prefix only for localhost
+const getEndpoint = (path) => {
+  if (API_BASE_URL.includes('localhost')) {
+    return `${API_BASE_URL}/api${path}`;
+  }
+  return `${API_BASE_URL}${path}`;
+};
+
 export const authService = {
   async register(userData) {
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    const response = await fetch(getEndpoint('/register'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,7 +32,7 @@ export const authService = {
 
   async login(userData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await fetch(getEndpoint('/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +67,7 @@ export const authService = {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/me`, {
+      const response = await fetch(getEndpoint('/me'), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -101,7 +109,7 @@ export const authService = {
 
   async forgotPassword(data) {
     try {
-      const response = await fetch(`${API_BASE_URL}/forgot-password`, {
+      const response = await fetch(getEndpoint('/forgot-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +139,7 @@ export const authService = {
 
   async sendResetCode(data) {
     try {
-      const response = await fetch(`${API_BASE_URL}/send-reset-code`, {
+      const response = await fetch(getEndpoint('/send-reset-code'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,7 +169,7 @@ export const authService = {
 
   async verifyResetCode(data) {
     try {
-      const response = await fetch(`${API_BASE_URL}/verify-reset-code`, {
+      const response = await fetch(getEndpoint('/verify-reset-code'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +199,7 @@ export const authService = {
 
   async resetPasswordWithToken(data) {
     try {
-      const response = await fetch(`${API_BASE_URL}/reset-password-with-token`, {
+      const response = await fetch(getEndpoint('/reset-password-with-token'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,7 +229,7 @@ export const authService = {
 
   async resetPassword(data) {
     try {
-      const response = await fetch(`${API_BASE_URL}/reset-password`, {
+      const response = await fetch(getEndpoint('/reset-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

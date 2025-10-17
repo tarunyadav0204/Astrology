@@ -11,6 +11,8 @@ import bcrypt
 import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
+from daily_predictions import DailyPredictionEngine
+from house_combinations import router as house_combinations_router, init_house_combinations_db
 
 # Load environment variables explicitly
 try:
@@ -34,6 +36,7 @@ app.add_middleware(
 # Include rule engine router with /api prefix
 app.include_router(rule_engine_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(house_combinations_router, prefix="/api")
 
 # Root endpoint for health check
 @app.get("/")
@@ -84,6 +87,14 @@ class VerifyResetCode(BaseModel):
 class ResetPasswordWithToken(BaseModel):
     token: str
     new_password: str
+
+class DailyPredictionRequest(BaseModel):
+    birth_data: BirthData
+    target_date: Optional[str] = None
+
+class ClassicalPredictionRequest(BaseModel):
+    birth_data: BirthData
+    prediction_date: Optional[str] = None
 
 class User(BaseModel):
     userid: int
@@ -151,6 +162,25 @@ def init_db():
             interpretation TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(planet, nakshatra, house)
+        )
+    ''')
+    
+    # Create nakshatras table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS nakshatras (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            lord TEXT NOT NULL,
+            deity TEXT NOT NULL,
+            nature TEXT NOT NULL,
+            guna TEXT NOT NULL,
+            description TEXT NOT NULL,
+            characteristics TEXT NOT NULL,
+            positive_traits TEXT NOT NULL,
+            negative_traits TEXT NOT NULL,
+            careers TEXT NOT NULL,
+            compatibility TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -813,6 +843,11 @@ async def calculate_yogi(birth_data: BirthData):
 async def calculate_dasha(birth_data: BirthData):
     return await calculate_accurate_dasha(birth_data)
 
+@app.post("/api/dasha")
+async def get_dasha(birth_data: BirthData):
+    """Get current dasha data for classical engine"""
+    return await calculate_accurate_dasha(birth_data)
+
 @app.post("/api/calculate-panchang")
 async def calculate_panchang(request: TransitRequest):
     jd = swe.julday(
@@ -1400,73 +1435,43 @@ async def predict_marriage_complete(birth_data: BirthData):
 
 @app.post("/api/calculate-accurate-dasha")
 async def calculate_accurate_dasha(birth_data: BirthData):
-    """Calculate accurate Vimshottari Dasha using standard method"""
-    time_parts = birth_data.time.split(':')
-    hour = float(time_parts[0]) + float(time_parts[1])/60
+    """Calculate accurate Vimshottari Dasha using shared calculator"""
+    from shared.dasha_calculator import DashaCalculator
     
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    # Convert BirthData to dict
+    birth_dict = {
+        'name': birth_data.name,
+        'date': birth_data.date,
+        'time': birth_data.time,
+        'latitude': birth_data.latitude,
+        'longitude': birth_data.longitude,
+        'timezone': birth_data.timezone
+    }
     
-    utc_hour = hour - tz_offset
-    jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
+    calculator = DashaCalculator()
+    dasha_data = calculator.calculate_current_dashas(birth_dict)
     
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    
-    from event_prediction.config import DASHA_PERIODS, NAKSHATRA_LORDS, PLANET_ORDER
-    
-    # Standard nakshatra calculation: 13°20' per nakshatra
-    nakshatra_index = int(moon_pos / 13.333333333333334)
-    moon_lord = NAKSHATRA_LORDS[nakshatra_index]
-    
-    # Calculate balance of first dasha
-    nakshatra_start = nakshatra_index * 13.333333333333334
-    elapsed_degrees = moon_pos - nakshatra_start
-    balance_fraction = 1 - (elapsed_degrees / 13.333333333333334)
-    
-    birth_datetime = datetime.strptime(f"{birth_data.date} {birth_data.time}", "%Y-%m-%d %H:%M")
-    
+    # Format maha_dashas for API response
     maha_dashas = []
-    current_date = birth_datetime
-    start_index = PLANET_ORDER.index(moon_lord)
-    
-    for i in range(9):
-        planet = PLANET_ORDER[(start_index + i) % 9]
-        
-        if i == 0:
-            # Balance of first dasha
-            years = DASHA_PERIODS[planet] * balance_fraction
-        else:
-            years = DASHA_PERIODS[planet]
-        
-        days = years * 365.25
-        end_date = current_date + timedelta(days=days)
-        
+    for maha in dasha_data.get('maha_dashas', []):
         maha_dashas.append({
-            'planet': planet,
-            'start': current_date.strftime('%Y-%m-%d'),
-            'end': (end_date - timedelta(seconds=1)).strftime('%Y-%m-%d'),
-            'years': round(years, 2)
+            'planet': maha['planet'],
+            'start': maha['start'].strftime('%Y-%m-%d'),
+            'end': maha['end'].strftime('%Y-%m-%d'),
+            'years': maha['years']
         })
-        
-        current_date = end_date
     
     return {
         "maha_dashas": maha_dashas,
-        "moon_nakshatra": nakshatra_index + 1,
-        "moon_lord": moon_lord
+        "current_dashas": {
+            "mahadasha": dasha_data.get('mahadasha', {}),
+            "antardasha": dasha_data.get('antardasha', {}),
+            "pratyantardasha": dasha_data.get('pratyantardasha', {}),
+            "sookshma": dasha_data.get('sookshma', {}),
+            "prana": dasha_data.get('prana', {})
+        },
+        "moon_nakshatra": dasha_data.get('moon_nakshatra', 1),
+        "moon_lord": dasha_data.get('moon_lord', 'Sun')
     }
 
 @app.post("/api/calculate-sub-dashas")
@@ -1662,7 +1667,355 @@ async def analyze_single_house(request: dict, current_user: User = Depends(get_c
         "house_analysis": house_analysis
     }
 
+@app.post("/api/daily-predictions")
+async def get_daily_predictions(request: DailyPredictionRequest, current_user: User = Depends(get_current_user)):
+    """Get daily predictions using rule engine"""
+    from datetime import datetime, date
+    
+    # Parse target date
+    target_date = date.today()
+    if request.target_date:
+        target_date = datetime.strptime(request.target_date, '%Y-%m-%d').date()
+    
+    # Get required data using existing functions
+    chart_data = await calculate_chart(request.birth_data, 'mean', current_user)
+    dasha_data = await calculate_accurate_dasha(request.birth_data)
+    
+    # Calculate transit data for target date
+    transit_request = TransitRequest(
+        birth_data=request.birth_data,
+        transit_date=target_date.isoformat()
+    )
+    transit_data = await calculate_transits(transit_request, current_user)
+    
+    # Initialize prediction engine
+    prediction_engine = DailyPredictionEngine()
+    
+    # Generate predictions
+    predictions = prediction_engine.get_daily_predictions(
+        birth_data=request.birth_data.model_dump(),
+        chart_data=chart_data,
+        dasha_data=dasha_data,
+        transit_data=transit_data,
+        target_date=target_date
+    )
+    
+    return predictions
 
+@app.post("/api/daily-prediction-rules")
+async def add_daily_prediction_rule(rule_data: dict, current_user: User = Depends(get_current_user)):
+    """Add new daily prediction rule (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    prediction_engine = DailyPredictionEngine()
+    success = prediction_engine.add_prediction_rule(rule_data)
+    
+    if success:
+        return {"message": "Prediction rule added successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to add prediction rule")
+
+@app.post("/api/reset-prediction-rules")
+async def reset_prediction_rules(current_user: User = Depends(get_current_user)):
+    """Reset daily prediction rules to defaults (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    prediction_engine = DailyPredictionEngine()
+    success = prediction_engine.reset_prediction_rules()
+    
+    if success:
+        return {"message": "Prediction rules reset successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to reset prediction rules")
+
+@app.post("/api/classical-prediction")
+async def get_classical_prediction(request: ClassicalPredictionRequest, current_user: User = Depends(get_current_user)):
+    """Generate comprehensive classical Vedic prediction"""
+    from classical_engine.prediction_engine import ClassicalPredictionEngine
+    
+    # Convert birth_data to dict
+    birth_dict = {
+        'name': request.birth_data.name,
+        'date': request.birth_data.date,
+        'time': request.birth_data.time,
+        'latitude': request.birth_data.latitude,
+        'longitude': request.birth_data.longitude,
+        'timezone': request.birth_data.timezone
+    }
+    
+    # Parse prediction date
+    prediction_date = datetime.now()
+    if request.prediction_date:
+        try:
+            prediction_date = datetime.strptime(request.prediction_date, '%Y-%m-%d')
+        except ValueError:
+            prediction_date = datetime.now()
+    
+    # Initialize classical prediction engine with specific date
+    engine = ClassicalPredictionEngine(birth_dict, prediction_date)
+    
+    # Generate comprehensive prediction
+    result = engine.generate_comprehensive_prediction()
+    
+    return result
+
+@app.get("/api/daily-prediction-rules")
+async def get_daily_prediction_rules(current_user: User = Depends(get_current_user)):
+    """Get all daily prediction rules (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    import sqlite3
+    import json
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM daily_prediction_rules ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    rules = []
+    for row in rows:
+        rules.append({
+            "id": row[0],
+            "rule_type": row[1],
+            "conditions": json.loads(row[2]),
+            "prediction_template": row[3],
+            "confidence_base": row[4],
+            "life_areas": json.loads(row[5]) if row[5] else [],
+            "timing_advice": row[6],
+            "colors": json.loads(row[7]) if row[7] else [],
+            "is_active": bool(row[8]),
+            "created_at": row[9]
+        })
+    
+    return {"rules": rules}
+
+@app.delete("/api/daily-prediction-rules/{rule_id}")
+async def delete_daily_prediction_rule(rule_id: str, current_user: User = Depends(get_current_user)):
+    """Delete a daily prediction rule (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    import sqlite3
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM daily_prediction_rules WHERE id = ?", (rule_id,))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Rule not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Rule deleted successfully"}
+
+@app.put("/api/daily-prediction-rules/{rule_id}")
+async def update_daily_prediction_rule(rule_id: str, rule_data: dict, current_user: User = Depends(get_current_user)):
+    """Update a daily prediction rule (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    import sqlite3
+    import json
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE daily_prediction_rules 
+        SET rule_type=?, conditions=?, prediction_template=?, confidence_base=?, 
+            life_areas=?, timing_advice=?, colors=?, is_active=?
+        WHERE id=?
+    ''', (
+        rule_data.get("rule_type", ""),
+        json.dumps(rule_data.get("conditions", {})),
+        rule_data.get("prediction_template", ""),
+        rule_data.get("confidence_base", 50),
+        json.dumps(rule_data.get("life_areas", [])),
+        rule_data.get("timing_advice", ""),
+        json.dumps(rule_data.get("colors", [])),
+        rule_data.get("is_active", True),
+        rule_id
+    ))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Rule not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Rule updated successfully"}
+
+# Nakshatra Management APIs
+class NakshatraData(BaseModel):
+    name: str
+    lord: str
+    deity: str
+    nature: str
+    guna: str
+    description: str
+    characteristics: str
+    positive_traits: str
+    negative_traits: str
+    careers: str
+    compatibility: str
+
+@app.get("/api/nakshatras")
+async def get_nakshatras(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM nakshatras ORDER BY id")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    nakshatras = []
+    for row in rows:
+        nakshatras.append({
+            "id": row[0],
+            "name": row[1],
+            "lord": row[2],
+            "deity": row[3],
+            "nature": row[4],
+            "guna": row[5],
+            "description": row[6],
+            "characteristics": row[7],
+            "positive_traits": row[8],
+            "negative_traits": row[9],
+            "careers": row[10],
+            "compatibility": row[11],
+            "created_at": row[12]
+        })
+    
+    return {"nakshatras": nakshatras}
+
+@app.get("/api/nakshatras-public")
+async def get_nakshatras_public(current_user: User = Depends(get_current_user)):
+    """Public endpoint to get detailed nakshatra data for UI"""
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM nakshatras ORDER BY id")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    nakshatras = []
+    for row in rows:
+        nakshatras.append({
+            "name": row[1],
+            "lord": row[2],
+            "deity": row[3],
+            "nature": row[4],
+            "guna": row[5],
+            "description": row[6],
+            "characteristics": row[7],
+            "positive_traits": row[8],
+            "negative_traits": row[9],
+            "careers": row[10],
+            "compatibility": row[11]
+        })
+    
+    return {"nakshatras": nakshatras}
+
+@app.post("/api/nakshatras")
+async def create_nakshatra(nakshatra_data: NakshatraData, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            INSERT INTO nakshatras (name, lord, deity, nature, guna, description, 
+                                  characteristics, positive_traits, negative_traits, 
+                                  careers, compatibility)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            nakshatra_data.name, nakshatra_data.lord, nakshatra_data.deity,
+            nakshatra_data.nature, nakshatra_data.guna, nakshatra_data.description,
+            nakshatra_data.characteristics, nakshatra_data.positive_traits,
+            nakshatra_data.negative_traits, nakshatra_data.careers,
+            nakshatra_data.compatibility
+        ))
+        conn.commit()
+        nakshatra_id = cursor.lastrowid
+        conn.close()
+        
+        return {"message": "Nakshatra created successfully", "id": nakshatra_id}
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Nakshatra name already exists")
+
+@app.put("/api/nakshatras/{nakshatra_id}")
+async def update_nakshatra(nakshatra_id: int, nakshatra_data: NakshatraData, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE nakshatras 
+        SET name=?, lord=?, deity=?, nature=?, guna=?, description=?, 
+            characteristics=?, positive_traits=?, negative_traits=?, 
+            careers=?, compatibility=?
+        WHERE id=?
+    ''', (
+        nakshatra_data.name, nakshatra_data.lord, nakshatra_data.deity,
+        nakshatra_data.nature, nakshatra_data.guna, nakshatra_data.description,
+        nakshatra_data.characteristics, nakshatra_data.positive_traits,
+        nakshatra_data.negative_traits, nakshatra_data.careers,
+        nakshatra_data.compatibility, nakshatra_id
+    ))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Nakshatra not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Nakshatra updated successfully"}
+
+@app.delete("/api/nakshatras/{nakshatra_id}")
+async def delete_nakshatra(nakshatra_id: int, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM nakshatras WHERE id=?", (nakshatra_id,))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Nakshatra not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Nakshatra deleted successfully"}
+
+# Initialize prediction engine on startup
+@app.on_event("startup")
+async def startup_event():
+    # Initialize daily prediction rules database
+    prediction_engine = DailyPredictionEngine()
+    # Reset rules to ensure we have the latest ones
+    prediction_engine.reset_prediction_rules()
+    print("Daily prediction engine initialized with updated rules")
+    
+    # Initialize house combinations database
+    init_house_combinations_db()
+    print("House combinations database initialized")
 
 if __name__ == "__main__":
     import uvicorn

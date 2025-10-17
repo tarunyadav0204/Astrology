@@ -1,0 +1,322 @@
+.house-combinations {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.add-btn, .generate-btn, .massive-btn {
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.add-btn {
+  background: #3498db;
+  color: white;
+}
+
+.generate-btn {
+  background: #4caf50;
+  color: white;
+}
+
+.massive-btn {
+  background: #ff6b35;
+  color: white;
+  font-weight: bold;
+}
+
+.search-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.search-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.house-selector label {
+  font-weight: 500;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.house-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.house-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.house-checkbox:hover {
+  background: #f0f0f0;
+}
+
+.text-search {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.text-search input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.search-btn, .clear-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  align-self: flex-start;
+}
+
+.search-btn {
+  background: #007bff;
+  color: white;
+}
+
+.clear-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.house-logic-selector {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 10px;
+  padding: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+}
+
+.house-logic-selector label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.form-container {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-group input, .form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.house-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.house-item label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.house-item label:hover {
+  background: #f8f9fa;
+}
+
+.house-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.house-label small {
+  color: #666;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 30px;
+}
+
+.form-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.form-actions button[type="submit"] {
+  background: #27ae60;
+  color: white;
+}
+
+.form-actions button[type="button"] {
+  background: #95a5a6;
+  color: white;
+}
+
+.combinations-list {
+  display: grid;
+  gap: 20px;
+}
+
+.combination-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.combo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.combo-header h4 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.combo-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.combo-actions button {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.combo-actions button:first-child {
+  background: #f39c12;
+  color: white;
+}
+
+.combo-actions button:last-child {
+  background: #e74c3c;
+  color: white;
+}
+
+.combo-houses {
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #555;
+}
+
+.combo-predictions {
+  margin-bottom: 15px;
+}
+
+.combo-predictions > div {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.combo-predictions .positive {
+  background: #d5f4e6;
+  border-left: 4px solid #27ae60;
+}
+
+.combo-predictions .negative {
+  background: #ffeaa7;
+  border-left: 4px solid #e17055;
+}
+
+.combo-status {
+  font-size: 12px;
+  color: #666;
+}
+
+.combo-status .active {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+.combo-status .inactive {
+  color: #e74c3c;
+  font-weight: 500;
+}

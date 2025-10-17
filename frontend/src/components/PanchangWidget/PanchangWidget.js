@@ -67,22 +67,10 @@ const PanchangWidget = ({ transitDate }) => {
     
     setLoading(true);
     try {
-      const API_BASE_URL = process.env.NODE_ENV === 'production' 
-        ? APP_CONFIG.api.prod 
-        : APP_CONFIG.api.dev;
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/calculate-panchang`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          birth_data: birthData,
-          transit_date: transitDate.toISOString().split('T')[0]
-        })
+      const data = await apiService.calculatePanchang({
+        birth_data: birthData,
+        transit_date: transitDate.toISOString().split('T')[0]
       });
-      const data = await response.json();
       setPanchangData(data);
     } catch (error) {
       console.error('Failed to calculate Panchang:', error);
@@ -120,35 +108,35 @@ const PanchangWidget = ({ transitDate }) => {
       <PanchangItem>
         <div className="label">Tithi</div>
         <div className="value">
-          {panchangData.tithi.name} ({panchangData.tithi.number})
+          {panchangData.tithi?.name || 'N/A'} ({panchangData.tithi?.number || 'N/A'})
         </div>
       </PanchangItem>
       
       <PanchangItem>
         <div className="label">Vara</div>
         <div className="value">
-          {panchangData.vara.name}
+          {panchangData.vara?.name || 'N/A'}
         </div>
       </PanchangItem>
       
       <PanchangItem>
         <div className="label">Nakshatra</div>
         <div className="value">
-          {panchangData.nakshatra.name} ({panchangData.nakshatra.number})
+          {panchangData.nakshatra?.name || 'N/A'} ({panchangData.nakshatra?.number || 'N/A'})
         </div>
       </PanchangItem>
       
       <PanchangItem>
         <div className="label">Yoga</div>
         <div className="value">
-          {panchangData.yoga.name} ({panchangData.yoga.number})
+          {panchangData.yoga?.name || 'N/A'} ({panchangData.yoga?.number || 'N/A'})
         </div>
       </PanchangItem>
       
       <PanchangItem>
         <div className="label">Karana</div>
         <div className="value">
-          {panchangData.karana.name} ({panchangData.karana.number})
+          {panchangData.karana?.name || 'N/A'} ({panchangData.karana?.number || 'N/A'})
         </div>
       </PanchangItem>
     </PanchangContainer>
