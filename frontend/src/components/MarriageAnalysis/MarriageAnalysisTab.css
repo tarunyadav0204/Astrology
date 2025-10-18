@@ -2405,3 +2405,423 @@
   font-weight: 600;
   color: #333;
 }
+
+/* Spouse Personality Prediction Styles */
+.spouse-personality-result {
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.05) 0%, rgba(233, 30, 99, 0.05) 100%);
+  border: 1px solid rgba(156, 39, 176, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.personality-summary {
+  margin-bottom: 25px;
+}
+
+.personality-summary h4 {
+  color: #9c27b0;
+  margin: 0 0 15px 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.darakarka-highlight {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 20px;
+  border-left: 5px solid #9c27b0;
+  text-align: center;
+}
+
+.darakarka-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.darakarka-planet {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #9c27b0;
+  background: rgba(156, 39, 176, 0.1);
+  padding: 10px 20px;
+  border-radius: 50px;
+  border: 2px solid rgba(156, 39, 176, 0.3);
+}
+
+.darakarka-label {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.darakarka-highlight p {
+  color: #555;
+  margin: 0;
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.personality-details {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.personality-section h4 {
+  color: #9c27b0;
+  margin: 0 0 15px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.traits-grid, .behavior-grid, .physical-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.trait-card, .behavior-card, .physical-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  padding: 15px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trait-card:hover, .behavior-card:hover, .physical-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.trait-card.primary, .behavior-card.primary, .physical-card.primary {
+  border-left: 4px solid #9c27b0;
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(156, 39, 176, 0.12) 100%);
+}
+
+.trait-card.strong, .behavior-card.strong, .physical-card.strong {
+  border-left: 4px solid #4caf50;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.12) 100%);
+}
+
+.trait-card.moderate, .behavior-card.moderate, .physical-card.moderate {
+  border-left: 4px solid #ff9800;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 152, 0, 0.12) 100%);
+}
+
+.trait-header, .behavior-header, .physical-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.trait-source, .behavior-source, .physical-source {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.trait-strength, .behavior-strength, .physical-strength {
+  padding: 3px 10px;
+  border-radius: 15px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.trait-strength.primary, .behavior-strength.primary, .physical-strength.primary {
+  background: #9c27b0;
+  color: white;
+}
+
+.trait-strength.strong, .behavior-strength.strong, .physical-strength.strong {
+  background: #4caf50;
+  color: white;
+}
+
+.trait-strength.moderate, .behavior-strength.moderate, .physical-strength.moderate {
+  background: #ff9800;
+  color: white;
+}
+
+.trait-list, .physical-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trait-tag, .physical-tag {
+  background: rgba(156, 39, 176, 0.1);
+  color: #9c27b0;
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(156, 39, 176, 0.2);
+}
+
+.behavior-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.behavior-item {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #555;
+  border-left: 3px solid #9c27b0;
+}
+
+.compatibility-insights {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 20px;
+  border-left: 4px solid #e91e63;
+}
+
+.compatibility-insights h4 {
+  color: #e91e63;
+  margin: 0 0 15px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
+}
+
+.insight-item {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid rgba(233, 30, 99, 0.1);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.insight-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.insight-content h5 {
+  color: #e91e63;
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.insight-content p {
+  color: #555;
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Mobile Responsive for Spouse Personality */
+@media (max-width: 768px) {
+  .spouse-personality-result {
+    padding: 15px;
+  }
+  
+  .personality-summary h4 {
+    font-size: 1.2rem;
+  }
+  
+  .darakarka-highlight {
+    padding: 15px;
+  }
+  
+  .darakarka-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .darakarka-planet {
+    font-size: 1.5rem;
+    padding: 8px 16px;
+  }
+  
+  .darakarka-label {
+    font-size: 0.8rem;
+  }
+  
+  .darakarka-highlight p {
+    font-size: 0.9rem;
+  }
+  
+  .traits-grid, .behavior-grid, .physical-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .trait-card, .behavior-card, .physical-card {
+    padding: 12px;
+  }
+  
+  .trait-header, .behavior-header, .physical-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .trait-source, .behavior-source, .physical-source {
+    font-size: 0.85rem;
+  }
+  
+  .trait-tag, .physical-tag {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+  }
+  
+  .behavior-item {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+  }
+  
+  .insights-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .insight-item {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .insight-icon {
+    font-size: 1.3rem;
+  }
+  
+  .insight-content h5 {
+    font-size: 0.9rem;
+  }
+  
+  .insight-content p {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .spouse-personality-result {
+    padding: 12px;
+  }
+  
+  .darakarka-highlight {
+    padding: 12px;
+  }
+  
+  .darakarka-planet {
+    font-size: 1.3rem;
+    padding: 6px 12px;
+  }
+  
+  .trait-card, .behavior-card, .physical-card {
+    padding: 10px;
+  }
+  
+  .trait-source, .behavior-source, .physical-source {
+    font-size: 0.8rem;
+  }
+  
+  .trait-tag, .physical-tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+  
+  .behavior-item {
+    font-size: 0.75rem;
+    padding: 5px 8px;
+  }
+  
+  .insight-item {
+    padding: 10px;
+  }
+  
+  .insight-content h5 {
+    font-size: 0.85rem;
+  }
+  
+  .insight-content p {
+    font-size: 0.75rem;
+  }
+}
+
+/* Tab Navigation Styles */
+.marriage-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.tab-btn:hover {
+  background: rgba(233, 30, 99, 0.1);
+  color: #e91e63;
+}
+
+.tab-btn.active {
+  background: #e91e63;
+  color: white;
+  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+}
+
+.marriage-tab-content,
+.spouse-tab-content,
+.compatibility-tab-content {
+  background: white;
+  border-radius: 0 0 12px 12px;
+  min-height: 400px;
+}
+
+/* Mobile responsive for tabs */
+@media (max-width: 768px) {
+  .marriage-tabs {
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .tab-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tab-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
