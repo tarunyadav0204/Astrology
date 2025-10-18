@@ -330,7 +330,6 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
-          { id: 'classical', label: '🔮 Classical', icon: '🔮' },
           { id: 'marriage', label: '💍 Marriage', icon: '💍' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
           { id: 'houses', label: '🏠 House Analysis', icon: '🏠' },

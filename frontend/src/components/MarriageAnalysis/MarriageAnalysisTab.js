@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './MarriageAnalysisTab.css';
 import { apiService } from '../../services/apiService';
 import SpousePersonalityAnalysis from './SpousePersonalityAnalysis';
+import CompatibilityAnalysis from './CompatibilityAnalysis';
 import { 
   getHouseLordship, getFriendship, ownSigns, exaltationSigns, debilitationSigns,
   houseLords, getPlanetStatus, getPlanetDignity, getStatusColor, getNakshatraLord,
@@ -1880,7 +1881,7 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
 
       {activeTab === 'compatibility' && (
         <div className="compatibility-tab-content" style={{ marginTop: '20px' }}>
-          <CompatibilityAnalysis analysis={analysis} />
+          <CompatibilityAnalysis />
         </div>
       )}
 
@@ -1902,17 +1903,6 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
   );
 };
 
-const CompatibilityAnalysis = ({ analysis }) => {
-  // Placeholder for compatibility analysis
-  return (
-    <div className="compatibility-analysis">
-      <div className="coming-soon">
-        <h3>🔄 Compatibility Analysis</h3>
-        <p>Two-chart compatibility analysis coming soon...</p>
-        <p>This will include Guna Milan (Ashtakoot) scoring and detailed compatibility assessment.</p>
-      </div>
-    </div>
-  );
-};
+
 
 export default MarriageAnalysisTab;

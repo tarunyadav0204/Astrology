@@ -102,6 +102,10 @@ class MarriageAnalysisRequest(BaseModel):
     birth_details: dict
     analysis_type: str = "single"
 
+class CompatibilityRequest(BaseModel):
+    boy_birth_data: BirthData
+    girl_birth_data: BirthData
+
 class DailyPredictionRequest(BaseModel):
     birth_data: BirthData
     target_date: Optional[str] = None
@@ -2035,6 +2039,29 @@ async def get_marriage_analysis(request: MarriageAnalysisRequest, current_user: 
         raise HTTPException(status_code=400, detail="Invalid analysis type")
     
     return result
+
+@app.post("/api/compatibility-analysis")
+async def analyze_compatibility(request: CompatibilityRequest, current_user: User = Depends(get_current_user)):
+    """Analyze compatibility between two birth charts"""
+    from marriage_analysis.compatibility_analyzer import CompatibilityAnalyzer
+    
+    # Calculate both charts
+    boy_chart = await calculate_chart(request.boy_birth_data, 'mean', current_user)
+    girl_chart = await calculate_chart(request.girl_birth_data, 'mean', current_user)
+    
+    # Convert birth data to dict
+    boy_birth = request.boy_birth_data.model_dump()
+    girl_birth = request.girl_birth_data.model_dump()
+    
+    # Analyze compatibility
+    analyzer = CompatibilityAnalyzer()
+    result = analyzer.analyze_compatibility(boy_chart, girl_chart, boy_birth, girl_birth)
+    
+    return {
+        "boy_details": boy_birth,
+        "girl_details": girl_birth,
+        "compatibility_analysis": result
+    }
 
 # Initialize prediction engine on startup
 @app.on_event("startup")
