@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { useAstrology } from '../../context/AstrologyContext';
+import { 
+  getHouseLordship, getFriendship, ownSigns, exaltationSigns, debilitationSigns,
+  houseLords, getPlanetStatus, getPlanetDignity, getStatusColor, getNakshatraLord
+} from '../../utils/planetAnalyzer';
 
 const HouseAnalysisModal = ({ 
   isOpen, 
@@ -43,33 +47,7 @@ const HouseAnalysisModal = ({
     return ((lordSign - ascendantSign + 12) % 12) + 1;
   })() : null;
   
-  const getHouseLordship = (planet) => {
-    const ascendantSign = chartData.houses?.[0]?.sign || 0;
-    const signLordships = {
-      'Sun': [4], 'Moon': [3], 'Mars': [0, 7], 'Mercury': [2, 5], 
-      'Jupiter': [8, 11], 'Venus': [1, 6], 'Saturn': [9, 10]
-    };
-    const planetSigns = signLordships[planet] || [];
-    return planetSigns.map(sign => ((sign - ascendantSign + 12) % 12) + 1);
-  };
-  
-  const getFriendship = (planet1, planet2) => {
-    const friends = {
-      'Sun': ['Moon', 'Mars', 'Jupiter'], 'Moon': ['Sun', 'Mercury'], 'Mars': ['Sun', 'Moon', 'Jupiter'],
-      'Mercury': ['Sun', 'Venus'], 'Jupiter': ['Sun', 'Moon', 'Mars'], 'Venus': ['Mercury', 'Saturn'], 'Saturn': ['Mercury', 'Venus']
-    };
-    const enemies = {
-      'Sun': ['Venus', 'Saturn'], 'Moon': [], 'Mars': ['Mercury'], 'Mercury': ['Moon'],
-      'Jupiter': ['Mercury', 'Venus'], 'Venus': ['Sun', 'Moon'], 'Saturn': ['Sun', 'Moon', 'Mars']
-    };
-    if (friends[planet1]?.includes(planet2)) return 'Friend';
-    if (enemies[planet1]?.includes(planet2)) return 'Enemy';
-    return 'Neutral';
-  };
-  
-  const ownSigns = { 'Mars': [0, 7], 'Venus': [1, 6], 'Mercury': [2, 5], 'Moon': [3], 'Sun': [4], 'Jupiter': [8, 11], 'Saturn': [9, 10] };
-  const exaltationSigns = { 'Mars': 9, 'Venus': 11, 'Mercury': 5, 'Moon': 1, 'Sun': 0, 'Jupiter': 3, 'Saturn': 6 };
-  const debilitationSigns = { 'Mars': 3, 'Venus': 5, 'Mercury': 11, 'Moon': 7, 'Sun': 6, 'Jupiter': 9, 'Saturn': 0 };
+  const ascendantSign = chartData.houses?.[0]?.sign || 0;
 
   return (
     <div style={{
@@ -107,30 +85,9 @@ const HouseAnalysisModal = ({
             {planetsInHouse.length > 0 ? planetsInHouse.map(planet => {
               const isNaturalBenefic = ['Jupiter', 'Venus', 'Moon'].includes(planet.name);
               const isNaturalMalefic = ['Mars', 'Saturn', 'Sun', 'Rahu', 'Ketu'].includes(planet.name);
-              const lordships = getHouseLordship(planet.name);
+              const lordships = getHouseLordship(planet.name, ascendantSign);
               const isInOwnSign = ownSigns[planet.name]?.includes(rashiIndex);
-              
-              let status = '';
-              const hasTrikonaLordship = lordships.some(h => [1, 5, 9].includes(h));
-              const hasKendraLordship = lordships.some(h => [1, 4, 7, 10].includes(h));
-              
-              if (lordships.includes(6)) {
-                status = 'Negative';
-              } else if (lordships.includes(8)) {
-                status = hasTrikonaLordship ? 'Mixed (8th lord negative dominates)' : 'Negative';
-              } else if (lordships.includes(12)) {
-                status = hasTrikonaLordship || hasKendraLordship ? 'Mixed' : 'Negative';
-              } else if (isNaturalBenefic && (hasTrikonaLordship || hasKendraLordship)) {
-                status = 'Positive';
-              } else if (isNaturalMalefic && isInOwnSign) {
-                status = 'Positive';
-              } else if (isNaturalMalefic && hasKendraLordship) {
-                status = 'Mixed (natural malefic in kendra)';
-              } else if (isNaturalMalefic) {
-                status = 'Negative';
-              } else {
-                status = 'Neutral';
-              }
+              const status = getPlanetStatus(planet.name, rashiIndex, lordships);
               
               return (
                 <div key={planet.name} style={{
@@ -143,7 +100,7 @@ const HouseAnalysisModal = ({
                   {isInOwnSign && <span style={{ color: '#4caf50' }}> • Own Sign</span>}
                   <div style={{ marginTop: '4px' }}>
                     <span style={{
-                      color: status === 'Positive' ? '#4caf50' : status === 'Negative' ? '#f44336' : '#ff9800',
+                      color: getStatusColor(status),
                       fontWeight: '600', fontSize: '12px'
                     }}>● {status}</span>
                   </div>
@@ -165,13 +122,7 @@ const HouseAnalysisModal = ({
               const isInOwnSign = ownSigns[planet.name]?.includes(rashiIndex);
               
               const planetData = chartData.planets?.[planet.name];
-              const nakshatraLords = [
-                'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
-                'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
-                'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury'
-              ];
-              const nakshatraIndex = planetData ? Math.floor(planetData.longitude / 13.333333) : 0;
-              const nakshatraLord = nakshatraLords[nakshatraIndex];
+              const nakshatraLord = planetData ? getNakshatraLord(planetData.longitude) : 'Unknown';
               const nakshatraFriendship = getFriendship(planet.name, nakshatraLord);
               
               const getColoredText = (text) => {

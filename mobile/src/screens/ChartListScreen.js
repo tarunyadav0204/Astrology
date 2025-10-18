@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAstrology } from '../context/AstrologyContext';
 import { apiService } from '../services/apiService';
 
 export default function ChartListScreen({ navigation }) {
-  const { calculateChart } = useAstrology();
+  const { calculateChart, setUser } = useAstrology();
   const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,6 +60,20 @@ export default function ChartListScreen({ navigation }) {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      setUser(null);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Landing' }],
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -67,8 +82,13 @@ export default function ChartListScreen({ navigation }) {
       >
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <Text style={styles.title}>🌌 Welcome to Your Cosmic Journey</Text>
-            <Text style={styles.subtitle}>Discover the secrets written in the stars</Text>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.title}>🌌 Welcome to Your Cosmic Journey</Text>
+              <Text style={styles.subtitle}>Discover the secrets written in the stars</Text>
+            </View>
           </View>
 
           <View style={styles.searchContainer}>
@@ -143,12 +163,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 30,
-    paddingTop: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     margin: 20,
     borderRadius: 20,
+    paddingBottom: 30,
+  },
+  logoutButton: {
+    backgroundColor: '#ff6b35',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+    margin: 15,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  headerContent: {
     alignItems: 'center',
+    paddingHorizontal: 30,
   },
   title: {
     fontSize: 24,

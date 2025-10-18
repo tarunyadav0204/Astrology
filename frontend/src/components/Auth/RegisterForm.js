@@ -7,8 +7,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
     name: '',
     phone: '',
     password: '',
-    confirmPassword: '',
-    role: 'user'
+    confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -38,8 +37,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       const response = await authService.register({
         name: formData.name,
         phone: formData.phone,
-        password: formData.password,
-        role: formData.role
+        password: formData.password
       });
       localStorage.setItem('token', response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));

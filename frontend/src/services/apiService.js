@@ -321,5 +321,10 @@ export const apiService = {
   getNakshatrasPublic: async () => {
     const response = await apiClient.get(getEndpoint('/nakshatras-public'));
     return response.data;
+  },
+  
+  getMarriageAnalysis: async (requestData) => {
+    const response = await apiClient.post(getEndpoint('/marriage-analysis'), requestData);
+    return response.data;
   }
 };

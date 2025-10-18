@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { apiService } from '../services/apiService';
 
 const PlanetarySignificance = ({ planet, nakshatra, house }) => {
@@ -38,6 +38,7 @@ export default function NakshatrasTab({ chartData, birthData }) {
   const [selectedPlanetPosition, setSelectedPlanetPosition] = useState(null);
   const [nakshatras, setNakshatras] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState('planets');
   
   useEffect(() => {
     loadNakshatras();
@@ -91,11 +92,17 @@ export default function NakshatrasTab({ chartData, birthData }) {
   };
 
   const getPlanetaryPositions = () => {
-    if (!chartData?.planets) return [];
+    if (!chartData?.planets || nakshatras.length === 0) return [];
     
     return Object.entries(chartData.planets).map(([name, data]) => {
       const nakshatra = getNakshatra(data.longitude);
-      const nakshatraData = nakshatras[nakshatra.index] || nakshatras[0];
+      const nakshatraData = nakshatras[nakshatra.index] || nakshatras[0] || {
+        name: 'Unknown',
+        lord: 'Unknown',
+        deity: 'Unknown',
+        nature: 'Unknown',
+        guna: 'Unknown'
+      };
       
       return {
         planet: name,
@@ -115,7 +122,7 @@ export default function NakshatrasTab({ chartData, birthData }) {
 
   if (selectedPlanetPosition) {
     return (
-      <ScrollView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={() => setSelectedPlanetPosition(null)}
@@ -126,7 +133,7 @@ export default function NakshatrasTab({ chartData, birthData }) {
           <Text style={styles.selectedTitle}>🪐 {selectedPlanetPosition.planet} in {selectedPlanetPosition.nakshatra}</Text>
         </View>
         
-        <View style={styles.scrollContent}>
+        <View style={[styles.scrollContent, {flex: 1, overflow: 'auto'}]}>
           <View style={styles.detailCard}>
             <View style={styles.basicInfo}>
               <View style={styles.infoRow}>
@@ -182,13 +189,13 @@ export default function NakshatrasTab({ chartData, birthData }) {
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
     );
   }
 
   if (selectedNakshatra) {
     return (
-      <ScrollView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={() => setSelectedNakshatra(null)}
@@ -199,7 +206,7 @@ export default function NakshatrasTab({ chartData, birthData }) {
           <Text style={styles.selectedTitle}>🌟 {selectedNakshatra.name}</Text>
         </View>
         
-        <View style={styles.scrollContent}>
+        <View style={[styles.scrollContent, {flex: 1, overflow: 'auto'}]}>
           <View style={styles.detailCard}>
             <View style={styles.basicInfo}>
               <View style={styles.infoRow}>
@@ -251,7 +258,7 @@ export default function NakshatrasTab({ chartData, birthData }) {
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
     );
   }
 
@@ -264,55 +271,112 @@ export default function NakshatrasTab({ chartData, birthData }) {
   }
   
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>🌟 Nakshatra Analysis</Text>
-        {planetaryPositions.length > 0 && (
-          <View style={styles.planetarySection}>
-            <Text style={styles.sectionTitle}>🪐 Planetary Positions</Text>
-            {planetaryPositions.map((pos, index) => (
-              <TouchableOpacity 
-                key={pos.planet} 
-                style={styles.planetCard}
-                onPress={() => setSelectedPlanetPosition(pos)}
-              >
-                <View style={styles.planetInfo}>
-                  <Text style={styles.planetName}>{pos.planet}</Text>
-                  <Text style={styles.planetDetails}>{pos.nakshatra} - Pada {pos.pada}</Text>
-                  <Text style={styles.planetLord}>Lord: {pos.lord}</Text>
-                </View>
-                <Text style={styles.arrow}>→</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-        
-        <View style={styles.nakshatraGrid}>
-          <Text style={styles.sectionTitle}>📚 All Nakshatras</Text>
-          {nakshatras.map((nakshatra, index) => (
+    <View style={styles.container}>
+      <View style={styles.tabNavigation}>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeSubTab === 'planets' && styles.activeTabButton]}
+          onPress={() => setActiveSubTab('planets')}
+        >
+          <Text style={[styles.tabButtonText, activeSubTab === 'planets' && styles.activeTabButtonText]}>🪐 Planetary Positions</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeSubTab === 'nakshatras' && styles.activeTabButton]}
+          onPress={() => setActiveSubTab('nakshatras')}
+        >
+          <Text style={[styles.tabButtonText, activeSubTab === 'nakshatras' && styles.activeTabButtonText]}>📚 All Nakshatras</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {activeSubTab === 'planets' && planetaryPositions.length > 0 && (
+        <FlatList
+          style={styles.scrollContainer}
+          data={planetaryPositions}
+          keyExtractor={(item) => item.planet}
+          renderItem={({ item }) => (
             <TouchableOpacity 
-              key={index} 
+              style={styles.planetCard}
+              onPress={() => setSelectedPlanetPosition(item)}
+            >
+              <View style={styles.planetInfo}>
+                <Text style={styles.planetName}>{item.planet}</Text>
+                <Text style={styles.planetDetails}>{item.nakshatra} - Pada {item.pada}</Text>
+                <Text style={styles.planetLord}>Lord: {item.lord}</Text>
+              </View>
+              <Text style={styles.arrow}>→</Text>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.scrollContent}
+        />
+      )}
+      
+      {activeSubTab === 'nakshatras' && (
+        <FlatList
+          style={styles.scrollContainer}
+          data={nakshatras}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item, index }) => (
+            <TouchableOpacity 
               style={styles.nakshatraCard}
-              onPress={() => setSelectedNakshatra(nakshatra)}
+              onPress={() => setSelectedNakshatra(item)}
             >
               <View style={styles.nakshatraHeader}>
-                <Text style={styles.nakshatraName}>{index + 1}. {nakshatra.name}</Text>
-                <Text style={styles.nakshatraLord}>{nakshatra.lord}</Text>
+                <Text style={styles.nakshatraName}>{index + 1}. {item.name}</Text>
+                <Text style={styles.nakshatraLord}>{item.lord}</Text>
               </View>
               <Text style={styles.nakshatraRange}>
                 {(index * 13.33).toFixed(1)}° - {((index + 1) * 13.33).toFixed(1)}°
               </Text>
-              <Text style={styles.nakshatraDeity}>Deity: {nakshatra.deity}</Text>
+              <Text style={styles.nakshatraDeity}>Deity: {item.deity}</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-    </ScrollView>
+          )}
+          contentContainerStyle={styles.scrollContent}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    overflow: 'hidden',
+  },
+  tabNavigation: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    flexShrink: 0,
+    marginBottom: 8,
+    gap: 2,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  activeTabButton: {
+    borderBottomWidth: 3,
+    borderBottomColor: '#e91e63',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeTabButtonText: {
+    color: '#e91e63',
+  },
+
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 22,

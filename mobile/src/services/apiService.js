@@ -211,9 +211,9 @@ class ApiService {
     }
   }
 
-  async getExistingCharts(search = '') {
+  async getExistingCharts(search = '', limit = 50) {
     try {
-      const response = await this.api.get(`/birth-charts?search=${encodeURIComponent(search)}`);
+      const response = await this.api.get(`/birth-charts?search=${encodeURIComponent(search)}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching charts:', error);
@@ -310,6 +310,36 @@ class ApiService {
     } catch (error) {
       console.error('Error fetching nakshatras:', error);
       throw new Error('Failed to fetch nakshatra details');
+    }
+  }
+
+  async sendResetCode(data) {
+    try {
+      const response = await this.api.post('/send-reset-code', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error sending reset code:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to send reset code');
+    }
+  }
+
+  async verifyResetCode(data) {
+    try {
+      const response = await this.api.post('/verify-reset-code', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying reset code:', error);
+      throw new Error(error.response?.data?.detail || 'Invalid or expired code');
+    }
+  }
+
+  async resetPasswordWithToken(data) {
+    try {
+      const response = await this.api.post('/reset-password-with-token', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      throw new Error(error.response?.data?.detail || 'Password reset failed');
     }
   }
 }

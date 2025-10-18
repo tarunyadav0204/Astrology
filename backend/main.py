@@ -12,7 +12,14 @@ import jwt
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 from daily_predictions import DailyPredictionEngine
-from house_combinations import router as house_combinations_router, init_house_combinations_db
+from house_combinations import router as house_combinations_router
+try:
+    from house_combinations import init_house_combinations_db
+except ImportError:
+    def init_house_combinations_db():
+        print("House combinations database initialization skipped")
+        pass
+from marriage_analysis.marriage_analyzer import MarriageAnalyzer
 
 # Load environment variables explicitly
 try:
@@ -21,6 +28,8 @@ try:
     print("Loaded environment variables from .env file")
 except ImportError:
     print("python-dotenv not installed, using system environment variables")
+except Exception as e:
+    print(f"Warning loading environment variables: {e}")
     pass
 
 app = FastAPI()
@@ -87,6 +96,11 @@ class VerifyResetCode(BaseModel):
 class ResetPasswordWithToken(BaseModel):
     token: str
     new_password: str
+
+class MarriageAnalysisRequest(BaseModel):
+    chart_data: dict
+    birth_details: dict
+    analysis_type: str = "single"
 
 class DailyPredictionRequest(BaseModel):
     birth_data: BirthData
@@ -2004,6 +2018,24 @@ async def delete_nakshatra(nakshatra_id: int, current_user: User = Depends(get_c
     
     return {"message": "Nakshatra deleted successfully"}
 
+@app.post("/api/marriage-analysis")
+async def get_marriage_analysis(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
+    """Get marriage analysis for single chart or compatibility"""
+    analyzer = MarriageAnalyzer()
+    
+    if request.analysis_type == "single":
+        result = analyzer.analyze_single_chart(request.chart_data, request.birth_details)
+    elif request.analysis_type == "compatibility":
+        # For now, return placeholder for compatibility
+        result = {
+            "message": "Compatibility analysis coming soon",
+            "chart_type": "compatibility"
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Invalid analysis type")
+    
+    return result
+
 # Initialize prediction engine on startup
 @app.on_event("startup")
 async def startup_event():
@@ -2014,8 +2046,11 @@ async def startup_event():
     print("Daily prediction engine initialized with updated rules")
     
     # Initialize house combinations database
-    init_house_combinations_db()
-    print("House combinations database initialized")
+    try:
+        init_house_combinations_db()
+        print("House combinations database initialized")
+    except Exception as e:
+        print(f"Warning: Could not initialize house combinations database: {e}")
 
 if __name__ == "__main__":
     import uvicorn

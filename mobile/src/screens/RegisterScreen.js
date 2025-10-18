@@ -20,7 +20,6 @@ export default function RegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    email: '',
     password: '',
     confirmPassword: '',
   });
@@ -32,7 +31,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const validateForm = () => {
-    if (!formData.name || !formData.phone || !formData.email || !formData.password) {
+    if (!formData.name || !formData.phone || !formData.password) {
       Alert.alert('Error', 'Please fill all required fields');
       return false;
     }
@@ -115,18 +114,7 @@ export default function RegisterScreen({ navigation }) {
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.email}
-                  onChangeText={(value) => handleInputChange('email', value)}
-                  placeholder="Enter your email"
-                  placeholderTextColor="#999"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
+
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Password *</Text>
@@ -175,13 +163,6 @@ export default function RegisterScreen({ navigation }) {
                 <Text style={styles.loginLinkText}>
                   Already have an account? <Text style={styles.loginLinkBold}>Sign In</Text>
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.guestButton}
-                onPress={() => navigation.navigate('BirthForm')}
-              >
-                <Text style={styles.guestButtonText}>Continue as Guest</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -291,16 +272,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  guestButton: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-  },
-  guestButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+
 });

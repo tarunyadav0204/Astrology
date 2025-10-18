@@ -304,7 +304,7 @@ export default function DashboardScreen({ navigation }) {
       </View>
 
       {/* Tab Content - Chart moved to top */}
-      <View style={{ flex: 1 }}>
+      <View style={styles.tabContentContainer}>
         {activeTab === 'dashboard' && (
         <View style={styles.dashboardContainer}>
           {/* Main Content Area */}
@@ -482,7 +482,7 @@ export default function DashboardScreen({ navigation }) {
       )}
       
         {activeTab !== 'dashboard' && (
-          <View style={{ flex: 1 }}>
+          <View style={[styles.nonScrollableTabContent, {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}]}>
             {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'relationships' && <RelationshipsTab chartData={chartData} birthData={birthData} />}
@@ -722,7 +722,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  tabContentContainer: {
+    flex: 1,
+  },
   tabContent: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    margin: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  nonScrollableTabContent: {
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 20,
