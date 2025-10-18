@@ -2809,27 +2809,30 @@
 
 /* Compatibility Analysis Styles */
 .compatibility-analysis {
-  padding: 20px;
+  padding: 0;
+  width: 100%;
 }
 
 .partners-summary-top {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 20px;
+  gap: 15px;
   align-items: center;
   background: linear-gradient(135deg, rgba(233, 30, 99, 0.05) 0%, rgba(156, 39, 176, 0.05) 100%);
   border: 1px solid rgba(233, 30, 99, 0.2);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
+  width: 100%;
 }
 
 .partner-card-top {
   background: rgba(255, 255, 255, 0.9);
-  border-radius: 10px;
-  padding: 15px;
+  border-radius: 6px;
+  padding: 10px;
   text-align: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
 }
 
 .partner-info h4 {
@@ -2863,10 +2866,11 @@
   text-align: center;
   background: linear-gradient(135deg, #e91e63, #ad1457);
   color: white;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
   box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+  width: 100%;
 }
 
 .overall-compatibility-score h3 {
@@ -3074,10 +3078,11 @@
 
 .guna-score-card {
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
   border: 1px solid rgba(0, 0, 0, 0.1);
+  width: 100%;
 }
 
 .overall-score {
@@ -3116,9 +3121,10 @@
 
 .koot-item {
   background: rgba(248, 249, 250, 0.8);
-  padding: 15px;
-  border-radius: 8px;
+  padding: 10px;
+  border-radius: 6px;
   border: 1px solid rgba(0, 0, 0, 0.05);
+  width: 100%;
 }
 
 .koot-header {
@@ -3147,11 +3153,12 @@
 
 .koot-interpretation {
   background: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
-  padding: 15px;
-  margin: 10px 0;
-  border-left: 4px solid #e91e63;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  border-left: 3px solid #e91e63;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  width: 100%;
 }
 
 .interpretation-header {
@@ -3206,9 +3213,10 @@
 
 .compatibility-report {
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 12px;
   border: 1px solid rgba(0, 0, 0, 0.1);
+  width: 100%;
 }
 
 .partners-summary {
