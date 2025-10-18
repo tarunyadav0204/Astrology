@@ -930,6 +930,368 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
         </div>
       </div>
 
+          {/* 7th House Analysis */}
+          <div className="analysis-section">
+            <h3>🏠 7th House Analysis (Marriage House)</h3>
+            <div className="section-score-header">
+              <span className="section-score">House Strength: {seventhHouse.strength_score || 0}/100</span>
+            </div>
+            <div className="house-analysis-grid">
+              <div className="house-basic-info">
+                <h4>📋 Basic Information</h4>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <span className="info-label">House Sign:</span>
+                    <span className="info-value">{signNames[seventhHouseSign]} ({seventhHouseSign + 1})</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">House Lord:</span>
+                    <span className="info-value">{seventhHouse.house_lord}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Lord Position:</span>
+                    <span className="info-value">
+                      {seventhLordAnalysis ? 
+                        `${signNames[seventhLordAnalysis.sign]} (${chartData?.houses?.findIndex(house => house.sign === seventhLordAnalysis.sign) + 1}th house)` : 
+                        'Not available'
+                      }
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Lord Dignity:</span>
+                    <span className={`info-value dignity-${seventhLordAnalysis?.dignity?.toLowerCase() || 'neutral'}`}>
+                      {seventhLordAnalysis ? getDignityExplanation(seventhHouse.house_lord, seventhLordAnalysis.sign, seventhLordAnalysis.longitude) : 'Not available'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="planets-in-house">
+                <h4>🪐 Planets in 7th House</h4>
+                {planetsIn7th.length > 0 ? (
+                  <div className="planets-list">
+                    {planetsIn7th.map(planet => {
+                      const planetData = chartData?.planets?.[planet];
+                      const planetAnalysis = analyzeKaraka(planet);
+                      return (
+                        <div key={planet} className="planet-item">
+                          <div className="planet-header">
+                            <span className="planet-name">{planet}</span>
+                            <span className={`planet-status ${getStatusColor(planetAnalysis?.status || 'Neutral')}`}>
+                              {planetAnalysis?.status || 'Neutral'}
+                            </span>
+                          </div>
+                          <div className="planet-details">
+                            <span className="planet-position">
+                              {planetData ? getDignityExplanation(planet, planetData.sign, planetData.longitude) : 'Position unknown'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="no-planets">No planets in 7th house</p>
+                )}
+              </div>
+              
+              <div className="aspecting-planets">
+                <h4>👁️ Planets Aspecting 7th House</h4>
+                {aspectingPlanets.length > 0 ? (
+                  <div className="aspects-list">
+                    {aspectingPlanets.map(planet => {
+                      const planetData = chartData?.planets?.[planet];
+                      const planetAnalysis = analyzeKaraka(planet);
+                      return (
+                        <div key={planet} className="aspect-item">
+                          <div className="aspect-header">
+                            <span className="planet-name">{planet}</span>
+                            <span className={`planet-status ${getStatusColor(planetAnalysis?.status || 'Neutral')}`}>
+                              {planetAnalysis?.status || 'Neutral'}
+                            </span>
+                          </div>
+                          <div className="aspect-details">
+                            <span className="aspect-type">
+                              {planet === 'Mars' ? '4th, 7th, 8th aspects' : 
+                               planet === 'Jupiter' ? '5th, 7th, 9th aspects' : 
+                               planet === 'Saturn' ? '3rd, 7th, 10th aspects' : 
+                               '7th aspect'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="no-aspects">No major aspects to 7th house</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="house-interpretation">
+              <h4>🔍 Interpretation</h4>
+              <div className="interpretation-content">
+                {(() => {
+                  const strength = seventhHouse.strength_score || 0;
+                  const lordDignity = seventhLordAnalysis?.dignity || 'Neutral';
+                  const hasGoodPlanets = planetsIn7th.some(p => ['Jupiter', 'Venus', 'Moon'].includes(p));
+                  const hasMalefics = planetsIn7th.some(p => ['Mars', 'Saturn', 'Rahu', 'Ketu'].includes(p));
+                  
+                  let interpretation = '';
+                  if (strength >= 70) {
+                    interpretation = '🌟 Excellent 7th house! Your marriage prospects are very strong. ';
+                  } else if (strength >= 50) {
+                    interpretation = '😊 Good 7th house strength. Marriage will be generally favorable. ';
+                  } else if (strength >= 30) {
+                    interpretation = '🤔 Moderate 7th house. Some challenges in marriage that can be overcome. ';
+                  } else {
+                    interpretation = '💪 Weak 7th house requires attention and remedies for marriage success. ';
+                  }
+                  
+                  if (lordDignity === 'Exalted') {
+                    interpretation += 'The 7th lord is exalted, bringing exceptional marriage happiness. ';
+                  } else if (lordDignity === 'Debilitated') {
+                    interpretation += 'The 7th lord is debilitated, requiring remedies to strengthen marriage prospects. ';
+                  } else if (lordDignity === 'Own') {
+                    interpretation += 'The 7th lord is in own sign, providing stability in marriage. ';
+                  }
+                  
+                  if (hasGoodPlanets) {
+                    interpretation += 'Benefic planets in 7th house enhance marital harmony. ';
+                  }
+                  if (hasMalefics) {
+                    interpretation += 'Malefic planets in 7th house may cause some friction - remedies recommended. ';
+                  }
+                  
+                  return <p>{interpretation}</p>;
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Planet Karaka Analysis */}
+          <div className="analysis-section">
+            <h3>🪐 Planet Karaka Analysis</h3>
+            <div className="karaka-grid">
+              {/* Venus Analysis */}
+              <div className="karaka-card venus-card">
+                <div className="karaka-header">
+                  <span className="karaka-icon">♀</span>
+                  <div className="karaka-info">
+                    <h4>Venus (Kalatra Karaka)</h4>
+                    <span className="karaka-role">Love, Romance, Marriage Happiness</span>
+                  </div>
+                  <div className="karaka-score">
+                    <span className="score-number">{karakas.venus?.strength || 0}</span>
+                    <span className="score-max">/10</span>
+                  </div>
+                </div>
+                
+                <div className="karaka-details">
+                  <div className="detail-item">
+                    <span className="detail-label">Position:</span>
+                    <span className="detail-value">
+                      {venusAnalysis ? getDignityExplanation('Venus', venusAnalysis.sign, venusAnalysis.longitude) : 'Not available'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">House:</span>
+                    <span className="detail-value">
+                      {venusAnalysis ? `${chartData?.houses?.findIndex(house => house.sign === venusAnalysis.sign) + 1}th house` : 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Status:</span>
+                    <span className={`detail-value status-${getStatusColor(venusAnalysis?.status || 'Neutral')}`}>
+                      {venusAnalysis?.status || 'Neutral'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Conjunctions:</span>
+                    <span className="detail-value">
+                      {getConjunctions('Venus').length > 0 ? getConjunctions('Venus').join(', ') : 'None'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Aspects:</span>
+                    <span className="detail-value">
+                      {getAspectsTo('Venus').length > 0 ? 
+                        getAspectsTo('Venus').map(a => `${a.planet} (${a.aspect})`).join(', ') : 
+                        'None'
+                      }
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="karaka-interpretation">
+                  <h5>🔍 Venus Impact on Marriage:</h5>
+                  <p>
+                    {(() => {
+                      const strength = karakas.venus?.strength || 0;
+                      const dignity = venusAnalysis?.dignity || 'Neutral';
+                      const house = venusAnalysis ? chartData?.houses?.findIndex(house => house.sign === venusAnalysis.sign) + 1 : 0;
+                      
+                      if (strength >= 8) {
+                        return '🌟 Excellent Venus! You will have a very loving, beautiful marriage filled with romance, luxury, and happiness. Your spouse will be attractive and affectionate.';
+                      } else if (strength >= 6) {
+                        return '😊 Good Venus strength. You will experience love, attraction, and reasonable happiness in marriage. Romance will be present in your relationship.';
+                      } else if (strength >= 4) {
+                        return '🤔 Moderate Venus. You may face some challenges in expressing or receiving love. Work on developing romantic qualities and Venus remedies.';
+                      } else {
+                        return '💪 Weak Venus requires immediate attention. You may struggle with love, attraction, or marital happiness. Strong Venus remedies are essential.';
+                      }
+                    })()}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Jupiter Analysis */}
+              <div className="karaka-card jupiter-card">
+                <div className="karaka-header">
+                  <span className="karaka-icon">♃</span>
+                  <div className="karaka-info">
+                    <h4>Jupiter (Guru)</h4>
+                    <span className="karaka-role">Wisdom, Dharma, Marriage Guidance</span>
+                  </div>
+                  <div className="karaka-score">
+                    <span className="score-number">{karakas.jupiter?.strength || 0}</span>
+                    <span className="score-max">/10</span>
+                  </div>
+                </div>
+                
+                <div className="karaka-details">
+                  <div className="detail-item">
+                    <span className="detail-label">Position:</span>
+                    <span className="detail-value">
+                      {jupiterAnalysis ? getDignityExplanation('Jupiter', jupiterAnalysis.sign, jupiterAnalysis.longitude) : 'Not available'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">House:</span>
+                    <span className="detail-value">
+                      {jupiterAnalysis ? `${chartData?.houses?.findIndex(house => house.sign === jupiterAnalysis.sign) + 1}th house` : 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Status:</span>
+                    <span className={`detail-value status-${getStatusColor(jupiterAnalysis?.status || 'Neutral')}`}>
+                      {jupiterAnalysis?.status || 'Neutral'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Conjunctions:</span>
+                    <span className="detail-value">
+                      {getConjunctions('Jupiter').length > 0 ? getConjunctions('Jupiter').join(', ') : 'None'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Aspects:</span>
+                    <span className="detail-value">
+                      {getAspectsTo('Jupiter').length > 0 ? 
+                        getAspectsTo('Jupiter').map(a => `${a.planet} (${a.aspect})`).join(', ') : 
+                        'None'
+                      }
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="karaka-interpretation">
+                  <h5>🔍 Jupiter Impact on Marriage:</h5>
+                  <p>
+                    {(() => {
+                      const strength = karakas.jupiter?.strength || 0;
+                      const dignity = jupiterAnalysis?.dignity || 'Neutral';
+                      
+                      if (strength >= 8) {
+                        return '🌟 Excellent Jupiter! You will make wise marriage decisions and have a spiritually fulfilling relationship. Your spouse will be dharmic and bring divine blessings.';
+                      } else if (strength >= 6) {
+                        return '😊 Good Jupiter strength. You will generally make good relationship choices and have a meaningful marriage with spiritual growth.';
+                      } else if (strength >= 4) {
+                        return '🤔 Moderate Jupiter. You may need guidance in marriage decisions. Seek elder advice and strengthen Jupiter through spiritual practices.';
+                      } else {
+                        return '💪 Weak Jupiter is concerning for marriage wisdom. You may make poor relationship choices. Strong Jupiter remedies and guru guidance are essential.';
+                      }
+                    })()}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Darakarka Analysis */}
+              <div className="karaka-card darakarka-card">
+                <div className="karaka-header">
+                  <span className="karaka-icon">🎯</span>
+                  <div className="karaka-info">
+                    <h4>Darakarka ({darakarka})</h4>
+                    <span className="karaka-role">Spouse Significator (Lowest Degree Planet)</span>
+                  </div>
+                  <div className="karaka-score">
+                    <span className="score-number">
+                      {(() => {
+                        const darakarkaStrength = karakas[darakarka?.toLowerCase()]?.strength || 
+                                                  (darakarka && chartData?.planets?.[darakarka] ? 
+                                                   Math.min(10, Math.max(1, 5 + (getPlanetDignity(darakarka, chartData.planets[darakarka].sign) === 'Exalted' ? 3 : 
+                                                                              getPlanetDignity(darakarka, chartData.planets[darakarka].sign) === 'Own' ? 2 : 
+                                                                              getPlanetDignity(darakarka, chartData.planets[darakarka].sign) === 'Debilitated' ? -3 : 0))) : 0);
+                        return darakarkaStrength;
+                      })()}
+                    </span>
+                    <span className="score-max">/10</span>
+                  </div>
+                </div>
+                
+                {darakarka && chartData?.planets?.[darakarka] && (
+                  <div className="karaka-details">
+                    <div className="detail-item">
+                      <span className="detail-label">Position:</span>
+                      <span className="detail-value">
+                        {getDignityExplanation(darakarka, chartData.planets[darakarka].sign, chartData.planets[darakarka].longitude)}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">House:</span>
+                      <span className="detail-value">
+                        {chartData?.houses?.findIndex(house => house.sign === chartData.planets[darakarka].sign) + 1}th house
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Degree:</span>
+                      <span className="detail-value">
+                        {(chartData.planets[darakarka].longitude % 30).toFixed(2)}° (Lowest degree)
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Conjunctions:</span>
+                      <span className="detail-value">
+                        {getConjunctions(darakarka).length > 0 ? getConjunctions(darakarka).join(', ') : 'None'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="karaka-interpretation">
+                  <h5>🔍 Darakarka Spouse Indication:</h5>
+                  <p>
+                    {(() => {
+                      if (!darakarka) return 'Darakarka calculation not available.';
+                      
+                      const spouseQualities = {
+                        'Sun': 'Your spouse will be authoritative, confident, government-related, father-like, dignified, and leadership-oriented.',
+                        'Moon': 'Your spouse will be emotional, nurturing, caring, mother-like, intuitive, and connected to public or water-related work.',
+                        'Mars': 'Your spouse will be energetic, athletic, competitive, engineering/technical background, strong-willed, and protective.',
+                        'Mercury': 'Your spouse will be intelligent, communicative, business-minded, youthful, analytical, and involved in education/media.',
+                        'Jupiter': 'Your spouse will be wise, spiritual, teacher-like, dharmic, optimistic, and involved in education/religion.',
+                        'Venus': 'Your spouse will be beautiful, artistic, luxury-loving, creative, charming, and involved in arts/beauty industry.',
+                        'Saturn': 'Your spouse will be mature, responsible, hardworking, traditional, disciplined, and possibly older or serious-natured.'
+                      };
+                      
+                      return spouseQualities[darakarka] || 'Spouse qualities depend on the specific planet characteristics.';
+                    })()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Marriage Yoga Detection */}
           <div className="analysis-section">
             <h3>🕉️ Marriage Yogas</h3>
@@ -1286,6 +1648,741 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                   </div>
                 );
             })()}
+          </div>
+
+          {/* D9 Navamsa Analysis */}
+          <div className="analysis-section">
+            <h3>🌟 D9 Navamsa Analysis (Soul Connection)</h3>
+            <div className="section-score-header">
+              <span className="section-score">D9 Strength: {d9Analysis?.overall_strength || 0}/10</span>
+            </div>
+            
+            {d9Analysis ? (
+              <div className="d9-analysis-grid">
+                <div className="d9-overview">
+                  <h4>📊 D9 Overview</h4>
+                  <div className="d9-stats">
+                    <div className="d9-stat-item">
+                      <span className="stat-label">Overall D9 Strength:</span>
+                      <span className="stat-value">{d9Analysis.overall_strength}/10</span>
+                    </div>
+                    <div className="d9-stat-item">
+                      <span className="stat-label">D9 7th House Strength:</span>
+                      <span className="stat-value">{d9Analysis.seventh_house_d9?.strength || 0}/10</span>
+                    </div>
+                    <div className="d9-stat-item">
+                      <span className="stat-label">Venus in D9:</span>
+                      <span className="stat-value">{d9Analysis.venus_d9?.strength || 0}/10</span>
+                    </div>
+                    <div className="d9-stat-item">
+                      <span className="stat-label">Jupiter in D9:</span>
+                      <span className="stat-value">{d9Analysis.jupiter_d9?.strength || 0}/10</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="d9-interpretation">
+                  <h4>🔍 D9 Marriage Interpretation</h4>
+                  <div className="d9-meaning">
+                    {(() => {
+                      const strength = d9Analysis.overall_strength || 0;
+                      if (strength >= 8) {
+                        return (
+                          <div className="d9-excellent">
+                            <span className="d9-icon">🌟</span>
+                            <div className="d9-text">
+                              <strong>Excellent D9 Chart!</strong>
+                              <p>Your soul connection with your spouse will be extraordinary. You will understand each other at the deepest level, share similar spiritual values, and experience true marital bliss. This is a blessed combination for marriage.</p>
+                            </div>
+                          </div>
+                        );
+                      } else if (strength >= 6) {
+                        return (
+                          <div className="d9-good">
+                            <span className="d9-icon">😊</span>
+                            <div className="d9-text">
+                              <strong>Good D9 Strength</strong>
+                              <p>Your soul connection with your spouse will be satisfying. You will generally understand each other well and find emotional fulfillment in marriage, though there may be some areas that need work.</p>
+                            </div>
+                          </div>
+                        );
+                      } else if (strength >= 4) {
+                        return (
+                          <div className="d9-moderate">
+                            <span className="d9-icon">🤔</span>
+                            <div className="d9-text">
+                              <strong>Moderate D9 Connection</strong>
+                              <p>Your soul connection may face some challenges. You and your spouse might not always understand each other's deeper needs. Spiritual practices and conscious effort will improve the connection.</p>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="d9-challenging">
+                            <span className="d9-icon">💪</span>
+                            <div className="d9-text">
+                              <strong>D9 Needs Attention</strong>
+                              <p>Your soul connection faces significant challenges. You may feel emotionally disconnected from your spouse or unfulfilled in marriage. Strong spiritual remedies and conscious relationship work are essential.</p>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+                
+                {/* Comprehensive D9 Planetary Analysis */}
+                <div className="d9-detailed-analysis">
+                  <h4>🪐 Detailed D9 Planetary Analysis</h4>
+                  <div className="d9-planets-comprehensive">
+                    {/* Venus D9 Analysis */}
+                    {d9Analysis.venus_d9 && (
+                      <div className="d9-planet-detailed venus-d9">
+                        <div className="d9-planet-header">
+                          <span className="planet-symbol">♀</span>
+                          <div className="planet-info">
+                            <h5>Venus in D9 (Love & Romance)</h5>
+                            <span className="planet-strength-score">{d9Analysis.venus_d9.strength}/10</span>
+                          </div>
+                        </div>
+                        
+                        <div className="d9-planet-parameters">
+                          <div className="parameter-grid">
+                            <div className="param-item">
+                              <span className="param-label">D9 Position:</span>
+                              <span className="param-value">
+                                {d9Analysis.venus_d9.sign !== undefined ? 
+                                  `${signNames[d9Analysis.venus_d9.sign]} (${d9Analysis.venus_d9.house || 'Unknown'}th house)` : 
+                                  'Position unknown'
+                                }
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Dignity:</span>
+                              <span className={`param-value dignity-${(d9Analysis.venus_d9.dignity || 'neutral').toLowerCase()}`}>
+                                {d9Analysis.venus_d9.dignity || 'Neutral'}
+                                {d9Analysis.venus_d9.dignity === 'Exalted' && ' 🌟'}
+                                {d9Analysis.venus_d9.dignity === 'Debilitated' && ' ⚠️'}
+                                {d9Analysis.venus_d9.dignity === 'Own' && ' 👑'}
+                                {d9Analysis.venus_d9.parameter_scores?.dignity && (
+                                  <span className="param-score" style={{ color: d9Analysis.venus_d9.parameter_scores.dignity.color === 'green' ? '#4caf50' : d9Analysis.venus_d9.parameter_scores.dignity.color === 'red' ? '#f44336' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.venus_d9.parameter_scores.dignity.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Conjunctions:</span>
+                              <span className="param-value">
+                                {d9Analysis.venus_d9.conjunctions && d9Analysis.venus_d9.conjunctions.length > 0 ? 
+                                  d9Analysis.venus_d9.conjunctions.join(', ') : 'None'
+                                }
+                                {d9Analysis.venus_d9.parameter_scores?.conjunctions && (
+                                  <span className="param-score" style={{ color: d9Analysis.venus_d9.parameter_scores.conjunctions.color === 'green' ? '#4caf50' : d9Analysis.venus_d9.parameter_scores.conjunctions.color === 'red' ? '#f44336' : d9Analysis.venus_d9.parameter_scores.conjunctions.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.venus_d9.parameter_scores.conjunctions.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Aspects:</span>
+                              <span className="param-value">
+                                {d9Analysis.venus_d9.aspects && d9Analysis.venus_d9.aspects.length > 0 ? 
+                                  d9Analysis.venus_d9.aspects.map(a => `${a.planet} (${a.aspect})`).join(', ') : 
+                                  'None'
+                                }
+                                {d9Analysis.venus_d9.parameter_scores?.aspects && (
+                                  <span className="param-score" style={{ color: d9Analysis.venus_d9.parameter_scores.aspects.color === 'green' ? '#4caf50' : d9Analysis.venus_d9.parameter_scores.aspects.color === 'red' ? '#f44336' : d9Analysis.venus_d9.parameter_scores.aspects.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.venus_d9.parameter_scores.aspects.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">Nakshatra Lord:</span>
+                              <span className="param-value">
+                                {d9Analysis.venus_d9.nakshatra_lord || 'Unknown'}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">Special Conditions:</span>
+                              <span className="param-value">
+                                {d9Analysis.venus_d9.special_conditions && d9Analysis.venus_d9.special_conditions.length > 0 ? 
+                                  d9Analysis.venus_d9.special_conditions.join(', ') : 'None'
+                                }
+                              </span>
+                            </div>
+                          </div>
+                          
+
+                        </div>
+                        
+                        <div className="d9-planet-interpretation">
+                          <h6>💕 Venus D9 Marriage Impact:</h6>
+                          <p>
+                            {(() => {
+                              const strength = d9Analysis.venus_d9.strength || 0;
+                              const dignity = d9Analysis.venus_d9.dignity || 'Neutral';
+                              
+                              if (dignity === 'Exalted') {
+                                return '🌟 Venus exalted in D9 - Exceptional romantic fulfillment! Your marriage will be filled with deep love, beauty, and luxury. Your spouse will be very attractive and loving.';
+                              } else if (dignity === 'Debilitated') {
+                                return '⚠️ Venus debilitated in D9 - Challenges in romantic expression. You may struggle to feel loved or express love properly in marriage. Venus remedies essential.';
+                              } else if (dignity === 'Own') {
+                                return '👑 Venus in own sign in D9 - Strong romantic nature. You will experience good love and attraction in marriage with natural charm and beauty.';
+                              } else if (strength >= 8) {
+                                return '🌟 Excellent Venus in D9! Deep romantic connection with spouse, beautiful marriage filled with love, arts, and luxury. Strong attraction and harmony.';
+                              } else if (strength >= 6) {
+                                return '😊 Good Venus strength in D9. You will experience satisfying love and romance in marriage with reasonable attraction and affection.';
+                              } else if (strength >= 4) {
+                                return '🤔 Moderate Venus in D9. Some challenges in romantic expression or feeling loved. Work on Venus remedies and romantic gestures.';
+                              } else {
+                                return '💪 Weak Venus in D9 needs attention. You may feel unloved or struggle with romantic connection. Strong Venus remedies and relationship counseling recommended.';
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Jupiter D9 Analysis */}
+                    {d9Analysis.jupiter_d9 && (
+                      <div className="d9-planet-detailed jupiter-d9">
+                        <div className="d9-planet-header">
+                          <span className="planet-symbol">♃</span>
+                          <div className="planet-info">
+                            <h5>Jupiter in D9 (Wisdom & Dharma)</h5>
+                            <span className="planet-strength-score">{d9Analysis.jupiter_d9.strength}/10</span>
+                          </div>
+                        </div>
+                        
+                        <div className="d9-planet-parameters">
+                          <div className="parameter-grid">
+                            <div className="param-item">
+                              <span className="param-label">D9 Position:</span>
+                              <span className="param-value">
+                                {d9Analysis.jupiter_d9.sign !== undefined ? 
+                                  `${signNames[d9Analysis.jupiter_d9.sign]} (${d9Analysis.jupiter_d9.house || 'Unknown'}th house)` : 
+                                  'Position unknown'
+                                }
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Dignity:</span>
+                              <span className={`param-value dignity-${(d9Analysis.jupiter_d9.dignity || 'neutral').toLowerCase()}`}>
+                                {d9Analysis.jupiter_d9.dignity || 'Neutral'}
+                                {d9Analysis.jupiter_d9.dignity === 'Exalted' && ' 🌟'}
+                                {d9Analysis.jupiter_d9.dignity === 'Debilitated' && ' ⚠️'}
+                                {d9Analysis.jupiter_d9.dignity === 'Own' && ' 👑'}
+                                {d9Analysis.jupiter_d9.parameter_scores?.dignity && (
+                                  <span className="param-score" style={{ color: d9Analysis.jupiter_d9.parameter_scores.dignity.color === 'green' ? '#4caf50' : d9Analysis.jupiter_d9.parameter_scores.dignity.color === 'red' ? '#f44336' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.jupiter_d9.parameter_scores.dignity.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Conjunctions:</span>
+                              <span className="param-value">
+                                {d9Analysis.jupiter_d9.conjunctions && d9Analysis.jupiter_d9.conjunctions.length > 0 ? 
+                                  d9Analysis.jupiter_d9.conjunctions.join(', ') : 'None'
+                                }
+                                {d9Analysis.jupiter_d9.parameter_scores?.conjunctions && (
+                                  <span className="param-score" style={{ color: d9Analysis.jupiter_d9.parameter_scores.conjunctions.color === 'green' ? '#4caf50' : d9Analysis.jupiter_d9.parameter_scores.conjunctions.color === 'red' ? '#f44336' : d9Analysis.jupiter_d9.parameter_scores.conjunctions.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.jupiter_d9.parameter_scores.conjunctions.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Aspects:</span>
+                              <span className="param-value">
+                                {d9Analysis.jupiter_d9.aspects && d9Analysis.jupiter_d9.aspects.length > 0 ? 
+                                  d9Analysis.jupiter_d9.aspects.map(a => `${a.planet} (${a.aspect})`).join(', ') : 
+                                  'None'
+                                }
+                                {d9Analysis.jupiter_d9.parameter_scores?.aspects && (
+                                  <span className="param-score" style={{ color: d9Analysis.jupiter_d9.parameter_scores.aspects.color === 'green' ? '#4caf50' : d9Analysis.jupiter_d9.parameter_scores.aspects.color === 'red' ? '#f44336' : d9Analysis.jupiter_d9.parameter_scores.aspects.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.jupiter_d9.parameter_scores.aspects.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">Nakshatra Lord:</span>
+                              <span className="param-value">
+                                {d9Analysis.jupiter_d9.nakshatra_lord || 'Unknown'}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">Special Conditions:</span>
+                              <span className="param-value">
+                                {d9Analysis.jupiter_d9.special_conditions && d9Analysis.jupiter_d9.special_conditions.length > 0 ? 
+                                  d9Analysis.jupiter_d9.special_conditions.join(', ') : 'None'
+                                }
+                              </span>
+                            </div>
+                          </div>
+                          
+
+                        </div>
+                        
+                        <div className="d9-planet-interpretation">
+                          <h6>🙏 Jupiter D9 Marriage Impact:</h6>
+                          <p>
+                            {(() => {
+                              const strength = d9Analysis.jupiter_d9.strength || 0;
+                              const dignity = d9Analysis.jupiter_d9.dignity || 'Neutral';
+                              
+                              if (dignity === 'Exalted') {
+                                return '🌟 Jupiter exalted in D9 - Divine blessings in marriage! Your spouse will be highly spiritual, wise, and dharmic. Marriage will bring spiritual growth and divine protection.';
+                              } else if (dignity === 'Debilitated') {
+                                return '⚠️ Jupiter debilitated in D9 - Challenges in marriage wisdom. You may make poor relationship decisions or lack spiritual connection with spouse. Jupiter remedies essential.';
+                              } else if (dignity === 'Own') {
+                                return '👑 Jupiter in own sign in D9 - Strong dharmic marriage. Your spouse will be wise, spiritual, and bring good fortune. Marriage blessed with divine grace.';
+                              } else if (strength >= 8) {
+                                return '🌟 Excellent Jupiter in D9! Highly spiritual and wise marriage. Your spouse will be dharmic, learned, and bring divine blessings. Strong moral foundation.';
+                              } else if (strength >= 6) {
+                                return '😊 Good Jupiter strength in D9. You will have a meaningful marriage with spiritual growth and reasonable wisdom in relationship decisions.';
+                              } else if (strength >= 4) {
+                                return '🤔 Moderate Jupiter in D9. Some challenges in marriage wisdom or spiritual connection. Seek elder guidance and strengthen Jupiter through spiritual practices.';
+                              } else {
+                                return '💪 Weak Jupiter in D9 needs attention. You may lack wisdom in marriage or spiritual connection with spouse. Strong Jupiter remedies and guru guidance essential.';
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Mars D9 Analysis */}
+                    {d9Analysis.mars_d9 && (
+                      <div className="d9-planet-detailed mars-d9">
+                        <div className="d9-planet-header">
+                          <span className="planet-symbol">♂</span>
+                          <div className="planet-info">
+                            <h5>Mars in D9 (Energy & Passion)</h5>
+                            <span className="planet-strength-score">{d9Analysis.mars_d9.strength}/10</span>
+                          </div>
+                        </div>
+                        
+                        <div className="d9-planet-parameters">
+                          <div className="parameter-grid">
+                            <div className="param-item">
+                              <span className="param-label">D9 Position:</span>
+                              <span className="param-value">
+                                {d9Analysis.mars_d9.sign !== undefined ? 
+                                  `${signNames[d9Analysis.mars_d9.sign]} (${d9Analysis.mars_d9.house || 'Unknown'}th house)` : 
+                                  'Position unknown'
+                                }
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Dignity:</span>
+                              <span className={`param-value dignity-${(d9Analysis.mars_d9.dignity || 'neutral').toLowerCase()}`}>
+                                {d9Analysis.mars_d9.dignity || 'Neutral'}
+                                {d9Analysis.mars_d9.dignity === 'Exalted' && ' 🌟'}
+                                {d9Analysis.mars_d9.dignity === 'Debilitated' && ' ⚠️'}
+                                {d9Analysis.mars_d9.dignity === 'Own' && ' 👑'}
+                                {d9Analysis.mars_d9.parameter_scores?.dignity && (
+                                  <span className="param-score" style={{ color: d9Analysis.mars_d9.parameter_scores.dignity.color === 'green' ? '#4caf50' : d9Analysis.mars_d9.parameter_scores.dignity.color === 'red' ? '#f44336' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.mars_d9.parameter_scores.dignity.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Conjunctions:</span>
+                              <span className="param-value">
+                                {d9Analysis.mars_d9.conjunctions && d9Analysis.mars_d9.conjunctions.length > 0 ? 
+                                  d9Analysis.mars_d9.conjunctions.join(', ') : 'None'
+                                }
+                                {d9Analysis.mars_d9.parameter_scores?.conjunctions && (
+                                  <span className="param-score" style={{ color: d9Analysis.mars_d9.parameter_scores.conjunctions.color === 'green' ? '#4caf50' : d9Analysis.mars_d9.parameter_scores.conjunctions.color === 'red' ? '#f44336' : d9Analysis.mars_d9.parameter_scores.conjunctions.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.mars_d9.parameter_scores.conjunctions.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Aspects:</span>
+                              <span className="param-value">
+                                {d9Analysis.mars_d9.aspects && d9Analysis.mars_d9.aspects.length > 0 ? 
+                                  d9Analysis.mars_d9.aspects.map(a => `${a.planet} (${a.aspect})`).join(', ') : 
+                                  'None'
+                                }
+                                {d9Analysis.mars_d9.parameter_scores?.aspects && (
+                                  <span className="param-score" style={{ color: d9Analysis.mars_d9.parameter_scores.aspects.color === 'green' ? '#4caf50' : d9Analysis.mars_d9.parameter_scores.aspects.color === 'red' ? '#f44336' : d9Analysis.mars_d9.parameter_scores.aspects.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.mars_d9.parameter_scores.aspects.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          
+
+                        </div>
+                        
+                        <div className="d9-planet-interpretation">
+                          <h6>🔥 Mars D9 Marriage Impact:</h6>
+                          <p>
+                            {(() => {
+                              const strength = d9Analysis.mars_d9.strength || 0;
+                              const dignity = d9Analysis.mars_d9.dignity || 'Neutral';
+                              
+                              if (dignity === 'Exalted') {
+                                return '🌟 Mars exalted in D9 - Excellent energy and passion in marriage! Strong physical compatibility and protective spouse. Good for overcoming obstacles together.';
+                              } else if (dignity === 'Debilitated') {
+                                return '⚠️ Mars debilitated in D9 - Low energy or conflicts in marriage. May lack passion or face aggression issues. Mars remedies recommended.';
+                              } else if (strength >= 7) {
+                                return '🔥 Strong Mars in D9 - Good energy and passion in marriage. You will have strong physical compatibility and ability to overcome challenges together.';
+                              } else if (strength >= 4) {
+                                return '🤔 Moderate Mars in D9 - Balanced energy in marriage. Some passion present but may need to work on physical compatibility or managing conflicts.';
+                              } else {
+                                return '💪 Weak Mars in D9 - Low energy or passion in marriage. May lack physical compatibility or struggle with conflicts. Mars strengthening needed.';
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Moon D9 Analysis */}
+                    {d9Analysis.moon_d9 && (
+                      <div className="d9-planet-detailed moon-d9">
+                        <div className="d9-planet-header">
+                          <span className="planet-symbol">☽</span>
+                          <div className="planet-info">
+                            <h5>Moon in D9 (Emotions & Mind)</h5>
+                            <span className="planet-strength-score">{d9Analysis.moon_d9.strength}/10</span>
+                          </div>
+                        </div>
+                        
+                        <div className="d9-planet-parameters">
+                          <div className="parameter-grid">
+                            <div className="param-item">
+                              <span className="param-label">D9 Position:</span>
+                              <span className="param-value">
+                                {d9Analysis.moon_d9.sign !== undefined ? 
+                                  `${signNames[d9Analysis.moon_d9.sign]} (${d9Analysis.moon_d9.house || 'Unknown'}th house)` : 
+                                  'Position unknown'
+                                }
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Dignity:</span>
+                              <span className={`param-value dignity-${(d9Analysis.moon_d9.dignity || 'neutral').toLowerCase()}`}>
+                                {d9Analysis.moon_d9.dignity || 'Neutral'}
+                                {d9Analysis.moon_d9.dignity === 'Exalted' && ' 🌟'}
+                                {d9Analysis.moon_d9.dignity === 'Debilitated' && ' ⚠️'}
+                                {d9Analysis.moon_d9.dignity === 'Own' && ' 👑'}
+                                {d9Analysis.moon_d9.parameter_scores?.dignity && (
+                                  <span className="param-score" style={{ color: d9Analysis.moon_d9.parameter_scores.dignity.color === 'green' ? '#4caf50' : d9Analysis.moon_d9.parameter_scores.dignity.color === 'red' ? '#f44336' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.moon_d9.parameter_scores.dignity.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Conjunctions:</span>
+                              <span className="param-value">
+                                {d9Analysis.moon_d9.conjunctions && d9Analysis.moon_d9.conjunctions.length > 0 ? 
+                                  d9Analysis.moon_d9.conjunctions.join(', ') : 'None'
+                                }
+                                {d9Analysis.moon_d9.parameter_scores?.conjunctions && (
+                                  <span className="param-score" style={{ color: d9Analysis.moon_d9.parameter_scores.conjunctions.color === 'green' ? '#4caf50' : d9Analysis.moon_d9.parameter_scores.conjunctions.color === 'red' ? '#f44336' : d9Analysis.moon_d9.parameter_scores.conjunctions.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.moon_d9.parameter_scores.conjunctions.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 Aspects:</span>
+                              <span className="param-value">
+                                {d9Analysis.moon_d9.aspects && d9Analysis.moon_d9.aspects.length > 0 ? 
+                                  d9Analysis.moon_d9.aspects.map(a => `${a.planet} (${a.aspect})`).join(', ') : 
+                                  'None'
+                                }
+                                {d9Analysis.moon_d9.parameter_scores?.aspects && (
+                                  <span className="param-score" style={{ color: d9Analysis.moon_d9.parameter_scores.aspects.color === 'green' ? '#4caf50' : d9Analysis.moon_d9.parameter_scores.aspects.color === 'red' ? '#f44336' : d9Analysis.moon_d9.parameter_scores.aspects.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.moon_d9.parameter_scores.aspects.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          
+
+                        </div>
+                        
+                        <div className="d9-planet-interpretation">
+                          <h6>🌙 Moon D9 Marriage Impact:</h6>
+                          <p>
+                            {(() => {
+                              const strength = d9Analysis.moon_d9.strength || 0;
+                              const dignity = d9Analysis.moon_d9.dignity || 'Neutral';
+                              
+                              if (dignity === 'Exalted') {
+                                return '🌟 Moon exalted in D9 - Excellent emotional connection! Deep understanding and emotional fulfillment in marriage. Strong intuitive bond with spouse.';
+                              } else if (dignity === 'Debilitated') {
+                                return '⚠️ Moon debilitated in D9 - Emotional challenges in marriage. May feel emotionally disconnected or face mood-related issues. Moon remedies needed.';
+                              } else if (strength >= 7) {
+                                return '🌙 Strong Moon in D9 - Good emotional stability and connection in marriage. You will understand each other\'s feelings well and provide emotional support.';
+                              } else if (strength >= 4) {
+                                return '🤔 Moderate Moon in D9 - Some emotional challenges in marriage. Work on emotional communication and understanding with spouse.';
+                              } else {
+                                return '💪 Weak Moon in D9 - Emotional instability or disconnection in marriage. Focus on Moon strengthening and emotional healing practices.';
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 7th House D9 Analysis */}
+                    {d9Analysis.seventh_house_d9 && (
+                      <div className="d9-house-detailed">
+                        <div className="d9-house-header">
+                          <span className="house-symbol">🏠</span>
+                          <div className="house-info">
+                            <h5>7th House in D9 (Marriage Foundation)</h5>
+                            <span className="house-strength-score">{d9Analysis.seventh_house_d9.strength}/10</span>
+                          </div>
+                        </div>
+                        
+                        <div className="d9-house-parameters">
+                          <div className="parameter-grid">
+                            <div className="param-item">
+                              <span className="param-label">D9 7th Sign:</span>
+                              <span className="param-value">
+                                {d9Analysis.seventh_house_d9.sign !== undefined ? 
+                                  signNames[d9Analysis.seventh_house_d9.sign] : 'Unknown'
+                                }
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">D9 7th Lord:</span>
+                              <span className="param-value">
+                                {d9Analysis.seventh_house_d9.lord || 'Unknown'}
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">Lord Position:</span>
+                              <span className="param-value">
+                                {d9Analysis.seventh_house_d9.lord_position ? 
+                                  `${signNames[d9Analysis.seventh_house_d9.lord_position.sign]} (${d9Analysis.seventh_house_d9.lord_position.house}th house)` : 
+                                  'Unknown'
+                                }
+                              </span>
+                            </div>
+                            <div className="param-item">
+                              <span className="param-label">Planets in 7th D9:</span>
+                              <span className="param-value">
+                                {d9Analysis.seventh_house_d9.planets && d9Analysis.seventh_house_d9.planets.length > 0 ? 
+                                  d9Analysis.seventh_house_d9.planets.join(', ') : 'None'
+                                }
+                                {d9Analysis.seventh_house_d9.parameter_scores?.occupants && (
+                                  <span className="param-score" style={{ color: d9Analysis.seventh_house_d9.parameter_scores.occupants.color === 'green' ? '#4caf50' : d9Analysis.seventh_house_d9.parameter_scores.occupants.color === 'red' ? '#f44336' : d9Analysis.seventh_house_d9.parameter_scores.occupants.color === 'orange' ? '#ff9800' : '#666', marginLeft: '8px', fontSize: '0.85em' }}>
+                                    ({d9Analysis.seventh_house_d9.parameter_scores.occupants.score}/10)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          
+
+                        </div>
+                        
+                        <div className="d9-house-interpretation">
+                          <h6>🏠 7th House D9 Marriage Foundation:</h6>
+                          <p>
+                            {(() => {
+                              const strength = d9Analysis.seventh_house_d9.strength || 0;
+                              
+                              if (strength >= 8) {
+                                return '🌟 Excellent 7th house in D9! Your marriage foundation is very strong at the soul level. Deep compatibility and lasting bond with spouse.';
+                              } else if (strength >= 6) {
+                                return '😊 Good 7th house strength in D9. Solid marriage foundation with good soul-level compatibility and understanding.';
+                              } else if (strength >= 4) {
+                                return '🤔 Moderate 7th house in D9. Some challenges in deep compatibility. Work on spiritual connection and understanding.';
+                              } else {
+                                return '💪 Weak 7th house in D9 needs attention. Fundamental compatibility issues possible. Focus on spiritual remedies and conscious relationship work.';
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* D9 Yoga Analysis */}
+                {d9Analysis.d9_yogas && d9Analysis.d9_yogas.length > 0 && (
+                  <div className="d9-yogas">
+                    <h4>🕉️ D9 Marriage Yogas</h4>
+                    <div className="d9-yogas-list">
+                      {d9Analysis.d9_yogas.map((yoga, index) => (
+                        <div key={index} className={`d9-yoga-item ${yoga.type?.toLowerCase() || 'neutral'}`}>
+                          <div className="yoga-header">
+                            <span className="yoga-name">{yoga.name}</span>
+                            <span className={`yoga-strength ${yoga.strength?.toLowerCase().replace(' ', '-') || 'moderate'}`}>
+                              {yoga.strength || 'Moderate'}
+                            </span>
+                          </div>
+                          <div className="yoga-description">{yoga.description}</div>
+                          <div className="yoga-effect">Effect: {yoga.effect}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* D9 Summary */}
+                <div className="d9-summary">
+                  <h4>📋 D9 Analysis Summary</h4>
+                  <div className="d9-summary-content">
+                    <div className="d9-strengths">
+                      <h5>✅ D9 Strengths:</h5>
+                      <ul>
+                        {d9Analysis.venus_d9?.strength >= 6 && <li>Strong Venus in D9 - Good romantic fulfillment</li>}
+                        {d9Analysis.jupiter_d9?.strength >= 6 && <li>Strong Jupiter in D9 - Spiritual wisdom in marriage</li>}
+                        {d9Analysis.mars_d9?.strength >= 6 && <li>Strong Mars in D9 - Good energy and passion</li>}
+                        {d9Analysis.moon_d9?.strength >= 6 && <li>Strong Moon in D9 - Emotional stability</li>}
+                        {d9Analysis.seventh_house_d9?.strength >= 6 && <li>Strong 7th house in D9 - Solid marriage foundation</li>}
+                        {(d9Analysis.venus_d9?.strength < 6 && d9Analysis.jupiter_d9?.strength < 6 && d9Analysis.mars_d9?.strength < 6 && d9Analysis.moon_d9?.strength < 6 && d9Analysis.seventh_house_d9?.strength < 6) && <li>Overall D9 strength: {d9Analysis.overall_strength}/10</li>}
+                      </ul>
+                    </div>
+                    
+                    <div className="d9-challenges">
+                      <h5>⚠️ D9 Challenges:</h5>
+                      <ul>
+                        {d9Analysis.venus_d9?.strength < 4 && <li>Weak Venus in D9 - Romantic challenges need attention</li>}
+                        {d9Analysis.jupiter_d9?.strength < 4 && <li>Weak Jupiter in D9 - Lack of spiritual wisdom</li>}
+                        {d9Analysis.mars_d9?.strength < 4 && <li>Weak Mars in D9 - Low energy or passion issues</li>}
+                        {d9Analysis.moon_d9?.strength < 4 && <li>Weak Moon in D9 - Emotional instability</li>}
+                        {d9Analysis.seventh_house_d9?.strength < 4 && <li>Weak 7th house in D9 - Foundation issues</li>}
+                        {(d9Analysis.venus_d9?.strength >= 4 && d9Analysis.jupiter_d9?.strength >= 4 && d9Analysis.mars_d9?.strength >= 4 && d9Analysis.moon_d9?.strength >= 4 && d9Analysis.seventh_house_d9?.strength >= 4) && d9Analysis.overall_strength < 5 && <li>Overall D9 needs strengthening through spiritual practices</li>}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="d9-unavailable">
+                <p>D9 Navamsa analysis not available. This chart shows your soul-level compatibility with your spouse.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Manglik Analysis */}
+          <div className="analysis-section">
+            <h3>🔥 Manglik Analysis</h3>
+            <div className="manglik-result">
+              <div className="manglik-status-header">
+                <div className="manglik-icon">
+                  {manglik.is_manglik ? '🔥' : '✅'}
+                </div>
+                <div className="manglik-info">
+                  <h4>{manglik.is_manglik ? `${manglik.severity} Manglik` : 'Non-Manglik'}</h4>
+                  <span className="manglik-subtitle">
+                    {manglik.is_manglik ? `Mars in ${manglik.mars_house}th house` : 'No Manglik dosha detected'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="manglik-details">
+                {manglik.is_manglik ? (
+                  <div className="manglik-present">
+                    <div className="manglik-explanation">
+                      <h5>🔍 What This Means:</h5>
+                      <p>
+                        {manglik.severity === 'High' ? 
+                          'You have strong Manglik dosha which can create significant conflicts and aggression in marriage. This requires serious attention and proper remedies before marriage.' :
+                          'You have mild Manglik dosha which may cause some initial friction or arguments in marriage. This is manageable with simple remedies.'
+                        }
+                      </p>
+                    </div>
+                    
+                    <div className="manglik-effects">
+                      <h5>⚠️ Potential Effects:</h5>
+                      <ul>
+                        <li>Arguments and conflicts with spouse</li>
+                        <li>Aggressive or dominating behavior in marriage</li>
+                        <li>Possible delays in marriage</li>
+                        {manglik.severity === 'High' && <li>Risk of separation if not properly addressed</li>}
+                      </ul>
+                    </div>
+                    
+                    <div className="manglik-remedies">
+                      <h5>🛡️ Remedies:</h5>
+                      <div className="remedies-list">
+                        {manglik.severity === 'High' ? (
+                          <div className="high-manglik-remedies">
+                            <div className="remedy-item critical">
+                              <span className="remedy-icon">👫</span>
+                              <span className="remedy-text">Marry another Manglik person (most effective)</span>
+                            </div>
+                            <div className="remedy-item critical">
+                              <span className="remedy-icon">🏺</span>
+                              <span className="remedy-text">Perform Kumbh Vivah (marriage to a pot/tree) before actual marriage</span>
+                            </div>
+                            <div className="remedy-item critical">
+                              <span className="remedy-icon">🕯️</span>
+                              <span className="remedy-text">Mangal Shanti Puja by qualified priest</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mild-manglik-remedies">
+                            <div className="remedy-item moderate">
+                              <span className="remedy-icon">🙏</span>
+                              <span className="remedy-text">Fast on Tuesdays and recite Hanuman Chalisa</span>
+                            </div>
+                            <div className="remedy-item moderate">
+                              <span className="remedy-icon">🌺</span>
+                              <span className="remedy-text">Offer red flowers to Hanuman ji every Tuesday</span>
+                            </div>
+                            <div className="remedy-item moderate">
+                              <span className="remedy-icon">💎</span>
+                              <span className="remedy-text">Wear red coral (if suitable) after astrological consultation</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {manglik.cancellation?.has_cancellation && (
+                      <div className="manglik-cancellation">
+                        <h5>✨ Good News - Cancellation Present!</h5>
+                        <p>Your chart shows some cancellation factors that reduce the negative effects of Manglik dosha:</p>
+                        <ul>
+                          {manglik.cancellation.factors?.map((factor, index) => (
+                            <li key={index}>{factor}</li>
+                          ))}
+                        </ul>
+                        <p className="cancellation-note">This significantly reduces the severity, but basic remedies are still recommended.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="non-manglik">
+                    <div className="non-manglik-benefits">
+                      <h5>✅ Benefits of Non-Manglik Status:</h5>
+                      <ul>
+                        <li>No restrictions on marriage partner selection</li>
+                        <li>Natural harmony and peace in marriage</li>
+                        <li>Less likelihood of conflicts due to Mars energy</li>
+                        <li>Can marry at any suitable time without Mars-related delays</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="non-manglik-advice">
+                      <h5>💡 Advice:</h5>
+                      <p>Since you are non-Manglik, you have more flexibility in marriage partner selection. However, if you're considering a Manglik partner, ensure they perform proper remedies to balance the energy difference.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
         </div>

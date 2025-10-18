@@ -329,7 +329,7 @@ class MarriageAnalyzer:
         return recommendations
     
     def _analyze_d9_chart(self, birth_details: Dict) -> Dict[str, Any]:
-        """Analyze D9 Navamsa chart for marriage"""
+        """Analyze D9 Navamsa chart for marriage with comprehensive details"""
         try:
             # Calculate D9 using Swiss Ephemeris directly
             import swisseph as swe
@@ -355,15 +355,20 @@ class MarriageAnalyzer:
             # Set Lahiri Ayanamsa
             swe.set_sid_mode(swe.SIDM_LAHIRI)
             
-            # Calculate D9 chart
-            d9_chart = self._calculate_d9_positions(jd, birth_details['latitude'], birth_details['longitude'])
+            # Calculate D9 chart using corrected method
+            d9_chart = self._calculate_d9_positions_corrected(jd, birth_details['latitude'], birth_details['longitude'])
             
             # Analyze D9 7th house
             d9_seventh_house = self._analyze_d9_seventh_house(d9_chart)
             
-            # Analyze Venus and Jupiter in D9
+            # Analyze all major planets in D9
             venus_d9 = self._analyze_planet_in_d9('Venus', d9_chart)
             jupiter_d9 = self._analyze_planet_in_d9('Jupiter', d9_chart)
+            mars_d9 = self._analyze_planet_in_d9('Mars', d9_chart)
+            moon_d9 = self._analyze_planet_in_d9('Moon', d9_chart)
+            
+            # Detect D9 yogas
+            d9_yogas = self._detect_d9_yogas(d9_chart)
             
             # Calculate D9 overall strength
             overall_strength = self._calculate_d9_strength(d9_seventh_house, venus_d9, jupiter_d9)
@@ -372,6 +377,9 @@ class MarriageAnalyzer:
                 'seventh_house_d9': d9_seventh_house,
                 'venus_d9': venus_d9,
                 'jupiter_d9': jupiter_d9,
+                'mars_d9': mars_d9,
+                'moon_d9': moon_d9,
+                'd9_yogas': d9_yogas,
                 'overall_strength': overall_strength,
                 'interpretation': self._interpret_d9_results(d9_seventh_house, venus_d9, jupiter_d9)
             }
@@ -399,16 +407,20 @@ class MarriageAnalyzer:
         # Calculate strength
         strength = self._calculate_house_strength_d9(seventh_lord_d9, d9_planets, planets_in_7th_d9)
         
+        # Calculate 7th house parameter scores
+        house_scores = self._calculate_house_parameter_scores(seventh_lord_d9, strength, planets_in_7th_d9)
+        
         return {
             'sign': seventh_sign_d9,
             'sign_name': self._get_sign_name(seventh_sign_d9),
             'lord': seventh_lord_d9,
             'planets': planets_in_7th_d9,
-            'strength': strength
+            'strength': strength,
+            'parameter_scores': house_scores
         }
     
     def _analyze_planet_in_d9(self, planet_name: str, d9_chart: Dict) -> Dict[str, Any]:
-        """Analyze specific planet in D9"""
+        """Analyze specific planet in D9 with comprehensive details"""
         d9_planets = d9_chart.get('planets', {})
         planet_data = d9_planets.get(planet_name, {})
         
@@ -416,15 +428,51 @@ class MarriageAnalyzer:
             return {'error': f'{planet_name} not found in D9'}
         
         sign = planet_data.get('sign', 0)
+        longitude = planet_data.get('longitude', 0)
         dignity = self._get_planet_dignity(planet_name, sign)
         strength = self._calculate_planet_strength_d9(planet_name, sign)
+        
+        # Calculate house position in D9 using Whole Sign system
+        d9_houses = d9_chart.get('houses', [])
+        d9_ascendant_sign = d9_houses[0].get('sign', 0) if d9_houses else 0
+        
+        # Calculate house number using Whole Sign system
+        house = ((sign - d9_ascendant_sign) % 12) + 1
+        
+        # Find conjunctions in D9
+        conjunctions = []
+        for other_planet, other_data in d9_planets.items():
+            if other_planet != planet_name and other_data.get('sign') == sign:
+                conjunctions.append(other_planet)
+        
+        # Calculate aspects in D9
+        aspects = self._get_d9_aspects(planet_name, sign, d9_planets)
+        
+        # Get nakshatra lord
+        nakshatra_lord = self._get_nakshatra_lord(longitude)
+        
+        # Check special conditions
+        special_conditions = self._check_d9_special_conditions(planet_name, sign, longitude)
+        
+        # Calculate positive/negative marking
+        positive_negative = self._get_positive_negative_marking(strength, dignity, house)
+        
+        # Calculate detailed parameter scores
+        parameter_scores = self._calculate_parameter_scores(planet_name, sign, house, dignity, strength, conjunctions, aspects)
         
         return {
             'sign': sign,
             'sign_name': self._get_sign_name(sign),
+            'house': house,
             'dignity': dignity,
             'strength': strength,
-            'longitude': planet_data.get('longitude', 0)
+            'longitude': longitude,
+            'conjunctions': conjunctions,
+            'aspects': aspects,
+            'nakshatra_lord': nakshatra_lord,
+            'special_conditions': special_conditions,
+            'positive_negative': positive_negative,
+            'parameter_scores': parameter_scores
         }
     
     def _calculate_d9_strength(self, seventh_house: Dict, venus: Dict, jupiter: Dict) -> int:
@@ -515,8 +563,139 @@ class MarriageAnalyzer:
         
         return max(0, min(10, strength))
     
-    def _calculate_d9_positions(self, jd: float, latitude: float, longitude: float) -> Dict[str, Any]:
-        """Calculate D9 Navamsa positions"""
+    def _calculate_parameter_scores(self, planet_name: str, sign: int, house: int, dignity: str, strength: int, conjunctions: List, aspects: List) -> Dict[str, Any]:
+        """Calculate detailed parameter scores with color coding"""
+        scores = {}
+        
+        # Dignity Score
+        if dignity == 'Exalted':
+            scores['dignity'] = {'score': 10, 'status': 'Positive', 'color': 'green', 'text': f'{planet_name} Exalted'}
+        elif dignity == 'Own':
+            scores['dignity'] = {'score': 8, 'status': 'Positive', 'color': 'green', 'text': f'{planet_name} in Own Sign'}
+        elif dignity == 'Debilitated':
+            scores['dignity'] = {'score': 2, 'status': 'Negative', 'color': 'red', 'text': f'{planet_name} Debilitated'}
+        else:
+            scores['dignity'] = {'score': 5, 'status': 'Neutral', 'color': 'gray', 'text': f'{planet_name} Neutral'}
+        
+        # House Score
+        if house in [1, 4, 7, 10]:  # Kendra
+            scores['house'] = {'score': 8, 'status': 'Positive', 'color': 'green', 'text': f'{house}th House (Kendra)'}
+        elif house in [5, 9]:  # Trikona
+            scores['house'] = {'score': 9, 'status': 'Positive', 'color': 'green', 'text': f'{house}th House (Trikona)'}
+        elif house in [2, 11]:  # Wealth houses
+            scores['house'] = {'score': 7, 'status': 'Positive', 'color': 'green', 'text': f'{house}th House (Wealth)'}
+        elif house in [6, 8, 12]:  # Dusthana
+            scores['house'] = {'score': 3, 'status': 'Negative', 'color': 'red', 'text': f'{house}th House (Dusthana)'}
+        else:
+            scores['house'] = {'score': 5, 'status': 'Neutral', 'color': 'gray', 'text': f'{house}th House'}
+        
+        # Conjunction Score
+        benefics = ['Jupiter', 'Venus', 'Moon']
+        malefics = ['Mars', 'Saturn', 'Rahu', 'Ketu']
+        conj_score = 5
+        conj_status = 'Neutral'
+        conj_color = 'gray'
+        conj_text = 'No Conjunctions'
+        
+        if conjunctions:
+            benefic_conj = [p for p in conjunctions if p in benefics]
+            malefic_conj = [p for p in conjunctions if p in malefics]
+            
+            if benefic_conj and not malefic_conj:
+                conj_score = 8
+                conj_status = 'Positive'
+                conj_color = 'green'
+                conj_text = f'With {", ".join(benefic_conj)}'
+            elif malefic_conj and not benefic_conj:
+                conj_score = 3
+                conj_status = 'Negative'
+                conj_color = 'red'
+                conj_text = f'With {", ".join(malefic_conj)}'
+            else:
+                conj_score = 5
+                conj_status = 'Mixed'
+                conj_color = 'orange'
+                conj_text = f'Mixed Conjunctions'
+        
+        scores['conjunctions'] = {'score': conj_score, 'status': conj_status, 'color': conj_color, 'text': conj_text}
+        
+        # Aspects Score
+        aspect_score = 5
+        aspect_status = 'Neutral'
+        aspect_color = 'gray'
+        aspect_text = 'No Major Aspects'
+        
+        if aspects:
+            benefic_aspects = [a for a in aspects if a['planet'] in benefics]
+            malefic_aspects = [a for a in aspects if a['planet'] in malefics]
+            
+            if benefic_aspects and not malefic_aspects:
+                aspect_score = 7
+                aspect_status = 'Positive'
+                aspect_color = 'green'
+                aspect_text = f'Benefic Aspects ({len(benefic_aspects)})'
+            elif malefic_aspects and not benefic_aspects:
+                aspect_score = 4
+                aspect_status = 'Negative'
+                aspect_color = 'red'
+                aspect_text = f'Malefic Aspects ({len(malefic_aspects)})'
+            else:
+                aspect_score = 5
+                aspect_status = 'Mixed'
+                aspect_color = 'orange'
+                aspect_text = f'Mixed Aspects'
+        
+        scores['aspects'] = {'score': aspect_score, 'status': aspect_status, 'color': aspect_color, 'text': aspect_text}
+        
+        # Overall Strength Score
+        if strength >= 8:
+            scores['strength'] = {'score': strength, 'status': 'Positive', 'color': 'green', 'text': f'Very Strong ({strength}/10)'}
+        elif strength >= 6:
+            scores['strength'] = {'score': strength, 'status': 'Positive', 'color': 'green', 'text': f'Strong ({strength}/10)'}
+        elif strength <= 3:
+            scores['strength'] = {'score': strength, 'status': 'Negative', 'color': 'red', 'text': f'Weak ({strength}/10)'}
+        elif strength <= 5:
+            scores['strength'] = {'score': strength, 'status': 'Negative', 'color': 'red', 'text': f'Below Average ({strength}/10)'}
+        else:
+            scores['strength'] = {'score': strength, 'status': 'Neutral', 'color': 'gray', 'text': f'Average ({strength}/10)'}
+        
+        return scores
+    
+    def _calculate_house_parameter_scores(self, lord: str, strength: int, occupants: List) -> Dict[str, Any]:
+        """Calculate 7th house parameter scores"""
+        scores = {}
+        
+        # House Strength Score
+        if strength >= 8:
+            scores['strength'] = {'score': strength, 'status': 'Positive', 'color': 'green', 'text': f'Very Strong 7th House ({strength}/10)'}
+        elif strength >= 6:
+            scores['strength'] = {'score': strength, 'status': 'Positive', 'color': 'green', 'text': f'Strong 7th House ({strength}/10)'}
+        elif strength <= 3:
+            scores['strength'] = {'score': strength, 'status': 'Negative', 'color': 'red', 'text': f'Weak 7th House ({strength}/10)'}
+        else:
+            scores['strength'] = {'score': strength, 'status': 'Neutral', 'color': 'gray', 'text': f'Average 7th House ({strength}/10)'}
+        
+        # Occupants Score
+        benefics = ['Jupiter', 'Venus', 'Moon']
+        malefics = ['Mars', 'Saturn', 'Rahu', 'Ketu']
+        
+        if not occupants:
+            scores['occupants'] = {'score': 5, 'status': 'Neutral', 'color': 'gray', 'text': 'No Planets in 7th House'}
+        else:
+            benefic_count = len([p for p in occupants if p in benefics])
+            malefic_count = len([p for p in occupants if p in malefics])
+            
+            if benefic_count > malefic_count:
+                scores['occupants'] = {'score': 8, 'status': 'Positive', 'color': 'green', 'text': f'Benefic Planets: {", ".join([p for p in occupants if p in benefics])}'}
+            elif malefic_count > benefic_count:
+                scores['occupants'] = {'score': 3, 'status': 'Negative', 'color': 'red', 'text': f'Malefic Planets: {", ".join([p for p in occupants if p in malefics])}'}
+            else:
+                scores['occupants'] = {'score': 5, 'status': 'Mixed', 'color': 'orange', 'text': f'Mixed Planets: {", ".join(occupants)}'}
+        
+        return scores
+    
+    def _calculate_d9_positions_corrected(self, jd: float, latitude: float, longitude: float) -> Dict[str, Any]:
+        """Calculate D9 positions using corrected method from main.py"""
         import swisseph as swe
         
         # Calculate planetary positions
@@ -525,14 +704,14 @@ class MarriageAnalyzer:
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6]):
             pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
-            longitude = pos[0]
+            longitude_deg = pos[0]
             
-            # Calculate D9 position
-            sign = int(longitude / 30)
-            degree_in_sign = longitude % 30
+            # Calculate D9 position using proper Vedic formula
+            sign = int(longitude_deg / 30)
+            degree_in_sign = longitude_deg % 30
             navamsa_part = int(degree_in_sign / (30/9))
             
-            # D9 calculation based on sign type
+            # D9 calculation based on sign type (corrected)
             if sign in [0, 3, 6, 9]:  # Movable signs
                 d9_sign = (sign + navamsa_part) % 12
             elif sign in [1, 4, 7, 10]:  # Fixed signs
@@ -540,12 +719,20 @@ class MarriageAnalyzer:
             else:  # Dual signs [2, 5, 8, 11]
                 d9_sign = ((sign + 4) + navamsa_part) % 12
             
+            # Calculate actual degree within divisional sign
+            part_size = 30.0 / 9
+            part_index = int(degree_in_sign / part_size)
+            degree_within_part = degree_in_sign % part_size
+            actual_degree = (degree_within_part / part_size) * 30.0
+            
+            divisional_longitude = d9_sign * 30 + actual_degree
+            
             planets[planet_names[i]] = {
                 'sign': d9_sign,
-                'longitude': d9_sign * 30 + 15  # Middle of sign
+                'longitude': divisional_longitude
             }
         
-        # Calculate D9 ascendant
+        # Calculate D9 ascendant using same method
         houses_data = swe.houses(jd, latitude, longitude, b'P')
         ayanamsa = swe.get_ayanamsa_ut(jd)
         ascendant_tropical = houses_data[1][0]
@@ -576,6 +763,8 @@ class MarriageAnalyzer:
             'houses': houses,
             'ascendant': d9_asc_sign * 30 + 15
         }
+    
+
     
     def _calculate_yoga_score(self, karakas: Dict, manglik: Dict) -> float:
         """Calculate yoga score for marriage (-1.5 to +1.5)"""
@@ -624,3 +813,214 @@ class MarriageAnalyzer:
             return 'Average'
         else:
             return 'Below Average'
+    
+    def _get_d9_aspects(self, planet_name: str, planet_sign: int, d9_planets: Dict) -> List[Dict[str, str]]:
+        """Calculate aspects to a planet in D9"""
+        aspects = []
+        
+        for other_planet, other_data in d9_planets.items():
+            if other_planet == planet_name:
+                continue
+            
+            other_sign = other_data.get('sign', 0)
+            
+            # 7th aspect (opposition)
+            if (other_sign + 6) % 12 == planet_sign:
+                aspects.append({'planet': other_planet, 'aspect': '7th'})
+            
+            # Special aspects
+            if other_planet == 'Mars':
+                if (other_sign + 3) % 12 == planet_sign:
+                    aspects.append({'planet': other_planet, 'aspect': '4th'})
+                if (other_sign + 7) % 12 == planet_sign:
+                    aspects.append({'planet': other_planet, 'aspect': '8th'})
+            elif other_planet == 'Jupiter':
+                if (other_sign + 4) % 12 == planet_sign:
+                    aspects.append({'planet': other_planet, 'aspect': '5th'})
+                if (other_sign + 8) % 12 == planet_sign:
+                    aspects.append({'planet': other_planet, 'aspect': '9th'})
+            elif other_planet == 'Saturn':
+                if (other_sign + 2) % 12 == planet_sign:
+                    aspects.append({'planet': other_planet, 'aspect': '3rd'})
+                if (other_sign + 9) % 12 == planet_sign:
+                    aspects.append({'planet': other_planet, 'aspect': '10th'})
+        
+        return aspects
+    
+    def _get_nakshatra_lord(self, longitude: float) -> str:
+        """Get nakshatra lord for given longitude"""
+        # Nakshatra lords in order
+        nakshatra_lords = [
+            'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
+            'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
+            'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury'
+        ]
+        
+        # Each nakshatra is 13°20' (800 minutes)
+        nakshatra_index = int(longitude / (13 + 20/60))
+        return nakshatra_lords[nakshatra_index % 27]
+    
+    def _check_d9_special_conditions(self, planet_name: str, sign: int, longitude: float) -> List[str]:
+        """Check for special conditions in D9"""
+        conditions = []
+        
+        # Check for Vargottama (same sign in D1 and D9)
+        d1_sign = int(longitude / 30)  # Approximate D1 sign
+        if d1_sign == sign:
+            conditions.append('Vargottama')
+        
+        # Check for Pushkara Navamsa (specific degrees)
+        degree_in_sign = longitude % 30
+        if 10 <= degree_in_sign <= 13.33 or 23.33 <= degree_in_sign <= 26.66:
+            conditions.append('Pushkara Navamsa')
+        
+        return conditions
+    
+    def _get_positive_negative_marking(self, strength: int, dignity: str, house: int) -> Dict[str, Any]:
+        """Calculate positive/negative marking for D9 planet"""
+        score = 0
+        factors = []
+        
+        # Strength contribution
+        if strength >= 8:
+            score += 2
+            factors.append("Very Strong")
+        elif strength >= 6:
+            score += 1
+            factors.append("Strong")
+        elif strength <= 3:
+            score -= 2
+            factors.append("Weak")
+        elif strength <= 5:
+            score -= 1
+            factors.append("Below Average")
+        
+        # Dignity contribution
+        if dignity == 'Exalted':
+            score += 3
+            factors.append("Exalted")
+        elif dignity == 'Own':
+            score += 2
+            factors.append("Own Sign")
+        elif dignity == 'Debilitated':
+            score -= 3
+            factors.append("Debilitated")
+        
+        # House contribution (beneficial houses)
+        if house in [1, 4, 7, 10]:  # Kendra
+            score += 1
+            factors.append("Kendra House")
+        elif house in [5, 9]:  # Trikona
+            score += 2
+            factors.append("Trikona House")
+        elif house in [6, 8, 12]:  # Dusthana
+            score -= 1
+            factors.append("Dusthana House")
+        
+        # Determine overall marking
+        if score >= 3:
+            marking = "Very Positive"
+            symbol = "++"
+        elif score >= 1:
+            marking = "Positive"
+            symbol = "+"
+        elif score <= -3:
+            marking = "Very Negative"
+            symbol = "--"
+        elif score <= -1:
+            marking = "Negative"
+            symbol = "-"
+        else:
+            marking = "Neutral"
+            symbol = "="
+        
+        return {
+            'marking': marking,
+            'symbol': symbol,
+            'score': score,
+            'factors': factors
+        }
+    
+    def _detect_d9_yogas(self, d9_chart: Dict) -> List[Dict[str, str]]:
+        """Detect yogas in D9 chart"""
+        yogas = []
+        d9_planets = d9_chart.get('planets', {})
+        
+        # Check for Raj Yoga in D9 (Kendra-Trikona lords together)
+        venus_data = d9_planets.get('Venus', {})
+        jupiter_data = d9_planets.get('Jupiter', {})
+        
+        if venus_data and jupiter_data:
+            if venus_data.get('sign') == jupiter_data.get('sign'):
+                yogas.append({
+                    'name': 'Venus-Jupiter Conjunction in D9',
+                    'type': 'benefic',
+                    'strength': 'Strong',
+                    'description': 'Venus and Jupiter together in D9 creates auspicious marriage yoga',
+                    'effect': 'Harmonious marriage with spiritual and material fulfillment'
+                })
+        
+        # Check for Neecha Bhanga in D9
+        for planet_name, planet_data in d9_planets.items():
+            if planet_name in ['Venus', 'Jupiter', 'Mars', 'Moon']:
+                sign = planet_data.get('sign', 0)
+                dignity = self._get_planet_dignity(planet_name, sign)
+                
+                if dignity == 'Exalted':
+                    yogas.append({
+                        'name': f'{planet_name} Exalted in D9',
+                        'type': 'benefic',
+                        'strength': 'Very Strong',
+                        'description': f'{planet_name} is exalted in D9 Navamsa',
+                        'effect': f'Excellent results for {planet_name} significations in marriage'
+                    })
+        
+        return yogas
+    
+    def _analyze_d9_seventh_house(self, d9_chart: Dict) -> Dict[str, Any]:
+        """Analyze 7th house in D9 with enhanced details"""
+        d9_houses = d9_chart.get('houses', [])
+        if len(d9_houses) < 7:
+            return {'error': 'Invalid D9 chart data'}
+        
+        seventh_house_d9 = d9_houses[6]  # 7th house (0-indexed)
+        seventh_sign_d9 = seventh_house_d9.get('sign', 0)
+        seventh_lord_d9 = self._get_house_lord(seventh_sign_d9)
+        
+        # Find planets in 7th house D9
+        planets_in_7th_d9 = []
+        d9_planets = d9_chart.get('planets', {})
+        for planet, data in d9_planets.items():
+            if data.get('sign') == seventh_sign_d9:
+                planets_in_7th_d9.append(planet)
+        
+        # Find 7th lord position in D9
+        lord_position = None
+        if seventh_lord_d9 in d9_planets:
+            lord_data = d9_planets[seventh_lord_d9]
+            lord_sign = lord_data.get('sign', 0)
+            lord_house = 1
+            for i, house_data in enumerate(d9_houses):
+                if house_data.get('sign') == lord_sign:
+                    lord_house = i + 1
+                    break
+            lord_position = {
+                'sign': lord_sign,
+                'house': lord_house
+            }
+        
+        # Calculate strength
+        strength = self._calculate_house_strength_d9(seventh_lord_d9, d9_planets, planets_in_7th_d9)
+        
+        # Add positive/negative marking for 7th house
+        house_marking = self._get_positive_negative_marking(strength, 'Neutral', 7)
+        
+        return {
+            'sign': seventh_sign_d9,
+            'sign_name': self._get_sign_name(seventh_sign_d9),
+            'lord': seventh_lord_d9,
+            'lord_position': lord_position,
+            'planets': planets_in_7th_d9,
+            'strength': strength,
+            'positive_negative': house_marking
+        }
