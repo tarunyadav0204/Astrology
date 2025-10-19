@@ -20,6 +20,8 @@ except ImportError:
         print("House combinations database initialization skipped")
         pass
 from marriage_analysis.marriage_analyzer import MarriageAnalyzer
+from nadi.services.nadi_service import router as nadi_router
+from vedic_transit_aspects import router as vedic_transit_router
 
 # Load environment variables explicitly
 try:
@@ -46,6 +48,8 @@ app.add_middleware(
 app.include_router(rule_engine_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(house_combinations_router, prefix="/api")
+app.include_router(nadi_router, prefix="/api")
+app.include_router(vedic_transit_router, prefix="/api")
 
 # Root endpoint for health check
 @app.get("/")

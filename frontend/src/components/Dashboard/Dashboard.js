@@ -4,14 +4,14 @@ import { DASHBOARD_CONFIG } from '../../config/dashboard.config';
 import ChartWidget from '../Charts/ChartWidget';
 import DashaWidget from '../DashaTable/DashaWidget';
 import TransitControls from '../TransitControls/TransitControls';
-import YogiWidget from '../YogiWidget/YogiWidget';
-import PanchangWidget from '../PanchangWidget/PanchangWidget';
+import VedicTransitAspects from '../TransitAspects/VedicTransitAspects';
 import EventPredictionWidget from '../EventPredictionWidget/EventPredictionWidget';
 import NakshatrasTab from '../NakshatrasTab/NakshatrasTab';
 import YogasTab from '../YogasTab/YogasTab';
 import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
+import NadiTab from '../Nadi/NadiTab';
 
 import ClassicalPrediction from '../ClassicalPrediction/ClassicalPrediction';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
@@ -330,6 +330,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       }}>
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
+          { id: 'nadi', label: '🔍 Nadi', icon: '🔍' },
           { id: 'marriage', label: '💍 Marriage', icon: '💍' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
           { id: 'houses', label: '🏠 House Analysis', icon: '🏠' },
@@ -506,14 +507,12 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 </div>
                 </div>
               )}
-              {mobileSubTab === 'yogi' && (
+              {mobileSubTab === 'transit-aspects' && (
                 <div style={{ height: '100%' }}>
-                  <YogiWidget />
-                </div>
-              )}
-              {mobileSubTab === 'panchang' && (
-                <div style={{ height: '100%' }}>
-                  <PanchangWidget transitDate={transitDate} />
+                  <VedicTransitAspects 
+                    birthData={birthData} 
+                    onTimelineClick={handleTransitDateChange}
+                  />
                 </div>
               )}
             </div>
@@ -542,8 +541,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 { id: 'transit', label: '🔄 Transit', icon: '🔄' },
                 { id: 'divisional', label: '📈 Divisional', icon: '📈' },
                 { id: 'dashas', label: '⏰ Dashas', icon: '⏰' },
-                { id: 'yogi', label: '🧘 Yogi', icon: '🧘' },
-                { id: 'panchang', label: '📅 Panchang', icon: '📅' }
+                { id: 'transit-aspects', label: '🎯 Aspects', icon: '🎯' }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -681,12 +679,11 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 />
               </GridItem>
               
-              <GridItem dasha>
-                <YogiWidget />
-              </GridItem>
-              
-              <GridItem dasha>
-                <PanchangWidget transitDate={transitDate} />
+              <GridItem dasha style={{ gridColumn: 'span 2' }}>
+                <VedicTransitAspects 
+                  birthData={birthData} 
+                  onTimelineClick={handleTransitDateChange}
+                />
               </GridItem>
             </div>
           </GridContainer>
@@ -704,6 +701,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
         }}>
           {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
+          {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} />}
           {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
           {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
           {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
