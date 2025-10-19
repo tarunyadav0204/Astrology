@@ -29,6 +29,41 @@
   gap: 0.3rem;
 }
 
+.dasha-filter {
+  background: transparent;
+  border: 1px solid #e91e63;
+  color: #e91e63;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+  margin-right: 0.5rem;
+}
+
+.dasha-filter:hover {
+  background: #e91e63;
+  color: white;
+}
+
+.dasha-filter.active {
+  background: #e91e63;
+  color: white;
+  font-weight: 600;
+}
+
+.dasha-filter:disabled {
+  background: #f0f0f0;
+  color: #999;
+  border-color: #ddd;
+  cursor: not-allowed;
+}
+
+.dasha-filter:disabled:hover {
+  background: #f0f0f0;
+  color: #999;
+}
+
 .nav-arrow {
   background: #e91e63;
   color: white;
@@ -161,6 +196,15 @@
   background: #2196f3;
   color: white;
   border-color: #2196f3;
+}
+
+.timeline-chip.dasha-relevant {
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+}
+
+.timeline-chip.dasha-relevant:hover {
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
 }
 
 .no-periods {

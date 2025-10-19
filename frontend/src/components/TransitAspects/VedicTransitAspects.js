@@ -6,9 +6,15 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [yearOffset, setYearOffset] = useState(0);
   const [aspects, setAspects] = useState([]);
+  const [dashaTimeline, setDashaTimeline] = useState([]);
+  const [showDashaRelevantOnly, setShowDashaRelevantOnly] = useState(false);
+  const [dashaDataReady, setDashaDataReady] = useState(false);
 
   useEffect(() => {
+    // Clear cached timelines when birthData changes
+    setAspectTimelines({});
     fetchVedicAspects();
+    fetchDashaTimeline();
   }, [birthData]);
 
   const fetchVedicAspects = async () => {
@@ -31,6 +37,33 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
     }
   };
 
+  const fetchDashaTimeline = async () => {
+    try {
+      const response = await fetch('/api/dasha-timeline', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Cache-Control': 'no-cache'
+        },
+        body: JSON.stringify({
+          birth_data: birthData,
+          start_year: 2020,
+          end_year: 2030,
+          _cache_bust: Date.now()
+        })
+      });
+      
+      const data = await response.json();
+      console.log('[DASHA_DEBUG] Fresh dasha timeline received:', data.dasha_timeline?.[0]);
+      setDashaTimeline(data.dasha_timeline || []);
+      setDashaDataReady(true);
+    } catch (error) {
+      console.error('Error fetching dasha timeline:', error);
+      setDashaDataReady(false);
+    }
+  };
+
   const loadTimeline = async (aspect, year) => {
     try {
       console.log('Loading timeline for:', aspect, 'year:', year);
@@ -46,7 +79,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
           planet1: aspect.planet1,
           planet2: aspect.planet2,
           start_year: year,
-          year_range: 1
+          year_range: 1,
+          required_transit_house: aspect.required_transit_house
         })
       });
       
@@ -64,6 +98,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
 
   const handleYearChange = (year) => {
     setCurrentYear(year);
+    // Clear cached timelines for new year
+    setAspectTimelines({});
     aspects.forEach(aspect => {
       loadTimeline(aspect, year);
     });
@@ -97,29 +133,112 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
   
   const getAspectName = (aspectType) => {
     const aspectMap = {
+      '1th_house': '1st',
+      '2th_house': '2nd', 
       '3th_house': '3rd',
       '4th_house': '4th', 
       '5th_house': '5th',
+      '6th_house': '6th',
       '7th_house': '7th',
       '8th_house': '8th',
       '9th_house': '9th',
-      '10th_house': '10th'
+      '10th_house': '10th',
+      '11th_house': '11th',
+      '12th_house': '12th'
     };
     return aspectMap[aspectType] || aspectType;
   };
 
-  const getPeriodClass = (period) => {
+  const getPeriodClass = (period, aspect) => {
     const now = new Date();
     const startDate = new Date(period.start_date);
     const endDate = new Date(period.end_date);
     
+    let baseClass = '';
     if (endDate < now) {
-      return 'past';
+      baseClass = 'past';
     } else if (startDate <= now && now <= endDate) {
-      return 'current';
+      baseClass = 'current';
     } else {
-      return 'future';
+      baseClass = 'future';
     }
+    
+    // Add dasha-relevant class
+    if (isDashaRelevant(aspect, period)) {
+      baseClass += ' dasha-relevant';
+    }
+    
+    return baseClass;
+  };
+
+  const getDashaForPeriod = (periodDate) => {
+    if (!dashaTimeline.length) return null;
+    
+    const targetDate = new Date(periodDate);
+    // Find the closest dasha entry before or on the target date
+    let closestDasha = null;
+    
+    for (const dasha of dashaTimeline) {
+      const dashaDate = new Date(dasha.date);
+      if (dashaDate <= targetDate) {
+        closestDasha = dasha;
+      } else {
+        break;
+      }
+    }
+    
+    return closestDasha;
+  };
+
+  const isDashaRelevant = (aspect, period) => {
+    if (!dashaDataReady) return false;
+    
+    const periodDashas = getDashaForPeriod(period.start_date);
+    if (!periodDashas) return false;
+    
+    // Get all dasha levels from the data structure
+    const dashaLords = [
+      periodDashas.mahadasha,
+      periodDashas.antardasha,
+      periodDashas.pratyantardasha,
+      periodDashas.sookshmadasha,
+      periodDashas.pranadasha
+    ].filter(Boolean);
+    
+    // Debug for Mars->Sun aspects
+    if (aspect.planet1 === 'Mars' && aspect.planet2 === 'Sun') {
+      console.log(`[DASHA_DEBUG] Mars->Sun dasha check for ${period.start_date}:`);
+      console.log(`[DASHA_DEBUG] Full dasha data:`, periodDashas);
+      console.log(`[DASHA_DEBUG] All dashas: ${dashaLords.join(', ')}`);
+      console.log(`[DASHA_DEBUG] Relevant: ${dashaLords.includes(aspect.planet1) || dashaLords.includes(aspect.planet2)}`);
+    }
+    
+    return dashaLords.includes(aspect.planet1) || dashaLords.includes(aspect.planet2);
+  };
+
+  const getDashaContext = (aspect, period) => {
+    if (!dashaDataReady) return '';
+    
+    const periodDashas = getDashaForPeriod(period.start_date);
+    if (!periodDashas) return '';
+    
+    const relevantDashas = [];
+    if (periodDashas.mahadasha === aspect.planet1 || periodDashas.mahadasha === aspect.planet2) {
+      relevantDashas.push(`${periodDashas.mahadasha} Maha`);
+    }
+    if (periodDashas.antardasha === aspect.planet1 || periodDashas.antardasha === aspect.planet2) {
+      relevantDashas.push(`${periodDashas.antardasha} Antar`);
+    }
+    return relevantDashas.length > 0 ? `During ${relevantDashas.join('-')} period` : '';
+  };
+
+  const getFilteredAspects = () => {
+    if (!showDashaRelevantOnly) return aspects;
+    
+    return aspects.filter(aspect => {
+      const timeline = aspectTimelines[`${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`] || [];
+      return timeline.some(period => isDashaRelevant(aspect, period));
+    });
   };
 
   return (
@@ -129,6 +248,14 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
         <div className="nav-title">Transit Aspects</div>
         
         <div className="nav-controls">
+          <button 
+            className={`dasha-filter ${showDashaRelevantOnly ? 'active' : ''}`}
+            onClick={() => setShowDashaRelevantOnly(!showDashaRelevantOnly)}
+            title={dashaDataReady ? "Show only dasha-relevant aspects" : "Loading dasha data..."}
+            disabled={!dashaDataReady}
+          >
+            {dashaDataReady ? '🎯' : '⏳'}
+          </button>
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev - 1)}
@@ -162,7 +289,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
 
       {/* Compact Aspects List */}
       <div className="transit-aspects-list">
-        {aspects.slice(0, 8).map((aspect, index) => {
+        {getFilteredAspects().slice(0, 8).map((aspect, index) => {
           const aspectKey = `${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`;
           const timeline = aspectTimelines[aspectKey] || [];
           
@@ -172,15 +299,15 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
                 <span className="transit-planet">{aspect.planet1}</span>
                 <span className="aspect-arrow">→</span>
                 <span className="target-planet">{aspect.planet2}</span>
-                <span className="aspect-house">({getAspectName(aspect.aspect_type)})</span>
+                <span className="aspect-house">({getAspectName(aspect.aspect_type)} aspect)</span>
               </div>
               <div className="timeline-chips">
                 {timeline.slice(0, 3).map((period, pIndex) => (
                   <button
                     key={pIndex}
-                    className={`timeline-chip ${getPeriodClass(period)}`}
+                    className={`timeline-chip ${getPeriodClass(period, aspect)}`}
                     onClick={() => onTimelineClick(new Date(period.peak_date || period.start_date))}
-                    title={`${period.start_date} to ${period.end_date}`}
+                    title={`${period.start_date} to ${period.end_date}${getDashaContext(aspect, period) ? '\n' + getDashaContext(aspect, period) : ''}`}
                   >
                     {formatPeriod(period)}
                   </button>

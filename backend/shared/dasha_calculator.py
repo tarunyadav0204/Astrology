@@ -259,3 +259,7 @@ class DashaCalculator:
             current_prana_date = prana_end
         
         return {'planet': sookshma_planet, 'start': sookshma_start, 'end': sookshma_end}
+    
+    def calculate_dashas_for_date(self, target_date: datetime, birth_data: Dict) -> Dict[str, Any]:
+        """Calculate dashas for a specific date"""
+        return self.calculate_current_dashas(birth_data, target_date)
