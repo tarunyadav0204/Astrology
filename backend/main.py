@@ -1608,7 +1608,21 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
     birth_data = BirthData(**request['birth_data'])
     chart_type = request.get('chart_type', 'lagna')
     
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    if chart_type == 'transit':
+        # For transit charts, use current transit positions
+        transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
+        # Parse ISO datetime string to date if needed
+        if 'T' in transit_date:
+            transit_date = transit_date.split('T')[0]
+        transit_request = TransitRequest(
+            birth_data=birth_data,
+            transit_date=transit_date
+        )
+        chart_data = await calculate_transits(transit_request, current_user)
+    else:
+        # For birth charts (lagna, navamsa), use birth positions
+        chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    
     calculator = AshtakavargaCalculator(birth_data, chart_data)
     
     sarva = calculator.calculate_sarvashtakavarga()

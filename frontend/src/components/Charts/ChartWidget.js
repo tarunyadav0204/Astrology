@@ -125,6 +125,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
         onClose={() => setShowAshtakavarga(false)}
         birthData={birthData}
         chartType={chartType}
+        transitDate={transitDate}
       />
     </WidgetContainer>
   );

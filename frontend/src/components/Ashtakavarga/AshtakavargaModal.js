@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './AshtakavargaModal.css';
 import { API_BASE_URL } from '../../config';
 
-const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
+const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate }) => {
   const [ashtakavargaData, setAshtakavargaData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('sarva');
@@ -18,7 +18,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
 
   const fetchAshtakavarga = async () => {
     setLoading(true);
-    const apiUrl = `${API_BASE_URL}/calculate-ashtakavarga`;
+    const apiUrl = `${API_BASE_URL}/api/calculate-ashtakavarga`;
     console.log('Fetching Ashtakavarga data...', { birthData, chartType, apiUrl });
     try {
       const token = localStorage.getItem('token');
@@ -30,7 +30,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType }) => {
         },
         body: JSON.stringify({
           birth_data: birthData,
-          chart_type: chartType
+          chart_type: chartType,
+          transit_date: transitDate
         })
       });
       
