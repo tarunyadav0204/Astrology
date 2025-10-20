@@ -5,7 +5,7 @@ import { apiService } from '../../services/apiService';
 import HouseContextMenu from './HouseContextMenu';
 import HouseAnalysisModal from './HouseAnalysisModal';
 
-const SouthIndianChart = ({ chartData, birthData }) => {
+const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) => {
   const { signs, planets } = CHART_CONFIG;
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
@@ -176,6 +176,22 @@ const SouthIndianChart = ({ chartData, birthData }) => {
     return nakshatras[nakshatraIndex] || 'Unknown';
   };
 
+  const getShortNakshatra = (longitude) => {
+    const shortNakshatras = [
+      'Ash', 'Bha', 'Kri', 'Roh', 'Mri', 'Ard',
+      'Pun', 'Pus', 'Asl', 'Mag', 'PPh', 'UPh',
+      'Has', 'Chi', 'Swa', 'Vis', 'Anu', 'Jye',
+      'Mul', 'PAs', 'UAs', 'Shr', 'Dha', 'Sha',
+      'PBh', 'UBh', 'Rev'
+    ];
+    const nakshatraIndex = Math.floor(longitude / 13.333333);
+    return shortNakshatras[nakshatraIndex] || 'Unk';
+  };
+
+  const formatDegree = (degree) => {
+    return Math.floor(degree) + '°';
+  };
+
   const handlePlanetRightClick = (e, planet) => {
     e.preventDefault();
     setContextMenu({
@@ -323,7 +339,9 @@ const SouthIndianChart = ({ chartData, birthData }) => {
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
-          nakshatra: getNakshatra(data.longitude)
+          nakshatra: getNakshatra(data.longitude),
+          shortNakshatra: getShortNakshatra(data.longitude),
+          formattedDegree: formatDegree(data.degree || 0)
         };
       });
   };
@@ -486,9 +504,9 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                     planetX = pos.x + pos.width / 2;
                     planetY = pos.y + pos.height / 2 + (isDoubleDigitHouse ? 8 : 5);
                   } else {
-                    // Stack all multiple planets vertically
+                    // Stack all multiple planets vertically with increased spacing for 2-line layout
                     planetX = pos.x + pos.width / 2;
-                    const lineHeight = totalPlanets > 4 ? 10 : totalPlanets > 2 ? 12 : 13;
+                    const lineHeight = totalPlanets > 4 ? 16 : totalPlanets > 2 ? 18 : 20;
                     const startY = pos.y + pos.height / 2 + (isDoubleDigitHouse ? 5 : 2) - ((totalPlanets - 1) * lineHeight / 2);
                     planetY = startY + (pIndex * lineHeight);
                   }
@@ -504,9 +522,10 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                                 strokeWidth="1.5" 
                                 strokeDasharray="2,1"/>
                       )}
+                      {/* Planet symbol */}
                       <text x={planetX} 
-                            y={planetY} 
-                            fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : totalPlanets > 1 ? "11" : "14"} 
+                            y={planetY - 6} 
+                            fontSize={totalPlanets > 4 ? "9" : totalPlanets > 2 ? "11" : totalPlanets > 1 ? "12" : "15"} 
                             fill={getPlanetColor(planet)}
                             fontWeight="900"
                             textAnchor="middle"
@@ -514,10 +533,10 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                           onMouseEnter={(e) => {
                             if (isTouchDevice) return;
                             const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
-                            const isRightSide = pos.x >= 150; // Right side houses (including middle-right)
+                            const isRightSide = pos.x >= 150;
                             const offsetX = isRightSide ? -120 : 10;
-                            const fontSize = totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 11 : 14;
-                            const offsetY = fontSize + 2; // Dynamic offset based on font size
+                            const fontSize = totalPlanets > 4 ? 7 : totalPlanets > 2 ? 9 : totalPlanets > 1 ? 10 : 13;
+                            const offsetY = fontSize + 2;
                             setTooltip({ show: true, x: planetX + offsetX, y: planetY - offsetY, text: tooltipText });
                           }}
                           onMouseLeave={(e) => {
@@ -530,7 +549,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                             const rect = e.currentTarget.closest('svg').getBoundingClientRect();
                             const isRightSide = pos.x >= 150;
                             const offsetX = isRightSide ? -120 : 10;
-                            const fontSize = totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 11 : 14;
+                            const fontSize = totalPlanets > 4 ? 7 : totalPlanets > 2 ? 9 : totalPlanets > 1 ? 10 : 13;
                             const offsetY = fontSize + 2;
                             setTooltip({ show: true, x: e.touches[0].clientX - rect.left + offsetX, y: e.touches[0].clientY - rect.top - offsetY, text: tooltipText });
                             setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 2000);
@@ -538,6 +557,19 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                           onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
                         {getPlanetSymbolWithStatus(planet)}
                       </text>
+                      {/* Degree and Nakshatra combined */}
+                      {showDegreeNakshatra && (
+                        <text x={planetX} 
+                              y={planetY + 6} 
+                              fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "8" : totalPlanets > 1 ? "8" : "9"} 
+                              fill="#666"
+                              fontWeight="500"
+                              textAnchor="middle"
+                              style={{ cursor: 'pointer' }}
+                            onContextMenu={(e) => handlePlanetRightClick(e, planet)}>
+                          {planet.formattedDegree} {planet.shortNakshatra}
+                        </text>
+                      )}
                     </g>
                   );
                 })}

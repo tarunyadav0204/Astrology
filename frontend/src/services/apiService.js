@@ -326,5 +326,12 @@ export const apiService = {
   getMarriageAnalysis: async (requestData) => {
     const response = await apiClient.post(getEndpoint('/marriage-analysis'), requestData);
     return response.data;
+  },
+  
+  calculateBadhakaMaraka: async (chartData) => {
+    const response = await apiClient.post(getEndpoint('/badhaka-maraka-analysis'), {
+      natal_chart: chartData
+    });
+    return response.data;
   }
 };

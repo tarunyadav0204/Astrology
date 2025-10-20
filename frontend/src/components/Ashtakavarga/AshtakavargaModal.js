@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './AshtakavargaModal.css';
 import { API_BASE_URL } from '../../config';
 
@@ -171,7 +172,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate 
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="ashtakavarga-modal-overlay" onClick={onClose}>
       <div className="ashtakavarga-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
@@ -210,7 +211,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

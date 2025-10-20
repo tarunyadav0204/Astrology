@@ -23,6 +23,7 @@ from marriage_analysis.marriage_analyzer import MarriageAnalyzer
 from nadi.services.nadi_service import router as nadi_router
 from vedic_transit_aspects import router as vedic_transit_router
 from vedic_predictions.api.prediction_endpoint import router as vedic_predictions_router
+from vedic_predictions.api.badhaka_maraka_endpoint import router as badhaka_maraka_router
 
 # Load environment variables explicitly
 try:
@@ -52,6 +53,7 @@ app.include_router(house_combinations_router, prefix="/api")
 app.include_router(nadi_router, prefix="/api")
 app.include_router(vedic_transit_router, prefix="/api")
 app.include_router(vedic_predictions_router)
+app.include_router(badhaka_maraka_router, prefix="/api")
 
 # Root endpoint for health check
 @app.get("/")
