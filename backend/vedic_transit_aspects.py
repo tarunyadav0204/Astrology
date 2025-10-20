@@ -23,8 +23,8 @@ class VedicTransitAspectCalculator:
             'Ketu': [1, 5, 7, 9]     # Conjunction, 5th, 7th, 9th house aspects
         }
         
-        # Focus on slow-moving planets for meaningful transits
-        self.transit_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu', 'Mars']
+        # All planets that can create meaningful transit aspects
+        self.transit_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
         self.natal_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
     
     def calculate_vedic_aspects(self, natal_planets: Dict) -> List[Dict]:
@@ -438,6 +438,30 @@ async def _calculate_natal_positions(birth_data: dict) -> Dict:
                 'house': house_number
             }
         
+        # Add Rahu and Ketu
+        rahu_pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+        rahu_longitude = rahu_pos[0][0]
+        rahu_sign = int(rahu_longitude / 30)
+        rahu_house = ((rahu_sign - ascendant_sign) % 12) + 1
+        
+        ketu_longitude = (rahu_longitude + 180) % 360
+        ketu_sign = int(ketu_longitude / 30)
+        ketu_house = ((ketu_sign - ascendant_sign) % 12) + 1
+        
+        planets['Rahu'] = {
+            'longitude': rahu_longitude,
+            'sign': rahu_sign,
+            'degree': rahu_longitude % 30,
+            'house': rahu_house
+        }
+        
+        planets['Ketu'] = {
+            'longitude': ketu_longitude,
+            'sign': ketu_sign,
+            'degree': ketu_longitude % 30,
+            'house': ketu_house
+        }
+        
         print(f"Calculated natal positions with houses: {planets}")
         return planets
     
@@ -445,11 +469,14 @@ async def _calculate_natal_positions(birth_data: dict) -> Dict:
         print(f"Error calculating natal positions: {e}")
         # Return fallback data
         return {
-            'Sun': {'longitude': 349.21, 'sign': 11, 'degree': 19.21},
-            'Moon': {'longitude': 188.45, 'sign': 6, 'degree': 8.45},
-            'Mars': {'longitude': 122.39, 'sign': 4, 'degree': 2.39},
-            'Mercury': {'longitude': 321.44, 'sign': 10, 'degree': 21.44},
-            'Jupiter': {'longitude': 127.54, 'sign': 4, 'degree': 7.54},
-            'Venus': {'longitude': 34.99, 'sign': 1, 'degree': 4.99},
-            'Saturn': {'longitude': 148.59, 'sign': 4, 'degree': 28.59}
+            'Sun': {'longitude': 349.21, 'sign': 11, 'degree': 19.21, 'house': 9},
+            'Moon': {'longitude': 188.45, 'sign': 6, 'degree': 8.45, 'house': 4},
+            'Mars': {'longitude': 122.39, 'sign': 4, 'degree': 2.39, 'house': 2},
+            'Mercury': {'longitude': 321.44, 'sign': 10, 'degree': 21.44, 'house': 8},
+            'Jupiter': {'longitude': 127.54, 'sign': 4, 'degree': 7.54, 'house': 2},
+            'Venus': {'longitude': 34.99, 'sign': 1, 'degree': 4.99, 'house': 11},
+            'Saturn': {'longitude': 148.59, 'sign': 4, 'degree': 28.59, 'house': 2},
+            'Rahu': {'longitude': 45.30, 'sign': 1, 'degree': 15.30, 'house': 11},
+            'Ketu': {'longitude': 225.30, 'sign': 7, 'degree': 15.30, 'house': 5},
+            'ascendant_sign': 3
         }

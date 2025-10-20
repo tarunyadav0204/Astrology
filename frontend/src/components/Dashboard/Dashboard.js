@@ -512,6 +512,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   <VedicTransitAspects 
                     birthData={birthData} 
                     onTimelineClick={handleTransitDateChange}
+                    natalChart={chartData}
                   />
                 </div>
               )}
@@ -683,6 +684,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 <VedicTransitAspects 
                   birthData={birthData} 
                   onTimelineClick={handleTransitDateChange}
+                  natalChart={chartData}
                 />
               </GridItem>
             </div>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './VedicTransitAspects.css';
+import PredictionPopup from './PredictionPopup';
 
-const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
+const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   const [aspectTimelines, setAspectTimelines] = useState({});
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [yearOffset, setYearOffset] = useState(0);
@@ -9,6 +10,9 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
   const [dashaTimeline, setDashaTimeline] = useState([]);
   const [showDashaRelevantOnly, setShowDashaRelevantOnly] = useState(false);
   const [dashaDataReady, setDashaDataReady] = useState(false);
+  const [showPredictionPopup, setShowPredictionPopup] = useState(false);
+  const [selectedAspect, setSelectedAspect] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
 
   useEffect(() => {
     // Clear cached timelines when birthData changes
@@ -241,6 +245,24 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
     });
   };
 
+  const handlePredictionClick = (aspect, period, event) => {
+    event.stopPropagation();
+    setSelectedAspect(aspect);
+    setSelectedPeriod(period);
+    setShowPredictionPopup(true);
+  };
+
+  const getDashaDataForPeriod = (period) => {
+    const periodDashas = getDashaForPeriod(period.start_date);
+    if (!periodDashas) return null;
+    
+    return {
+      mahadasha: periodDashas.mahadasha,
+      antardasha: periodDashas.antardasha,
+      pratyantardasha: periodDashas.pratyantardasha
+    };
+  };
+
   return (
     <div className="vedic-transit-aspects">
       {/* Year Navigation */}
@@ -306,8 +328,18 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
                   <button
                     key={pIndex}
                     className={`timeline-chip ${getPeriodClass(period, aspect)}`}
-                    onClick={() => onTimelineClick(new Date(period.peak_date || period.start_date))}
-                    title={`${period.start_date} to ${period.end_date}${getDashaContext(aspect, period) ? '\n' + getDashaContext(aspect, period) : ''}`}
+                    onClick={(e) => {
+                      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                        handlePredictionClick(aspect, period, e);
+                      } else {
+                        onTimelineClick(new Date(period.peak_date || period.start_date));
+                      }
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      handlePredictionClick(aspect, period, e);
+                    }}
+                    title={`${period.start_date} to ${period.end_date}${getDashaContext(aspect, period) ? '\n' + getDashaContext(aspect, period) : ''}\n\nRight-click or Shift+click for prediction`}
                   >
                     {formatPeriod(period)}
                   </button>
@@ -320,6 +352,16 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
           );
         })}
       </div>
+      
+      <PredictionPopup
+        isOpen={showPredictionPopup}
+        onClose={() => setShowPredictionPopup(false)}
+        aspect={selectedAspect}
+        period={selectedPeriod}
+        birthData={birthData}
+        natalChart={natalChart}
+        dashaData={selectedPeriod ? getDashaDataForPeriod(selectedPeriod) : null}
+      />
     </div>
   );
 };

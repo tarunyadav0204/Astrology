@@ -22,6 +22,7 @@ except ImportError:
 from marriage_analysis.marriage_analyzer import MarriageAnalyzer
 from nadi.services.nadi_service import router as nadi_router
 from vedic_transit_aspects import router as vedic_transit_router
+from vedic_predictions.api.prediction_endpoint import router as vedic_predictions_router
 
 # Load environment variables explicitly
 try:
@@ -50,6 +51,7 @@ app.include_router(settings_router, prefix="/api")
 app.include_router(house_combinations_router, prefix="/api")
 app.include_router(nadi_router, prefix="/api")
 app.include_router(vedic_transit_router, prefix="/api")
+app.include_router(vedic_predictions_router)
 
 # Root endpoint for health check
 @app.get("/")

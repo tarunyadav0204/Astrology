@@ -1,0 +1,919 @@
+.prediction-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.prediction-popup {
+  background: rgba(255, 255, 255, 0.98);
+  color: #333;
+  border-radius: 20px;
+  max-width: 800px;
+  width: 95%;
+  max-height: 95vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%) !important;
+  color: white !important;
+  flex-shrink: 0;
+}
+
+.popup-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.4em;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 24px;
+  cursor: pointer;
+  color: white;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.popup-content {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #ff6f00;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #d32f2f;
+}
+
+.error-state button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: #ff6f00;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.aspect-summary {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.aspect-summary h4 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 1.2em;
+}
+
+.period-info {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.peak-date {
+  font-weight: 500;
+  color: #ff6f00;
+}
+
+.prediction-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.theme-section,
+.timing,
+.intensity,
+.affected-areas {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.theme-section h5,
+.timing h5,
+.intensity h5,
+.effects-section h5,
+.affected-areas h5,
+.context-notes h5,
+.remedies-section h5 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.timing-intensity {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+.intensity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.intensity-value {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.dasha-relevant {
+  font-size: 0.8em;
+  background: linear-gradient(45deg, #ffd700, #ffed4e);
+  color: #333;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.effects-section {
+  background: rgba(248, 249, 250, 0.9);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.effect {
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.effect:last-child {
+  margin-bottom: 0;
+}
+
+.effect.positive {
+  border-left: 4px solid #4caf50;
+  padding-left: 12px;
+}
+
+.effect.negative {
+  border-left: 4px solid #f44336;
+  padding-left: 12px;
+}
+
+.effect.neutral {
+  border-left: 4px solid #ff9800;
+  padding-left: 12px;
+}
+
+.areas-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.area-tag {
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.8em;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.area-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.house-area-group[data-house="2"] .area-tag {
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
+}
+
+.house-area-group[data-house="5"] .area-tag {
+  background: linear-gradient(135deg, #2196f3, #42a5f5);
+}
+
+.house-area-group[data-house="9"] .area-tag {
+  background: linear-gradient(135deg, #ff9800, #ffb74d);
+}
+
+.house-area-group[data-house="10"] .area-tag {
+  background: linear-gradient(135deg, #9c27b0, #ba68c8);
+}
+
+.house-area-group[data-house="1"] .area-tag {
+  background: linear-gradient(135deg, #f44336, #ef5350);
+}
+
+.house-area-group[data-house="3"] .area-tag {
+  background: linear-gradient(135deg, #00bcd4, #26c6da);
+}
+
+.house-area-group[data-house="4"] .area-tag {
+  background: linear-gradient(135deg, #795548, #8d6e63);
+}
+
+.house-area-group[data-house="6"] .area-tag {
+  background: linear-gradient(135deg, #607d8b, #78909c);
+}
+
+.house-area-group[data-house="7"] .area-tag {
+  background: linear-gradient(135deg, #e91e63, #ec407a);
+}
+
+.house-area-group[data-house="8"] .area-tag {
+  background: linear-gradient(135deg, #3f51b5, #5c6bc0);
+}
+
+.house-area-group[data-house="11"] .area-tag {
+  background: linear-gradient(135deg, #8bc34a, #9ccc65);
+}
+
+.house-area-group[data-house="12"] .area-tag {
+  background: linear-gradient(135deg, #ff5722, #ff7043);
+}
+
+.context-notes {
+  background: #fff3e0;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #ff9800;
+}
+
+.lordship-context {
+  background: #e8f5e8;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #4caf50;
+}
+
+.activation-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background: rgba(240, 248, 255, 0.9);
+  padding: 16px;
+  border-radius: 12px;
+  border-left: 4px solid #4a90e2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.activated-planets h5,
+.activated-houses h5 {
+  margin: 0 0 8px 0;
+  color: #1976d2;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.planet-list,
+.house-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.house-activation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planet-tag {
+  background: linear-gradient(135deg, #ffeb3b, #ffc107);
+  color: #f57f17;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+  border: 1px solid rgba(245, 127, 23, 0.2);
+}
+
+.house-tag {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  color: #1976d2;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  min-width: 32px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(25, 118, 210, 0.2);
+  border: 1px solid rgba(25, 118, 210, 0.1);
+}
+
+.house-reasons {
+  font-size: 0.75em;
+  color: #666;
+  font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .activation-summary {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.remedies-section {
+  background: rgba(240, 255, 240, 0.9);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #c8e6c8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.remedy-group {
+  margin-bottom: 12px;
+}
+
+.remedy-group:last-child {
+  margin-bottom: 0;
+}
+
+.remedy-group strong {
+  color: #7b1fa2;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.remedy-group ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+}
+
+.remedy-group li {
+  margin-bottom: 2px;
+  font-size: 0.9em;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .prediction-popup-overlay {
+    padding: 5px;
+  }
+  
+  .prediction-popup {
+    max-width: 98%;
+    width: 98%;
+    max-height: 98vh;
+    border-radius: 8px;
+  }
+  
+  .popup-header {
+    padding: 16px 20px 12px;
+  }
+  
+  .popup-content {
+    padding: 16px 20px 20px;
+  }
+  
+  .timing-intensity {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .period-info {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .prediction-popup {
+    max-width: 100%;
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .prediction-popup-overlay {
+    padding: 0;
+  }
+}
+.dasha-hierarchy {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: nowrap;
+}
+
+.dasha-label {
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+.dasha-chain {
+  display: flex;
+  align-items: center;
+  font-size: 0.85em;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.dasha-planet {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f0f0f0;
+  color: #333;
+  white-space: nowrap;
+}
+
+.dasha-planet.active-planet {
+  background: #ffd700;
+  color: #000;
+  font-weight: bold;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+}
+
+.dasha-arrow {
+  color: #666;
+  font-weight: bold;
+  margin: 0 2px;
+}
+.house-areas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.house-area-group {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.house-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9em;
+}
+.dignity-section {
+  background: rgba(255, 248, 220, 0.9);
+  padding: 16px;
+  border-radius: 12px;
+  border-left: 4px solid #daa520;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.dignity-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.dignity-status {
+  font-weight: 600;
+  color: #b8860b;
+  text-transform: capitalize;
+}
+
+.dignity-modifier {
+  background: linear-gradient(135deg, #daa520, #ffd700);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.dignity-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.functional-nature {
+  font-size: 0.85em;
+  color: #8b4513;
+  font-style: italic;
+}
+
+.planetary-analysis-section {
+  margin: 15px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.planets-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.planet-analysis {
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.natal-planet {
+  background: #e8f5e8;
+  border-left: 3px solid #28a745;
+}
+
+.transiting-planet {
+  background: #fff3cd;
+  border-left: 3px solid #ffc107;
+}
+
+.planet-analysis h6 {
+  margin: 0 0 8px 0;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.planet-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planet-details .dignity-status {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #495057;
+}
+
+.planet-details .functional-nature {
+  font-size: 0.8em;
+  color: #666;
+  font-style: italic;
+}
+
+.planet-details .strength-value {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #007bff;
+}
+
+@media (max-width: 600px) {
+  .planets-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.nakshatra-analysis-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9ff, #e8f4fd);
+  border-radius: 12px;
+  border-left: 4px solid #2196f3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.nakshatra-summary {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border-left: 3px solid #2196f3;
+}
+
+.summary-text {
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.4;
+  color: #2c3e50;
+}
+
+.nakshatra-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nakshatra-positions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.nakshatra-position {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid #e3f2fd;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nakshatra-position h6 {
+  margin: 0;
+  font-size: 0.85em;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.nakshatra-name {
+  font-size: 1em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.pada-info {
+  font-size: 0.8em;
+  color: #666;
+  font-style: italic;
+}
+
+.compatibility-score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid #e3f2fd;
+}
+
+.score-label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.score-value {
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+.timing-precision {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid #e3f2fd;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timing-precision h6 {
+  margin: 0;
+  font-size: 0.9em;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.timing-intensity {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #ff9800;
+}
+
+.timing-note {
+  font-size: 0.8em;
+  color: #666;
+  font-style: italic;
+}
+
+.nakshatra-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.effect-group {
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid;
+}
+
+.effect-group.positive {
+  background: rgba(76, 175, 80, 0.1);
+  border-left-color: #4caf50;
+}
+
+.effect-group.negative {
+  background: rgba(244, 67, 54, 0.1);
+  border-left-color: #f44336;
+}
+
+.effect-group.neutral {
+  background: rgba(255, 152, 0, 0.1);
+  border-left-color: #ff9800;
+}
+
+.effect-group strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+}
+
+.effect-group ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.effect-group li {
+  font-size: 0.85em;
+  line-height: 1.3;
+  margin-bottom: 4px;
+  color: #2c3e50;
+}
+
+.timing-advice {
+  padding: 12px;
+  background: rgba(156, 39, 176, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #9c27b0;
+}
+
+.timing-advice strong {
+  color: #7b1fa2;
+  font-size: 0.9em;
+}
+
+@media (max-width: 600px) {
+  .nakshatra-positions {
+    grid-template-columns: 1fr;
+  }
+  
+  .compatibility-score {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+
+.combustion-status {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.combustion-status.combust {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.combustion-status.cazimi {
+  background-color: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffcc02;
+}
+
+.retrograde-status {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.retrograde-status.retrograde {
+  background-color: #e8eaf6;
+  color: #3f51b5;
+  border: 1px solid #c5cae9;
+}
+
+.retrograde-status.stationary {
+  background-color: #fce4ec;
+  color: #e91e63;
+  border: 1px solid #f8bbd9;
+}
+
+.retrograde-effects-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  border-radius: 12px;
+  border-left: 4px solid #9c27b0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.retrograde-planet-effects {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid #e1bee7;
+}
+
+.retrograde-planet-effects h6 {
+  margin: 0 0 8px 0;
+  color: #7b1fa2;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.retrograde-significations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.enhanced-qualities {
+  font-size: 0.85em;
+  color: #2e7d32;
+}
+
+.modified-effects {
+  font-size: 0.85em;
+  color: #d84315;
+}
+
+.enhanced-qualities strong,
+.modified-effects strong {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.benefic-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.natural-nature {
+  font-size: 0.8em;
+  color: #2e7d32;
+  font-style: italic;
+}
+
+.temporal-benefic {
+  font-size: 0.8em;
+  color: #ff6f00;
+  font-weight: 600;
+  background: linear-gradient(135deg, #fff3e0, #ffcc02);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #ffb74d;
+}
