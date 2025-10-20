@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Connectivity Test</h1>
+    <button onclick="testAPI()">Test API Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Testing...';
+            
+            try {
+                // Test different API endpoints
+                const endpoints = [
+                    'https://astroclick.net/api/',
+                    'https://astroclick.net:8001/',
+                    'https://astroclick.net/api/health',
+                    'https://astroclick.net:8001/api/health'
+                ];
+                
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(endpoint, { 
+                            method: 'GET',
+                            timeout: 5000 
+                        });
+                        result.innerHTML += `<p>${endpoint}: ${response.status} - ${response.ok ? 'OK' : 'Failed'}</p>`;
+                    } catch (error) {
+                        result.innerHTML += `<p>${endpoint}: Error - ${error.message}</p>`;
+                    }
+                }
+            } catch (error) {
+                result.innerHTML = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
