@@ -273,6 +273,158 @@ class VedicTransitAspectCalculator:
         date2 = datetime.strptime(date2_str, '%Y-%m-%d')
         return (date2 - date1).days <= max_days
     
+    def calculate_nakshatra_timeline(self, transit_planet: str, natal_planet: str, 
+                                   start_year: int, year_range: int, natal_planets: Dict, 
+                                   request_data: Dict) -> List[Dict]:
+        """Calculate when transiting planet enters natal planet's nakshatra for activation"""
+        timeline = []
+        
+        # Get the target nakshatra to transit through
+        natal_data = natal_planets.get(natal_planet, {})
+        if not natal_data:
+            print(f"[NAKSHATRA_DEBUG] No natal data found for {natal_planet}")
+            return []
+            
+        target_nakshatra = self._get_nakshatra_from_longitude(natal_data['longitude'])
+        enhancement_type = request_data.get('enhancement_type', 'natal_nakshatra')
+        
+        print(f"[NAKSHATRA_DEBUG] Natal {natal_planet} longitude: {natal_data['longitude']:.2f}°")
+        print(f"[NAKSHATRA_DEBUG] Natal {natal_planet} nakshatra: {target_nakshatra}")
+        print(f"[NAKSHATRA_DEBUG] Looking for {transit_planet} transits through {target_nakshatra}")
+        
+        print(f"[NAKSHATRA_DEBUG] === CALCULATING NAKSHATRA TIMELINE ===")
+        print(f"[NAKSHATRA_DEBUG] Transit {transit_planet} entering {natal_planet}'s nakshatra ({target_nakshatra})")
+        print(f"[NAKSHATRA_DEBUG] Enhancement type: {enhancement_type}")
+        
+        # Calculate nakshatra boundaries (each nakshatra = 13°20' = 13.333°)
+        nakshatra_names = [
+            'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+            'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+            'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+            'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+            'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
+        ]
+        
+        try:
+            nakshatra_index = nakshatra_names.index(target_nakshatra)
+            nakshatra_start = nakshatra_index * 13.333333
+            nakshatra_end = (nakshatra_index + 1) * 13.333333
+            
+            print(f"[NAKSHATRA_DEBUG] Target nakshatra {target_nakshatra} spans {nakshatra_start:.2f}° to {nakshatra_end:.2f}°")
+            
+            # Date range for calculation
+            start_date = datetime(start_year, 1, 1)
+            end_date = datetime(start_year + year_range, 12, 31)
+            current_date = start_date
+            
+            step_days = 30  # Monthly steps for faster calculation
+            in_nakshatra = False
+            period_start_date = None
+            
+            while current_date <= end_date:
+                transit_position = self._get_planet_position(current_date, transit_planet)
+                
+                if transit_position is not None:
+                    # Check if transit planet is in target nakshatra
+                    is_in_target_nakshatra = self._is_in_nakshatra_range(
+                        transit_position, nakshatra_start, nakshatra_end
+                    )
+                    
+                    if is_in_target_nakshatra:
+                        if not in_nakshatra:
+                            # Start new nakshatra period
+                            in_nakshatra = True
+                            period_start_date = current_date
+                            print(f"[NAKSHATRA_DEBUG] Started nakshatra period: {current_date.strftime('%Y-%m-%d')}")
+                            print(f"[NAKSHATRA_DEBUG] Transit {transit_planet} at {transit_position:.1f}° on {current_date.strftime('%Y-%m-%d')}")
+                    else:
+                        if in_nakshatra:
+                            # End current nakshatra period
+                            in_nakshatra = False
+                            if period_start_date:
+                                timeline.append({
+                                    'start_date': period_start_date.strftime('%Y-%m-%d'),
+                                    'end_date': current_date.strftime('%Y-%m-%d'),
+                                    'peak_date': period_start_date.strftime('%Y-%m-%d')
+                                })
+                                print(f"[NAKSHATRA_DEBUG] Ended nakshatra period: {period_start_date.strftime('%Y-%m-%d')} to {current_date.strftime('%Y-%m-%d')}")
+                                print(f"[NAKSHATRA_DEBUG] Transit {transit_planet} at {transit_position:.1f}° on {current_date.strftime('%Y-%m-%d')}")
+                                period_start_date = None
+                else:
+                    # No planet position, end any current period
+                    if in_nakshatra:
+                        in_nakshatra = False
+                        if period_start_date:
+                            timeline.append({
+                                'start_date': period_start_date.strftime('%Y-%m-%d'),
+                                'end_date': current_date.strftime('%Y-%m-%d'),
+                                'peak_date': period_start_date.strftime('%Y-%m-%d')
+                            })
+                            period_start_date = None
+                
+                current_date += timedelta(days=step_days)
+            
+            # Handle case where nakshatra period continues to end of range
+            if in_nakshatra and period_start_date:
+                timeline.append({
+                    'start_date': period_start_date.strftime('%Y-%m-%d'),
+                    'end_date': end_date.strftime('%Y-%m-%d'),
+                    'peak_date': period_start_date.strftime('%Y-%m-%d')
+                })
+            
+            print(f"[NAKSHATRA_DEBUG] Found {len(timeline)} nakshatra activation periods")
+            for period in timeline:
+                print(f"[NAKSHATRA_DEBUG] Period: {period['start_date']} to {period['end_date']}")
+            if len(timeline) == 0:
+                print(f"[NAKSHATRA_DEBUG] No periods found for {transit_planet} transiting through {target_nakshatra}")
+                print(f"[NAKSHATRA_DEBUG] This could mean {transit_planet} doesn't transit through this nakshatra in {start_year}")
+                
+                # Show Jupiter's position at start and end of year for context
+                start_pos = self._get_planet_position(start_date, transit_planet)
+                end_pos = self._get_planet_position(end_date, transit_planet)
+                if start_pos and end_pos:
+                    start_nak = self._get_nakshatra_from_longitude(start_pos)
+                    end_nak = self._get_nakshatra_from_longitude(end_pos)
+                    print(f"[NAKSHATRA_DEBUG] {transit_planet} position: {start_pos:.1f}° ({start_nak}) to {end_pos:.1f}° ({end_nak}) in {start_year}")
+                    print(f"[NAKSHATRA_DEBUG] Target range: {nakshatra_start:.1f}° to {nakshatra_end:.1f}° ({target_nakshatra})")
+                    
+                    # Calculate approximate years when Jupiter was/will be in target nakshatra
+                    if transit_planet == 'Jupiter':
+                        current_pos = (start_pos + end_pos) / 2
+                        target_pos = (nakshatra_start + nakshatra_end) / 2
+                        
+                        # Handle 360° wraparound
+                        if target_pos < current_pos:
+                            target_pos += 360
+                        
+                        degrees_to_travel = target_pos - current_pos
+                        years_to_target = degrees_to_travel / 30  # Jupiter moves ~30°/year
+                        target_year = start_year + int(years_to_target)
+                        
+                        # Also calculate when it was last there (12 years ago)
+                        last_year = target_year - 12
+                        
+                        print(f"[NAKSHATRA_DEBUG] Jupiter was last in {target_nakshatra}: ~{last_year}")
+                        print(f"[NAKSHATRA_DEBUG] Jupiter will next be in {target_nakshatra}: ~{target_year}")
+            return timeline
+            
+        except ValueError:
+            print(f"[NAKSHATRA_DEBUG] Unknown nakshatra: {target_nakshatra}")
+            return []
+        except Exception as e:
+            print(f"[NAKSHATRA_DEBUG] Error calculating nakshatra timeline: {e}")
+            return []
+    
+    def _is_in_nakshatra_range(self, longitude: float, start: float, end: float) -> bool:
+        """Check if longitude is within nakshatra range (handles 360° wraparound)"""
+        # Normalize longitude to 0-360
+        longitude = longitude % 360
+        
+        if start <= end:
+            return start <= longitude <= end
+        else:  # Range crosses 0° (e.g., Revati to Ashwini)
+            return longitude >= start or longitude <= end
+    
     def _get_nakshatra_from_longitude(self, longitude: float) -> str:
         """Get nakshatra name from longitude"""
         nakshatra_names = [
@@ -382,20 +534,23 @@ async def get_vedic_transit_timeline(request: Request):
     start_year = request_data.get('start_year', datetime.now().year)
     year_range = request_data.get('year_range', 1)
     
+    # Get natal planet information
+    natal_planets = await _calculate_natal_positions(birth_data)
+    
     # Handle nakshatra-only connections
     if aspect_type == 'nakshatra_connection':
+        timeline = vedic_calculator.calculate_nakshatra_timeline(
+            planet1, planet2, start_year, year_range, natal_planets, request_data
+        )
         return {
-            'timeline': [],  # No timeline for pure nakshatra connections
+            'timeline': timeline,
             'start_year': start_year,
-            'year_range': year_range,
-            'message': 'Nakshatra connections are permanent - no timeline needed'
+            'year_range': year_range
         }
     
     # Extract aspect house number from aspect_type
     aspect_house = int(aspect_type.replace('th_house', ''))
     
-    # Get natal planet information
-    natal_planets = await _calculate_natal_positions(birth_data)
     natal_planet_data = natal_planets.get(planet2, {})
     natal_longitude = natal_planet_data.get('longitude', 0)
     natal_house = natal_planet_data.get('house', 1)

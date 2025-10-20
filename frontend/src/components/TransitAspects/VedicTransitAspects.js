@@ -80,7 +80,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
           planet2: aspect.planet2,
           start_year: year,
           year_range: 1,
-          required_transit_house: aspect.required_transit_house
+          required_transit_house: aspect.required_transit_house,
+          enhancement_type: aspect.enhancement_type
         })
       });
       
@@ -307,7 +308,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev - 1)}
-            disabled={yearOffset <= -3}
+            disabled={yearOffset <= -10}
           >
             ←
           </button>
@@ -328,7 +329,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick }) => {
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev + 1)}
-            disabled={yearOffset >= 3}
+            disabled={yearOffset >= 10}
           >
             →
           </button>
