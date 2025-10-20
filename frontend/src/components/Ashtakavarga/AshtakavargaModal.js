@@ -18,7 +18,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate 
 
   const fetchAshtakavarga = async () => {
     setLoading(true);
-    const apiUrl = `${API_BASE_URL}/api/calculate-ashtakavarga`;
+    const apiUrl = `${API_BASE_URL}/calculate-ashtakavarga`;
     console.log('Fetching Ashtakavarga data...', { birthData, chartType, apiUrl });
     try {
       const token = localStorage.getItem('token');
