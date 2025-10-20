@@ -23,25 +23,25 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
   // South Indian chart - fixed 4x4 grid positions (signs don't rotate)
   const gridPositions = [
     // Row 1
-    { x: 0, y: 0, width: 75, height: 75, sign: 11 },     // Pisces
-    { x: 75, y: 0, width: 75, height: 75, sign: 0 },     // Aries  
-    { x: 150, y: 0, width: 75, height: 75, sign: 1 },    // Taurus
-    { x: 225, y: 0, width: 75, height: 75, sign: 2 },    // Gemini
+    { x: 0, y: 0, width: 85, height: 85, sign: 11 },     // Pisces
+    { x: 85, y: 0, width: 85, height: 85, sign: 0 },     // Aries  
+    { x: 170, y: 0, width: 85, height: 85, sign: 1 },    // Taurus
+    { x: 255, y: 0, width: 85, height: 85, sign: 2 },    // Gemini
     // Row 2
-    { x: 0, y: 75, width: 75, height: 75, sign: 10 },    // Aquarius
-    { x: 75, y: 75, width: 75, height: 75, sign: -1 },   // Empty
-    { x: 150, y: 75, width: 75, height: 75, sign: -1 },  // Empty
-    { x: 225, y: 75, width: 75, height: 75, sign: 3 },   // Cancer
+    { x: 0, y: 85, width: 85, height: 85, sign: 10 },    // Aquarius
+    { x: 85, y: 85, width: 85, height: 85, sign: -1 },   // Empty
+    { x: 170, y: 85, width: 85, height: 85, sign: -1 },  // Empty
+    { x: 255, y: 85, width: 85, height: 85, sign: 3 },   // Cancer
     // Row 3
-    { x: 0, y: 150, width: 75, height: 75, sign: 9 },    // Capricorn
-    { x: 75, y: 150, width: 75, height: 75, sign: -1 },  // Empty
-    { x: 150, y: 150, width: 75, height: 75, sign: -1 }, // Empty
-    { x: 225, y: 150, width: 75, height: 75, sign: 4 },  // Leo
+    { x: 0, y: 170, width: 85, height: 85, sign: 9 },    // Capricorn
+    { x: 85, y: 170, width: 85, height: 85, sign: -1 },  // Empty
+    { x: 170, y: 170, width: 85, height: 85, sign: -1 }, // Empty
+    { x: 255, y: 170, width: 85, height: 85, sign: 4 },  // Leo
     // Row 4
-    { x: 0, y: 225, width: 75, height: 75, sign: 8 },    // Sagittarius
-    { x: 75, y: 225, width: 75, height: 75, sign: 7 },   // Scorpio
-    { x: 150, y: 225, width: 75, height: 75, sign: 6 },  // Libra
-    { x: 225, y: 225, width: 75, height: 75, sign: 5 }   // Virgo
+    { x: 0, y: 255, width: 85, height: 85, sign: 8 },    // Sagittarius
+    { x: 85, y: 255, width: 85, height: 85, sign: 7 },   // Scorpio
+    { x: 170, y: 255, width: 85, height: 85, sign: 6 },  // Libra
+    { x: 255, y: 255, width: 85, height: 85, sign: 5 }   // Virgo
   ];
 
   useEffect(() => {
@@ -407,13 +407,13 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
         </div>
       )}
       <svg 
-        viewBox="0 0 300 320"
+        viewBox="0 0 340 360"
         style={{ 
           width: '100%', 
           height: window.innerWidth <= 768 ? 'auto' : '100%',
-          minHeight: window.innerWidth <= 768 ? '350px' : '280px',
+          minHeight: window.innerWidth <= 768 ? '380px' : '320px',
           maxWidth: '100%',
-          aspectRatio: window.innerWidth <= 768 ? '300/320' : 'auto'
+          aspectRatio: window.innerWidth <= 768 ? '340/360' : 'auto'
         }}
         preserveAspectRatio="xMidYMid meet"
       >
@@ -427,34 +427,34 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
       </defs>
       
       {/* Outer border */}
-      <rect x="0" y="0" width="300" height="300" 
+      <rect x="0" y="0" width="340" height="340" 
             fill="url(#southChartGradient)" stroke="#e91e63" strokeWidth="3"/>
       
       {/* Outer house divisions - no center grid */}
       {/* Top row divisions */}
-      <line x1="75" y1="0" x2="75" y2="75" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="150" y1="0" x2="150" y2="75" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="225" y1="0" x2="225" y2="75" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="85" y1="0" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="170" y1="0" x2="170" y2="85" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="255" y1="0" x2="255" y2="85" stroke="#ff8a65" strokeWidth="2"/>
       {/* Bottom row divisions */}
-      <line x1="75" y1="225" x2="75" y2="300" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="150" y1="225" x2="150" y2="300" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="225" y1="225" x2="225" y2="300" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="85" y1="255" x2="85" y2="340" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="170" y1="255" x2="170" y2="340" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="255" y1="255" x2="255" y2="340" stroke="#ff8a65" strokeWidth="2"/>
       {/* Left column divisions */}
-      <line x1="0" y1="75" x2="75" y2="75" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="0" y1="150" x2="75" y2="150" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="0" y1="225" x2="75" y2="225" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="0" y1="85" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="0" y1="170" x2="85" y2="170" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="0" y1="255" x2="85" y2="255" stroke="#ff8a65" strokeWidth="2"/>
       {/* Right column divisions */}
-      <line x1="225" y1="75" x2="300" y2="75" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="225" y1="150" x2="300" y2="150" stroke="#ff8a65" strokeWidth="2"/>
-      <line x1="225" y1="225" x2="300" y2="225" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="255" y1="85" x2="340" y2="85" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="255" y1="170" x2="340" y2="170" stroke="#ff8a65" strokeWidth="2"/>
+      <line x1="255" y1="255" x2="340" y2="255" stroke="#ff8a65" strokeWidth="2"/>
       {/* Inner borders of outer houses */}
-      <line x1="0" y1="75" x2="300" y2="75" stroke="#ff6f00" strokeWidth="3"/>
-      <line x1="0" y1="225" x2="300" y2="225" stroke="#ff6f00" strokeWidth="3"/>
-      <line x1="75" y1="0" x2="75" y2="300" stroke="#ff6f00" strokeWidth="3"/>
-      <line x1="225" y1="0" x2="225" y2="300" stroke="#ff6f00" strokeWidth="3"/>
+      <line x1="0" y1="85" x2="340" y2="85" stroke="#ff6f00" strokeWidth="3"/>
+      <line x1="0" y1="255" x2="340" y2="255" stroke="#ff6f00" strokeWidth="3"/>
+      <line x1="85" y1="0" x2="85" y2="340" stroke="#ff6f00" strokeWidth="3"/>
+      <line x1="255" y1="0" x2="255" y2="340" stroke="#ff6f00" strokeWidth="3"/>
 
       {/* Instruction text */}
-      <text x="150" y="310" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
+      <text x="170" y="350" fontSize="9" fill="#666" textAnchor="middle" fontStyle="italic">
         Hover or touch planets to see Nakshatra and degree
       </text>
       
@@ -506,7 +506,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                   } else {
                     // Stack all multiple planets vertically with increased spacing for 2-line layout
                     planetX = pos.x + pos.width / 2;
-                    const lineHeight = totalPlanets > 4 ? 16 : totalPlanets > 2 ? 18 : 20;
+                    const lineHeight = totalPlanets > 4 ? 22 : totalPlanets > 2 ? 24 : 26;
                     const startY = pos.y + pos.height / 2 + (isDoubleDigitHouse ? 5 : 2) - ((totalPlanets - 1) * lineHeight / 2);
                     planetY = startY + (pIndex * lineHeight);
                   }
@@ -524,8 +524,8 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                       )}
                       {/* Planet symbol */}
                       <text x={planetX} 
-                            y={planetY - 6} 
-                            fontSize={totalPlanets > 4 ? "9" : totalPlanets > 2 ? "11" : totalPlanets > 1 ? "12" : "15"} 
+                            y={planetY - 8} 
+                            fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : totalPlanets > 1 ? "12" : "14"} 
                             fill={getPlanetColor(planet)}
                             fontWeight="900"
                             textAnchor="middle"
@@ -560,8 +560,8 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                       {/* Degree and Nakshatra combined */}
                       {showDegreeNakshatra && (
                         <text x={planetX} 
-                              y={planetY + 6} 
-                              fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "8" : totalPlanets > 1 ? "8" : "9"} 
+                              y={planetY + 8} 
+                              fontSize={totalPlanets > 4 ? "6" : totalPlanets > 2 ? "7" : totalPlanets > 1 ? "8" : "9"} 
                               fill="#666"
                               fontWeight="500"
                               textAnchor="middle"
