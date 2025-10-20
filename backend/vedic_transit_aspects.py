@@ -39,6 +39,13 @@ class VedicTransitAspectCalculator:
         # Focus on slow-moving planets for meaningful transits
         self.transit_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu', 'Mars']
         self.natal_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        
+        # Gandanta points - critical junction degrees between water and fire signs
+        self.gandanta_points = [
+            {'name': 'Pisces-Aries', 'water_end': 360.0, 'fire_start': 0.0, 'range': 3.0},  # 27° Pisces to 3° Aries
+            {'name': 'Cancer-Leo', 'water_end': 120.0, 'fire_start': 120.0, 'range': 3.0},   # 27° Cancer to 3° Leo  
+            {'name': 'Scorpio-Sagittarius', 'water_end': 240.0, 'fire_start': 240.0, 'range': 3.0}  # 27° Scorpio to 3° Sagittarius
+        ]
     
     def calculate_vedic_aspects(self, natal_planets: Dict) -> List[Dict]:
         """Calculate enhanced Vedic transit aspects including nakshatra connections"""
@@ -74,6 +81,9 @@ class VedicTransitAspectCalculator:
         
         # 2. Nakshatra-enhanced aspects (new logic)
         aspects.extend(self._find_nakshatra_enhanced_aspects(natal_planets))
+        
+        # 3. Gandanta point aspects (critical junction transits)
+        aspects.extend(self._find_gandanta_aspects(natal_planets))
         
         print(f"Total enhanced transit aspects created: {len(aspects)}")
         return aspects
@@ -415,6 +425,120 @@ class VedicTransitAspectCalculator:
             print(f"[NAKSHATRA_DEBUG] Error calculating nakshatra timeline: {e}")
             return []
     
+    def calculate_gandanta_timeline(self, transit_planet: str, natal_planet: str,
+                                  start_year: int, year_range: int, natal_planets: Dict,
+                                  request_data: Dict) -> List[Dict]:
+        """Calculate when transiting planet crosses Gandanta points to activate natal planet"""
+        timeline = []
+        
+        # Get natal planet's Gandanta point
+        natal_data = natal_planets.get(natal_planet, {})
+        if not natal_data:
+            print(f"[GANDANTA_DEBUG] No natal data found for {natal_planet}")
+            return []
+        
+        natal_longitude = natal_data['longitude']
+        gandanta_info = self._is_at_gandanta_point(natal_longitude)
+        
+        if not gandanta_info:
+            print(f"[GANDANTA_DEBUG] {natal_planet} is not at a Gandanta point")
+            return []
+        
+        print(f"[GANDANTA_DEBUG] === CALCULATING GANDANTA TIMELINE ===")
+        print(f"[GANDANTA_DEBUG] Natal {natal_planet} at {gandanta_info['name']} Gandanta ({natal_longitude:.2f}°)")
+        print(f"[GANDANTA_DEBUG] Looking for {transit_planet} transits through {gandanta_info['name']} junction")
+        
+        # Define Gandanta ranges for transit calculation
+        gandanta_ranges = {
+            'Pisces-Aries': [(357.0, 360.0), (0.0, 3.0)],  # Split range due to 360° wraparound
+            'Cancer-Leo': [(117.0, 123.0)],
+            'Scorpio-Sagittarius': [(237.0, 243.0)]
+        }
+        
+        target_ranges = gandanta_ranges.get(gandanta_info['name'], [])
+        print(f"[GANDANTA_DEBUG] Target Gandanta ranges: {target_ranges}")
+        
+        try:
+            # Date range for calculation
+            start_date = datetime(start_year, 1, 1)
+            end_date = datetime(start_year + year_range, 12, 31)
+            current_date = start_date
+            
+            step_days = 7  # Weekly steps
+            in_gandanta = False
+            period_start_date = None
+            
+            while current_date <= end_date:
+                transit_position = self._get_planet_position(current_date, transit_planet)
+                
+                if transit_position is not None:
+                    # Check if transit planet is in any of the target Gandanta ranges
+                    is_in_gandanta = False
+                    for range_start, range_end in target_ranges:
+                        if self._is_in_gandanta_range(transit_position, range_start, range_end):
+                            is_in_gandanta = True
+                            break
+                    
+                    if is_in_gandanta:
+                        if not in_gandanta:
+                            # Start new Gandanta period
+                            in_gandanta = True
+                            period_start_date = current_date
+                            print(f"[GANDANTA_DEBUG] Started Gandanta period: {current_date.strftime('%Y-%m-%d')}")
+                            print(f"[GANDANTA_DEBUG] Transit {transit_planet} at {transit_position:.1f}°")
+                    else:
+                        if in_gandanta:
+                            # End current Gandanta period
+                            in_gandanta = False
+                            if period_start_date:
+                                timeline.append({
+                                    'start_date': period_start_date.strftime('%Y-%m-%d'),
+                                    'end_date': current_date.strftime('%Y-%m-%d'),
+                                    'peak_date': period_start_date.strftime('%Y-%m-%d')
+                                })
+                                print(f"[GANDANTA_DEBUG] Ended Gandanta period: {period_start_date.strftime('%Y-%m-%d')} to {current_date.strftime('%Y-%m-%d')}")
+                                period_start_date = None
+                else:
+                    # No planet position, end any current period
+                    if in_gandanta:
+                        in_gandanta = False
+                        if period_start_date:
+                            timeline.append({
+                                'start_date': period_start_date.strftime('%Y-%m-%d'),
+                                'end_date': current_date.strftime('%Y-%m-%d'),
+                                'peak_date': period_start_date.strftime('%Y-%m-%d')
+                            })
+                            period_start_date = None
+                
+                current_date += timedelta(days=step_days)
+            
+            # Handle case where Gandanta period continues to end of range
+            if in_gandanta and period_start_date:
+                timeline.append({
+                    'start_date': period_start_date.strftime('%Y-%m-%d'),
+                    'end_date': end_date.strftime('%Y-%m-%d'),
+                    'peak_date': period_start_date.strftime('%Y-%m-%d')
+                })
+            
+            print(f"[GANDANTA_DEBUG] Found {len(timeline)} Gandanta activation periods")
+            for period in timeline:
+                print(f"[GANDANTA_DEBUG] Period: {period['start_date']} to {period['end_date']}")
+            
+            return timeline
+            
+        except Exception as e:
+            print(f"[GANDANTA_DEBUG] Error calculating Gandanta timeline: {e}")
+            return []
+    
+    def _is_in_gandanta_range(self, longitude: float, range_start: float, range_end: float) -> bool:
+        """Check if longitude is within Gandanta range (handles 360° wraparound)"""
+        longitude = longitude % 360
+        
+        if range_start <= range_end:
+            return range_start <= longitude <= range_end
+        else:  # Range crosses 0° (Pisces-Aries case)
+            return longitude >= range_start or longitude <= range_end
+    
     def _is_in_nakshatra_range(self, longitude: float, start: float, end: float) -> bool:
         """Check if longitude is within nakshatra range (handles 360° wraparound)"""
         # Normalize longitude to 0-360
@@ -494,6 +618,68 @@ class VedicTransitAspectCalculator:
         
         print(f"Total nakshatra enhanced aspects: {len(enhanced_aspects)}")
         return enhanced_aspects
+    
+    def _find_gandanta_aspects(self, natal_planets: Dict) -> List[Dict]:
+        """Find aspects for planets at or transiting through Gandanta points"""
+        gandanta_aspects = []
+        
+        print(f"\n=== FINDING GANDANTA ASPECTS ===")
+        
+        for transit_planet in self.transit_planets:
+            if transit_planet not in natal_planets:
+                continue
+                
+            for natal_planet in self.natal_planets:
+                if natal_planet not in natal_planets:
+                    continue
+                    
+                natal_data = natal_planets[natal_planet]
+                natal_longitude = natal_data['longitude']
+                
+                # Check if natal planet is at a Gandanta point
+                gandanta_info = self._is_at_gandanta_point(natal_longitude)
+                if gandanta_info:
+                    aspect_entry = {
+                        'planet1': transit_planet,
+                        'planet2': natal_planet,
+                        'aspect_type': 'gandanta_transit',
+                        'natal_longitude': natal_longitude,
+                        'natal_house': natal_data.get('house', 1),
+                        'aspect_house': None,
+                        'description': f'Transit {transit_planet} activating {natal_planet} at Gandanta point ({gandanta_info["name"]})',
+                        'enhancement_type': 'gandanta',
+                        'gandanta_point': gandanta_info['name'],
+                        'gandanta_degree': natal_longitude % 30,
+                        'is_gandanta': True
+                    }
+                    
+                    gandanta_aspects.append(aspect_entry)
+                    print(f"Added Gandanta aspect: {transit_planet} -> {natal_planet} at {gandanta_info['name']} ({natal_longitude:.2f}°)")
+        
+        print(f"Total Gandanta aspects: {len(gandanta_aspects)}")
+        return gandanta_aspects
+    
+    def _is_at_gandanta_point(self, longitude: float) -> Dict:
+        """Check if longitude is at a Gandanta point (within 3° of water-fire junction)"""
+        longitude = longitude % 360
+        
+        for gandanta in self.gandanta_points:
+            # Check Pisces-Aries junction (357° to 3°)
+            if gandanta['name'] == 'Pisces-Aries':
+                if longitude >= 357.0 or longitude <= 3.0:
+                    return gandanta
+            
+            # Check Cancer-Leo junction (117° to 123°)
+            elif gandanta['name'] == 'Cancer-Leo':
+                if 117.0 <= longitude <= 123.0:
+                    return gandanta
+            
+            # Check Scorpio-Sagittarius junction (237° to 243°)
+            elif gandanta['name'] == 'Scorpio-Sagittarius':
+                if 237.0 <= longitude <= 243.0:
+                    return gandanta
+        
+        return None
 
 # API endpoints
 vedic_calculator = VedicTransitAspectCalculator()
@@ -540,6 +726,17 @@ async def get_vedic_transit_timeline(request: Request):
     # Handle nakshatra-only connections
     if aspect_type == 'nakshatra_connection':
         timeline = vedic_calculator.calculate_nakshatra_timeline(
+            planet1, planet2, start_year, year_range, natal_planets, request_data
+        )
+        return {
+            'timeline': timeline,
+            'start_year': start_year,
+            'year_range': year_range
+        }
+    
+    # Handle Gandanta transit connections
+    if aspect_type == 'gandanta_transit':
+        timeline = vedic_calculator.calculate_gandanta_timeline(
             planet1, planet2, start_year, year_range, natal_planets, request_data
         )
         return {

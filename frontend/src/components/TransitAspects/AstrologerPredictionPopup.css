@@ -1,0 +1,1046 @@
+.astrologer-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.astrologer-popup {
+  background: rgba(255, 255, 255, 0.98);
+  color: #333;
+  border-radius: 20px;
+  max-width: 1000px;
+  width: 95%;
+  max-height: 95vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  position: relative;
+  z-index: 10000;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%) !important;
+  color: white !important;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.popup-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.4em;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 24px;
+  cursor: pointer;
+  color: white;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.popup-content {
+  padding: 30px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+}
+
+.astrologer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Technical Header */
+.technical-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 1px solid #eee;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid #4caf50;
+}
+
+.aspect-formula {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+.transit-planet {
+  color: #ff9800;
+}
+
+.aspect-symbol {
+  color: #666;
+}
+
+.natal-planet {
+  color: #2196f3;
+}
+
+.aspect-type {
+  color: #9e9e9e;
+  font-size: 0.9em;
+}
+
+.period-technical {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.intensity-badge {
+  background: #f44336;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+/* Planetary Grid */
+.planetary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.planet-card {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.planet-card.natal {
+  border-left: 4px solid #2196f3;
+}
+
+.planet-card.transiting {
+  border-left: 4px solid #ff9800;
+}
+
+.planet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.planet-header h4 {
+  margin: 0;
+  font-size: 1.05em;
+  color: #000;
+  font-weight: 600;
+}
+
+.house-position {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(25, 118, 210, 0.2);
+  border: 1px solid rgba(25, 118, 210, 0.1);
+}
+
+.technical-data {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.longitude-data,
+.dignity-row,
+.nature-row,
+.status-row,
+.strength-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85em;
+}
+
+.label {
+  color: #333;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.value {
+  color: #000;
+  font-weight: bold;
+}
+
+.dignity-badge {
+  color: white;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: bold;
+  text-transform: capitalize;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.nature-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nat-badge,
+.func-badge,
+.temp-badge,
+.stat-badge,
+.badhaka-badge,
+.maraka-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  white-space: nowrap;
+}
+
+.nat-badge {
+  background: #495057;
+  color: white;
+}
+
+.func-badge {
+  background: #4caf50;
+  color: white;
+}
+
+.temp-badge {
+  background: #ff9800;
+  color: white;
+}
+
+.stat-badge {
+  background: #e91e63;
+  color: white;
+}
+
+.badhaka-badge {
+  background: #ff5722;
+  color: white;
+}
+
+.maraka-badge {
+  background: #d32f2f;
+  color: white;
+}
+
+.status-badge {
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 0.7em;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.status-badge.combust {
+  background: #f44336;
+  color: white;
+}
+
+.status-badge.cazimi {
+  background: #ff9800;
+  color: white;
+}
+
+.status-badge.retrograde {
+  background: #9c27b0;
+  color: white;
+}
+
+.status-badge.stationary {
+  background: #e91e63;
+  color: white;
+}
+
+.status-badge.badhaka {
+  background: #ff5722;
+  color: white;
+}
+
+.status-badge.maraka {
+  background: #d32f2f;
+  color: white;
+}
+
+.strength-bar {
+  position: relative;
+  width: 80px;
+  height: 16px;
+  background: #e9ecef;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+}
+
+.strength-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.strength-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.7em;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 2px rgba(0,0,0,0.8);
+}
+
+/* Dasha Section */
+.dasha-section {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #9c27b0;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.dasha-section h5 {
+  margin: 0 0 8px 0;
+  color: #000;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.dasha-chain {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dasha-level {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dasha-planet {
+  padding: 4px 8px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: bold;
+  color: #212529;
+}
+
+.dasha-planet.active {
+  background: #9c27b0;
+  color: white;
+}
+
+.dasha-arrow {
+  color: #666;
+  font-weight: bold;
+  margin: 0 2px;
+}
+
+/* Nakshatra Section */
+.nakshatra-section {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fdff 100%);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e1f5fe;
+  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.nakshatra-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #00bcd4 0%, #0097a7 100%);
+}
+
+.nakshatra-section h5 {
+  margin: 0 0 16px 0;
+  color: #006064;
+  font-size: 1.1em;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nakshatra-section h5::before {
+  content: '⭐';
+  font-size: 1.2em;
+}
+
+.nakshatra-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.nak-position,
+.nak-compatibility {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 188, 212, 0.1);
+  transition: all 0.2s ease;
+}
+
+.nak-position:hover,
+.nak-compatibility:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 188, 212, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 188, 212, 0.1);
+}
+
+.nak-position h6,
+.nak-compatibility h6 {
+  margin: 0 0 6px 0;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #00838f;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.nak-data {
+  font-weight: 700;
+  font-size: 1em;
+  color: #004d5c;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 77, 92, 0.1);
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 77, 92, 0.1);
+}
+
+.compat-score {
+  font-weight: 700;
+  font-size: 1em;
+  color: #004d5c;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+  color: white;
+  border-radius: 6px;
+  border: 1px solid rgba(76, 175, 80, 0.1);
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.compat-score::after {
+  content: '%';
+  font-size: 0.8em;
+  opacity: 0.9;
+}
+
+.compat-score.perfect {
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+  animation: pulse-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 3px 8px rgba(76, 175, 80, 0.3);
+  }
+  100% {
+    box-shadow: 0 3px 12px rgba(76, 175, 80, 0.5), 0 0 20px rgba(76, 175, 80, 0.2);
+  }
+}
+
+/* Yoga Section */
+.yoga-section {
+  background: linear-gradient(135deg, #ffffff 0%, #fefefe 100%);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e8f5e8;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.yoga-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #4caf50 0%, #388e3c 100%);
+}
+
+.yoga-section h5 {
+  margin: 0 0 16px 0;
+  color: #2e7d32;
+  font-size: 1.1em;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.yoga-section h5::before {
+  content: '🕉️';
+  font-size: 1.2em;
+}
+
+.yoga-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.yoga-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.yoga-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+}
+
+.yoga-card.raja {
+  border-color: #e91e63;
+  background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+}
+
+.yoga-card.raja::before {
+  background: linear-gradient(180deg, #e91e63 0%, #c2185b 100%);
+}
+
+.yoga-card.dhana {
+  border-color: #ff9800;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
+}
+
+.yoga-card.dhana::before {
+  background: linear-gradient(180deg, #ff9800 0%, #f57c00 100%);
+}
+
+.yoga-card.career {
+  border-color: #2196f3;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+}
+
+.yoga-card.career::before {
+  background: linear-gradient(180deg, #2196f3 0%, #1976d2 100%);
+}
+
+.yoga-card.relationship {
+  border-color: #9c27b0;
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+}
+
+.yoga-card.relationship::before {
+  background: linear-gradient(180deg, #9c27b0 0%, #7b1fa2 100%);
+}
+
+.yoga-card.spiritual {
+  border-color: #00bcd4;
+  background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
+}
+
+.yoga-card.spiritual::before {
+  background: linear-gradient(180deg, #00bcd4 0%, #0097a7 100%);
+}
+
+.yoga-card.transformation {
+  border-color: #795548;
+  background: linear-gradient(135deg, #efebe9 0%, #d7ccc8 100%);
+}
+
+.yoga-card.transformation::before {
+  background: linear-gradient(180deg, #795548 0%, #5d4037 100%);
+}
+
+.yoga-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.yoga-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.yoga-name {
+  margin: 0;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
+  flex: 1;
+}
+
+.yoga-strength {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.7em;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.yoga-strength.high {
+  background: #4caf50;
+  color: white;
+}
+
+.yoga-strength.medium {
+  background: #ff9800;
+  color: white;
+}
+
+.yoga-strength.low {
+  background: #9e9e9e;
+  color: white;
+}
+
+.yoga-description {
+  margin: 0 0 8px 0;
+  font-size: 0.8em;
+  color: #555;
+  line-height: 1.3;
+}
+
+.yoga-activations {
+  margin: 8px 0;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+  border-left: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.activation-label {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.activation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activation-item {
+  font-size: 0.75em;
+  color: #444;
+  margin: 2px 0;
+  padding: 2px 0;
+  line-height: 1.2;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+.yoga-type {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.65em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.yoga-type.raja {
+  background: rgba(233, 30, 99, 0.2);
+  color: #c2185b;
+}
+
+.yoga-type.dhana {
+  background: rgba(255, 152, 0, 0.2);
+  color: #f57c00;
+}
+
+.yoga-type.career {
+  background: rgba(33, 150, 243, 0.2);
+  color: #1976d2;
+}
+
+.yoga-type.relationship {
+  background: rgba(156, 39, 176, 0.2);
+  color: #7b1fa2;
+}
+
+.yoga-type.spiritual {
+  background: rgba(0, 188, 212, 0.2);
+  color: #0097a7;
+}
+
+.yoga-type.transformation {
+  background: rgba(121, 85, 72, 0.2);
+  color: #5d4037;
+}
+
+/* House Section */
+.house-section {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #4caf50;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.house-section h5 {
+  margin: 0 0 12px 0;
+  color: #000;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.house-hierarchy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activation-level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.level-header {
+  font-size: 0.8em;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.level-header.primary {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border-left: 3px solid #4caf50;
+}
+
+.level-header.secondary {
+  background: #fff3e0;
+  color: #ef6c00;
+  border-left: 3px solid #ff9800;
+}
+
+.level-header.tertiary {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  border-left: 3px solid #9c27b0;
+}
+
+.house-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.house-activation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.house-activation.primary {
+  background: #f1f8e9;
+  border-color: #c8e6c9;
+}
+
+.house-activation.secondary {
+  background: #fff8e1;
+  border-color: #ffcc02;
+}
+
+.house-activation.tertiary {
+  background: #fce4ec;
+  border-color: #f8bbd9;
+}
+
+.house-num {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  min-width: 32px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.primary .house-num {
+  background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+  color: #2e7d32;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+.secondary .house-num {
+  background: linear-gradient(135deg, #fff3e0, #ffcc02);
+  color: #ef6c00;
+  border: 1px solid rgba(239, 108, 0, 0.2);
+}
+
+.tertiary .house-num {
+  background: linear-gradient(135deg, #f3e5f5, #f8bbd9);
+  color: #7b1fa2;
+  border: 1px solid rgba(123, 31, 162, 0.2);
+}
+
+.house-reasons {
+  font-size: 0.8em;
+  color: #495057;
+  font-weight: 500;
+}
+
+/* Remedies Section */
+.remedies-section {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #8bc34a;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.remedies-section h5 {
+  margin: 0 0 8px 0;
+  color: #000;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.remedy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.remedy-item {
+  display: flex;
+  gap: 8px;
+  font-size: 0.85em;
+}
+
+.remedy-label {
+  color: #7b1fa2;
+  min-width: 60px;
+  font-weight: 500;
+}
+
+.remedy-value {
+  color: #000;
+  font-weight: 500;
+}
+
+/* Loading and Error States */
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 2px solid #dee2e6;
+  border-top: 2px solid #4caf50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-state button {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Disable native title tooltips globally in popup */
+.astrologer-popup [title] {
+  title: none !important;
+}
+
+.astrologer-popup *[title]:hover:before,
+.astrologer-popup *[title]:hover:after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Make custom tooltips appear immediately */
+.astrologer-popup .tooltip,
+.astrologer-popup [data-tooltip],
+.astrologer-popup .MuiTooltip-tooltip {
+  transition-delay: 0ms !important;
+  animation-delay: 0ms !important;
+}
+
+/* Override common tooltip delay properties */
+.astrologer-popup * {
+  --tooltip-delay: 0ms !important;
+  --tooltip-show-delay: 0ms !important;
+}
+
+/* Ensure popup stays above everything */
+.astrologer-popup-overlay {
+  z-index: 10000 !important;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%) !important;
+  color: white !important;
+  flex-shrink: 0;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .astrologer-popup {
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .planetary-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .nakshatra-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .nak-position,
+  .nak-compatibility {
+    padding: 10px;
+  }
+  
+  .compat-score {
+    font-size: 1.2em;
+  }
+  
+  .yoga-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .yoga-card {
+    padding: 10px;
+  }
+  
+  .yoga-name {
+    font-size: 0.85em;
+  }
+  
+  .technical-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}

@@ -100,11 +100,78 @@ const PredictionPopup = ({ isOpen, onClose, aspect, period, birthData, natalChar
                 </div>
               </div>
 
+              {prediction.is_gandanta_only ? (
+                // Show only Gandanta explanation for Gandanta aspects
+                prediction.gandanta_explanation && (
+                  <div className="gandanta-explanation-section">
+                    <h5>{prediction.gandanta_explanation.title}</h5>
+                    <p className="gandanta-description">{prediction.gandanta_explanation.description}</p>
+                    <p className="gandanta-significance">{prediction.gandanta_explanation.significance}</p>
+                    <div className="gandanta-effects">
+                      <strong>Key Effects:</strong>
+                      <ul>
+                        {prediction.gandanta_explanation.effects.map((effect, index) => (
+                          <li key={index}>{effect}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="gandanta-advice">
+                      <strong>Guidance:</strong> {prediction.gandanta_explanation.advice}
+                    </div>
+                  </div>
+                )
+              ) : prediction.is_nakshatra_only ? (
+                // Show simplified view for nakshatra connections
+                <div className="prediction-details">
+                  <div className="theme-section">
+                    <h5>Theme</h5>
+                    <p>{prediction.theme}</p>
+                  </div>
+                  <div className="effects-section">
+                    <h5>Effects</h5>
+                    {prediction.effects.positive && (
+                      <div className="effect positive">
+                        <strong>Positive:</strong> {prediction.effects.positive}
+                      </div>
+                    )}
+                    {prediction.effects.negative && (
+                      <div className="effect negative">
+                        <strong>Challenging:</strong> {prediction.effects.negative}
+                      </div>
+                    )}
+                    {prediction.effects.neutral && (
+                      <div className="effect neutral">
+                        <strong>General:</strong> {prediction.effects.neutral}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+
               <div className="prediction-details">
                 <div className="theme-section">
                   <h5>Theme</h5>
                   <p>{prediction.theme}</p>
                 </div>
+
+                {prediction.gandanta_explanation && (
+                  <div className="gandanta-explanation-section">
+                    <h5>{prediction.gandanta_explanation.title}</h5>
+                    <p className="gandanta-description">{prediction.gandanta_explanation.description}</p>
+                    <p className="gandanta-significance">{prediction.gandanta_explanation.significance}</p>
+                    <div className="gandanta-effects">
+                      <strong>Key Effects:</strong>
+                      <ul>
+                        {prediction.gandanta_explanation.effects.map((effect, index) => (
+                          <li key={index}>{effect}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="gandanta-advice">
+                      <strong>Guidance:</strong> {prediction.gandanta_explanation.advice}
+                    </div>
+                  </div>
+                )}
 
                 <div className="timing-intensity">
                   <div className="timing">
@@ -468,6 +535,7 @@ const PredictionPopup = ({ isOpen, onClose, aspect, period, birthData, natalChar
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
         </div>

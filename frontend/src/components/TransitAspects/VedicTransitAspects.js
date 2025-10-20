@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './VedicTransitAspects.css';
-import PredictionPopup from './PredictionPopup';
+import AstrologerPredictionPopup from './AstrologerPredictionPopup';
 
 const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   const [aspectTimelines, setAspectTimelines] = useState({});
@@ -170,6 +170,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
         return 'Transit Nakshatra ⭐';
       } else if (enhancementType === 'nakshatra_return') {
         return 'Nakshatra Return 🔄';
+      } else if (enhancementType === 'gandanta') {
+        return 'Gandanta Point ⚠️';
       }
       return 'Nakshatra Connection';
     }
@@ -197,6 +199,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       return `${baseName} 🌟`;
     } else if (enhancementType === 'natal_nakshatra') {
       return `${baseName} ⭐`;
+    } else if (enhancementType === 'gandanta') {
+      return `${baseName} ⚠️`;
     }
     
     return baseName;
@@ -365,7 +369,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           const timeline = aspectTimelines[aspectKey] || [];
           
           return (
-            <div key={index} className="transit-aspect-row" title={getAspectTooltip(aspect)}>
+            <div key={index} className="transit-aspect-row" data-tooltip={getAspectTooltip(aspect)}>
               <div className="aspect-info">
                 <span className="transit-planet">{aspect.planet1}</span>
                 <span className="aspect-arrow">→</span>
@@ -404,7 +408,11 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
         })}
       </div>
       
-      <PredictionPopup
+      <div className="transit-help-text">
+        💡 Right-click or Shift+click on time periods for details
+      </div>
+      
+      <AstrologerPredictionPopup
         isOpen={showPredictionPopup}
         onClose={() => setShowPredictionPopup(false)}
         aspect={selectedAspect}

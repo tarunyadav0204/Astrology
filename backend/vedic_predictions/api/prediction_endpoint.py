@@ -6,6 +6,7 @@ from datetime import datetime
 from ..engines.base_predictor import BasePredictionEngine
 from ..engines.context_analyzer import ContextAnalyzer
 from ..engines.timing_analyzer import TimingAnalyzer
+from ..engines.yoga_analyzer import YogaAnalyzer
 from shared.dasha_calculator import DashaCalculator
 
 router = APIRouter()
@@ -29,6 +30,7 @@ async def get_transit_prediction(request: PredictionRequest):
         base_engine = BasePredictionEngine()
         context_analyzer = ContextAnalyzer()
         timing_analyzer = TimingAnalyzer()
+        yoga_analyzer = YogaAnalyzer()
         
         # Extract data
         aspect = request.aspect_data
@@ -46,9 +48,62 @@ async def get_transit_prediction(request: PredictionRequest):
             aspect['planet2']
         )
         print(f"[PREDICTION_DEBUG] Base prediction: {base_prediction}")
+        print(f"[PREDICTION_DEBUG] Enhancement type: {aspect.get('enhancement_type')}")
+        print(f"[PREDICTION_DEBUG] Aspect type: {aspect.get('aspect_type')}")
         
+        # Handle Gandanta aspects - show explanation only, no prediction
+        if aspect.get('enhancement_type') == 'gandanta':
+            print(f"[PREDICTION_DEBUG] Gandanta aspect detected - returning explanation only")
+            gandanta_explanation = {
+                'title': 'Gandanta Point Activation',
+                'description': 'A critical karmic junction between water and fire signs representing intense transformation and spiritual evolution.',
+                'significance': 'Gandanta points mark the transition between emotional (water) and action-oriented (fire) energies, creating periods of vulnerability and breakthrough potential.',
+                'effects': [
+                    'Intense emotional and spiritual transformation',
+                    'Release of deep karmic patterns',
+                    'Potential for breakthrough or breakdown',
+                    'Heightened intuition and psychic sensitivity',
+                    'Need for spiritual practices and grounding'
+                ],
+                'advice': 'Use this period for meditation, spiritual practices, and releasing old patterns. Avoid major decisions during peak intensity.'
+            }
+            return {
+                "prediction": {
+                    'aspect_summary': f"{aspect['planet1']} activates Gandanta point affecting natal {aspect['planet2']}",
+                    'gandanta_explanation': gandanta_explanation,
+                    'period_info': {
+                        'start_date': period['start_date'],
+                        'end_date': period['end_date'],
+                        'peak_date': period.get('peak_date')
+                    },
+                    'is_gandanta_only': True
+                }
+            }
+        
+        # Handle nakshatra connections - provide full analysis
+        if not base_prediction and aspect.get('aspect_type') == 'nakshatra_connection':
+            print(f"[PREDICTION_DEBUG] Nakshatra connection detected - providing full analysis")
+            base_prediction = {
+                'theme': f"Karmic nakshatra activation between {aspect['planet1']} and {aspect['planet2']}",
+                'positive': 'Enhanced spiritual connection and karmic understanding through nakshatra resonance',
+                'negative': 'Karmic patterns requiring conscious resolution and spiritual growth',
+                'neutral': 'Deep soul-level activation through nakshatra connection and star lord influence',
+                'transiting_planet': aspect['planet1'],
+                'natal_planet': aspect['planet2']
+            }
+        
+        # Generic fallback for regular house aspects
         if not base_prediction:
-            raise HTTPException(status_code=404, detail="Prediction template not found")
+            print(f"[PREDICTION_DEBUG] Using generic fallback for {aspect['planet1']} {aspect['aspect_type']} {aspect['planet2']}")
+            aspect_house = aspect['aspect_type'].replace('th_house', '').replace('st_house', '').replace('nd_house', '').replace('rd_house', '').replace('_house', '')
+            base_prediction = {
+                'theme': f"{aspect['planet1']} activating {aspect['planet2']} through {aspect_house} house connection",
+                'positive': f"Harmonious activation of {aspect['planet2']} qualities through {aspect['planet1']} energy",
+                'negative': f"Challenging activation requiring conscious integration of {aspect['planet1']}-{aspect['planet2']} energies",
+                'neutral': f"{aspect['planet1']} brings dynamic change to {aspect['planet2']} significations",
+                'transiting_planet': aspect['planet1'],
+                'natal_planet': aspect['planet2']
+            }
         
         # Analyze natal context (skip if no natal chart)
         natal_context = {}
@@ -108,105 +163,126 @@ async def get_transit_prediction(request: PredictionRequest):
         if 'negative' in enhanced_prediction and final_intensity > 1.0:
             affected_houses = [natal_context.get('natal_house'), aspect.get('required_transit_house')]
             affected_houses = [h for h in affected_houses if h is not None]
-            remedies = base_engine.get_remedies(aspect['planet1'], affected_houses)
+            remedies = base_engine.get_remedies(aspect['planet1'], affected_houses) if hasattr(base_engine, 'get_remedies') else None
         
         # Get activated planets and houses with reasons
         activated_planets = [aspect['planet1'], aspect['planet2']]
-        formatted_activations = []
+        
+        # Calculate house activations with hierarchy
+        house_activations = {
+            'primary': [],
+            'secondary': [],
+            'tertiary': []
+        }
         
         try:
-            house_activations = {}
-            
-            # Transiting planet tenancy (where it's located in natal chart)
-            if transiting_context.get('transiting_house'):
-                house = transiting_context['transiting_house']
-                if house not in house_activations:
-                    house_activations[house] = []
-                house_activations[house].append(f"{aspect['planet1']} tenancy")
-            
-            # Transiting planet lordships
-            for lordship in transiting_context.get('transiting_lordships', []):
-                if lordship not in house_activations:
-                    house_activations[lordship] = []
-                house_activations[lordship].append(f"{aspect['planet1']} lordship")
-            
-            # Natal planet tenancy (where it's located)
+            # Primary: Direct tenancy and lordship
             if natal_context.get('natal_house'):
-                house = natal_context['natal_house']
-                if house not in house_activations:
-                    house_activations[house] = []
-                house_activations[house].append(f"{aspect['planet2']} tenancy")
-            
-            # Natal planet lordships - need to calculate these too
-            natal_planet_lordships = context_analyzer._get_house_lordships(aspect['planet2'], natal_chart) if natal_chart else []
-            for lordship in natal_planet_lordships:
-                if lordship not in house_activations:
-                    house_activations[lordship] = []
-                house_activations[lordship].append(f"{aspect['planet2']} lordship")
-            
-            # Convert to formatted list
-            for house, reasons in house_activations.items():
-                formatted_activations.append({
-                    'house': house,
-                    'reasons': reasons
+                house_activations['primary'].append({
+                    'house': natal_context['natal_house'],
+                    'reasons': [f"{aspect['planet2']} tenancy"]
                 })
             
-            # Sort by house number
-            formatted_activations.sort(key=lambda x: x['house'])
+            if transiting_context.get('transiting_house'):
+                house_activations['primary'].append({
+                    'house': transiting_context['transiting_house'],
+                    'reasons': [f"{aspect['planet1']} tenancy"]
+                })
             
-        except Exception as house_error:
-            print(f"[PREDICTION_ERROR] House activation error: {house_error}")
-            formatted_activations = []
+            # Add transiting planet lordships
+            for lordship in transiting_context.get('transiting_lordships', []):
+                house_activations['primary'].append({
+                    'house': lordship,
+                    'reasons': [f"{aspect['planet1']} lordship"]
+                })
+            
+            # Add natal planet lordships
+            if natal_chart:
+                natal_planet_lordships = context_analyzer._get_house_lordships(aspect['planet2'], natal_chart)
+                for lordship in natal_planet_lordships:
+                    house_activations['primary'].append({
+                        'house': lordship,
+                        'reasons': [f"{aspect['planet2']} lordship"]
+                    })
+            
+            # Secondary: Conjunctions within orb (3-5 degrees)
+            if natal_chart and 'planets' in natal_chart:
+                transiting_house = transiting_context.get('transiting_house')
+                if transiting_house:
+                    # Find planets in same house as transiting planet
+                    for planet_name, planet_data in natal_chart['planets'].items():
+                        if isinstance(planet_data, dict) and planet_data.get('house') == transiting_house:
+                            if planet_name != aspect['planet2']:  # Don't duplicate natal planet
+                                # Get conjunct planet's lordships
+                                conjunct_lordships = context_analyzer._get_house_lordships(planet_name, natal_chart)
+                                for lordship in conjunct_lordships:
+                                    house_activations['secondary'].append({
+                                        'house': lordship,
+                                        'reasons': [f"{planet_name} conjunction"]
+                                    })
+            
+            # Tertiary: Dasha lord houses
+            if dasha_relevance:
+                for level, dasha_info in dasha_relevance.items():
+                    if isinstance(dasha_info, dict) and 'planet' in dasha_info:
+                        dasha_planet = dasha_info['planet']
+                        # Get dasha planet's lordships (simplified)
+                        if dasha_planet in ['Jupiter', 'Venus', 'Mercury', 'Mars', 'Saturn', 'Sun', 'Moon']:
+                            house_activations['tertiary'].append({
+                                'house': 1,  # Simplified - would need proper lordship calculation
+                                'reasons': [f"{dasha_planet} dasha lord"]
+                            })
+            
+            # Remove duplicates and empty lists
+            for level in house_activations:
+                seen_houses = set()
+                unique_activations = []
+                for activation in house_activations[level]:
+                    if activation['house'] not in seen_houses:
+                        seen_houses.add(activation['house'])
+                        unique_activations.append(activation)
+                house_activations[level] = unique_activations
         
-        print(f"[PREDICTION_DEBUG] Final house activations: {formatted_activations}")
+        except Exception as e:
+            print(f"[HOUSE_DEBUG] Error calculating house activations: {e}")
+            house_activations = {'primary': [], 'secondary': [], 'tertiary': []}
         
-        # Get house-wise life areas after formatted_activations is ready
-        house_wise_areas = {}
-        for activation in formatted_activations:
-            house = activation['house']
-            house_meanings = context_analyzer.house_meanings.get(house, {})
-            if house_meanings.get('primary'):
-                house_wise_areas[house] = house_meanings['primary']
-        
-        affected_areas = enhanced_prediction.get('affected_areas', [])
+        # Analyze activated yogas
+        activated_yogas = []
+        try:
+            activated_yogas = yoga_analyzer.analyze_activated_yogas(house_activations)
+            print(f"[YOGA_DEBUG] Activated yogas: {activated_yogas}")
+        except Exception as e:
+            print(f"[YOGA_DEBUG] Error analyzing yogas: {e}")
         
         # Compile final prediction
-        aspect_name = aspect['aspect_type'].replace('_house', '').replace('th', 'th')
         prediction = {
             'aspect_summary': f"{aspect['planet1']} {aspect['aspect_type'].replace('_house', '')} aspect to natal {aspect['planet2']}",
             'theme': enhanced_prediction['theme'],
-            'timing': timing_analyzer.get_timing_description(timing_info, period),
             'intensity': round(final_intensity, 2),
             'effects': {
                 'positive': enhanced_prediction.get('positive', ''),
                 'negative': enhanced_prediction.get('negative', ''),
                 'neutral': enhanced_prediction.get('neutral', '')
             },
-            'affected_areas': affected_areas,
-            'house_wise_areas': house_wise_areas,
             'activated_planets': activated_planets,
-            'house_activations': formatted_activations,
-            'lordship_context': f"{aspect['planet1']} lords: {', '.join([f'{h}th' for h in transiting_context.get('transiting_lordships', [])])}" if transiting_context.get('transiting_lordships') else '',
-            'context_notes': enhanced_prediction.get('context_note', ''),
-            'body_parts': enhanced_prediction.get('body_parts', []),
-            'planetary_dignity': enhanced_prediction.get('planetary_dignity', {}),
+            'house_activations': house_activations,
+            'activated_yogas': activated_yogas,
             'planetary_analysis': enhanced_prediction.get('planetary_analysis', {}),
             'nakshatra_analysis': enhanced_prediction.get('nakshatra_analysis', {}),
             'remedies': remedies,
             'period_info': {
                 'start_date': period['start_date'],
                 'end_date': period['end_date'],
-                'peak_date': period.get('peak_date'),
-                'duration_days': timing_info['duration_days']
+                'peak_date': period.get('peak_date')
             },
-            'dasha_relevance': bool(dasha_relevance),
-            'dasha_hierarchy': {k: v for k, v in {
-                'mahadasha': dasha_relevance.get('mahadasha'),
-                'antardasha': dasha_relevance.get('antardasha'), 
-                'pratyantardasha': dasha_relevance.get('pratyantardasha'),
-                'sookshma': dasha_relevance.get('sookshma'),
-                'prana': dasha_relevance.get('prana')
-            }.items() if v is not None} if dasha_relevance else None
+            'dasha_hierarchy': {
+                'mahadasha': dasha_relevance.get('mahadasha', {}).get('planet') if dasha_relevance and isinstance(dasha_relevance.get('mahadasha'), dict) else dasha_relevance.get('mahadasha') if dasha_relevance else None,
+                'antardasha': dasha_relevance.get('antardasha', {}).get('planet') if dasha_relevance and isinstance(dasha_relevance.get('antardasha'), dict) else dasha_relevance.get('antardasha') if dasha_relevance else None,
+                'pratyantardasha': dasha_relevance.get('pratyantardasha', {}).get('planet') if dasha_relevance and isinstance(dasha_relevance.get('pratyantardasha'), dict) else dasha_relevance.get('pratyantardasha') if dasha_relevance else None,
+                'sookshma': dasha_relevance.get('sookshma', {}).get('planet') if dasha_relevance and isinstance(dasha_relevance.get('sookshma'), dict) else dasha_relevance.get('sookshma') if dasha_relevance else None,
+                'prana': dasha_relevance.get('prana', {}).get('planet') if dasha_relevance and isinstance(dasha_relevance.get('prana'), dict) else dasha_relevance.get('prana') if dasha_relevance else None
+            } if dasha_relevance else None
         }
         
         return {"prediction": prediction}

@@ -146,6 +146,12 @@
   border-left: 3px solid #6c757d;
 }
 
+.transit-aspect-row.gandanta {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
+  border-left: 3px solid #dc3545;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.1);
+}
+
 .aspect-info {
   display: flex;
   align-items: center;
@@ -160,31 +166,37 @@
   font-size: 0.9em;
 }
 
-/* Faster tooltip appearance */
+/* Custom tooltip */
 .transit-aspect-row {
   position: relative;
 }
 
-.transit-aspect-row[title]:hover::after {
-  content: attr(title);
+.transit-aspect-row[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
   position: absolute;
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(60, 60, 60, 0.95);
   color: white;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.75rem;
   white-space: nowrap;
-  z-index: 1000;
+  z-index: 1001;
   pointer-events: none;
-  animation: tooltipFadeIn 0.2s ease-in;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-@keyframes tooltipFadeIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+.transit-aspect-row[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(1px);
+  border: 5px solid transparent;
+  border-top-color: rgba(60, 60, 60, 0.95);
+  z-index: 1001;
 }
 
 .transit-planet {
@@ -263,6 +275,16 @@
   color: #999;
   font-size: 0.65rem;
   font-style: italic;
+}
+
+.transit-help-text {
+  text-align: center;
+  color: #666;
+  font-size: 0.7rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  margin-top: auto;
 }
 
 /* Mobile responsive */

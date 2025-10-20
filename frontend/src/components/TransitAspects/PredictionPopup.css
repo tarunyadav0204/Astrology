@@ -917,3 +917,74 @@
   border-radius: 3px;
   border: 1px solid #ffb74d;
 }
+
+.gandanta-explanation-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: linear-gradient(135deg, #ffebee, #fce4ec);
+  border-radius: 12px;
+  border-left: 4px solid #e91e63;
+  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.1);
+}
+
+.gandanta-description {
+  margin: 8px 0;
+  font-size: 0.9em;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.gandanta-significance {
+  margin: 8px 0;
+  font-size: 0.85em;
+  color: #666;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.gandanta-effects {
+  margin: 12px 0;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border-left: 3px solid #e91e63;
+}
+
+.gandanta-effects strong {
+  color: #c2185b;
+  font-size: 0.9em;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.gandanta-effects ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.gandanta-effects li {
+  font-size: 0.85em;
+  line-height: 1.3;
+  margin-bottom: 4px;
+  color: #2c3e50;
+}
+
+.gandanta-advice {
+  margin: 12px 0 0 0;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border-left: 3px solid #ff9800;
+}
+
+.gandanta-advice strong {
+  color: #f57c00;
+  font-size: 0.9em;
+  margin-right: 4px;
+}
+
+.gandanta-advice {
+  font-size: 0.85em;
+  color: #2c3e50;
+  line-height: 1.4;
+}
