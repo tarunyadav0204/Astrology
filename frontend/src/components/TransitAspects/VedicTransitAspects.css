@@ -126,6 +126,26 @@
   background: #f8f9fa;
 }
 
+.transit-aspect-row.star-lord {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
+  border-left: 3px solid #ffc107;
+}
+
+.transit-aspect-row.natal-nakshatra {
+  background: linear-gradient(135deg, #d1ecf1 0%, #ffffff 100%);
+  border-left: 3px solid #17a2b8;
+}
+
+.transit-aspect-row.transit-nakshatra {
+  background: linear-gradient(135deg, #d4edda 0%, #ffffff 100%);
+  border-left: 3px solid #28a745;
+}
+
+.transit-aspect-row.nakshatra-return {
+  background: linear-gradient(135deg, #e2e3e5 0%, #ffffff 100%);
+  border-left: 3px solid #6c757d;
+}
+
 .aspect-info {
   display: flex;
   align-items: center;
@@ -133,6 +153,38 @@
   font-size: 0.75rem;
   min-width: 0;
   flex: 1;
+}
+
+.enhancement-icon {
+  margin-left: 4px;
+  font-size: 0.9em;
+}
+
+/* Faster tooltip appearance */
+.transit-aspect-row {
+  position: relative;
+}
+
+.transit-aspect-row[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  animation: tooltipFadeIn 0.2s ease-in;
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .transit-planet {

@@ -84,7 +84,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           planet2: aspect.planet2,
           start_year: year,
           year_range: 1,
-          required_transit_house: aspect.required_transit_house
+          required_transit_house: aspect.required_transit_house,
+          enhancement_type: aspect.enhancement_type
         })
       });
       
@@ -135,7 +136,45 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     }
   };
   
-  const getAspectName = (aspectType) => {
+  const getAspectTooltip = (aspect) => {
+    if (aspect.description) {
+      return aspect.description;
+    }
+    
+    let tooltip = `${aspect.planet1} → ${aspect.planet2}`;
+    
+    if (aspect.aspect_type === 'nakshatra_connection') {
+      if (aspect.enhancement_type === 'star_lord') {
+        tooltip += ` - ${aspect.planet1} is the star lord of ${aspect.planet2}'s nakshatra`;
+      } else if (aspect.enhancement_type === 'natal_nakshatra') {
+        tooltip += ` - ${aspect.planet2} is placed in ${aspect.planet1}'s nakshatra`;
+      }
+      if (aspect.natal_nakshatra) {
+        tooltip += ` (${aspect.natal_nakshatra})`;
+      }
+    } else {
+      tooltip += ` - ${getAspectName(aspect.aspect_type, aspect.enhancement_type)} aspect`;
+    }
+    
+    return tooltip;
+  };
+
+  const getAspectName = (aspectType, enhancementType) => {
+    // Handle nakshatra-only connections
+    if (aspectType === 'nakshatra_connection') {
+      if (enhancementType === 'star_lord') {
+        return 'Nakshatra Lord 🌟';
+      } else if (enhancementType === 'natal_nakshatra') {
+        return 'Natal Nakshatra ⭐';
+      } else if (enhancementType === 'transit_nakshatra') {
+        return 'Transit Nakshatra ⭐';
+      } else if (enhancementType === 'nakshatra_return') {
+        return 'Nakshatra Return 🔄';
+      }
+      return 'Nakshatra Connection';
+    }
+    
+    // Regular geometric aspects
     const aspectMap = {
       '1th_house': '1st',
       '2th_house': '2nd', 
@@ -150,7 +189,17 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       '11th_house': '11th',
       '12th_house': '12th'
     };
-    return aspectMap[aspectType] || aspectType;
+    
+    const baseName = aspectMap[aspectType] || aspectType;
+    
+    // Add enhancement indicators to regular aspects
+    if (enhancementType === 'star_lord') {
+      return `${baseName} 🌟`;
+    } else if (enhancementType === 'natal_nakshatra') {
+      return `${baseName} ⭐`;
+    }
+    
+    return baseName;
   };
 
   const getPeriodClass = (period, aspect) => {
@@ -281,7 +330,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev - 1)}
-            disabled={yearOffset <= -3}
+            disabled={yearOffset <= -10}
           >
             ←
           </button>
@@ -302,7 +351,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev + 1)}
-            disabled={yearOffset >= 3}
+            disabled={yearOffset >= 10}
           >
             →
           </button>
@@ -316,12 +365,14 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           const timeline = aspectTimelines[aspectKey] || [];
           
           return (
-            <div key={index} className="transit-aspect-row">
+            <div key={index} className="transit-aspect-row" title={getAspectTooltip(aspect)}>
               <div className="aspect-info">
                 <span className="transit-planet">{aspect.planet1}</span>
                 <span className="aspect-arrow">→</span>
                 <span className="target-planet">{aspect.planet2}</span>
-                <span className="aspect-house">({getAspectName(aspect.aspect_type)} aspect)</span>
+                <span className={`aspect-house ${aspect.enhancement_type || 'regular'}`}>
+                  ({getAspectName(aspect.aspect_type, aspect.enhancement_type)})
+                </span>
               </div>
               <div className="timeline-chips">
                 {timeline.slice(0, 3).map((period, pIndex) => (
