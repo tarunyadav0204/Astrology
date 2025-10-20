@@ -23,19 +23,33 @@ class VedicTransitAspectCalculator:
             'Ketu': [1, 5, 7, 9]     # Conjunction, 5th, 7th, 9th house aspects
         }
         
+        # Nakshatra lordship mapping
+        self.nakshatra_lords = {
+            'Ashwini': 'Ketu', 'Bharani': 'Venus', 'Krittika': 'Sun',
+            'Rohini': 'Moon', 'Mrigashira': 'Mars', 'Ardra': 'Rahu',
+            'Punarvasu': 'Jupiter', 'Pushya': 'Saturn', 'Ashlesha': 'Mercury',
+            'Magha': 'Ketu', 'Purva Phalguni': 'Venus', 'Uttara Phalguni': 'Sun',
+            'Hasta': 'Moon', 'Chitra': 'Mars', 'Swati': 'Rahu',
+            'Vishakha': 'Jupiter', 'Anuradha': 'Saturn', 'Jyeshtha': 'Mercury',
+            'Mula': 'Ketu', 'Purva Ashadha': 'Venus', 'Uttara Ashadha': 'Sun',
+            'Shravana': 'Moon', 'Dhanishta': 'Mars', 'Shatabhisha': 'Rahu',
+            'Purva Bhadrapada': 'Jupiter', 'Uttara Bhadrapada': 'Saturn', 'Revati': 'Mercury'
+        }
+        
         # Focus on slow-moving planets for meaningful transits
         self.transit_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu', 'Mars']
         self.natal_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
     
     def calculate_vedic_aspects(self, natal_planets: Dict) -> List[Dict]:
-        """Calculate valid Vedic transit aspects - only show aspects that exist in natal chart"""
+        """Calculate enhanced Vedic transit aspects including nakshatra connections"""
         aspects = []
         
         # First, find all natal aspects
         natal_aspects = self._find_natal_aspects(natal_planets)
         
-        print(f"\n=== CREATING TRANSIT ASPECTS ===")
-        # Only show transit aspects for planets that aspect each other in natal chart
+        print(f"\n=== CREATING ENHANCED TRANSIT ASPECTS ===")
+        
+        # 1. Traditional aspects (existing logic)
         for natal_aspect in natal_aspects:
             transit_planet = natal_aspect['planet1']
             natal_planet = natal_aspect['planet2']
@@ -45,19 +59,23 @@ class VedicTransitAspectCalculator:
                 natal_data = natal_planets[natal_planet]
                 
                 aspect_entry = {
-                    'planet1': transit_planet,  # Transiting planet
-                    'planet2': natal_planet,    # Natal planet
+                    'planet1': transit_planet,
+                    'planet2': natal_planet,
                     'aspect_type': aspect_type,
                     'natal_longitude': natal_data['longitude'],
                     'natal_house': natal_data.get('house', 1),
                     'aspect_house': int(aspect_type.replace('th_house', '')),
-                    'description': f'Transit {transit_planet} re-activating natal {aspect_type} to {natal_planet}'
+                    'description': f'Transit {transit_planet} re-activating natal {aspect_type} to {natal_planet}',
+                    'enhancement_type': 'regular'
                 }
                 
                 aspects.append(aspect_entry)
-                print(f"Added transit aspect: {transit_planet} -> {natal_planet} ({aspect_type})")
+                print(f"Added regular aspect: {transit_planet} -> {natal_planet} ({aspect_type})")
         
-        print(f"Total transit aspects created: {len(aspects)}")
+        # 2. Nakshatra-enhanced aspects (new logic)
+        aspects.extend(self._find_nakshatra_enhanced_aspects(natal_planets))
+        
+        print(f"Total enhanced transit aspects created: {len(aspects)}")
         return aspects
     
     def _find_natal_aspects(self, natal_planets: Dict) -> List[Dict]:
@@ -254,6 +272,76 @@ class VedicTransitAspectCalculator:
         date1 = datetime.strptime(date1_str, '%Y-%m-%d')
         date2 = datetime.strptime(date2_str, '%Y-%m-%d')
         return (date2 - date1).days <= max_days
+    
+    def _get_nakshatra_from_longitude(self, longitude: float) -> str:
+        """Get nakshatra name from longitude"""
+        nakshatra_names = [
+            'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+            'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+            'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+            'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+            'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
+        ]
+        nakshatra_index = int(longitude / 13.333333)  # Each nakshatra is 13°20'
+        return nakshatra_names[nakshatra_index % 27]
+    
+    def _find_nakshatra_enhanced_aspects(self, natal_planets: Dict) -> List[Dict]:
+        """Find aspects enhanced by nakshatra connections"""
+        enhanced_aspects = []
+        
+        print(f"\n=== FINDING NAKSHATRA ENHANCED ASPECTS ===")
+        
+        for transit_planet in self.transit_planets:
+            if transit_planet not in natal_planets:
+                continue
+                
+            transit_data = natal_planets[transit_planet]
+            transit_nakshatra = self._get_nakshatra_from_longitude(transit_data['longitude'])
+            transit_nakshatra_lord = self.nakshatra_lords.get(transit_nakshatra)
+            
+            for natal_planet in self.natal_planets:
+                if natal_planet not in natal_planets or transit_planet == natal_planet:
+                    continue
+                    
+                natal_data = natal_planets[natal_planet]
+                natal_nakshatra = self._get_nakshatra_from_longitude(natal_data['longitude'])
+                natal_nakshatra_lord = self.nakshatra_lords.get(natal_nakshatra)
+                
+                # Check for nakshatra connections
+                enhancement_type = None
+                description_suffix = ""
+                
+                # Case 1: Transit planet is natal planet's nakshatra lord
+                if transit_planet == natal_nakshatra_lord:
+                    enhancement_type = 'star_lord'
+                    description_suffix = f" (Star Lord: {natal_planet} in {natal_nakshatra})"
+                
+                # Case 2: Natal planet is in transit planet's nakshatra
+                elif natal_nakshatra_lord == transit_planet:
+                    enhancement_type = 'natal_nakshatra'
+                    description_suffix = f" (Natal Connection: {natal_planet} in {transit_planet}'s {natal_nakshatra})"
+                
+                # If there's a nakshatra connection, create a single nakshatra-only aspect
+                if enhancement_type:
+                    aspect_entry = {
+                        'planet1': transit_planet,
+                        'planet2': natal_planet,
+                        'aspect_type': 'nakshatra_connection',
+                        'natal_longitude': natal_data['longitude'],
+                        'natal_house': natal_data.get('house', 1),
+                        'aspect_house': None,  # No geometric aspect
+                        'description': f'Transit {transit_planet} nakshatra connection to {natal_planet}{description_suffix}',
+                        'enhancement_type': enhancement_type,
+                        'natal_nakshatra': natal_nakshatra,
+                        'natal_nakshatra_lord': natal_nakshatra_lord,
+                        'is_nakshatra_only': True
+                    }
+                    
+                    enhanced_aspects.append(aspect_entry)
+                    print(f"Added {enhancement_type} connection: {transit_planet} -> {natal_planet} (nakshatra only)")
+        
+        print(f"Total nakshatra enhanced aspects: {len(enhanced_aspects)}")
+        return enhanced_aspects
 
 # API endpoints
 vedic_calculator = VedicTransitAspectCalculator()
@@ -293,6 +381,15 @@ async def get_vedic_transit_timeline(request: Request):
     planet2 = request_data['planet2']  # Natal planet
     start_year = request_data.get('start_year', datetime.now().year)
     year_range = request_data.get('year_range', 1)
+    
+    # Handle nakshatra-only connections
+    if aspect_type == 'nakshatra_connection':
+        return {
+            'timeline': [],  # No timeline for pure nakshatra connections
+            'start_year': start_year,
+            'year_range': year_range,
+            'message': 'Nakshatra connections are permanent - no timeline needed'
+        }
     
     # Extract aspect house number from aspect_type
     aspect_house = int(aspect_type.replace('th_house', ''))
