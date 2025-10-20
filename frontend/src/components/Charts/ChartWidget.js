@@ -157,7 +157,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
             {isMobile ? 'AV' : 'Ashtak'}
           </button>
           <StyleToggle onClick={toggleStyle}>
-            {isMobile ? (chartStyle === 'north' ? 'N' : 'S') : CHART_CONFIG.styles[chartStyle]}
+            {chartStyle === 'north' ? 'N' : 'S'}
           </StyleToggle>
           <button 
             onClick={() => setShowMaximized(true)}
