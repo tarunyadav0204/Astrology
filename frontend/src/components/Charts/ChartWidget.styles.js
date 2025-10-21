@@ -31,11 +31,13 @@ export const WidgetHeader = styled.div`
   border-radius: 15px 15px 0 0;
   flex-shrink: 0;
   gap: 0.5rem;
+  min-width: 0;
   
   @media (max-width: 768px) {
     padding: 0.5rem 0.75rem;
     gap: 0.25rem;
     min-height: 44px;
+    flex-wrap: nowrap;
   }
 `;
 
@@ -47,40 +49,40 @@ export const WidgetTitle = styled.h3`
   text-shadow: none;
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   @media (max-width: 768px) {
     font-size: 0.85rem;
-    overflow: hidden;
+    flex: 0 1 auto;
+    max-width: 120px;
   }
 `;
 
 export const StyleToggle = styled.button`
-  padding: 0.3rem 0.8rem;
-  background: rgba(255, 255, 255, 0.9);
-  color: #8b4513;
-  border: none;
-  border-radius: 15px;
+  padding: 4px 8px;
+  background: white;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: 10px;
   font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
-  min-height: 32px;
+  transition: all 0.2s ease;
   flex-shrink: 0;
 
   &:hover {
     background: rgba(255, 255, 255, 1);
     transform: translateY(-1px);
-    box-shadow: 0 3px 12px rgba(255, 255, 255, 0.5);
   }
   
   @media (max-width: 768px) {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    min-height: 32px;
-    min-width: 32px;
-    border-radius: 50%;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 500;
+    min-width: auto;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;

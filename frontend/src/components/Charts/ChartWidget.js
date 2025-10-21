@@ -142,17 +142,17 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
   return (
     <WidgetContainer>
       <WidgetHeader>
-        <WidgetTitle>{title}</WidgetTitle>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <WidgetTitle title={title}>{title}</WidgetTitle>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden' }}>
           <button
             onClick={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
             style={{
-              padding: '6px 10px',
-              fontSize: '11px',
+              padding: '4px 8px',
+              fontSize: '10px',
               background: 'white',
               color: showDegreeNakshatra ? '#e91e63' : '#666',
               border: `1px solid ${showDegreeNakshatra ? '#e91e63' : '#ddd'}`,
-              borderRadius: '16px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontWeight: '500',
               transition: 'all 0.2s ease'
@@ -165,12 +165,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
             <button 
               onClick={() => handleSpecialPoints()}
               style={{
-                padding: '6px 10px',
-                fontSize: '11px',
+                padding: '4px 8px',
+                fontSize: '10px',
                 background: 'white',
                 color: '#666',
                 border: '1px solid #ddd',
-                borderRadius: '16px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontWeight: '500',
                 transition: 'all 0.2s ease'
@@ -183,12 +183,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
           <button 
             onClick={() => handlePlanetaryDignities()}
             style={{
-              padding: '6px 10px',
-              fontSize: '11px',
+              padding: '4px 8px',
+              fontSize: '10px',
               background: 'white',
               color: '#666',
               border: '1px solid #ddd',
-              borderRadius: '16px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontWeight: '500',
               transition: 'all 0.2s ease'
@@ -201,12 +201,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
             <button 
               onClick={() => handleCharaKarakas()}
               style={{
-                padding: '6px 10px',
-                fontSize: '11px',
+                padding: '4px 8px',
+                fontSize: '10px',
                 background: 'white',
                 color: '#666',
                 border: '1px solid #ddd',
-                borderRadius: '16px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontWeight: '500',
                 transition: 'all 0.2s ease'
@@ -219,12 +219,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
           <button 
             onClick={() => setShowShadbala(true)}
             style={{
-              padding: '6px 10px',
-              fontSize: '11px',
+              padding: '4px 8px',
+              fontSize: '10px',
               background: 'white',
               color: '#666',
               border: '1px solid #ddd',
-              borderRadius: '16px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontWeight: '500',
               transition: 'all 0.2s ease'
@@ -236,12 +236,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
           <button 
             onClick={() => setShowAshtakavarga(true)}
             style={{
-              padding: '6px 10px',
-              fontSize: '11px',
+              padding: '4px 8px',
+              fontSize: '10px',
               background: 'white',
               color: '#666',
               border: '1px solid #ddd',
-              borderRadius: '16px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontWeight: '500',
               transition: 'all 0.2s ease'
@@ -256,12 +256,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
             <button 
               onClick={() => setShowMaximized(true)}
               style={{
-                padding: '6px 10px',
-                fontSize: '11px',
+                padding: '4px 8px',
+                fontSize: '10px',
                 background: 'white',
                 color: '#666',
                 border: '1px solid #ddd',
-                borderRadius: '16px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontWeight: '500',
                 transition: 'all 0.2s ease'
