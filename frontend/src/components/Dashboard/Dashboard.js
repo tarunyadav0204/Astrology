@@ -693,26 +693,29 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       )}
       
       {activeTab !== 'dashboard' && (
-        <div style={{ 
-          background: 'rgba(255,255,255,0.95)',
-          borderRadius: '12px',
-          padding: '1rem',
-          margin: window.innerWidth <= 768 ? '0 0.5rem' : '0 1rem',
-          marginTop: window.innerWidth <= 768 ? '110px' : '0',
-          minHeight: '70vh',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
-        }}>
-          {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
-          {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} />}
-          {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
-          {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
-          {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
-          {activeTab === 'relationships' && <RelationshipsTab chartData={chartData} birthData={birthData} />}
-          {activeTab === 'yogas' && <YogasTab chartData={chartData} birthData={birthData} />}
-          {activeTab === 'settings' && <UserSettings user={user} onSettingsUpdate={handleSettingsUpdate} />}
-          {activeTab === 'admin' && user?.role === 'admin' && <AdminTab chartData={chartData} birthData={birthData} />}
-
-        </div>
+        activeTab === 'nadi' && window.innerWidth <= 768 ? (
+          <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} />
+        ) : (
+          <div style={{ 
+            background: 'rgba(255,255,255,0.95)',
+            borderRadius: '12px',
+            padding: '1rem',
+            margin: window.innerWidth <= 768 ? '0 0.5rem' : '0 1rem',
+            marginTop: window.innerWidth <= 768 ? '110px' : '0',
+            minHeight: '70vh',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
+          }}>
+            {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
+            {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} />}
+            {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
+            {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
+            {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
+            {activeTab === 'relationships' && <RelationshipsTab chartData={chartData} birthData={birthData} />}
+            {activeTab === 'yogas' && <YogasTab chartData={chartData} birthData={birthData} />}
+            {activeTab === 'settings' && <UserSettings user={user} onSettingsUpdate={handleSettingsUpdate} />}
+            {activeTab === 'admin' && user?.role === 'admin' && <AdminTab chartData={chartData} birthData={birthData} />}
+          </div>
+        )
       )}
     </DashboardContainer>
   );

@@ -614,49 +614,55 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                   planetY = houseData.center.y - 10;
                 }
               } else if (totalPlanets <= 4) {
-                const row = Math.floor(pIndex / 2);
-                const col = pIndex % 2;
-                const spacing = 25; // Horizontal spacing for 2-line text
-                const rowSpacing = 32; // Increased vertical spacing for 2-line text
-                
-                if (houseNumber === 1) {
-                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 20 + (row * rowSpacing);
-                } else if (houseNumber === 3) {
-                  planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y + 5 + (row * rowSpacing);
-                } else if (houseNumber === 4) {
-                  planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y + 5 + (row * rowSpacing);
-                } else if (houseNumber === 5) {
-                  planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y + 5 + (row * rowSpacing);
-                } else if ([6, 7, 8].includes(houseNumber)) {
-                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y + 25 + (row * rowSpacing);
-                } else if (houseNumber === 9) {
-                  planetX = houseData.center.x + 25 + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 15 + (row * rowSpacing);
-                } else if (houseNumber === 10) {
-                  planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 25 + (row * rowSpacing);
-                } else if (houseNumber === 11) {
-                  planetX = houseData.center.x + 20 + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 10 + (row * rowSpacing);
-                } else if (houseNumber === 12) {
-                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 15 + (row * rowSpacing);
-                } else if (houseNumber === 2) {
-                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 40 + (row * rowSpacing);
+                // Houses 3, 5, 9, 11: Vertical arrangement (single column)
+                if ([3, 5, 9, 11].includes(houseNumber)) {
+                  const rowSpacing = 35;
+                  if (houseNumber === 3) {
+                    planetX = houseData.center.x - 35;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 5) {
+                    planetX = houseData.center.x - 25;
+                    planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 9) {
+                    planetX = houseData.center.x + 35;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 11) {
+                    planetX = houseData.center.x + 35;
+                    planetY = houseData.center.y - 45 + (pIndex * rowSpacing);
+                  }
                 } else {
-                  planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                  planetY = houseData.center.y - 25 + (row * rowSpacing);
+                  // Other houses: 2-column arrangement
+                  const row = Math.floor(pIndex / 2);
+                  const col = pIndex % 2;
+                  const spacing = 25;
+                  const rowSpacing = 32;
+                  
+                  if (houseNumber === 1) {
+                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y - 20 + (row * rowSpacing);
+                  } else if (houseNumber === 4) {
+                    planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y + 5 + (row * rowSpacing);
+                  } else if ([6, 7, 8].includes(houseNumber)) {
+                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y + 25 + (row * rowSpacing);
+                  } else if (houseNumber === 10) {
+                    planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y - 25 + (row * rowSpacing);
+                  } else if (houseNumber === 12) {
+                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y - 15 + (row * rowSpacing);
+                  } else if (houseNumber === 2) {
+                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y - 40 + (row * rowSpacing);
+                  } else {
+                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y - 25 + (row * rowSpacing);
+                  }
                 }
               } else {
                 // For 5+ planets - arrange in single column
-                const spacing = 0; // No horizontal spacing for single column
-                const rowSpacing = 26; // Increased vertical spacing for 2-line layout
+                const rowSpacing = 26;
                 
                 if (houseNumber === 1) {
                   planetX = houseData.center.x;
@@ -702,7 +708,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                   {/* Planet symbol */}
                   <text x={planetX} 
                         y={planetY - 8} 
-                        fontSize={totalPlanets > 4 ? "11" : totalPlanets > 2 ? "13" : "15"} 
+                        fontSize={totalPlanets >= 4 ? "10" : totalPlanets > 2 ? "13" : "15"} 
                         fill={getPlanetColor(planet)}
                         fontWeight="900"
                         textAnchor="middle"
@@ -733,7 +739,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                   {showDegreeNakshatra && (
                     <text x={planetX} 
                           y={planetY + 8} 
-                          fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "9" : "10"} 
+                          fontSize={totalPlanets >= 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
                           fill="#666"
                           fontWeight="500"
                           textAnchor="middle"

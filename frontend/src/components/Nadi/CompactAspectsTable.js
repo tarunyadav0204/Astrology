@@ -92,13 +92,15 @@ const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick }) => {
     return colors[strength] || '#6c757d';
   };
 
+  const isMobile = window.innerWidth <= 768;
+
   return (
     <div className="nadi-aspects-compact">
       {/* Year Navigation with Title */}
-      <div className="year-nav">
-        <div className="nav-title">Nadi Aspects with Timeline</div>
+      <div className="year-nav" style={{ background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)', marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0, paddingTop: '10px', paddingBottom: '10px', paddingLeft: '16px', paddingRight: '16px' }}>
+        <div className="nav-title" style={{ background: 'transparent' }}>{isMobile ? 'Nadi Aspects' : 'Nadi Aspects with Timeline'}</div>
         
-        <div className="nav-controls">
+        <div className="nav-controls" style={{ background: 'transparent' }}>
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev - 1)}
@@ -107,8 +109,8 @@ const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick }) => {
             ←
           </button>
           
-          {Array.from({ length: 7 }, (_, i) => {
-            const year = new Date().getFullYear() + yearOffset + i - 3;
+          {Array.from({ length: isMobile ? 5 : 7 }, (_, i) => {
+            const year = new Date().getFullYear() + yearOffset + i - (isMobile ? 2 : 3);
             return (
               <button
                 key={year}
@@ -136,12 +138,50 @@ const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick }) => {
           const aspectKey = `${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`;
           const timeline = aspectTimelines[aspectKey] || [];
           
+          if (isMobile) {
+            return (
+              <div key={index} className="aspect-row">
+                <div className="aspect-info-mobile">
+                  <span className="aspect-planet">{aspect.planet1}</span>
+                  <span className="aspect-target">→ {aspect.planet2}</span>
+                  <span className="aspect-type">
+                    {aspect.aspect_type.replace('_ASPECT', '')} Aspect
+                  </span>
+                </div>
+                <div 
+                  className="aspect-strength"
+                  style={{ color: getStrengthColor(aspect.strength) }}
+                >
+                  {aspect.strength.replace('_', ' ').substring(0, 6)}
+                </div>
+                <div className="timeline-chips">
+                  {timeline.map((period, pIndex) => (
+                    <button
+                      key={pIndex}
+                      className={`timeline-chip ${getPeriodClass(period)}`}
+                      onClick={() => {
+                        setSelectedPeriod(period);
+                        setSelectedAspect(aspect);
+                      }}
+                      title={`${period.start_date} to ${period.end_date} (±${period.min_orb?.toFixed(1)}°)`}
+                    >
+                      {formatPeriod(period)}
+                    </button>
+                  ))}
+                  {timeline.length === 0 && (
+                    <span style={{ fontSize: '12px', color: '#999' }}>No periods</span>
+                  )}
+                </div>
+              </div>
+            );
+          }
+          
           return (
             <div key={index} className="aspect-row">
               <div className="aspect-planet">{aspect.planet1}</div>
               <div className="aspect-target">→ {aspect.planet2}</div>
               <div className="aspect-type">
-                {aspect.aspect_type.replace('_ASPECT', '')}
+                {aspect.aspect_type.replace('_ASPECT', '')} Aspect
               </div>
               <div className="timeline-chips">
                 {timeline.map((period, pIndex) => (

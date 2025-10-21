@@ -333,5 +333,29 @@ export const apiService = {
       natal_chart: chartData
     });
     return response.data;
+  },
+  
+  calculatePlanetaryDignities: async (chartData, birthData) => {
+    const response = await apiClient.post(getEndpoint('/planetary-dignities'), {
+      chart_data: chartData,
+      birth_data: birthData
+    });
+    return response.data;
+  },
+  
+  calculateCharaKarakas: async (chartData, birthData) => {
+    const response = await apiClient.post(getEndpoint('/chara-karakas'), {
+      chart_data: chartData,
+      birth_data: birthData
+    });
+    return response.data;
+  },
+  
+  calculateShadbala: async (chartData, birthData) => {
+    const response = await apiClient.post(getEndpoint('/calculate-classical-shadbala'), {
+      chart_data: chartData,
+      birth_data: birthData
+    });
+    return response.data;
   }
 };

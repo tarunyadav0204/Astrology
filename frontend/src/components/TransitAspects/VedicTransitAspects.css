@@ -19,7 +19,7 @@
 
 .nav-title {
   font-weight: 600;
-  color: #e91e63;
+  color: #e91e63 !important;
   font-size: 0.9rem;
 }
 

@@ -12,6 +12,13 @@ export const WidgetContainer = styled.div`
     min-height: 350px;
     overflow: visible;
   }
+  
+  .nadi-mobile & {
+    background: transparent;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
 `;
 
 export const WidgetHeader = styled.div`

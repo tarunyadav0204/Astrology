@@ -9,6 +9,8 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
   const [loading, setLoading] = useState(true);
   const [transitDate, setTransitDate] = useState(propTransitDate || new Date());
   const [selectedDashas, setSelectedDashas] = useState({});
+  const [mobileTab, setMobileTab] = useState('charts');
+  const [mobileChartTab, setMobileChartTab] = useState('rasi');
 
   useEffect(() => {
     fetchNadiAnalysis();
@@ -102,6 +104,152 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
     return <div className="nadi-error">Missing chart or transit data</div>;
   }
 
+  const isMobile = window.innerWidth <= 768;
+
+  if (isMobile) {
+    return (
+      <div className="nadi-mobile">
+        {/* Main Content Area */}
+        <div className="mobile-content">
+          {mobileTab === 'charts' && (
+            <div className="mobile-charts">
+              {/* Chart Tab Navigation */}
+              <div className="chart-tabs">
+                {[
+                  { id: 'rasi', label: 'Rasi', icon: '📊' },
+                  { id: 'navamsa', label: 'Navamsa', icon: '🌙' },
+                  { id: 'transit', label: 'Transit', icon: '🔄' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setMobileChartTab(tab.id)}
+                    className={`chart-tab ${mobileChartTab === tab.id ? 'active' : ''}`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+              
+              {/* Chart Content */}
+              <div className="chart-content">
+                {mobileChartTab === 'rasi' && (
+                  <ChartWidget 
+                    title="Rasi Chart"
+                    chartType="lagna"
+                    chartData={nadiData.chart_data}
+                    birthData={birthData}
+                    defaultStyle="north"
+                  />
+                )}
+                {mobileChartTab === 'navamsa' && (
+                  <ChartWidget 
+                    title="Navamsa Chart"
+                    chartType="navamsa"
+                    chartData={nadiData.chart_data}
+                    birthData={birthData}
+                    defaultStyle="north"
+                  />
+                )}
+                {mobileChartTab === 'transit' && (
+                  <ChartWidget 
+                    title="Transit Chart"
+                    chartType="transit"
+                    chartData={nadiData.transit_data}
+                    birthData={birthData}
+                    transitDate={transitDate}
+                    defaultStyle="north"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+          
+          {mobileTab === 'aspects' && (
+            <div className="mobile-aspects">
+              <CompactAspectsTable 
+                aspects={nadiData.natal_aspects}
+                natalPlanets={nadiData.natal_planets}
+                onTimelineClick={handleTimelineClick}
+              />
+            </div>
+          )}
+          
+          {mobileTab === 'dashas' && (
+            <div className="mobile-dashas">
+              <div className="dashas-grid">
+                <DashaWidget 
+                  title="Maha"
+                  dashaType="maha" 
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+                <DashaWidget 
+                  title="Antar"
+                  dashaType="antar" 
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+                <DashaWidget 
+                  title="Pratyantar"
+                  dashaType="pratyantar" 
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+                <DashaWidget 
+                  title="Sookshma"
+                  dashaType="sookshma" 
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+                <DashaWidget 
+                  title="Prana"
+                  dashaType="prana" 
+                  birthData={birthData}
+                  onDashaClick={handleDashaClick}
+                  selectedDashas={selectedDashas}
+                  onDashaSelection={handleDashaSelection}
+                  transitDate={transitDate}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Bottom Tab Navigation */}
+        <div className="mobile-bottom-tabs">
+          {[
+            { id: 'charts', label: 'Charts', icon: '📊' },
+            { id: 'aspects', label: 'Aspects', icon: '🎯' },
+            { id: 'dashas', label: 'Dashas', icon: '⏰' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setMobileTab(tab.id)}
+              className={`mobile-tab ${mobileTab === tab.id ? 'active' : ''}`}
+            >
+              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-label">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop Layout
   return (
     <div className="nadi-dashboard">
       {/* Left Column - Charts and Aspects */}

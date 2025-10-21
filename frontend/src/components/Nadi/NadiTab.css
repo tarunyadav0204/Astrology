@@ -105,14 +105,28 @@
   flex-direction: column;
   background: #ffffff;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   overflow: hidden;
+  height: 100%;
+  position: relative;
+  padding: 0;
+  margin: 0;
+}
+
+.nadi-aspects-compact .year-nav {
+  margin: 0;
+  border-radius: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .aspects-list {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .aspect-row {
@@ -122,6 +136,66 @@
   border-bottom: 1px solid #f0f0f0;
   font-size: 13px;
   transition: background-color 0.2s ease;
+}
+
+/* Mobile aspect row layout - simple */
+@media (max-width: 768px) {
+  .aspect-row {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .aspect-info-mobile {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .aspect-planet {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e91e63;
+  }
+  
+  .aspect-target {
+    font-size: 12px;
+    color: #2c3e50;
+    font-weight: 600;
+  }
+  
+  .aspect-type {
+    font-size: 11px;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    font-weight: 600;
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 8px;
+  }
+  
+  .aspect-strength {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: #f8f9fa;
+    text-align: center;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  
+  .timeline-chips {
+    width: 100%;
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
 }
 
 .aspect-row:hover {
@@ -163,31 +237,58 @@
 }
 
 .timeline-chip {
-  background: linear-gradient(135deg, #3498db, #2980b9);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 10px;
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 500;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.timeline-chip::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.timeline-chip:hover::before {
+  left: 100%;
 }
 
 .timeline-chip:hover {
-  background: linear-gradient(135deg, #2980b9, #1f5f8b);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
 }
 
 .timeline-chip.current {
-  background: linear-gradient(135deg, #27ae60, #229954);
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4); }
+  50% { box-shadow: 0 4px 16px rgba(17, 153, 142, 0.6); }
+  100% { box-shadow: 0 2px 8px rgba(17, 153, 142, 0.4); }
 }
 
 .timeline-chip.past {
-  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+  box-shadow: 0 2px 8px rgba(149, 165, 166, 0.3);
+  opacity: 0.8;
 }
 
 .aspect-strength {
@@ -205,15 +306,25 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%) !important;
   border-bottom: 1px solid #e0e0e0;
+  margin: 0 !important;
+  border-radius: 8px 8px 0 0 !important;
+  position: relative;
+  z-index: 1;
+}
+
+.year-nav * {
+  background: transparent !important;
 }
 
 .nav-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
   margin: 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  letter-spacing: 0.5px;
 }
 
 .nav-controls {
@@ -223,30 +334,33 @@
 }
 
 .year-nav button {
-  background: #ffffff;
-  border: 1px solid #d0d0d0;
+  background: white;
+  border: 1px solid rgba(255,255,255,0.8);
   border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 500;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  min-width: 45px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  min-width: 50px;
+  color: #333;
 }
 
 .year-nav button:hover:not(:disabled) {
-  background: #f0f0f0;
-  border-color: #b0b0b0;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: rgba(255,255,255,1);
+  border-color: rgba(255,255,255,0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  color: #e91e63;
 }
 
 .year-nav button.active {
-  background: linear-gradient(135deg, #3498db, #2980b9);
-  color: white;
-  border-color: #2980b9;
-  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+  background: linear-gradient(135deg, #ffffff, #f8f9fa);
+  color: #e91e63;
+  border-color: rgba(255,255,255,0.8);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2), inset 0 2px 4px rgba(233, 30, 99, 0.1);
+  font-weight: 700;
 }
 
 .year-nav button.nav-arrow {
@@ -278,7 +392,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 10000;
+  padding: 16px;
 }
 
 .aspect-popup {
@@ -286,9 +401,25 @@
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
+  width: 100%;
+  max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .aspect-popup-overlay {
+    padding: 8px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+  
+  .aspect-popup {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100vh - 40px);
+    border-radius: 16px;
+  }
 }
 
 .popup-header {
@@ -300,6 +431,17 @@
   background: linear-gradient(135deg, #3498db, #2980b9);
   color: white;
   border-radius: 12px 12px 0 0;
+}
+
+@media (max-width: 768px) {
+  .popup-header {
+    padding: 16px;
+    border-radius: 16px 16px 0 0;
+  }
+  
+  .popup-header h3 {
+    font-size: 16px;
+  }
 }
 
 .popup-header h3 {
@@ -324,12 +466,26 @@
   transition: background-color 0.2s;
 }
 
+@media (max-width: 768px) {
+  .close-button {
+    width: 36px;
+    height: 36px;
+    font-size: 28px;
+  }
+}
+
 .close-button:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
 .popup-content {
   padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .popup-content {
+    padding: 16px;
+  }
 }
 
 .aspect-info h4,
@@ -357,6 +513,23 @@
   margin-bottom: 8px;
   padding: 8px 0;
   border-bottom: 1px solid #f8f9fa;
+}
+
+@media (max-width: 768px) {
+  .detail-row {
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 0;
+  }
+  
+  .detail-row .label {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  
+  .detail-row .value {
+    font-size: 14px;
+  }
 }
 
 .detail-row .label {
@@ -397,6 +570,16 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(39, 174, 96, 0.3);
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .view-chart-btn {
+    padding: 16px 24px;
+    font-size: 16px;
+    border-radius: 12px;
+    margin-top: 8px;
+  }
 }
 
 .view-chart-btn:hover {
@@ -441,7 +624,336 @@
   margin: 0;
 }
 
-/* Responsive adjustments */
+/* Mobile Layout */
+.nadi-mobile {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  position: fixed;
+  top: 120px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.mobile-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 80px;
+  background: transparent;
+}
+
+/* Chart Tab Navigation */
+.chart-tabs {
+  display: flex;
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  border-radius: 8px 8px 0 0;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+  box-shadow: none;
+}
+
+.chart-tab {
+  flex: 1;
+  padding: 1rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+  position: relative;
+}
+
+.chart-tab.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-bottom: 3px solid white;
+  font-weight: 700;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.chart-tab span:first-child {
+  font-size: 0.9rem;
+}
+
+.chart-content {
+  flex: 1;
+  height: calc(100% - 60px);
+  background: white;
+  padding: 0.5rem;
+  margin: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Mobile Charts */
+.mobile-charts {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+/* Remove widget container styling in Nadi mobile charts only */
+.mobile-charts [class*="sc-"] {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.mobile-charts div[class*="sc-"] {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Mobile Aspects */
+.mobile-aspects {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-aspects .nadi-aspects-compact {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+}
+
+.mobile-aspects .aspects-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile Dashas */
+.mobile-dashas {
+  height: 100%;
+  overflow: auto;
+}
+
+.dashas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 0.5rem;
+  height: 100%;
+}
+
+.dashas-grid > div:last-child {
+  grid-column: span 2;
+}
+
+
+
+/* Fix dasha header text color with specific class names */
+.nadi-mobile .dashas-grid .sc-fdbPbf,
+.nadi-mobile .dashas-grid .sc-gJUwzu,
+.nadi-mobile .dashas-grid h3,
+.nadi-mobile .dashas-grid [class*="WidgetTitle"],
+.nadi-mobile .dashas-grid [class*="WidgetHeader"] h3,
+.nadi-mobile .dashas-grid [class*="WidgetHeader"] * {
+  color: white !important;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+/* Bottom Tab Navigation */
+.mobile-bottom-tabs {
+  display: flex;
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  border-top: none;
+  padding: 0;
+  gap: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  box-shadow: 0 -4px 12px rgba(233, 30, 99, 0.2);
+}
+
+.mobile-tab {
+  flex: 1;
+  padding: 0.75rem 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.3s ease;
+  min-height: 70px;
+  border-top: 3px solid transparent;
+  position: relative;
+}
+
+.mobile-tab.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 700;
+  border-top: 3px solid white;
+  transform: translateY(-2px);
+  box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.tab-icon {
+  font-size: 1.2rem;
+}
+
+.tab-label {
+  font-size: 0.65rem;
+}
+
+/* Mobile Aspects Table */
+@media (max-width: 768px) {
+  .nadi-dashboard {
+    display: none;
+  }
+  
+  /* Mobile aspect rows - simple working design */
+  .aspect-row {
+    display: block;
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    margin: 0;
+    border-radius: 0;
+    background: white;
+    box-shadow: none;
+    border: none;
+    transition: background-color 0.2s ease;
+  }
+  
+  .aspect-row:hover {
+    background-color: #f8f9fa;
+  }
+  
+  /* Top row - planet info */
+  .aspect-row::before {
+    content: '';
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .aspect-planet,
+  .aspect-target,
+  .aspect-type {
+    width: auto;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  
+  .aspect-planet {
+    color: #e91e63;
+    font-size: 16px;
+  }
+  
+  .aspect-target {
+    color: #2c3e50;
+    font-size: 14px;
+  }
+  
+  .aspect-type {
+    color: #7f8c8d;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+  
+  /* Timeline chips - enhanced mobile design */
+  .timeline-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+  }
+  
+  .timeline-chip {
+    padding: 10px 16px;
+    font-size: 12px;
+    min-height: 40px;
+    border-radius: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.3px;
+  }
+  
+  /* Strength indicator */
+  .aspect-strength {
+    align-self: flex-end;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.8);
+  }
+  
+  /* Year navigation - mobile friendly */
+  .year-nav {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .nav-title {
+    font-size: 16px;
+    text-align: center;
+  }
+  
+  .nav-controls {
+    justify-content: center;
+  }
+  
+  .year-nav button {
+    padding: 10px 14px;
+    font-size: 13px;
+    min-height: 40px;
+    min-width: 50px;
+  }
+  
+  .year-nav button.nav-arrow {
+    min-width: 40px;
+    font-size: 16px;
+  }
+}
+
 @media (max-width: 1200px) {
   .dashboard-top-row {
     height: 40%;

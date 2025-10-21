@@ -1,6 +1,6 @@
 # Planetary Dignity Configuration for Enhanced Vedic Analysis
 
-# Exaltation signs and degrees
+# Exaltation signs and degrees (Rahu/Ketu don't have traditional exaltation)
 EXALTATION_DATA = {
     'Sun': {'sign': 0, 'degree': 10},      # Aries 10°
     'Moon': {'sign': 1, 'degree': 3},      # Taurus 3°
@@ -8,12 +8,10 @@ EXALTATION_DATA = {
     'Mercury': {'sign': 5, 'degree': 15},  # Virgo 15°
     'Jupiter': {'sign': 3, 'degree': 5},   # Cancer 5°
     'Venus': {'sign': 11, 'degree': 27},   # Pisces 27°
-    'Saturn': {'sign': 6, 'degree': 20},   # Libra 20°
-    'Rahu': {'sign': 2, 'degree': 20},     # Gemini 20°
-    'Ketu': {'sign': 8, 'degree': 20}      # Sagittarius 20°
+    'Saturn': {'sign': 6, 'degree': 20}    # Libra 20°
 }
 
-# Debilitation signs and degrees (opposite of exaltation)
+# Debilitation signs and degrees (Rahu/Ketu don't have traditional debilitation)
 DEBILITATION_DATA = {
     'Sun': {'sign': 6, 'degree': 10},      # Libra 10°
     'Moon': {'sign': 7, 'degree': 3},      # Scorpio 3°
@@ -21,9 +19,7 @@ DEBILITATION_DATA = {
     'Mercury': {'sign': 11, 'degree': 15}, # Pisces 15°
     'Jupiter': {'sign': 9, 'degree': 5},   # Capricorn 5°
     'Venus': {'sign': 5, 'degree': 27},    # Virgo 27°
-    'Saturn': {'sign': 0, 'degree': 20},   # Aries 20°
-    'Rahu': {'sign': 8, 'degree': 20},     # Sagittarius 20°
-    'Ketu': {'sign': 2, 'degree': 20}      # Gemini 20°
+    'Saturn': {'sign': 0, 'degree': 20}    # Aries 20°
 }
 
 # Own signs (Swakshetra)

@@ -24,6 +24,10 @@ from nadi.services.nadi_service import router as nadi_router
 from vedic_transit_aspects import router as vedic_transit_router
 from vedic_predictions.api.prediction_endpoint import router as vedic_predictions_router
 from vedic_predictions.api.badhaka_maraka_endpoint import router as badhaka_maraka_router
+from planetary_dignities import router as planetary_dignities_router
+from chara_karakas import router as chara_karakas_router
+from shadbala import router as shadbala_router
+from classical_shadbala import router as classical_shadbala_router
 
 # Load environment variables explicitly
 try:
@@ -54,6 +58,10 @@ app.include_router(nadi_router, prefix="/api")
 app.include_router(vedic_transit_router, prefix="/api")
 app.include_router(vedic_predictions_router)
 app.include_router(badhaka_maraka_router, prefix="/api")
+app.include_router(planetary_dignities_router, prefix="/api")
+app.include_router(chara_karakas_router, prefix="/api")
+app.include_router(shadbala_router, prefix="/api")
+app.include_router(classical_shadbala_router, prefix="/api")
 
 # Root endpoint for health check
 @app.get("/")

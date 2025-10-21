@@ -1,0 +1,524 @@
+.shadbala-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 15000;
+  padding: 20px;
+}
+
+.shadbala-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.shadbala-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  background: linear-gradient(135deg, #ff6f00, #ff8f00);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
+}
+
+.shadbala-modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.shadbala-close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.shadbala-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.shadbala-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.shadbala-loading {
+  text-align: center;
+  padding: 40px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #ff6f00;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.shadbala-error {
+  text-align: center;
+  padding: 40px;
+  color: #f44336;
+}
+
+.shadbala-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.summary-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid #e9ecef;
+}
+
+.summary-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
+.planet-highlight {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planet-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.planet-strength {
+  font-size: 18px;
+  font-weight: 500;
+  color: #ff6f00;
+}
+
+.planet-grade {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.shadbala-table-container {
+  margin-bottom: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.shadbala-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  table-layout: fixed;
+}
+
+.shadbala-table * {
+  text-align: left !important;
+}
+
+.shadbala-table td:first-child,
+.shadbala-table th:first-child {
+  text-align: left !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+}
+
+.shadbala-table th {
+  background: #f5f5f5;
+  padding: 12px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.shadbala-table th:first-child {
+  text-align: left !important;
+  padding-left: 30px;
+}
+
+.shadbala-table th:first-child {
+  width: 25%;
+}
+
+.shadbala-table th:nth-child(2) {
+  width: 30%;
+}
+
+.shadbala-table th:nth-child(3) {
+  width: 25%;
+}
+
+.shadbala-table th:nth-child(4) {
+  width: 20%;
+}
+
+.planet-row {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+}
+
+.planet-row:hover {
+  background: #f8f9fa;
+}
+
+.planet-cell {
+  padding: 12px 12px 12px 30px;
+  width: 25%;
+  box-sizing: border-box;
+  text-align: left !important;
+}
+
+.planet-symbol {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  display: block;
+  text-align: left !important;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 0;
+  margin: 0;
+}
+
+.strength-cell {
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 30%;
+}
+
+.rupas-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff6f00;
+}
+
+.points-value {
+  font-size: 12px;
+  color: #666;
+}
+
+.grade-cell {
+  padding: 12px 8px;
+  width: 25%;
+}
+
+.grade-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: inline-block;
+}
+
+.details-cell {
+  padding: 12px 8px;
+  text-align: center;
+  width: 20%;
+}
+
+.expand-btn {
+  background: #ff6f00;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.expand-btn:hover {
+  background: #e65100;
+}
+
+.expanded-row {
+  background: #f8f9fa;
+}
+
+.expanded-row td {
+  padding: 0;
+}
+
+.component-breakdown {
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.component-breakdown h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #333;
+  font-weight: 600;
+}
+
+.components-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.component-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.component-name {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.component-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff6f00;
+}
+
+.shadbala-guide {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.shadbala-guide h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 600;
+}
+
+.grade-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grade-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #666;
+}
+
+.grade-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Formula Styles */
+.formulas-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+}
+
+.formulas-section h4 {
+  color: #ff6f00;
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.formula-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.formula-card h5 {
+  color: #e91e63;
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.formula-details {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.formula-item {
+  margin-bottom: 6px;
+}
+
+.formula-item code {
+  background: #e3f2fd;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #1976d2;
+}
+
+.formula-components {
+  margin-top: 8px;
+  padding-left: 12px;
+  border-left: 3px solid #ff6f00;
+}
+
+.sub-formula {
+  margin-bottom: 8px;
+  padding: 6px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.sub-formula h6 {
+  color: #666;
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sub-formula div {
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .shadbala-modal-content {
+    width: 95%;
+    max-height: 95vh;
+  }
+  
+  .shadbala-modal-header {
+    padding: 16px 20px;
+  }
+  
+  .shadbala-modal-header h2 {
+    font-size: 20px;
+  }
+  
+  .shadbala-modal-body {
+    padding: 16px;
+  }
+  
+  .shadbala-summary {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  
+  .summary-card {
+    padding: 12px;
+  }
+  
+  .shadbala-table th,
+  .shadbala-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  
+  .planet-cell {
+    width: 30%;
+  }
+  
+  .planet-symbol {
+    font-size: 11px;
+  }
+  
+  .strength-cell {
+    width: 35%;
+  }
+  
+  .grade-cell {
+    width: 25%;
+  }
+  
+  .details-cell {
+    width: 10%;
+  }
+  
+  .rupas-value {
+    font-size: 12px;
+  }
+  
+  .points-value {
+    font-size: 10px;
+  }
+  
+  .grade-badge {
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+  
+  .components-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .component-item {
+    padding: 8px 10px;
+  }
+  
+  .component-name,
+  .component-value {
+    font-size: 12px;
+  }
+}
