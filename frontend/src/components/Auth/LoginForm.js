@@ -26,10 +26,15 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
 
     try {
       const response = await authService.login(formData);
+      
+      // Check if user is admin (you can modify this condition as needed)
+      const isAdmin = formData.phone === 'admin' || response.user?.role === 'admin';
+      const userWithAdmin = { ...response.user, isAdmin };
+      
       localStorage.setItem('token', response.access_token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('user', JSON.stringify(userWithAdmin));
       toast.success('Login successful!');
-      onLogin(response.user);
+      onLogin(userWithAdmin);
     } catch (error) {
       toast.error(error.message || 'Login failed');
     } finally {

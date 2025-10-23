@@ -13,15 +13,17 @@ class VedicTransitAspectCalculator:
         # Traditional Vedic aspects for each planet (including conjunction)
         self.vedic_aspects = {
             'Sun': [1, 7],           # Conjunction, 7th house aspect
-            'Moon': [1, 7],          # Conjunction, 7th house aspect
+            'Moon': [1, 7],          # Conjunction, 7th house aspect  
             'Mars': [1, 4, 7, 8],    # Conjunction, 4th, 7th, 8th house aspects
             'Mercury': [1, 7],       # Conjunction, 7th house aspect
             'Jupiter': [1, 5, 7, 9], # Conjunction, 5th, 7th, 9th house aspects
             'Venus': [1, 7],         # Conjunction, 7th house aspect
             'Saturn': [1, 3, 7, 10], # Conjunction, 3rd, 7th, 10th house aspects
-            'Rahu': [1, 5, 7, 9],    # Conjunction, 5th, 7th, 9th house aspects
-            'Ketu': [1, 5, 7, 9]     # Conjunction, 5th, 7th, 9th house aspects
+            'Rahu': [1, 5, 7, 9],    # Same as Jupiter - 5th, 7th, 9th house aspects
+            'Ketu': [1, 5, 7, 9]     # Same as Jupiter - 5th, 7th, 9th house aspects
         }
+        
+
         
         # Nakshatra lordship mapping
         self.nakshatra_lords = {
@@ -40,6 +42,8 @@ class VedicTransitAspectCalculator:
         self.transit_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu', 'Mars']
         self.natal_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         
+
+        
         # Gandanta points - critical junction degrees between water and fire signs
         self.gandanta_points = [
             {'name': 'Pisces-Aries', 'water_end': 360.0, 'fire_start': 0.0, 'range': 3.0},  # 27° Pisces to 3° Aries
@@ -51,33 +55,44 @@ class VedicTransitAspectCalculator:
         """Calculate enhanced Vedic transit aspects including nakshatra connections"""
         aspects = []
         
-        # First, find all natal aspects
-        natal_aspects = self._find_natal_aspects(natal_planets)
+        # Generate aspects based on actual planetary positions
         
-        print(f"\n=== CREATING ENHANCED TRANSIT ASPECTS ===")
+
         
-        # 1. Traditional aspects (existing logic)
-        for natal_aspect in natal_aspects:
-            transit_planet = natal_aspect['planet1']
-            natal_planet = natal_aspect['planet2']
-            aspect_type = natal_aspect['aspect_type']
-            
-            if transit_planet in self.transit_planets and natal_planet in self.natal_planets:
+        # 1. Generate ONLY VALID transit aspects based on actual house positions
+        for transit_planet in self.transit_planets:
+            if transit_planet not in natal_planets:
+                continue
+                
+            transit_data = natal_planets[transit_planet]
+            transit_house = transit_data.get('house', 1)
+            available_aspects = self.vedic_aspects.get(transit_planet, [])
+                
+            for natal_planet in self.natal_planets:
+                if natal_planet not in natal_planets:
+                    continue
+                    
                 natal_data = natal_planets[natal_planet]
+                natal_house = natal_data.get('house', 1)
                 
-                aspect_entry = {
-                    'planet1': transit_planet,
-                    'planet2': natal_planet,
-                    'aspect_type': aspect_type,
-                    'natal_longitude': natal_data['longitude'],
-                    'natal_house': natal_data.get('house', 1),
-                    'aspect_house': int(aspect_type.replace('th_house', '')),
-                    'description': f'Transit {transit_planet} re-activating natal {aspect_type} to {natal_planet}',
-                    'enhancement_type': 'regular'
-                }
+
                 
-                aspects.append(aspect_entry)
-                print(f"Added regular aspect: {transit_planet} -> {natal_planet} ({aspect_type})")
+
+                
+                # Generate ALL possible transit aspects for this planet pair
+                for aspect_number in available_aspects:
+                    aspect_entry = {
+                        'planet1': transit_planet,
+                        'planet2': natal_planet,
+                        'aspect_type': f'{aspect_number}th_house',
+                        'natal_longitude': natal_data['longitude'],
+                        'natal_house': natal_house,
+                        'aspect_house': aspect_number,
+                        'description': f'Transit {transit_planet} {aspect_number}th house aspect to natal {natal_planet}',
+                        'enhancement_type': 'regular'
+                    }
+                    
+                    aspects.append(aspect_entry)
         
         # 2. Nakshatra-enhanced aspects (new logic)
         aspects.extend(self._find_nakshatra_enhanced_aspects(natal_planets))
@@ -85,44 +100,48 @@ class VedicTransitAspectCalculator:
         # 3. Gandanta point aspects (critical junction transits)
         aspects.extend(self._find_gandanta_aspects(natal_planets))
         
-        print(f"Total enhanced transit aspects created: {len(aspects)}")
+
+        
         return aspects
     
     def _find_natal_aspects(self, natal_planets: Dict) -> List[Dict]:
         """Find all aspects that exist in the natal chart"""
         natal_aspects = []
         
-        print(f"\n=== FINDING NATAL ASPECTS ===")
-        print(f"Available planets: {list(natal_planets.keys())}")
+
         
         for planet1_name, planet1_data in natal_planets.items():
             if planet1_name not in self.transit_planets or not isinstance(planet1_data, dict):
+
                 continue
                 
             planet1_house = planet1_data.get('house', 1)
-            print(f"\nChecking {planet1_name} in house {planet1_house}:")
+
             
             for planet2_name, planet2_data in natal_planets.items():
                 if (planet2_name not in self.natal_planets or 
-                    not isinstance(planet2_data, dict) or 
-                    planet1_name == planet2_name):
+                    not isinstance(planet2_data, dict)):
+                    # Note: Allowing same-planet aspects for transit calculations (e.g., Saturn to Saturn)
+
                     continue
                 
                 planet2_house = planet2_data.get('house', 1)
                 
                 # Calculate which house planet2 is FROM planet1's perspective
-                house_diff = (planet2_house - planet1_house) % 12
+                # Saturn in 12th house, natal Saturn in 2nd house
+                # From 12th to 2nd: (2 - 12 + 12) % 12 = 2, but that's 3rd house from 12th
+                house_diff = (planet2_house - planet1_house + 12) % 12
                 if house_diff == 0:
                     aspect_number = 1  # Same house = conjunction
                 else:
-                    aspect_number = house_diff + 1  # House position from aspecting planet
+                    aspect_number = house_diff + 1  # 1st, 2nd, 3rd, etc. house from aspecting planet
                 
-                print(f"  -> {planet2_name} (house {planet2_house}): {aspect_number}th position from {planet1_name}")
+
                 
                 # Check if planet1 can actually make this aspect
                 if planet1_name in self.vedic_aspects:
                     available_aspects = self.vedic_aspects[planet1_name]
-                    print(f"     {planet1_name} can make aspects: {available_aspects}")
+
                     
                     if aspect_number in available_aspects:
                         natal_aspects.append({
@@ -131,11 +150,10 @@ class VedicTransitAspectCalculator:
                             'aspect_type': f'{aspect_number}th_house',
                             'house_difference': aspect_number
                         })
-                        print(f"     ✓ VALID ASPECT: {planet1_name} {aspect_number}th aspect to {planet2_name}")
+
                     else:
-                        print(f"     ✗ Invalid aspect: {planet1_name} cannot make {aspect_number}th aspect (only has {available_aspects})")
+                        pass
         
-        print(f"\nTotal natal aspects found: {len(natal_aspects)}")
         return natal_aspects
     
     def calculate_aspect_timeline(self, natal_longitude: float, aspect_house: int, 
@@ -148,9 +166,7 @@ class VedicTransitAspectCalculator:
         if natal_house is None or ascendant_sign is None:
             return []  # Can't calculate without house information
         
-        print(f"\n=== CALCULATING TIMELINE FOR {transit_planet} {aspect_house}th ASPECT TO {natal_house} ===")
-        print(f"Natal target planet in house {natal_house}, need {aspect_house}th aspect from transit {transit_planet}")
-        print(f"Ascendant sign: {ascendant_sign}")
+
         
         # Date range for calculation
         start_date = datetime(start_year, 1, 1)
@@ -159,6 +175,8 @@ class VedicTransitAspectCalculator:
         
         # Use smaller step for debugging
         step_days = 7  # Weekly steps for better debugging
+        
+
         
         in_aspect = False
         aspect_start_date = None
@@ -172,7 +190,7 @@ class VedicTransitAspectCalculator:
                 transit_house = ((transit_sign - ascendant_sign) % 12) + 1
                 
                 # Calculate what aspect transit planet makes to natal planet
-                actual_house_diff = (natal_house - transit_house) % 12
+                actual_house_diff = (natal_house - transit_house + 12) % 12
                 actual_aspect = 1 if actual_house_diff == 0 else actual_house_diff + 1
                 
                 # STRICT VALIDATION: Only valid if ALL conditions met
@@ -183,14 +201,9 @@ class VedicTransitAspectCalculator:
                 # Check if this is a valid aspect
                 is_valid_aspect = (actual_aspect in available_aspects and actual_aspect == aspect_house)
                 
-                # Test specific problematic period
-                if (transit_planet == 'Mars' and current_date.month == 6 and current_date.year == 2025):
-                    print(f"TESTING: {current_date.strftime('%Y-%m-%d')}")
-                    print(f"  Transit Mars longitude: {transit_position:.2f}° (sign {transit_sign}, house {transit_house})")
-                    print(f"  Natal Sun house: {natal_house}")
-                    print(f"  Actual aspect: {actual_aspect}, Required: {aspect_house}, Valid: {is_valid_aspect}")
-                    if not is_valid_aspect:
-                        print(f"  SHOULD BE REJECTED: Mars can't make {actual_aspect}th aspect (only {available_aspects})")
+
+                
+
                 
                 if is_valid_aspect:
                     if not in_aspect:
@@ -230,11 +243,7 @@ class VedicTransitAspectCalculator:
                 'peak_date': aspect_start_date.strftime('%Y-%m-%d')
             })
         
-        # Final check: if Mars timeline has any periods, verify they're all valid
-        if transit_planet == 'Mars' and len(timeline) > 0:
-            print(f"WARNING: Mars timeline has {len(timeline)} periods - these should all be valid 8th aspects only")
-            for period in timeline:
-                print(f"  Period: {period['start_date']} to {period['end_date']}")
+
         
         return timeline
     
@@ -244,6 +253,8 @@ class VedicTransitAspectCalculator:
             # Set Lahiri Ayanamsa
             swe.set_sid_mode(swe.SIDM_LAHIRI)
             jd = swe.julday(date.year, date.month, date.day, 12.0)
+            
+
             
             planet_map = {
                 'Sun': swe.SUN, 'Moon': swe.MOON, 'Mars': swe.MARS,
@@ -260,9 +271,11 @@ class VedicTransitAspectCalculator:
                 if planet == 'Ketu':
                     longitude = (longitude + 180) % 360
                 
+
+                
                 return longitude
         except Exception as e:
-            print(f"Error calculating {planet} position: {e}")
+            pass
         
         return None
     
@@ -292,19 +305,13 @@ class VedicTransitAspectCalculator:
         # Get the target nakshatra to transit through
         natal_data = natal_planets.get(natal_planet, {})
         if not natal_data:
-            print(f"[NAKSHATRA_DEBUG] No natal data found for {natal_planet}")
+
             return []
             
         target_nakshatra = self._get_nakshatra_from_longitude(natal_data['longitude'])
         enhancement_type = request_data.get('enhancement_type', 'natal_nakshatra')
         
-        print(f"[NAKSHATRA_DEBUG] Natal {natal_planet} longitude: {natal_data['longitude']:.2f}°")
-        print(f"[NAKSHATRA_DEBUG] Natal {natal_planet} nakshatra: {target_nakshatra}")
-        print(f"[NAKSHATRA_DEBUG] Looking for {transit_planet} transits through {target_nakshatra}")
-        
-        print(f"[NAKSHATRA_DEBUG] === CALCULATING NAKSHATRA TIMELINE ===")
-        print(f"[NAKSHATRA_DEBUG] Transit {transit_planet} entering {natal_planet}'s nakshatra ({target_nakshatra})")
-        print(f"[NAKSHATRA_DEBUG] Enhancement type: {enhancement_type}")
+
         
         # Calculate nakshatra boundaries (each nakshatra = 13°20' = 13.333°)
         nakshatra_names = [
@@ -320,7 +327,7 @@ class VedicTransitAspectCalculator:
             nakshatra_start = nakshatra_index * 13.333333
             nakshatra_end = (nakshatra_index + 1) * 13.333333
             
-            print(f"[NAKSHATRA_DEBUG] Target nakshatra {target_nakshatra} spans {nakshatra_start:.2f}° to {nakshatra_end:.2f}°")
+
             
             # Date range for calculation
             start_date = datetime(start_year, 1, 1)
@@ -345,8 +352,7 @@ class VedicTransitAspectCalculator:
                             # Start new nakshatra period
                             in_nakshatra = True
                             period_start_date = current_date
-                            print(f"[NAKSHATRA_DEBUG] Started nakshatra period: {current_date.strftime('%Y-%m-%d')}")
-                            print(f"[NAKSHATRA_DEBUG] Transit {transit_planet} at {transit_position:.1f}° on {current_date.strftime('%Y-%m-%d')}")
+
                     else:
                         if in_nakshatra:
                             # End current nakshatra period
@@ -357,8 +363,7 @@ class VedicTransitAspectCalculator:
                                     'end_date': current_date.strftime('%Y-%m-%d'),
                                     'peak_date': period_start_date.strftime('%Y-%m-%d')
                                 })
-                                print(f"[NAKSHATRA_DEBUG] Ended nakshatra period: {period_start_date.strftime('%Y-%m-%d')} to {current_date.strftime('%Y-%m-%d')}")
-                                print(f"[NAKSHATRA_DEBUG] Transit {transit_planet} at {transit_position:.1f}° on {current_date.strftime('%Y-%m-%d')}")
+
                                 period_start_date = None
                 else:
                     # No planet position, end any current period
@@ -382,47 +387,12 @@ class VedicTransitAspectCalculator:
                     'peak_date': period_start_date.strftime('%Y-%m-%d')
                 })
             
-            print(f"[NAKSHATRA_DEBUG] Found {len(timeline)} nakshatra activation periods")
-            for period in timeline:
-                print(f"[NAKSHATRA_DEBUG] Period: {period['start_date']} to {period['end_date']}")
-            if len(timeline) == 0:
-                print(f"[NAKSHATRA_DEBUG] No periods found for {transit_planet} transiting through {target_nakshatra}")
-                print(f"[NAKSHATRA_DEBUG] This could mean {transit_planet} doesn't transit through this nakshatra in {start_year}")
-                
-                # Show Jupiter's position at start and end of year for context
-                start_pos = self._get_planet_position(start_date, transit_planet)
-                end_pos = self._get_planet_position(end_date, transit_planet)
-                if start_pos and end_pos:
-                    start_nak = self._get_nakshatra_from_longitude(start_pos)
-                    end_nak = self._get_nakshatra_from_longitude(end_pos)
-                    print(f"[NAKSHATRA_DEBUG] {transit_planet} position: {start_pos:.1f}° ({start_nak}) to {end_pos:.1f}° ({end_nak}) in {start_year}")
-                    print(f"[NAKSHATRA_DEBUG] Target range: {nakshatra_start:.1f}° to {nakshatra_end:.1f}° ({target_nakshatra})")
-                    
-                    # Calculate approximate years when Jupiter was/will be in target nakshatra
-                    if transit_planet == 'Jupiter':
-                        current_pos = (start_pos + end_pos) / 2
-                        target_pos = (nakshatra_start + nakshatra_end) / 2
-                        
-                        # Handle 360° wraparound
-                        if target_pos < current_pos:
-                            target_pos += 360
-                        
-                        degrees_to_travel = target_pos - current_pos
-                        years_to_target = degrees_to_travel / 30  # Jupiter moves ~30°/year
-                        target_year = start_year + int(years_to_target)
-                        
-                        # Also calculate when it was last there (12 years ago)
-                        last_year = target_year - 12
-                        
-                        print(f"[NAKSHATRA_DEBUG] Jupiter was last in {target_nakshatra}: ~{last_year}")
-                        print(f"[NAKSHATRA_DEBUG] Jupiter will next be in {target_nakshatra}: ~{target_year}")
+
             return timeline
             
         except ValueError:
-            print(f"[NAKSHATRA_DEBUG] Unknown nakshatra: {target_nakshatra}")
             return []
         except Exception as e:
-            print(f"[NAKSHATRA_DEBUG] Error calculating nakshatra timeline: {e}")
             return []
     
     def calculate_gandanta_timeline(self, transit_planet: str, natal_planet: str,
@@ -434,19 +404,17 @@ class VedicTransitAspectCalculator:
         # Get natal planet's Gandanta point
         natal_data = natal_planets.get(natal_planet, {})
         if not natal_data:
-            print(f"[GANDANTA_DEBUG] No natal data found for {natal_planet}")
+
             return []
         
         natal_longitude = natal_data['longitude']
         gandanta_info = self._is_at_gandanta_point(natal_longitude)
         
         if not gandanta_info:
-            print(f"[GANDANTA_DEBUG] {natal_planet} is not at a Gandanta point")
+
             return []
         
-        print(f"[GANDANTA_DEBUG] === CALCULATING GANDANTA TIMELINE ===")
-        print(f"[GANDANTA_DEBUG] Natal {natal_planet} at {gandanta_info['name']} Gandanta ({natal_longitude:.2f}°)")
-        print(f"[GANDANTA_DEBUG] Looking for {transit_planet} transits through {gandanta_info['name']} junction")
+
         
         # Define Gandanta ranges for transit calculation
         gandanta_ranges = {
@@ -456,7 +424,7 @@ class VedicTransitAspectCalculator:
         }
         
         target_ranges = gandanta_ranges.get(gandanta_info['name'], [])
-        print(f"[GANDANTA_DEBUG] Target Gandanta ranges: {target_ranges}")
+
         
         try:
             # Date range for calculation
@@ -484,8 +452,7 @@ class VedicTransitAspectCalculator:
                             # Start new Gandanta period
                             in_gandanta = True
                             period_start_date = current_date
-                            print(f"[GANDANTA_DEBUG] Started Gandanta period: {current_date.strftime('%Y-%m-%d')}")
-                            print(f"[GANDANTA_DEBUG] Transit {transit_planet} at {transit_position:.1f}°")
+
                     else:
                         if in_gandanta:
                             # End current Gandanta period
@@ -496,7 +463,7 @@ class VedicTransitAspectCalculator:
                                     'end_date': current_date.strftime('%Y-%m-%d'),
                                     'peak_date': period_start_date.strftime('%Y-%m-%d')
                                 })
-                                print(f"[GANDANTA_DEBUG] Ended Gandanta period: {period_start_date.strftime('%Y-%m-%d')} to {current_date.strftime('%Y-%m-%d')}")
+
                                 period_start_date = None
                 else:
                     # No planet position, end any current period
@@ -520,14 +487,11 @@ class VedicTransitAspectCalculator:
                     'peak_date': period_start_date.strftime('%Y-%m-%d')
                 })
             
-            print(f"[GANDANTA_DEBUG] Found {len(timeline)} Gandanta activation periods")
-            for period in timeline:
-                print(f"[GANDANTA_DEBUG] Period: {period['start_date']} to {period['end_date']}")
+
             
             return timeline
             
         except Exception as e:
-            print(f"[GANDANTA_DEBUG] Error calculating Gandanta timeline: {e}")
             return []
     
     def _is_in_gandanta_range(self, longitude: float, range_start: float, range_end: float) -> bool:
@@ -565,7 +529,7 @@ class VedicTransitAspectCalculator:
         """Find aspects enhanced by nakshatra connections"""
         enhanced_aspects = []
         
-        print(f"\n=== FINDING NAKSHATRA ENHANCED ASPECTS ===")
+
         
         for transit_planet in self.transit_planets:
             if transit_planet not in natal_planets:
@@ -614,16 +578,16 @@ class VedicTransitAspectCalculator:
                     }
                     
                     enhanced_aspects.append(aspect_entry)
-                    print(f"Added {enhancement_type} connection: {transit_planet} -> {natal_planet} (nakshatra only)")
+
         
-        print(f"Total nakshatra enhanced aspects: {len(enhanced_aspects)}")
+
         return enhanced_aspects
     
     def _find_gandanta_aspects(self, natal_planets: Dict) -> List[Dict]:
         """Find aspects for planets at or transiting through Gandanta points"""
         gandanta_aspects = []
         
-        print(f"\n=== FINDING GANDANTA ASPECTS ===")
+
         
         for transit_planet in self.transit_planets:
             if transit_planet not in natal_planets:
@@ -654,9 +618,9 @@ class VedicTransitAspectCalculator:
                     }
                     
                     gandanta_aspects.append(aspect_entry)
-                    print(f"Added Gandanta aspect: {transit_planet} -> {natal_planet} at {gandanta_info['name']} ({natal_longitude:.2f}°)")
+
         
-        print(f"Total Gandanta aspects: {len(gandanta_aspects)}")
+
         return gandanta_aspects
     
     def _is_at_gandanta_point(self, longitude: float) -> Dict:
@@ -680,6 +644,8 @@ class VedicTransitAspectCalculator:
                     return gandanta
         
         return None
+    
+
 
 # API endpoints
 vedic_calculator = VedicTransitAspectCalculator()
@@ -692,6 +658,11 @@ class BirthData(BaseModel):
     longitude: float
     timezone: str
 
+@router.get("/test-vedic-aspects")
+async def test_vedic_aspects():
+    """Test endpoint to verify router is working"""
+    return {"message": "Vedic transit aspects router is working!"}
+
 @router.post("/vedic-transit-aspects")
 async def get_vedic_transit_aspects(request: Request):
     """Get all possible Vedic transit aspects"""
@@ -702,6 +673,8 @@ async def get_vedic_transit_aspects(request: Request):
     natal_planets = await _calculate_natal_positions(birth_data)
     
     aspects = vedic_calculator.calculate_vedic_aspects(natal_planets)
+    
+
     
     return {
         'aspects': aspects,
@@ -756,18 +729,14 @@ async def get_vedic_transit_timeline(request: Request):
     # Get the required transit house from the aspect data if available
     required_transit_house = request_data.get('required_transit_house')
     
-    print(f"\n=== API REQUEST DEBUG ===")
-    print(f"Requested: Transit {planet1} -> Natal {planet2} ({aspect_type})")
-    print(f"Natal {planet1} in house: {natal_planets.get(planet1, {}).get('house', 'unknown')}")
-    print(f"Natal {planet2} in house: {natal_house}")
-    print(f"Aspect house number: {aspect_house}")
+
     
     timeline = vedic_calculator.calculate_aspect_timeline(
         natal_longitude, aspect_house, planet1, start_year, year_range, 
         required_transit_house, natal_house, ascendant_sign, natal_planets
     )
     
-    print(f"Returning timeline with {len(timeline)} periods for {planet1} -> {planet2}")
+
     
     return {
         'timeline': timeline,
@@ -827,7 +796,7 @@ async def get_dasha_timeline(request: Request):
         }
     
     except Exception as e:
-        print(f"Error calculating dasha timeline: {e}")
+
         return {'dasha_timeline': [], 'error': str(e)}
 
 async def _calculate_natal_positions(birth_data: dict) -> Dict:
@@ -887,11 +856,11 @@ async def _calculate_natal_positions(birth_data: dict) -> Dict:
                 'house': house_number
             }
         
-        print(f"Calculated natal positions with houses: {planets}")
+
         return planets
     
     except Exception as e:
-        print(f"Error calculating natal positions: {e}")
+
         # Return fallback data
         return {
             'Sun': {'longitude': 349.21, 'sign': 11, 'degree': 19.21},

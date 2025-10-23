@@ -23,7 +23,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
 
   const fetchVedicAspects = async () => {
     try {
-      console.log('Fetching Vedic aspects for:', birthData);
       const response = await fetch('/api/vedic-transit-aspects', {
         method: 'POST',
         headers: { 
@@ -34,7 +33,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       });
       
       const data = await response.json();
-      console.log('Received aspects data:', data);
+      
       setAspects(data.aspects || []);
     } catch (error) {
       console.error('Error fetching Vedic aspects:', error);
@@ -59,7 +58,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       });
       
       const data = await response.json();
-      console.log('[DASHA_DEBUG] Fresh dasha timeline received:', data.dasha_timeline?.[0]);
       setDashaTimeline(data.dasha_timeline || []);
       setDashaDataReady(true);
     } catch (error) {
@@ -70,7 +68,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
 
   const loadTimeline = async (aspect, year) => {
     try {
-      console.log('Loading timeline for:', aspect, 'year:', year);
       const response = await fetch('/api/vedic-transit-timeline', {
         method: 'POST',
         headers: { 
@@ -90,7 +87,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       });
       
       const data = await response.json();
-      console.log('Received timeline data:', data);
       const aspectKey = `${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`;
       setAspectTimelines(prev => ({
         ...prev,
@@ -262,13 +258,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       periodDashas.pranadasha
     ].filter(Boolean);
     
-    // Debug for Mars->Sun aspects
-    if (aspect.planet1 === 'Mars' && aspect.planet2 === 'Sun') {
-      console.log(`[DASHA_DEBUG] Mars->Sun dasha check for ${period.start_date}:`);
-      console.log(`[DASHA_DEBUG] Full dasha data:`, periodDashas);
-      console.log(`[DASHA_DEBUG] All dashas: ${dashaLords.join(', ')}`);
-      console.log(`[DASHA_DEBUG] Relevant: ${dashaLords.includes(aspect.planet1) || dashaLords.includes(aspect.planet2)}`);
-    }
+
     
     return dashaLords.includes(aspect.planet1) || dashaLords.includes(aspect.planet2);
   };
@@ -289,13 +279,48 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     return relevantDashas.length > 0 ? `During ${relevantDashas.join('-')} period` : '';
   };
 
-  const getFilteredAspects = () => {
-    if (!showDashaRelevantOnly) return aspects;
+  const getGroupedAspects = () => {
+    // Group aspects by planet pair
+    const grouped = {};
     
-    return aspects.filter(aspect => {
-      const timeline = aspectTimelines[`${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`] || [];
-      return timeline.some(period => isDashaRelevant(aspect, period));
+    aspects.forEach(aspect => {
+      const key = `${aspect.planet1}-${aspect.planet2}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          planet1: aspect.planet1,
+          planet2: aspect.planet2,
+          aspects: []
+        };
+      }
+      grouped[key].aspects.push(aspect);
     });
+    
+    return Object.values(grouped);
+  };
+  
+  const getFilteredAspects = () => {
+    return getGroupedAspects();
+  };
+  
+  const getCombinedTimeline = (aspectGroup) => {
+    const allPeriods = [];
+    
+    aspectGroup.aspects.forEach(aspect => {
+      const timeline = aspectTimelines[`${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`] || [];
+      timeline.forEach(period => {
+        // Apply dasha filter at the period level, not group level
+        if (!showDashaRelevantOnly || isDashaRelevant(aspect, period)) {
+          allPeriods.push({
+            ...period,
+            aspectType: aspect.aspect_type,
+            aspect: aspect
+          });
+        }
+      });
+    });
+    
+    // Sort by start date
+    return allPeriods.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
   };
 
   const handlePredictionClick = (aspect, period, event) => {
@@ -334,7 +359,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev - 1)}
-            disabled={yearOffset <= -10}
+            disabled={currentYear + yearOffset - 2 <= 1900}
           >
             ←
           </button>
@@ -355,7 +380,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           <button 
             className="nav-arrow"
             onClick={() => setYearOffset(prev => prev + 1)}
-            disabled={yearOffset >= 10}
+            disabled={currentYear + yearOffset + 2 >= 2100}
           >
             →
           </button>
@@ -364,42 +389,41 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
 
       {/* Compact Aspects List */}
       <div className="transit-aspects-list">
-        {getFilteredAspects().slice(0, 8).map((aspect, index) => {
-          const aspectKey = `${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`;
-          const timeline = aspectTimelines[aspectKey] || [];
+        {getFilteredAspects().map((aspectGroup, index) => {
+          const combinedTimeline = getCombinedTimeline(aspectGroup);
           
           return (
-            <div key={index} className="transit-aspect-row" data-tooltip={getAspectTooltip(aspect)}>
+            <div key={index} className="transit-aspect-row">
               <div className="aspect-info">
-                <span className="transit-planet">{aspect.planet1}</span>
+                <span className="transit-planet">{aspectGroup.planet1}</span>
                 <span className="aspect-arrow">→</span>
-                <span className="target-planet">{aspect.planet2}</span>
-                <span className={`aspect-house ${aspect.enhancement_type || 'regular'}`}>
-                  ({getAspectName(aspect.aspect_type, aspect.enhancement_type)})
-                </span>
+                <span className="target-planet">{aspectGroup.planet2}</span>
               </div>
               <div className="timeline-chips">
-                {timeline.slice(0, 3).map((period, pIndex) => (
+                {combinedTimeline.slice(0, 3).map((period, pIndex) => (
                   <button
                     key={pIndex}
-                    className={`timeline-chip ${getPeriodClass(period, aspect)}`}
+                    className={`timeline-chip ${getPeriodClass(period, period.aspect)}`}
                     onClick={(e) => {
                       if (e.shiftKey || e.ctrlKey || e.metaKey) {
-                        handlePredictionClick(aspect, period, e);
+                        handlePredictionClick(period.aspect, period, e);
                       } else {
                         onTimelineClick(new Date(period.peak_date || period.start_date));
                       }
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      handlePredictionClick(aspect, period, e);
+                      handlePredictionClick(period.aspect, period, e);
                     }}
-                    title={`${period.start_date} to ${period.end_date}${getDashaContext(aspect, period) ? '\n' + getDashaContext(aspect, period) : ''}\n\nRight-click or Shift+click for prediction`}
+                    title={`${getAspectName(period.aspectType)} aspect\n${period.start_date} to ${period.end_date}${getDashaContext(period.aspect, period) ? '\n' + getDashaContext(period.aspect, period) : ''}\n\nRight-click or Shift+click for prediction`}
                   >
-                    {formatPeriod(period)}
+                    <div className="chip-content">
+                      <div className="aspect-number">{getAspectName(period.aspectType).replace(/th$/, '')}</div>
+                      <div className="period-date">{formatPeriod(period)}</div>
+                    </div>
                   </button>
                 ))}
-                {timeline.length === 0 && (
+                {combinedTimeline.length === 0 && (
                   <span className="no-periods">No periods</span>
                 )}
               </div>

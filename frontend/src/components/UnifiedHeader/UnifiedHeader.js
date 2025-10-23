@@ -221,6 +221,7 @@ const UnifiedHeader = ({
                 >
                   ⚙️ Settings
                 </button>
+
                 <div
                   style={{
                     padding: '12px 16px',
@@ -296,6 +297,7 @@ const UnifiedHeader = ({
             >
               ➕ New Chart
             </button>
+
           </>
         )}
 

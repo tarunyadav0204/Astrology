@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import bcrypt
 import jwt
+from horoscope.api import HoroscopeAPI
 from rule_engine.api import router as rule_engine_router
 from user_settings import router as settings_router
 from daily_predictions import DailyPredictionEngine
@@ -41,6 +42,7 @@ except Exception as e:
     pass
 
 app = FastAPI()
+horoscope_api = HoroscopeAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -2108,6 +2110,78 @@ async def startup_event():
         print("House combinations database initialized")
     except Exception as e:
         print(f"Warning: Could not initialize house combinations database: {e}")
+
+# Horoscope endpoints
+@app.get("/horoscope/daily/{zodiac_sign}")
+async def get_daily_horoscope(zodiac_sign: str, date: Optional[str] = None):
+    try:
+        if date:
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+        else:
+            date_obj = None
+            
+        horoscope = horoscope_api.get_daily_horoscope(zodiac_sign.capitalize(), date_obj)
+        return horoscope
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/horoscope/weekly/{zodiac_sign}")
+async def get_weekly_horoscope(zodiac_sign: str, date: Optional[str] = None):
+    try:
+        if date:
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+        else:
+            date_obj = None
+            
+        horoscope = horoscope_api.get_weekly_horoscope(zodiac_sign.capitalize(), date_obj)
+        return horoscope
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/horoscope/monthly/{zodiac_sign}")
+async def get_monthly_horoscope(zodiac_sign: str, date: Optional[str] = None):
+    try:
+        if date:
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+        else:
+            date_obj = None
+            
+        horoscope = horoscope_api.get_monthly_horoscope(zodiac_sign.capitalize(), date_obj)
+        return horoscope
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/horoscope/yearly/{zodiac_sign}")
+async def get_yearly_horoscope(zodiac_sign: str, date: Optional[str] = None):
+    try:
+        if date:
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+        else:
+            date_obj = None
+            
+        horoscope = horoscope_api.get_yearly_horoscope(zodiac_sign.capitalize(), date_obj)
+        return horoscope
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/horoscope/all-signs")
+async def get_all_daily_horoscopes(date: Optional[str] = None):
+    try:
+        zodiac_signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+                       'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        
+        if date:
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+        else:
+            date_obj = None
+            
+        horoscopes = {}
+        for sign in zodiac_signs:
+            horoscopes[sign.lower()] = horoscope_api.get_daily_horoscope(sign, date_obj)
+            
+        return horoscopes
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

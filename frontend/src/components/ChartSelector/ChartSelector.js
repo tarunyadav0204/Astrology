@@ -142,7 +142,7 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(styleSheet);
 }
 
-const ChartSelector = ({ onSelectChart, onCreateNew, onLogout }) => {
+const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
   const { setBirthData, setChartData } = useAstrology();
   const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,22 +277,42 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout }) => {
               }}>Professional Vedic Astrology Platform</p>
             </div>
           </div>
-          <button 
-            onClick={onLogout}
-            style={{
-              padding: '12px 24px',
-              background: 'linear-gradient(45deg, #dc3545, #c82333)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '25px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: '600',
-              boxShadow: '0 4px 15px rgba(220, 53, 69, 0.3)'
-            }}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {user?.isAdmin && (
+              <button
+                onClick={() => window.location.href = '/investor'}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(45deg, #ff6b35, #f7931e)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  boxShadow: '0 4px 15px rgba(255, 107, 53, 0.3)'
+                }}
+              >
+                👑 Admin
+              </button>
+            )}
+            <button 
+              onClick={onLogout}
+              style={{
+                padding: '12px 24px',
+                background: 'linear-gradient(45deg, #dc3545, #c82333)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '25px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: '600',
+                boxShadow: '0 4px 15px rgba(220, 53, 69, 0.3)'
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         <div style={{

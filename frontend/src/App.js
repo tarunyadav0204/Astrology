@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/mobile-fixes.css';
@@ -8,6 +9,9 @@ import PredictionsPage from './components/PredictionsPage/PredictionsPage';
 import LandingPage from './components/LandingPage/LandingPage';
 import ChartSelector from './components/ChartSelector/ChartSelector';
 import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
+import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
+import InvestorHomepage from './components/Homepage/InvestorHomepage';
+import HoroscopePage from './components/Horoscope/HoroscopePage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -15,7 +19,7 @@ import { authService } from './services/authService';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [currentView, setCurrentView] = useState('selector'); // selector, form, dashboard, predictions
+  const [currentView, setCurrentView] = useState('selector'); // user-home, selector, form, dashboard, predictions
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,31 +66,49 @@ function App() {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
   }
 
+  // Show landing page for non-authenticated users
   if (!user) {
     return (
-      <>
-        <LandingPage onLogin={handleLogin} onRegister={handleLogin} />
+      <Router>
+        <Routes>
+          <Route path="/" element={
+            <LandingPage onLogin={handleLogin} onRegister={handleLogin} />
+          } />
+          <Route path="/horoscope/:period" element={<HoroscopePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
         <ToastContainer />
-      </>
+      </Router>
     );
   }
 
   return (
-    <AstrologyProvider>
-      <div style={{ 
-        padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
-        maxWidth: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' ? '100vw' : '1200px', 
-        margin: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' ? '0' : '0 auto',
-        minHeight: '100vh',
-        background: currentView === 'dashboard' || currentView === 'predictions' ? 'transparent' : 
-                   currentView === 'selector' ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
-        overflowX: 'hidden'
-      }}>
+    <Router>
+      <AstrologyProvider>
+        <Routes>
+          <Route path="/horoscope/:period" element={<HoroscopePage />} />
+          <Route path="/investor" element={<InvestorHomepage />} />
+          <Route path="/*" element={
+            <div style={{ 
+              padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
+              maxWidth: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '100vw' : '1200px', 
+              margin: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '0' : '0 auto',
+              minHeight: '100vh',
+              background: currentView === 'dashboard' || currentView === 'predictions' ? 'transparent' : 
+                         currentView === 'selector' || currentView === 'user-home' ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
+              overflowX: 'hidden',
+              width: '100%'
+            }}>
+        {currentView === 'user-home' && (
+          <InvestorHomepage onGetStarted={() => setCurrentView('selector')} />
+        )}
         {currentView === 'selector' && (
           <ChartSelector 
             onSelectChart={() => setCurrentView('dashboard')} 
             onCreateNew={() => setCurrentView('form')} 
-            onLogout={handleLogout} 
+            onLogout={handleLogout}
+            onBackToUserHome={() => setCurrentView('user-home')}
+            user={user}
           />
         )}
         {currentView === 'form' && (
@@ -128,8 +150,11 @@ function App() {
           pauseOnHover
         />
 
-      </div>
-    </AstrologyProvider>
+            </div>
+          } />
+        </Routes>
+      </AstrologyProvider>
+    </Router>
   );
 }
 

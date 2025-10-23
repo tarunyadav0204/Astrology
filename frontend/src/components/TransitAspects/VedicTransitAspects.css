@@ -238,10 +238,36 @@
   white-space: nowrap;
 }
 
-.timeline-chip:hover {
+.chip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.aspect-number {
   background: #e91e63;
   color: white;
+  border-radius: 8px;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.period-date {
+  font-size: 0.6rem;
+  color: #333;
+  line-height: 1;
+}
+
+.timeline-chip:hover {
+  background: #e91e63;
   border-color: #e91e63;
+}
+
+.timeline-chip:hover .period-date {
+  color: white;
 }
 
 .timeline-chip.current {
