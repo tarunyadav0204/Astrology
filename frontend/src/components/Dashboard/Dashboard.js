@@ -3,6 +3,7 @@ import { useAstrology } from '../../context/AstrologyContext';
 import { DASHBOARD_CONFIG } from '../../config/dashboard.config';
 import ChartWidget from '../Charts/ChartWidget';
 import DashaWidget from '../DashaTable/DashaWidget';
+import DashaHierarchyBar from '../DashaHierarchyBar/DashaHierarchyBar';
 import TransitControls from '../TransitControls/TransitControls';
 import VedicTransitAspects from '../TransitAspects/VedicTransitAspects';
 import EventPredictionWidget from '../EventPredictionWidget/EventPredictionWidget';
@@ -441,6 +442,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     onTransitDateChange={handleTransitDateChange}
                     onResetToToday={resetToToday}
                   />
+                  <DashaHierarchyBar selectedDashas={selectedDashas} transitDate={transitDate} />
                   <div style={{ 
                     display: 'grid', 
                     gridTemplateColumns: '1fr 1fr', 
@@ -612,6 +614,10 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 defaultStyle={userSettings.default_chart_style}
               />
             </GridItem>
+            
+            <div style={{ gridColumn: '1 / -1' }}>
+              <DashaHierarchyBar selectedDashas={selectedDashas} transitDate={transitDate} />
+            </div>
             
             <div style={{ 
               gridColumn: '1 / -1', 
