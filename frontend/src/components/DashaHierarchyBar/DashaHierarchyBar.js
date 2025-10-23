@@ -9,6 +9,15 @@ const DashaHierarchyBar = ({ selectedDashas, transitDate }) => {
     { key: 'sookshma', label: 'S', color: '#3f51b5' },
     { key: 'prana', label: 'Pr', color: '#2196f3' }
   ];
+  
+  const getShortPlanetName = (planetName) => {
+    if (!planetName || planetName === '—') return '—';
+    const shortNames = {
+      'Sun': 'Su', 'Moon': 'Mo', 'Mars': 'Ma', 'Mercury': 'Me',
+      'Jupiter': 'Ju', 'Venus': 'Ve', 'Saturn': 'Sa', 'Rahu': 'Ra', 'Ketu': 'Ke'
+    };
+    return shortNames[planetName] || planetName.slice(0, 2);
+  };
 
   return (
     <div className="dasha-hierarchy-bar">
@@ -22,7 +31,7 @@ const DashaHierarchyBar = ({ selectedDashas, transitDate }) => {
                 <div className="dasha-content">
                   <span className="level-label">{level.label}:</span>
                   <span className="planet-name">
-                    {dasha ? dasha.planet : '—'}
+                    {dasha ? (window.innerWidth <= 768 ? getShortPlanetName(dasha.planet) : dasha.planet) : '—'}
                   </span>
                 </div>
               </div>
