@@ -79,16 +79,32 @@ class VedicTransitAspectCalculator:
                 
 
                 
-                # Generate all possible aspects that transit planet can make to natal planet
-                for aspect_number in available_aspects:
+                # Only generate aspects that actually exist in the natal chart
+                # Check if transit planet can aspect natal planet from their natal positions
+                actual_aspect = None
+                for test_aspect in available_aspects:
+                    if test_aspect == 1:
+                        # Conjunction - same house
+                        if transit_house == natal_house:
+                            actual_aspect = test_aspect
+                            break
+                    else:
+                        # Calculate target house for this aspect
+                        target_house = ((transit_house + test_aspect - 2) % 12) + 1
+                        if target_house == natal_house:
+                            actual_aspect = test_aspect
+                            break
+                
+                # Only add if there's a valid aspect in the natal chart
+                if actual_aspect is not None:
                     aspect_entry = {
                         'planet1': transit_planet,
                         'planet2': natal_planet,
-                        'aspect_type': f'{aspect_number}th_house',
+                        'aspect_type': f'{actual_aspect}th_house',
                         'natal_longitude': natal_data['longitude'],
                         'natal_house': natal_house,
-                        'aspect_house': aspect_number,
-                        'description': f'Transit {transit_planet} {aspect_number}th house aspect to natal {natal_planet}',
+                        'aspect_house': actual_aspect,
+                        'description': f'Transit {transit_planet} {actual_aspect}th house aspect to natal {natal_planet}',
                         'enhancement_type': 'regular'
                     }
                     
