@@ -392,6 +392,11 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
         {getFilteredAspects().map((aspectGroup, index) => {
           const combinedTimeline = getCombinedTimeline(aspectGroup);
           
+          // Hide rows with no periods
+          if (combinedTimeline.length === 0) {
+            return null;
+          }
+          
           return (
             <div key={index} className="transit-aspect-row">
               <div className="aspect-info">
@@ -423,9 +428,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
                     </div>
                   </button>
                 ))}
-                {combinedTimeline.length === 0 && (
-                  <span className="no-periods">No periods</span>
-                )}
               </div>
             </div>
           );

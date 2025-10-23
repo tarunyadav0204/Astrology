@@ -79,7 +79,7 @@ class VedicTransitAspectCalculator:
                 
 
                 
-                # Generate ALL possible transit aspects for this planet pair
+                # Generate all possible aspects that transit planet can make to natal planet
                 for aspect_number in available_aspects:
                     aspect_entry = {
                         'planet1': transit_planet,
@@ -127,32 +127,32 @@ class VedicTransitAspectCalculator:
                 
                 planet2_house = planet2_data.get('house', 1)
                 
-                # Calculate which house planet2 is FROM planet1's perspective
-                # Saturn in 12th house, natal Saturn in 2nd house
-                # From 12th to 2nd: (2 - 12 + 12) % 12 = 2, but that's 3rd house from 12th
-                house_diff = (planet2_house - planet1_house + 12) % 12
-                if house_diff == 0:
-                    aspect_number = 1  # Same house = conjunction
-                else:
-                    aspect_number = house_diff + 1  # 1st, 2nd, 3rd, etc. house from aspecting planet
-                
-
-                
-                # Check if planet1 can actually make this aspect
+                # Check if planet1 can aspect planet2 from their natal positions
                 if planet1_name in self.vedic_aspects:
                     available_aspects = self.vedic_aspects[planet1_name]
-
                     
-                    if aspect_number in available_aspects:
+                    # Find which aspect (if any) from planet1_house reaches planet2_house
+                    aspect_number = None
+                    for test_aspect in available_aspects:
+                        if test_aspect == 1:
+                            # Conjunction - same house
+                            if planet1_house == planet2_house:
+                                aspect_number = 1
+                                break
+                        else:
+                            # Calculate target house for this aspect
+                            target_house = ((planet1_house + test_aspect - 2) % 12) + 1
+                            if target_house == planet2_house:
+                                aspect_number = test_aspect
+                                break
+                    
+                    if aspect_number is not None:
                         natal_aspects.append({
                             'planet1': planet1_name,
                             'planet2': planet2_name,
                             'aspect_type': f'{aspect_number}th_house',
                             'house_difference': aspect_number
                         })
-
-                    else:
-                        pass
         
         return natal_aspects
     
@@ -189,17 +189,26 @@ class VedicTransitAspectCalculator:
                 transit_sign = int(transit_position / 30)
                 transit_house = ((transit_sign - ascendant_sign) % 12) + 1
                 
-                # Calculate what aspect transit planet makes to natal planet
-                actual_house_diff = (natal_house - transit_house + 12) % 12
-                actual_aspect = 1 if actual_house_diff == 0 else actual_house_diff + 1
-                
-                # STRICT VALIDATION: Only valid if ALL conditions met
+                # Check if transit planet can aspect natal planet from current position
                 available_aspects = self.vedic_aspects.get(transit_planet, [])
-                can_make_this_aspect = actual_aspect in available_aspects
-                matches_required = actual_aspect == aspect_house
                 
-                # Check if this is a valid aspect
-                is_valid_aspect = (actual_aspect in available_aspects and actual_aspect == aspect_house)
+                # Find which aspect (if any) from transit_house reaches natal_house
+                actual_aspect = None
+                for test_aspect in available_aspects:
+                    if test_aspect == 1:
+                        # Conjunction - same house
+                        if transit_house == natal_house:
+                            actual_aspect = 1
+                            break
+                    else:
+                        # Calculate target house for this aspect
+                        target_house = ((transit_house + test_aspect - 2) % 12) + 1
+                        if target_house == natal_house:
+                            actual_aspect = test_aspect
+                            break
+                
+                # Check if this matches the required aspect and is valid
+                is_valid_aspect = (actual_aspect is not None and actual_aspect == aspect_house)
                 
 
                 
