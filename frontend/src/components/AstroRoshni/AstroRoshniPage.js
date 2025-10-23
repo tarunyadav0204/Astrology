@@ -178,6 +178,22 @@ const AstroRoshniPage = () => {
         </div>
       </section>
 
+      {/* Wide Dasha/Transit Table Section */}
+      <section className="wide-table-section">
+        <div className="container">
+          <h2>Complete Dasha & Transit Analysis</h2>
+          <div className="wide-image-container">
+            <img src="/images/software/dasha-transit-table.png" alt="Comprehensive Dasha and Transit Analysis Table" />
+            <div className="wide-image-overlay">
+              <div className="overlay-content">
+                <h3>🔮 Advanced Timeline Analysis</h3>
+                <p>Complete dasha periods with precise transit timings for accurate predictions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section className="pricing-section">
         <div className="container">
