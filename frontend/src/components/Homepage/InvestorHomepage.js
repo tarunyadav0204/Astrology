@@ -222,6 +222,43 @@ const InvestorHomepage = () => {
         </div>
       </section>
 
+      {/* AstroRoshni Software Advertisement */}
+      <section className="astroroshni-ad">
+        <div className="container">
+          <div className="astroroshni-banner">
+            <div className="astroroshni-content">
+              <div className="astroroshni-badge">🌟 WORLD'S #1 ASTROLOGY SOFTWARE</div>
+              <h2>AstroRoshni Professional</h2>
+              <p className="astroroshni-tagline">The Most Advanced Vedic Astrology Software Globally</p>
+              <div className="astroroshni-features">
+                <span>✨ Swiss Ephemeris Precision</span>
+                <span>🎯 Highest Automation Level</span>
+                <span>📊 Feature Rich Charts</span>
+                <span>🔮 Advanced Dasha Systems</span>
+              </div>
+              <div className="astroroshni-pricing">
+                <span className="old-price">₹4,999</span>
+                <span className="new-price">₹2,999</span>
+                <span className="discount">40% OFF</span>
+              </div>
+              <button className="astroroshni-btn" onClick={() => window.open('/astroroshni', '_blank')}>
+                🚀 EXPLORE ASTROROSHNI
+              </button>
+            </div>
+            <div className="astroroshni-visual">
+              <div className="software-mockup">
+                <div className="mockup-screen">
+                  <div className="chart-preview">📊</div>
+                  <div className="feature-icons">
+                    <span>🌙</span><span>⭐</span><span>🪐</span><span>🔮</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Premium Services - Moved Higher */}
       <section className="premium-services">
         <div className="container">

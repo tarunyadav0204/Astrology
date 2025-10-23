@@ -60,9 +60,43 @@
   animation: pulse 2s infinite;
 }
 
+.astroroshni-link {
+  background: linear-gradient(135deg, #ffd700, #ff6b6b) !important;
+  color: white !important;
+  padding: 8px 16px;
+  border-radius: 25px;
+  font-weight: bold;
+  text-decoration: none;
+  animation: astroGlow 2s infinite, astroBlink 3s infinite;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s;
+}
+
+.astroroshni-link:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 25px rgba(255, 107, 107, 0.8);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+@keyframes astroGlow {
+  0%, 100% { 
+    box-shadow: 0 0 15px #ffd700, 0 0 25px #ffd700;
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 20px #ff6b6b, 0 0 30px #ff6b6b;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes astroBlink {
+  0%, 50% { opacity: 1; }
+  25%, 75% { opacity: 0.8; }
 }
 
 .auth-section .auth-btn {

@@ -12,6 +12,7 @@ import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
 import InvestorHomepage from './components/Homepage/InvestorHomepage';
 import HoroscopePage from './components/Horoscope/HoroscopePage';
+import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -88,6 +89,7 @@ function App() {
         <Routes>
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
           <Route path="/investor" element={<InvestorHomepage />} />
+          <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={
             <div style={{ 
               padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 

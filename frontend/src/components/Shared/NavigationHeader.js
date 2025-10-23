@@ -17,6 +17,9 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             <a href="#chat" className="chat-btn">
               💬 Chat with Astrologer <span className="online-dot"></span>
             </a>
+            <a href="/astroroshni" target="_blank" className="astroroshni-link">
+              ⭐ AstroRoshni Pro
+            </a>
           </div>
           <div className="auth-section">
             <button className="auth-btn">Sign In / Sign Up</button>
