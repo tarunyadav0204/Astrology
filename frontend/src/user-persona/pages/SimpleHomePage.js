@@ -24,7 +24,7 @@ const SimpleHomePage = ({ onGetStarted }) => {
         alignItems: 'center'
       }}>
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-          🌟 AstroVedic
+          🌟 AstroRoshni
         </div>
         <button 
           onClick={() => handleGetStarted('signin')}
@@ -717,10 +717,10 @@ const SimpleHomePage = ({ onGetStarted }) => {
         marginTop: '40px'
       }}>
         <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '10px' }}>
-          🌟 AstroVedic
+          🌟 AstroRoshni
         </div>
         <p style={{ margin: 0, color: '#ccc' }}>
-          © 2024 AstroVedic. Authentic Vedic Astrology Solutions.
+          © 2024 AstroRoshni. Authentic Vedic Astrology Solutions.
         </p>
       </footer>
     </div>

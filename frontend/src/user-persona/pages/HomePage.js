@@ -141,7 +141,7 @@ const HomePage = ({ onGetStarted }) => {
             color: '#e91e63'
           }}>
             <span style={{ fontSize: '28px' }}>🌟</span>
-            <span>AstroVedic</span>
+            <span>AstroRoshni</span>
           </div>
           <div style={{
             display: 'flex',
@@ -401,7 +401,7 @@ const HomePage = ({ onGetStarted }) => {
             <div className="footer-section">
               <div className="footer-logo">
                 <span className="logo-icon">🌟</span>
-                <span className="logo-text">AstroVedic</span>
+                <span className="logo-text">AstroRoshni</span>
               </div>
               <p>Authentic Vedic Astrology with Scientific Precision</p>
             </div>
@@ -434,7 +434,7 @@ const HomePage = ({ onGetStarted }) => {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>&copy; 2024 AstroVedic. All rights reserved.</p>
+            <p>&copy; 2024 AstroRoshni. All rights reserved.</p>
           </div>
         </div>
       </footer>

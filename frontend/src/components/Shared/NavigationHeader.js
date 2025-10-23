@@ -31,7 +31,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
         <div className="container">
           <div className="logo-section">
             <button className="logo-text" onClick={() => navigate('/')}>
-              🔮 AstroVedic
+              🔮 AstroRoshni
             </button>
           </div>
           <div className="language-section">

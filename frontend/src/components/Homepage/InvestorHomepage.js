@@ -712,7 +712,7 @@ const InvestorHomepage = () => {
               <a href="#privacy">Privacy Policy</a>
             </div>
             <div className="footer-bottom">
-              <p>© 2025 AstroVedic.com. All rights reserved.</p>
+              <p>© 2025 AstroRoshni.com. All rights reserved.</p>
             </div>
           </div>
         </div>
