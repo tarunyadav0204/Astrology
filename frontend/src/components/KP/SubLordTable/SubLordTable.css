@@ -1,0 +1,324 @@
+/* Sub-Lord Table Styles - No Scrollbar */
+.sublord-table-container {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sublord-header {
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid #2196f3;
+  flex-shrink: 0;
+}
+
+.sublord-header h3 {
+  margin: 0;
+  color: #2196f3;
+  font-size: 0.9rem;
+}
+
+.table-info {
+  display: none;
+}
+
+.sublord-table {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: #333;
+  margin-bottom: 0.3rem;
+  flex-shrink: 0;
+}
+
+.table-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  background: #fafafa;
+  border-radius: 3px;
+  align-items: center;
+  font-size: 0.75rem;
+  min-height: 36px;
+  line-height: 1.3;
+}
+
+.table-row:hover {
+  background: #f0f0f0;
+}
+
+.col-planet {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.planet-symbol {
+  font-weight: bold;
+  color: #e91e63;
+  font-size: 0.75rem;
+}
+
+.planet-name {
+  font-size: 0.75rem;
+  color: #333;
+}
+
+.col-degree {
+  font-size: 0.65rem;
+  color: #666;
+  font-family: monospace;
+}
+
+.col-sign {
+  font-size: 0.8rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.col-nakshatra {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.nakshatra-name {
+  font-size: 0.7rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.nakshatra-pada {
+  font-size: 0.6rem;
+  color: #666;
+}
+
+.col-sublord {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.sublord-name {
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  background: rgba(33, 150, 243, 0.1);
+  font-size: 0.7rem;
+}
+
+.col-subsublord {
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.subsublord-name {
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  background: rgba(233, 30, 99, 0.1);
+  font-size: 0.7rem;
+}
+
+/* House Cusps Section */
+.sublord-cusps {
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+}
+
+.sublord-cusps h4 {
+  margin: 0 0 0.5rem 0;
+  color: #2196f3;
+  font-size: 1rem;
+}
+
+.cusps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.cusp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.cusp-house {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 0.2rem;
+}
+
+.cusp-degree {
+  font-size: 0.6rem;
+  color: #333;
+  font-family: monospace;
+  margin-bottom: 0.2rem;
+}
+
+.cusp-sublord {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.sublord-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #dc3545;
+  font-size: 1rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .sublord-table-container {
+    padding: 0.5rem;
+  }
+  
+  .table-header {
+    display: none;
+  }
+  
+  .table-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0.4rem;
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 0.6rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .col-planet {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .col-degree {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.8rem;
+  }
+  
+  .col-degree::before {
+    content: 'Position:';
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 600;
+  }
+  
+  .col-sign {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.9rem;
+  }
+  
+  .col-sign::before {
+    content: 'Sign:';
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 600;
+  }
+  
+  .col-nakshatra {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 0.3rem;
+    border-radius: 4px;
+    margin-top: 0.2rem;
+  }
+  
+  .nakshatra-name {
+    font-size: 0.8rem;
+  }
+  
+  .nakshatra-pada {
+    font-size: 0.7rem;
+  }
+  
+  .col-sublord {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-top: 0.2rem;
+  }
+  
+  .col-sublord::before {
+    content: 'Sub-Lord: ';
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 600;
+  }
+  
+  .sublord-name {
+    font-size: 0.9rem;
+  }
+  
+  .cusps-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+  }
+  
+  .cusp-item {
+    padding: 0.4rem 0.2rem;
+  }
+  
+  .cusp-house {
+    font-size: 0.7rem;
+  }
+  
+  .cusp-degree {
+    font-size: 0.6rem;
+  }
+  
+  .cusp-sublord {
+    font-size: 0.7rem;
+  }
+}

@@ -2,17 +2,14 @@ import styled from 'styled-components';
 import { APP_CONFIG } from '../../config/app.config';
 
 export const DashboardContainer = styled.div`
-  height: 100vh;
-  max-height: 100vh;
+  min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   margin: 0;
   padding: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   
   @media (max-width: 768px) {
-    overflow: hidden;
     -webkit-overflow-scrolling: touch;
   }
   

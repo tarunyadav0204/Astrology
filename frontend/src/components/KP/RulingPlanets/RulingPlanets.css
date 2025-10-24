@@ -1,0 +1,138 @@
+/* Ruling Planets Styles */
+.ruling-planets-container {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.ruling-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #ff9800;
+}
+
+.ruling-header h3 {
+  margin: 0;
+  color: #ff9800;
+  font-size: 1.2rem;
+}
+
+.ruling-info {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.3rem;
+}
+
+.ruling-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.8rem;
+}
+
+.ruling-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.6rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+
+.ruling-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.ruling-label {
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.ruling-planet {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 2px solid currentColor;
+}
+
+.combined-ruling {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.combined-ruling h4 {
+  margin: 0 0 0.5rem 0;
+  color: #ff9800;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.combined-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.combined-planet {
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid currentColor;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ruling-loading,
+.ruling-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 150px;
+  font-size: 1rem;
+  color: #666;
+}
+
+.ruling-error {
+  color: #dc3545;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .ruling-planets-container {
+    padding: 0.5rem;
+  }
+  
+  .ruling-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .ruling-item {
+    padding: 0.5rem;
+  }
+  
+  .ruling-label {
+    font-size: 0.7rem;
+  }
+  
+  .ruling-planet {
+    font-size: 1rem;
+    padding: 0.3rem 0.6rem;
+  }
+  
+  .combined-planet {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+}

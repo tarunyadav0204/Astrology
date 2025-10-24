@@ -13,6 +13,7 @@ import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
 import NadiTab from '../Nadi/NadiTab';
+import KPTab from '../KP/KPTab';
 
 import ClassicalPrediction from '../ClassicalPrediction/ClassicalPrediction';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
@@ -361,6 +362,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         {[
           { id: 'dashboard', label: '🕉️ Parashara', icon: '🕉️' },
           { id: 'nadi', label: '🔍 Nadi', icon: '🔍' },
+          { id: 'kp', label: '🔢 KP', icon: '🔢' },
           { id: 'marriage', label: '💍 Marriage', icon: '💍' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
           { id: 'houses', label: '🏠 House Analysis', icon: '🏠' },
@@ -763,6 +765,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           }}>
             {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
             {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} selectedDashas={selectedDashas} onDashaSelection={handleDashaSelection} />}
+            {activeTab === 'kp' && <KPTab birthData={birthData} />}
             {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
             {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}

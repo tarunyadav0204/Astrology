@@ -1,0 +1,219 @@
+/* KP Chart Styles - Fit Container */
+.kp-chart-container {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kp-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid #e91e63;
+  flex-shrink: 0;
+}
+
+.kp-chart-header h3 {
+  margin: 0;
+  color: #e91e63;
+  font-size: 0.9rem;
+}
+
+.chart-info {
+  display: none;
+}
+
+.kp-chart-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  aspect-ratio: 1;
+  max-height: 100%;
+}
+
+.chart-row {
+  display: flex;
+  height: 25%;
+}
+
+.kp-house {
+  flex: 1;
+  border: 1px solid #9c27b0;
+  padding: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: #fafafa;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.house-number {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  font-size: 0.6rem;
+  font-weight: bold;
+  color: #9c27b0;
+  background: white;
+  padding: 1px 2px;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.house-cusp {
+  font-size: 0.5rem;
+  color: #666;
+  margin-top: 0.5rem;
+  line-height: 1;
+}
+
+.house-sign {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0.1rem 0;
+  line-height: 1;
+}
+
+.house-planets {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.planet-in-house {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 0.5rem;
+  margin-bottom: 0.1rem;
+  line-height: 1;
+}
+
+.planet-symbol {
+  font-weight: bold;
+  color: #e91e63;
+  font-size: 0.5rem;
+}
+
+.planet-name {
+  font-size: 0.45rem;
+  color: #333;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.planet-degree {
+  color: #666;
+  font-size: 0.4rem;
+  line-height: 1;
+}
+
+.chart-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  color: white;
+  text-align: center;
+  padding: 1rem;
+}
+
+.chart-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.birth-info {
+  font-size: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+
+.birth-location {
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+.chart-legend {
+  display: none;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.kp-chart-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #dc3545;
+  font-size: 1rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .kp-chart-container {
+    padding: 0.5rem;
+  }
+  
+  .kp-house {
+    padding: 0.3rem;
+  }
+  
+  .house-number {
+    font-size: 0.6rem;
+  }
+  
+  .house-cusp,
+  .house-sign {
+    font-size: 0.6rem;
+  }
+  
+  .planet-in-house {
+    font-size: 0.5rem;
+  }
+  
+  .planet-name {
+    font-size: 0.45rem;
+  }
+  
+  .planet-degree {
+    font-size: 0.45rem;
+  }
+  
+  .chart-center {
+    padding: 0.5rem;
+  }
+  
+  .chart-title {
+    font-size: 1.2rem;
+  }
+  
+  .birth-info,
+  .birth-location {
+    font-size: 0.7rem;
+  }
+}

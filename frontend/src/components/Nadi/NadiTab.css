@@ -231,7 +231,7 @@
 .timeline-chips {
   display: flex;
   gap: 3px;
-  flex-wrap: wrap;
+  
   flex: 1;
   margin: 0 8px;
 }

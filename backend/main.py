@@ -29,6 +29,8 @@ from planetary_dignities import router as planetary_dignities_router
 from chara_karakas import router as chara_karakas_router
 from shadbala import router as shadbala_router
 from classical_shadbala import router as classical_shadbala_router
+from auth import get_current_user as auth_get_current_user
+from app.kp.routes.kp_routes import router as kp_router
 
 # Load environment variables explicitly
 try:
@@ -64,6 +66,7 @@ app.include_router(planetary_dignities_router, prefix="/api")
 app.include_router(chara_karakas_router, prefix="/api")
 app.include_router(shadbala_router, prefix="/api")
 app.include_router(classical_shadbala_router, prefix="/api")
+app.include_router(kp_router, prefix="/api")
 
 # Root endpoint for health check
 @app.get("/")
@@ -250,25 +253,8 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        phone: str = payload.get("sub")
-        if phone is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT userid, name, phone, role FROM users WHERE phone = ?", (phone,))
-    user = cursor.fetchone()
-    conn.close()
-    
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return User(userid=user[0], name=user[1], phone=user[2], role=user[3])
+# Use the auth module function
+get_current_user = auth_get_current_user
 
 @app.post("/api/register")
 async def register(user_data: UserCreate):

@@ -1,0 +1,181 @@
+/* Significators Matrix Styles - No Scrollbar */
+.significators-container {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.significators-container.compact {
+  padding: 0.5rem;
+}
+
+.significators-header {
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid #4caf50;
+  flex-shrink: 0;
+}
+
+.significators-header h3 {
+  margin: 0;
+  color: #4caf50;
+  font-size: 0.9rem;
+}
+
+.matrix-info {
+  display: none;
+}
+
+.significators-matrix {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.house-significators {
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  margin-bottom: 0.1rem;
+  background: #f8f9fa;
+  border-radius: 3px;
+  border-left: 2px solid #4caf50;
+  min-height: 0;
+}
+
+.house-label {
+  min-width: 50px;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.7rem;
+}
+
+.significators-list {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.significator-item {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.3rem;
+  background: white;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+}
+
+.planet-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.significator-type {
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.1rem 0.2rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.no-significators {
+  font-size: 0.8rem;
+  color: #999;
+  font-style: italic;
+}
+
+.significators-legend {
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+}
+
+.legend-title {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.significators-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #dc3545;
+  font-size: 1rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .significators-container {
+    padding: 0.5rem;
+  }
+  
+  .house-significators {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .house-label {
+    min-width: auto;
+    font-size: 0.8rem;
+  }
+  
+  .significators-list {
+    width: 100%;
+  }
+  
+  .significator-item {
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .planet-name {
+    font-size: 0.7rem;
+  }
+  
+  .significator-type {
+    font-size: 0.6rem;
+  }
+  
+  .legend-items {
+    gap: 0.5rem;
+  }
+  
+  .legend-item {
+    font-size: 0.7rem;
+  }
+  
+  .legend-color {
+    width: 10px;
+    height: 10px;
+  }
+}
