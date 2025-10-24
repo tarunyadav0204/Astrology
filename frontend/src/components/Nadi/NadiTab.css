@@ -642,6 +642,7 @@
   overflow: hidden;
   margin-bottom: 80px;
   background: transparent;
+  padding-top: 8px;
 }
 
 /* Chart Tab Navigation */
@@ -798,22 +799,24 @@
 
 .mobile-tab {
   flex: 1;
-  padding: 0.75rem 0.25rem;
+  padding: 0.5rem 0.2rem;
   background: transparent;
   border: none;
   border-radius: 0;
   cursor: pointer;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
   transition: all 0.3s ease;
-  min-height: 70px;
+  min-height: 60px;
   border-top: 3px solid transparent;
   position: relative;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .mobile-tab.active {
@@ -832,11 +835,15 @@
 }
 
 .tab-icon {
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .tab-label {
-  font-size: 0.65rem;
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 /* Mobile Aspects Table */
@@ -927,14 +934,26 @@
   
   /* Year navigation - mobile friendly */
   .year-nav {
-    padding: 12px 16px;
+    padding: 8px 12px;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
   
   .nav-title {
-    font-size: 16px;
+    font-size: 14px;
     text-align: center;
+    line-height: 1.2;
+  }
+  
+  .nav-title > div:first-child {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  
+  .nav-title > div:last-child {
+    font-size: 10px;
+    margin-top: 2px;
+    opacity: 0.9;
   }
   
   .nav-controls {

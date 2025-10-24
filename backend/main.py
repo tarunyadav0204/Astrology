@@ -1510,6 +1510,133 @@ async def calculate_accurate_dasha(birth_data: BirthData):
         "moon_lord": dasha_data.get('moon_lord', 'Sun')
     }
 
+@app.post("/api/calculate-cascading-dashas")
+async def calculate_cascading_dashas(request: dict):
+    """Calculate complete cascading dasha hierarchy for a given date"""
+    from shared.dasha_calculator import DashaCalculator
+    
+    birth_data = BirthData(**request['birth_data'])
+    target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+    
+    # Convert to dict for calculator
+    birth_dict = {
+        'name': birth_data.name,
+        'date': birth_data.date,
+        'time': birth_data.time,
+        'latitude': birth_data.latitude,
+        'longitude': birth_data.longitude,
+        'timezone': birth_data.timezone
+    }
+    
+    calculator = DashaCalculator()
+    
+    # Get current dashas for target date
+    current_dashas = calculator.calculate_current_dashas(birth_dict, target_date)
+    
+    # Get all maha dashas
+    maha_dashas = []
+    for maha in current_dashas.get('maha_dashas', []):
+        maha_dashas.append({
+            'planet': maha['planet'],
+            'start': maha['start'].strftime('%Y-%m-%d'),
+            'end': maha['end'].strftime('%Y-%m-%d'),
+            'current': maha['start'] <= target_date <= maha['end'],
+            'years': maha['years']
+        })
+    
+    # Find current maha dasha
+    current_maha = None
+    for maha in current_dashas.get('maha_dashas', []):
+        if maha['start'] <= target_date <= maha['end']:
+            current_maha = maha
+            break
+    
+    result = {
+        'maha_dashas': maha_dashas,
+        'antar_dashas': [],
+        'pratyantar_dashas': [],
+        'sookshma_dashas': [],
+        'prana_dashas': [],
+        'current_dashas': current_dashas.get('current_dashas', {})
+    }
+    
+    if current_maha:
+        # Calculate all antar dashas for current maha
+        antar_request = {
+            'birth_data': birth_dict,
+            'parent_dasha': {
+                'planet': current_maha['planet'],
+                'start': current_maha['start'].strftime('%Y-%m-%d'),
+                'end': current_maha['end'].strftime('%Y-%m-%d')
+            },
+            'dasha_type': 'antar',
+            'target_date': target_date.strftime('%Y-%m-%d')
+        }
+        antar_result = await calculate_sub_dashas(antar_request)
+        result['antar_dashas'] = antar_result['sub_dashas']
+        
+        # Find current antar
+        current_antar = None
+        for antar in result['antar_dashas']:
+            if antar['current']:
+                current_antar = antar
+                break
+        
+        if current_antar:
+            # Calculate pratyantar dashas
+            pratyantar_request = {
+                'birth_data': birth_dict,
+                'parent_dasha': current_antar,
+                'dasha_type': 'pratyantar',
+                'target_date': target_date.strftime('%Y-%m-%d'),
+                'maha_lord': current_maha['planet']
+            }
+            pratyantar_result = await calculate_sub_dashas(pratyantar_request)
+            result['pratyantar_dashas'] = pratyantar_result['sub_dashas']
+            
+            # Find current pratyantar
+            current_pratyantar = None
+            for pratyantar in result['pratyantar_dashas']:
+                if pratyantar['current']:
+                    current_pratyantar = pratyantar
+                    break
+            
+            if current_pratyantar:
+                # Calculate sookshma dashas
+                sookshma_request = {
+                    'birth_data': birth_dict,
+                    'parent_dasha': current_pratyantar,
+                    'dasha_type': 'sookshma',
+                    'target_date': target_date.strftime('%Y-%m-%d'),
+                    'maha_lord': current_maha['planet'],
+                    'antar_lord': current_antar['planet']
+                }
+                sookshma_result = await calculate_sub_dashas(sookshma_request)
+                result['sookshma_dashas'] = sookshma_result['sub_dashas']
+                
+                # Find current sookshma
+                current_sookshma = None
+                for sookshma in result['sookshma_dashas']:
+                    if sookshma['current']:
+                        current_sookshma = sookshma
+                        break
+                
+                if current_sookshma:
+                    # Calculate prana dashas
+                    prana_request = {
+                        'birth_data': birth_dict,
+                        'parent_dasha': current_sookshma,
+                        'dasha_type': 'prana',
+                        'target_date': target_date.strftime('%Y-%m-%d'),
+                        'maha_lord': current_maha['planet'],
+                        'antar_lord': current_antar['planet'],
+                        'pratyantar_lord': current_pratyantar['planet']
+                    }
+                    prana_result = await calculate_sub_dashas(prana_request)
+                    result['prana_dashas'] = prana_result['sub_dashas']
+    
+    return result
+
 @app.post("/api/calculate-sub-dashas")
 async def calculate_sub_dashas(request: dict):
     """Calculate sub-dashas (Antar, Pratyantar, Sookshma, Prana) for given parent dasha"""

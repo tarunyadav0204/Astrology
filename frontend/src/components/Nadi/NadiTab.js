@@ -4,17 +4,24 @@ import DashaWidget from '../DashaTable/DashaWidget';
 import CompactAspectsTable from './CompactAspectsTable';
 import './NadiTab.css';
 
-const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange }) => {
+const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange, selectedDashas: propSelectedDashas, onDashaSelection: propOnDashaSelection }) => {
   const [nadiData, setNadiData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [transitDate, setTransitDate] = useState(propTransitDate || new Date());
   const [selectedDashas, setSelectedDashas] = useState({});
+  const [cascadingDashaData, setCascadingDashaData] = useState(null);
   const [mobileTab, setMobileTab] = useState('charts');
   const [mobileChartTab, setMobileChartTab] = useState('rasi');
 
   useEffect(() => {
     fetchNadiAnalysis();
   }, [birthData, transitDate]);
+
+  useEffect(() => {
+    if (propSelectedDashas) {
+      setSelectedDashas(propSelectedDashas);
+    }
+  }, [propSelectedDashas]);
 
   const fetchNadiAnalysis = async () => {
     try {
@@ -29,6 +36,24 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
         birth_data: birthData,
         transit_date: transitDate.toISOString().split('T')[0]
       });
+      
+      // Get cascading dasha data
+      const dashaResponse = await fetch('/api/calculate-cascading-dashas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          birth_data: birthData,
+          target_date: transitDate.toISOString().split('T')[0]
+        })
+      });
+      
+      if (dashaResponse.ok) {
+        const cascadingData = await dashaResponse.json();
+        setCascadingDashaData(cascadingData);
+      }
       
       const response = await fetch('/api/nadi-analysis', {
         method: 'POST',
@@ -48,11 +73,6 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
       
       const nadiAnalysis = await response.json();
       
-      // Debug: Log the data structure
-      console.log('Chart data:', chartData);
-      console.log('Transit data:', transitData);
-      console.log('Nadi analysis:', nadiAnalysis);
-      
       // Combine with existing chart data format
       setNadiData({
         ...nadiAnalysis,
@@ -67,25 +87,75 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
     }
   };
 
-  const handleTimelineClick = (date) => {
+  const handleTimelineClick = async (date) => {
     // Update transit date and refetch data
     const newDate = new Date(date);
     setTransitDate(newDate);
-    setSelectedDashas({}); // Clear selected dashas when date changes
+    setSelectedDashas({});
+    
+    // Refresh cascading dasha data for new date
+    try {
+      const dashaResponse = await fetch('/api/calculate-cascading-dashas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          birth_data: birthData,
+          target_date: newDate.toISOString().split('T')[0]
+        })
+      });
+      
+      if (dashaResponse.ok) {
+        const cascadingData = await dashaResponse.json();
+        setCascadingDashaData(cascadingData);
+      }
+    } catch (error) {
+      console.error('Error refreshing cascading dasha data:', error);
+    }
+    
     onTransitDateChange(newDate);
   };
 
-  const handleDashaClick = (dashaDate) => {
+  const handleDashaClick = async (dashaDate) => {
     const newDate = new Date(dashaDate);
     setTransitDate(newDate);
+    
+    // Refresh cascading dasha data for new date
+    try {
+      const dashaResponse = await fetch('/api/calculate-cascading-dashas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          birth_data: birthData,
+          target_date: newDate.toISOString().split('T')[0]
+        })
+      });
+      
+      if (dashaResponse.ok) {
+        const cascadingData = await dashaResponse.json();
+        setCascadingDashaData(cascadingData);
+      }
+    } catch (error) {
+      console.error('Error refreshing cascading dasha data:', error);
+    }
+    
     onTransitDateChange(newDate);
   };
 
   const handleDashaSelection = (dashaType, dasha) => {
-    setSelectedDashas(prev => ({
-      ...prev,
+    const newSelectedDashas = {
+      ...selectedDashas,
       [dashaType]: dasha
-    }));
+    };
+    setSelectedDashas(newSelectedDashas);
+    if (propOnDashaSelection) {
+      propOnDashaSelection(dashaType, dasha);
+    }
   };
 
   if (loading) {
@@ -167,61 +237,113 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
           
           {mobileTab === 'aspects' && (
             <div className="mobile-aspects">
+              {propSelectedDashas && Object.keys(propSelectedDashas).length > 0 && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
+                  color: 'white',
+                  padding: '8px 12px',
+                  fontSize: '0.7rem',
+                  borderRadius: '6px',
+                  marginBottom: '8px'
+                }}>
+                  {['maha', 'antar', 'pratyantar', 'sookshma', 'prana']
+                    .filter(level => propSelectedDashas[level])
+                    .map((level, index) => {
+                      const dasha = propSelectedDashas[level];
+                      const labels = { maha: 'M', antar: 'A', pratyantar: 'P', sookshma: 'S', prana: 'Pr' };
+                      return (
+                        <span key={level}>
+                          {index > 0 && ' → '}
+                          {labels[level]}:{dasha.planet}
+                        </span>
+                      );
+                    })}
+                </div>
+              )}
               <CompactAspectsTable 
                 aspects={nadiData.natal_aspects}
                 natalPlanets={nadiData.natal_planets}
                 onTimelineClick={handleTimelineClick}
+                selectedDashas={propSelectedDashas || selectedDashas}
               />
             </div>
           )}
           
           {mobileTab === 'dashas' && (
             <div className="mobile-dashas">
+              {propSelectedDashas && Object.keys(propSelectedDashas).length > 0 && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)',
+                  color: 'white',
+                  padding: '8px 12px',
+                  fontSize: '0.7rem',
+                  borderRadius: '6px',
+                  marginBottom: '8px'
+                }}>
+                  {['maha', 'antar', 'pratyantar', 'sookshma', 'prana']
+                    .filter(level => propSelectedDashas[level])
+                    .map((level, index) => {
+                      const dasha = propSelectedDashas[level];
+                      const labels = { maha: 'M', antar: 'A', pratyantar: 'P', sookshma: 'S', prana: 'Pr' };
+                      return (
+                        <span key={level}>
+                          {index > 0 && ' → '}
+                          {labels[level]}:{dasha.planet}
+                        </span>
+                      );
+                    })}
+                </div>
+              )}
               <div className="dashas-grid">
                 <DashaWidget 
                   title="Maha"
                   dashaType="maha" 
                   birthData={birthData}
                   onDashaClick={handleDashaClick}
-                  selectedDashas={selectedDashas}
-                  onDashaSelection={handleDashaSelection}
+                  selectedDashas={propSelectedDashas || selectedDashas}
+                  onDashaSelection={propOnDashaSelection || handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
                 <DashaWidget 
                   title="Antar"
                   dashaType="antar" 
                   birthData={birthData}
                   onDashaClick={handleDashaClick}
-                  selectedDashas={selectedDashas}
-                  onDashaSelection={handleDashaSelection}
+                  selectedDashas={propSelectedDashas || selectedDashas}
+                  onDashaSelection={propOnDashaSelection || handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
                 <DashaWidget 
                   title="Pratyantar"
                   dashaType="pratyantar" 
                   birthData={birthData}
                   onDashaClick={handleDashaClick}
-                  selectedDashas={selectedDashas}
-                  onDashaSelection={handleDashaSelection}
+                  selectedDashas={propSelectedDashas || selectedDashas}
+                  onDashaSelection={propOnDashaSelection || handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
                 <DashaWidget 
                   title="Sookshma"
                   dashaType="sookshma" 
                   birthData={birthData}
                   onDashaClick={handleDashaClick}
-                  selectedDashas={selectedDashas}
-                  onDashaSelection={handleDashaSelection}
+                  selectedDashas={propSelectedDashas || selectedDashas}
+                  onDashaSelection={propOnDashaSelection || handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
                 <DashaWidget 
                   title="Prana"
                   dashaType="prana" 
                   birthData={birthData}
                   onDashaClick={handleDashaClick}
-                  selectedDashas={selectedDashas}
-                  onDashaSelection={handleDashaSelection}
+                  selectedDashas={propSelectedDashas || selectedDashas}
+                  onDashaSelection={propOnDashaSelection || handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
               </div>
             </div>
@@ -294,6 +416,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
             aspects={nadiData.natal_aspects}
             natalPlanets={nadiData.natal_planets}
             onTimelineClick={handleTimelineClick}
+            selectedDashas={selectedDashas}
           />
         </div>
       </div>
@@ -309,6 +432,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
             selectedDashas={selectedDashas}
             onDashaSelection={handleDashaSelection}
             transitDate={transitDate}
+            cascadingData={cascadingDashaData}
           />
         </div>
         
@@ -321,6 +445,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
             selectedDashas={selectedDashas}
             onDashaSelection={handleDashaSelection}
             transitDate={transitDate}
+            cascadingData={cascadingDashaData}
           />
         </div>
         
@@ -333,6 +458,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
             selectedDashas={selectedDashas}
             onDashaSelection={handleDashaSelection}
             transitDate={transitDate}
+            cascadingData={cascadingDashaData}
           />
         </div>
         
@@ -345,6 +471,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
             selectedDashas={selectedDashas}
             onDashaSelection={handleDashaSelection}
             transitDate={transitDate}
+            cascadingData={cascadingDashaData}
           />
         </div>
         
@@ -357,6 +484,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange 
             selectedDashas={selectedDashas}
             onDashaSelection={handleDashaSelection}
             transitDate={transitDate}
+            cascadingData={cascadingDashaData}
           />
         </div>
       </div>

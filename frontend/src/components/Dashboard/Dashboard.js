@@ -167,6 +167,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
   const [transitDate, setTransitDate] = useState(new Date());
   const [transitData, setTransitData] = useState(null);
   const [selectedDashas, setSelectedDashas] = useState({});
+  const [cascadingDashaData, setCascadingDashaData] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileSubTab, setMobileSubTab] = useState('lagna');
   const [userSettings, setUserSettings] = useState({ node_type: 'mean', default_chart_style: 'north' });
@@ -177,7 +178,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
     if (savedLayouts) {
       setLayouts(JSON.parse(savedLayouts));
     }
-    // Load today's transit data on component mount
+    // Load today's transit data and cascading dashas on component mount
     handleTransitDateChange(new Date());
     // Load user settings
     loadUserSettings();
@@ -245,6 +246,8 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       });
       
       setChartData(chartData);
+      // Reset cascading data and load fresh data
+      setCascadingDashaData(null);
       handleTransitDateChange(new Date());
     } catch (error) {
       console.error('Failed to load chart:', error);
@@ -258,16 +261,37 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
 
   const handleTransitDateChange = async (newDate) => {
     setTransitDate(newDate);
-    setSelectedDashas({}); // Clear selected dashas to force recalculation
+    setSelectedDashas({});
+    
     try {
       const { apiService } = await import('../../services/apiService');
-      const data = await apiService.calculateTransits({
+      
+      // Calculate transits
+      const transitData = await apiService.calculateTransits({
         birth_data: birthData,
         transit_date: newDate.toISOString().split('T')[0]
       });
-      setTransitData(data);
+      setTransitData(transitData);
+      
+      // Calculate cascading dashas
+      const response = await fetch('/api/calculate-cascading-dashas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          birth_data: birthData,
+          target_date: newDate.toISOString().split('T')[0]
+        })
+      });
+      
+      if (response.ok) {
+        const cascadingData = await response.json();
+        setCascadingDashaData(cascadingData);
+      }
     } catch (error) {
-      console.error('Error fetching transit data:', error);
+      console.error('Error fetching transit/dasha data:', error);
     }
   };
 
@@ -465,6 +489,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       selectedDashas={selectedDashas}
                       onDashaSelection={handleDashaSelection}
                       transitDate={transitDate}
+                      cascadingData={cascadingDashaData}
                     />
                   </div>
                   <div>
@@ -476,6 +501,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       selectedDashas={selectedDashas}
                       onDashaSelection={handleDashaSelection}
                       transitDate={transitDate}
+                      cascadingData={cascadingDashaData}
                     />
                   </div>
                   <div>
@@ -487,6 +513,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       selectedDashas={selectedDashas}
                       onDashaSelection={handleDashaSelection}
                       transitDate={transitDate}
+                      cascadingData={cascadingDashaData}
                     />
                   </div>
                   <div>
@@ -498,6 +525,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       selectedDashas={selectedDashas}
                       onDashaSelection={handleDashaSelection}
                       transitDate={transitDate}
+                      cascadingData={cascadingDashaData}
                     />
                   </div>
                   <div>
@@ -509,6 +537,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       selectedDashas={selectedDashas}
                       onDashaSelection={handleDashaSelection}
                       transitDate={transitDate}
+                      cascadingData={cascadingDashaData}
                     />
                   </div>
                 </div>
@@ -559,24 +588,26 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   onClick={() => setMobileSubTab(tab.id)}
                   style={{
                     flex: 1,
-                    padding: '0.5rem 0.25rem',
+                    padding: '0.4rem 0.1rem',
                     background: mobileSubTab === tab.id ? '#e91e63' : 'transparent',
                     color: mobileSubTab === tab.id ? 'white' : '#e91e63',
                     border: 'none',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '0.6rem',
+                    fontSize: '0.5rem',
                     fontWeight: '600',
                     whiteSpace: 'nowrap',
                     minWidth: 'fit-content',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '0.1rem'
+                    gap: '0.1rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}
                 >
-                  <span style={{ fontSize: '0.8rem' }}>{tab.icon}</span>
-                  <span>{tab.label.split(' ')[1]}</span>
+                  <span style={{ fontSize: '0.7rem' }}>{tab.icon}</span>
+                  <span style={{ fontSize: '0.5rem', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label.split(' ')[1]}</span>
                 </button>
               ))}
             </div>
@@ -649,6 +680,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   selectedDashas={selectedDashas}
                   onDashaSelection={handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
               </GridItem>
               
@@ -661,6 +693,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   selectedDashas={selectedDashas}
                   onDashaSelection={handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
               </GridItem>
               
@@ -673,6 +706,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   selectedDashas={selectedDashas}
                   onDashaSelection={handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
               </GridItem>
               
@@ -685,6 +719,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   selectedDashas={selectedDashas}
                   onDashaSelection={handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
               </GridItem>
               
@@ -697,6 +732,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                   selectedDashas={selectedDashas}
                   onDashaSelection={handleDashaSelection}
                   transitDate={transitDate}
+                  cascadingData={cascadingDashaData}
                 />
               </GridItem>
               
@@ -714,7 +750,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       
       {activeTab !== 'dashboard' && (
         activeTab === 'nadi' && window.innerWidth <= 768 ? (
-          <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} />
+          <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} selectedDashas={selectedDashas} onDashaSelection={handleDashaSelection} />
         ) : (
           <div style={{ 
             background: 'rgba(255,255,255,0.95)',

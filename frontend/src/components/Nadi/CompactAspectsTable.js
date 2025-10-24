@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AspectDetailPopup from './AspectDetailPopup';
 
-const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick }) => {
+const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick, selectedDashas }) => {
   const [aspectTimelines, setAspectTimelines] = useState({});
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [yearOffset, setYearOffset] = useState(0);
@@ -98,7 +98,16 @@ const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick }) => {
     <div className="nadi-aspects-compact">
       {/* Year Navigation with Title */}
       <div className="year-nav" style={{ background: 'linear-gradient(135deg, #e91e63 0%, #ff6f00 100%)', marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0, paddingTop: '10px', paddingBottom: '10px', paddingLeft: '16px', paddingRight: '16px' }}>
-        <div className="nav-title" style={{ background: 'transparent' }}>{isMobile ? 'Nadi Aspects' : 'Nadi Aspects with Timeline'}</div>
+        <div className="nav-title" style={{ background: 'transparent' }}>
+          <div style={{ color: 'white' }}>{isMobile ? 'Nadi Aspects' : 'Nadi Aspects with Timeline'}</div>
+          {selectedDashas && Object.keys(selectedDashas).length > 0 && (
+            <div style={{ fontSize: isMobile ? '0.6rem' : '0.7rem', color: 'white', marginTop: '2px', lineHeight: '1.2' }}>
+              Selected dasha: {Object.entries(selectedDashas).map(([type, dasha]) => 
+                `${type.charAt(0).toUpperCase()}:${dasha.planet}`
+              ).join(' | ')}
+            </div>
+          )}
+        </div>
         
         <div className="nav-controls" style={{ background: 'transparent' }}>
           <button 

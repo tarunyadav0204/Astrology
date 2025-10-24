@@ -4,7 +4,7 @@ import { APP_CONFIG } from '../../config/app.config';
 import { apiService } from '../../services/apiService';
 import { WidgetContainer, WidgetHeader, WidgetTitle, DashaContainer, DashaTable, DashaRow, DashaCell } from './DashaWidget.styles';
 
-const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas, onDashaSelection, transitDate }) => {
+const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas, onDashaSelection, transitDate, cascadingData }) => {
   const [selectedDasha, setSelectedDasha] = useState(null);
   const [dashaData, setDashaData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -13,122 +13,45 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
   const debounceTimeout = React.useRef(null);
 
   useEffect(() => {
-    console.log(`DashaWidget ${dashaType} - transitDate changed:`, transitDate);
-    if (birthData) {
-      fetchDashaData();
+    if (cascadingData) {
+      loadCascadingData();
     }
-  }, [birthData, dashaType, transitDate]);
-  
-  useEffect(() => {
-    if (birthData) {
-      // Only fetch when relevant parent dasha changes
-      if (dashaType === 'maha') return; // Maha doesn't depend on selections
-      if (dashaType === 'antar' && selectedDashas.maha) fetchDashaData();
-      if (dashaType === 'pratyantar' && selectedDashas.antar) fetchDashaData();
-      if (dashaType === 'sookshma' && selectedDashas.pratyantar) fetchDashaData();
-      if (dashaType === 'prana' && selectedDashas.sookshma) fetchDashaData();
-    }
-  }, [selectedDashas.maha, selectedDashas.antar, selectedDashas.pratyantar, selectedDashas.sookshma]);
+  }, [cascadingData, dashaType]);
 
-  const fetchDashaData = async () => {
-    try {
-      const data = await apiService.calculateDasha(birthData);
-      
-      if (dashaType === 'maha') {
-        const targetDate = transitDate || new Date();
-        const processedDashas = data.maha_dashas.map(dasha => ({
-          ...dasha,
-          current: new Date(dasha.start) <= targetDate && targetDate <= new Date(dasha.end)
-        }));
-        setDashaData(processedDashas);
-        const currentDasha = processedDashas.find(d => d.current);
-        if (currentDasha) {
-          setSelectedDasha(currentDasha);
-          if (!selectedDashas.maha) {
-            onDashaSelection('maha', currentDasha);
-          }
-          setTimeout(() => scrollToCurrentDasha(processedDashas.findIndex(d => d.current)), 100);
-        }
-      } else {
-        // Calculate hierarchical sub-dashas using backend
-        const targetDate = transitDate || new Date();
-        const currentMaha = data.maha_dashas.find(d => {
-          return new Date(d.start) <= targetDate && targetDate <= new Date(d.end);
-        });
-        
-        if (currentMaha) {
-          let parentDasha = currentMaha;
-          
-          // Use selected dashas or current dashas for hierarchy
-          if (dashaType === 'antar') {
-            parentDasha = (selectedDashas && selectedDashas.maha) ? selectedDashas.maha : currentMaha;
-          } else if (dashaType === 'pratyantar') {
-            const mahaForAntar = (selectedDashas && selectedDashas.maha) ? selectedDashas.maha : currentMaha;
-            const antarDashas = await calculateSubDashas(mahaForAntar, 'antar', targetDate);
-            parentDasha = (selectedDashas && selectedDashas.antar) ? selectedDashas.antar : antarDashas.find(d => d.current) || antarDashas[0];
-          } else if (dashaType === 'sookshma') {
-            const mahaForAntar = (selectedDashas && selectedDashas.maha) ? selectedDashas.maha : currentMaha;
-            const antarDashas = await calculateSubDashas(mahaForAntar, 'antar', targetDate);
-            const antarForPratyantar = (selectedDashas && selectedDashas.antar) ? selectedDashas.antar : antarDashas.find(d => d.current) || antarDashas[0];
-            const pratyantarDashas = await calculateSubDashas(antarForPratyantar, 'pratyantar', targetDate);
-            parentDasha = (selectedDashas && selectedDashas.pratyantar) ? selectedDashas.pratyantar : pratyantarDashas.find(d => d.current) || pratyantarDashas[0];
-          } else if (dashaType === 'prana') {
-            const mahaForAntar = (selectedDashas && selectedDashas.maha) ? selectedDashas.maha : currentMaha;
-            const antarDashas = await calculateSubDashas(mahaForAntar, 'antar', targetDate);
-            const antarForPratyantar = (selectedDashas && selectedDashas.antar) ? selectedDashas.antar : antarDashas.find(d => d.current) || antarDashas[0];
-            const pratyantarDashas = await calculateSubDashas(antarForPratyantar, 'pratyantar', targetDate);
-            const pratyantarForSookshma = (selectedDashas && selectedDashas.pratyantar) ? selectedDashas.pratyantar : pratyantarDashas.find(d => d.current) || pratyantarDashas[0];
-            const sookshmaDashas = await calculateSubDashas(pratyantarForSookshma, 'sookshma', targetDate);
-            parentDasha = (selectedDashas && selectedDashas.sookshma) ? selectedDashas.sookshma : sookshmaDashas.find(d => d.current) || sookshmaDashas[0];
-          }
-          
-          const subDashas = await calculateSubDashas(parentDasha, dashaType, targetDate);
-          
-          setDashaData(subDashas);
-          const currentSubDasha = subDashas.find(d => d.current);
-          if (currentSubDasha) {
-            setSelectedDasha(currentSubDasha);
-            if (!selectedDashas || !selectedDashas[dashaType]) {
-              onDashaSelection(dashaType, currentSubDasha);
-            }
-            setTimeout(() => scrollToCurrentDasha(subDashas.findIndex(d => d.current)), 100);
-          }
-        }
+  const loadCascadingData = () => {
+    if (!cascadingData) return;
+    
+    let data = [];
+    switch (dashaType) {
+      case 'maha':
+        data = cascadingData.maha_dashas || [];
+        break;
+      case 'antar':
+        data = cascadingData.antar_dashas || [];
+        break;
+      case 'pratyantar':
+        data = cascadingData.pratyantar_dashas || [];
+        break;
+      case 'sookshma':
+        data = cascadingData.sookshma_dashas || [];
+        break;
+      case 'prana':
+        data = cascadingData.prana_dashas || [];
+        break;
+    }
+    
+    setDashaData(data);
+    const currentDasha = data.find(d => d.current);
+    if (currentDasha) {
+      setSelectedDasha(currentDasha);
+      if (!selectedDashas[dashaType]) {
+        onDashaSelection(dashaType, currentDasha);
       }
-    } catch (error) {
-      console.error('Error fetching dasha data:', error);
+      setTimeout(() => scrollToCurrentDasha(data.findIndex(d => d.current)), 100);
     }
   };
 
-  const calculateSubDashas = async (parentDasha, type, targetDate = null) => {
-    try {
-      // Prepare request data with hierarchy information
-      const requestData = {
-        birth_data: birthData,
-        parent_dasha: parentDasha,
-        dasha_type: type,
-        target_date: (targetDate || transitDate || new Date()).toISOString().split('T')[0]
-      };
-      
-      // Add hierarchy information for proper calculation
-      if (type === 'pratyantar' && selectedDashas.maha) {
-        requestData.maha_lord = selectedDashas.maha.planet;
-      } else if (type === 'sookshma' && selectedDashas.maha && selectedDashas.antar) {
-        requestData.maha_lord = selectedDashas.maha.planet;
-        requestData.antar_lord = selectedDashas.antar.planet;
-      } else if (type === 'prana' && selectedDashas.maha && selectedDashas.antar && selectedDashas.pratyantar) {
-        requestData.maha_lord = selectedDashas.maha.planet;
-        requestData.antar_lord = selectedDashas.antar.planet;
-        requestData.pratyantar_lord = selectedDashas.pratyantar.planet;
-      }
-      
-      const data = await apiService.calculateSubDashas(requestData);
-      return data.sub_dashas || [];
-    } catch (error) {
-      console.error('Error calculating sub-dashas:', error);
-      return [];
-    }
-  };
+
 
   const scrollToCurrentDasha = (currentIndex) => {
     if (currentIndex >= 0) {
@@ -141,23 +64,9 @@ const DashaWidget = ({ title, dashaType, birthData, onDashaClick, selectedDashas
   };
 
   const handleDashaClick = (dasha) => {
-    if (isLoading) return; // Prevent clicks while loading
-    
-    // Clear existing timeout
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
-    
-    // Immediate UI update
     setSelectedDasha(dasha);
-    
-    // Debounced API calls
-    debounceTimeout.current = setTimeout(() => {
-      setIsLoading(true);
-      onDashaClick(dasha.start);
-      onDashaSelection(dashaType, dasha);
-      setTimeout(() => setIsLoading(false), 500); // Reset loading after 500ms
-    }, 200); // 200ms debounce
+    onDashaClick(dasha.start);
+    onDashaSelection(dashaType, dasha);
   };
 
   const isMobile = window.innerWidth <= 768;
