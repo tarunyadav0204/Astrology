@@ -21,6 +21,19 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     fetchDashaTimeline();
   }, [birthData]);
 
+  useEffect(() => {
+    // Scroll current year into view
+    const scrollToCurrentYear = () => {
+      const activeButton = document.querySelector('.year-scroll-container .active');
+      if (activeButton) {
+        activeButton.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    };
+    
+    const timer = setTimeout(scrollToCurrentYear, 100);
+    return () => clearTimeout(timer);
+  }, [currentYear]);
+
   const fetchVedicAspects = async () => {
     try {
       const response = await fetch('/api/vedic-transit-aspects', {
@@ -358,29 +371,35 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
           </button>
           <button 
             className="nav-arrow"
-            onClick={() => setYearOffset(prev => prev - 1)}
-            disabled={currentYear + yearOffset - 2 <= 1900}
+            onClick={() => {
+              const container = document.querySelector('.year-scroll-container');
+              if (container) container.scrollBy({ left: -200, behavior: 'smooth' });
+            }}
           >
             ←
           </button>
           
-          {Array.from({ length: 5 }, (_, i) => {
-            const year = new Date().getFullYear() + yearOffset + i - 2;
-            return (
-              <button
-                key={year}
-                className={currentYear === year ? 'active' : ''}
-                onClick={() => handleYearChange(year)}
-              >
-                {year}
-              </button>
-            );
-          })}
+          <div className="year-scroll-container">
+            {Array.from({ length: 201 }, (_, i) => {
+              const year = 1900 + i;
+              return (
+                <button
+                  key={year}
+                  className={currentYear === year ? 'active' : ''}
+                  onClick={() => handleYearChange(year)}
+                >
+                  {year}
+                </button>
+              );
+            })}
+          </div>
           
           <button 
             className="nav-arrow"
-            onClick={() => setYearOffset(prev => prev + 1)}
-            disabled={currentYear + yearOffset + 2 >= 2100}
+            onClick={() => {
+              const container = document.querySelector('.year-scroll-container');
+              if (container) container.scrollBy({ left: 200, behavior: 'smooth' });
+            }}
           >
             →
           </button>

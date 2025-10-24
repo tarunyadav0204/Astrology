@@ -317,20 +317,25 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         marginBottom: '0.5rem',
         background: '#f8f9fa',
         borderRadius: window.innerWidth <= 768 ? '0' : '8px',
-        padding: '0.3rem',
+        padding: window.innerWidth <= 768 ? '0.8rem 0.5rem' : '0.6rem',
+        minHeight: window.innerWidth <= 768 ? '65px' : '50px',
         margin: window.innerWidth <= 768 ? '0' : '0 0.5rem',
         overflowX: 'auto',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
+        '&::-webkit-scrollbar': {
+          display: 'none'
+        },
         position: window.innerWidth <= 768 ? 'fixed' : 'static',
         top: window.innerWidth <= 768 ? '60px' : 'auto',
         left: window.innerWidth <= 768 ? '0' : 'auto',
         right: window.innerWidth <= 768 ? '0' : 'auto',
-        zIndex: window.innerWidth <= 768 ? 200 : 'auto'
+        zIndex: window.innerWidth <= 768 ? 200 : 'auto',
+        alignItems: 'center'
       }}>
         {[
-          { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
+          { id: 'dashboard', label: '🕉️ Parashara', icon: '🕉️' },
           { id: 'nadi', label: '🔍 Nadi', icon: '🔍' },
           { id: 'marriage', label: '💍 Marriage', icon: '💍' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
@@ -346,13 +351,13 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: window.innerWidth <= 768 ? '0.4rem 0.8rem' : '0.5rem 1rem',
+              padding: window.innerWidth <= 768 ? '0.7rem 1rem' : '0.6rem 1.2rem',
               background: activeTab === tab.id ? '#e91e63' : 'transparent',
               color: activeTab === tab.id ? 'white' : '#e91e63',
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.8rem',
+              fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
               fontWeight: '600',
               marginRight: '0.2rem',
               whiteSpace: 'nowrap',
@@ -373,17 +378,17 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
             display: 'flex', 
             flexDirection: 'column', 
             position: 'fixed',
-            top: '120px',
+            top: '185px',
             left: '0',
             right: '0',
-            bottom: '0'
+            bottom: '80px',
+            overflow: 'hidden'
           }}>
             {/* Main Content Area */}
             <div style={{ 
               flex: 1, 
               padding: '0.5rem', 
-              overflow: 'hidden',
-              marginBottom: '80px'
+              overflow: 'hidden'
             }}>
               {mobileSubTab === 'lagna' && (
                 <div style={{ height: '100%' }}>
@@ -531,6 +536,9 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
+              '&::-webkit-scrollbar': {
+                display: 'none'
+              },
               position: 'fixed',
               bottom: '0',
               left: '0',
@@ -615,7 +623,13 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               />
             </GridItem>
             
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ 
+              gridColumn: '1 / -1', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              padding: '0.3rem 0'
+            }}>
               <DashaHierarchyBar selectedDashas={selectedDashas} transitDate={transitDate} />
             </div>
             
@@ -624,7 +638,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
               display: 'grid', 
               gridTemplateColumns: 'repeat(7, 1fr)', 
               gap: '0.3rem', 
-              height: '30vh' 
+              height: '26vh' 
             }}>
               <GridItem dasha>
                 <DashaWidget
@@ -707,7 +721,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
             borderRadius: '12px',
             padding: '1rem',
             margin: window.innerWidth <= 768 ? '0 0.5rem' : '0 1rem',
-            marginTop: window.innerWidth <= 768 ? '110px' : '0',
+            marginTop: window.innerWidth <= 768 ? '175px' : '0',
             minHeight: '70vh',
             boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
           }}>

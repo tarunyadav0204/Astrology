@@ -2,17 +2,17 @@ import styled from 'styled-components';
 import { APP_CONFIG } from '../../config/app.config';
 
 export const DashboardContainer = styled.div`
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   
   @media (max-width: 768px) {
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     -webkit-overflow-scrolling: touch;
   }
   
@@ -31,10 +31,10 @@ export const DashboardContainer = styled.div`
 export const GridContainer = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: 55vh auto;
+  grid-template-rows: 52vh auto;
   gap: 0.3rem;
-  row-gap: 0.5rem;
-  padding: 0.5rem;
+  row-gap: 0.3rem;
+  padding: 0.5rem 0.5rem 0 0.5rem;
   max-width: 100vw;
   margin: 0;
   flex: 1;
@@ -94,11 +94,12 @@ export const GridItem = styled.div.withConfig({
     grid-row: 2;
     height: 100%;
     overflow: hidden;
+    margin-bottom: 0;
     
     @media (max-width: 768px) {
       grid-column: 1;
       height: 25vh;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0;
     }
   `}
   
