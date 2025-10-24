@@ -762,7 +762,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
             boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
           }}>
             {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
-            {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} />}
+            {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} selectedDashas={selectedDashas} onDashaSelection={handleDashaSelection} />}
             {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
             {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}

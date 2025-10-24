@@ -416,7 +416,7 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange,
             aspects={nadiData.natal_aspects}
             natalPlanets={nadiData.natal_planets}
             onTimelineClick={handleTimelineClick}
-            selectedDashas={selectedDashas}
+            selectedDashas={propSelectedDashas || selectedDashas}
           />
         </div>
       </div>
