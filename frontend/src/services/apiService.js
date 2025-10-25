@@ -5,11 +5,17 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? APP_CONFIG.api.prod 
   : APP_CONFIG.api.dev;
 
-// Helper function to add /api prefix only for localhost
+// Helper function to handle API endpoints for both dev and production
 const getEndpoint = (path) => {
-  const endpoint = API_BASE_URL.includes('localhost') ? `/api${path}` : path;
-  console.log('API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', endpoint);
-  return endpoint;
+  // For localhost development, add /api prefix
+  if (API_BASE_URL.includes('localhost')) {
+    const endpoint = `/api${path}`;
+    console.log('DEV - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', endpoint);
+    return endpoint;
+  }
+  // For production, path already includes /api from baseURL
+  console.log('PROD - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', path);
+  return path;
 };
 
 // Simple request caching to prevent duplicate calls
@@ -83,6 +89,28 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
+  // Health check API
+  healthCheck: async () => {
+    try {
+      const response = await apiClient.get(getEndpoint('/health'));
+      return response.data;
+    } catch (error) {
+      console.error('Health check failed:', error);
+      throw error;
+    }
+  },
+  
+  // Test API connectivity
+  testConnection: async () => {
+    try {
+      const response = await apiClient.get(getEndpoint('/test'));
+      return response.data;
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      throw error;
+    }
+  },
+  
   // Auth APIs
   register: async (userData) => {
     const response = await apiClient.post(getEndpoint('/register'), userData);

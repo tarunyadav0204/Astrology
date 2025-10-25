@@ -72,12 +72,25 @@ app.include_router(kp_router, prefix="/api")
 # Root endpoint for health check
 @app.get("/")
 async def root():
-    return {"message": "Astrology API", "docs": "/api/docs"}
+    return {"message": "Astrology API", "docs": "/api/docs", "version": "1.0.0"}
+
+@app.get("/api/test")
+async def test_endpoint():
+    return {"status": "ok", "message": "API is working", "timestamp": datetime.now().isoformat()}
 
 # Health check endpoint for load balancer
 @app.get("/docs")
 async def health_docs():
     return {"status": "healthy", "message": "Astrology API is running"}
+
+@app.get("/api/status")
+async def api_status():
+    return {
+        "api_status": "running",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "endpoints": ["/api/login", "/api/register", "/api/health"]
+    }
 
 class BirthData(BaseModel):
     name: str
@@ -155,6 +168,7 @@ security = HTTPBearer()
 
 # Initialize SQLite database
 def init_db():
+    try:
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
@@ -302,8 +316,33 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+    except Exception as e:
+        print(f"Database initialization error: {str(e)}")
+        # Create a minimal database if initialization fails
+        try:
+            conn = sqlite3.connect('astrology.db')
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    userid INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    phone TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    role TEXT DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+            conn.close()
+            print("Minimal database created")
+        except Exception as e2:
+            print(f"Failed to create minimal database: {str(e2)}")
 
-init_db()
+try:
+    init_db()
+    print("Database initialized successfully")
+except Exception as e:
+    print(f"Database initialization failed: {str(e)}")
 
 # Authentication functions
 def hash_password(password: str) -> str:
@@ -407,50 +446,62 @@ async def register(user_data: UserCreate):
 
 @app.post("/api/login")
 async def login(user_data: UserLogin):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT userid, name, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
-    user = cursor.fetchone()
-    
-    if not user or not verify_password(user_data.password, user[3]):
+    try:
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT userid, name, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
+        user = cursor.fetchone()
+        
+        if not user or not verify_password(user_data.password, user[3]):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Get user's active subscriptions
+        cursor.execute('''
+            SELECT sp.platform, sp.plan_name, sp.features, us.status, us.end_date
+            FROM user_subscriptions us
+            JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+            WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
+        ''', (user[0],))
+        
+        subscriptions = cursor.fetchall()
         conn.close()
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Get user's active subscriptions
-    cursor.execute('''
-        SELECT sp.platform, sp.plan_name, sp.features, us.status, us.end_date
-        FROM user_subscriptions us
-        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
-        WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
-    ''', (user[0],))
-    
-    subscriptions = cursor.fetchall()
-    conn.close()
-    
-    # Format subscriptions
-    user_subscriptions = {}
-    for sub in subscriptions:
-        platform, plan_name, features, status, end_date = sub
-        user_subscriptions[platform] = {
-            'plan_name': plan_name,
-            'features': json.loads(features),
-            'status': status,
-            'end_date': end_date
+        
+        # Format subscriptions
+        user_subscriptions = {}
+        for sub in subscriptions:
+            platform, plan_name, features, status, end_date = sub
+            try:
+                user_subscriptions[platform] = {
+                    'plan_name': plan_name,
+                    'features': json.loads(features) if features else {},
+                    'status': status,
+                    'end_date': end_date
+                }
+            except json.JSONDecodeError:
+                user_subscriptions[platform] = {
+                    'plan_name': plan_name,
+                    'features': {},
+                    'status': status,
+                    'end_date': end_date
+                }
+        
+        access_token = create_access_token(data={"sub": user_data.phone})
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "userid": user[0], 
+                "name": user[1], 
+                "phone": user[2], 
+                "role": user[4],
+                "subscriptions": user_subscriptions
+            }
         }
-    
-    access_token = create_access_token(data={"sub": user_data.phone})
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "userid": user[0], 
-            "name": user[1], 
-            "phone": user[2], 
-            "role": user[4],
-            "subscriptions": user_subscriptions
-        }
-    }
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):
@@ -684,7 +735,16 @@ async def reset_password(request: ResetPassword):
 
 @app.get("/api/health")
 async def api_health():
-    return {"status": "healthy", "message": "Astrology API is running"}
+    try:
+        # Test database connection
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+        conn.close()
+        return {"status": "healthy", "message": "Astrology API is running", "users": user_count}
+    except Exception as e:
+        return {"status": "unhealthy", "message": f"Database error: {str(e)}"}
 
 @app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
@@ -2452,11 +2512,14 @@ async def analyze_compatibility(request: CompatibilityRequest, current_user: Use
 # Initialize prediction engine on startup
 @app.on_event("startup")
 async def startup_event():
-    # Initialize daily prediction rules database
-    prediction_engine = DailyPredictionEngine()
-    # Reset rules to ensure we have the latest ones
-    prediction_engine.reset_prediction_rules()
-    print("Daily prediction engine initialized with updated rules")
+    try:
+        # Initialize daily prediction rules database
+        prediction_engine = DailyPredictionEngine()
+        # Reset rules to ensure we have the latest ones
+        prediction_engine.reset_prediction_rules()
+        print("Daily prediction engine initialized with updated rules")
+    except Exception as e:
+        print(f"Warning: Could not initialize prediction engine: {e}")
     
     # Initialize house combinations database
     try:
@@ -2720,4 +2783,5 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
 
 if __name__ == "__main__":
     import uvicorn
+    print("Starting Astrology API server on port 8001...")
     uvicorn.run(app, host="0.0.0.0", port=8001)
