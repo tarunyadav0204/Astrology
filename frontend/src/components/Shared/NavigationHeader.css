@@ -114,6 +114,41 @@
   backdrop-filter: blur(10px);
 }
 
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-name {
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.admin-btn {
+  background: linear-gradient(135deg, #ffd700, #ff6b6b);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  transition: all 0.3s;
+  animation: adminGlow 2s infinite alternate;
+}
+
+.admin-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+
+@keyframes adminGlow {
+  0% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+  100% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.6); }
+}
+
 .main-nav {
   padding: 15px 0;
 }

@@ -198,6 +198,43 @@ export const Input = styled.input`
   }
 `;
 
+export const Select = styled.select`
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid ${props => props.error ? '#e74c3c' : 'rgba(233, 30, 99, 0.2)'};
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  min-height: 44px;
+  cursor: pointer;
+  color: #333;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23e91e63" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 12px;
+  
+  @media (max-width: 768px) {
+    font-size: 16px;
+    padding: 1rem;
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.error ? '#e74c3c' : '#e91e63'};
+    box-shadow: 0 0 0 3px ${props => props.error ? 'rgba(231, 76, 60, 0.1)' : 'rgba(233, 30, 99, 0.1)'};
+    background: rgba(255, 255, 255, 1);
+  }
+  
+  option {
+    color: #333;
+    background: white;
+  }
+`;
+
 export const AutocompleteContainer = styled.div`
   position: relative;
 `;

@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange }) => {
+const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
 
   return (
@@ -22,7 +22,19 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             </a>
           </div>
           <div className="auth-section">
-            <button className="auth-btn">Sign In / Sign Up</button>
+            {user ? (
+              <div className="user-menu">
+                <span className="user-name">👤 {user.name || user.phone}</span>
+                {user.role === 'admin' && (
+                  <button className="admin-btn" onClick={onAdminClick}>
+                    ⚙️ Admin
+                  </button>
+                )}
+                <button className="auth-btn" onClick={onLogout}>Logout</button>
+              </div>
+            ) : (
+              <button className="auth-btn" onClick={onLogin}>Sign In / Sign Up</button>
+            )}
           </div>
         </div>
       </div>

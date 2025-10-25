@@ -142,7 +142,7 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(styleSheet);
 }
 
-const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
+const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, onAdminClick, user, onEditChart }) => {
   const { setBirthData, setChartData } = useAstrology();
   const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +186,7 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
         name: chart.name,
         date: chart.date,
         time: chart.time,
-        place: `${chart.latitude}, ${chart.longitude}`,
+        place: chart.place || `${chart.latitude}, ${chart.longitude}`,
         latitude: chart.latitude,
         longitude: chart.longitude,
         timezone: chart.timezone
@@ -199,6 +199,22 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const editChart = (chart, e) => {
+    e.stopPropagation();
+    setBirthData({
+      id: chart.id,
+      name: chart.name,
+      date: chart.date,
+      time: chart.time,
+      place: chart.place || `${chart.latitude}, ${chart.longitude}`,
+      latitude: chart.latitude,
+      longitude: chart.longitude,
+      timezone: chart.timezone,
+      gender: chart.gender || ''
+    });
+    onCreateNew();
   };
 
   const deleteChart = async (chartId, e) => {
@@ -278,9 +294,9 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {user?.isAdmin && (
+            {user?.role === 'admin' && (
               <button
-                onClick={() => window.location.href = '/investor'}
+                onClick={onAdminClick}
                 style={{
                   padding: '12px 24px',
                   background: 'linear-gradient(45deg, #ff6b35, #f7931e)',
@@ -435,24 +451,52 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
                   e.target.style.borderColor = 'rgba(255, 107, 53, 0.3)';
                 }}
               >
-                <button
-                  onClick={(e) => deleteChart(chart.id, e)}
-                  style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    background: 'rgba(220, 53, 69, 0.8)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '30px',
-                    height: '30px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  ×
-                </button>
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  display: 'flex',
+                  gap: '5px'
+                }}>
+                  <button
+                    onClick={(e) => editChart(chart, e)}
+                    style={{
+                      background: 'rgba(40, 167, 69, 0.8)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '30px',
+                      height: '30px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Edit Chart"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={(e) => deleteChart(chart.id, e)}
+                    style={{
+                      background: 'rgba(220, 53, 69, 0.8)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '30px',
+                      height: '30px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Delete Chart"
+                  >
+                    ×
+                  </button>
+                </div>
                 
                 <div style={{ marginBottom: '15px' }}>
                   <h3 style={{ 
@@ -465,7 +509,7 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, user }) => {
                   <div style={{ opacity: 0.8, fontSize: '14px' }}>
                     <div>📅 {new Date(chart.date).toLocaleDateString()}</div>
                     <div>🕐 {chart.time}</div>
-                    <div>📍 {chart.latitude.toFixed(2)}, {chart.longitude.toFixed(2)}</div>
+                    <div>📍 {chart.place || `${chart.latitude.toFixed(2)}, ${chart.longitude.toFixed(2)}`}</div>
                   </div>
                 </div>
                 

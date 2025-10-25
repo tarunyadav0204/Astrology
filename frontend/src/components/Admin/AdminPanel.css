@@ -1,0 +1,252 @@
+.admin-panel {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e91e63;
+}
+
+.admin-header h1 {
+  color: #e91e63;
+  margin: 0;
+}
+
+.logout-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.tab {
+  background: rgba(233, 30, 99, 0.1);
+  border: 2px solid rgba(233, 30, 99, 0.2);
+  padding: 12px 24px;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #e91e63;
+  font-weight: bold;
+}
+
+.tab.active,
+.tab:hover {
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  color: white;
+  border-color: #e91e63;
+}
+
+.admin-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.users-management h2,
+.charts-management h2 {
+  color: #e91e63;
+  margin-bottom: 20px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-style: italic;
+}
+
+.users-table,
+.charts-table {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th,
+td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  background: #e91e63;
+  color: white;
+  font-weight: bold;
+}
+
+tr:hover {
+  background: rgba(233, 30, 99, 0.05);
+}
+
+.subscriptions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subscription-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subscription {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.subscription:hover {
+  opacity: 0.8;
+}
+
+.subscription.active {
+  background: #4caf50;
+  color: white;
+}
+
+.subscription.inactive {
+  background: #f44336;
+  color: white;
+}
+
+.add-subscription-btn {
+  background: #ff6f00;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  margin-left: 8px;
+}
+
+.new-subscription {
+  margin-top: 4px;
+}
+
+.new-subscription select {
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.subscription-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.save-btn {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.cancel-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.save-btn:hover {
+  background: #45a049;
+}
+
+.cancel-btn:hover {
+  background: #da190b;
+}
+
+.edit-btn {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.delete-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.edit-btn:hover,
+.delete-btn:hover {
+  opacity: 0.8;
+}
+
+select {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+}
+
+@media (max-width: 768px) {
+  .admin-panel {
+    padding: 10px;
+  }
+  
+  .admin-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .admin-tabs {
+    flex-direction: column;
+  }
+  
+  .admin-content {
+    padding: 15px;
+  }
+  
+  table {
+    font-size: 14px;
+  }
+  
+  th,
+  td {
+    padding: 8px 4px;
+  }
+}

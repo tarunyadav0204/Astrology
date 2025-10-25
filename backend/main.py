@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import swisseph as swe
 import sqlite3
 import os
+import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import bcrypt
@@ -85,6 +86,8 @@ class BirthData(BaseModel):
     latitude: float
     longitude: float
     timezone: str
+    place: str = ""
+    gender: str = ""
 
 class TransitRequest(BaseModel):
     birth_data: BirthData
@@ -155,7 +158,7 @@ def init_db():
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
-    # Create users table
+    # Create users table (simplified)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             userid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,6 +169,52 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Create subscription plans table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS subscription_plans (
+            plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            platform TEXT NOT NULL,
+            plan_name TEXT NOT NULL,
+            price DECIMAL(10,2) DEFAULT 0.00,
+            duration_months INTEGER DEFAULT 1,
+            features TEXT NOT NULL,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create user subscriptions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            userid INTEGER NOT NULL,
+            plan_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'active',
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (userid) REFERENCES users (userid),
+            FOREIGN KEY (plan_id) REFERENCES subscription_plans (plan_id)
+        )
+    ''')
+    
+    # Insert default subscription plans
+    cursor.execute("SELECT COUNT(*) FROM subscription_plans")
+    if cursor.fetchone()[0] == 0:
+        default_plans = [
+            ('astrovishnu', 'Free', 0.00, 12, '{"charts": true, "basic_features": true}'),
+            ('astrovishnu', 'Premium', 99.99, 12, '{"charts": true, "predictions": true, "api_access": true, "advanced_features": true}'),
+            ('astroroshni', 'Free', 0.00, 12, '{"consultations": 1, "basic_reports": true}'),
+            ('astroroshni', 'Basic', 29.99, 1, '{"consultations": 3, "reports": true, "priority_support": false}'),
+            ('astroroshni', 'Premium', 99.99, 12, '{"consultations": 10, "reports": true, "priority_support": true, "custom_remedies": true}')
+        ]
+        
+        for platform, plan_name, price, duration, features in default_plans:
+            cursor.execute('''
+                INSERT INTO subscription_plans (platform, plan_name, price, duration_months, features)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (platform, plan_name, price, duration, features))
     
     # Check if birth_charts table exists and has userid column
     cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='birth_charts'")
@@ -185,11 +234,27 @@ def init_db():
             latitude REAL NOT NULL,
             longitude REAL NOT NULL,
             timezone TEXT NOT NULL,
+            place TEXT DEFAULT '',
+            gender TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (userid) REFERENCES users (userid),
             UNIQUE(userid, date, time, latitude, longitude)
         )
     ''')
+    
+    # Add place column if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE birth_charts ADD COLUMN place TEXT DEFAULT ""')
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    # Add gender column if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE birth_charts ADD COLUMN gender TEXT DEFAULT ""')
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     # Create planet nakshatra interpretations table
     cursor.execute('''
@@ -256,6 +321,31 @@ def create_access_token(data: dict):
 # Use the auth module function
 get_current_user = auth_get_current_user
 
+# Helper function to check user access
+def has_platform_access(userid: int, platform: str, feature: str = None) -> bool:
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT sp.features
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+        WHERE us.userid = ? AND sp.platform = ? AND us.status = 'active' 
+              AND us.end_date >= date('now')
+    ''', (userid, platform))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return False
+    
+    if feature:
+        features = json.loads(result[0])
+        return features.get(feature, False)
+    
+    return True
+
 @app.post("/api/register")
 async def register(user_data: UserCreate):
     conn = sqlite3.connect('astrology.db')
@@ -275,6 +365,31 @@ async def register(user_data: UserCreate):
     
     cursor.execute("SELECT userid, name, phone, role FROM users WHERE phone = ?", (user_data.phone,))
     user = cursor.fetchone()
+    
+    # Get free plans for both platforms
+    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'")
+    astrovishnu_free = cursor.fetchone()
+    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'")
+    astroroshni_free = cursor.fetchone()
+    
+    # Give user free access to both platforms
+    from datetime import date, timedelta
+    start_date = date.today()
+    end_date = start_date + timedelta(days=365)  # 1 year free
+    
+    if astrovishnu_free:
+        cursor.execute(
+            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
+            (user[0], astrovishnu_free[0], start_date, end_date)
+        )
+    
+    if astroroshni_free:
+        cursor.execute(
+            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
+            (user[0], astroroshni_free[0], start_date, end_date)
+        )
+    
+    conn.commit()
     conn.close()
     
     access_token = create_access_token(data={"sub": user_data.phone})
@@ -282,7 +397,12 @@ async def register(user_data: UserCreate):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[3]}
+        "user": {
+            "userid": user[0], 
+            "name": user[1], 
+            "phone": user[2], 
+            "role": user[3]
+        }
     }
 
 @app.post("/api/login")
@@ -291,22 +411,141 @@ async def login(user_data: UserLogin):
     cursor = conn.cursor()
     cursor.execute("SELECT userid, name, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
     user = cursor.fetchone()
-    conn.close()
     
     if not user or not verify_password(user_data.password, user[3]):
+        conn.close()
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Get user's active subscriptions
+    cursor.execute('''
+        SELECT sp.platform, sp.plan_name, sp.features, us.status, us.end_date
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+        WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
+    ''', (user[0],))
+    
+    subscriptions = cursor.fetchall()
+    conn.close()
+    
+    # Format subscriptions
+    user_subscriptions = {}
+    for sub in subscriptions:
+        platform, plan_name, features, status, end_date = sub
+        user_subscriptions[platform] = {
+            'plan_name': plan_name,
+            'features': json.loads(features),
+            'status': status,
+            'end_date': end_date
+        }
     
     access_token = create_access_token(data={"sub": user_data.phone})
     
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {"userid": user[0], "name": user[1], "phone": user[2], "role": user[4]}
+        "user": {
+            "userid": user[0], 
+            "name": user[1], 
+            "phone": user[2], 
+            "role": user[4],
+            "subscriptions": user_subscriptions
+        }
     }
 
 @app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# Subscription Management APIs
+@app.get("/api/subscription-plans")
+async def get_subscription_plans(platform: str = None):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    if platform:
+        cursor.execute("SELECT * FROM subscription_plans WHERE platform = ? AND is_active = 1", (platform,))
+    else:
+        cursor.execute("SELECT * FROM subscription_plans WHERE is_active = 1")
+    
+    plans = cursor.fetchall()
+    conn.close()
+    
+    result = []
+    for plan in plans:
+        result.append({
+            'plan_id': plan[0],
+            'platform': plan[1],
+            'plan_name': plan[2],
+            'price': plan[3],
+            'duration_months': plan[4],
+            'features': json.loads(plan[5]),
+            'is_active': plan[6]
+        })
+    
+    return {'plans': result}
+
+@app.get("/api/user-subscriptions")
+async def get_user_subscriptions(current_user: User = Depends(get_current_user)):
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT us.id, sp.platform, sp.plan_name, sp.features, us.status, 
+               us.start_date, us.end_date, sp.price
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+        WHERE us.userid = ?
+        ORDER BY us.created_at DESC
+    ''', (current_user.userid,))
+    
+    subscriptions = cursor.fetchall()
+    conn.close()
+    
+    result = []
+    for sub in subscriptions:
+        result.append({
+            'id': sub[0],
+            'platform': sub[1],
+            'plan_name': sub[2],
+            'features': json.loads(sub[3]),
+            'status': sub[4],
+            'start_date': sub[5],
+            'end_date': sub[6],
+            'price': sub[7]
+        })
+    
+    return {'subscriptions': result}
+
+@app.post("/api/check-access")
+async def check_access(request: dict, current_user: User = Depends(get_current_user)):
+    platform = request.get('platform')
+    feature = request.get('feature')
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT sp.features
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+        WHERE us.userid = ? AND sp.platform = ? AND us.status = 'active' 
+              AND us.end_date >= date('now')
+    ''', (current_user.userid, platform))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return {'has_access': False, 'reason': 'No active subscription'}
+    
+    features = json.loads(result[0])
+    has_access = features.get(feature, False)
+    
+    return {
+        'has_access': has_access,
+        'features': features,
+        'reason': 'Feature not included in plan' if not has_access else None
+    }
 
 @app.post("/api/forgot-password")
 async def forgot_password(request: ForgotPassword):
@@ -453,10 +692,10 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone))
+          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender))
     conn.commit()
     conn.close()
     
@@ -725,14 +964,14 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
         search_pattern = f'%{search.strip()}%'
         print(f"Using search pattern: {search_pattern}")
         cursor.execute('''
-            SELECT * FROM birth_charts 
+            SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender FROM birth_charts 
             WHERE userid = ? AND name LIKE ? 
             ORDER BY created_at DESC 
             LIMIT ?
         ''', (current_user.userid, search_pattern, limit))
     else:
         print("No search query, returning all charts")
-        cursor.execute('SELECT * FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
+        cursor.execute('SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
     
     rows = cursor.fetchall()
     print(f"Found {len(rows)} charts")
@@ -749,7 +988,9 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
             'latitude': row[5],
             'longitude': row[6],
             'timezone': row[7],
-            'created_at': row[8]
+            'created_at': row[8],
+            'place': row[9] if row[9] else '',
+            'gender': row[10] if row[10] else ''
         })
     
     return {"charts": charts}
@@ -760,10 +1001,10 @@ async def update_birth_chart(chart_id: int, birth_data: BirthData):
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE birth_charts 
-        SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?
+        SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?
         WHERE id=?
     ''', (birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone, chart_id))
+          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, chart_id))
     conn.commit()
     conn.close()
     return {"message": "Chart updated successfully"}
@@ -2295,6 +2536,187 @@ async def get_all_daily_horoscopes(date: Optional[str] = None):
         return horoscopes
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Admin endpoints
+@app.get("/api/admin/users")
+async def get_admin_users(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT userid, name, phone, role, created_at FROM users ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    
+    users = []
+    for row in rows:
+        # Get user subscriptions
+        cursor.execute('''
+            SELECT sp.platform, sp.plan_name, us.status, us.end_date
+            FROM user_subscriptions us
+            JOIN subscription_plans sp ON us.plan_id = sp.plan_id
+            WHERE us.userid = ? AND us.status = 'active' AND us.end_date >= date('now')
+        ''', (row[0],))
+        
+        subscriptions = {}
+        for sub in cursor.fetchall():
+            subscriptions[sub[0]] = {
+                'plan_name': sub[1],
+                'status': sub[2],
+                'end_date': sub[3]
+            }
+        
+        users.append({
+            'userid': row[0],
+            'name': row[1],
+            'phone': row[2],
+            'role': row[3],
+            'created_at': row[4],
+            'subscriptions': subscriptions
+        })
+    
+    conn.close()
+    return {'users': users}
+
+@app.get("/api/admin/charts")
+async def get_admin_charts(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT bc.id, bc.userid, bc.name, bc.date, bc.time, bc.latitude, bc.longitude, bc.place, bc.gender, bc.created_at, u.name as user_name, u.phone
+        FROM birth_charts bc
+        JOIN users u ON bc.userid = u.userid
+        ORDER BY bc.created_at DESC
+    ''')
+    rows = cursor.fetchall()
+    conn.close()
+    
+    charts = []
+    for row in rows:
+        charts.append({
+            'id': row[0],
+            'userid': row[1],
+            'name': row[2],
+            'date': row[3],
+            'time': row[4],
+            'latitude': row[5],
+            'longitude': row[6],
+            'place': row[7],
+            'gender': row[8],
+            'created_at': row[9],
+            'user_name': row[10],
+            'user_phone': row[11]
+        })
+    
+    return {'charts': charts}
+
+@app.delete("/api/admin/users/{user_id}")
+async def delete_admin_user(user_id: int, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM users WHERE userid=?', (user_id,))
+    conn.commit()
+    conn.close()
+    return {"message": "User deleted successfully"}
+
+@app.delete("/api/admin/charts/{chart_id}")
+async def delete_admin_chart(chart_id: int, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM birth_charts WHERE id=?', (chart_id,))
+    conn.commit()
+    conn.close()
+    return {"message": "Chart deleted successfully"}
+
+@app.put("/api/admin/users/{user_id}")
+async def update_admin_user(user_id: int, user_data: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE users 
+        SET name=?, phone=?, role=?
+        WHERE userid=?
+    ''', (user_data['name'], user_data['phone'], user_data['role'], user_id))
+    conn.commit()
+    conn.close()
+    return {"message": "User updated successfully"}
+
+@app.put("/api/admin/users/{user_id}/subscription")
+async def update_user_subscription(user_id: int, subscription_data: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    platform = subscription_data['platform']
+    plan_name = subscription_data['plan_name']
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    # Get plan_id
+    cursor.execute("SELECT plan_id FROM subscription_plans WHERE platform = ? AND plan_name = ?", (platform, plan_name))
+    plan = cursor.fetchone()
+    
+    if not plan:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    plan_id = plan[0]
+    
+    # Deactivate existing subscription for this platform
+    cursor.execute('''
+        UPDATE user_subscriptions 
+        SET status = 'inactive' 
+        WHERE userid = ? AND plan_id IN (
+            SELECT plan_id FROM subscription_plans WHERE platform = ?
+        )
+    ''', (user_id, platform))
+    
+    # Add new subscription
+    from datetime import date, timedelta
+    start_date = date.today()
+    end_date = start_date + timedelta(days=365)  # 1 year
+    
+    cursor.execute('''
+        INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date, status)
+        VALUES (?, ?, ?, ?, 'active')
+    ''', (user_id, plan_id, start_date, end_date))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Subscription updated successfully"}
+
+@app.get("/api/admin/subscription-plans")
+async def get_admin_subscription_plans(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT platform, plan_name FROM subscription_plans WHERE is_active = 1 ORDER BY platform, plan_name")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    plans = []
+    for row in rows:
+        plans.append({
+            'platform': row[0],
+            'plan_name': row[1]
+        })
+    
+    return {'plans': plans}
 
 if __name__ == "__main__":
     import uvicorn

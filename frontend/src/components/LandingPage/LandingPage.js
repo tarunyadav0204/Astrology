@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
+import { getCurrentDomainConfig } from '../../config/domains.config';
 import './LandingPage.css';
 
 const LandingPage = ({ onLogin, onRegister }) => {
   const [authView, setAuthView] = useState('login');
   const [showAuth, setShowAuth] = useState(false);
+  const [domainConfig, setDomainConfig] = useState(null);
+  
+  useEffect(() => {
+    setDomainConfig(getCurrentDomainConfig());
+  }, []);
 
   return (
     <div className="landing-page">
@@ -14,10 +20,15 @@ const LandingPage = ({ onLogin, onRegister }) => {
         <div className="hero-content">
           <div className="hero-text">
             <h1 className="hero-title">
-              ✨ Welcome to AstroClick 🌟
+              ✨ Welcome to {domainConfig?.title || 'AstroClick'} 🌟
             </h1>
             <p className="hero-subtitle">
-              Unlock the secrets of your birth chart with authentic Vedic astrology
+              {domainConfig?.userType === 'software' 
+                ? 'Professional Vedic astrology software for accurate calculations and predictions'
+                : domainConfig?.userType === 'general'
+                ? 'Get personalized astrology readings and spiritual guidance from expert astrologers'
+                : 'Unlock the secrets of your birth chart with authentic Vedic astrology'
+              }
             </p>
             <div className="features-grid">
               <div className="feature">
@@ -44,7 +55,7 @@ const LandingPage = ({ onLogin, onRegister }) => {
                 setShowAuth(true);
               }}
             >
-              Begin Your Reading
+              {domainConfig?.userType === 'software' ? 'Access Software' : 'Begin Your Reading'}
             </button>
           </div>
           <div className="hero-visual">

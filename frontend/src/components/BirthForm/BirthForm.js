@@ -5,10 +5,10 @@ import { apiService } from '../../services/apiService';
 import { locationService } from '../../services/locationService';
 import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
-import { TwoPanelContainer, FormPanel, ChartsPanel, FormContainer, FormField, Input, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem } from './BirthForm.styles';
+import { TwoPanelContainer, FormPanel, ChartsPanel, FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem } from './BirthForm.styles';
 
 const BirthForm = ({ onSubmit, onLogout }) => {
-  const { setBirthData, setChartData, setLoading, setError } = useAstrology();
+  const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -17,7 +17,8 @@ const BirthForm = ({ onSubmit, onLogout }) => {
     place: '',
     latitude: null,
     longitude: null,
-    timezone: ''
+    timezone: '',
+    gender: ''
   });
   
   const [suggestions, setSuggestions] = useState([]);
@@ -43,7 +44,22 @@ const BirthForm = ({ onSubmit, onLogout }) => {
 
   useEffect(() => {
     loadExistingCharts();
-  }, []);
+    
+    // Pre-populate form if birthData exists in context (from edit action)
+    if (birthData && birthData.id) {
+      setEditingChart(birthData);
+      setFormData({
+        name: birthData.name || '',
+        date: birthData.date || '',
+        time: birthData.time || '',
+        place: birthData.place || '',
+        latitude: birthData.latitude || null,
+        longitude: birthData.longitude || null,
+        timezone: birthData.timezone || '',
+        gender: birthData.gender || ''
+      });
+    }
+  }, [birthData]);
 
   const loadExistingCharts = async (search = '') => {
     try {
@@ -75,7 +91,9 @@ const BirthForm = ({ onSubmit, onLogout }) => {
         time: chart.time,
         latitude: chart.latitude,
         longitude: chart.longitude,
-        timezone: chart.timezone
+        timezone: chart.timezone,
+        place: chart.place || '',
+        gender: chart.gender || ''
       };
       
       const [chartData, yogiData] = await Promise.all([
@@ -113,10 +131,11 @@ const BirthForm = ({ onSubmit, onLogout }) => {
       name: chart.name,
       date: chart.date,
       time: chart.time,
-      place: `${chart.latitude}, ${chart.longitude}`,
+      place: chart.place || `${chart.latitude}, ${chart.longitude}`,
       latitude: chart.latitude,
       longitude: chart.longitude,
-      timezone: chart.timezone
+      timezone: chart.timezone,
+      gender: chart.gender || ''
     });
   };
 
@@ -141,7 +160,8 @@ const BirthForm = ({ onSubmit, onLogout }) => {
       place: '',
       latitude: null,
       longitude: null,
-      timezone: ''
+      timezone: '',
+      gender: ''
     });
   };
 
@@ -300,6 +320,19 @@ const BirthForm = ({ onSubmit, onLogout }) => {
             error={errors.name}
           />
           {errors.name && <span className="error">{errors.name}</span>}
+        </FormField>
+
+        <FormField>
+          <Label>Gender</Label>
+          <Select
+            name="gender"
+            value={formData.gender}
+            onChange={handleInputChange}
+          >
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </Select>
         </FormField>
 
         <FormField>

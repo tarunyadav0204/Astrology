@@ -7,21 +7,29 @@ import BirthForm from './components/BirthForm/BirthForm';
 import Dashboard from './components/Dashboard/Dashboard';
 import PredictionsPage from './components/PredictionsPage/PredictionsPage';
 import LandingPage from './components/LandingPage/LandingPage';
+import AstroVishnuLanding from './components/AstroVishnu/AstroVishnuLanding';
+import LoginForm from './components/Auth/LoginForm';
+import RegisterForm from './components/Auth/RegisterForm';
 import ChartSelector from './components/ChartSelector/ChartSelector';
 import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
 import InvestorHomepage from './components/Homepage/InvestorHomepage';
+import AstroRoshniHomepage from './components/AstroRoshniHomepage/AstroRoshniHomepage';
 import HoroscopePage from './components/Horoscope/HoroscopePage';
 import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
+import AdminPanel from './components/Admin/AdminPanel';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
+import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/domains.config';
 
 
 function App() {
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('selector'); // user-home, selector, form, dashboard, predictions
   const [loading, setLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authView, setAuthView] = useState('login');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -32,6 +40,23 @@ function App() {
         // Try to use saved user data first
         const userData = JSON.parse(savedUser);
         setUser(userData);
+        
+        // Check if user should be redirected based on domain
+        const redirectUrl = getRedirectUrl(userData);
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
+          return;
+        }
+        
+        // Set appropriate view based on domain configuration
+        const domainConfig = getCurrentDomainConfig();
+        
+        if (domainConfig.userType === 'general') {
+          setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
+        } else {
+          setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+        }
+        
         setLoading(false);
         
         // Verify token in background
@@ -55,6 +80,22 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
+    
+    // Check if user should be redirected after login
+    const redirectUrl = getRedirectUrl(userData);
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+      return;
+    }
+    
+    // Set appropriate view based on domain configuration
+    const domainConfig = getCurrentDomainConfig();
+    
+    if (domainConfig.userType === 'general') {
+      setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
+    } else {
+      setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+    }
   };
 
   const handleLogout = () => {
@@ -63,17 +104,224 @@ function App() {
     setCurrentView('selector');
   };
 
+  const handleAdminClick = () => {
+    if (user && user.role === 'admin') {
+      setCurrentView('admin');
+    }
+  };
+
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
   }
 
-  // Show landing page for non-authenticated users
+  // Show domain-specific page for non-authenticated users
   if (!user) {
+    const domainConfig = getCurrentDomainConfig();
+    
     return (
       <Router>
         <Routes>
           <Route path="/" element={
-            <LandingPage onLogin={handleLogin} onRegister={handleLogin} />
+            domainConfig.userType === 'general' ? (
+              <>
+                <AstroRoshniHomepage 
+                  user={null} 
+                  onLogin={() => setShowLoginModal(true)} 
+                  showLoginButton={true} 
+                />
+                {showLoginModal && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '15px',
+                      padding: '30px',
+                      maxWidth: '450px',
+                      width: '90%',
+                      position: 'relative'
+                    }}>
+                      <button 
+                        onClick={() => setShowLoginModal(false)}
+                        style={{
+                          position: 'absolute',
+                          top: '15px',
+                          right: '15px',
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '24px',
+                          cursor: 'pointer',
+                          color: '#666'
+                        }}
+                      >
+                        ×
+                      </button>
+                      <div style={{ marginBottom: '20px' }}>
+                        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                          <button 
+                            onClick={() => setAuthView('login')}
+                            style={{
+                              padding: '10px 20px',
+                              border: 'none',
+                              background: authView === 'login' ? '#e91e63' : 'transparent',
+                              color: authView === 'login' ? 'white' : '#e91e63',
+                              borderRadius: '25px 0 0 25px',
+                              cursor: 'pointer',
+                              borderRight: '1px solid #e91e63'
+                            }}
+                          >
+                            Sign In
+                          </button>
+                          <button 
+                            onClick={() => setAuthView('register')}
+                            style={{
+                              padding: '10px 20px',
+                              border: 'none',
+                              background: authView === 'register' ? '#e91e63' : 'transparent',
+                              color: authView === 'register' ? 'white' : '#e91e63',
+                              borderRadius: '0 25px 25px 0',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Sign Up
+                          </button>
+                        </div>
+                      </div>
+                      {authView === 'login' ? (
+                        <LoginForm 
+                          onLogin={(userData) => {
+                            handleLogin(userData);
+                            setShowLoginModal(false);
+                          }} 
+                          onSwitchToRegister={() => setAuthView('register')} 
+                        />
+                      ) : (
+                        <RegisterForm 
+                          onRegister={(userData) => {
+                            handleLogin(userData);
+                            setShowLoginModal(false);
+                          }} 
+                          onSwitchToLogin={() => setAuthView('login')} 
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : domainConfig.userType === 'software' ? (
+              <>
+                <AstroVishnuLanding 
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }} 
+                  onRegister={() => {
+                    setAuthView('register');
+                    setShowLoginModal(true);
+                  }} 
+                />
+                {showLoginModal && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '15px',
+                      padding: '30px',
+                      maxWidth: '450px',
+                      width: '90%',
+                      position: 'relative'
+                    }}>
+                      <button 
+                        onClick={() => setShowLoginModal(false)}
+                        style={{
+                          position: 'absolute',
+                          top: '15px',
+                          right: '15px',
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '24px',
+                          cursor: 'pointer',
+                          color: '#666'
+                        }}
+                      >
+                        ×
+                      </button>
+                      <div style={{ marginBottom: '20px' }}>
+                        <h2 style={{ textAlign: 'center', color: '#ff6b35', marginBottom: '20px' }}>Welcome to AstroVishnu</h2>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                          <button 
+                            onClick={() => setAuthView('login')}
+                            style={{
+                              padding: '10px 20px',
+                              border: 'none',
+                              background: authView === 'login' ? '#ff6b35' : 'transparent',
+                              color: authView === 'login' ? 'white' : '#ff6b35',
+                              borderRadius: '25px 0 0 25px',
+                              cursor: 'pointer',
+                              borderRight: '1px solid #ff6b35'
+                            }}
+                          >
+                            Sign In
+                          </button>
+                          <button 
+                            onClick={() => setAuthView('register')}
+                            style={{
+                              padding: '10px 20px',
+                              border: 'none',
+                              background: authView === 'register' ? '#ff6b35' : 'transparent',
+                              color: authView === 'register' ? 'white' : '#ff6b35',
+                              borderRadius: '0 25px 25px 0',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Sign Up
+                          </button>
+                        </div>
+                      </div>
+                      {authView === 'login' ? (
+                        <LoginForm 
+                          onLogin={(userData) => {
+                            handleLogin(userData);
+                            setShowLoginModal(false);
+                          }} 
+                          onSwitchToRegister={() => setAuthView('register')} 
+                        />
+                      ) : (
+                        <RegisterForm 
+                          onRegister={(userData) => {
+                            handleLogin(userData);
+                            setShowLoginModal(false);
+                          }} 
+                          onSwitchToLogin={() => setAuthView('login')} 
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <LandingPage onLogin={handleLogin} onRegister={handleLogin} domainConfig={domainConfig} />
+            )
           } />
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -92,23 +340,30 @@ function App() {
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={
             <div style={{ 
-              padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
-              maxWidth: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '100vw' : '1200px', 
-              margin: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' ? '0' : '0 auto',
+              padding: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? '0' : (window.innerWidth <= 768 ? '10px' : '20px'), 
+              maxWidth: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? '100vw' : '1200px', 
+              margin: currentView === 'dashboard' || currentView === 'predictions' || currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? '0' : '0 auto',
               minHeight: '100vh',
               background: currentView === 'dashboard' || currentView === 'predictions' ? 'transparent' : 
-                         currentView === 'selector' || currentView === 'user-home' ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
+                         currentView === 'selector' || currentView === 'user-home' || currentView === 'astroroshnihomepage' || currentView === 'admin' ? 'transparent' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%)',
               overflowX: 'hidden',
               width: '100%'
             }}>
         {currentView === 'user-home' && (
           <InvestorHomepage onGetStarted={() => setCurrentView('selector')} />
         )}
+        {currentView === 'astroroshnihomepage' && (
+          <AstroRoshniHomepage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} />
+        )}
+        {currentView === 'admin' && (
+          <AdminPanel user={user} onLogout={handleLogout} />
+        )}
         {currentView === 'selector' && (
           <ChartSelector 
             onSelectChart={() => setCurrentView('dashboard')} 
             onCreateNew={() => setCurrentView('form')} 
             onLogout={handleLogout}
+            onAdminClick={handleAdminClick}
             onBackToUserHome={() => setCurrentView('user-home')}
             user={user}
           />
