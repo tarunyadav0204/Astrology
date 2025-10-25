@@ -169,153 +169,153 @@ security = HTTPBearer()
 # Initialize SQLite database
 def init_db():
     try:
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Create users table (simplified)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            userid INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT DEFAULT 'user',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Create subscription plans table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS subscription_plans (
-            plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            platform TEXT NOT NULL,
-            plan_name TEXT NOT NULL,
-            price DECIMAL(10,2) DEFAULT 0.00,
-            duration_months INTEGER DEFAULT 1,
-            features TEXT NOT NULL,
-            is_active BOOLEAN DEFAULT true,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Create user subscriptions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_subscriptions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            userid INTEGER NOT NULL,
-            plan_id INTEGER NOT NULL,
-            status TEXT DEFAULT 'active',
-            start_date DATE NOT NULL,
-            end_date DATE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (userid) REFERENCES users (userid),
-            FOREIGN KEY (plan_id) REFERENCES subscription_plans (plan_id)
-        )
-    ''')
-    
-    # Insert default subscription plans
-    cursor.execute("SELECT COUNT(*) FROM subscription_plans")
-    if cursor.fetchone()[0] == 0:
-        default_plans = [
-            ('astrovishnu', 'Free', 0.00, 12, '{"charts": true, "basic_features": true}'),
-            ('astrovishnu', 'Premium', 99.99, 12, '{"charts": true, "predictions": true, "api_access": true, "advanced_features": true}'),
-            ('astroroshni', 'Free', 0.00, 12, '{"consultations": 1, "basic_reports": true}'),
-            ('astroroshni', 'Basic', 29.99, 1, '{"consultations": 3, "reports": true, "priority_support": false}'),
-            ('astroroshni', 'Premium', 99.99, 12, '{"consultations": 10, "reports": true, "priority_support": true, "custom_remedies": true}')
-        ]
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
         
-        for platform, plan_name, price, duration, features in default_plans:
-            cursor.execute('''
-                INSERT INTO subscription_plans (platform, plan_name, price, duration_months, features)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (platform, plan_name, price, duration, features))
-    
-    # Check if birth_charts table exists and has userid column
-    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='birth_charts'")
-    result = cursor.fetchone()
-    
-    if result and 'userid' not in result[0]:
-        # Drop existing table and recreate with userid column
-        cursor.execute('DROP TABLE birth_charts')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS birth_charts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            userid INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            date TEXT NOT NULL,
-            time TEXT NOT NULL,
-            latitude REAL NOT NULL,
-            longitude REAL NOT NULL,
-            timezone TEXT NOT NULL,
-            place TEXT DEFAULT '',
-            gender TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (userid) REFERENCES users (userid),
-            UNIQUE(userid, date, time, latitude, longitude)
-        )
-    ''')
-    
-    # Add place column if it doesn't exist
-    try:
-        cursor.execute('ALTER TABLE birth_charts ADD COLUMN place TEXT DEFAULT ""')
+        # Create users table (simplified)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                userid INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                phone TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create subscription plans table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS subscription_plans (
+                plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform TEXT NOT NULL,
+                plan_name TEXT NOT NULL,
+                price DECIMAL(10,2) DEFAULT 0.00,
+                duration_months INTEGER DEFAULT 1,
+                features TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create user subscriptions table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid INTEGER NOT NULL,
+                plan_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'active',
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userid) REFERENCES users (userid),
+                FOREIGN KEY (plan_id) REFERENCES subscription_plans (plan_id)
+            )
+        ''')
+        
+        # Insert default subscription plans
+        cursor.execute("SELECT COUNT(*) FROM subscription_plans")
+        if cursor.fetchone()[0] == 0:
+            default_plans = [
+                ('astrovishnu', 'Free', 0.00, 12, '{"charts": true, "basic_features": true}'),
+                ('astrovishnu', 'Premium', 99.99, 12, '{"charts": true, "predictions": true, "api_access": true, "advanced_features": true}'),
+                ('astroroshni', 'Free', 0.00, 12, '{"consultations": 1, "basic_reports": true}'),
+                ('astroroshni', 'Basic', 29.99, 1, '{"consultations": 3, "reports": true, "priority_support": false}'),
+                ('astroroshni', 'Premium', 99.99, 12, '{"consultations": 10, "reports": true, "priority_support": true, "custom_remedies": true}')
+            ]
+            
+            for platform, plan_name, price, duration, features in default_plans:
+                cursor.execute('''
+                    INSERT INTO subscription_plans (platform, plan_name, price, duration_months, features)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (platform, plan_name, price, duration, features))
+        
+        # Check if birth_charts table exists and has userid column
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='birth_charts'")
+        result = cursor.fetchone()
+        
+        if result and 'userid' not in result[0]:
+            # Drop existing table and recreate with userid column
+            cursor.execute('DROP TABLE birth_charts')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS birth_charts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userid INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                timezone TEXT NOT NULL,
+                place TEXT DEFAULT '',
+                gender TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userid) REFERENCES users (userid),
+                UNIQUE(userid, date, time, latitude, longitude)
+            )
+        ''')
+        
+        # Add place column if it doesn't exist
+        try:
+            cursor.execute('ALTER TABLE birth_charts ADD COLUMN place TEXT DEFAULT ""')
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        # Add gender column if it doesn't exist
+        try:
+            cursor.execute('ALTER TABLE birth_charts ADD COLUMN gender TEXT DEFAULT ""')
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        # Create planet nakshatra interpretations table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS planet_nakshatra_interpretations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                planet TEXT NOT NULL,
+                nakshatra TEXT NOT NULL,
+                house INTEGER NOT NULL,
+                interpretation TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(planet, nakshatra, house)
+            )
+        ''')
+        
+        # Create nakshatras table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nakshatras (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                lord TEXT NOT NULL,
+                deity TEXT NOT NULL,
+                nature TEXT NOT NULL,
+                guna TEXT NOT NULL,
+                description TEXT NOT NULL,
+                characteristics TEXT NOT NULL,
+                positive_traits TEXT NOT NULL,
+                negative_traits TEXT NOT NULL,
+                careers TEXT NOT NULL,
+                compatibility TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create password reset codes table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS password_reset_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                code TEXT NOT NULL,
+                token TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                used BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    # Add gender column if it doesn't exist
-    try:
-        cursor.execute('ALTER TABLE birth_charts ADD COLUMN gender TEXT DEFAULT ""')
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    # Create planet nakshatra interpretations table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS planet_nakshatra_interpretations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            planet TEXT NOT NULL,
-            nakshatra TEXT NOT NULL,
-            house INTEGER NOT NULL,
-            interpretation TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(planet, nakshatra, house)
-        )
-    ''')
-    
-    # Create nakshatras table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS nakshatras (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
-            lord TEXT NOT NULL,
-            deity TEXT NOT NULL,
-            nature TEXT NOT NULL,
-            guna TEXT NOT NULL,
-            description TEXT NOT NULL,
-            characteristics TEXT NOT NULL,
-            positive_traits TEXT NOT NULL,
-            negative_traits TEXT NOT NULL,
-            careers TEXT NOT NULL,
-            compatibility TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Create password reset codes table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS password_reset_codes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone TEXT NOT NULL,
-            code TEXT NOT NULL,
-            token TEXT NOT NULL,
-            expires_at TIMESTAMP NOT NULL,
-            used BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+        conn.close()
     except Exception as e:
         print(f"Database initialization error: {str(e)}")
         # Create a minimal database if initialization fails
