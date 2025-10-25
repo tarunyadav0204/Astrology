@@ -13,7 +13,7 @@ import RegisterForm from './components/Auth/RegisterForm';
 import ChartSelector from './components/ChartSelector/ChartSelector';
 import UnifiedHeader from './components/UnifiedHeader/UnifiedHeader';
 import UserPersonaHomePage from './user-persona/pages/SimpleHomePage';
-import InvestorHomepage from './components/Homepage/InvestorHomepage';
+
 import AstroRoshniHomepage from './components/AstroRoshniHomepage/AstroRoshniHomepage';
 import HoroscopePage from './components/Horoscope/HoroscopePage';
 import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
@@ -336,7 +336,7 @@ function App() {
       <AstrologyProvider>
         <Routes>
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
-          <Route path="/investor" element={<InvestorHomepage />} />
+
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={
             <div style={{ 
@@ -349,9 +349,7 @@ function App() {
               overflowX: 'hidden',
               width: '100%'
             }}>
-        {currentView === 'user-home' && (
-          <InvestorHomepage onGetStarted={() => setCurrentView('selector')} />
-        )}
+
         {currentView === 'astroroshnihomepage' && (
           <AstroRoshniHomepage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} />
         )}

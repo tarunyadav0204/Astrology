@@ -220,6 +220,8 @@
   background: rgba(255, 111, 0, 0.9);
   backdrop-filter: blur(10px);
   padding: 15px 0;
+  position: relative;
+  z-index: 100;
 }
 
 .navigation .container {
@@ -277,7 +279,7 @@
   min-width: 200px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
   border-radius: 10px;
-  z-index: 1000;
+  z-index: 9999;
   top: 100%;
   left: 0;
   backdrop-filter: blur(10px);
@@ -338,6 +340,8 @@
   margin-bottom: 30px;
   display: flex;
   justify-content: center;
+  position: relative;
+  z-index: 1;
 }
 
 .zodiac-nav {
@@ -375,6 +379,8 @@
   border-radius: 8px;
   transform: scale(1.05);
   color: white;
+  position: relative;
+  z-index: 1;
 }
 
 .zodiac-btn:hover .zodiac-name {
