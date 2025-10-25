@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../../config';
+import { APP_CONFIG } from '../../config/app.config';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AstroRoshniHomepage.css';
 
@@ -102,7 +102,13 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const fetchHoroscopes = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/horoscope/all-signs`);
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      const endpoint = API_BASE_URL.includes('localhost') 
+        ? `${API_BASE_URL}/api/horoscope/all-signs`
+        : `${API_BASE_URL}/horoscope/all-signs`;
+      const response = await fetch(endpoint);
       const data = await response.json();
       setHoroscopeData(data);
     } catch (error) {
