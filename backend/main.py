@@ -2529,7 +2529,7 @@ async def startup_event():
         print(f"Warning: Could not initialize house combinations database: {e}")
 
 # Horoscope endpoints
-@app.get("/horoscope/daily/{zodiac_sign}")
+@app.get("/api/horoscope/daily/{zodiac_sign}")
 async def get_daily_horoscope(zodiac_sign: str, date: Optional[str] = None):
     try:
         if date:
@@ -2542,7 +2542,7 @@ async def get_daily_horoscope(zodiac_sign: str, date: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/horoscope/weekly/{zodiac_sign}")
+@app.get("/api/horoscope/weekly/{zodiac_sign}")
 async def get_weekly_horoscope(zodiac_sign: str, date: Optional[str] = None):
     try:
         if date:
@@ -2555,7 +2555,7 @@ async def get_weekly_horoscope(zodiac_sign: str, date: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/horoscope/monthly/{zodiac_sign}")
+@app.get("/api/horoscope/monthly/{zodiac_sign}")
 async def get_monthly_horoscope(zodiac_sign: str, date: Optional[str] = None):
     try:
         if date:
@@ -2568,7 +2568,7 @@ async def get_monthly_horoscope(zodiac_sign: str, date: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/horoscope/yearly/{zodiac_sign}")
+@app.get("/api/horoscope/yearly/{zodiac_sign}")
 async def get_yearly_horoscope(zodiac_sign: str, date: Optional[str] = None):
     try:
         if date:
@@ -2581,7 +2581,7 @@ async def get_yearly_horoscope(zodiac_sign: str, date: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/horoscope/all-signs")
+@app.get("/api/horoscope/all-signs")
 async def get_all_daily_horoscopes(date: Optional[str] = None):
     try:
         zodiac_signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
