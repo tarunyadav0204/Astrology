@@ -541,7 +541,7 @@ async def get_user_subscriptions(current_user: User = Depends(get_current_user))
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT us.id, sp.platform, sp.plan_name, sp.features, us.status, 
+        SELECT us.subscription_id, sp.platform, sp.plan_name, sp.features, us.status, 
                us.start_date, us.end_date, sp.price
         FROM user_subscriptions us
         JOIN subscription_plans sp ON us.plan_id = sp.plan_id
