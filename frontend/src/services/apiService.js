@@ -13,9 +13,10 @@ const getEndpoint = (path) => {
     console.log('DEV - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', endpoint);
     return endpoint;
   }
-  // For production, path already includes /api from baseURL
-  console.log('PROD - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', path);
-  return path;
+  // For production, add /api prefix
+  const endpoint = `/api${path}`;
+  console.log('PROD - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', endpoint);
+  return endpoint;
 };
 
 // Simple request caching to prevent duplicate calls

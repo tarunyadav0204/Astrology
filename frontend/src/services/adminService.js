@@ -8,7 +8,7 @@ const getEndpoint = (path) => {
   if (API_BASE_URL.includes('localhost')) {
     return `${API_BASE_URL}/api${path}`;
   }
-  return `${API_BASE_URL}${path}`;
+  return `/api${path}`;
 };
 
 const getAuthHeaders = () => {

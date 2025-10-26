@@ -67,7 +67,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        🌟 Join AstroClick
+        🌟 Join AstroVishnu
       </h2>
 
       <form onSubmit={handleSubmit}>

@@ -20,7 +20,7 @@ const LandingPage = ({ onLogin, onRegister }) => {
         <div className="hero-content">
           <div className="hero-text">
             <h1 className="hero-title">
-              ✨ Welcome to {domainConfig?.title || 'AstroClick'} 🌟
+              ✨ Welcome to {domainConfig?.title || 'AstroVishnu'} 🌟
             </h1>
             <p className="hero-subtitle">
               {domainConfig?.userType === 'software' 

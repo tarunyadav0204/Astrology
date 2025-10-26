@@ -283,7 +283,7 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, onAdminClick, use
                 WebkitTextFillColor: 'transparent',
                 textShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
-                🌌 Welcome to AstroClick
+                🌌 Welcome to AstroVishnu
               </h1>
               <p style={{ 
                 margin: '10px 0 0 0', 

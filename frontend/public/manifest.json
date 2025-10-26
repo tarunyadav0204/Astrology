@@ -1,6 +1,6 @@
 {
-  "name": "AstroClick - Vedic Astrology",
-  "short_name": "AstroClick",
+  "name": "AstroVishnu - Vedic Astrology",
+  "short_name": "AstroVishnu",
   "description": "Professional Vedic astrology application with Lahiri Ayanamsa calculations",
   "start_url": "/",
   "display": "standalone",

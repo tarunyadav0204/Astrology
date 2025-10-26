@@ -118,7 +118,7 @@ const AstroRoshniPage = () => {
         <div className="container">
           <div className="hero-content">
             <div className="hero-badge">🌟 WORLD'S #1 ASTROLOGY SOFTWARE</div>
-            <h1>AstroRoshni Professional</h1>
+            <h1>AstroVishnu Professional</h1>
             <p className="hero-subtitle">The Most Advanced Vedic Astrology Software Trusted by 50,000+ Astrologers Globally</p>
             <div className="hero-stats">
               <div className="stat">

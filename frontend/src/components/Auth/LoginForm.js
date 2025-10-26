@@ -311,7 +311,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        ✨ Login to AstroClick
+        ✨ Login to AstroVishnu
       </h2>
 
       <form onSubmit={handleSubmit}>

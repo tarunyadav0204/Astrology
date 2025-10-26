@@ -358,7 +358,7 @@ const UnifiedHeader = ({
           margin: '0 20px',
           textShadow: '0 1px 2px rgba(0,0,0,0.2)'
         }}>
-          {showTransitControls ? 'Your Cosmic Portal' : 'AstroClick - Vedic Astrology'}
+          {showTransitControls ? 'Your Cosmic Portal' : 'AstroVishnu - Vedic Astrology'}
         </div>
       )}
 
