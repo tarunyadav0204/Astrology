@@ -8,6 +8,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [selectedZodiac, setSelectedZodiac] = useState('aries');
   const [horoscopeData, setHoroscopeData] = useState({});
   const [loading, setLoading] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState('daily');
 
   const bannerSlides = [
     { id: 1, image: '/images/banner-ai-astrologers.jpg', title: 'AI Astrologers Available 24/7' },
@@ -105,7 +106,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       const API_BASE_URL = process.env.NODE_ENV === 'production' 
         ? APP_CONFIG.api.prod 
         : APP_CONFIG.api.dev;
-      const endpoint = `${API_BASE_URL}/horoscope/all-signs`;
+      const endpoint = `${API_BASE_URL}/api/horoscope/all-signs`;
       const response = await fetch(endpoint);
       const data = await response.json();
       setHoroscopeData(data);
@@ -140,6 +141,15 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     }
   };
 
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(period);
+    // Scroll to horoscope section
+    const horoscopeSection = document.querySelector('.horoscope-section');
+    if (horoscopeSection) {
+      horoscopeSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="investor-homepage">
       {/* Animated Solar System */}
@@ -168,6 +178,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       </div>
       
       <NavigationHeader 
+        onPeriodChange={handlePeriodChange}
         showZodiacSelector={true}
         zodiacSigns={zodiacSigns}
         selectedZodiac={selectedZodiac}
@@ -412,10 +423,10 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           <div className="horoscope-grid">
             <div className="horoscope-content">
               <div className="horoscope-tabs">
-                <button className="tab active">Daily</button>
-                <button className="tab">Weekly</button>
-                <button className="tab">Monthly</button>
-                <button className="tab">Yearly</button>
+                <button className={`tab ${selectedPeriod === 'daily' ? 'active' : ''}`} onClick={() => setSelectedPeriod('daily')}>Daily</button>
+                <button className={`tab ${selectedPeriod === 'weekly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('weekly')}>Weekly</button>
+                <button className={`tab ${selectedPeriod === 'monthly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('monthly')}>Monthly</button>
+                <button className={`tab ${selectedPeriod === 'yearly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('yearly')}>Yearly</button>
               </div>
               
               <div className="zodiac-grid">
@@ -432,7 +443,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
 
               <div className="horoscope-content-area">
-                <h3>{selectedZodiac.charAt(0).toUpperCase() + selectedZodiac.slice(1)} Daily Horoscope</h3>
+                <h3>{selectedZodiac.charAt(0).toUpperCase() + selectedZodiac.slice(1)} {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope</h3>
                 {loading ? (
                   <div className="horoscope-loading">Loading your personalized horoscope...</div>
                 ) : (

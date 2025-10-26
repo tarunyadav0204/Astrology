@@ -38,7 +38,7 @@ const HoroscopePage = () => {
   const fetchHoroscope = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/horoscope/${selectedPeriod}/${selectedZodiac}`);
+      const response = await fetch(`${API_BASE_URL}/api/horoscope/${selectedPeriod}/${selectedZodiac}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

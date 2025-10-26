@@ -1,21 +1,34 @@
 // User-focused API service for consumer features
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
+import { API_BASE_URL } from '../config/app.config';
 
 class UserApiService {
   // Daily Horoscope
   async getDailyHoroscope(sunSign, date = null) {
-    const dateParam = date || new Date().toISOString().split('T')[0];
-    const response = await fetch(`${API_BASE_URL}/user/horoscope/daily?sign=${sunSign}&date=${dateParam}`);
+    const response = await fetch(`${API_BASE_URL}/api/horoscope/daily/${sunSign.toLowerCase()}`);
     return response.json();
   }
 
-  // Personalized Horoscope (requires birth data)
-  async getPersonalizedHoroscope(birthData, period = 'today') {
-    const response = await fetch(`${API_BASE_URL}/user/horoscope/personalized`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ birth_data: birthData, period })
-    });
+  // Weekly Horoscope
+  async getWeeklyHoroscope(sunSign) {
+    const response = await fetch(`${API_BASE_URL}/api/horoscope/weekly/${sunSign.toLowerCase()}`);
+    return response.json();
+  }
+
+  // Monthly Horoscope
+  async getMonthlyHoroscope(sunSign) {
+    const response = await fetch(`${API_BASE_URL}/api/horoscope/monthly/${sunSign.toLowerCase()}`);
+    return response.json();
+  }
+
+  // Yearly Horoscope
+  async getYearlyHoroscope(sunSign) {
+    const response = await fetch(`${API_BASE_URL}/api/horoscope/yearly/${sunSign.toLowerCase()}`);
+    return response.json();
+  }
+
+  // All Signs Daily Horoscope
+  async getAllDailyHoroscopes() {
+    const response = await fetch(`${API_BASE_URL}/api/horoscope/all-signs`);
     return response.json();
   }
 
