@@ -5,8 +5,9 @@ const getApiUrl = () => {
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
   
-  // If accessing via production domain, use production API
-  if (hostname === 'astroclick.net' || hostname.includes('astroclick.net')) {
+  // If accessing via production domains, use production API (load balancer)
+  if (hostname === 'astroclick.net' || hostname.includes('astroclick.net') ||
+      hostname === 'astroroshni.com' || hostname.includes('astroroshni.com')) {
     return APP_CONFIG.api.prod;
   }
   
