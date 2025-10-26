@@ -4,12 +4,12 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? APP_CONFIG.api.prod 
   : APP_CONFIG.api.dev;
 
-// Helper function to add /api prefix only for localhost
+// Helper function to add /api prefix for all endpoints
 const getEndpoint = (path) => {
   if (API_BASE_URL.includes('localhost')) {
     return `${API_BASE_URL}/api${path}`;
   }
-  return `${API_BASE_URL}${path}`;
+  return `/api${path}`;
 };
 
 export const authService = {
