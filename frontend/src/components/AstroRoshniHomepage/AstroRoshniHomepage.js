@@ -105,9 +105,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       const API_BASE_URL = process.env.NODE_ENV === 'production' 
         ? APP_CONFIG.api.prod 
         : APP_CONFIG.api.dev;
-      const endpoint = API_BASE_URL.includes('localhost') 
-        ? `${API_BASE_URL}/api/horoscope/all-signs`
-        : `${API_BASE_URL}/horoscope/all-signs`;
+      const endpoint = `${API_BASE_URL}/horoscope/all-signs`;
       const response = await fetch(endpoint);
       const data = await response.json();
       setHoroscopeData(data);
