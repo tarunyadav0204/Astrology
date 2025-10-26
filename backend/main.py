@@ -32,6 +32,8 @@ from shadbala import router as shadbala_router
 from classical_shadbala import router as classical_shadbala_router
 from auth import get_current_user as auth_get_current_user
 from app.kp.routes.kp_routes import router as kp_router
+from career_analysis.career_router import router as career_router
+
 
 # Load environment variables explicitly
 try:
@@ -68,6 +70,8 @@ app.include_router(chara_karakas_router, prefix="/api")
 app.include_router(shadbala_router, prefix="/api")
 app.include_router(classical_shadbala_router, prefix="/api")
 app.include_router(kp_router, prefix="/api")
+app.include_router(career_router, prefix="/api")
+
 
 # Root endpoint for health check
 @app.get("/")

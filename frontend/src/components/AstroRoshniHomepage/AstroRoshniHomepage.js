@@ -316,6 +316,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   onClick={() => {
                     if (service.title === 'Marriage Report') {
                       navigate('/marriage-analysis');
+                    } else if (service.title === 'Career Guidance') {
+                      navigate('/career-guidance');
                     }
                   }}
                 >

@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
-import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
+import CareerAnalysisTab from '../Career/CareerAnalysisTab';
 import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
-import './MarriageAnalysisPage.css';
+import './CareerGuidancePage.css';
 
-const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const [showForm, setShowForm] = useState(!chartData || !birthData);
-
-
 
   const handleAdminClick = () => {
     if (onAdminClick) {
@@ -25,7 +23,7 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
   };
 
   return (
-    <div className="marriage-analysis-page">
+    <div className="career-guidance-page">
       <NavigationHeader 
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}
@@ -42,21 +40,21 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
             <button className="back-btn" onClick={() => navigate('/')}>
               ← Back to Home
             </button>
-            <h1>💍 Marriage Analysis Report</h1>
-            <p>Get comprehensive insights about your marriage prospects and spouse characteristics</p>
+            <h1>🚀 Career Guidance Report</h1>
+            <p>Get comprehensive insights about your career prospects, suitable fields, and professional timing</p>
           </div>
 
           {showForm ? (
             <div className="form-section">
               <div className="form-card">
                 <h2>Enter Your Birth Details</h2>
-                <p>Please provide your birth information to generate your marriage analysis report</p>
+                <p>Please provide your birth information to generate your career guidance report</p>
                 <BirthForm onSubmit={handleFormSubmit} />
               </div>
             </div>
           ) : (
             <div className="analysis-section">
-              <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />
+              <CareerAnalysisTab chartData={chartData} birthDetails={birthData} />
             </div>
           )}
         </div>
@@ -65,4 +63,4 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
   );
 };
 
-export default MarriageAnalysisPage;
+export default CareerGuidancePage;
