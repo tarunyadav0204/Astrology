@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../../config/app.config';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AstroRoshniHomepage.css';
 
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+  const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedZodiac, setSelectedZodiac] = useState('aries');
   const [horoscopeData, setHoroscopeData] = useState({});
@@ -309,7 +311,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <h4>{service.title}</h4>
                 <p>{service.desc}</p>
                 <div className="price">{service.price}</div>
-                <button className="check-btn">Check Now</button>
+                <button 
+                  className="check-btn" 
+                  onClick={() => {
+                    if (service.title === 'Marriage Report') {
+                      navigate('/marriage-analysis');
+                    }
+                  }}
+                >
+                  Check Now
+                </button>
               </div>
             ))}
           </div>
