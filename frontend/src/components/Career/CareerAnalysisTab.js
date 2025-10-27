@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { careerService } from '../../services/careerService';
-import { safeRender } from '../../utils/objectToString';
+import { NAKSHATRA_CONFIG, CAREER_NAKSHATRA_ROLES } from '../../config/nakshatra.config';
+import CareerPersonality from './CareerPersonality';
+import CareerPaths from './CareerPaths';
+import CareerProfessions from './CareerProfessions';
+import CareerTiming from './CareerTiming';
+import CareerStrategy from './CareerStrategy';
+import { renderYogiBadhakaDetails } from './YogiBadhakaDetails';
 import './CareerAnalysisTab.css';
 
 const CareerAnalysisTab = ({ chartData, birthDetails }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('personality');
   const [careerData, setCareerData] = useState(null);
+  const [nakshatraData, setNakshatraData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const tabs = [
-    { id: 'overview', label: '📊 Career Overview' },
-    { id: 'strengths', label: '💪 Professional Strengths' },
+    { id: 'personality', label: '👤 Your Career Personality' },
     { id: 'professions', label: '💼 Suitable Professions' },
+    { id: 'nakshatras', label: '⭐ Nakshatra Analysis' },
     { id: 'timing', label: '⏰ Career Timing' },
     { id: 'strategy', label: '🎯 Growth Strategy' },
     { id: 'complete', label: '🔍 Complete Analysis' }
@@ -37,246 +44,177 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
     };
 
     loadCareerAnalysis();
+    loadNakshatraAnalysis();
   }, [birthDetails]);
-
-  const renderOverview = () => {
-    if (!careerData?.career_overview) return <div>Loading overview...</div>;
+  
+  const loadNakshatraAnalysis = async () => {
+    if (!birthDetails) return;
     
-    const overview = careerData.career_overview;
-    
-    return (
-      <div className="career-overview">
-        <div className="strength-summary">
-          <div className="strength-circle">
-            <div className="strength-score">{overview.overall_strength.score}</div>
-            <div className="strength-grade">{overview.overall_strength.grade}</div>
-          </div>
-          <div className="strength-details">
-            <h3>Career Strength Analysis</h3>
-            <p>{overview.overall_strength.description}</p>
-            <div className="key-planets">
-              <span>Primary: <strong>{overview.primary_career_planet}</strong></span>
-              <span>Secondary: <strong>{overview.secondary_career_planet}</strong></span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="key-insights">
-          <h4>🔍 Key Insights</h4>
-          <ul>
-            {overview.key_insights.map((insight, index) => (
-              <li key={index}>{insight}</li>
-            ))}
-          </ul>
-        </div>
-        
-        <div className="quick-actions">
-          <h4>⚡ Quick Recommendations</h4>
-          <ul>
-            {overview.quick_recommendations.map((rec, index) => (
-              <li key={index}>{rec}</li>
-            ))}
-          </ul>
-        </div>
-        
-        <div className="navigation-cards">
-          {tabs.slice(1).map(tab => (
-            <div key={tab.id} className="nav-card" onClick={() => setActiveTab(tab.id)}>
-              <h5>{tab.label}</h5>
-              <p>Click to explore detailed analysis</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    try {
+      const data = await careerService.getNakshatraAnalysis(birthDetails);
+      setNakshatraData(data);
+    } catch (error) {
+      console.error('Error loading nakshatra analysis:', error);
+    }
   };
 
-  const renderStrengths = () => {
-    if (!careerData?.professional_strengths) return <div>Loading strengths...</div>;
-    
-    const strengths = careerData.professional_strengths;
-    
-    return (
-      <div className="professional-strengths">
-        <h3>💪 Your Professional Strengths</h3>
-        
-        <div className="top-planets">
-          <h4>🌟 Top Career Planets</h4>
-          {strengths.top_career_planets.map(([planet, data], index) => (
-            <div key={planet} className="planet-strength">
-              <div className="planet-header">
-                <span className="rank">#{index + 1}</span>
-                <strong>{planet}</strong>
-                <span className="strength-badge">{data.career_suitability}</span>
-              </div>
-              <div className="planet-details">
-                <p><strong>Shadbala Strength:</strong> {data.shadbala_rupas.toFixed(1)} rupas</p>
-                <p><strong>Dignity:</strong> {data.dignity}</p>
-                <p><strong>Career Field:</strong> {data.classical_profession}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="skill-recommendations">
-          <h4>🎯 Recommended Skills to Develop</h4>
-          {strengths.skill_recommendations.map((skill, index) => (
-            <div key={index} className="skill-item">
-              <strong>{skill.planet}:</strong> {skill.skills}
-              <span className="skill-strength">({skill.strength})</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const renderCareerPersonality = () => {
+    return <CareerPersonality birthDetails={birthDetails} />;
   };
+
+
+
+
   
   const renderProfessions = () => {
-    if (!careerData?.suitable_professions) return <div>Loading professions...</div>;
-    
-    const professions = careerData.suitable_professions;
-    
-    return (
-      <div className="suitable-professions">
-        <h3>💼 Recommended Career Fields</h3>
-        
-        <div className="soul-calling">
-          <h4>🎯 Your Soul's Career Calling</h4>
-          <p>{professions.soul_calling}</p>
-        </div>
-        
-        <div className="primary-recommendations">
-          <h4>🏆 Top Recommendations</h4>
-          {professions.primary_recommendations.map((rec, index) => (
-            <div key={index} className="profession-rec">
-              <div className="rec-header">
-                <span className="rank">#{rec.rank}</span>
-                <strong>{rec.planet}</strong>
-                <span className="strength">{rec.strength_score} strength</span>
-              </div>
-              <p>{rec.profession_category}</p>
-              <span className="suitability">{rec.suitability} suitability</span>
-            </div>
-          ))}
-        </div>
-        
-        <div className="detailed-fields">
-          <h4>📋 Specific Career Options</h4>
-          {professions.detailed_fields.map((field, index) => (
-            <div key={index} className="field-category">
-              <h5>{field.planet} Fields (Strength: {field.strength_score})</h5>
-              <div className="field-list">
-                {field.specific_fields.map((profession, idx) => (
-                  <span key={idx} className="profession-tag">{profession}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <CareerProfessions careerData={careerData} />;
   };
   
   const renderTiming = () => {
-    if (!careerData?.career_timing) return <div>Loading timing...</div>;
+    return <CareerTiming careerData={careerData} />;
+  };
+  
+  const renderStrategy = () => {
+    return <CareerStrategy careerData={careerData} />;
+  };
+  
+  const renderNakshatraAnalysis = () => {
+    if (!nakshatraData || !nakshatraData.nakshatra_analysis) {
+      return (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Loading nakshatra analysis...</p>
+        </div>
+      );
+    }
     
-    const timing = careerData.career_timing;
+    const analysisData = nakshatraData.nakshatra_analysis;
     
     return (
-      <div className="career-timing">
-        <h3>⏰ Career Timing Analysis</h3>
+      <div className="nakshatra-analysis">
+        <h3>⭐ Key Career Nakshatras</h3>
+        <p>Stellar guidance for professional success based on key planetary positions</p>
         
-        <div className="current-period">
-          <h4>📅 Current Period</h4>
-          {timing.current_period ? (
-            <div className="period-info">
-              <p><strong>Mahadasha:</strong> {timing.current_period.planet}</p>
-              <p><strong>Period:</strong> {timing.current_period.start} - {timing.current_period.end}</p>
+        <div className="core-nakshatras">
+          {Object.entries(analysisData.key_nakshatras || {}).map(([role, data]) => {
+            const config = NAKSHATRA_CONFIG[data.nakshatra];
+            if (!config) return null;
+            
+            return (
+              <div key={role} className="nakshatra-card">
+                <div className="nakshatra-header">
+                  <h4>{getRoleIcon(role)} {data.planet} - {data.nakshatra}</h4>
+                  <span className="nakshatra-lord">Lord: {config.lord}</span>
+                  <p className="role-explanation">{getRoleExplanation(role)}</p>
+                </div>
+                
+                <div className="nakshatra-content">
+                  <div className="role-description">
+                    <strong>{data.description || CAREER_NAKSHATRA_ROLES[role]}</strong>
+                  </div>
+                  
+                  <div className="career-traits">
+                    <div className="trait-item">
+                      <span className="trait-label">Your natural career approach:</span>
+                      <span className="trait-value">{config.career_nature}</span>
+                    </div>
+                    <div className="trait-item">
+                      <span className="trait-label">How you work best:</span>
+                      <span className="trait-value">{config.work_style}</span>
+                    </div>
+                    <div className="trait-item">
+                      <span className="trait-label">Your leadership style:</span>
+                      <span className="trait-value">{config.leadership_style}</span>
+                    </div>
+                    <div className="trait-item">
+                      <span className="trait-label">Ideal work environment:</span>
+                      <span className="trait-value">{config.work_environment}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="suitable-fields">
+                    <strong>Career fields that suit you:</strong>
+                    <div className="field-tags">
+                      {config.suitable_fields.map((field, index) => (
+                        <span key={index} className="field-tag">{field}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        
+        {analysisData.current_dasha && (
+          <div className="nakshatra-timing">
+            <h4>⏰ Current Nakshatra Dasha Period</h4>
+            <div className="dasha-info">
+              <div className="dasha-current">
+                <strong>Current Mahadasha:</strong> {analysisData.current_dasha.planet} 
+                ({analysisData.current_dasha.start} - {analysisData.current_dasha.end})
+              </div>
+              <div className="dasha-career-impact">
+                <strong>Career Impact:</strong> {analysisData.current_dasha.career_impact}
+              </div>
+              {analysisData.current_dasha.recommendations && (
+                <div className="dasha-recommendations">
+                  <strong>Recommendations:</strong>
+                  <ul>
+                    {analysisData.current_dasha.recommendations.map((rec, index) => (
+                      <li key={index}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          ) : (
-            <p>Current period analysis in progress...</p>
-          )}
-        </div>
+          </div>
+        )}
         
-        <div className="favorable-periods">
-          <h4>🌟 Favorable Periods</h4>
-          <ul>
-            {timing.favorable_periods.map((period, index) => (
-              <li key={index}>{period}</li>
-            ))}
-          </ul>
-        </div>
-        
-        <div className="timing-recommendations">
-          <h4>💡 Timing Recommendations</h4>
-          <ul>
-            {timing.timing_recommendations.map((rec, index) => (
-              <li key={index}>{rec}</li>
-            ))}
-          </ul>
-        </div>
+        {analysisData.upcoming_periods && analysisData.upcoming_periods.length > 0 && (
+          <div className="upcoming-periods">
+            <h4>🔮 Upcoming Favorable Periods</h4>
+            <div className="periods-list">
+              {analysisData.upcoming_periods.slice(0, 3).map((period, index) => (
+                <div key={index} className="period-item">
+                  <div className="period-header">
+                    <strong>{period.planet} Period</strong>
+                    <span className="period-duration">({period.start} - {period.end})</span>
+                  </div>
+                  <p>{period.career_opportunities}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
   
-  const renderStrategy = () => {
-    if (!careerData?.growth_strategy) return <div>Loading strategy...</div>;
-    
-    const strategy = careerData.growth_strategy;
-    
-    return (
-      <div className="growth-strategy">
-        <h3>🎯 Career Growth Strategy</h3>
-        
-        <div className="action-plan">
-          <h4>📋 Action Plan</h4>
-          <ol>
-            {strategy.action_plan.map((action, index) => (
-              <li key={index}>{action}</li>
-            ))}
-          </ol>
-        </div>
-        
-        <div className="favorable-yogas">
-          <h4>✨ Your Career Yogas</h4>
-          {strategy.favorable_yogas.length > 0 ? (
-            strategy.favorable_yogas.map((yoga, index) => (
-              <div key={index} className="yoga-item">
-                <strong>{yoga.name}</strong>
-                <p>{yoga.description}</p>
-                <span className="yoga-strength">{yoga.strength} strength</span>
-              </div>
-            ))
-          ) : (
-            <p>Focus on building career yogas through planetary strengthening</p>
-          )}
-        </div>
-        
-        <div className="obstacles">
-          <h4>⚠️ Career Obstacles</h4>
-          {strategy.career_obstacles.length > 0 ? (
-            strategy.career_obstacles.map((obstacle, index) => (
-              <div key={index} className="obstacle-item">
-                <strong>{obstacle.type}</strong>
-                <p>{obstacle.description}</p>
-                <p><em>Remedy: {obstacle.remedy}</em></p>
-              </div>
-            ))
-          ) : (
-            <p>No major obstacles identified - clear path ahead!</p>
-          )}
-        </div>
-        
-        <div className="remedial-measures">
-          <h4>🔧 Remedial Measures</h4>
-          <ul>
-            {strategy.remedial_measures.map((remedy, index) => (
-              <li key={index}>{remedy}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    );
+  const getRoleIcon = (role) => {
+    const icons = {
+      'JANMA': '🌙',
+      'TENTH_LORD': '🏢',
+      'ATMAKARAKA': '👑',
+      'AMATYAKARAKA': '🎯',
+      'SATURN': '🪐',
+      'D10_TENTH_LORD': '📊',
+      'LAGNA': '🌅'
+    };
+    return icons[role] || '⭐';
+  };
+  
+  const getRoleExplanation = (role) => {
+    const explanations = {
+      'JANMA': 'Your birth nakshatra - reveals your natural career inclinations and core professional identity',
+      'TENTH_LORD': 'The planet ruling your 10th house of career - shows how you achieve professional success',
+      'ATMAKARAKA': 'Your Atmakaraka (soul planet with highest degrees) - reveals your dharmic path and ultimate career fulfillment',
+      'AMATYAKARAKA': 'Your Amatyakaraka (professional minister planet) - reveals your natural work style and career approach',
+      'SATURN': 'Saturn as Karma Karaka (natural career significator) - shows your discipline, hard work, and long-term career patterns',
+      'D10_TENTH_LORD': 'The 10th lord in your career chart (D10) - indicates specialized professional skills',
+      'LAGNA': 'Your ascendant nakshatra - shows how you present yourself professionally to the world'
+    };
+    return explanations[role] || 'This planetary position influences your career path';
   };
   
   const [completeAnalysisData, setCompleteAnalysisData] = useState({});
@@ -292,7 +230,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
       if (sectionId === 'tenth-lord') {
         data = await careerService.getTenthLordAnalysis(birthDetails);
       } else if (sectionId === 'tenth-house') {
-        data = await careerService.getTenthHouseComprehensive(birthDetails);
+        data = await careerService.getTenthHouseAnalysis(birthDetails);
       } else if (sectionId === 'd10-analysis') {
         data = await careerService.getD10Analysis(birthDetails);
       } else if (sectionId === 'saturn-karaka') {
@@ -1164,7 +1102,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
         color: '#4CAF50'
       },
       { id: 'tenth-house', icon: '🏢', title: '10th House Analysis', status: 'active', summary: completeAnalysisData['tenth-house'] ? 
-        `${completeAnalysisData['tenth-house'].house_info.house_sign} - ${completeAnalysisData['tenth-house'].overall_assessment.overall_grade}` : 
+        `${completeAnalysisData['tenth-house'].house_sign} - ${completeAnalysisData['tenth-house'].strength}` : 
         'Click to analyze', color: '#2196F3' },
       { id: 'd10-analysis', icon: '📋', title: 'D10 Dasamsa', status: 'active', summary: 'Career divisional chart', color: '#FF9800' },
       { id: 'saturn-karaka', icon: '⚙️', title: 'Saturn Karma Karaka', status: 'active', summary: 'Natural career significator', color: '#9C27B0' },
@@ -1225,8 +1163,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             const avgScore = aspects.length > 0 ? totalScore / aspects.length : 0;
                             return avgScore > 1 ? 'positive' : avgScore < -1 ? 'negative' : 'neutral';
                           })() : 'neutral' },
-                          { label: 'Combustion', value: completeAnalysisData['tenth-lord'].lord_analysis.combustion_status.is_combust ? 'Combust' : completeAnalysisData['tenth-lord'].lord_analysis.combustion_status.is_cazimi ? 'Cazimi' : 'Normal', type: completeAnalysisData['tenth-lord'].lord_analysis.combustion_status.is_cazimi ? 'positive' : completeAnalysisData['tenth-lord'].lord_analysis.combustion_status.is_combust ? 'negative' : 'neutral' },
-                          { label: 'Motion', value: completeAnalysisData['tenth-lord'].lord_analysis.retrograde_analysis.is_retrograde ? 'Retrograde' : 'Direct', type: 'neutral' }
+                          { label: 'Yogi Status', value: completeAnalysisData['tenth-lord'].yogi_significance ? (completeAnalysisData['tenth-lord'].yogi_significance.lord_significance.has_impact ? completeAnalysisData['tenth-lord'].yogi_significance.lord_significance.special_status.replace('_', ' ').toUpperCase() : 'Neutral') : 'N/A', type: completeAnalysisData['tenth-lord'].yogi_significance ? (completeAnalysisData['tenth-lord'].yogi_significance.lord_significance.special_status === 'yogi_lord' ? 'positive' : completeAnalysisData['tenth-lord'].yogi_significance.lord_significance.special_status === 'avayogi_lord' || completeAnalysisData['tenth-lord'].yogi_significance.lord_significance.special_status === 'dagdha_lord' ? 'negative' : 'neutral') : 'neutral' },
+                          { label: 'Badhaka Status', value: completeAnalysisData['tenth-lord'].badhaka_impact ? (completeAnalysisData['tenth-lord'].badhaka_impact.lord_impact.has_impact ? (completeAnalysisData['tenth-lord'].badhaka_impact.lord_impact.is_badhaka_lord ? 'IS Badhaka Lord' : 'Affected by Badhaka') : 'No Impact') : 'N/A', type: completeAnalysisData['tenth-lord'].badhaka_impact ? (completeAnalysisData['tenth-lord'].badhaka_impact.lord_impact.has_impact ? 'negative' : 'positive') : 'neutral' }
                         ].map((item, index) => (
                           <div key={index} className="summary-item">
                             <span className="item-label">{item.label}</span>
@@ -1254,7 +1192,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { key: 'friendship', title: '5-Fold Friendship', icon: '🤝' },
                           { key: 'conjunctions', title: 'Conjunctions', icon: '🔗' },
                           { key: 'aspects', title: 'Aspects Received', icon: '👁️' },
-                          { key: 'combustion', title: 'Combustion Status', icon: '☀️' },
+                          { key: 'yogi-analysis', title: 'Yogi Points', icon: '🌟' },
+                          { key: 'badhaka-analysis', title: 'Badhaka Impact', icon: '⚠️' },
                           { key: 'overall', title: 'Overall Assessment', icon: '📊' }
                         ].map((section) => {
                           const data = completeAnalysisData['tenth-lord'].lord_analysis;
@@ -1287,11 +1226,25 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             const avgScore = aspects.length > 0 ? totalScore / aspects.length : 0;
                             status = avgScore > 1 ? 'positive' : avgScore < -1 ? 'negative' : 'neutral';
                             score = aspects.length > 0 ? `${avgScore > 0 ? '+' : ''}${avgScore.toFixed(1)}` : '0';
-                          } else if (section.key === 'combustion') {
-                            const isCombust = data.combustion_status.is_combust;
-                            const isCazimi = data.combustion_status.is_cazimi;
-                            status = isCazimi ? 'positive' : isCombust ? 'negative' : 'neutral';
-                            score = isCazimi ? 'C+' : isCombust ? 'C-' : 'OK';
+                          } else if (section.key === 'yogi-analysis') {
+                            const yogiData = completeAnalysisData['tenth-lord'].yogi_significance;
+                            if (yogiData && yogiData.lord_significance.has_impact) {
+                              const specialStatus = yogiData.lord_significance.special_status;
+                              status = specialStatus === 'yogi_lord' ? 'positive' : specialStatus === 'avayogi_lord' || specialStatus === 'dagdha_lord' ? 'negative' : 'neutral';
+                              score = specialStatus === 'yogi_lord' ? 'Y+' : specialStatus === 'avayogi_lord' ? 'A-' : specialStatus === 'dagdha_lord' ? 'D-' : specialStatus === 'tithi_shunya_lord' ? 'T~' : '~';
+                            } else {
+                              status = 'neutral';
+                              score = '~';
+                            }
+                          } else if (section.key === 'badhaka-analysis') {
+                            const badhakaData = completeAnalysisData['tenth-lord'].badhaka_impact;
+                            if (badhakaData && badhakaData.lord_impact.has_impact) {
+                              status = 'negative';
+                              score = badhakaData.lord_impact.is_badhaka_lord ? 'BL' : 'B-';
+                            } else {
+                              status = 'positive';
+                              score = '✓';
+                            }
                           } else if (section.key === 'overall') {
                             const overallScore = data.overall_assessment.overall_strength_score;
                             status = overallScore >= 70 ? 'positive' : overallScore <= 40 ? 'negative' : 'neutral';
@@ -1302,7 +1255,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             <button 
                               key={section.key}
                               className={`section-btn section-btn-${status}`}
-                              onClick={() => openModal(`${section.title} - ${completeAnalysisData['tenth-lord'].tenth_house_info.house_lord}`, renderSectionDetails(section.key))}
+                              onClick={() => openModal(`${section.title} - ${completeAnalysisData['tenth-lord'].tenth_house_info.house_lord}`, section.key === 'yogi-analysis' ? renderYogiBadhakaDetails('tenth-lord', 'yogi', completeAnalysisData) : section.key === 'badhaka-analysis' ? renderYogiBadhakaDetails('tenth-lord', 'badhaka', completeAnalysisData) : renderSectionDetails(section.key))}
                             >
                               <span className="section-icon">{section.icon}</span>
                               <span className="section-title">{section.title}</span>
@@ -1316,12 +1269,14 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                     <div className="analysis-summary">
                       <div className="summary-grid">
                         {[
-                          { label: 'House Sign', value: completeAnalysisData['tenth-house'].house_info.house_sign, type: 'neutral' },
-                          { label: 'Grade', value: completeAnalysisData['tenth-house'].overall_assessment.overall_grade, type: completeAnalysisData['tenth-house'].overall_assessment.overall_grade === 'Excellent' || completeAnalysisData['tenth-house'].overall_assessment.overall_grade === 'Very Good' ? 'positive' : completeAnalysisData['tenth-house'].overall_assessment.overall_grade === 'Weak' ? 'negative' : 'neutral' },
-                          { label: 'Strength', value: `${Math.round(completeAnalysisData['tenth-house'].overall_assessment.overall_strength_score)}/100`, type: completeAnalysisData['tenth-house'].overall_assessment.overall_strength_score >= 70 ? 'positive' : completeAnalysisData['tenth-house'].overall_assessment.overall_strength_score <= 40 ? 'negative' : 'neutral' },
-                          { label: 'Planets', value: `${completeAnalysisData['tenth-house'].planets_in_house.planet_count} planet(s)`, type: completeAnalysisData['tenth-house'].planets_in_house.planet_count > 0 ? 'positive' : 'neutral' },
-                          { label: 'Aspects', value: `${completeAnalysisData['tenth-house'].aspects_on_house.aspect_count} aspect(s)`, type: completeAnalysisData['tenth-house'].aspects_on_house.net_aspect_score > 2 ? 'positive' : completeAnalysisData['tenth-house'].aspects_on_house.net_aspect_score < -2 ? 'negative' : 'neutral' },
-                          { label: 'Ashtakavarga', value: `${completeAnalysisData['tenth-house'].ashtakavarga_points.total_points} pts`, type: completeAnalysisData['tenth-house'].ashtakavarga_points.total_points >= 30 ? 'positive' : completeAnalysisData['tenth-house'].ashtakavarga_points.total_points <= 25 ? 'negative' : 'neutral' }
+                          { label: 'House Sign', value: completeAnalysisData['tenth-house'].house_sign, type: 'neutral' },
+                          { label: 'Grade', value: completeAnalysisData['tenth-house'].strength, type: completeAnalysisData['tenth-house'].strength === 'A+' || completeAnalysisData['tenth-house'].strength === 'A' ? 'positive' : completeAnalysisData['tenth-house'].strength === 'F' ? 'negative' : 'neutral' },
+                          { label: 'Strength', value: `${Math.round(completeAnalysisData['tenth-house'].strength_details.enhanced_strength)}/100`, type: completeAnalysisData['tenth-house'].strength_details.enhanced_strength >= 70 ? 'positive' : completeAnalysisData['tenth-house'].strength_details.enhanced_strength <= 40 ? 'negative' : 'neutral' },
+                          { label: 'Planets', value: `${completeAnalysisData['tenth-house'].planets_in_house.length} planet(s)`, type: completeAnalysisData['tenth-house'].planets_in_house.length > 0 ? 'positive' : 'neutral' },
+                          { label: 'Aspects', value: `${completeAnalysisData['tenth-house'].aspects.length} aspect(s)`, type: completeAnalysisData['tenth-house'].aspects.length > 0 ? 'positive' : 'neutral' },
+                          { label: 'Ashtakavarga', value: 'N/A', type: 'neutral' },
+                          { label: 'Yogi Impact', value: completeAnalysisData['tenth-house'].yogi_analysis ? `${Math.round(completeAnalysisData['tenth-house'].yogi_analysis.career_impact.total_impact)}%` : 'N/A', type: completeAnalysisData['tenth-house'].yogi_analysis && completeAnalysisData['tenth-house'].yogi_analysis.career_impact.total_impact > 70 ? 'positive' : completeAnalysisData['tenth-house'].yogi_analysis && completeAnalysisData['tenth-house'].yogi_analysis.career_impact.total_impact < 40 ? 'negative' : 'neutral' },
+                          { label: 'Badhaka Impact', value: completeAnalysisData['tenth-house'].badhaka_analysis ? (completeAnalysisData['tenth-house'].badhaka_analysis.career_impact.has_impact ? `${Math.round(completeAnalysisData['tenth-house'].badhaka_analysis.career_impact.impact_score)}%` : 'None') : 'N/A', type: completeAnalysisData['tenth-house'].badhaka_analysis && completeAnalysisData['tenth-house'].badhaka_analysis.career_impact.has_impact && completeAnalysisData['tenth-house'].badhaka_analysis.career_impact.impact_score > 50 ? 'negative' : 'positive' }
                         ].map((item, index) => (
                           <div key={index} className="summary-item">
                             <span className="item-label">{item.label}</span>
@@ -1348,6 +1303,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { key: 'aspects-on-house', title: 'Aspects on House', icon: '👁️' },
                           { key: 'house-strength', title: 'House Strength', icon: '💪' },
                           { key: 'ashtakavarga', title: 'Ashtakavarga Points', icon: '🎯' },
+                          { key: 'yogi-analysis', title: 'Yogi Points', icon: '🌟' },
+                          { key: 'badhaka-analysis', title: 'Badhaka Obstacles', icon: '⚠️' },
                           { key: 'house-overall', title: 'Overall Assessment', icon: '📊' }
                         ].map((section) => {
                           const data = completeAnalysisData['tenth-house'];
@@ -1356,25 +1313,32 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           
                           if (section.key === 'house-sign') {
                             status = 'neutral';
-                            score = data.house_info.house_sign.substring(0, 3);
+                            score = data.house_sign.substring(0, 3);
                           } else if (section.key === 'planets-in-house') {
-                            const count = data.planets_in_house.planet_count;
+                            const count = data.planets_in_house.length;
                             status = count > 0 ? 'positive' : 'neutral';
                             score = `${count}`;
                           } else if (section.key === 'aspects-on-house') {
-                            const netScore = data.aspects_on_house.net_aspect_score;
-                            status = netScore > 2 ? 'positive' : netScore < -2 ? 'negative' : 'neutral';
-                            score = `${netScore > 0 ? '+' : ''}${netScore.toFixed(1)}`;
+                            const count = data.aspects.length;
+                            status = count > 0 ? 'positive' : 'neutral';
+                            score = `${count}`;
                           } else if (section.key === 'house-strength') {
-                            const strength = data.house_strength.total_score;
+                            const strength = data.strength_details.enhanced_strength;
                             status = strength >= 70 ? 'positive' : strength <= 40 ? 'negative' : 'neutral';
                             score = `${Math.round(strength)}`;
                           } else if (section.key === 'ashtakavarga') {
-                            const points = data.ashtakavarga_points.total_points;
-                            status = points >= 30 ? 'positive' : points <= 25 ? 'negative' : 'neutral';
-                            score = `${points}`;
+                            status = 'neutral';
+                            score = 'N/A';
+                          } else if (section.key === 'yogi-analysis') {
+                            const yogiImpact = data.yogi_analysis ? data.yogi_analysis.career_impact.total_impact : 0;
+                            status = yogiImpact > 70 ? 'positive' : yogiImpact < 40 ? 'negative' : 'neutral';
+                            score = data.yogi_analysis ? `${Math.round(yogiImpact)}` : 'N/A';
+                          } else if (section.key === 'badhaka-analysis') {
+                            const badhakaImpact = data.badhaka_analysis ? (data.badhaka_analysis.career_impact.has_impact ? data.badhaka_analysis.career_impact.impact_score : 0) : 0;
+                            status = badhakaImpact > 50 ? 'negative' : 'positive';
+                            score = data.badhaka_analysis ? (data.badhaka_analysis.career_impact.has_impact ? `${Math.round(badhakaImpact)}` : '0') : 'N/A';
                           } else if (section.key === 'house-overall') {
-                            const overallScore = data.overall_assessment.overall_strength_score;
+                            const overallScore = data.strength_details.enhanced_strength;
                             status = overallScore >= 70 ? 'positive' : overallScore <= 40 ? 'negative' : 'neutral';
                             score = `${Math.round(overallScore)}`;
                           }
@@ -1383,7 +1347,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             <button 
                               key={section.key}
                               className={`section-btn section-btn-${status}`}
-                              onClick={() => openModal(`${section.title} - 10th House`, renderTenthHouseDetails(section.key))}
+                              onClick={() => openModal(`${section.title} - 10th House`, section.key === 'yogi-analysis' ? renderYogiBadhakaDetails('tenth-house', 'yogi', completeAnalysisData) : section.key === 'badhaka-analysis' ? renderYogiBadhakaDetails('tenth-house', 'badhaka', completeAnalysisData) : renderTenthHouseDetails(section.key))}
                             >
                               <span className="section-icon">{section.icon}</span>
                               <span className="section-title">{section.title}</span>
@@ -1450,6 +1414,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { label: '10th from Saturn', value: `H${completeAnalysisData['saturn-tenth'].saturn_tenth_house_info.house_number}`, type: 'neutral' },
                           { label: 'House Sign', value: completeAnalysisData['saturn-tenth'].saturn_tenth_house_info.house_sign, type: 'neutral' },
                           { label: 'House Lord', value: completeAnalysisData['saturn-tenth'].saturn_tenth_house_info.house_lord, type: 'neutral' },
+                          { label: 'Yogi Impact', value: completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis ? `${Math.round(completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis.house_impact.total_impact)}%` : 'N/A', type: completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis && completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis.house_impact.total_impact > 70 ? 'positive' : completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis && completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis.house_impact.total_impact < 40 ? 'negative' : 'neutral' },
+                          { label: 'Badhaka Impact', value: completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis ? (completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis.house_impact.has_impact ? `${Math.round(completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis.house_impact.impact_score)}%` : 'None') : 'N/A', type: completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis && completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis.house_impact.has_impact && completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis.house_impact.impact_score > 50 ? 'negative' : 'positive' },
                           { label: 'Grade', value: completeAnalysisData['saturn-tenth'].overall_assessment.overall_grade, type: completeAnalysisData['saturn-tenth'].overall_assessment.overall_grade === 'Excellent' || completeAnalysisData['saturn-tenth'].overall_assessment.overall_grade === 'Very Good' ? 'positive' : completeAnalysisData['saturn-tenth'].overall_assessment.overall_grade === 'Weak' ? 'negative' : 'neutral' },
                           { label: 'Strength', value: `${Math.round(completeAnalysisData['saturn-tenth'].overall_assessment.overall_strength_score)}/100`, type: completeAnalysisData['saturn-tenth'].overall_assessment.overall_strength_score >= 70 ? 'positive' : completeAnalysisData['saturn-tenth'].overall_assessment.overall_strength_score <= 40 ? 'negative' : 'neutral' }
                         ].map((item, index) => (
@@ -1477,6 +1443,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { key: 'saturn-planets', title: 'Planets in House', icon: '🌟' },
                           { key: 'saturn-aspects', title: 'Aspects on House', icon: '👁️' },
                           { key: 'saturn-strength', title: 'House Strength', icon: '💪' },
+                          { key: 'saturn-yogi', title: 'Yogi Points', icon: '🌟' },
+                          { key: 'saturn-badhaka', title: 'Badhaka Impact', icon: '⚠️' },
                           { key: 'saturn-ashtakavarga', title: 'Ashtakavarga Points', icon: '🎯' },
                           { key: 'saturn-overall', title: 'Overall Assessment', icon: '📊' }
                         ].map((section) => {
@@ -1499,6 +1467,25 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             const strength = data.house_strength.total_score;
                             status = strength >= 70 ? 'positive' : strength <= 40 ? 'negative' : 'neutral';
                             score = `${Math.round(strength)}`;
+                          } else if (section.key === 'saturn-yogi') {
+                            const yogiData = completeAnalysisData['saturn-tenth'].saturn_tenth_yogi_analysis;
+                            if (yogiData && yogiData.house_impact.total_impact) {
+                              const impact = yogiData.house_impact.total_impact;
+                              status = impact > 70 ? 'positive' : impact < 40 ? 'negative' : 'neutral';
+                              score = `${Math.round(impact)}`;
+                            } else {
+                              status = 'neutral';
+                              score = '~';
+                            }
+                          } else if (section.key === 'saturn-badhaka') {
+                            const badhakaData = completeAnalysisData['saturn-tenth'].saturn_tenth_badhaka_analysis;
+                            if (badhakaData && badhakaData.house_impact.has_impact) {
+                              status = 'negative';
+                              score = `${Math.round(badhakaData.house_impact.impact_score)}`;
+                            } else {
+                              status = 'positive';
+                              score = '✓';
+                            }
                           } else if (section.key === 'saturn-ashtakavarga') {
                             const points = data.ashtakavarga_points.total_points;
                             status = points >= 30 ? 'positive' : points <= 25 ? 'negative' : 'neutral';
@@ -1513,7 +1500,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             <button 
                               key={section.key}
                               className={`section-btn section-btn-${status}`}
-                              onClick={() => openModal(`${section.title} - 10th from Saturn`, renderSaturnTenthSectionDetails(section.key))}
+                              onClick={() => openModal(`${section.title} - 10th from Saturn`, section.key === 'saturn-yogi' ? renderYogiBadhakaDetails('saturn-tenth', 'yogi', completeAnalysisData) : section.key === 'saturn-badhaka' ? renderYogiBadhakaDetails('saturn-tenth', 'badhaka', completeAnalysisData) : renderSaturnTenthSectionDetails(section.key))}
                             >
                               <span className="section-icon">{section.icon}</span>
                               <span className="section-title">{section.title}</span>
@@ -1532,7 +1519,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { label: 'Grade', value: completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_grade, type: completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_grade === 'Excellent' || completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_grade === 'Very Good' ? 'positive' : completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_grade === 'Weak' ? 'negative' : 'neutral' },
                           { label: 'Score', value: `${Math.round(completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_strength_score)}/100`, type: completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_strength_score >= 70 ? 'positive' : completeAnalysisData['saturn-karaka'].saturn_analysis.overall_assessment.overall_strength_score <= 40 ? 'negative' : 'neutral' },
                           { label: 'Dignity', value: completeAnalysisData['saturn-karaka'].saturn_analysis.dignity_analysis.dignity, type: completeAnalysisData['saturn-karaka'].saturn_analysis.dignity_analysis.dignity === 'exalted' || completeAnalysisData['saturn-karaka'].saturn_analysis.dignity_analysis.dignity === 'own_sign' ? 'positive' : completeAnalysisData['saturn-karaka'].saturn_analysis.dignity_analysis.dignity === 'debilitated' ? 'negative' : 'neutral' },
-                          { label: 'Karma Pattern', value: completeAnalysisData['saturn-karaka'].karma_interpretation.karmic_strength_level, type: 'neutral' }
+                          { label: 'Yogi Status', value: completeAnalysisData['saturn-karaka'].saturn_yogi_significance ? (completeAnalysisData['saturn-karaka'].saturn_yogi_significance.saturn_significance.has_impact ? completeAnalysisData['saturn-karaka'].saturn_yogi_significance.saturn_significance.special_status.replace('_', ' ').toUpperCase() : 'Neutral') : 'N/A', type: completeAnalysisData['saturn-karaka'].saturn_yogi_significance ? (completeAnalysisData['saturn-karaka'].saturn_yogi_significance.saturn_significance.special_status === 'yogi_lord' ? 'positive' : completeAnalysisData['saturn-karaka'].saturn_yogi_significance.saturn_significance.special_status === 'avayogi_lord' || completeAnalysisData['saturn-karaka'].saturn_yogi_significance.saturn_significance.special_status === 'dagdha_lord' ? 'negative' : 'neutral') : 'neutral' },
+                          { label: 'Badhaka Status', value: completeAnalysisData['saturn-karaka'].saturn_badhaka_impact ? (completeAnalysisData['saturn-karaka'].saturn_badhaka_impact.badhaka_impact.has_impact ? (completeAnalysisData['saturn-karaka'].saturn_badhaka_impact.badhaka_impact.is_badhaka_lord ? 'IS Badhaka Lord' : 'Affected by Badhaka') : 'No Impact') : 'N/A', type: completeAnalysisData['saturn-karaka'].saturn_badhaka_impact ? (completeAnalysisData['saturn-karaka'].saturn_badhaka_impact.badhaka_impact.has_impact ? 'negative' : 'positive') : 'neutral' }
                         ].map((item, index) => (
                           <div key={index} className="summary-item">
                             <span className="item-label">{item.label}</span>
@@ -1560,6 +1548,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { key: 'friendship', title: '5-Fold Friendship', icon: '🤝' },
                           { key: 'conjunctions', title: 'Conjunctions', icon: '🔗' },
                           { key: 'aspects', title: 'Aspects Received', icon: '👁️' },
+                          { key: 'yogi-analysis', title: 'Yogi Points', icon: '🌟' },
+                          { key: 'badhaka-analysis', title: 'Badhaka Impact', icon: '⚠️' },
                           { key: 'karma', title: 'Career Karma', icon: '⚙️' },
                           { key: 'overall', title: 'Overall Assessment', icon: '📊' }
                         ].map((section) => {
@@ -1593,6 +1583,25 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             const avgScore = aspects.length > 0 ? totalScore / aspects.length : 0;
                             status = avgScore > 1 ? 'positive' : avgScore < -1 ? 'negative' : 'neutral';
                             score = aspects.length > 0 ? `${avgScore > 0 ? '+' : ''}${avgScore.toFixed(1)}` : '0';
+                          } else if (section.key === 'yogi-analysis') {
+                            const yogiData = completeAnalysisData['saturn-karaka'].saturn_yogi_significance;
+                            if (yogiData && yogiData.saturn_significance.has_impact) {
+                              const specialStatus = yogiData.saturn_significance.special_status;
+                              status = specialStatus === 'yogi_lord' ? 'positive' : specialStatus === 'avayogi_lord' || specialStatus === 'dagdha_lord' ? 'negative' : 'neutral';
+                              score = specialStatus === 'yogi_lord' ? 'Y+' : specialStatus === 'avayogi_lord' ? 'A-' : specialStatus === 'dagdha_lord' ? 'D-' : specialStatus === 'tithi_shunya_lord' ? 'T~' : '~';
+                            } else {
+                              status = 'neutral';
+                              score = '~';
+                            }
+                          } else if (section.key === 'badhaka-analysis') {
+                            const badhakaData = completeAnalysisData['saturn-karaka'].saturn_badhaka_impact;
+                            if (badhakaData && badhakaData.badhaka_impact.has_impact) {
+                              status = 'negative';
+                              score = badhakaData.badhaka_impact.is_badhaka_lord ? 'BL' : 'B-';
+                            } else {
+                              status = 'positive';
+                              score = '✓';
+                            }
                           } else if (section.key === 'karma') {
                             status = 'neutral';
                             score = 'KK';
@@ -1606,7 +1615,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                             <button 
                               key={section.key}
                               className={`section-btn section-btn-${status}`}
-                              onClick={() => openModal(`${section.title} - Saturn Karma Karaka`, section.key === 'karma' ? renderSaturnKarmaDetails() : renderSaturnSectionDetails(section.key))}
+                              onClick={() => openModal(`${section.title} - Saturn Karma Karaka`, section.key === 'yogi-analysis' ? renderYogiBadhakaDetails('saturn-karaka', 'yogi', completeAnalysisData) : section.key === 'badhaka-analysis' ? renderYogiBadhakaDetails('saturn-karaka', 'badhaka', completeAnalysisData) : section.key === 'karma' ? renderSaturnKarmaDetails() : renderSaturnSectionDetails(section.key))}
                             >
                               <span className="section-icon">{section.icon}</span>
                               <span className="section-title">{section.title}</span>
@@ -1624,8 +1633,9 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           { label: 'AmK House', value: `H${completeAnalysisData['amatyakaraka'].amk_analysis.house}`, type: 'neutral' },
                           { label: 'AmK Sign', value: completeAnalysisData['amatyakaraka'].amk_analysis.sign_name, type: 'neutral' },
                           { label: 'Dignity', value: completeAnalysisData['amatyakaraka'].amk_analysis.dignity, type: completeAnalysisData['amatyakaraka'].amk_analysis.dignity === 'exalted' || completeAnalysisData['amatyakaraka'].amk_analysis.dignity === 'own_sign' ? 'positive' : completeAnalysisData['amatyakaraka'].amk_analysis.dignity === 'debilitated' ? 'negative' : 'neutral' },
-                          { label: 'AK-AmK Relation', value: completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type, type: completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type.includes('Harmonious') || completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type === 'Conjunction' ? 'positive' : completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type.includes('Friction') ? 'negative' : 'neutral' },
-                          { label: 'Karma Bhava', value: `H${completeAnalysisData['amatyakaraka'].tenth_from_amk.karma_bhava_house}`, type: 'neutral' }
+                          { label: 'Yogi Status', value: completeAnalysisData['amatyakaraka'].amk_yogi_significance ? (completeAnalysisData['amatyakaraka'].amk_yogi_significance.amk_significance.has_impact ? completeAnalysisData['amatyakaraka'].amk_yogi_significance.amk_significance.special_status.replace('_', ' ').toUpperCase() : 'Neutral') : 'N/A', type: completeAnalysisData['amatyakaraka'].amk_yogi_significance ? (completeAnalysisData['amatyakaraka'].amk_yogi_significance.amk_significance.special_status === 'yogi_lord' ? 'positive' : completeAnalysisData['amatyakaraka'].amk_yogi_significance.amk_significance.special_status === 'avayogi_lord' || completeAnalysisData['amatyakaraka'].amk_yogi_significance.amk_significance.special_status === 'dagdha_lord' ? 'negative' : 'neutral') : 'neutral' },
+                          { label: 'Badhaka Status', value: completeAnalysisData['amatyakaraka'].amk_badhaka_impact ? (completeAnalysisData['amatyakaraka'].amk_badhaka_impact.badhaka_impact.has_impact ? (completeAnalysisData['amatyakaraka'].amk_badhaka_impact.badhaka_impact.is_badhaka_lord ? 'IS Badhaka Lord' : 'Affected by Badhaka') : 'No Impact') : 'N/A', type: completeAnalysisData['amatyakaraka'].amk_badhaka_impact ? (completeAnalysisData['amatyakaraka'].amk_badhaka_impact.badhaka_impact.has_impact ? 'negative' : 'positive') : 'neutral' },
+                          { label: 'AK-AmK Relation', value: completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type, type: completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type.includes('Harmonious') || completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type === 'Conjunction' ? 'positive' : completeAnalysisData['amatyakaraka'].ak_amk_relationship.relationship_type.includes('Friction') ? 'negative' : 'neutral' }
                         ].map((item, index) => (
                           <div key={index} className="summary-item">
                             <span className="item-label">{item.label}</span>
@@ -1695,6 +1705,49 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                           <div className="step-content">
                             <p>{completeAnalysisData['amatyakaraka'].d10_analysis.message}</p>
                           </div>
+                        </div>
+                        
+                        <div className="analysis-sections-grid">
+                          {[
+                            { key: 'yogi-analysis', title: 'Yogi Points', icon: '🌟' },
+                            { key: 'badhaka-analysis', title: 'Badhaka Impact', icon: '⚠️' }
+                          ].map((section) => {
+                            let status = 'neutral';
+                            let score = '';
+                            
+                            if (section.key === 'yogi-analysis') {
+                              const yogiData = completeAnalysisData['amatyakaraka'].amk_yogi_significance;
+                              if (yogiData && yogiData.amk_significance.has_impact) {
+                                const specialStatus = yogiData.amk_significance.special_status;
+                                status = specialStatus === 'yogi_lord' ? 'positive' : specialStatus === 'avayogi_lord' || specialStatus === 'dagdha_lord' ? 'negative' : 'neutral';
+                                score = specialStatus === 'yogi_lord' ? 'Y+' : specialStatus === 'avayogi_lord' ? 'A-' : specialStatus === 'dagdha_lord' ? 'D-' : specialStatus === 'tithi_shunya_lord' ? 'T~' : '~';
+                              } else {
+                                status = 'neutral';
+                                score = '~';
+                              }
+                            } else if (section.key === 'badhaka-analysis') {
+                              const badhakaData = completeAnalysisData['amatyakaraka'].amk_badhaka_impact;
+                              if (badhakaData && badhakaData.badhaka_impact.has_impact) {
+                                status = 'negative';
+                                score = badhakaData.badhaka_impact.is_badhaka_lord ? 'BL' : 'B-';
+                              } else {
+                                status = 'positive';
+                                score = '✓';
+                              }
+                            }
+                            
+                            return (
+                              <button 
+                                key={section.key}
+                                className={`section-btn section-btn-${status}`}
+                                onClick={() => openModal(`${section.title} - Amatyakaraka`, section.key === 'yogi-analysis' ? renderYogiBadhakaDetails('amatyakaraka', 'yogi', completeAnalysisData) : renderYogiBadhakaDetails('amatyakaraka', 'badhaka', completeAnalysisData))}
+                              >
+                                <span className="section-icon">{section.icon}</span>
+                                <span className="section-title">{section.title}</span>
+                                <span className="section-score">{score}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                         
                         <div className="profession-summary">
@@ -1879,20 +1932,20 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
     }
     
     switch (activeTab) {
-      case 'overview':
-        return renderOverview();
-      case 'strengths':
-        return renderStrengths();
+      case 'personality':
+        return renderCareerPersonality();
       case 'professions':
         return renderProfessions();
       case 'timing':
         return renderTiming();
       case 'strategy':
         return renderStrategy();
+      case 'nakshatras':
+        return renderNakshatraAnalysis();
       case 'complete':
         return renderCompleteAnalysis();
       default:
-        return renderOverview();
+        return renderCareerPersonality();
     }
   };
 

@@ -77,6 +77,72 @@ class CareerService {
     return response.data;
   }
 
+  // Nakshatra Career Analysis
+  async getNakshatraAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/nakshatra-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Leadership Analysis
+  async getLeadershipAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/leadership-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Work Style Analysis
+  async getWorkStyleAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/work-style-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Solo vs Team Analysis
+  async getSoloTeamAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/solo-team-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Career Fields Analysis
+  async getCareerFieldsAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/career-fields-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Job Roles Analysis
+  async getJobRolesAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/job-roles-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Work Mode Analysis (Employee vs Entrepreneur)
+  async getWorkModeAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/work-mode-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Industries Analysis
+  async getIndustriesAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/industries-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Work Type Analysis (Creative vs Technical vs Service)
+  async getWorkTypeAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/work-type-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Avoid Careers Analysis
+  async getAvoidCareersAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/avoid-careers-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
+  // Conjunction Analysis
+  async getConjunctionAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/conjunction-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
   // Use existing APIs for supporting data
   async getChartData(birthData) {
     return await apiClient.post('/api/calculate-chart', birthData);

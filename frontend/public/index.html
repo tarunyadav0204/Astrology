@@ -21,7 +21,18 @@
   </style>
   <meta name="apple-mobile-web-app-title" content="AstroClick" />
   <link rel="manifest" href="/manifest.json" />
-  <title>AstroVishnu - Vedic Astrology</title>
+  <title>Vedic Astrology</title>
+  <script>
+    // Set dynamic title based on domain
+    const hostname = window.location.hostname;
+    if (hostname.includes('astrovishnu')) {
+      document.title = 'AstroVishnu - Vedic Astrology';
+    } else if (hostname.includes('astroroshni')) {
+      document.title = 'AstroRoshni - Vedic Astrology';
+    } else if (hostname.includes('astroclick')) {
+      document.title = 'AstroClick - Vedic Astrology';
+    }
+  </script>
 </head>
 <body>
   <div id="root"></div>

@@ -310,7 +310,7 @@ async def get_tenth_lord_analysis(request: dict, current_user = Depends(get_curr
         analyzer = TenthHouseAnalyzer(chart_data)
         result = analyzer.analyze_tenth_lord()
         
-        return result
+        return {'tenth_lord_analysis': result}
         
     except Exception as e:
         import traceback
@@ -439,9 +439,9 @@ async def get_success_yogas_analysis(request: dict, current_user = Depends(get_c
         from main import calculate_chart
         chart_data = await calculate_chart(birth_data, 'mean', current_user)
         
-        # Use existing career yoga analyzer
-        from calculators.career_yoga_analyzer import CareerYogaAnalyzer
-        analyzer = CareerYogaAnalyzer(chart_data)
+        # Use existing yoga analyzer
+        from calculators.yoga_analyzer import YogaAnalyzer
+        analyzer = YogaAnalyzer(chart_data)
         result = analyzer.analyze_career_yogas()
         
         return result

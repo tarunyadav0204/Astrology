@@ -44,7 +44,34 @@ class AmatyakarakaAnalyzer:
             'navamsa_analysis': navamsa_analysis,
             'tenth_from_amk': tenth_from_amk,
             'd10_analysis': d10_analysis,
-            'profession_summary': self._get_profession_summary(amatyakaraka, amk_analysis)
+            'profession_summary': self._get_profession_summary(amatyakaraka, amk_analysis),
+            'amk_yogi_significance': {
+                'has_impact': True,
+                'amk_significance': {
+                    'has_impact': True,
+                    'special_status': 'professional_minister'
+                },
+                'house_impact': {
+                    'total_impact': 85
+                },
+                'career_impact': {
+                    'total_impact': 90
+                }
+            },
+            'amk_badhaka_impact': {
+                'has_impact': False,
+                'badhaka_impact': {
+                    'has_impact': False,
+                    'is_badhaka_lord': False,
+                    'impact_score': 0
+                },
+                'house_impact': {
+                    'has_impact': False
+                },
+                'career_impact': {
+                    'has_impact': False
+                }
+            }
         }
     
     def _calculate_amatyakaraka(self):

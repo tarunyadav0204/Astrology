@@ -81,9 +81,16 @@ apiClient.interceptors.response.use(
     if (error.response?.status >= 500) {
       throw new Error('Server error. Please try again later.');
     }
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Clear token and redirect to login
       localStorage.removeItem('token');
-      window.location.reload();
+      localStorage.removeItem('user');
+      
+      // Redirect to login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(new Error('Session expired. Please login again.'));
     }
     throw error;
   }
