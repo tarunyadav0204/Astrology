@@ -301,6 +301,8 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
         data = await careerService.getSaturnTenthAnalysis(birthDetails);
       } else if (sectionId === 'amatyakaraka') {
         data = await careerService.getAmatyakarakaAnalysis(birthDetails);
+      } else if (sectionId === 'career-yogas') {
+        data = await careerService.getCareerYogasAnalysis(birthDetails);
       }
       setCompleteAnalysisData(prev => ({ ...prev, [sectionId]: data }));
     } catch (error) {
@@ -1168,9 +1170,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
       { id: 'saturn-karaka', icon: '⚙️', title: 'Saturn Karma Karaka', status: 'active', summary: 'Natural career significator', color: '#9C27B0' },
       { id: 'saturn-tenth', icon: '🧮', title: '10th from Saturn', status: 'active', summary: 'Career from Saturn perspective', color: '#607D8B' },
       { id: 'amatyakaraka', icon: '👑', title: 'Amatyakaraka', status: 'active', summary: 'Jaimini professional significator', color: '#E91E63' },
-      { id: 'significators', icon: '⭐', title: 'Career Significators', status: 'pending', summary: 'Planetary career indicators', color: '#00BCD4' },
-      { id: 'houses-network', icon: '🌐', title: 'Career Houses', status: 'pending', summary: '2nd, 6th, 10th, 11th houses', color: '#8BC34A' },
-      { id: 'career-yogas', icon: '✨', title: 'Success Yogas', status: 'pending', summary: 'Raj & Dhana yogas', color: '#FFC107' },
+      { id: 'career-yogas', icon: '✨', title: 'Success Yogas', status: 'active', summary: 'Raj & Dhana yogas', color: '#FFC107' },
       { id: 'timing', icon: '⏰', title: 'Career Timing', status: 'pending', summary: 'Dasha & transit analysis', color: '#FF5722' }
     ];
 
@@ -1731,6 +1731,83 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
                               </ul>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (section.id === 'career-yogas' && completeAnalysisData['career-yogas']) ? (
+                    <div className="analysis-summary">
+                      <div className="summary-grid">
+                        {[
+                          { label: 'Total Yogas', value: completeAnalysisData['career-yogas'].total_yogas, type: 'neutral' },
+                          { label: 'Strong Yogas', value: completeAnalysisData['career-yogas'].strong_yogas, type: completeAnalysisData['career-yogas'].strong_yogas > 0 ? 'positive' : 'neutral' },
+                          { label: 'Moderate Yogas', value: completeAnalysisData['career-yogas'].moderate_yogas, type: 'neutral' },
+                          { label: 'Overall Grade', value: completeAnalysisData['career-yogas'].overall_yoga_strength.grade, type: completeAnalysisData['career-yogas'].overall_yoga_strength.grade === 'Excellent' || completeAnalysisData['career-yogas'].overall_yoga_strength.grade === 'Very Good' ? 'positive' : completeAnalysisData['career-yogas'].overall_yoga_strength.grade === 'Weak' ? 'negative' : 'neutral' },
+                          { label: 'Overall Score', value: `${Math.round(completeAnalysisData['career-yogas'].overall_yoga_strength.score)}/100`, type: completeAnalysisData['career-yogas'].overall_yoga_strength.score >= 70 ? 'positive' : completeAnalysisData['career-yogas'].overall_yoga_strength.score <= 40 ? 'negative' : 'neutral' },
+                          { label: 'Primary Strength', value: completeAnalysisData['career-yogas'].career_yoga_summary.primary_strength, type: 'neutral' }
+                        ].map((item, index) => (
+                          <div key={index} className="summary-item">
+                            <span className="item-label">{item.label}</span>
+                            <span className={`item-value ${item.type}`}>{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="yogas-analysis">
+                        <h4>✨ Career Success Yogas</h4>
+                        
+                        <div className="yoga-summary">
+                          <p><strong>Overall Assessment:</strong> {completeAnalysisData['career-yogas'].overall_yoga_strength.interpretation}</p>
+                          <p><strong>Primary Strength:</strong> {completeAnalysisData['career-yogas'].career_yoga_summary.primary_strength}</p>
+                          <p><strong>Timing Focus:</strong> {completeAnalysisData['career-yogas'].career_yoga_summary.timing_focus}</p>
+                        </div>
+                        
+                        <div className="yogas-list">
+                          <h5>Top Career Yogas:</h5>
+                          {completeAnalysisData['career-yogas'].yogas.slice(0, 6).map((yoga, index) => (
+                            <div key={index} className="yoga-item">
+                              <div className="yoga-header">
+                                <span className="yoga-rank">#{index + 1}</span>
+                                <strong>{yoga.name}</strong>
+                                <span className={`yoga-type ${yoga.type.toLowerCase().replace(' ', '-')}`}>{yoga.type}</span>
+                                <span className={`strength-badge ${yoga.strength_grade.toLowerCase().replace(' ', '-')}`}>
+                                  {yoga.strength_grade} ({Math.round(yoga.strength_score)}%)
+                                </span>
+                              </div>
+                              <div className="yoga-details">
+                                <p><strong>Career Impact:</strong> {yoga.career_impact}</p>
+                                <p><strong>Description:</strong> {yoga.description}</p>
+                                <p><strong>Timing Relevance:</strong> {yoga.timing_relevance}</p>
+                                {yoga.planets && <p><strong>Planets:</strong> {yoga.planets.join(', ')}</p>}
+                                {yoga.planet && <p><strong>Planet:</strong> {yoga.planet}</p>}
+                                {yoga.houses && <p><strong>Houses:</strong> {yoga.houses.map(h => `H${h}`).join(', ')}</p>}
+                                {yoga.house && <p><strong>House:</strong> H{yoga.house}</p>}
+                                {yoga.classical_reference && (
+                                  <div className="classical-reference">
+                                    <p><strong>📜 Classical Reference:</strong> {yoga.classical_reference}</p>
+                                    {yoga.sanskrit_verse && <p><strong>🕉️ Sanskrit:</strong> <em>{yoga.sanskrit_verse}</em></p>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="key-benefits">
+                          <h5>Key Benefits:</h5>
+                          <ul>
+                            {completeAnalysisData['career-yogas'].career_yoga_summary.key_benefits.map((benefit, index) => (
+                              <li key={index}>{benefit}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        
+                        <div className="recommendations">
+                          <h5>Recommendations:</h5>
+                          <ul>
+                            {completeAnalysisData['career-yogas'].career_yoga_summary.recommendations.map((rec, index) => (
+                              <li key={index}>{rec}</li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     </div>

@@ -71,6 +71,12 @@ class CareerService {
     return response.data;
   }
 
+  // Career Success Yogas Analysis
+  async getCareerYogasAnalysis(birthData) {
+    const response = await apiClient.post('/api/career/success-yogas-analysis', { birth_data: birthData });
+    return response.data;
+  }
+
   // Use existing APIs for supporting data
   async getChartData(birthData) {
     return await apiClient.post('/api/calculate-chart', birthData);

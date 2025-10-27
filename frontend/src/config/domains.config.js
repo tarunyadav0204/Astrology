@@ -15,7 +15,7 @@ export const DOMAIN_CONFIG = {
     theme: 'general'
   },
   ASTROCLICK: {
-    domain: 'astroclick.com',
+    domain: 'astroclick.net',
     userType: 'legacy',
     homepage: 'dashboard',
     title: 'AstroClick - Astrology Platform',
@@ -40,7 +40,7 @@ export const getCurrentDomainConfig = () => {
   
   // Check for exact domain matches
   for (const config of Object.values(DOMAIN_CONFIG)) {
-    if (hostname.includes(config.domain.replace('.com', ''))) {
+    if (hostname === config.domain || hostname === `www.${config.domain}`) {
       return config;
     }
   }

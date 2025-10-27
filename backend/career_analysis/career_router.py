@@ -670,3 +670,26 @@ async def get_amatyakaraka_analysis(request: dict, current_user = Depends(get_cu
         print(f"Amatyakaraka analysis error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Amatyakaraka analysis failed: {str(e)}")
+
+@router.post("/career/success-yogas-analysis")
+async def get_success_yogas_analysis(request: dict, current_user = Depends(get_current_user)):
+    """Get career success yogas analysis"""
+    try:
+        birth_data = BirthData(**request['birth_data'])
+        
+        # Calculate chart data
+        from main import calculate_chart
+        chart_data = await calculate_chart(birth_data, 'mean', current_user)
+        
+        # Use CareerYogaAnalyzer
+        from calculators.career_yoga_analyzer import CareerYogaAnalyzer
+        analyzer = CareerYogaAnalyzer(chart_data)
+        analysis = analyzer.analyze_career_yogas()
+        
+        return analysis
+        
+    except Exception as e:
+        import traceback
+        print(f"Career yogas analysis error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Career yogas analysis failed: {str(e)}")
