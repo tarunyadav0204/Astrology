@@ -127,6 +127,17 @@ const CareerProfessions = ({ careerData }) => {
                         </div>
                       </div>
                       
+                      {recommended_roles.nakshatra_specializations && (
+                        <div className="role-section">
+                          <h6>Nakshatra Specializations</h6>
+                          <div className="role-tags">
+                            {recommended_roles.nakshatra_specializations.map((role, index) => (
+                              <span key={index} className="role-tag nakshatra">{role}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
                       {recommended_roles.specialized_combinations && (
                         <div className="role-section">
                           <h6>Specialized Combinations</h6>
@@ -181,6 +192,11 @@ const CareerProfessions = ({ careerData }) => {
                       <div className="domain-result">
                         <span className="domain-type">{careerData.domain_of_work.primary_domain}</span>
                       </div>
+                      {careerData.domain_of_work.nakshatra_domain_insight && (
+                        <div className="nakshatra-insight">
+                          <strong>Nakshatra Insight:</strong> {careerData.domain_of_work.nakshatra_domain_insight}
+                        </div>
+                      )}
                       {careerData.domain_of_work.astrological_analysis && (
                         <div className="analysis-why">
                           <strong>Why:</strong> {careerData.domain_of_work.astrological_analysis.primary_domain_why}

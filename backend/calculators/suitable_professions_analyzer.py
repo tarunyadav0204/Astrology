@@ -66,16 +66,24 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         }
     
     def _generate_career_summary(self, tenth_lord, sign, conjunctions):
-        """Generate clear career summary"""
+        """Generate clear career summary with nakshatra insights"""
         base_nature = PLANETARY_WORK_NATURE[tenth_lord][0]
         sign_element = SIGN_ELEMENTS[sign]
         sign_nature = ELEMENT_WORK_NATURES[sign_element]
+        
+        # Get nakshatra specialization
+        tenth_lord_nakshatra = self.nakshatra_data[tenth_lord]['nakshatra_name']
+        nakshatra_specialization = self._get_nakshatra_specialization(tenth_lord_nakshatra)
         
         # Create meaningful combination
         if base_nature == sign_nature:
             primary_style = f"{base_nature} with {SIGN_WORK_INFLUENCE[sign]['modifies']}"
         else:
             primary_style = f"{base_nature} combined with {sign_nature} tendencies"
+        
+        # Add nakshatra flavor with work nature
+        nakshatra_nature = NAKSHATRA_WORK_NATURE.get(tenth_lord_nakshatra, 'specialized')
+        primary_style += f", with {nakshatra_nature} approach specialized in {nakshatra_specialization.lower()}"
         
         # Add conjunction influence
         if conjunctions:
@@ -90,10 +98,14 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         return f"You are naturally suited for {primary_style}.{conjunction_summary}"
     
     def _get_specific_job_roles(self, tenth_lord, sign, conjunctions):
-        """Get specific job recommendations"""
+        """Get specific job recommendations with nakshatra specializations"""
         # Base roles from planet
         base_roles = PLANETARY_DOMAINS[tenth_lord]['modern'][:3]
         traditional_roles = PLANETARY_DOMAINS[tenth_lord]['traditional'][:3]
+        
+        # Get nakshatra-specific roles
+        tenth_lord_nakshatra = self.nakshatra_data[tenth_lord]['nakshatra_name']
+        nakshatra_roles = self._get_nakshatra_specific_roles(tenth_lord_nakshatra)
         
         # Check for special combinations
         combination_roles = []
@@ -108,6 +120,7 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         return {
             'primary_recommendations': base_roles,
             'traditional_options': traditional_roles,
+            'nakshatra_specializations': nakshatra_roles[:3],  # Top 3 nakshatra roles
             'specialized_combinations': combination_roles if combination_roles else None,
             'approach_style': sign_modifier
         }
@@ -126,9 +139,10 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         house_context = HOUSE_WORK_INFLUENCE[house]['context']
         explanations.append(f"Placed in the {house}th house, your career becomes about {house_context}.")
         
-        # Nakshatra influence
+        # Nakshatra influence with specific work nature
         nakshatra_nature = NAKSHATRA_WORK_NATURE[nakshatra]
-        explanations.append(f"Your {nakshatra} nakshatra adds {nakshatra_nature} qualities to your work style.")
+        nakshatra_specialization = self._get_nakshatra_specialization(nakshatra)
+        explanations.append(f"Your {nakshatra} nakshatra adds {nakshatra_nature} qualities to your work style, creating natural affinity for {nakshatra_specialization.lower()}.")
         
         # Conjunctions
         if conjunctions:
@@ -316,6 +330,10 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         # Add modern applications based on conjunctions
         modern_apps = self._get_modern_applications(tenth_lord_analysis)
         
+        # Add nakshatra-based domain insights
+        tenth_lord_nakshatra = self.nakshatra_data[tenth_lord_analysis['tenth_lord']]['nakshatra_name']
+        nakshatra_domain_insight = self._get_nakshatra_domain_insight(tenth_lord_nakshatra, details['primary_domain'], tenth_lord_analysis['tenth_lord'])
+        
         return {
             'primary_domain': details['primary_domain'],
             'industries': details['industries'],
@@ -324,6 +342,7 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
             'key_skills': details['key_skills'],
             'specialization': details['specialization'],
             'modern_applications': modern_apps,
+            'nakshatra_domain_insight': nakshatra_domain_insight,
             'career_guidance': self._generate_career_guidance(details, second_lord_analysis),
             'astrological_analysis': self._generate_domain_analysis(tenth_lord_analysis, second_lord_analysis, details)
         }
@@ -878,51 +897,65 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
     def _get_company_conjunction_effect(self, planet, company_types):
         """Get how conjunctions affect company type preferences"""
         company_effects = {
-            'Rahu': {
-                'Tech Companies': 'innovative tech startups and disruptive companies',
-                'Engineering Firms': 'cutting-edge engineering and automation companies',
-                'Defense Contractors': 'advanced defense technology companies',
-                'Government Agencies': 'modernizing government organizations',
-                'Creative Agencies': 'viral marketing and digital-first agencies'
+            'Sun': {
+                'Government Agencies': 'high-level government departments and public sector leadership',
+                'Public Sector': 'government corporations and administrative bodies',
+                'Administrative Bodies': 'policy-making and executive organizations',
+                'Leadership Roles': 'corporate headquarters and executive offices'
             },
-            'Jupiter': {
-                'Tech Companies': 'educational technology and knowledge-based companies',
-                'Educational Institutions': 'prestigious universities and training organizations',
-                'Law Firms': 'ethical law firms and policy organizations',
-                'Financial Services': 'ethical finance and consulting firms',
-                'Government Agencies': 'policy-making and advisory organizations'
-            },
-            'Saturn': {
-                'Tech Companies': 'enterprise software and established tech companies',
-                'Engineering Firms': 'infrastructure and heavy engineering companies',
-                'Manufacturing Companies': 'quality-focused manufacturing organizations',
-                'Government Agencies': 'systematic government departments',
-                'Real Estate Firms': 'established property development companies'
+            'Moon': {
+                'Hospitals': 'healthcare institutions and medical centers',
+                'Hotels': 'hospitality chains and luxury resorts',
+                'PR Agencies': 'public relations and communication firms',
+                'Healthcare Organizations': 'nursing homes and wellness centers',
+                'Food Services': 'restaurant chains and catering companies'
             },
             'Mercury': {
-                'Tech Companies': 'communication technology and software companies',
+                'Tech Startups': 'communication and software companies',
                 'Media Companies': 'digital media and content organizations',
                 'Consulting Firms': 'analytical and strategy consulting companies',
                 'Government Contractors': 'communication and documentation services'
             },
             'Venus': {
-                'Tech Companies': 'design-focused and user experience companies',
                 'Creative Agencies': 'luxury brands and aesthetic-focused agencies',
                 'Entertainment Studios': 'high-end entertainment and media companies',
-                'Fashion Brands': 'luxury fashion and lifestyle companies'
+                'Fashion Brands': 'luxury fashion and lifestyle companies',
+                'Tech Companies': 'design-focused and user experience companies'
             },
             'Mars': {
-                'Tech Companies': 'fast-growing and competitive tech companies',
                 'Engineering Firms': 'dynamic engineering and project-based companies',
                 'Defense Contractors': 'military and security-focused organizations',
-                'Manufacturing': 'automated and efficiency-focused manufacturers'
+                'Manufacturing': 'automated and efficiency-focused manufacturers',
+                'Sports': 'competitive sports and fitness organizations'
+            },
+            'Jupiter': {
+                'Educational Institutions': 'prestigious universities and training organizations',
+                'Law Firms': 'ethical law firms and policy organizations',
+                'Financial Services': 'ethical finance and consulting firms',
+                'Consulting': 'wisdom-based advisory organizations'
+            },
+            'Saturn': {
+                'Manufacturing Companies': 'quality-focused manufacturing organizations',
+                'Real Estate Firms': 'established property development companies',
+                'Construction Companies': 'infrastructure and building organizations',
+                'Government Agencies': 'systematic government departments'
+            },
+            'Rahu': {
+                'Foreign Companies': 'international and multinational corporations',
+                'Innovation Labs': 'cutting-edge research and development firms',
+                'Disruptive Startups': 'unconventional and breakthrough companies',
+                'Technology Firms': 'advanced technology and automation companies'
             }
         }
         
         effects = []
         for company_type in company_types[:3]:  # Check first 3 company types
-            if planet in company_effects and company_type in company_effects[planet]:
-                effects.append(company_effects[planet][company_type])
+            if planet in company_effects:
+                # Find matching company type or use closest match
+                for key, value in company_effects[planet].items():
+                    if key.lower() in company_type.lower() or company_type.lower() in key.lower():
+                        effects.append(value)
+                        break
         
         return ', '.join(effects) if effects else f'{planet.lower()}-influenced organizations'
     
@@ -1151,6 +1184,108 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         }
         
         return specialization_map[nakshatra]
+    
+    def _get_nakshatra_specific_roles(self, nakshatra):
+        """Get specific job roles based on nakshatra"""
+        nakshatra_roles = {
+            'Ashwini': ['Emergency Medicine Doctor', 'Paramedic', 'Healthcare Administrator'],
+            'Bharani': ['Change Management Consultant', 'Transformation Specialist', 'Business Analyst'],
+            'Krittika': ['Manufacturing Engineer', 'Production Manager', 'Quality Control Specialist'],
+            'Rohini': ['Agricultural Scientist', 'Luxury Brand Manager', 'Interior Designer'],
+            'Mrigashira': ['Research Scientist', 'Detective', 'Market Research Analyst'],
+            'Ardra': ['Software Developer', 'Innovation Manager', 'Technology Consultant'],
+            'Punarvasu': ['Real Estate Developer', 'Hotel Manager', 'Property Consultant'],
+            'Pushya': ['Nutritionist', 'Wellness Coach', 'Healthcare Administrator'],
+            'Ashlesha': ['Psychologist', 'Counselor', 'Mental Health Specialist'],
+            'Magha': ['Government Official', 'Executive Leader', 'Public Administrator'],
+            'Purva Phalguni': ['Entertainment Producer', 'Artist', 'Creative Director'],
+            'Uttara Phalguni': ['Public Service Officer', 'Social Worker', 'Community Manager'],
+            'Hasta': ['Craftsperson', 'Skilled Technician', 'Manual Arts Specialist'],
+            'Chitra': ['Architect', 'Graphic Designer', 'Visual Arts Professional'],
+            'Swati': ['Sales Manager', 'Business Development', 'Trade Specialist'],
+            'Vishakha': ['Project Manager', 'Goal Achievement Coach', 'Strategic Planner'],
+            'Anuradha': ['Network Administrator', 'Relationship Manager', 'Community Builder'],
+            'Jyeshtha': ['Senior Manager', 'Team Leader', 'Executive Coach'],
+            'Mula': ['Research Director', 'Foundation Manager', 'Root Cause Analyst'],
+            'Purva Ashadha': ['Motivational Speaker', 'Inspirational Coach', 'Training Manager'],
+            'Uttara Ashadha': ['Achievement Specialist', 'Victory Coach', 'Success Consultant'],
+            'Shravana': ['Communication Specialist', 'Learning Manager', 'Educational Consultant'],
+            'Dhanishta': ['Music Producer', 'Rhythm Specialist', 'Audio Engineer'],
+            'Shatabhisha': ['Medical Doctor', 'Healer', 'Alternative Medicine Practitioner'],
+            'Purva Bhadrapada': ['Spiritual Counselor', 'Occult Specialist', 'Metaphysical Consultant'],
+            'Uttara Bhadrapada': ['Knowledge Manager', 'Deep Research Specialist', 'Wisdom Consultant'],
+            'Revati': ['Completion Specialist', 'Guidance Counselor', 'Final Stage Manager']
+        }
+        
+        return nakshatra_roles.get(nakshatra, ['Specialized Professional'])
+    
+    def _get_nakshatra_domain_insight(self, nakshatra, primary_domain, tenth_lord):
+        """Get nakshatra-specific insights with astrological authenticity"""
+        # Nakshatra meanings for authenticity
+        nakshatra_meanings = {
+            'Ashwini': 'The Horse Riders - symbolizing speed, healing, and emergency action',
+            'Bharani': 'The Bearer - symbolizing transformation, death-rebirth cycles, and change',
+            'Krittika': 'The Cutter - symbolizing precision, sharpness, and purification',
+            'Rohini': 'The Red One - symbolizing beauty, growth, fertility, and luxury',
+            'Mrigashira': 'The Deer Head - symbolizing searching, investigation, and curiosity',
+            'Ardra': 'The Moist One - symbolizing storms, destruction-creation, and innovation',
+            'Punarvasu': 'The Returner - symbolizing renewal, restoration, and hospitality',
+            'Pushya': 'The Nourisher - symbolizing nourishment, growth, and supportive care',
+            'Ashlesha': 'The Embracer - symbolizing psychology, hidden knowledge, and serpent wisdom',
+            'Magha': 'The Mighty One - symbolizing authority, tradition, and ancestral power',
+            'Purva Phalguni': 'The Former Red One - symbolizing creativity, pleasure, and artistic expression',
+            'Uttara Phalguni': 'The Latter Red One - symbolizing service, support, and helpful nature',
+            'Hasta': 'The Hand - symbolizing craftsmanship, skill, and manual dexterity',
+            'Chitra': 'The Bright One - symbolizing design, architecture, and visual beauty',
+            'Swati': 'The Independent One - symbolizing flexibility, trade, and self-reliance',
+            'Vishakha': 'The Forked Branch - symbolizing goal achievement and purposeful direction',
+            'Anuradha': 'The Follower - symbolizing networking, friendship, and collaborative success',
+            'Jyeshtha': 'The Eldest - symbolizing seniority, leadership, and protective authority',
+            'Mula': 'The Root - symbolizing foundations, research, and getting to core issues',
+            'Purva Ashadha': 'The Former Invincible One - symbolizing motivation and inspirational power',
+            'Uttara Ashadha': 'The Latter Invincible One - symbolizing final victory and lasting achievement',
+            'Shravana': 'The Listener - symbolizing learning, communication, and knowledge absorption',
+            'Dhanishta': 'The Wealthiest - symbolizing rhythm, music, and wealth generation',
+            'Shatabhisha': 'The Hundred Healers - symbolizing healing, medicine, and hundred solutions',
+            'Purva Bhadrapada': 'The Former Blessed Feet - symbolizing spirituality and transformative wisdom',
+            'Uttara Bhadrapada': 'The Latter Blessed Feet - symbolizing deep knowledge and cosmic understanding',
+            'Revati': 'The Wealthy - symbolizing completion, guidance, and nurturing outcomes'
+        }
+        
+        nakshatra_domain_insights = {
+            'Ashwini': f"In {primary_domain}, you excel at emergency solutions and rapid implementation",
+            'Bharani': f"In {primary_domain}, you specialize in transformation and change management",
+            'Krittika': f"In {primary_domain}, you focus on precision, quality, and cutting-edge solutions",
+            'Rohini': f"In {primary_domain}, you create beautiful, luxurious, and growth-oriented solutions",
+            'Mrigashira': f"In {primary_domain}, you excel at research, investigation, and seeking new opportunities",
+            'Ardra': f"In {primary_domain}, you bring innovation, disruption, and technological advancement",
+            'Punarvasu': f"In {primary_domain}, you focus on restoration, renewal, and sustainable solutions",
+            'Pushya': f"In {primary_domain}, you nurture growth, provide nourishment, and build supportive systems",
+            'Ashlesha': f"In {primary_domain}, you understand deep psychology and hidden motivations",
+            'Magha': f"In {primary_domain}, you bring authority, tradition, and ancestral wisdom",
+            'Purva Phalguni': f"In {primary_domain}, you create enjoyable, creative, and relationship-focused solutions",
+            'Uttara Phalguni': f"In {primary_domain}, you provide service, support, and helpful solutions",
+            'Hasta': f"In {primary_domain}, you excel at detailed craftsmanship and skilled execution",
+            'Chitra': f"In {primary_domain}, you create visually appealing and architecturally sound solutions",
+            'Swati': f"In {primary_domain}, you bring flexibility, independence, and trade-oriented approaches",
+            'Vishakha': f"In {primary_domain}, you focus on goal achievement and purposeful direction",
+            'Anuradha': f"In {primary_domain}, you excel at networking, relationships, and collaborative success",
+            'Jyeshtha': f"In {primary_domain}, you provide senior leadership and protective guidance",
+            'Mula': f"In {primary_domain}, you get to the root of problems and create foundational solutions",
+            'Purva Ashadha': f"In {primary_domain}, you inspire others and create invincible solutions",
+            'Uttara Ashadha': f"In {primary_domain}, you achieve final victory and lasting success",
+            'Shravana': f"In {primary_domain}, you excel at learning, listening, and knowledge dissemination",
+            'Dhanishta': f"In {primary_domain}, you bring rhythm, music, and wealth-generating solutions",
+            'Shatabhisha': f"In {primary_domain}, you provide healing, medicine, and hundred solutions",
+            'Purva Bhadrapada': f"In {primary_domain}, you bring spiritual depth and transformative solutions",
+            'Uttara Bhadrapada': f"In {primary_domain}, you provide deep knowledge and cosmic understanding",
+            'Revati': f"In {primary_domain}, you excel at completion, guidance, and nurturing final outcomes"
+        }
+        
+        insight = nakshatra_domain_insights.get(nakshatra, f"In {primary_domain}, you bring specialized nakshatra qualities")
+        meaning = nakshatra_meanings.get(nakshatra, 'specialized nakshatra qualities')
+        
+        return f"Your 10th lord {tenth_lord} is placed in {nakshatra} nakshatra ({meaning}). {insight}"
     
     def _analyze_tenth_lord_situation(self):
         """Analyze 10th lord planetary situation"""
