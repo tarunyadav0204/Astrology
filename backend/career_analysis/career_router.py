@@ -452,6 +452,29 @@ async def get_success_yogas_analysis(request: dict, current_user = Depends(get_c
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Career yogas analysis failed: {str(e)}")
 
+@router.post("/career/suitable-professions")
+async def get_suitable_professions(request: dict, current_user = Depends(get_current_user)):
+    """Get suitable professions analysis"""
+    try:
+        birth_data = BirthData(**request['birth_data'])
+        
+        # Calculate chart data
+        from main import calculate_chart
+        chart_data = await calculate_chart(birth_data, 'mean', current_user)
+        
+        # Use SuitableProfessionsAnalyzer
+        from calculators.suitable_professions_analyzer import SuitableProfessionsAnalyzer
+        analyzer = SuitableProfessionsAnalyzer(chart_data, birth_data)
+        result = analyzer.analyze_suitable_professions()
+        
+        return result
+        
+    except Exception as e:
+        import traceback
+        print(f"Suitable professions analysis error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Suitable professions analysis failed: {str(e)}")
+
 def _get_house_lord(sign_num):
     """Get the lord of a zodiac sign"""
     lords = {

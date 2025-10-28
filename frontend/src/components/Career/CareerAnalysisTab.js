@@ -66,8 +66,48 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
 
 
   
+  const [professionsData, setProfessionsData] = useState(null);
+  const [professionsLoading, setProfessionsLoading] = useState(false);
+
+  const loadProfessionsData = async () => {
+    if (!birthDetails || professionsData || professionsLoading) return;
+    
+    setProfessionsLoading(true);
+    try {
+      const data = await careerService.getSuitableProfessions(birthDetails);
+      setProfessionsData(data);
+    } catch (error) {
+      console.error('Error loading suitable professions:', error);
+      setProfessionsData(null);
+    } finally {
+      setProfessionsLoading(false);
+    }
+  };
+
   const renderProfessions = () => {
-    return <CareerProfessions careerData={careerData} />;
+    if (activeTab === 'professions' && !professionsData && !professionsLoading) {
+      loadProfessionsData();
+    }
+    
+    if (professionsLoading) {
+      return (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Loading suitable professions...</p>
+        </div>
+      );
+    }
+    
+    if (!professionsData) {
+      return (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Loading suitable professions...</p>
+        </div>
+      );
+    }
+    
+    return <CareerProfessions careerData={professionsData} />;
   };
   
   const renderTiming = () => {

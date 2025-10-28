@@ -119,6 +119,12 @@ class CareerService {
     return response.data;
   }
 
+  // Suitable Professions Analysis
+  async getSuitableProfessions(birthData) {
+    const response = await apiClient.post('/api/career/suitable-professions', { birth_data: birthData });
+    return response.data;
+  }
+
   // Industries Analysis
   async getIndustriesAnalysis(birthData) {
     const response = await apiClient.post('/api/career/industries-analysis', { birth_data: birthData });

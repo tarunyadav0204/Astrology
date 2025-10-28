@@ -4,7 +4,8 @@ class NakshatraCalculator(BaseCalculator):
     """Calculate Nakshatra positions, lords, and padas"""
     
     def __init__(self, birth_data=None, chart_data=None):
-        super().__init__(birth_data, chart_data)
+        super().__init__(chart_data)
+        self.birth_data = birth_data
         
         self.NAKSHATRA_NAMES = [
             'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu', 'Pushya',
