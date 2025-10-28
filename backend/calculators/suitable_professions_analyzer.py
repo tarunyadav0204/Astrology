@@ -321,7 +321,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
             'industries': details['industries'],
             'specific_roles': details['specific_roles'],
             'company_types': details['company_types'],
-            'growth_potential': details['growth_potential'],
             'key_skills': details['key_skills'],
             'specialization': details['specialization'],
             'modern_applications': modern_apps,
@@ -352,26 +351,79 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         return modern_apps[:2]
     
     def _generate_career_guidance(self, details, second_lord_analysis):
-        """Generate actionable career guidance"""
+        """Generate enhanced actionable career guidance with astrological reasoning"""
         guidance = []
         
-        # Industry focus
+        # Industry focus with reasoning
         top_industries = details['industries'][:3]
-        guidance.append(f"Focus on these high-growth industries: {', '.join(top_industries)}")
+        guidance.append(f"Prioritize {', '.join(top_industries)} industries as your planetary combination creates natural success in these sectors")
         
-        # Role recommendations
+        # Role recommendations with approach
         top_roles = details['specific_roles'][:3]
-        guidance.append(f"Target these specific roles: {', '.join(top_roles)}")
+        guidance.append(f"Target {', '.join(top_roles)} roles where your astrological strengths will be most valued")
         
-        # Skills development
+        # Skills development with planetary backing
         key_skills = details['key_skills'][:3]
-        guidance.append(f"Develop these key skills: {', '.join(key_skills)}")
+        guidance.append(f"Focus skill development on {', '.join(key_skills)} as these align with your natural planetary abilities")
         
-        # Company targeting
+        # Company targeting with cultural fit
         company_types = details['company_types'][:2]
-        guidance.append(f"Apply to: {', '.join(company_types)}")
+        guidance.append(f"Seek opportunities in {', '.join(company_types)} where your planetary combination indicates best cultural and professional fit")
+        
+        # Add specific wealth strategy based on 2nd lord
+        wealth_strategy = self._get_wealth_strategy(second_lord_analysis)
+        guidance.append(wealth_strategy)
         
         return guidance
+    
+    def _get_wealth_strategy(self, second_lord_analysis):
+        """Generate specific wealth strategy based on 2nd lord placement"""
+        second_lord = second_lord_analysis['second_lord']
+        second_house = second_lord_analysis['house_placement']
+        
+        # Wealth strategies based on 2nd lord and house
+        wealth_strategies = {
+            ('Sun', 9): 'Build wealth through government positions, higher education, or international business ventures',
+            ('Sun', 10): 'Accumulate wealth through leadership roles, government service, or authoritative positions',
+            ('Sun', 11): 'Generate income through large organizations, networking, or government connections',
+            ('Moon', 4): 'Build wealth through real estate, property development, or homeland-based businesses',
+            ('Moon', 6): 'Earn through healthcare services, hospitality, or public-facing service roles',
+            ('Moon', 11): 'Generate income through public relations, networking, or community-based businesses',
+            ('Mercury', 3): 'Build wealth through communication, media, writing, or short-distance business ventures',
+            ('Mercury', 11): 'Accumulate wealth through technology networks, large-scale communication, or tech consulting',
+            ('Mercury', 9): 'Generate income through publishing, education, or international communication business',
+            ('Venus', 5): 'Build wealth through creative work, entertainment, speculation, or luxury goods',
+            ('Venus', 7): 'Earn through partnerships, luxury services, or beauty/fashion businesses',
+            ('Venus', 11): 'Generate income through creative networks, entertainment industry, or luxury markets',
+            ('Mars', 2): 'Build wealth through family business, engineering ventures, or technical financial services',
+            ('Mars', 6): 'Accumulate wealth through healthcare technology, service industries, or competitive fields',
+            ('Mars', 11): 'Generate income through technology networks, engineering consulting, or large-scale projects',
+            ('Jupiter', 9): 'Build wealth through education, legal services, publishing, or international consulting',
+            ('Jupiter', 11): 'Earn through educational networks, financial consulting, or wisdom-based large organizations',
+            ('Jupiter', 5): 'Generate income through teaching, creative education, or speculative wisdom-based ventures',
+            ('Saturn', 10): 'Build wealth through systematic career progression, manufacturing, or structured organizations',
+            ('Saturn', 11): 'Accumulate wealth through disciplined networking, organized systems, or long-term investments',
+            ('Saturn', 4): 'Generate income through real estate, construction, or property-based systematic businesses'
+        }
+        
+        # Get specific strategy or create general one
+        key = (second_lord, second_house)
+        if key in wealth_strategies:
+            return wealth_strategies[key]
+        else:
+            # General strategy based on 2nd lord
+            planet_wealth_focus = {
+                'Sun': 'leadership and authoritative positions',
+                'Moon': 'public-facing and nurturing services',
+                'Mercury': 'communication and analytical work',
+                'Venus': 'creative and luxury-oriented ventures',
+                'Mars': 'technical and competitive fields',
+                'Jupiter': 'educational and consulting services',
+                'Saturn': 'systematic and long-term investments'
+            }
+            
+            focus = planet_wealth_focus.get(second_lord, 'your natural talents')
+            return f'Build wealth by focusing on {focus} and leveraging your {second_house}th house placement for income generation'
     
     def _generate_domain_analysis(self, tenth_lord_analysis, second_lord_analysis, details):
         """Generate comprehensive astrological reasoning with conjunctions and house flavors"""
@@ -395,12 +447,18 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         # Enhanced roles explanation
         roles_why = self._get_enhanced_roles_explanation(tenth_lord, tenth_house, conjunct_planets, details)
         
+        # Enhanced companies explanation
+        companies_why = self._get_enhanced_companies_explanation(tenth_lord, tenth_house, conjunct_planets, details)
+        
+        # Enhanced skills explanation
+        skills_why = self._get_enhanced_skills_explanation(tenth_lord, tenth_house, conjunct_planets, details)
+        
         analysis = {
             'primary_domain_why': primary_domain_why,
             'industries_why': industries_why,
             'roles_why': roles_why,
-            'companies_why': f"Success indicated in {', '.join(details['company_types'][:2])} due to the {tenth_house}th house influence.",
-            'skills_why': f"Key skills {', '.join(details['key_skills'][:2])} develop through this planetary combination and house placement."
+            'companies_why': companies_why,
+            'skills_why': skills_why
         }
         
         return analysis
@@ -769,6 +827,207 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         
         return ', '.join(effects) if effects else f'{planet.lower()}-influenced capabilities'
     
+    def _get_enhanced_companies_explanation(self, tenth_lord, tenth_house, conjunct_planets, details):
+        """Generate detailed companies explanation with planetary and house influences"""
+        planet_significations = {
+            'Sun': 'government, authority, leadership, public service',
+            'Moon': 'public relations, hospitality, healthcare, nurturing services', 
+            'Mercury': 'communication, technology, analysis, commerce',
+            'Venus': 'arts, entertainment, luxury, beauty, design',
+            'Mars': 'engineering, technology, sports, defense, surgery',
+            'Jupiter': 'education, law, finance, consulting, wisdom',
+            'Saturn': 'organization, structure, manufacturing, real estate',
+            'Rahu': 'innovation, foreign technology, unconventional methods',
+            'Ketu': 'research, spirituality, behind-the-scenes work'
+        }
+        
+        house_company_influence = {
+            1: 'entrepreneurial startups and self-owned businesses',
+            2: 'family businesses and wealth-focused companies',
+            3: 'media companies and communication-based organizations',
+            4: 'real estate firms and property-based companies',
+            5: 'creative companies and entertainment organizations',
+            6: 'service companies and healthcare organizations',
+            7: 'partnership firms and international companies',
+            8: 'research organizations and transformation-focused companies',
+            9: 'educational institutions and international organizations',
+            10: 'large corporations and government organizations',
+            11: 'network companies and large-scale organizations',
+            12: 'multinational companies and behind-the-scenes organizations'
+        }
+        
+        base_companies = ', '.join(details['company_types'][:2])
+        house_influence = house_company_influence.get(tenth_house, 'professional organizations')
+        
+        base_explanation = f"Your 10th lord {tenth_lord} ({planet_significations[tenth_lord]}) in {tenth_house}th house creates natural success in {base_companies}, particularly {house_influence}"
+        
+        # Add conjunction effects on company preferences
+        if conjunct_planets:
+            conjunction_details = []
+            for planet in conjunct_planets:
+                if planet in planet_significations:
+                    company_effect = self._get_company_conjunction_effect(planet, details['company_types'])
+                    if company_effect:
+                        conjunction_details.append(f"{planet} adds affinity for {company_effect}")
+            
+            if conjunction_details:
+                base_explanation += f". {', '.join(conjunction_details)}."
+        
+        return base_explanation
+    
+    def _get_company_conjunction_effect(self, planet, company_types):
+        """Get how conjunctions affect company type preferences"""
+        company_effects = {
+            'Rahu': {
+                'Tech Companies': 'innovative tech startups and disruptive companies',
+                'Engineering Firms': 'cutting-edge engineering and automation companies',
+                'Defense Contractors': 'advanced defense technology companies',
+                'Government Agencies': 'modernizing government organizations',
+                'Creative Agencies': 'viral marketing and digital-first agencies'
+            },
+            'Jupiter': {
+                'Tech Companies': 'educational technology and knowledge-based companies',
+                'Educational Institutions': 'prestigious universities and training organizations',
+                'Law Firms': 'ethical law firms and policy organizations',
+                'Financial Services': 'ethical finance and consulting firms',
+                'Government Agencies': 'policy-making and advisory organizations'
+            },
+            'Saturn': {
+                'Tech Companies': 'enterprise software and established tech companies',
+                'Engineering Firms': 'infrastructure and heavy engineering companies',
+                'Manufacturing Companies': 'quality-focused manufacturing organizations',
+                'Government Agencies': 'systematic government departments',
+                'Real Estate Firms': 'established property development companies'
+            },
+            'Mercury': {
+                'Tech Companies': 'communication technology and software companies',
+                'Media Companies': 'digital media and content organizations',
+                'Consulting Firms': 'analytical and strategy consulting companies',
+                'Government Contractors': 'communication and documentation services'
+            },
+            'Venus': {
+                'Tech Companies': 'design-focused and user experience companies',
+                'Creative Agencies': 'luxury brands and aesthetic-focused agencies',
+                'Entertainment Studios': 'high-end entertainment and media companies',
+                'Fashion Brands': 'luxury fashion and lifestyle companies'
+            },
+            'Mars': {
+                'Tech Companies': 'fast-growing and competitive tech companies',
+                'Engineering Firms': 'dynamic engineering and project-based companies',
+                'Defense Contractors': 'military and security-focused organizations',
+                'Manufacturing': 'automated and efficiency-focused manufacturers'
+            }
+        }
+        
+        effects = []
+        for company_type in company_types[:3]:  # Check first 3 company types
+            if planet in company_effects and company_type in company_effects[planet]:
+                effects.append(company_effects[planet][company_type])
+        
+        return ', '.join(effects) if effects else f'{planet.lower()}-influenced organizations'
+    
+    def _get_enhanced_skills_explanation(self, tenth_lord, tenth_house, conjunct_planets, details):
+        """Generate detailed skills explanation with planetary and house influences"""
+        planet_significations = {
+            'Sun': 'government, authority, leadership, public service',
+            'Moon': 'public relations, hospitality, healthcare, nurturing services', 
+            'Mercury': 'communication, technology, analysis, commerce',
+            'Venus': 'arts, entertainment, luxury, beauty, design',
+            'Mars': 'engineering, technology, sports, defense, surgery',
+            'Jupiter': 'education, law, finance, consulting, wisdom',
+            'Saturn': 'organization, structure, manufacturing, real estate',
+            'Rahu': 'innovation, foreign technology, unconventional methods',
+            'Ketu': 'research, spirituality, behind-the-scenes work'
+        }
+        
+        house_skill_influence = {
+            1: 'self-reliance and entrepreneurial abilities',
+            2: 'wealth management and financial acumen',
+            3: 'communication and networking skills',
+            4: 'foundational knowledge and security-focused abilities',
+            5: 'creative problem-solving and innovative thinking',
+            6: 'service excellence and health-focused skills',
+            7: 'partnership building and diplomatic abilities',
+            8: 'research capabilities and transformational skills',
+            9: 'higher learning and international perspective',
+            10: 'leadership excellence and reputation management',
+            11: 'large-scale thinking and network building',
+            12: 'behind-the-scenes expertise and spiritual insight'
+        }
+        
+        base_skills = ', '.join(details['key_skills'][:2])
+        house_influence = house_skill_influence.get(tenth_house, 'professional capabilities')
+        
+        base_explanation = f"Your 10th lord {tenth_lord} ({planet_significations[tenth_lord]}) naturally develops {base_skills} abilities, enhanced by {tenth_house}th house placement which adds {house_influence}"
+        
+        # Add conjunction effects on skill development
+        if conjunct_planets:
+            conjunction_details = []
+            for planet in conjunct_planets:
+                if planet in planet_significations:
+                    skill_effect = self._get_skill_conjunction_effect(planet, details['key_skills'])
+                    if skill_effect:
+                        conjunction_details.append(f"{planet} enhances {skill_effect}")
+            
+            if conjunction_details:
+                base_explanation += f". {', '.join(conjunction_details)}."
+        
+        return base_explanation
+    
+    def _get_skill_conjunction_effect(self, planet, skills):
+        """Get how conjunctions enhance specific skills"""
+        skill_effects = {
+            'Rahu': {
+                'Technical Problem Solving': 'innovative and unconventional problem-solving approaches',
+                'Engineering Design': 'cutting-edge design thinking and automation skills',
+                'Project Management': 'disruptive project methodologies and tech adoption',
+                'Innovation': 'breakthrough innovation and future-focused thinking',
+                'Leadership': 'unconventional leadership styles and change management'
+            },
+            'Jupiter': {
+                'Technical Problem Solving': 'systematic and wisdom-based problem analysis',
+                'Teaching': 'advanced pedagogical skills and curriculum development',
+                'Project Management': 'ethical project leadership and team development',
+                'Legal Knowledge': 'comprehensive legal understanding and policy expertise',
+                'Financial Analysis': 'strategic financial planning and ethical investing'
+            },
+            'Saturn': {
+                'Technical Problem Solving': 'methodical and quality-focused problem resolution',
+                'Engineering Design': 'precision engineering and long-term durability focus',
+                'Project Management': 'disciplined execution and risk management expertise',
+                'Organization': 'systematic organizational design and process improvement',
+                'Quality Control': 'rigorous quality standards and continuous improvement'
+            },
+            'Mercury': {
+                'Technical Communication': 'exceptional technical writing and documentation skills',
+                'Data Analysis': 'advanced analytical thinking and pattern recognition',
+                'Project Management': 'superior coordination and communication abilities',
+                'Problem Solving': 'logical analysis and systematic solution development',
+                'Communication': 'multi-channel communication and information synthesis'
+            },
+            'Venus': {
+                'Design Thinking': 'aesthetic design sensibilities and user empathy',
+                'User Experience': 'intuitive understanding of user needs and preferences',
+                'Brand Strategy': 'creative brand development and market positioning',
+                'Creative Software': 'mastery of design tools and creative technologies',
+                'Team Management': 'harmonious team dynamics and collaborative leadership'
+            },
+            'Mars': {
+                'Technical Problem Solving': 'rapid problem identification and decisive solutions',
+                'Engineering Design': 'dynamic design approaches and hands-on implementation',
+                'Project Management': 'fast-paced execution and deadline management',
+                'Innovation': 'action-oriented innovation and rapid prototyping',
+                'Leadership': 'decisive leadership and crisis management abilities'
+            }
+        }
+        
+        effects = []
+        for skill in skills[:3]:  # Check first 3 skills
+            if planet in skill_effects and skill in skill_effects[planet]:
+                effects.append(skill_effects[planet][skill])
+        
+        return ', '.join(effects) if effects else f'{planet.lower()}-enhanced capabilities'
+    
     def _get_domain_by_signification(self, planet, house_placement, domain_details):
         """Get domain based on actual planetary significations"""
         # Primary domain mapping based on planetary nature
@@ -778,7 +1037,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Government Services', 'Public Administration', 'Politics', 'Leadership Roles'],
                 'specific_roles': ['Government Officer', 'Public Administrator', 'Policy Maker', 'Executive Leader'],
                 'company_types': ['Government Agencies', 'Public Sector', 'Administrative Bodies'],
-                'growth_potential': 'Stable - Government sector with steady growth',
                 'key_skills': ['Leadership', 'Public Administration', 'Policy Making', 'Team Management'],
                 'specialization': 'Government & Authority'
             },
@@ -787,7 +1045,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Healthcare', 'Hospitality', 'Public Relations', 'Nursing', 'Food Services'],
                 'specific_roles': ['Healthcare Professional', 'PR Manager', 'Hospitality Manager', 'Counselor'],
                 'company_types': ['Hospitals', 'Hotels', 'PR Agencies', 'Healthcare Organizations'],
-                'growth_potential': 'High - Healthcare and hospitality growing rapidly',
                 'key_skills': ['Empathy', 'Communication', 'Patient Care', 'Public Relations'],
                 'specialization': 'Care & Public Relations'
             },
@@ -796,7 +1053,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Software Development', 'Digital Marketing', 'EdTech', 'Fintech', 'Media Technology'],
                 'specific_roles': ['Product Manager', 'Technical Writer', 'Developer Relations', 'Solutions Architect'],
                 'company_types': ['Tech Startups', 'Fortune 500 Tech', 'Government Contractors', 'Consulting Firms'],
-                'growth_potential': 'High - 13% annual growth in tech sector',
                 'key_skills': ['Technical Communication', 'Project Management', 'Data Analysis', 'Problem Solving'],
                 'specialization': 'Technology Communication & Networks'
             },
@@ -805,7 +1061,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Entertainment', 'Design', 'Fashion', 'Gaming', 'Creative Technology'],
                 'specific_roles': ['UX/UI Designer', 'Creative Director', 'Game Designer', 'Brand Manager'],
                 'company_types': ['Creative Agencies', 'Entertainment Studios', 'Tech Companies', 'Fashion Brands'],
-                'growth_potential': 'High - 10% growth in creative industries',
                 'key_skills': ['Design Thinking', 'Creative Software', 'Brand Strategy', 'User Experience'],
                 'specialization': 'Creative Design & Entertainment'
             },
@@ -814,7 +1069,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Engineering', 'Technology', 'Defense', 'Sports', 'Manufacturing'],
                 'specific_roles': ['Software Engineer', 'Mechanical Engineer', 'Project Manager', 'Technical Lead'],
                 'company_types': ['Tech Companies', 'Engineering Firms', 'Defense Contractors', 'Manufacturing'],
-                'growth_potential': 'High - Engineering and tech sectors growing',
                 'key_skills': ['Technical Problem Solving', 'Engineering Design', 'Project Management', 'Innovation'],
                 'specialization': 'Engineering & Technical Innovation'
             },
@@ -823,7 +1077,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Education', 'Legal Services', 'Finance', 'Consulting', 'Publishing'],
                 'specific_roles': ['Teacher', 'Lawyer', 'Financial Advisor', 'Consultant', 'Academic'],
                 'company_types': ['Educational Institutions', 'Law Firms', 'Financial Services', 'Consulting'],
-                'growth_potential': 'Moderate - Education and legal services stable growth',
                 'key_skills': ['Teaching', 'Legal Knowledge', 'Financial Analysis', 'Consulting'],
                 'specialization': 'Education & Legal Wisdom'
             },
@@ -832,7 +1085,6 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
                 'industries': ['Manufacturing', 'Real Estate', 'Construction', 'Mining', 'Agriculture'],
                 'specific_roles': ['Operations Manager', 'Real Estate Developer', 'Construction Manager', 'Farmer'],
                 'company_types': ['Manufacturing Companies', 'Real Estate Firms', 'Construction Companies'],
-                'growth_potential': 'Stable - Traditional industries with steady demand',
                 'key_skills': ['Organization', 'Project Management', 'Quality Control', 'Long-term Planning'],
                 'specialization': 'Structure & Organization'
             }

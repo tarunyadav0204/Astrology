@@ -230,11 +230,7 @@ const CareerProfessions = ({ careerData }) => {
                       )}
                     </div>
                     
-                    <div className="growth-potential">
-                      <h5>Growth Potential</h5>
-                      <p className="growth-text">{careerData.domain_of_work.growth_potential}</p>
-                    </div>
-                    
+
                     <div className="key-skills">
                       <h5>Skills to Develop</h5>
                       <div className="skills-grid">
