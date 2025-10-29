@@ -271,7 +271,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <span className="discount">40% OFF</span>
               </div>
               <button className="astroroshni-btn" onClick={() => window.open('/astroroshni', '_blank')}>
-                🚀 EXPLORE ASTROROSHNI
+                🚀 EXPLORE ASTROVISHNU
               </button>
             </div>
             <div className="astroroshni-visual">

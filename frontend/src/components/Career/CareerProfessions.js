@@ -47,7 +47,7 @@ const CareerProfessions = ({ careerData }) => {
       icon: '💼',
       bgColor: 'rgba(255, 152, 0, 0.05)',
       borderColor: 'rgba(255, 152, 0, 0.2)',
-      active: false
+      active: careerData?.work_pattern ? true : false
     },
     {
       id: 'trajectory',
@@ -175,6 +175,74 @@ const CareerProfessions = ({ careerData }) => {
                       <h5>Astrological Reasoning</h5>
                       <div className="reasoning-list">
                         {astrological_reasoning.map((reason, index) => (
+                          <div key={index} className="reasoning-item">
+                            <span className="reasoning-bullet">•</span>
+                            <span className="reasoning-text">{reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+                
+                {section.id === 'pattern' && careerData?.work_pattern && (
+                  <>
+                    <div className="pattern-summary">
+                      <h5>Your Work Pattern</h5>
+                      <div className="pattern-result">
+                        <span className="pattern-type">{careerData.work_pattern.primary_pattern}</span>
+                      </div>
+                      <p className="pattern-description">{careerData.work_pattern.pattern_analysis.summary}</p>
+                    </div>
+                    
+                    <div className="pattern-characteristics">
+                      <h5>Key Characteristics</h5>
+                      <div className="characteristics-grid">
+                        {careerData.work_pattern.pattern_analysis.characteristics.map((char, index) => (
+                          <div key={index} className="characteristic-item">
+                            <span className="characteristic-icon">✓</span>
+                            {char}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="ideal-roles">
+                      <h5>Ideal Roles</h5>
+                      <div className="role-tags">
+                        {careerData.work_pattern.pattern_analysis.ideal_roles.map((role, index) => (
+                          <span key={index} className="role-tag pattern">{role}</span>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="work-style">
+                      <h5>Your Work Style</h5>
+                      <p className="style-text">{careerData.work_pattern.pattern_analysis.work_style}</p>
+                    </div>
+                    
+                    <div className="pattern-scores">
+                      <h5>Pattern Analysis Scores</h5>
+                      <div className="scores-grid">
+                        {Object.entries(careerData.work_pattern.pattern_scores).map(([pattern, score]) => (
+                          <div key={pattern} className="score-item">
+                            <span className="score-label">{pattern}</span>
+                            <div className="score-bar">
+                              <div 
+                                className="score-fill" 
+                                style={{ width: `${(score / Math.max(...Object.values(careerData.work_pattern.pattern_scores))) * 100}%` }}
+                              ></div>
+                              <span className="score-value">{score}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="pattern-reasoning">
+                      <h5>Astrological Reasoning</h5>
+                      <div className="reasoning-list">
+                        {careerData.work_pattern.astrological_reasoning.map((reason, index) => (
                           <div key={index} className="reasoning-item">
                             <span className="reasoning-bullet">•</span>
                             <span className="reasoning-text">{reason}</span>

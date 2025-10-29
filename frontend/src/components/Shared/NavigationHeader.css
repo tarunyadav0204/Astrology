@@ -222,12 +222,14 @@
   padding: 15px 0;
   position: relative;
   z-index: 100;
+  overflow: visible;
 }
 
 .navigation .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
+  overflow: visible;
 }
 
 .nav-menu {
@@ -243,6 +245,7 @@
   color: white;
   font-weight: 500;
   transition: all 0.3s;
+  white-space: nowrap;
 }
 
 .nav-menu a:hover {
@@ -253,6 +256,7 @@
 .dropdown {
   position: relative;
   display: inline-block;
+  z-index: 2147483646;
 }
 
 .dropdown-toggle::after {
@@ -273,15 +277,13 @@
 }
 
 .dropdown-content {
-  display: none;
-  position: absolute;
+  position: fixed;
   background: rgba(255, 255, 255, 0.95);
-  min-width: 200px;
+  min-width: 250px;
+  width: max-content;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
   border-radius: 10px;
-  z-index: 9999;
-  top: 100%;
-  left: 0;
+  z-index: 9999999;
   backdrop-filter: blur(10px);
   border: 2px solid rgba(233, 30, 99, 0.2);
 }
@@ -293,6 +295,7 @@
   display: block;
   transition: all 0.3s;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .dropdown-content a:hover {
@@ -319,14 +322,15 @@
   color: white;
 }
 
-.dropdown:hover .dropdown-content {
-  display: block;
-  animation: fadeIn 0.3s;
+.dropdown-content {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+.dropdown:hover .dropdown-content {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* Zodiac Selector */
@@ -341,7 +345,7 @@
   display: flex;
   justify-content: center;
   position: relative;
-  z-index: 1;
+  z-index: 50;
 }
 
 .zodiac-nav {
@@ -399,18 +403,40 @@
   }
   
   .main-nav .container {
-    flex-direction: column;
-    gap: 15px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
   
   .language-section {
-    justify-content: center;
+    display: none;
+  }
+  
+  .mobile-auth {
+    display: flex !important;
+    align-items: center;
+  }
+  
+  .mobile-auth .auth-btn {
+    background: transparent;
+    border: 2px solid #fff;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
   }
   
   .nav-menu {
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     gap: 20px;
+    padding: 0 10px;
+  }
+  
+  .navigation .container {
+    overflow-x: auto;
   }
   
   .dropdown-content {
@@ -420,6 +446,18 @@
   
   .dropdown:hover .dropdown-content {
     transform: translateX(-50%) translateY(0);
+  }
+  
+  .zodiac-selector {
+    overflow-x: auto;
+    padding: 10px 0;
+    justify-content: flex-start;
+  }
+  
+  .zodiac-nav {
+    min-width: max-content;
+    padding: 0 20px;
+    width: max-content;
   }
 }
 .zodiac-symbol {

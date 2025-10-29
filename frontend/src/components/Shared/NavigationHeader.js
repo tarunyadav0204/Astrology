@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './NavigationHeader.css';
 
 const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
+
+
 
   return (
     <header className="main-header">
@@ -51,6 +53,21 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             <button className="lang-btn">தமிழ்</button>
             <button className="lang-btn">తెలుగు</button>
           </div>
+          <div className="mobile-auth">
+            {user ? (
+              <div className="user-menu">
+                <span className="user-name">👤 {user.name || user.phone}</span>
+                {user.role === 'admin' && (
+                  <button className="admin-btn" onClick={onAdminClick}>
+                    ⚙️ Admin
+                  </button>
+                )}
+                <button className="auth-btn" onClick={onLogout}>Logout</button>
+              </div>
+            ) : (
+              showLoginButton && <button className="auth-btn" onClick={onLogin}>Sign In</button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -76,10 +93,17 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
               </div>
             </li>
             <li><a href="/#astrology">Astrology</a></li>
-            <li><a href="/#reports">Free Reports</a></li>
+            <li className="dropdown">
+              <a href="#yourlife" className="dropdown-toggle">Your Life</a>
+              <div className="dropdown-content">
+                <a href="/#career">💼 Your Career</a>
+                <a href="/#marriage">💍 Your Marriage</a>
+                <a href="/#education">🎓 Your Education</a>
+                <a href="/#health">🏥 Your Health</a>
+                <a href="/#wealth">💰 Your Wealth</a>
+              </div>
+            </li>
             <li><a href="/#panchang">Panchang</a></li>
-            <li><a href="/#lalkitab">Lal Kitab</a></li>
-            <li><a href="/#compatibility">Compatibility</a></li>
             <li><a href="/#calculators">Calculators</a></li>
           </ul>
         </div>

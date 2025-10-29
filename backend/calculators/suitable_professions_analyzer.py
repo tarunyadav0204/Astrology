@@ -34,9 +34,15 @@ class SuitableProfessionsAnalyzer(BaseCalculator):
         # 3. Domain of Work Analysis
         domain_of_work = self._analyze_domain_of_work(tenth_lord_analysis)
         
+        # 4. Work Pattern Analysis
+        from .work_pattern_analyzer import WorkPatternAnalyzer
+        work_pattern_analyzer = WorkPatternAnalyzer(self.chart_data, {'birth_data': True})
+        work_pattern = work_pattern_analyzer.analyze_work_pattern()
+        
         return {
             'nature_of_work': nature_of_work,
-            'domain_of_work': domain_of_work
+            'domain_of_work': domain_of_work,
+            'work_pattern': work_pattern
         }
     
     def _analyze_nature_of_work(self, tenth_lord_analysis):
