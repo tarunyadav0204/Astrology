@@ -181,7 +181,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       
       <NavigationHeader 
         onPeriodChange={handlePeriodChange}
-        showZodiacSelector={true}
+        showZodiacSelector={false}
         zodiacSigns={zodiacSigns}
         selectedZodiac={selectedZodiac}
         onZodiacChange={setSelectedZodiac}
@@ -191,6 +191,58 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onLogin={onLogin}
         showLoginButton={showLoginButton}
       />
+
+      {/* Your Life Categories */}
+      <section className="life-categories">
+        <div className="container">
+          <div className="life-categories-header">
+            <h3>✨ Discover Your Life Path</h3>
+            <p>Unlock the secrets of your destiny</p>
+          </div>
+          <div className="life-categories-grid">
+            <div className="life-category" onClick={() => navigate('/career-guidance')}>
+              <div className="category-icon">💼</div>
+              <div className="category-content">
+                <h4>Your Career</h4>
+                <p>Professional success & growth</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
+            <div className="life-category" onClick={() => navigate('/marriage-analysis')}>
+              <div className="category-icon">💕</div>
+              <div className="category-content">
+                <h4>Your Marriage</h4>
+                <p>Love, compatibility & relationships</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
+            <div className="life-category">
+              <div className="category-icon">🎓</div>
+              <div className="category-content">
+                <h4>Your Education</h4>
+                <p>Learning path & academic success</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
+            <div className="life-category">
+              <div className="category-icon">🌿</div>
+              <div className="category-content">
+                <h4>Your Health</h4>
+                <p>Wellness & vitality insights</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
+            <div className="life-category">
+              <div className="category-icon">💎</div>
+              <div className="category-content">
+                <h4>Your Wealth</h4>
+                <p>Financial prosperity & abundance</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Banner Slider */}
       <section className="banner-slider">
@@ -433,6 +485,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Horoscope Section */}
       <section className="horoscope-section">
         <div className="container">
+          <div className="section-header">
+            <h2>Western Horoscopes</h2>
+          </div>
           <div className="horoscope-grid">
             <div className="horoscope-content">
               <div className="horoscope-tabs">

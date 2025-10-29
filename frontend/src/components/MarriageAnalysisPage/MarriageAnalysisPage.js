@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
+import NativeSelector from '../Shared/NativeSelector';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
 import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -56,6 +57,10 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
             </div>
           ) : (
             <div className="analysis-section">
+              <NativeSelector 
+                birthData={birthData} 
+                onNativeChange={() => window.location.reload()}
+              />
               <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />
             </div>
           )}

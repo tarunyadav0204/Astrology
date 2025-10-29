@@ -91,9 +91,6 @@ const CareerProfessions = ({ careerData }) => {
                 {section.active && (
                   <span className={`expand-arrow ${expandedSections[section.id] ? 'expanded' : ''}`}>▼</span>
                 )}
-                <span className={`status-badge ${section.active ? 'active' : 'placeholder'}`}>
-                  {section.active ? 'Active' : 'Coming Soon'}
-                </span>
               </div>
             </div>
             

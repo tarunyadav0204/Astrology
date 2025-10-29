@@ -1203,47 +1203,97 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .career-professions {
-    padding: 20px;
-    margin: 10px;
+    padding: 0 5px;
+    margin: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    max-width: 100%;
   }
   
   .career-professions h3 {
-    font-size: 1.8rem;
+    font-size: 1.4rem;
+    margin-bottom: 10px;
+    padding: 10px;
+    color: #2d3748;
+    text-align: center;
+    margin: 0 0 15px 0;
+  }
+  
+  .professions-sections {
+    gap: 8px;
+  }
+  
+  .profession-section-card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: none;
+    margin-bottom: 20px;
+  }
+  
+  .profession-section-card:first-child {
+    margin-top: -10px;
   }
   
   .section-header {
-    padding: 15px 20px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
+    padding: 8px 10px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-left: 4px solid #e91e63;
+    border-radius: 0;
+    margin-bottom: 5px;
   }
   
   .section-title {
-    gap: 12px;
+    gap: 10px;
+    flex: 1;
   }
   
   .section-icon {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
   }
   
   .title-content h4 {
-    font-size: 1.1rem;
+    font-size: 1rem;
+    margin-bottom: 3px;
+    color: #2d3748;
   }
   
-  .section-controls {
-    align-self: flex-end;
+  .title-content p {
+    font-size: 0.85rem;
+    color: #666;
+    line-height: 1.2;
   }
   
   .section-content {
-    padding: 20px;
+    padding: 0;
+    background: none;
+    border: none;
   }
   
   .career-summary,
   .recommended-roles,
   .key-strengths,
   .work-environment,
-  .astrological-reasoning {
-    padding: 15px;
+  .astrological-reasoning,
+  .domain-summary,
+  .secondary-domains,
+  .specialization,
+  .modern-applications,
+  .domain-reasoning,
+  .target-industries,
+  .specific-roles,
+  .company-types,
+  .growth-potential,
+  .key-skills,
+  .career-guidance {
+    background: white;
+    border: none;
+    border-radius: 0;
+    padding: 10px 8px;
+    margin-bottom: 10px;
+    border-left: 3px solid #ff6f00;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
   
   .strengths-grid {
@@ -1266,19 +1316,76 @@
     justify-content: center;
   }
   
-  .domain-summary,
-  .secondary-domains,
-  .specialization,
-  .modern-applications,
-  .domain-reasoning,
-  .target-industries,
-  .specific-roles,
-  .company-types,
-  .growth-potential,
-  .key-skills,
-  .career-guidance {
-    padding: 15px;
+  
+  .summary-text,
+  .environment-text,
+  .growth-text,
+  .style-text,
+  .pattern-description,
+  .specialization-text {
+    padding: 10px;
+    font-size: 0.95rem;
+    background: #f8f9fa;
+    border: none;
+    border-radius: 4px;
+    margin: 10px 0;
   }
+  
+  .strength-item,
+  .reasoning-item,
+  .guidance-item,
+  .characteristic-item,
+  .skill-item {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    border: none;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  
+  .approach-style,
+  .analysis-why,
+  .nakshatra-insight {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    background: #fff3e0;
+    border-left: 3px solid #ff9800;
+    border-radius: 0 4px 4px 0;
+  }
+  
+  .role-tags,
+  .domain-tags,
+  .application-tags,
+  .industry-tags,
+  .company-tags {
+    gap: 6px;
+    margin: 10px 0;
+  }
+  
+  .role-tag,
+  .domain-tag,
+  .application-tag,
+  .industry-tag,
+  .company-tag {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 15px;
+  }
+  
+  .strengths-grid,
+  .characteristics-grid,
+  .skills-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .section-placeholder {
+    padding: 12px 8px;
+    background: #f8f9fa;
+    border-left: 3px solid #ccc;
+  }
+}
   
   .industry-tags,
   .company-tags {
@@ -1288,4 +1395,3 @@
   .skills-grid {
     grid-template-columns: 1fr;
   }
-}

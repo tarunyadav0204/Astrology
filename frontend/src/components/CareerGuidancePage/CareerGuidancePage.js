@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
+import NativeSelector from '../Shared/NativeSelector';
 import CareerAnalysisTab from '../Career/CareerAnalysisTab';
 import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -54,6 +55,10 @@ const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
             </div>
           ) : (
             <div className="analysis-section">
+              <NativeSelector 
+                birthData={birthData} 
+                onNativeChange={() => window.location.reload()}
+              />
               <CareerAnalysisTab chartData={chartData} birthDetails={birthData} />
             </div>
           )}

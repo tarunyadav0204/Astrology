@@ -720,7 +720,7 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .career-analysis-tab {
-    padding: 15px;
+    padding: 5px;
   }
   
   .analysis-grid {
@@ -728,7 +728,7 @@
   }
   
   .card-header {
-    padding: 15px;
+    padding: 10px;
   }
   
   .card-icon {
@@ -756,15 +756,15 @@
   }
   
   .modal-content {
-    padding: 25px;
+    padding: 15px;
   }
   
   .aspect-item {
-    padding: 1rem;
+    padding: 0.75rem;
   }
   
   .calculation-breakdown {
-    padding: 1rem;
+    padding: 0.75rem;
   }
   
   .detail-row {
@@ -2841,8 +2841,8 @@
 /* Responsive Design for Career Personality */
 @media (max-width: 768px) {
   .career-personality {
-    padding: 20px;
-    margin: 10px;
+    padding: 10px 5px;
+    margin: 5px;
   }
   
   .career-personality h3 {
@@ -2850,7 +2850,7 @@
   }
   
   .question-header {
-    padding: 15px 20px;
+    padding: 10px 12px;
   }
   
   .question-title {
@@ -2866,12 +2866,12 @@
   }
   
   .question-content {
-    padding: 20px;
+    padding: 12px 8px;
   }
   
   .development-note {
-    padding: 20px;
-    margin-top: 30px;
+    padding: 12px 8px;
+    margin-top: 15px;
   }
   
   .development-note h4 {

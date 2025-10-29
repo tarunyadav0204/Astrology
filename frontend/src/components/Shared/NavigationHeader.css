@@ -348,6 +348,10 @@
   z-index: 50;
 }
 
+.zodiac-selector:empty {
+  display: none;
+}
+
 .zodiac-nav {
   display: flex;
   gap: 5px;

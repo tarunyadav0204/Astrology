@@ -1665,8 +1665,31 @@
     grid-template-columns: 1fr;
   }
   
+  .horoscope-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 0 5px 10px 5px;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  
   .zodiac-grid {
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 0 5px 10px 5px;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .zodiac-card {
+    flex-shrink: 0;
+    min-width: 60px;
   }
   
   .slide-content h2 {
@@ -1707,6 +1730,228 @@
     flex-direction: column;
     gap: 5px;
   }
+  
+  /* Additional mobile fixes */
+  .container {
+    padding: 0 15px;
+  }
+  
+  .banner-slider {
+    height: 200px;
+  }
+  
+  .slide-content h2 {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+  }
+  
+  .cta-btn {
+    padding: 12px 25px;
+    font-size: 14px;
+  }
+  
+  .astrologers-scroll {
+    gap: 15px;
+    padding: 0 15px;
+  }
+  
+  .astrologer-card {
+    min-width: 180px;
+    padding: 12px;
+  }
+  
+  .placeholder-img {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+  
+  .action-buttons {
+    gap: 8px;
+  }
+  
+  .call-btn, .chat-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .premium-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+  }
+  
+  .premium-card, .featured-service {
+    padding: 15px;
+  }
+  
+  .form-card {
+    padding: 15px;
+  }
+  
+  .birth-form input, .birth-form select, .matching-form input {
+    padding: 10px;
+    font-size: 16px;
+  }
+  
+  .services-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .consultation-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .solar-system {
+    width: 200px;
+    height: 200px;
+    top: 150px;
+    right: 2%;
+  }
+  
+  .constellation {
+    width: 100px;
+    height: 100px;
+    top: 180px;
+    left: 5%;
+  }
+  
+  .section-header h2 {
+    font-size: 1.8rem;
+    margin-bottom: 25px;
+  }
+  
+  .ai-astrologers, .premium-services, .consultation-section {
+    padding: 20px 0;
+    margin: 10px 0;
+  }
+  
+  .main-content {
+    padding: 30px 0;
+  }
+  
+  /* Festivals Section Mobile */
+  .festivals-sidebar {
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .festivals-sidebar h3 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+  }
+  
+  .festival-tabs {
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 15px;
+  }
+  
+  .festival-tabs .tab {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    border-radius: 15px;
+  }
+  
+  .festival-list {
+    gap: 8px;
+  }
+  
+  .festival-list a {
+    padding: 10px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+  
+  /* Horoscope Section Mobile */
+  .horoscope-section {
+    padding: 20px 0;
+  }
+  
+  .horoscope-content-area {
+    padding: 15px;
+  }
+  
+  .horoscope-content-area h3 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+  }
+  
+  .horoscope-main {
+    padding: 12px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  
+  .horoscope-categories {
+    gap: 10px;
+  }
+  
+  .category {
+    padding: 10px;
+  }
+  
+  .category h4 {
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+  }
+  
+  .category p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+  
+  .horoscope-extras {
+    padding: 12px;
+  }
+  
+  .lucky-info {
+    gap: 8px;
+  }
+  
+  .lucky-info span {
+    font-size: 0.8rem;
+  }
+  
+  /* Force mobile layout for specific sections */
+  .horoscope-grid {
+    display: block !important;
+    gap: 20px;
+  }
+  
+  .horoscope-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden;
+    margin-bottom: 20px;
+  }
+  
+  .festivals-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    margin-top: 20px;
+  }
+  
+  .horoscope-content-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  
+  .horoscope-categories {
+    display: block !important;
+  }
+  
+  .category {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+  }
 }
 /* Horoscope section zodiac buttons styling */
 .horoscope-section .zodiac-card {
@@ -1743,4 +1988,158 @@
 
 .horoscope-section .zodiac-card.active .zodiac-text {
   color: white;
+}
+
+/* Your Life Categories */
+.life-categories {
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  padding: 25px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  margin-bottom: 30px;
+  position: relative;
+  z-index: 50;
+  overflow: hidden;
+}
+
+.life-categories::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="stars" x="0" y="0" width="15" height="15" patternUnits="userSpaceOnUse"><circle cx="7.5" cy="7.5" r="0.8" fill="%23ffffff" opacity="0.3"/></pattern></defs><rect width="100" height="100" fill="url(%23stars)"/></svg>');
+  pointer-events: none;
+}
+
+.life-categories-header {
+  text-align: center;
+  margin-bottom: 25px;
+  position: relative;
+  z-index: 10;
+}
+
+.life-categories-header h3 {
+  color: white;
+  font-size: 1.8rem;
+  margin: 0 0 8px 0;
+  font-weight: bold;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.life-categories-header p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+  margin: 0;
+  font-style: italic;
+}
+
+.life-categories-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  position: relative;
+  z-index: 10;
+}
+
+.life-category {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 15px;
+  padding: 20px 15px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.life-category::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.life-category:hover::before {
+  left: 100%;
+}
+
+.life-category:hover {
+  transform: translateY(-5px);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.category-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.category-content h4 {
+  color: white;
+  font-size: 1.1rem;
+  margin: 0 0 5px 0;
+  font-weight: bold;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.category-content p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.category-arrow {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.2rem;
+  transition: all 0.3s;
+}
+
+.life-category:hover .category-arrow {
+  color: white;
+  transform: translateX(3px);
+}
+
+@media (max-width: 768px) {
+  .life-categories-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+  
+  .life-categories-header h3 {
+    font-size: 1.5rem;
+  }
+  
+  .category-icon {
+    font-size: 2rem;
+  }
+  
+  .life-category {
+    padding: 15px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .life-categories-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 }
