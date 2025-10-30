@@ -216,7 +216,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category">
+            <div className="life-category" onClick={() => user ? onLogin() : onLogin()}>
               <div className="category-icon">🎓</div>
               <div className="category-content">
                 <h4>Your Education</h4>
@@ -224,7 +224,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category">
+            <div className="life-category" onClick={() => user ? onLogin() : onLogin()}>
               <div className="category-icon">🌿</div>
               <div className="category-content">
                 <h4>Your Health</h4>
@@ -232,7 +232,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category">
+            <div className="life-category" onClick={() => user ? onLogin() : onLogin()}>
               <div className="category-icon">💎</div>
               <div className="category-content">
                 <h4>Your Wealth</h4>

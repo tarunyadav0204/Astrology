@@ -96,15 +96,15 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             <li className="dropdown">
               <a href="#yourlife" className="dropdown-toggle">Your Life</a>
               <div className="dropdown-content">
-                <a href="/#career">💼 Your Career</a>
-                <a href="/#marriage">💍 Your Marriage</a>
-                <a href="/#education">🎓 Your Education</a>
-                <a href="/#health">🏥 Your Health</a>
-                <a href="/#wealth">💰 Your Wealth</a>
+                <button onClick={() => user ? navigate('/career-guidance') : onLogin()}>💼 Your Career</button>
+                <button onClick={() => user ? navigate('/marriage-analysis') : onLogin()}>💍 Your Marriage</button>
+                <button onClick={() => user ? onLogin() : onLogin()}>🎓 Your Education</button>
+                <button onClick={() => user ? onLogin() : onLogin()}>🏥 Your Health</button>
+                <button onClick={() => user ? onLogin() : onLogin()}>💰 Your Wealth</button>
               </div>
             </li>
-            <li><button onClick={() => navigate('/panchang')}>Panchang</button></li>
-            <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
+            <li><button onClick={() => user ? navigate('/panchang') : onLogin()}>Panchang</button></li>
+            <li><button onClick={() => user ? navigate('/muhurat-finder') : onLogin()}>Muhurat Finder</button></li>
             <li><a href="/#calculators">Calculators</a></li>
           </ul>
         </div>
