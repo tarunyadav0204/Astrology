@@ -19,6 +19,7 @@ import HoroscopePage from './components/Horoscope/HoroscopePage';
 import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
 import MarriageAnalysisPage from './components/MarriageAnalysisPage/MarriageAnalysisPage';
 import CareerGuidancePage from './components/CareerGuidancePage/CareerGuidancePage';
+import PanchangPage from './components/Panchang/PanchangPage';
 import AdminPanel from './components/Admin/AdminPanel';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
@@ -341,6 +342,13 @@ function App() {
                 showLoginButton={true} 
               />
             } />
+            <Route path="/panchang" element={
+              <PanchangPage 
+                user={null} 
+                onLogin={() => setShowLoginModal(true)} 
+                showLoginButton={true} 
+              />
+            } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <ToastContainer />
@@ -363,6 +371,13 @@ function App() {
           } />
           <Route path="/career-guidance" element={
             <CareerGuidancePage 
+              user={user} 
+              onLogout={handleLogout} 
+              onAdminClick={handleAdminClick} 
+            />
+          } />
+          <Route path="/panchang" element={
+            <PanchangPage 
               user={user} 
               onLogout={handleLogout} 
               onAdminClick={handleAdminClick} 

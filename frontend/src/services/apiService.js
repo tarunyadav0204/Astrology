@@ -393,5 +393,60 @@ export const apiService = {
       birth_data: birthData
     });
     return response.data;
+  },
+  
+  // Panchang APIs
+  calculateSunriseSunset: async (date, latitude, longitude) => {
+    const response = await apiClient.post(getEndpoint('/calculate-sunrise-sunset'), {
+      date: date,
+      latitude: latitude,
+      longitude: longitude
+    });
+    return response.data;
+  },
+  
+  calculateMoonPhase: async (date) => {
+    const response = await apiClient.post(getEndpoint('/calculate-moon-phase'), {
+      date: date
+    });
+    return response.data;
+  },
+  
+  calculateInauspiciousTimes: async (date, latitude, longitude) => {
+    const response = await apiClient.post(getEndpoint('/calculate-inauspicious-times'), {
+      date: date,
+      latitude: latitude,
+      longitude: longitude
+    });
+    return response.data;
+  },
+  
+  getFestivals: async (date) => {
+    const response = await apiClient.get(getEndpoint(`/festivals/${date}`));
+    return response.data;
+  },
+  
+  calculateRahuKaal: async (date, latitude, longitude) => {
+    const response = await apiClient.post(getEndpoint('/calculate-rahu-kaal'), {
+      date: date,
+      latitude: latitude,
+      longitude: longitude
+    });
+    return response.data;
+  },
+  
+  calculateChoghadiya: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/choghadiya')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+  
+  calculateHora: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/hora')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+  
+  calculateSpecialMuhurtas: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/special-muhurtas')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
   }
 };

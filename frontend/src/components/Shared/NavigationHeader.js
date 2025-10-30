@@ -103,7 +103,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
                 <a href="/#wealth">💰 Your Wealth</a>
               </div>
             </li>
-            <li><a href="/#panchang">Panchang</a></li>
+            <li><button onClick={() => navigate('/panchang')}>Panchang</button></li>
             <li><a href="/#calculators">Calculators</a></li>
           </ul>
         </div>

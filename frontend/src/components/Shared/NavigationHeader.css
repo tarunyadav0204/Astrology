@@ -2,8 +2,10 @@
 .main-header {
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -240,15 +242,21 @@
   gap: 30px;
 }
 
-.nav-menu a {
+.nav-menu a,
+.nav-menu button {
   text-decoration: none;
   color: white;
   font-weight: 500;
   transition: all 0.3s;
   white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
 }
 
-.nav-menu a:hover {
+.nav-menu a:hover,
+.nav-menu button:hover {
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
   transform: translateY(-2px);
 }
@@ -436,11 +444,37 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     gap: 20px;
-    padding: 0 10px;
+    padding: 0 10px 8px 10px;
+  }
+  
+  .nav-menu::-webkit-scrollbar {
+    height: 3px;
+  }
+  
+  .nav-menu::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .nav-menu::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 3px;
   }
   
   .navigation .container {
     overflow-x: auto;
+  }
+  
+  .navigation .container::-webkit-scrollbar {
+    height: 3px;
+  }
+  
+  .navigation .container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .navigation .container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 3px;
   }
   
   .dropdown-content {
