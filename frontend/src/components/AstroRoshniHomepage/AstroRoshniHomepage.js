@@ -197,10 +197,10 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         <div className="container">
           <div className="life-categories-header">
             <h3>✨ Discover Your Life Path</h3>
-            <p>Unlock the secrets of your destiny</p>
+            <p>Unlock the secrets of your destiny with best in class Vedic Astrology</p>
           </div>
           <div className="life-categories-grid">
-            <div className="life-category" onClick={() => navigate('/career-guidance')}>
+            <div className="life-category" onClick={() => user ? navigate('/career-guidance') : onLogin()}>
               <div className="category-icon">💼</div>
               <div className="category-content">
                 <h4>Your Career</h4>
@@ -208,7 +208,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category" onClick={() => navigate('/marriage-analysis')}>
+            <div className="life-category" onClick={() => user ? navigate('/marriage-analysis') : onLogin()}>
               <div className="category-icon">💕</div>
               <div className="category-content">
                 <h4>Your Marriage</h4>
