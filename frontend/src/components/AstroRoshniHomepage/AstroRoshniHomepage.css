@@ -6,7 +6,7 @@
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   min-height: 100vh;
   position: relative;
-  padding: 0;
+  padding: 200px 0 0 0;
   margin: 0;
   width: 100%;
 }
@@ -1628,6 +1628,10 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  .investor-homepage {
+    padding: 150px 0 0 0;
+  }
+  
   .astroroshni-banner {
     grid-template-columns: 1fr;
     gap: 30px;

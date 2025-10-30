@@ -203,6 +203,10 @@
   gap: 6px;
 }
 
+.mobile-auth {
+  display: none;
+}
+
 .lang-btn {
   background: linear-gradient(135deg, #ff8a65 0%, #e91e63 100%);
   color: white;

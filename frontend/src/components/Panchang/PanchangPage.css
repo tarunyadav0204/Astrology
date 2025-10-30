@@ -108,28 +108,46 @@
 .panchang-header {
   background: white;
   border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-  padding: 15px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+  padding: 20px;
   margin-bottom: 20px;
 }
 
-.single-row-header {
+.header-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 15px;
 }
 
-.single-row-header .main-date {
-  margin-left: auto;
-  font-size: 1.2rem;
+.date-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.date-display {
+  text-align: center;
+  font-size: 1.3rem;
   color: #e91e63;
+  font-weight: 600;
+  margin: 0;
+}
+
+.location-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
 
 .date-navigation {
   display: flex;
   align-items: center;
   gap: 15px;
+  flex-shrink: 0;
 }
 
 .nav-btn {
@@ -178,6 +196,8 @@
   cursor: pointer;
   font-weight: 600;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .today-btn:hover {
@@ -202,6 +222,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .location-icon {
@@ -211,6 +233,7 @@
 .location-text {
   font-weight: 600;
   color: #333;
+  white-space: nowrap;
 }
 
 .change-location-btn {
@@ -1457,7 +1480,72 @@
   }
   
   .panchang-header {
-    padding: 20px;
+    padding: 15px;
+  }
+  
+  .planets-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  
+  .planet-card {
+    padding: 8px 4px;
+  }
+  
+  .planet-header .planet-name {
+    font-size: 10px;
+  }
+  
+  .planet-info .sign {
+    font-size: 9px;
+  }
+  
+  .planet-info .degree {
+    font-size: 8px;
+  }
+  
+  .header-row {
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .date-navigation {
+    gap: 6px;
+  }
+  
+  .nav-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  
+  .date-input {
+    width: 140px;
+    padding: 8px;
+    font-size: 16px;
+  }
+  
+  .today-btn {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  .calendar-select {
+    padding: 8px;
+    font-size: 14px;
+  }
+  
+  .date-display {
+    font-size: 1.1rem;
+  }
+  
+  .location-info {
+    font-size: 12px;
+  }
+  
+  .change-location-btn {
+    padding: 4px 8px;
+    font-size: 11px;
   }
   
   .date-controls {

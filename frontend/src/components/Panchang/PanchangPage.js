@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import NavigationHeader from '../Shared/NavigationHeader';
 import PanchangHeader from './components/PanchangHeader';
+import LocationFinder from './components/LocationFinder';
 import CorePanchangElements from './components/CorePanchangElements';
 import SunriseSunsetInfo from './components/SunriseSunsetInfo';
 import LunarInformation from './components/LunarInformation';
@@ -23,6 +24,7 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
   const [calendarSystem, setCalendarSystem] = useState(CALENDAR_SYSTEMS.GREGORIAN);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showLocationFinder, setShowLocationFinder] = useState(false);
   
   // Data states
   const [panchangData, setPanchangData] = useState(null);
@@ -122,9 +124,12 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
   };
 
   const handleLocationChange = () => {
-    // This would open a location picker modal
-    // For now, we'll just show a toast
-    toast.info('Location picker will be implemented');
+    setShowLocationFinder(true);
+  };
+  
+  const handleLocationSelect = (newLocation) => {
+    setLocation(newLocation);
+    toast.success(`Location changed to ${newLocation.name}`);
   };
 
   const handleCalendarSystemChange = (newSystem) => {
@@ -275,6 +280,13 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
 
         </div>
       </div>
+      
+      <LocationFinder
+        isOpen={showLocationFinder}
+        onClose={() => setShowLocationFinder(false)}
+        onLocationSelect={handleLocationSelect}
+        currentLocation={location}
+      />
     </div>
   );
 };

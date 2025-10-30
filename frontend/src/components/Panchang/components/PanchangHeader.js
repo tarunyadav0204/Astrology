@@ -31,20 +31,37 @@ const PanchangHeader = ({
 
   return (
     <div className="panchang-header">
-      <div className="single-row-header">
-        <button className="nav-btn" onClick={() => navigateDate(-1)}>←</button>
-        <input type="date" value={formatDateForCalendar(selectedDate)} onChange={handleDateChange} className="date-input" />
+      <div className="header-row">
+        <div className="date-navigation">
+          <button className="nav-btn" onClick={() => navigateDate(-1)}>←</button>
+          <input 
+            type="date" 
+            value={formatDateForCalendar(selectedDate)} 
+            onChange={handleDateChange} 
+            className="date-input" 
+          />
+          <button className="nav-btn" onClick={() => navigateDate(1)}>→</button>
+        </div>
         <button className="today-btn" onClick={goToToday}>Today</button>
-        <button className="nav-btn" onClick={() => navigateDate(1)}>→</button>
-        <select value={calendarSystem} onChange={(e) => onCalendarSystemChange(e.target.value)} className="calendar-select">
+        <select 
+          value={calendarSystem} 
+          onChange={(e) => onCalendarSystemChange(e.target.value)} 
+          className="calendar-select"
+        >
           <option value={CALENDAR_SYSTEMS.GREGORIAN}>Gregorian</option>
         </select>
-        <span className="location-icon">📍</span>
-        <span className="location-text">{location.name}</span>
-        <button className="change-location-btn" onClick={onLocationChange}>Change</button>
-        <h1 className="main-date">
-          {selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </h1>
+        <div className="location-info">
+          <span>📍 {location.name}</span>
+          <button className="change-location-btn" onClick={onLocationChange}>Change</button>
+        </div>
+      </div>
+      <div className="date-display">
+        {selectedDate.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        })}
       </div>
     </div>
   );

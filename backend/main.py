@@ -34,6 +34,7 @@ from auth import get_current_user as auth_get_current_user
 from app.kp.routes.kp_routes import router as kp_router
 from career_analysis.career_router import router as career_router
 from panchang.panchang_routes import router as panchang_router
+from panchang.muhurat_routes import router as muhurat_router
 import math
 from datetime import timedelta
 
@@ -75,6 +76,7 @@ app.include_router(classical_shadbala_router, prefix="/api")
 app.include_router(kp_router, prefix="/api")
 app.include_router(career_router, prefix="/api")
 app.include_router(panchang_router, prefix="/api")
+app.include_router(muhurat_router, prefix="/api")
 
 
 # Root endpoint for health check

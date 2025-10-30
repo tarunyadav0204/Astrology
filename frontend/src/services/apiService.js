@@ -448,5 +448,26 @@ export const apiService = {
   calculateSpecialMuhurtas: async (date, latitude, longitude) => {
     const response = await apiClient.get(`${getEndpoint('/special-muhurtas')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
     return response.data;
+  },
+  
+  // Muhurat APIs
+  getVivahMuhurat: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/vivah-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+  
+  getPropertyMuhurat: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/property-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+  
+  getVehicleMuhurat: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/vehicle-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+  
+  getGrihaPraveshMuhurat: async (date, latitude, longitude) => {
+    const response = await apiClient.get(`${getEndpoint('/griha-pravesh-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
   }
 };
