@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
+import AIInsightsTab from '../Health/AIInsightsTab';
 import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
@@ -12,6 +13,7 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
   const [showForm, setShowForm] = useState(!chartData || !birthData);
+  const [activeTab, setActiveTab] = useState('insights');
 
   const handleAdminClick = () => {
     if (onAdminClick) {
@@ -60,7 +62,29 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
                 onNativeChange={() => window.location.reload()}
               />
               <div className="analysis-section">
-                <CompleteHealthAnalysisTab chartData={chartData} birthDetails={birthData} />
+                <div className="tab-navigation">
+                  <button 
+                    className={`tab-btn ${activeTab === 'insights' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('insights')}
+                  >
+                    Personalized Health Insights
+                  </button>
+                  <button 
+                    className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('detailed')}
+                  >
+                    Detailed Technical Analysis
+                  </button>
+                </div>
+                
+                <div className="tab-content">
+                  {activeTab === 'insights' && (
+                    <AIInsightsTab chartData={chartData} birthDetails={birthData} />
+                  )}
+                  {activeTab === 'detailed' && (
+                    <CompleteHealthAnalysisTab chartData={chartData} birthDetails={birthData} />
+                  )}
+                </div>
               </div>
             </>
           )}

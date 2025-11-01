@@ -1,0 +1,373 @@
+.ai-insights-tab {
+  padding: 0;
+  width: 100%;
+  margin: 0;
+}
+
+.ai-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 25px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 15px;
+  color: #2c3e50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid #dee2e6;
+}
+
+.ai-header h3 {
+  margin-bottom: 10px;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.ai-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin-bottom: 15px;
+}
+
+.cache-indicator {
+  margin-top: 10px;
+}
+
+.cache-badge {
+  background: rgba(44, 62, 80, 0.1);
+  color: #2c3e50;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.insights-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.insight-card {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8ecf0;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.insight-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+.insight-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--card-accent);
+}
+
+.overview-card {
+  --card-accent: #27ae60;
+}
+
+.constitution-card {
+  --card-accent: #3498db;
+}
+
+.health-areas-card {
+  --card-accent: #e67e22;
+}
+
+.lifestyle-card {
+  --card-accent: #8e44ad;
+}
+
+.preventive-card {
+  --card-accent: #e74c3c;
+}
+
+.positive-card {
+  --card-accent: #16a085;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.card-icon {
+  font-size: 2.8rem;
+  margin-right: 18px;
+  color: var(--card-accent);
+  animation: iconGlow 3s ease-in-out infinite;
+  transition: transform 0.3s ease;
+  text-shadow: 0 0 10px var(--card-accent), 0 0 20px var(--card-accent), 0 0 30px var(--card-accent);
+  filter: drop-shadow(0 0 8px var(--card-accent));
+}
+
+.card-icon:hover {
+  transform: scale(1.2);
+  animation-play-state: paused;
+  text-shadow: 0 0 15px var(--card-accent), 0 0 25px var(--card-accent), 0 0 35px var(--card-accent);
+}
+
+@keyframes iconGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    text-shadow: 0 0 10px var(--card-accent), 0 0 20px var(--card-accent), 0 0 30px var(--card-accent);
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.9;
+    text-shadow: 0 0 20px var(--card-accent), 0 0 30px var(--card-accent), 0 0 40px var(--card-accent);
+  }
+}
+
+.card-header h4 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.card-content {
+  line-height: 1.7;
+  text-align: left;
+}
+
+.card-content p {
+  margin: 0;
+  color: #4a5568;
+  font-size: 1.05rem;
+  text-align: left;
+}
+
+.insight-list {
+  text-align: left;
+}
+
+.insight-list li {
+  text-align: left;
+}
+
+/* Style bold headings in content */
+.card-content p strong,
+.insight-list li strong {
+  color: #2c3e50;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* Handle markdown-style bold text */
+.card-content p,
+.insight-list li {
+  white-space: pre-wrap;
+}
+
+.card-content p::before,
+.insight-list li::before {
+  content: '';
+}
+
+/* Convert **text** to bold styling */
+.card-content,
+.insight-list {
+  font-family: inherit;
+}
+
+.card-content p,
+.insight-list li {
+  line-height: 1.6;
+}
+
+.insight-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.insight-list li {
+  padding: 15px 0;
+  border-bottom: 1px solid #f8f9fa;
+  color: #4a5568;
+  font-size: 1rem;
+  line-height: 1.6;
+  position: relative;
+  padding-left: 30px;
+}
+
+.insight-list li:before {
+  content: "●";
+  position: absolute;
+  left: 0;
+  color: var(--card-accent);
+  font-weight: bold;
+  font-size: 1.2rem;
+  top: 15px;
+}
+
+.insight-list li:last-child {
+  border-bottom: none;
+}
+
+.ai-footer {
+  text-align: center;
+  padding: 25px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 15px;
+  margin-top: 40px;
+  border: 1px solid #dee2e6;
+}
+
+.ai-disclaimer {
+  color: #6c757d;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+  font-style: italic;
+}
+
+.regenerate-btn {
+  background: #2c3e50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 15px;
+  transition: background 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.regenerate-btn:hover {
+  background: #34495e;
+  transform: translateY(-1px);
+}
+
+/* Loading States */
+.loading-state, .error-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.ai-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #e9ecef;
+  border-top: 4px solid #2c3e50;
+  border-radius: 50%;
+  animation: ai-spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes ai-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #2c3e50;
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-top: 15px;
+}
+
+.loading-steps {
+  margin: 30px 0;
+  text-align: left;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.step {
+  padding: 12px 20px;
+  margin: 8px 0;
+  background: #f8f9fa;
+  border-radius: 25px;
+  border-left: 4px solid #4CAF50;
+  font-size: 0.95rem;
+  animation: pulse 2s infinite;
+  opacity: 0.7;
+}
+
+.step.active {
+  opacity: 1;
+  background: #e8f5e8;
+}
+
+.loading-message {
+  margin-top: 30px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #666;
+  font-style: italic;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.error-state h3 {
+  color: #e74c3c;
+  margin-bottom: 15px;
+}
+
+.error-state button {
+  background: #2c3e50;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 15px;
+  transition: background 0.2s ease;
+}
+
+.error-state button:hover {
+  background: #34495e;
+}
+
+
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .ai-header {
+    padding: 20px;
+  }
+  
+  .ai-header h3 {
+    font-size: 1.6rem;
+  }
+  
+  .insight-card {
+    padding: 25px;
+  }
+  
+  .card-header h4 {
+    font-size: 1.2rem;
+  }
+  
+  .card-icon {
+    font-size: 2rem;
+    margin-right: 15px;
+  }
+}

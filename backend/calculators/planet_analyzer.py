@@ -319,55 +319,44 @@ class PlanetAnalyzer(BaseCalculator):
         }
     
     def _calculate_overall_assessment(self, analysis):
-        """Calculate overall planet assessment"""
-        strength_score = 0
+        """Calculate overall planet assessment using classical Vedic principles"""
+        planet_name = analysis['basic_info']['planet']
         
-        # Dignity contribution
-        dignity = analysis['dignity_analysis']['dignity']
-        if dignity == 'exalted':
-            strength_score += 30
-        elif dignity == 'own_sign':
-            strength_score += 20
-        elif dignity == 'moolatrikona':
-            strength_score += 25
-        elif dignity == 'debilitated':
-            strength_score -= 25
+        # Classical assessment factors
+        dignity_assessment = self._assess_dignity_strength(analysis)
+        shadbala_assessment = self._assess_shadbala_strength(analysis)
+        house_assessment = self._assess_house_placement(analysis)
+        aspectual_assessment = self._assess_aspectual_effects(analysis)
+        conjunction_assessment = self._assess_conjunction_effects(analysis)
+        avastha_assessment = self._assess_avastha_conditions(analysis)
         
-        # Shadbala contribution
-        shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
-        strength_score += min(shadbala_rupas * 5, 30)
+        # Calculate composite score using classical weightings
+        total_score = (
+            dignity_assessment['value'] * 0.25 +
+            shadbala_assessment['value'] * 0.20 +
+            house_assessment['value'] * 0.20 +
+            aspectual_assessment['value'] * 0.15 +
+            conjunction_assessment['value'] * 0.10 +
+            avastha_assessment['value'] * 0.10
+        )
         
-        # House position contribution
-        house_types = analysis['house_position_analysis']['house_types']
-        if 'Kendra' in house_types:
-            strength_score += 15
-        if 'Trikona' in house_types:
-            strength_score += 20
-        if 'Dusthana' in house_types:
-            strength_score -= 10
-        
-        # Combustion penalty
-        if analysis['combustion_status']['is_combust']:
-            strength_score -= 20
-        elif analysis['combustion_status']['is_cazimi']:
-            strength_score += 15
-        
-        # Conjunction effects
-        conjunction_effect = analysis['conjunctions']['overall_conjunction_effect']
-        if conjunction_effect == 'beneficial':
-            strength_score += 10
-        elif conjunction_effect == 'harmful':
-            strength_score -= 10
-        
-        # Normalize score
-        strength_score = max(0, min(100, strength_score))
+        # Classical grading (Uttama/Madhyama/Adhama)
+        classical_grade = self._determine_classical_grade(total_score, planet_name)
         
         return {
-            'overall_strength_score': strength_score,
-            'overall_grade': self._get_overall_grade(strength_score),
-            'key_strengths': self._identify_key_strengths(analysis),
-            'key_weaknesses': self._identify_key_weaknesses(analysis),
-            'recommendations': self._get_recommendations(analysis)
+            'overall_strength_score': round(total_score, 1),
+            'classical_grade': classical_grade,
+            'assessment_factors': {
+                'dignity': dignity_assessment,
+                'shadbala': shadbala_assessment,
+                'house_placement': house_assessment,
+                'aspectual_effects': aspectual_assessment,
+                'conjunction_effects': conjunction_assessment,
+                'avastha_conditions': avastha_assessment
+            },
+            'key_strengths': self._identify_classical_strengths(analysis),
+            'key_weaknesses': self._identify_classical_weaknesses(analysis),
+            'vedic_recommendations': self._get_vedic_recommendations(analysis)
         }
     
     # Helper methods
@@ -804,71 +793,267 @@ class PlanetAnalyzer(BaseCalculator):
         effect = aspect['effect']
         return 'beneficial' in effect.lower() or aspect.get('effect_score', 0) > 0
     
-    def _get_overall_grade(self, score):
-        """Get overall grade from score"""
-        if score >= 80:
-            return 'Excellent'
-        elif score >= 65:
-            return 'Very Good'
-        elif score >= 50:
-            return 'Good'
-        elif score >= 35:
-            return 'Average'
+    def _assess_dignity_strength(self, analysis):
+        """Assess planetary dignity using classical principles"""
+        dignity = analysis['dignity_analysis']['dignity']
+        
+        if dignity == 'exalted':
+            return {'value': 100, 'reasoning': 'Exalted - highest dignity, maximum strength'}
+        elif dignity == 'moolatrikona':
+            return {'value': 85, 'reasoning': 'Moolatrikona - root trine, excellent strength'}
+        elif dignity == 'own_sign':
+            return {'value': 75, 'reasoning': 'Own sign - comfortable and strong'}
+        elif dignity == 'debilitated':
+            return {'value': 15, 'reasoning': 'Debilitated - weakest dignity, major challenges'}
         else:
-            return 'Weak'
+            return {'value': 50, 'reasoning': 'Neutral dignity - moderate strength'}
     
-    def _identify_key_strengths(self, analysis):
-        """Identify key strengths"""
+    def _assess_shadbala_strength(self, analysis):
+        """Assess Shadbala strength using classical thresholds"""
+        planet_name = analysis['basic_info']['planet']
+        
+        # Rahu/Ketu don't have Shadbala in classical tradition
+        if planet_name in ['Rahu', 'Ketu']:
+            return {'value': 50, 'reasoning': 'Shadbala not applicable for shadow planets'}
+        
+        shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
+        
+        if shadbala_rupas >= 6:
+            return {'value': 90, 'reasoning': f'Excellent Shadbala ({shadbala_rupas:.2f} rupas) - highly capable'}
+        elif shadbala_rupas >= 4.5:
+            return {'value': 75, 'reasoning': f'Good Shadbala ({shadbala_rupas:.2f} rupas) - capable of results'}
+        elif shadbala_rupas >= 3:
+            return {'value': 55, 'reasoning': f'Average Shadbala ({shadbala_rupas:.2f} rupas) - moderate capability'}
+        else:
+            return {'value': 30, 'reasoning': f'Weak Shadbala ({shadbala_rupas:.2f} rupas) - struggles to give results'}
+    
+    def _assess_house_placement(self, analysis):
+        """Assess house placement using classical house classifications"""
+        house_types = analysis['house_position_analysis']['house_types']
+        house_number = analysis['house_position_analysis']['house_number']
+        
+        if 'Trikona' in house_types and house_number != 1:
+            return {'value': 95, 'reasoning': 'Trikona house (5th/9th) - most auspicious placement'}
+        elif house_number == 1:
+            return {'value': 85, 'reasoning': '1st house - Kendra and Trikona, excellent for self-expression'}
+        elif 'Kendra' in house_types:
+            return {'value': 75, 'reasoning': 'Kendra house - strong angular placement'}
+        elif 'Upachaya' in house_types and house_number in [10, 11]:
+            return {'value': 70, 'reasoning': 'Upachaya house (10th/11th) - grows with time'}
+        elif house_number in [2, 3]:
+            return {'value': 60, 'reasoning': 'Neutral house - moderate results'}
+        elif 'Dusthana' in house_types:
+            return {'value': 25, 'reasoning': 'Dusthana house - challenging placement'}
+        else:
+            return {'value': 50, 'reasoning': 'Neutral house placement'}
+    
+    def _assess_aspectual_effects(self, analysis):
+        """Assess aspectual effects on planet"""
+        aspects_data = analysis['aspects_received']
+        
+        if not aspects_data['has_aspects']:
+            return {'value': 50, 'reasoning': 'No aspects received - neutral'}
+        
+        benefic_count = len(aspects_data['benefic_aspects'])
+        malefic_count = len(aspects_data['malefic_aspects'])
+        
+        net_effect = benefic_count - malefic_count
+        
+        if net_effect >= 2:
+            return {'value': 80, 'reasoning': f'Strong benefic aspects ({benefic_count} benefic, {malefic_count} malefic)'}
+        elif net_effect == 1:
+            return {'value': 65, 'reasoning': f'Mild benefic aspects ({benefic_count} benefic, {malefic_count} malefic)'}
+        elif net_effect == 0:
+            return {'value': 50, 'reasoning': f'Balanced aspects ({benefic_count} benefic, {malefic_count} malefic)'}
+        elif net_effect == -1:
+            return {'value': 35, 'reasoning': f'Mild malefic aspects ({benefic_count} benefic, {malefic_count} malefic)'}
+        else:
+            return {'value': 20, 'reasoning': f'Strong malefic aspects ({benefic_count} benefic, {malefic_count} malefic)'}
+    
+    def _assess_conjunction_effects(self, analysis):
+        """Assess conjunction effects using classical principles"""
+        conjunctions_data = analysis['conjunctions']
+        
+        if not conjunctions_data['has_conjunctions']:
+            return {'value': 50, 'reasoning': 'No conjunctions - neutral'}
+        
+        conjunctions = conjunctions_data['conjunctions']
+        benefic_conjunctions = [c for c in conjunctions if c['type'] == 'benefic']
+        malefic_conjunctions = [c for c in conjunctions if c['type'] == 'malefic']
+        
+        # Multiple malefic conjunctions significantly compromise planet
+        if len(malefic_conjunctions) >= 2:
+            return {'value': 20, 'reasoning': f'Multiple malefic conjunctions ({len(malefic_conjunctions)}) - severely compromised'}
+        elif len(malefic_conjunctions) == 1 and len(benefic_conjunctions) == 0:
+            return {'value': 35, 'reasoning': 'Single malefic conjunction - moderately afflicted'}
+        elif len(benefic_conjunctions) >= 2:
+            return {'value': 75, 'reasoning': f'Multiple benefic conjunctions ({len(benefic_conjunctions)}) - enhanced'}
+        elif len(benefic_conjunctions) == 1 and len(malefic_conjunctions) == 0:
+            return {'value': 65, 'reasoning': 'Single benefic conjunction - mildly enhanced'}
+        else:
+            return {'value': 45, 'reasoning': 'Mixed conjunctions - variable effects'}
+    
+    def _assess_avastha_conditions(self, analysis):
+        """Assess Avastha (planetary states) conditions"""
+        conditions = []
+        score = 50
+        
+        # Combustion analysis
+        if analysis['combustion_status']['is_combust']:
+            score -= 25
+            conditions.append('Combust')
+        elif analysis['combustion_status']['is_cazimi']:
+            score += 20
+            conditions.append('Cazimi')
+        
+        # Retrograde analysis
+        planet_name = analysis['basic_info']['planet']
+        if analysis['retrograde_analysis']['is_retrograde']:
+            if planet_name in ['Jupiter', 'Venus']:
+                score += 10
+                conditions.append('Retrograde (beneficial)')
+            elif planet_name in ['Mercury', 'Mars', 'Saturn']:
+                score -= 10
+                conditions.append('Retrograde (challenging)')
+        
+        # Gandanta analysis
+        gandanta_data = analysis.get('gandanta_analysis', {})
+        if gandanta_data.get('is_gandanta'):
+            intensity = gandanta_data.get('intensity', 'medium')
+            if intensity == 'high':
+                score -= 20
+                conditions.append('Gandanta (high intensity)')
+            elif intensity == 'medium':
+                score -= 10
+                conditions.append('Gandanta (medium intensity)')
+            else:
+                score -= 5
+                conditions.append('Gandanta (low intensity)')
+        
+        reasoning = f"Avastha conditions: {', '.join(conditions) if conditions else 'Normal states'}"
+        return {'value': max(10, min(90, score)), 'reasoning': reasoning}
+    
+    def _determine_classical_grade(self, total_score, planet_name):
+        """Determine classical grade (Uttama/Madhyama/Adhama)"""
+        # Rahu/Ketu use different thresholds due to lack of Shadbala
+        if planet_name in ['Rahu', 'Ketu']:
+            if total_score >= 70:
+                return 'Uttama (Excellent)'
+            elif total_score >= 45:
+                return 'Madhyama (Moderate)'
+            else:
+                return 'Adhama (Weak)'
+        else:
+            if total_score >= 75:
+                return 'Uttama (Excellent)'
+            elif total_score >= 50:
+                return 'Madhyama (Moderate)'
+            else:
+                return 'Adhama (Weak)'
+    
+    def _identify_classical_strengths(self, analysis):
+        """Identify key strengths using classical principles"""
         strengths = []
         
-        if analysis['dignity_analysis']['dignity'] in ['exalted', 'own_sign', 'moolatrikona']:
-            strengths.append(f"Strong dignity: {analysis['dignity_analysis']['dignity']}")
+        # Dignity strengths
+        dignity = analysis['dignity_analysis']['dignity']
+        if dignity in ['exalted', 'moolatrikona', 'own_sign']:
+            strengths.append(f"Excellent dignity ({dignity})")
         
-        if analysis['strength_analysis']['shadbala_rupas'] >= 5:
-            strengths.append(f"Good Shadbala strength: {analysis['strength_analysis']['shadbala_rupas']:.1f} rupas")
+        # Shadbala strengths
+        shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
+        if shadbala_rupas >= 5:
+            strengths.append(f"Strong Shadbala ({shadbala_rupas:.1f} rupas)")
         
+        # House placement strengths
         house_types = analysis['house_position_analysis']['house_types']
-        if 'Kendra' in house_types or 'Trikona' in house_types:
-            strengths.append(f"Favorable house position: {', '.join(house_types)}")
+        if 'Trikona' in house_types:
+            strengths.append("Trikona house placement")
+        elif 'Kendra' in house_types:
+            strengths.append("Kendra house placement")
         
+        # Aspectual strengths
+        benefic_aspects = len(analysis['aspects_received']['benefic_aspects'])
+        if benefic_aspects >= 2:
+            strengths.append(f"Multiple benefic aspects ({benefic_aspects})")
+        
+        # Conjunction strengths
+        benefic_conjunctions = [c for c in analysis['conjunctions']['conjunctions'] if c['type'] == 'benefic']
+        if len(benefic_conjunctions) >= 1:
+            strengths.append(f"Benefic conjunctions ({len(benefic_conjunctions)})")
+        
+        # Special conditions
         if analysis['combustion_status']['is_cazimi']:
-            strengths.append("Cazimi status enhances planet")
+            strengths.append("Cazimi empowerment")
         
         return strengths
     
-    def _identify_key_weaknesses(self, analysis):
-        """Identify key weaknesses"""
+    def _identify_classical_weaknesses(self, analysis):
+        """Identify key weaknesses using classical principles"""
         weaknesses = []
         
+        # Dignity weaknesses
         if analysis['dignity_analysis']['dignity'] == 'debilitated':
             weaknesses.append("Debilitated dignity")
         
-        if analysis['strength_analysis']['shadbala_rupas'] < 3:
-            weaknesses.append(f"Weak Shadbala strength: {analysis['strength_analysis']['shadbala_rupas']:.1f} rupas")
+        # Shadbala weaknesses
+        shadbala_rupas = analysis['strength_analysis']['shadbala_rupas']
+        if shadbala_rupas < 3 and analysis['basic_info']['planet'] not in ['Rahu', 'Ketu']:
+            weaknesses.append(f"Weak Shadbala ({shadbala_rupas:.1f} rupas)")
         
+        # House placement weaknesses
         if 'Dusthana' in analysis['house_position_analysis']['house_types']:
-            weaknesses.append("Placed in Dusthana house")
+            weaknesses.append("Dusthana house placement")
         
+        # Aspectual weaknesses
+        malefic_aspects = len(analysis['aspects_received']['malefic_aspects'])
+        if malefic_aspects >= 2:
+            weaknesses.append(f"Multiple malefic aspects ({malefic_aspects})")
+        
+        # Conjunction weaknesses
+        malefic_conjunctions = [c for c in analysis['conjunctions']['conjunctions'] if c['type'] == 'malefic']
+        if len(malefic_conjunctions) >= 2:
+            weaknesses.append(f"Multiple malefic conjunctions ({len(malefic_conjunctions)})")
+        
+        # Avastha weaknesses
         if analysis['combustion_status']['is_combust']:
-            weaknesses.append("Combust by Sun")
+            weaknesses.append("Combustion by Sun")
+        
+        gandanta_data = analysis.get('gandanta_analysis', {})
+        if gandanta_data.get('is_gandanta') and gandanta_data.get('intensity') == 'high':
+            weaknesses.append("High intensity Gandanta")
         
         return weaknesses
     
-    def _get_recommendations(self, analysis):
-        """Get recommendations for planet strengthening"""
+    def _get_vedic_recommendations(self, analysis):
+        """Get Vedic recommendations based on classical assessment"""
         recommendations = []
+        planet_name = analysis['basic_info']['planet']
         
+        # Dignity-based recommendations
         if analysis['dignity_analysis']['dignity'] == 'debilitated':
-            recommendations.append("Consider remedies for debilitated planet")
+            recommendations.append(f"Perform {planet_name} strengthening remedies (mantras, gemstones, charity)")
         
-        if analysis['strength_analysis']['shadbala_rupas'] < 4:
-            recommendations.append("Strengthen planet through appropriate remedies")
+        # Shadbala-based recommendations
+        if analysis['strength_analysis']['shadbala_rupas'] < 4 and planet_name not in ['Rahu', 'Ketu']:
+            recommendations.append(f"Enhance {planet_name} through appropriate Vedic practices")
         
+        # House-based recommendations
+        if 'Dusthana' in analysis['house_position_analysis']['house_types']:
+            recommendations.append(f"Practice patience with {planet_name} matters, focus on spiritual growth")
+        
+        # Combustion recommendations
         if analysis['combustion_status']['is_combust']:
-            recommendations.append("Wait for planet to move away from Sun for better results")
+            recommendations.append(f"Avoid major {planet_name}-related decisions during combustion period")
         
+        # Gandanta recommendations
+        gandanta_data = analysis.get('gandanta_analysis', {})
+        if gandanta_data.get('is_gandanta'):
+            recommendations.append(f"Perform Gandanta remedies for {planet_name} (Mrityunjaya mantra, spiritual practices)")
+        
+        # General recommendations
         if not recommendations:
-            recommendations.append("Planet is well-placed, maintain positive practices")
+            recommendations.append(f"{planet_name} is well-placed, continue positive practices and maintain dharmic lifestyle")
         
         return recommendations
     

@@ -547,128 +547,109 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
                         </div>
                         <div 
                           className={`strength-badge clickable ${(() => {
-                            const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
-                            const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
-                            const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
-                            
-                            // Reduce effective strength if conjunct with multiple malefics
-                            if (maleficConjunctions.length >= 2 && shadbala >= 5) {
-                              return 'moderate'; // Downgrade from strong to moderate
-                            } else if (maleficConjunctions.length >= 3 && shadbala >= 3) {
-                              return 'weak'; // Downgrade from moderate to weak
-                            } else if (shadbala >= 5) {
-                              return 'strong';
-                            } else if (shadbala >= 3) {
-                              return 'moderate';
-                            } else {
-                              return 'weak';
-                            }
+                            const classicalGrade = analysis.basic_analysis?.overall_assessment?.classical_grade;
+                            if (classicalGrade?.includes('Uttama')) return 'uttama';
+                            if (classicalGrade?.includes('Madhyama')) return 'madhyama';
+                            return 'adhama';
                           })()}`}
                           onClick={() => openModal(
-                            `${planet} Strength Calculation`,
+                            `${planet} Classical Assessment`,
                             <div className="calculation-details">
-                              <h4>Shadbala (Six-fold Strength) Breakdown</h4>
-                              {analysis.basic_analysis?.strength_analysis?.shadbala_breakdown && (
-                                <div className="shadbala-breakdown">
-                                  {Object.entries(analysis.basic_analysis.strength_analysis.shadbala_breakdown).map(([component, value]) => (
-                                    <div key={component} className="shadbala-component">
-                                      <div className="component-header">
-                                        <strong>{component.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
-                                        <span className="component-value">{value?.toFixed(2) || 0} rupas</span>
-                                      </div>
+                              <h4>Classical Vedic Planetary Assessment</h4>
+                              
+                              {analysis.basic_analysis?.overall_assessment?.assessment_factors && (
+                                <div className="assessment-factors">
+                                  <h5>Assessment Factors</h5>
+                                  <div className="factors-visual">
+                                    <div className="factor-bars">
+                                      {Object.entries(analysis.basic_analysis.overall_assessment.assessment_factors).map(([factor, data]) => (
+                                        <div key={factor} className="factor-bar">
+                                          <div className="factor-name">{factor.replace(/_/g, ' ')}</div>
+                                          <div className="progress-bar">
+                                            <div 
+                                              className="progress-fill" 
+                                              style={{width: `${data.value}%`}}
+                                            />
+                                          </div>
+                                          <div className="factor-score">{data.value?.toFixed(0)}/100</div>
+                                          <div className="factor-reasoning">{data.reasoning}</div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
-                                  <div className="total-shadbala">
-                                    <strong>Total Shadbala: {analysis.basic_analysis.strength_analysis.shadbala_rupas?.toFixed(2)} rupas</strong>
                                   </div>
                                 </div>
                               )}
                               
-                              <div className="strength-factors">
-                                <h5>Strength Assessment Factors</h5>
-                                <div className="factor-list">
-                                  <div className="factor-item">
-                                    <strong>Base Shadbala:</strong> {analysis.basic_analysis?.strength_analysis?.shadbala_rupas?.toFixed(2)} rupas
-                                  </div>
-                                  <div className="factor-item">
-                                    <strong>Dignity:</strong> {analysis.basic_analysis?.dignity_analysis?.dignity || 'neutral'}
-                                  </div>
-                                  <div className="factor-item">
-                                    <strong>House Placement:</strong> {analysis.basic_analysis?.basic_info?.house}th house
-                                  </div>
-                                  {analysis.basic_analysis?.conjunctions?.has_conjunctions && (
-                                    <div className="factor-item">
-                                      <strong>Conjunctions:</strong> {analysis.basic_analysis.conjunctions.conjunctions.map(c => c.planet).join(', ')}
-                                      {(() => {
-                                        const conjunctions = analysis.basic_analysis.conjunctions.conjunctions || [];
-                                        const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
-                                        if (maleficConjunctions.length >= 2) {
-                                          return <span className="affliction-note"> (Multiple malefic conjunctions reduce effective strength)</span>;
-                                        }
-                                        return null;
-                                      })()
-                                      }
-                                    </div>
-                                  )}
-                                  {analysis.basic_analysis?.combustion_status?.is_combust && (
-                                    <div className="factor-item">
-                                      <strong>Combustion:</strong> Combust (reduces strength)
-                                    </div>
-                                  )}
+                              <div className="final-assessment">
+                                <h5>Final Classical Assessment</h5>
+                                <div className="assessment-result">
+                                  <p><strong>Grade:</strong> {analysis.basic_analysis?.overall_assessment?.classical_grade}</p>
+                                  <p><strong>Overall Score:</strong> {analysis.basic_analysis?.overall_assessment?.overall_strength_score}/100</p>
                                 </div>
                               </div>
                               
-                              <div className="strength-interpretation">
-                                <h5>Classical Strength Interpretation</h5>
-                                <div className="interpretation-grid">
-                                  <div className="strength-range">
-                                    <strong>6+ rupas:</strong> Uttama (Excellent) - Planet gives full results
-                                  </div>
-                                  <div className="strength-range">
-                                    <strong>4-6 rupas:</strong> Madhyama (Average) - Planet gives moderate results
-                                  </div>
-                                  <div className="strength-range">
-                                    <strong>&lt;4 rupas:</strong> Adhama (Weak) - Planet struggles to give results
-                                  </div>
+                              {analysis.basic_analysis?.overall_assessment?.key_strengths?.length > 0 && (
+                                <div className="key-points">
+                                  <h5>Key Strengths</h5>
+                                  <ul>
+                                    {analysis.basic_analysis.overall_assessment.key_strengths.map((strength, idx) => (
+                                      <li key={idx} className="strength-point">{strength}</li>
+                                    ))}
+                                  </ul>
                                 </div>
-                                <div className="current-assessment">
-                                  <p><strong>Current Assessment:</strong> {(() => {
-                                    const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
-                                    const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
-                                    const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
-                                    
-                                    if (maleficConjunctions.length >= 2 && shadbala >= 5) {
-                                      return `Afflicted - Good Shadbala (${shadbala.toFixed(1)} rupas) but compromised by ${maleficConjunctions.length} malefic conjunctions`;
-                                    } else if (shadbala >= 6) {
-                                      return `Uttama (Excellent) - ${shadbala.toFixed(1)} rupas`;
-                                    } else if (shadbala >= 4) {
-                                      return `Madhyama (Average) - ${shadbala.toFixed(1)} rupas`;
-                                    } else {
-                                      return `Adhama (Weak) - ${shadbala.toFixed(1)} rupas`;
-                                    }
-                                  })()}</p>
+                              )}
+                              
+                              {analysis.basic_analysis?.overall_assessment?.key_weaknesses?.length > 0 && (
+                                <div className="key-points">
+                                  <h5>Key Weaknesses</h5>
+                                  <ul>
+                                    {analysis.basic_analysis.overall_assessment.key_weaknesses.map((weakness, idx) => (
+                                      <li key={idx} className="weakness-point">{weakness}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {analysis.basic_analysis?.overall_assessment?.vedic_recommendations?.length > 0 && (
+                                <div className="vedic-recommendations">
+                                  <h5>Vedic Recommendations</h5>
+                                  <ul>
+                                    {analysis.basic_analysis.overall_assessment.vedic_recommendations.map((rec, idx) => (
+                                      <li key={idx}>{rec}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              <div className="classical-grading">
+                                <h5>Classical Grading System</h5>
+                                <div className="grading-explanation">
+                                  <div className="grade-item">
+                                    <strong><span className="vedic-term" title="Uttama: Sanskrit term meaning 'highest' or 'best' grade in classical Vedic astrology">Uttama</span> (Excellent):</strong> 75-100 - Strong dignity, good Shadbala, favorable placement
+                                  </div>
+                                  <div className="grade-item">
+                                    <strong><span className="vedic-term" title="Madhyama: Sanskrit term meaning 'middle' or 'average' grade in classical Vedic astrology">Madhyama</span> (Moderate):</strong> 50-74 - Mixed influences, average strength
+                                  </div>
+                                  <div className="grade-item">
+                                    <strong><span className="vedic-term" title="Adhama: Sanskrit term meaning 'lowest' or 'weak' grade in classical Vedic astrology">Adhama</span> (Weak):</strong> 0-49 - Weak dignity, poor placement, afflictions
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           )}
                         >
                           {(() => {
-                            const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
-                            const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
-                            const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
+                            const classicalGrade = analysis.basic_analysis?.overall_assessment?.classical_grade;
+                            const score = analysis.basic_analysis?.overall_assessment?.overall_strength_score || 0;
                             
-                            if (maleficConjunctions.length >= 2 && shadbala >= 5) {
-                              return '⚖️ Afflicted'; // Strong Shadbala but afflicted by conjunctions
-                            } else if (maleficConjunctions.length >= 3 && shadbala >= 3) {
-                              return '⚠️ Heavily Afflicted';
-                            } else if (shadbala >= 5) {
-                              return '💪 Strong';
-                            } else if (shadbala >= 3) {
-                              return '⚖️ Moderate';
+                            if (classicalGrade?.includes('Uttama')) {
+                              return '💪 Uttama';
+                            } else if (classicalGrade?.includes('Madhyama')) {
+                              return '⚖️ Madhyama';
                             } else {
-                              return '⚠️ Weak';
+                              return '⚠️ Adhama';
                             }
-                          })()} 🔍
+                          })()} ({(analysis.basic_analysis?.overall_assessment?.overall_strength_score || 0).toFixed(0)}) 🔍
                         </div>
                       </div>
                       
@@ -728,8 +709,13 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
                           <div className="info-item">
                             <span className="icon">🔥</span>
                             <div>
-                              <strong>Shadbala</strong>
-                              <p><span className={getStrengthClass(analysis.basic_analysis?.strength_analysis?.shadbala_rupas)}>{analysis.basic_analysis?.strength_analysis?.shadbala_rupas?.toFixed(1) || 0}</span>/7 Rupas</p>
+                              <strong>Classical Score</strong>
+                              <p><span className={`vedic-term ${(() => {
+                                const score = analysis.basic_analysis?.overall_assessment?.overall_strength_score || 0;
+                                if (score >= 75) return 'positive';
+                                if (score >= 50) return 'moderate';
+                                return 'negative';
+                              })()}`} title="Classical Vedic assessment score based on 6 factors: Dignity, Shadbala, House placement, Aspects, Conjunctions, and Avastha conditions">{(analysis.basic_analysis?.overall_assessment?.overall_strength_score || 0).toFixed(0)}</span>/100</p>
                             </div>
                           </div>
                           
@@ -812,37 +798,38 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
                         )}
                         
                         <div className="health-summary">
-                          <p>{(() => {
-                            const originalReasoning = analysis.health_impact?.reasoning || `${planet} shows standard influence on health.`;
-                            
-                            // Check if there's a yoga cancellation for this planet
-                            const hasYogaCancellation = healthData.yoga_analysis?.beneficial_yogas?.some(yoga => {
-                              return yoga.planet === planet || (yoga.planets && yoga.planets.includes(planet));
-                            }) || false;
-                            
-                            if (hasYogaCancellation) {
-                              const yoga = healthData.yoga_analysis.beneficial_yogas.find(yoga => 
-                                yoga.planet === planet || (yoga.planets && yoga.planets.includes(planet))
-                              );
-                              const yogaName = yoga?.name || 'Beneficial Yoga';
+                          <div className="classical-assessment-summary">
+                            <p><strong>Classical Grade:</strong> {analysis.basic_analysis?.overall_assessment?.classical_grade}</p>
+                            <p><strong>Health Impact:</strong> {(() => {
+                              const originalReasoning = analysis.health_impact?.reasoning || `${planet} shows standard influence on health.`;
                               
-                              // Get lordship information for detailed explanation
-                              const planetLordships = analysis.basic_analysis?.house_position_analysis?.house_types || [];
-                              const dusthanaLordships = planetLordships.filter(type => type.includes('6th') || type.includes('8th') || type.includes('12th'));
-                              const currentHouse = analysis.basic_analysis?.basic_info?.house;
+                              // Check if there's a yoga cancellation for this planet
+                              const hasYogaCancellation = healthData.yoga_analysis?.beneficial_yogas?.some(yoga => {
+                                return yoga.planet === planet || (yoga.planets && yoga.planets.includes(planet));
+                              }) || false;
                               
-                              console.log(`${planet} lordships:`, planetLordships, 'dusthana lordships:', dusthanaLordships, 'current house:', currentHouse);
-                              
-                              if (dusthanaLordships.length > 0 && [6, 8, 12].includes(currentHouse)) {
-                                const lordshipText = dusthanaLordships.join(', ');
-                                return `${originalReasoning}, but this is cancelled by ${yogaName} as ${planet} is Lord of ${lordshipText.replace('house lord', '')} Dusthana and is in another (${currentHouse}th) Dusthana.`;
-                              } else {
-                                return `${originalReasoning}, but this is cancelled by ${yogaName}.`;
+                              if (hasYogaCancellation) {
+                                const yoga = healthData.yoga_analysis.beneficial_yogas.find(yoga => 
+                                  yoga.planet === planet || (yoga.planets && yoga.planets.includes(planet))
+                                );
+                                const yogaName = yoga?.name || 'Beneficial Yoga';
+                                
+                                // Get lordship information for detailed explanation
+                                const planetLordships = analysis.basic_analysis?.house_position_analysis?.house_types || [];
+                                const dusthanaLordships = planetLordships.filter(type => type.includes('6th') || type.includes('8th') || type.includes('12th'));
+                                const currentHouse = analysis.basic_analysis?.basic_info?.house;
+                                
+                                if (dusthanaLordships.length > 0 && [6, 8, 12].includes(currentHouse)) {
+                                  const lordshipText = dusthanaLordships.join(', ');
+                                  return `${originalReasoning}, but this is cancelled by ${yogaName} as ${planet} is Lord of ${lordshipText.replace('house lord', '')} Dusthana and is in another (${currentHouse}th) Dusthana.`;
+                                } else {
+                                  return `${originalReasoning}, but this is cancelled by ${yogaName}.`;
+                                }
                               }
-                            }
-                            
-                            return originalReasoning;
-                          })()}</p>
+                              
+                              return originalReasoning;
+                            })()}</p>
+                          </div>
                         </div>
                       </div>
                     </div>

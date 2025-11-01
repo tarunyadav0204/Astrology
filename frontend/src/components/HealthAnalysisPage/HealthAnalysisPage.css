@@ -88,6 +88,40 @@
   overflow: hidden;
 }
 
+.tab-navigation {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+  background: #e9ecef;
+  color: #2e7d32;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #2e7d32;
+  border-bottom-color: #4caf50;
+}
+
+.tab-content {
+  padding: 0;
+}
+
 @media (max-width: 768px) {
   .page-header {
     padding: 20px 15px;
@@ -110,5 +144,10 @@
   
   .container {
     padding: 0 10px;
+  }
+  
+  .tab-btn {
+    padding: 12px 15px;
+    font-size: 14px;
   }
 }
