@@ -625,6 +625,9 @@ class HealthCalculator(BaseCalculator):
         else:
             reason_text = f" (overall strength: {strength:.0f}/100)"
         
+        # Clean up any HTML entities that might have been introduced
+        reason_text = reason_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+        
         interpretations = {
             1: f"Physical vitality is {strength_desc}{reason_text}",
             2: f"Face and speech health is {strength_desc.replace('weak', 'concerning').replace('strong', 'good')}{reason_text}",
@@ -634,7 +637,11 @@ class HealthCalculator(BaseCalculator):
             12: f"Mental health is {strength_desc.replace('weak', 'needs attention').replace('strong', 'stable')}{reason_text}"
         }
         
-        return interpretations.get(house_num, 'General health influence')
+        final_interpretation = interpretations.get(house_num, 'General health influence')
+        # Clean up any HTML entities in the final interpretation
+        final_interpretation = final_interpretation.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+        
+        return final_interpretation
     
     def _get_yoga_health_impact(self, yoga):
         """Get health impact of specific yoga"""

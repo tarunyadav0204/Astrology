@@ -188,58 +188,50 @@ class HouseAnalyzer(BaseCalculator):
         return self.house_strength_calc.calculate_house_strength(house_number)
     
     def _calculate_overall_house_assessment(self, analysis):
-        """Calculate overall house assessment"""
-        # Start with base house strength from HouseStrengthCalculator
-        base_strength = analysis['house_strength']['total_strength']
-        strength_score = base_strength
+        """Calculate classical house assessment using real Vedic principles"""
+        # Initialize classical calculators for real calculations
+        from .shadbala_calculator import ShadbalaCalculator
+        from .argala_calculator import ArgalaCalculator
         
-        # House lord dignity bonus/penalty
-        lord_dignity = analysis['house_lord_analysis']['dignity_analysis']['dignity']
-        if lord_dignity == 'exalted':
-            strength_score += 15
-        elif lord_dignity == 'own_sign':
-            strength_score += 10
-        elif lord_dignity == 'debilitated':
-            strength_score -= 15
-        elif lord_dignity == 'enemy_sign':
-            strength_score -= 10
+        shadbala_calc = ShadbalaCalculator(self.chart_data)
+        argala_calc = ArgalaCalculator(self.chart_data)
+        # Set birth_data separately if needed
+        if hasattr(argala_calc, 'birth_data'):
+            argala_calc.birth_data = self.birth_data
         
-        # Resident planets contribution
-        if analysis['resident_planets']:
-            for resident in analysis['resident_planets']:
-                planet_dignity = resident['analysis']['dignity_analysis']['dignity']
-                if planet_dignity == 'exalted':
-                    strength_score += 8
-                elif planet_dignity == 'own_sign':
-                    strength_score += 5
-                elif planet_dignity == 'debilitated':
-                    strength_score -= 8
+        # Get real Shadbala data
+        shadbala_data = shadbala_calc.calculate_shadbala()
         
-        # Aspects contribution (more balanced)
-        if analysis['aspects_received']:
-            benefic_aspects = sum(1 for a in analysis['aspects_received'] 
-                                if self._is_benefic_aspect_for_house(a))
-            malefic_aspects = len(analysis['aspects_received']) - benefic_aspects
-            aspect_score = (benefic_aspects * 5) - (malefic_aspects * 3)
-            strength_score += aspect_score
+        # Get real Argala data for this house
+        house_num = analysis['basic_info']['house_number']
+        argala_data = argala_calc.calculate_argala_analysis()
+        house_argala = argala_data.get(house_num, {})
         
-        # Special combinations
-        if analysis['special_house_analysis']['dusthana_cancellation']:
-            strength_score += 20
-        if analysis['special_house_analysis']['is_yogi_house']:
-            strength_score += 15
-        if analysis['special_house_analysis']['is_badhaka_house']:
-            strength_score -= 8
+        # Classical assessment factors
+        assessment_factors = {
+            'lord_shadbala_strength': self._assess_lord_shadbala_strength(analysis, shadbala_data),
+            'lord_positional_strength': self._assess_lord_positional_strength(analysis),
+            'resident_planets_strength': self._assess_resident_planets_strength(analysis, shadbala_data),
+            'aspectual_strength': self._assess_aspectual_strength(analysis, shadbala_data),
+            'argala_strength': self._assess_argala_strength(house_argala),
+            'yoga_strength': self._assess_yoga_strength(analysis),
+            'house_type_strength': self._assess_house_type_strength(analysis)
+        }
         
-        # Ensure minimum reasonable score
-        strength_score = max(25, min(100, strength_score))
+        # Calculate classical grade (not numerical score)
+        classical_grade = self._determine_classical_grade(assessment_factors)
+        
+        # Convert to numerical for compatibility (but based on classical assessment)
+        numerical_score = self._classical_grade_to_score(classical_grade)
         
         return {
-            'overall_strength_score': round(strength_score, 2),
-            'overall_grade': self._get_house_grade(strength_score),
-            'key_strengths': self._identify_house_strengths(analysis),
-            'key_weaknesses': self._identify_house_weaknesses(analysis),
-            'recommendations': self._get_house_recommendations(analysis)
+            'overall_strength_score': numerical_score,
+            'classical_grade': classical_grade,
+            'overall_grade': classical_grade,
+            'assessment_factors': assessment_factors,
+            'key_strengths': self._identify_classical_strengths(assessment_factors),
+            'key_weaknesses': self._identify_classical_weaknesses(assessment_factors),
+            'recommendations': self._get_classical_recommendations(assessment_factors)
         }
     
     def _get_house_lordship_impact(self, house_lord, house_number, lord_analysis):
@@ -415,24 +407,415 @@ class HouseAnalyzer(BaseCalculator):
         else:
             return False
     
-    def _get_house_grade(self, score):
-        """Get house grade from score"""
-        if score >= 90:
-            return 'A+'
-        elif score >= 80:
-            return 'A'
-        elif score >= 70:
-            return 'B+'
-        elif score >= 60:
-            return 'B'
-        elif score >= 50:
-            return 'C+'
-        elif score >= 40:
-            return 'C'
-        elif score >= 30:
-            return 'D'
+    def _is_benefic_aspect_safe(self, aspect, planet_name):
+        """Safe version of benefic aspect check that handles missing data"""
+        natural_nature = self._get_natural_nature(planet_name)
+        
+        # Try to get dignity safely
+        dignity = 'neutral'
+        if 'planet_analysis' in aspect and aspect['planet_analysis']:
+            if 'dignity_analysis' in aspect['planet_analysis']:
+                dignity = aspect['planet_analysis']['dignity_analysis'].get('dignity', 'neutral')
+        
+        if natural_nature == 'benefic' and dignity in ['exalted', 'own_sign']:
+            return True
+        elif natural_nature == 'malefic' and dignity == 'debilitated':
+            return True
+        elif natural_nature == 'benefic':
+            return True
         else:
-            return 'F'
+            return False
+    
+    def _assess_lord_shadbala_strength(self, analysis, shadbala_data):
+        """Assess house lord strength using real Shadbala"""
+        lord_planet = analysis['house_lord_analysis']['basic_info']['planet']
+        lord_shadbala = shadbala_data.get(lord_planet, {})
+        
+        rupas = lord_shadbala.get('total_rupas', 0)
+        grade = 'Uttama' if rupas >= 6 else 'Madhyama' if rupas >= 4 else 'Adhama'
+        
+        return {
+            'value': rupas,
+            'grade': grade,
+            'reasoning': f"{lord_planet} has {rupas:.2f} Shadbala rupas. Classical threshold: 6+ = Uttama, 4-6 = Madhyama, <4 = Adhama"
+        }
+    
+    def _assess_lord_positional_strength(self, analysis):
+        """Assess lord's positional strength classically"""
+        lord_analysis = analysis['house_lord_analysis']
+        lord_house = lord_analysis['basic_info']['house']
+        lord_dignity = lord_analysis['dignity_analysis']['dignity']
+        lord_planet = lord_analysis['basic_info']['planet']
+        
+        # Classical positional assessment
+        if lord_dignity in ['exalted', 'own_sign']:
+            dignity_strength = 'Uttama'
+        elif lord_dignity in ['friend_sign', 'neutral']:
+            dignity_strength = 'Madhyama'
+        else:
+            dignity_strength = 'Adhama'
+        
+        # House position assessment
+        if lord_house in [1, 4, 7, 10]:  # Kendra
+            position_strength = 'Uttama'
+        elif lord_house in [1, 5, 9]:  # Trikona
+            position_strength = 'Uttama'
+        elif lord_house in [3, 6, 10, 11]:  # Upachaya
+            position_strength = 'Madhyama'
+        elif lord_house in [6, 8, 12]:  # Dusthana
+            position_strength = 'Adhama'
+        else:
+            position_strength = 'Madhyama'
+        
+        # Combine dignity and position more logically
+        if dignity_strength == 'Uttama' or position_strength == 'Uttama':
+            overall_grade = 'Uttama'
+        elif dignity_strength == 'Adhama' and position_strength == 'Adhama':
+            overall_grade = 'Adhama'
+        else:
+            overall_grade = 'Madhyama'
+        
+        return {
+            'value': 85 if overall_grade == 'Uttama' else 55 if overall_grade == 'Madhyama' else 25,
+            'grade': overall_grade,
+            'reasoning': f"{lord_planet} is {lord_dignity} (dignity: {dignity_strength}) and placed in {lord_house}th house (position: {position_strength})",
+            'dignity_strength': dignity_strength,
+            'position_strength': position_strength
+        }
+    
+    def _assess_resident_planets_strength(self, analysis, shadbala_data):
+        """Assess resident planets using classical principles"""
+        residents = analysis.get('resident_planets', [])
+        
+        if not residents:
+            return {
+                'value': 55,
+                'grade': 'Madhyama',
+                'reasoning': 'No resident planets in this house'
+            }
+        
+        strong_residents = 0
+        weak_residents = 0
+        planet_details = []
+        
+        for resident in residents:
+            planet_name = resident['planet']
+            
+            # Handle shadow planets (Rahu/Ketu) which don't have Shadbala
+            if planet_name in ['Rahu', 'Ketu']:
+                # Use dignity and house placement for shadow planets
+                planet_analysis = resident.get('analysis', {})
+                dignity = planet_analysis.get('dignity_analysis', {}).get('dignity', 'neutral')
+                house = planet_analysis.get('basic_info', {}).get('house', 1)
+                
+                if dignity in ['exalted', 'own_sign'] or house in [3, 6, 10, 11]:  # Upachaya houses good for Rahu/Ketu
+                    strong_residents += 1
+                    house_name = f"{house}st" if house == 1 else f"{house}nd" if house == 2 else f"{house}rd" if house == 3 else f"{house}th"
+                    reason = "upachaya house" if house in [3, 6, 10, 11] else dignity
+                    planet_details.append(f"{planet_name} (strong: {reason} in {house_name} house)")
+                elif dignity == 'debilitated' or house in [1, 2, 4, 7, 8, 12]:  # Challenging houses for shadow planets
+                    weak_residents += 1
+                    house_name = f"{house}st" if house == 1 else f"{house}nd" if house == 2 else f"{house}rd" if house == 3 else f"{house}th"
+                    reason = "maraka/dusthana house" if house in [2, 8, 12] else dignity
+                    planet_details.append(f"{planet_name} (weak: {reason} in {house_name} house)")
+                else:
+                    house_name = f"{house}st" if house == 1 else f"{house}nd" if house == 2 else f"{house}rd" if house == 3 else f"{house}th"
+                    planet_details.append(f"{planet_name} (moderate: {dignity} in {house_name} house)")
+            else:
+                # Regular planets use Shadbala
+                planet_shadbala = shadbala_data.get(planet_name, {})
+                rupas = planet_shadbala.get('total_rupas', 0)
+                
+                if rupas >= 4:
+                    strong_residents += 1
+                    planet_details.append(f"{planet_name} (strong: {rupas:.1f} rupas)")
+                elif rupas < 3:
+                    weak_residents += 1
+                    planet_details.append(f"{planet_name} (weak: {rupas:.1f} rupas)")
+                else:
+                    planet_details.append(f"{planet_name} (moderate: {rupas:.1f} rupas)")
+        
+        if strong_residents > weak_residents:
+            grade = 'Uttama'
+            value = 85
+        elif weak_residents > strong_residents:
+            grade = 'Adhama'
+            value = 25
+        else:
+            grade = 'Madhyama'
+            value = 55
+        
+        return {
+            'value': value,
+            'grade': grade,
+            'reasoning': f"Resident planets: {', '.join(planet_details)}. Strong: {strong_residents}, Weak: {weak_residents}. Note: Rahu/Ketu assessed by dignity+house, others by Shadbala",
+            'strong_count': strong_residents,
+            'weak_count': weak_residents
+        }
+    
+    def _assess_aspectual_strength(self, analysis, shadbala_data):
+        """Assess aspectual strength using real Shadbala of aspecting planets - includes both house and house lord aspects"""
+        house_aspects = analysis.get('aspects_received', [])
+        lord_aspects = analysis.get('house_lord_analysis', {}).get('aspects_received', {})
+        
+        # Combine house aspects and lord aspects
+        all_aspects = list(house_aspects)
+        
+        # Add lord aspects if they exist
+        if lord_aspects.get('has_aspects', False):
+            for lord_aspect in lord_aspects.get('aspects', []):
+                # Convert lord aspect format to house aspect format
+                all_aspects.append({
+                    'aspecting_planet': lord_aspect['aspecting_planet'],
+                    'aspecting_from_house': lord_aspect.get('aspecting_from_house', 0),
+                    'aspect_type': lord_aspect.get('aspect_type', 'aspect'),
+                    'planet_analysis': lord_aspect.get('planet_analysis', {}),
+                    'target': 'house_lord'  # Mark this as lord aspect
+                })
+        
+        if not all_aspects:
+            return {
+                'value': 55,
+                'grade': 'Madhyama',
+                'reasoning': 'No aspects received by house or house lord'
+            }
+        
+        strong_benefic_aspects = 0
+        strong_malefic_aspects = 0
+        aspect_details = []
+        
+        for aspect in all_aspects:
+            planet_name = aspect['aspecting_planet']
+            target = aspect.get('target', 'house')
+            
+            # Handle shadow planets (Rahu/Ketu) which don't have Shadbala
+            if planet_name in ['Rahu', 'Ketu']:
+                # Shadow planets are always considered strong aspecters
+                if self._is_benefic_aspect_safe(aspect, planet_name):
+                    strong_benefic_aspects += 1
+                    aspect_details.append(f"{planet_name} → {target} (benefic shadow planet)")
+                else:
+                    strong_malefic_aspects += 1
+                    aspect_details.append(f"{planet_name} → {target} (malefic shadow planet)")
+            else:
+                # Regular planets use Shadbala
+                planet_shadbala = shadbala_data.get(planet_name, {})
+                rupas = planet_shadbala.get('total_rupas', 0)
+                
+                if rupas >= 4:  # Strong planet
+                    if self._is_benefic_aspect_safe(aspect, planet_name):
+                        strong_benefic_aspects += 1
+                        aspect_details.append(f"{planet_name} → {target} (benefic, {rupas:.1f} rupas)")
+                    else:
+                        strong_malefic_aspects += 1
+                        aspect_details.append(f"{planet_name} → {target} (malefic, {rupas:.1f} rupas)")
+                else:
+                    aspect_details.append(f"{planet_name} → {target} (weak, {rupas:.1f} rupas)")
+        
+        if strong_benefic_aspects > strong_malefic_aspects:
+            grade = 'Uttama'
+            value = 85
+        elif strong_malefic_aspects > strong_benefic_aspects:
+            grade = 'Adhama'
+            value = 25
+        else:
+            grade = 'Madhyama'
+            value = 55
+        
+        return {
+            'value': value,
+            'grade': grade,
+            'reasoning': f"Aspects: {', '.join(aspect_details)}. Strong benefic: {strong_benefic_aspects}, Strong malefic: {strong_malefic_aspects}. Includes both house and house lord aspects",
+            'benefic_count': strong_benefic_aspects,
+            'malefic_count': strong_malefic_aspects
+        }
+    
+    def _assess_argala_strength(self, house_argala):
+        """Assess Argala strength using real calculations"""
+        net_strength = house_argala.get('net_argala_strength', 0)
+        argala_grade = house_argala.get('argala_grade', 'Neutral')
+        
+        if 'Strong Support' in argala_grade:
+            grade = 'Uttama'
+            value = 85
+        elif 'Support' in argala_grade:
+            grade = 'Madhyama'
+            value = 65
+        elif 'Obstruction' in argala_grade:
+            grade = 'Adhama'
+            value = 25
+        else:
+            grade = 'Madhyama'
+            value = 55
+        
+        return {
+            'value': value,
+            'grade': grade,
+            'reasoning': f"Argala analysis shows {argala_grade} with net strength of {net_strength:.2f}. Positive = support, negative = obstruction",
+            'net_strength': net_strength,
+            'argala_grade': argala_grade
+        }
+    
+    def _assess_yoga_strength(self, analysis):
+        """Assess yoga strength affecting the house"""
+        special_analysis = analysis.get('special_house_analysis', {})
+        
+        positive_yogas = 0
+        negative_yogas = 0
+        yoga_details = []
+        
+        if special_analysis.get('dusthana_cancellation'):
+            positive_yogas += 1
+            yoga_details.append('Viparita Raja Yoga (dusthana cancellation)')
+        if special_analysis.get('is_yogi_house'):
+            positive_yogas += 1
+            yoga_details.append('Yogi house (spiritually beneficial)')
+        if special_analysis.get('is_badhaka_house'):
+            negative_yogas += 1
+            yoga_details.append('Badhaka house (obstacles)')
+        
+        if positive_yogas > negative_yogas:
+            grade = 'Uttama'
+            value = 85
+        elif negative_yogas > positive_yogas:
+            grade = 'Adhama'
+            value = 25
+        else:
+            grade = 'Madhyama'
+            value = 55
+        
+        reasoning = f"Yogas present: {', '.join(yoga_details) if yoga_details else 'None'}. Positive: {positive_yogas}, Negative: {negative_yogas}"
+        
+        return {
+            'value': value,
+            'grade': grade,
+            'reasoning': reasoning,
+            'positive_count': positive_yogas,
+            'negative_count': negative_yogas
+        }
+    
+    def _assess_house_type_strength(self, analysis):
+        """Assess strength based on house type (Kendra, Trikona, etc.)"""
+        house_types = analysis['basic_info']['house_types']
+        
+        # Prioritize most significant house type
+        if 'Trikona' in house_types:
+            grade = 'Uttama'
+            value = 85
+            primary_type = 'Trikona'
+            reason = 'Trikona house - naturally auspicious'
+        elif 'Kendra' in house_types:
+            grade = 'Uttama'
+            value = 85
+            primary_type = 'Kendra'
+            reason = 'Kendra house - strong foundation'
+        elif 'Dusthana' in house_types:
+            grade = 'Adhama'
+            value = 25
+            primary_type = 'Dusthana'
+            reason = 'Dusthana house - naturally challenging'
+        elif 'Upachaya' in house_types:
+            grade = 'Madhyama'
+            value = 65
+            primary_type = 'Upachaya'
+            reason = 'Upachaya house - improves with time'
+        elif 'Maraka' in house_types:
+            grade = 'Madhyama'
+            value = 45
+            primary_type = 'Maraka'
+            reason = 'Maraka house - death-dealing, requires caution'
+        else:
+            grade = 'Madhyama'
+            value = 55
+            primary_type = 'Regular'
+            reason = 'Regular house'
+        
+        return {
+            'value': value,
+            'grade': grade,
+            'reasoning': f"{reason}. Primary type: {primary_type}. All types: {', '.join(house_types) if house_types else 'None'}",
+            'house_types': house_types,
+            'primary_type': primary_type
+        }
+    
+    def _determine_classical_grade(self, factors):
+        """Determine overall classical grade from assessment factors"""
+        uttama_count = sum(1 for f in factors.values() if f.get('grade') == 'Uttama')
+        adhama_count = sum(1 for f in factors.values() if f.get('grade') == 'Adhama')
+        madhyama_count = len(factors) - uttama_count - adhama_count
+        
+        if uttama_count >= 4:
+            return 'Uttama'
+        elif adhama_count >= 4:
+            return 'Adhama'
+        elif uttama_count > adhama_count:
+            return 'Uttama-Madhyama'
+        elif adhama_count > uttama_count:
+            return 'Adhama-Madhyama'
+        else:
+            return 'Madhyama'
+    
+    def _classical_grade_to_score(self, grade):
+        """Convert classical grade to numerical score for compatibility"""
+        grade_scores = {
+            'Uttama': 85,
+            'Uttama-Madhyama': 70,
+            'Madhyama': 55,
+            'Adhama-Madhyama': 40,
+            'Adhama': 25
+        }
+        return grade_scores.get(grade, 55)
+    
+    def _identify_classical_strengths(self, factors):
+        """Identify key strengths from classical assessment"""
+        strengths = []
+        
+        for factor_name, factor_data in factors.items():
+            if factor_data.get('grade') == 'Uttama':
+                if factor_name == 'lord_shadbala_strength':
+                    strengths.append(f"Strong house lord with {factor_data.get('shadbala_rupas', 0):.1f} Shadbala rupas")
+                elif factor_name == 'argala_strength':
+                    strengths.append(f"Excellent Argala support: {factor_data.get('grade', '')}")
+                elif factor_name == 'yoga_strength':
+                    strengths.append("Beneficial yogas present")
+                elif factor_name == 'house_type_strength':
+                    strengths.append(factor_data.get('reason', 'Favorable house type'))
+        
+        return strengths
+    
+    def _identify_classical_weaknesses(self, factors):
+        """Identify key weaknesses from classical assessment"""
+        weaknesses = []
+        
+        for factor_name, factor_data in factors.items():
+            if factor_data.get('grade') == 'Adhama':
+                if factor_name == 'lord_shadbala_strength':
+                    weaknesses.append(f"Weak house lord with {factor_data.get('shadbala_rupas', 0):.1f} Shadbala rupas")
+                elif factor_name == 'argala_strength':
+                    weaknesses.append(f"Argala obstruction: {factor_data.get('grade', '')}")
+                elif factor_name == 'aspectual_strength':
+                    weaknesses.append("Predominantly malefic aspects from strong planets")
+                elif factor_name == 'house_type_strength':
+                    weaknesses.append(factor_data.get('reason', 'Challenging house type'))
+        
+        return weaknesses
+    
+    def _get_classical_recommendations(self, factors):
+        """Get classical remedial recommendations"""
+        recommendations = []
+        
+        lord_strength = factors.get('lord_shadbala_strength', {})
+        if lord_strength.get('grade') == 'Adhama':
+            recommendations.append("Strengthen house lord through appropriate gemstone and mantras")
+        
+        argala_strength = factors.get('argala_strength', {})
+        if argala_strength.get('grade') == 'Adhama':
+            recommendations.append("Perform remedies to remove Argala obstructions")
+        
+        if not recommendations:
+            recommendations.append("House shows good classical strength - maintain positive practices")
+        
+        return recommendations
     
     def _identify_house_strengths(self, analysis):
         """Identify key house strengths"""

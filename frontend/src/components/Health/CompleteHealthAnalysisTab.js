@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './CompleteHealthAnalysisTab.css';
 
 const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
@@ -544,24 +545,113 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
                           <h3 data-symbol={planetSymbols[planet]}>{planet}</h3>
                           <span className="body-parts">{bodyParts[planet]}</span>
                         </div>
-                        <div className={`strength-badge ${(() => {
-                          const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
-                          const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
-                          const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
-                          
-                          // Reduce effective strength if conjunct with multiple malefics
-                          if (maleficConjunctions.length >= 2 && shadbala >= 5) {
-                            return 'moderate'; // Downgrade from strong to moderate
-                          } else if (maleficConjunctions.length >= 3 && shadbala >= 3) {
-                            return 'weak'; // Downgrade from moderate to weak
-                          } else if (shadbala >= 5) {
-                            return 'strong';
-                          } else if (shadbala >= 3) {
-                            return 'moderate';
-                          } else {
-                            return 'weak';
-                          }
-                        })()}`}>
+                        <div 
+                          className={`strength-badge clickable ${(() => {
+                            const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
+                            const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
+                            const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
+                            
+                            // Reduce effective strength if conjunct with multiple malefics
+                            if (maleficConjunctions.length >= 2 && shadbala >= 5) {
+                              return 'moderate'; // Downgrade from strong to moderate
+                            } else if (maleficConjunctions.length >= 3 && shadbala >= 3) {
+                              return 'weak'; // Downgrade from moderate to weak
+                            } else if (shadbala >= 5) {
+                              return 'strong';
+                            } else if (shadbala >= 3) {
+                              return 'moderate';
+                            } else {
+                              return 'weak';
+                            }
+                          })()}`}
+                          onClick={() => openModal(
+                            `${planet} Strength Calculation`,
+                            <div className="calculation-details">
+                              <h4>Shadbala (Six-fold Strength) Breakdown</h4>
+                              {analysis.basic_analysis?.strength_analysis?.shadbala_breakdown && (
+                                <div className="shadbala-breakdown">
+                                  {Object.entries(analysis.basic_analysis.strength_analysis.shadbala_breakdown).map(([component, value]) => (
+                                    <div key={component} className="shadbala-component">
+                                      <div className="component-header">
+                                        <strong>{component.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
+                                        <span className="component-value">{value?.toFixed(2) || 0} rupas</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <div className="total-shadbala">
+                                    <strong>Total Shadbala: {analysis.basic_analysis.strength_analysis.shadbala_rupas?.toFixed(2)} rupas</strong>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              <div className="strength-factors">
+                                <h5>Strength Assessment Factors</h5>
+                                <div className="factor-list">
+                                  <div className="factor-item">
+                                    <strong>Base Shadbala:</strong> {analysis.basic_analysis?.strength_analysis?.shadbala_rupas?.toFixed(2)} rupas
+                                  </div>
+                                  <div className="factor-item">
+                                    <strong>Dignity:</strong> {analysis.basic_analysis?.dignity_analysis?.dignity || 'neutral'}
+                                  </div>
+                                  <div className="factor-item">
+                                    <strong>House Placement:</strong> {analysis.basic_analysis?.basic_info?.house}th house
+                                  </div>
+                                  {analysis.basic_analysis?.conjunctions?.has_conjunctions && (
+                                    <div className="factor-item">
+                                      <strong>Conjunctions:</strong> {analysis.basic_analysis.conjunctions.conjunctions.map(c => c.planet).join(', ')}
+                                      {(() => {
+                                        const conjunctions = analysis.basic_analysis.conjunctions.conjunctions || [];
+                                        const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
+                                        if (maleficConjunctions.length >= 2) {
+                                          return <span className="affliction-note"> (Multiple malefic conjunctions reduce effective strength)</span>;
+                                        }
+                                        return null;
+                                      })()
+                                      }
+                                    </div>
+                                  )}
+                                  {analysis.basic_analysis?.combustion_status?.is_combust && (
+                                    <div className="factor-item">
+                                      <strong>Combustion:</strong> Combust (reduces strength)
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="strength-interpretation">
+                                <h5>Classical Strength Interpretation</h5>
+                                <div className="interpretation-grid">
+                                  <div className="strength-range">
+                                    <strong>6+ rupas:</strong> Uttama (Excellent) - Planet gives full results
+                                  </div>
+                                  <div className="strength-range">
+                                    <strong>4-6 rupas:</strong> Madhyama (Average) - Planet gives moderate results
+                                  </div>
+                                  <div className="strength-range">
+                                    <strong>&lt;4 rupas:</strong> Adhama (Weak) - Planet struggles to give results
+                                  </div>
+                                </div>
+                                <div className="current-assessment">
+                                  <p><strong>Current Assessment:</strong> {(() => {
+                                    const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
+                                    const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
+                                    const maleficConjunctions = conjunctions.filter(c => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(c.planet));
+                                    
+                                    if (maleficConjunctions.length >= 2 && shadbala >= 5) {
+                                      return `Afflicted - Good Shadbala (${shadbala.toFixed(1)} rupas) but compromised by ${maleficConjunctions.length} malefic conjunctions`;
+                                    } else if (shadbala >= 6) {
+                                      return `Uttama (Excellent) - ${shadbala.toFixed(1)} rupas`;
+                                    } else if (shadbala >= 4) {
+                                      return `Madhyama (Average) - ${shadbala.toFixed(1)} rupas`;
+                                    } else {
+                                      return `Adhama (Weak) - ${shadbala.toFixed(1)} rupas`;
+                                    }
+                                  })()}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        >
                           {(() => {
                             const shadbala = analysis.basic_analysis?.strength_analysis?.shadbala_rupas || 0;
                             const conjunctions = analysis.basic_analysis?.conjunctions?.conjunctions || [];
@@ -578,8 +668,7 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
                             } else {
                               return '⚠️ Weak';
                             }
-                          })()
-                        }
+                          })()} 🔍
                         </div>
                       </div>
                       
@@ -822,18 +911,88 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
                           })()}</h3>
                           <span className="body-parts">{houseNames[house] || 'Health influence'}</span>
                         </div>
-                        <div className={`strength-badge ${(() => {
-                          const score = analysis.house_analysis?.overall_house_assessment?.overall_strength_score || 0;
-                          if (score >= 70) return 'strong';
-                          if (score >= 40) return 'moderate';
-                          return 'weak';
-                        })()}`}>
+                        <div 
+                          className={`strength-badge clickable ${(() => {
+                            const score = analysis.house_analysis?.overall_house_assessment?.overall_strength_score || 0;
+                            if (score >= 85) return 'strong';
+                            if (score >= 55) return 'moderate';
+                            return 'weak';
+                          })()}`}
+                          onClick={() => openModal(
+                            `${(() => {
+                              const houseNum = parseInt(house);
+                              if (houseNum === 1) return '1st House';
+                              if (houseNum === 2) return '2nd House';
+                              if (houseNum === 3) return '3rd House';
+                              if (houseNum === 21) return '21st House';
+                              if (houseNum === 22) return '22nd House';
+                              if (houseNum === 23) return '23rd House';
+                              return `${houseNum}th House`;
+                            })()} Strength Calculation`,
+                            <div className="calculation-details">
+                              <h4>Classical Vedic Assessment Factors</h4>
+                              {analysis.house_analysis?.overall_house_assessment?.assessment_factors && (
+                                <div className="factors-breakdown">
+                                  {Object.entries(analysis.house_analysis.overall_house_assessment.assessment_factors).map(([factor, data]) => (
+                                    <div key={factor} className="factor-item">
+                                      <div className="factor-header">
+                                        <strong>{factor.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
+                                        <span className={`grade-badge ${data.grade?.toLowerCase()}`}>{data.grade}</span>
+                                      </div>
+                                      <div className="factor-details">
+                                        <p><strong>Reasoning:</strong> {data.reasoning}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              <div className="final-assessment">
+                                <h5>Final Classical Grade</h5>
+                                <div className="grade-explanation">
+                                  <p><strong>Grade:</strong> {analysis.house_analysis?.overall_house_assessment?.classical_grade}</p>
+                                  <p><strong>Score:</strong> {(analysis.house_analysis?.overall_house_assessment?.overall_strength_score || 0).toFixed(0)}/100</p>
+                                  <div className="grade-meaning">
+                                    <h6>Classical Grading System:</h6>
+                                    <ul>
+                                      <li><strong>Uttama (Excellent):</strong> 70-100 - Strong planetary support, favorable Argala, beneficial yogas</li>
+                                      <li><strong>Madhyama (Average):</strong> 40-69 - Mixed influences, moderate planetary strength</li>
+                                      <li><strong>Adhama (Weak):</strong> 0-39 - Weak lord, malefic influences, unfavorable placements</li>
+                                    </ul>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {analysis.house_analysis?.overall_house_assessment?.key_strengths?.length > 0 && (
+                                <div className="key-points">
+                                  <h5>Key Strengths</h5>
+                                  <ul>
+                                    {analysis.house_analysis.overall_house_assessment.key_strengths.map((strength, idx) => (
+                                      <li key={idx} className="strength-point">{strength}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {analysis.house_analysis?.overall_house_assessment?.key_weaknesses?.length > 0 && (
+                                <div className="key-points">
+                                  <h5>Key Weaknesses</h5>
+                                  <ul>
+                                    {analysis.house_analysis.overall_house_assessment.key_weaknesses.map((weakness, idx) => (
+                                      <li key={idx} className="weakness-point">{weakness}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        >
                           {(() => {
                             const score = analysis.house_analysis?.overall_house_assessment?.overall_strength_score || 0;
-                            if (score >= 70) return '💪 Strong';
-                            if (score >= 40) return '⚖️ Average';
+                            if (score >= 85) return '💪 Strong';
+                            if (score >= 55) return '⚖️ Average';
                             return '⚠️ Weak';
-                          })()} ({(analysis.house_analysis?.overall_house_assessment?.overall_strength_score || 0).toFixed(0)})
+                          })()} ({(analysis.house_analysis?.overall_house_assessment?.overall_strength_score || 0).toFixed(0)}) 🔍
                         </div>
                       </div>
                       
@@ -1055,9 +1214,38 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
       </div>
 
       {/* Modal */}
-      {modalData && (
-        <div className="analysis-modal-overlay" onClick={closeModal}>
-          <div className="analysis-modal" onClick={(e) => e.stopPropagation()}>
+      {modalData && createPortal(
+        <div 
+          className="analysis-modal-overlay" 
+          onClick={closeModal}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999999,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '100px'
+          }}
+        >
+          <div 
+            className="analysis-modal" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+              zIndex: 999999,
+              position: 'relative'
+            }}
+          >
             <div className="modal-header">
               <h3>{modalData.title}</h3>
               <button className="close-btn" onClick={closeModal}>×</button>
@@ -1066,7 +1254,8 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
               {modalData.content}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
