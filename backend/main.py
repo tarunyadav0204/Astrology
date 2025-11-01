@@ -69,6 +69,23 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         return response
 
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        import time
+        start_time = time.time()
+        
+        # Log incoming request
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {request.method} {request.url.path} - Client: {request.client.host if request.client else 'unknown'}")
+        
+        response = await call_next(request)
+        
+        # Log response
+        process_time = time.time() - start_time
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Response: {response.status_code} - Time: {process_time:.2f}s")
+        
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
 
 app.add_middleware(
@@ -2820,7 +2837,7 @@ if __name__ == "__main__":
         port=8001,
         timeout_keep_alive=300,  # Keep connections alive for 5 minutes
         timeout_graceful_shutdown=60,  # Allow 60 seconds for graceful shutdown
-        access_log=False,  # Disable access logs for performance
+        access_log=True,  # Enable access logs to see requests
         limit_max_requests=1000,  # Prevent memory leaks
         limit_concurrency=100  # Limit concurrent connections
     )
