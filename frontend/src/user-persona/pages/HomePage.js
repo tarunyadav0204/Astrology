@@ -53,6 +53,12 @@ const HomePage = ({ onGetStarted }) => {
       popular: false
     },
     {
+      icon: "🏥",
+      title: "Health Analysis",
+      description: "Complete Vedic health assessment with remedies",
+      popular: true
+    },
+    {
       icon: "🕉️",
       title: "Spiritual Remedies",
       description: "Mantras, yantras, and ritual timing",
@@ -274,6 +280,11 @@ const HomePage = ({ onGetStarted }) => {
               <h3>Love Match</h3>
               <p>Find your perfect astrological match</p>
             </div>
+            <div className="quick-card" onClick={() => handleGetStarted('health-analysis')}>
+              <div className="quick-icon">🏥</div>
+              <h3>Health Analysis</h3>
+              <p>Complete Vedic health assessment</p>
+            </div>
             <div className="quick-card" onClick={() => handleGetStarted('ask-astrologer')}>
               <div className="quick-icon">🔮</div>
               <h3>Ask Expert</h3>
@@ -411,6 +422,7 @@ const HomePage = ({ onGetStarted }) => {
                 <li><a href="#birth-chart">Birth Chart</a></li>
                 <li><a href="#horoscope">Daily Horoscope</a></li>
                 <li><a href="#compatibility">Compatibility</a></li>
+                <li><a href="#health-analysis">Health Analysis</a></li>
                 <li><a href="#predictions">Predictions</a></li>
               </ul>
             </div>

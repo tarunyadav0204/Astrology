@@ -12,6 +12,7 @@ import YogasTab from '../YogasTab/YogasTab';
 import RelationshipsTab from '../RelationshipsTab/RelationshipsTab';
 import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
+import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
 import NadiTab from '../Nadi/NadiTab';
 import KPTab from '../KP/KPTab';
 
@@ -364,6 +365,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
           { id: 'nadi', label: '🔍 Nadi', icon: '🔍' },
           { id: 'kp', label: '🔢 KP', icon: '🔢' },
           { id: 'marriage', label: '💍 Marriage', icon: '💍' },
+          { id: 'health', label: '🏥 Health', icon: '🏥' },
           { id: 'nakshatras', label: '🌟 Nakshatras', icon: '🌟' },
           { id: 'houses', label: '🏠 House Analysis', icon: '🏠' },
           { id: 'relationships', label: '🤝 Relationships', icon: '🤝' },
@@ -767,6 +769,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
             {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} selectedDashas={selectedDashas} onDashaSelection={handleDashaSelection} />}
             {activeTab === 'kp' && <KPTab birthData={birthData} />}
             {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
+            {activeTab === 'health' && <CompleteHealthAnalysisTab chartData={chartData} birthDetails={birthData} />}
             {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'houses' && <HouseAnalysisTab chartData={chartData} birthData={birthData} />}
             {activeTab === 'relationships' && <RelationshipsTab chartData={chartData} birthData={birthData} />}

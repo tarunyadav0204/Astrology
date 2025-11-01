@@ -3,19 +3,37 @@ from .base_calculator import BaseCalculator
 class PlanetAnalyzer(BaseCalculator):
     """Comprehensive planet analyzer - reusable for any planet analysis"""
     
-    def __init__(self, chart_data=None):
+    def __init__(self, chart_data=None, birth_data=None):
         super().__init__(chart_data or {})
+        self.birth_data = birth_data
         
         # Initialize existing calculators
         from .shadbala_calculator import ShadbalaCalculator
         from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
+        from .yogi_calculator import YogiCalculator
+        from .badhaka_calculator import BadhakaCalculator
+        from .friendship_calculator import FriendshipCalculator
+        from .gandanta_calculator import GandantaCalculator
         
         self.shadbala_calc = ShadbalaCalculator(chart_data)
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
+        self.yogi_calc = YogiCalculator(chart_data)
+        self.badhaka_calc = BadhakaCalculator(chart_data)
+        self.friendship_calc = FriendshipCalculator()
+        self.gandanta_calc = GandantaCalculator(chart_data)
         
         # Get calculated data
         self.shadbala_data = self.shadbala_calc.calculate_shadbala()
         self.dignities_data = self.dignities_calc.calculate_planetary_dignities()
+        self.yogi_data = self.yogi_calc.calculate_yogi_points(birth_data) if birth_data else {}
+        # Get ascendant sign for badhaka calculation
+        ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data else 0
+        self.badhaka_data = {
+            'badhaka_lords': [self.badhaka_calc.get_badhaka_lord(ascendant_sign)],
+            'maraka_lords': [lord['planet'] for lord in self.badhaka_calc.get_maraka_lords(ascendant_sign)]
+        }
+        self.friendship_data = self.friendship_calc.calculate_friendship(birth_data) if birth_data else None
+        self.gandanta_data = self.gandanta_calc.calculate_gandanta_analysis()
         
         # House classifications
         self.HOUSE_TYPES = {
@@ -40,8 +58,8 @@ class PlanetAnalyzer(BaseCalculator):
     
     def analyze_planet(self, planet_name):
         """Complete analysis of any planet"""
-        if planet_name not in self.chart_data.get('planets', {}):
-            return {'error': f'Planet {planet_name} not found in chart'}
+        if planet_name not in self.chart_data['planets']:
+            raise KeyError(f'Planet {planet_name} not found in chart')
         
         planet_data = self.chart_data['planets'][planet_name]
         
@@ -56,6 +74,7 @@ class PlanetAnalyzer(BaseCalculator):
             'combustion_status': self._get_combustion_status(planet_name),
             'retrograde_analysis': self._get_retrograde_analysis(planet_name, planet_data),
             'aspects_received': self._get_aspects_received(planet_name, planet_data),
+            'gandanta_analysis': self._get_gandanta_analysis(planet_name, planet_data),
             'overall_assessment': {}
         }
         
@@ -68,41 +87,61 @@ class PlanetAnalyzer(BaseCalculator):
         """Basic planet information"""
         return {
             'planet': planet_name,
-            'sign': planet_data.get('sign', 0),
-            'sign_name': self.get_sign_name(planet_data.get('sign', 0)),
-            'house': planet_data.get('house', 1),
-            'degree': round(planet_data.get('degree', 0), 2),
-            'longitude': round(planet_data.get('longitude', 0), 2),
-            'nakshatra': self._get_nakshatra(planet_data.get('longitude', 0))
+            'sign': planet_data['sign'],
+            'sign_name': self.get_sign_name(planet_data['sign']),
+            'house': planet_data['house'],
+            'degree': round(planet_data['degree'], 2),
+            'longitude': round(planet_data['longitude'], 2),
+            'nakshatra': self._get_nakshatra(planet_data['longitude'])
         }
     
     def _get_dignity_analysis(self, planet_name):
         """Planetary dignity analysis"""
-        dignity_data = self.dignities_data.get(planet_name, {})
+        if planet_name not in self.dignities_data:
+            # For planets without traditional dignity (like Rahu/Ketu)
+            return {
+                'dignity': 'neutral',
+                'functional_nature': 'neutral',
+                'strength_multiplier': 1.0,
+                'states': [],
+                'dignity_description': 'Traditional dignity not applicable'
+            }
+        
+        dignity_data = self.dignities_data[planet_name]
         
         return {
-            'dignity': dignity_data.get('dignity', 'neutral'),
-            'functional_nature': dignity_data.get('functional_nature', 'neutral'),
-            'strength_multiplier': dignity_data.get('strength_multiplier', 1.0),
-            'states': dignity_data.get('states', []),
-            'dignity_description': self._get_dignity_description(dignity_data.get('dignity', 'neutral'))
+            'dignity': dignity_data['dignity'],
+            'functional_nature': dignity_data['functional_nature'],
+            'strength_multiplier': dignity_data['strength_multiplier'],
+            'states': dignity_data['states'],
+            'dignity_description': self._get_dignity_description(dignity_data['dignity'])
         }
     
     def _get_strength_analysis(self, planet_name):
         """Shadbala strength analysis"""
-        shadbala_data = self.shadbala_data.get(planet_name, {})
+        if planet_name not in self.shadbala_data:
+            # For planets without Shadbala (like Rahu/Ketu)
+            return {
+                'shadbala_rupas': 0,
+                'shadbala_points': 0,
+                'shadbala_grade': 'N/A',
+                'strength_components': {},
+                'strength_interpretation': 'Shadbala not applicable for this planet'
+            }
+        
+        shadbala_data = self.shadbala_data[planet_name]
         
         return {
-            'shadbala_rupas': shadbala_data.get('total_rupas', 0),
-            'shadbala_points': shadbala_data.get('total_points', 0),
-            'shadbala_grade': shadbala_data.get('grade', 'Average'),
-            'strength_components': shadbala_data.get('components', {}),
-            'strength_interpretation': self._interpret_shadbala_strength(shadbala_data.get('total_rupas', 0))
+            'shadbala_rupas': shadbala_data['total_rupas'],
+            'shadbala_points': shadbala_data['total_points'],
+            'shadbala_grade': shadbala_data['grade'],
+            'strength_components': shadbala_data['components'],
+            'strength_interpretation': self._interpret_shadbala_strength(shadbala_data['total_rupas'])
         }
     
     def _get_house_position_analysis(self, planet_data):
         """House position analysis"""
-        house = planet_data.get('house', 1)
+        house = planet_data['house']
         
         house_types = []
         if house in self.HOUSE_TYPES['kendra']:
@@ -124,53 +163,86 @@ class PlanetAnalyzer(BaseCalculator):
         }
     
     def _get_friendship_analysis(self, planet_name, planet_data):
-        """5-fold friendship analysis"""
-        sign = planet_data.get('sign', 0)
-        longitude = planet_data.get('longitude', 0)
-        nakshatra_num = self._get_nakshatra_number(longitude)
-        nakshatra_lord = self.NAKSHATRA_LORDS.get(nakshatra_num, 'Unknown')
-        
-        # Get sign lord
-        sign_lord = self.get_sign_lord(sign)
-        
-        # Simplified friendship calculation for now
-        # friendship_data = self.friendship_calc.calculate_friendship({'planets': {planet_name: planet_data}})
-        
-        return {
-            'sign_lord': sign_lord,
-            'sign_friendship': self._get_friendship_level(planet_name, sign_lord),
-            'nakshatra_number': nakshatra_num,
-            'nakshatra_lord': nakshatra_lord,
-            'nakshatra_friendship': self._get_friendship_level(planet_name, nakshatra_lord),
-            'overall_friendship_status': self._calculate_overall_friendship(planet_name, sign_lord, nakshatra_lord)
-        }
+        """5-fold friendship analysis using FriendshipCalculator"""
+        if self.friendship_data and planet_name in self.friendship_data.get('friendship_matrix', {}):
+            # Use complete 5-fold friendship from FriendshipCalculator
+            planet_friendship = self.friendship_data['friendship_matrix'][planet_name]
+            return {
+                'friendship_matrix': planet_friendship,
+                'aspects_matrix': self.friendship_data['aspects_matrix'].get(planet_name, {}),
+                'planet_positions': self.friendship_data['planet_positions'].get(planet_name, {})
+            }
+        else:
+            # Fallback to basic analysis without birth_data
+            sign = planet_data['sign']
+            longitude = planet_data['longitude']
+            nakshatra_num = self._get_nakshatra_number(longitude)
+            nakshatra_lord = self.NAKSHATRA_LORDS[nakshatra_num]
+            sign_lord = self.get_sign_lord(sign)
+            
+            natural_friends = self.friendship_calc.NATURAL_FRIENDS.get(planet_name, [])
+            natural_enemies = self.friendship_calc.NATURAL_ENEMIES.get(planet_name, [])
+            
+            sign_friendship = 'friend' if sign_lord in natural_friends else 'enemy' if sign_lord in natural_enemies else 'neutral'
+            nakshatra_friendship = 'friend' if nakshatra_lord in natural_friends else 'enemy' if nakshatra_lord in natural_enemies else 'neutral'
+            
+            return {
+                'sign_lord': sign_lord,
+                'sign_friendship': sign_friendship,
+                'nakshatra_number': nakshatra_num,
+                'nakshatra_lord': nakshatra_lord,
+                'nakshatra_friendship': nakshatra_friendship,
+                'natural_friends': natural_friends,
+                'natural_enemies': natural_enemies,
+                'overall_friendship_status': self._calculate_overall_friendship(sign_friendship, nakshatra_friendship)
+            }
     
     def _get_special_lordships(self, planet_name):
         """Special lordship analysis (Yogi, Badhaka, etc.)"""
-        # This would integrate with YogiCalculator and BadhakaCalculator
-        # For now, returning basic structure
+        special_roles = []
+        
+        # Yogi/Avayogi analysis
+        is_yogi = self.yogi_data.get('yogi', {}).get('lord') == planet_name
+        is_avayogi = self.yogi_data.get('avayogi', {}).get('lord') == planet_name
+        is_dagdha = self.yogi_data.get('dagdha_rashi', {}).get('lord') == planet_name
+        is_tithi_shunya = self.yogi_data.get('tithi_shunya_rashi', {}).get('lord') == planet_name
+        
+        # Badhaka analysis
+        is_badhaka = planet_name in self.badhaka_data['badhaka_lords']
+        
+        if is_yogi:
+            special_roles.append('Yogi Lord')
+        if is_avayogi:
+            special_roles.append('Avayogi Lord')
+        if is_dagdha:
+            special_roles.append('Dagdha Lord')
+        if is_tithi_shunya:
+            special_roles.append('Tithi Shunya Lord')
+        if is_badhaka:
+            special_roles.append('Badhaka Lord')
+        
         return {
-            'is_yogi_lord': False,
-            'is_avayogi_lord': False,
-            'is_dagdha_lord': False,
-            'is_tithi_shunya_lord': False,
-            'is_badhaka_lord': False,
-            'special_roles': []
+            'is_yogi_lord': is_yogi,
+            'is_avayogi_lord': is_avayogi,
+            'is_dagdha_lord': is_dagdha,
+            'is_tithi_shunya_lord': is_tithi_shunya,
+            'is_badhaka_lord': is_badhaka,
+            'special_roles': special_roles
         }
     
     def _get_conjunctions(self, planet_name, planet_data):
         """Conjunction analysis"""
-        house = planet_data.get('house', 1)
+        house = planet_data['house']
         conjunctions = []
         
-        planets = self.chart_data.get('planets', {})
+        planets = self.chart_data['planets']
         for other_planet, other_data in planets.items():
-            if other_planet != planet_name and other_data.get('house') == house:
+            if other_planet != planet_name and other_data['house'] == house:
                 conjunction_type = self._classify_conjunction(planet_name, other_planet)
                 conjunctions.append({
                     'planet': other_planet,
                     'type': conjunction_type,
-                    'orb': self._calculate_orb(planet_data.get('longitude', 0), other_data.get('longitude', 0)),
+                    'orb': self._calculate_orb(planet_data['longitude'], other_data['longitude']),
                     'effect': self._get_conjunction_effect(planet_name, other_planet, conjunction_type)
                 })
         
@@ -183,15 +255,23 @@ class PlanetAnalyzer(BaseCalculator):
     
     def _get_combustion_status(self, planet_name):
         """Combustion analysis"""
-        if planet_name == 'Sun':
+        if planet_name in ['Sun', 'Rahu', 'Ketu']:
             return {
                 'is_combust': False, 
                 'is_cazimi': False,
-                'status': 'Not applicable - Sun cannot be combust',
-                'effect': 'Sun cannot be combust'
+                'status': f'Not applicable - {planet_name} cannot be combust',
+                'effect': f'{planet_name} cannot be combust'
             }
         
-        dignity_data = self.dignities_data.get(planet_name, {})
+        if planet_name not in self.dignities_data:
+            return {
+                'is_combust': False,
+                'is_cazimi': False,
+                'status': 'normal',
+                'effect': 'No combustion data available'
+            }
+        
+        dignity_data = self.dignities_data[planet_name]
         combustion_status = dignity_data.get('combustion_status', 'normal')
         
         return {
@@ -212,13 +292,13 @@ class PlanetAnalyzer(BaseCalculator):
     
     def _get_aspects_received(self, planet_name, planet_data):
         """Aspects received by the planet"""
-        house = planet_data.get('house', 1)
+        house = planet_data['house']
         aspects = []
         
-        planets = self.chart_data.get('planets', {})
+        planets = self.chart_data['planets']
         for other_planet, other_data in planets.items():
             if other_planet != planet_name:
-                aspect_houses = self._get_aspect_houses(other_planet, other_data.get('house', 1))
+                aspect_houses = self._get_aspect_houses(other_planet, other_data['house'])
                 if house in aspect_houses:
                     aspect_effect_data = self._get_aspect_effect(other_planet, planet_name)
                     aspects.append({
@@ -378,11 +458,8 @@ class PlanetAnalyzer(BaseCalculator):
         else:
             return 'neutral'
     
-    def _calculate_overall_friendship(self, planet, sign_lord, nakshatra_lord):
+    def _calculate_overall_friendship(self, sign_friendship, nakshatra_friendship):
         """Calculate overall friendship status"""
-        sign_friendship = self._get_friendship_level(planet, sign_lord)
-        nakshatra_friendship = self._get_friendship_level(planet, nakshatra_lord)
-        
         if sign_friendship == 'friend' and nakshatra_friendship == 'friend':
             return 'Very Favorable'
         elif sign_friendship == 'enemy' and nakshatra_friendship == 'enemy':
@@ -794,3 +871,21 @@ class PlanetAnalyzer(BaseCalculator):
             recommendations.append("Planet is well-placed, maintain positive practices")
         
         return recommendations
+    
+    def _get_gandanta_analysis(self, planet_name, planet_data):
+        """Get Gandanta analysis for planet"""
+        longitude = planet_data['longitude']
+        gandanta_info = self.gandanta_calc._check_planet_gandanta(planet_name, longitude)
+        
+        if gandanta_info['is_gandanta']:
+            return {
+                'is_gandanta': True,
+                'gandanta_type': gandanta_info['gandanta_type'],
+                'gandanta_name': gandanta_info['gandanta_name'],
+                'intensity': gandanta_info['intensity'],
+                'distance_from_junction': gandanta_info['distance_from_junction']
+            }
+        else:
+            return {
+                'is_gandanta': False
+            }

@@ -1,0 +1,1277 @@
+.complete-health-analysis {
+  padding: 0;
+  width: 100%;
+  margin: 0;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.analysis-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.analysis-header h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 1.8rem;
+}
+
+.analysis-header p {
+  color: #7f8c8d;
+  font-size: 1rem;
+}
+
+.analysis-sections {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  gap: 25px;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.analysis-sections .analysis-section:first-child {
+  grid-column: 1 / -1;
+}
+
+.remaining-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 25px;
+}
+
+.analysis-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #4CAF50;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.analysis-card:hover {
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  cursor: pointer;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.card-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-right: 15px;
+  color: white;
+}
+
+.card-info {
+  flex: 1;
+}
+
+.card-info h4 {
+  margin: 0 0 5px 0;
+  color: #2c3e50;
+  font-size: 1.2rem;
+}
+
+.card-info p {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.card-status {
+  display: flex;
+  align-items: center;
+}
+
+.expand-icon {
+  font-size: 1.2rem;
+  color: #7f8c8d;
+  transition: transform 0.3s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.card-content {
+  padding: 20px;
+  background: #f8f9fa;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Health Score Section */
+.health-score-summary {
+  display: block;
+  width: 100%;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.score-display {
+  text-align: center;
+}
+
+.score-circle {
+  display: inline-block;
+  padding: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  margin-bottom: 10px;
+}
+
+.score-number {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.score-max {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.score-grade {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+.constitution-info h5 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.constitution-breakdown {
+  margin-bottom: 15px;
+}
+
+.dosha-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+}
+
+.dosha-name {
+  font-weight: bold;
+}
+
+.dosha-percentage {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.primary-constitution {
+  font-weight: bold;
+  color: #2c3e50;
+  text-align: center;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+}
+
+/* Enhanced Constitution Analysis */
+.detailed-constitution {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.constitution-primary h6 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.constitution-description {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.element-breakdown h6 {
+  color: #2c3e50;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.element-bars {
+  margin-bottom: 20px;
+}
+
+.element-bar {
+  margin-bottom: 10px;
+}
+
+.element-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+}
+
+.element-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.element-percentage {
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #ecf0f1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.fire {
+  background: linear-gradient(90deg, #ff6b6b, #ee5a52);
+}
+
+.progress-fill.water {
+  background: linear-gradient(90deg, #4ecdc4, #44a08d);
+}
+
+.progress-fill.air {
+  background: linear-gradient(90deg, #a8e6cf, #7fcdcd);
+}
+
+.progress-fill.earth {
+  background: linear-gradient(90deg, #d4a574, #c49b61);
+}
+
+.planetary-contributors {
+  margin-bottom: 20px;
+}
+
+.planetary-contributors h6 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.astrological-reasoning {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #2196F3;
+}
+
+.astrological-reasoning h6 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.reasoning-text {
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Ayurvedic Constitution Styles */
+.ayurvedic-constitution {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  padding: 25px;
+  margin: 20px 0;
+}
+
+.constitution-header h4 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+}
+
+.constitution-type h3 {
+  color: #2c3e50;
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.constitution-blend {
+  color: #666;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.element-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.element-badge {
+  background: white;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-left: 4px solid #4CAF50;
+}
+
+.collapsible-section {
+  background: white;
+  border-radius: 8px;
+  margin: 20px 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.collapsible-section summary {
+  padding: 15px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #2c3e50;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.collapsible-section summary:hover {
+  background: #e9ecef;
+}
+
+.details-content {
+  padding: 20px;
+  border-top: 1px solid #e9ecef;
+}
+
+.element-table, .meaning-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.element-table th, .meaning-table th {
+  background: #2c3e50;
+  color: white;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.element-table td, .meaning-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.element-table tr:hover, .meaning-table tr:hover {
+  background: #f8f9fa;
+}
+
+.astrological-summary {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.astrological-summary h5 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.constitution-meaning {
+  margin: 25px 0;
+}
+
+.constitution-meaning h4 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+}
+
+.lifestyle-alignment {
+  margin: 25px 0;
+}
+
+.lifestyle-alignment h4 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+}
+
+.lifestyle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.favorable, .avoid {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.favorable {
+  border-left: 4px solid #4CAF50;
+}
+
+.avoid {
+  border-left: 4px solid #f44336;
+}
+
+.favorable h5 {
+  color: #4CAF50;
+  margin-bottom: 10px;
+}
+
+.avoid h5 {
+  color: #f44336;
+  margin-bottom: 10px;
+}
+
+.lifestyle-grid ul {
+  list-style: none;
+  padding: 0;
+}
+
+.lifestyle-grid li {
+  padding: 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.lifestyle-grid li:before {
+  content: "•";
+  color: #4CAF50;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.avoid li:before {
+  color: #f44336;
+}
+
+.harmony-insight {
+  margin: 25px 0;
+}
+
+.harmony-insight h4 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+}
+
+.harmony-insight blockquote {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 8px;
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin: 0;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+
+
+.score-explanation {
+  font-size: 0.8rem;
+  color: #666;
+  text-align: center;
+  margin-top: 10px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Planetary Health Analysis */
+.planetary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.planet-health-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #2196F3;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.planet-health-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.planet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.planet-name {
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #2c3e50;
+}
+
+/* Detailed Planetary Analysis */
+.planetary-detailed-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  margin-top: 20px;
+}
+
+.planet-detailed-card {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #2196F3;
+}
+
+.planet-title h3 {
+  color: #2c3e50;
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+.overall-assessment {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 25px;
+  border-left: 4px solid #4CAF50;
+}
+
+.overall-assessment h4 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.assessment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.assessment-item {
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.summary-line {
+  background: white;
+  padding: 15px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  border-left: 3px solid #2196F3;
+}
+
+.planetary-details h4 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+}
+
+.detail-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.detail-section {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 3px solid #FF9800;
+}
+
+.detail-section h5 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.detail-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.detail-section li {
+  padding: 5px 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #555;
+}
+
+.conclusion-text {
+  background: white;
+  padding: 15px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #333;
+  font-style: italic;
+}
+
+.health-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.health-status.very-positive {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+}
+
+.health-status.challenging {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  color: white;
+}
+
+.health-status.gandanta-afflicted {
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  color: white;
+}
+
+.health-status.neutral {
+  background: linear-gradient(135deg, #607D8B, #546E7A);
+  color: white;
+}
+
+/* House Analysis */
+.house-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.house-health-card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  border-left: 4px solid #FF9800;
+}
+
+.house-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.house-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+.house-strength {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.house-strength.strong {
+  background: #d4edda;
+  color: #155724;
+}
+
+.house-strength.moderate {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.house-strength.weak {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.house-details {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.house-lord, .health-significance, .resident-planets {
+  margin-bottom: 8px;
+}
+
+/* Yogas Analysis */
+.yogas-analysis {
+  space-y: 20px;
+}
+
+.yoga-category {
+  margin-bottom: 25px;
+}
+
+.yoga-category h5 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.yoga-list {
+  display: grid;
+  gap: 15px;
+}
+
+.yoga-item {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  border-left: 4px solid;
+}
+
+.yoga-item.benefic {
+  border-left-color: #4CAF50;
+}
+
+.yoga-item.malefic {
+  border-left-color: #f44336;
+}
+
+.yoga-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.yoga-name {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.yoga-strength {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.yoga-strength.strong {
+  background: #d4edda;
+  color: #155724;
+}
+
+.yoga-strength.moderate {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.yoga-description, .yoga-effect, .yoga-remedy {
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.yoga-remedy {
+  color: #666;
+  font-style: italic;
+}
+
+/* Gandanta Analysis */
+.gandanta-analysis {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.gandanta-status h5 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.gandanta-indicator {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+.gandanta-indicator.present {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.gandanta-indicator.absent {
+  background: #d4edda;
+  color: #155724;
+}
+
+.gandanta-impact {
+  margin-top: 20px;
+}
+
+.health-implications h6, .remedial-measures h6 {
+  margin-bottom: 10px;
+  color: #2c3e50;
+}
+
+.remedial-measures ul {
+  list-style-type: disc;
+  padding-left: 20px;
+}
+
+.remedial-measures li {
+  margin-bottom: 5px;
+}
+
+.no-gandanta {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+/* Loading and Error States */
+.loading-state, .error-state, .no-data-state {
+  text-align: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-state h3 {
+  color: #e74c3c;
+  margin-bottom: 15px;
+}
+
+.error-state button {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.error-state button:hover {
+  background: #45a049;
+}
+
+/* Modal */
+.analysis-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.analysis-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.card-content {
+  max-height: none !important;
+  overflow: visible !important;
+  width: 100% !important;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #7f8c8d;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: #2c3e50;
+}
+
+.modal-content {
+  padding: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .health-score-summary {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  
+  .planetary-grid, .house-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .constitution-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .contributor-list {
+    justify-content: center;
+  }
+}
+/* New Compact Planet Card Design */
+.planets-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 15px !important;
+  padding: 20px 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+@media (max-width: 1200px) {
+  .planets-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .planets-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.planet-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border: 1px solid #e8e9ea;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 280px;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden;
+  flex: none !important;
+}
+
+.planet-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+.planet-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 12px 12px 0 0;
+  min-height: auto;
+}
+
+.planet-symbol {
+  display: none;
+}
+
+.planet-info {
+  flex: 1;
+  min-height: auto;
+  line-height: 1.2;
+}
+
+.planet-info h3 {
+  margin: 0;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #343a40;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.planet-info h3::before {
+  content: attr(data-symbol);
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.body-parts {
+  font-size: 0.65em;
+  color: #6c757d;
+  font-weight: 400;
+  margin-top: 0;
+  line-height: 1.1;
+}
+
+.strength-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.65em;
+  font-weight: 600;
+  text-align: center;
+  min-width: 60px;
+  line-height: 1;
+}
+
+.strength-badge.strong {
+  background: #d1f2eb;
+  color: #0d7377;
+  border: 1px solid #7dcea0;
+}
+
+.strength-badge.moderate {
+  background: #fdeaa7;
+  color: #b7950b;
+  border: 1px solid #f4d03f;
+}
+
+.strength-badge.weak {
+  background: #fadbd8;
+  color: #a93226;
+  border: 1px solid #ec7063;
+}
+
+.planet-content {
+  padding: 12px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #adb5bd;
+}
+
+.info-item .icon {
+  font-size: 1.3em;
+  margin-top: 2px;
+}
+
+.info-item strong {
+  display: block;
+  font-size: 0.85em;
+  color: #6c757d;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-item p {
+  margin: 0;
+  font-size: 0.85em;
+  color: #343a40;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.relationships {
+  margin-bottom: 12px;
+}
+
+.relationship-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #adb5bd;
+}
+
+.relationship-item .icon {
+  font-size: 1.2em;
+  margin-top: 2px;
+}
+
+.relationship-item p {
+  margin: 0;
+  font-size: 0.9em;
+  color: #343a40;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.special-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.role-badge {
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
+.role-badge.role-good {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #81c784;
+}
+
+.role-badge.role-bad {
+  background: #ffeaea;
+  color: #c62828;
+  border: 1px solid #ef5350;
+}
+
+.health-summary {
+  padding: 12px;
+  background: #fef9e7;
+  border-radius: 6px;
+  border-left: 3px solid #f39c12;
+}
+
+.health-summary p {
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: #b7950b;
+  font-style: italic;
+}
+
+.gandanta-info, .aspects-info, .conjunctions-info {
+  margin-bottom: 8px;
+}
+
+.gandanta-badge, .aspects-badge, .conjunctions-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 0.75em;
+  font-weight: 600;
+  background: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ffb74d;
+}
+
+.gandanta-badge.negative {
+  background: #ffeaea;
+  color: #c62828;
+  border: 1px solid #ef5350;
+}
+
+.aspects-badge.positive, .conjunctions-badge.positive {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #81c784;
+}
+
+.aspects-badge.negative, .conjunctions-badge.negative {
+  background: #ffeaea;
+  color: #c62828;
+  border: 1px solid #ef5350;
+}
+
+.positive {
+  color: #2e7d32 !important;
+  font-weight: 500;
+}
+
+.negative {
+  color: #c62828 !important;
+  font-weight: 500;
+}
+
+.moderate {
+  color: #f57c00 !important;
+  font-weight: 500;
+}
+

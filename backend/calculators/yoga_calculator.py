@@ -268,7 +268,8 @@ class YogaCalculator(BaseCalculator):
             'amala_yogas': self.calculate_amala_yoga(),
             'viparita_raja_yogas': self.calculate_viparita_raja_yogas(),
             'dharma_karma_yogas': self.calculate_dharma_karma_yogas(),
-            'career_specific_yogas': self.calculate_career_specific_yogas()
+            'career_specific_yogas': self.calculate_career_specific_yogas(),
+            'health_yogas': self.calculate_health_yogas()
         }
     
     def calculate_career_specific_yogas(self):
@@ -325,6 +326,203 @@ class YogaCalculator(BaseCalculator):
                     'description': f'10th lord {tenth_lord} with Saturn - structured, responsible work style',
                     'classical_reference': 'Phaladīpikā 6.16; Hora Sara 10.2',
                     'sanskrit_verse': 'Daśama-patiḥ śanisaṃyuktaḥ karma-niṣṭhaḥ'
+                })
+        
+        return yogas
+    
+    def calculate_health_yogas(self):
+        """Calculate health-related yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Aristha Yogas (health affliction yogas)
+        yogas.extend(self._calculate_aristha_yogas())
+        
+        # Ayur Yogas (longevity yogas)
+        yogas.extend(self._calculate_ayur_yogas())
+        
+        # Healing yogas
+        yogas.extend(self._calculate_healing_yogas())
+        
+        return yogas
+    
+    def _calculate_aristha_yogas(self):
+        """Calculate Aristha (health affliction) yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Lagna lord in 6th/8th/12th house
+        lagna_lord = self._get_house_lord(1)
+        if lagna_lord and lagna_lord in planets:
+            lagna_lord_house = planets[lagna_lord].get('house', 1)
+            if lagna_lord_house in [6, 8, 12]:
+                yogas.append({
+                    'name': 'Lagna Lord Aristha Yoga',
+                    'planet': lagna_lord,
+                    'house': lagna_lord_house,
+                    'strength': 'High',
+                    'type': 'affliction',
+                    'description': f'Lagna lord {lagna_lord} in {lagna_lord_house}th house - health challenges'
+                })
+        
+        # 6th lord in Lagna
+        sixth_lord = self._get_house_lord(6)
+        if sixth_lord and sixth_lord in planets:
+            sixth_lord_house = planets[sixth_lord].get('house', 1)
+            if sixth_lord_house == 1:
+                yogas.append({
+                    'name': 'Sixth Lord in Lagna',
+                    'planet': sixth_lord,
+                    'house': 1,
+                    'strength': 'Medium',
+                    'type': 'affliction',
+                    'description': f'6th lord {sixth_lord} in Lagna - disease proneness'
+                })
+        
+        # 8th lord in Lagna
+        eighth_lord = self._get_house_lord(8)
+        if eighth_lord and eighth_lord in planets:
+            eighth_lord_house = planets[eighth_lord].get('house', 1)
+            if eighth_lord_house == 1:
+                yogas.append({
+                    'name': 'Eighth Lord in Lagna',
+                    'planet': eighth_lord,
+                    'house': 1,
+                    'strength': 'High',
+                    'type': 'affliction',
+                    'description': f'8th lord {eighth_lord} in Lagna - chronic health issues'
+                })
+        
+        # Health-specific Viparita Raja Yogas (dusthana cancellation for health)
+        yogas.extend(self._calculate_health_viparita_yogas())
+        
+        return yogas
+    
+    def _calculate_ayur_yogas(self):
+        """Calculate Ayur (longevity) yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Lagna lord in Kendra/Trikona
+        lagna_lord = self._get_house_lord(1)
+        if lagna_lord and lagna_lord in planets:
+            lagna_lord_house = planets[lagna_lord].get('house', 1)
+            if lagna_lord_house in [1, 4, 5, 7, 9, 10]:
+                yogas.append({
+                    'name': 'Ayur Yoga',
+                    'planet': lagna_lord,
+                    'house': lagna_lord_house,
+                    'strength': 'High',
+                    'type': 'beneficial',
+                    'description': f'Lagna lord {lagna_lord} in favorable house - good longevity'
+                })
+        
+        # Jupiter in Lagna (natural healing)
+        if 'Jupiter' in planets:
+            jupiter_house = planets['Jupiter'].get('house', 1)
+            if jupiter_house == 1:
+                yogas.append({
+                    'name': 'Guru Lagna Yoga',
+                    'planet': 'Jupiter',
+                    'house': 1,
+                    'strength': 'High',
+                    'type': 'beneficial',
+                    'description': 'Jupiter in Lagna - natural healing ability, strong immunity'
+                })
+        
+        return yogas
+    
+    def _calculate_healing_yogas(self):
+        """Calculate healing and recovery yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Sun in 10th house (vitality)
+        if 'Sun' in planets:
+            sun_house = planets['Sun'].get('house', 1)
+            if sun_house == 10:
+                yogas.append({
+                    'name': 'Surya Karma Yoga',
+                    'planet': 'Sun',
+                    'house': 10,
+                    'strength': 'Medium',
+                    'type': 'beneficial',
+                    'description': 'Sun in 10th house - strong vitality and leadership in health'
+                })
+        
+        # Moon in 4th house (emotional stability)
+        if 'Moon' in planets:
+            moon_house = planets['Moon'].get('house', 1)
+            if moon_house == 4:
+                yogas.append({
+                    'name': 'Chandra Sukha Yoga',
+                    'planet': 'Moon',
+                    'house': 4,
+                    'strength': 'Medium',
+                    'type': 'beneficial',
+                    'description': 'Moon in 4th house - emotional stability, good digestive health'
+                })
+        
+        # Venus in 7th house (hormonal balance)
+        if 'Venus' in planets:
+            venus_house = planets['Venus'].get('house', 1)
+            if venus_house == 7:
+                yogas.append({
+                    'name': 'Shukra Kalatra Yoga',
+                    'planet': 'Venus',
+                    'house': 7,
+                    'strength': 'Medium',
+                    'type': 'beneficial',
+                    'description': 'Venus in 7th house - hormonal balance, reproductive health'
+                })
+        
+        return yogas
+    
+    def _calculate_health_viparita_yogas(self):
+        """Calculate health-specific Viparita Raja Yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # 6th lord in 8th/12th house (disease lord in other dusthana)
+        sixth_lord = self._get_house_lord(6)
+        if sixth_lord and sixth_lord in planets:
+            sixth_lord_house = planets[sixth_lord].get('house', 1)
+            if sixth_lord_house in [8, 12]:
+                yogas.append({
+                    'name': 'Sarala Yoga (Health)',
+                    'planet': sixth_lord,
+                    'house': sixth_lord_house,
+                    'strength': 'Medium',
+                    'type': 'beneficial',
+                    'description': f'6th lord {sixth_lord} in {sixth_lord_house}th house - victory over diseases'
+                })
+        
+        # 8th lord in 6th/12th house (chronic illness lord in other dusthana)
+        eighth_lord = self._get_house_lord(8)
+        if eighth_lord and eighth_lord in planets:
+            eighth_lord_house = planets[eighth_lord].get('house', 1)
+            if eighth_lord_house in [6, 12]:
+                yogas.append({
+                    'name': 'Vimala Yoga (Health)',
+                    'planet': eighth_lord,
+                    'house': eighth_lord_house,
+                    'strength': 'Medium',
+                    'type': 'beneficial',
+                    'description': f'8th lord {eighth_lord} in {eighth_lord_house}th house - reduces chronic health issues'
+                })
+        
+        # 12th lord in 6th/8th house (hospitalization lord in other dusthana)
+        twelfth_lord = self._get_house_lord(12)
+        if twelfth_lord and twelfth_lord in planets:
+            twelfth_lord_house = planets[twelfth_lord].get('house', 1)
+            if twelfth_lord_house in [6, 8]:
+                yogas.append({
+                    'name': 'Vipareeta Raja Yoga (Health)',
+                    'planet': twelfth_lord,
+                    'house': twelfth_lord_house,
+                    'strength': 'Medium',
+                    'type': 'beneficial',
+                    'description': f'12th lord {twelfth_lord} in {twelfth_lord_house}th house - reduces hospitalization and mental health issues'
                 })
         
         return yogas

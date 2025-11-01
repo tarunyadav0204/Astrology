@@ -5,7 +5,7 @@ class FriendshipCalculator(BaseCalculator):
     """Extract friendship calculation logic from main.py"""
     
     def __init__(self):
-        super().__init__()
+        # Don't call super().__init__() since we don't need chart_data
         self.NATURAL_FRIENDS = {
             'Sun': ['Moon', 'Mars', 'Jupiter'],
             'Moon': ['Sun', 'Mercury'],

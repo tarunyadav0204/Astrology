@@ -224,7 +224,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category" onClick={() => user ? onLogin() : onLogin()}>
+            <div className="life-category" onClick={() => user ? navigate('/health-analysis') : onLogin()}>
               <div className="category-icon">🌿</div>
               <div className="category-content">
                 <h4>Your Health</h4>
@@ -370,6 +370,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                       navigate('/marriage-analysis');
                     } else if (service.title === 'Career Guidance') {
                       navigate('/career-guidance');
+                    } else if (service.title === 'Health Report') {
+                      navigate('/health-analysis');
                     }
                   }}
                 >
