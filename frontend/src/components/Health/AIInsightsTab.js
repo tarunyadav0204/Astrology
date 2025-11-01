@@ -70,17 +70,41 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const result = await response.json();
-      console.log('=== FULL API RESPONSE ===', result);
-      console.log('=== AI INSIGHTS DATA ===', result.data);
-      console.log('=== INSIGHTS OBJECT ===', result.data?.insights);
-      console.log('=== HEALTH OVERVIEW VALUE ===', result.data?.insights?.health_overview);
-      console.log('=== SUCCESS FLAG ===', result.data?.success);
-      setAiInsights(result.data);
+      // Handle streaming response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.status === 'processing') {
+                // Update loading message based on server status
+                console.log('Processing:', data.message);
+              } else if (data.status === 'complete') {
+                setAiInsights(data.data);
+                setLoading(false);
+                return;
+              } else if (data.status === 'error') {
+                throw new Error(data.error);
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse streaming data:', parseError);
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error loading AI insights:', error);
       setError(error.message || 'Failed to load AI insights');
-    } finally {
       setLoading(false);
     }
   };

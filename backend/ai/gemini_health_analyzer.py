@@ -183,6 +183,9 @@ Format as JSON with sections as keys and content as values.
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
         """Parse Gemini response into structured insights"""
         
+        print(f"Raw response length: {len(response_text)}")
+        print(f"Raw response preview: {response_text[:200]}...")
+        
         # Clean the response text
         response_text = response_text.strip()
         
@@ -201,10 +204,13 @@ Format as JSON with sections as keys and content as values.
         # Additional cleanup for any remaining entities
         response_text = response_text.replace('&quot;', '"').replace('&#39;', "'").replace('&amp;', '&')
         
+        print(f"Cleaned response preview: {response_text[:200]}...")
+        
         try:
             # Try to parse as JSON
             if response_text.startswith('{') and response_text.endswith('}'):
                 raw_parsed = json.loads(response_text)
+                print(f"Successfully parsed JSON with keys: {list(raw_parsed.keys())}")
                 
                 # Map Gemini response keys to expected frontend keys
                 key_mapping = {
@@ -223,13 +229,17 @@ Format as JSON with sections as keys and content as values.
                     else:
                         parsed[frontend_key] = '' if frontend_key in ['health_overview', 'constitutional_analysis', 'positive_indicators'] else []
                 
+                print(f"Final parsed keys: {list(parsed.keys())}")
                 return parsed
+            else:
+                print(f"Response doesn't start/end with braces. Starts with: '{response_text[:10]}', ends with: '{response_text[-10:]}'")
         except json.JSONDecodeError as e:
-            pass  # Silent failure, return error response below
+            print(f"JSON parsing failed: {e}")
+            print(f"Failed text: {response_text[:500]}...")
         
         # Return error response if parsing fails
         return {
-            'health_overview': 'AI response parsing failed',
+            'health_overview': f'AI response parsing failed. Response preview: {response_text[:100]}...',
             'constitutional_analysis': 'Unable to parse AI response. Please try again.',
             'key_health_areas': [],
             'lifestyle_recommendations': [],
