@@ -6,7 +6,20 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+# Try multiple paths to find .env file
+env_paths = [
+    '.env',  # Current directory
+    os.path.join(os.path.dirname(__file__), '..', '.env'),  # Parent directory
+    '/home/tarun_yadav/AstrologyApp/backend/.env'  # Absolute path
+]
+
+for env_path in env_paths:
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        print(f"Loaded .env from: {env_path}")
+        break
+else:
+    print("No .env file found in any expected location")
 
 class GeminiHealthAnalyzer:
     """Gemini AI integration for personalized health insights"""
@@ -14,6 +27,8 @@ class GeminiHealthAnalyzer:
     def __init__(self):
         # Configure Gemini API
         api_key = os.getenv('GEMINI_API_KEY')
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"API key found: {bool(api_key)}")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
         

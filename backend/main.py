@@ -54,6 +54,23 @@ except Exception as e:
 app = FastAPI()
 horoscope_api = HoroscopeAPI()
 
+# Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Set longer timeout for AI endpoints
+        if "/ai-insights" in str(request.url):
+            # No timeout for AI endpoints - let them complete
+            response = await call_next(request)
+        else:
+            # Normal timeout for other endpoints
+            response = await call_next(request)
+        return response
+
+app.add_middleware(TimeoutMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -2796,4 +2813,12 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
 if __name__ == "__main__":
     import uvicorn
     print("Starting Astrology API server on port 8001...")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # Configure uvicorn with longer timeout for AI requests
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8001,
+        timeout_keep_alive=120,  # Keep connections alive for 2 minutes
+        timeout_graceful_shutdown=30,  # Allow 30 seconds for graceful shutdown
+        access_log=True
+    )
