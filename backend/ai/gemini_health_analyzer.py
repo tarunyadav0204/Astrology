@@ -60,10 +60,6 @@ class GeminiHealthAnalyzer:
         prompt = self._create_health_prompt(context)
         
         response = self.model.generate_content(prompt)
-        print(f"\n=== GEMINI RAW RESPONSE ===")
-        print(response.text)
-        print(f"=== END GEMINI RESPONSE ===\n")
-        
         insights = self._parse_response(response.text)
         return {
             'success': True,
@@ -205,13 +201,10 @@ Format as JSON with sections as keys and content as values.
         # Additional cleanup for any remaining entities
         response_text = response_text.replace('&quot;', '"').replace('&#39;', "'").replace('&amp;', '&')
         
-        print(f"\n=== CLEANED RESPONSE ===\n{response_text[:500]}...\n=== END CLEANED ===\n")
-        
         try:
             # Try to parse as JSON
             if response_text.startswith('{') and response_text.endswith('}'):
                 raw_parsed = json.loads(response_text)
-                print(f"\n=== PARSED JSON ===\n{raw_parsed}\n=== END PARSED ===\n")
                 
                 # Map Gemini response keys to expected frontend keys
                 key_mapping = {
@@ -230,11 +223,9 @@ Format as JSON with sections as keys and content as values.
                     else:
                         parsed[frontend_key] = '' if frontend_key in ['health_overview', 'constitutional_analysis', 'positive_indicators'] else []
                 
-                print(f"\n=== FINAL PARSED RESULT ===\n{parsed}\n=== END FINAL ===\n")
                 return parsed
         except json.JSONDecodeError as e:
-            print(f"JSON parsing failed: {e}")
-            print(f"Response text: {response_text[:500]}...")
+            pass  # Silent failure, return error response below
         
         # Return error response if parsing fails
         return {

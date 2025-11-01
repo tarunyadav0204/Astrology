@@ -101,6 +101,9 @@ async def get_overall_health_assessment(request: BirthDetailsRequest):
         print(f"Health calculation error: {error_details}")
         raise HTTPException(status_code=500, detail=f"Health calculation error: {str(e)}\n{error_details}")
 
+from fastapi.responses import StreamingResponse
+import asyncio
+
 @router.post("/ai-insights")
 async def get_ai_health_insights(request: BirthDetailsRequest):
     """Get AI-powered health insights with database caching"""
@@ -139,14 +142,41 @@ async def get_ai_health_insights(request: BirthDetailsRequest):
         health_calc = HealthCalculator(chart_data, birth_data)
         health_analysis = health_calc.calculate_overall_health()
         
-        # Generate AI insights
+        # Generate AI insights with keep-alive
         try:
             print("Initializing Gemini analyzer...")
             gemini_analyzer = GeminiHealthAnalyzer()
             print("Gemini analyzer initialized successfully")
             
             print("Calling Gemini API...")
-            ai_insights = gemini_analyzer.generate_health_insights(health_analysis, chart_data)
+            # Add periodic keep-alive during long operation
+            async def generate_with_keepalive():
+                # Start the AI generation in background
+                import threading
+                result = {}
+                exception = {}
+                
+                def ai_worker():
+                    try:
+                        result['data'] = gemini_analyzer.generate_health_insights(health_analysis, chart_data)
+                    except Exception as e:
+                        exception['error'] = e
+                
+                # Start AI generation in thread
+                thread = threading.Thread(target=ai_worker)
+                thread.start()
+                
+                # Wait with periodic checks
+                while thread.is_alive():
+                    await asyncio.sleep(5)  # Check every 5 seconds
+                
+                thread.join()
+                
+                if 'error' in exception:
+                    raise exception['error']
+                return result['data']
+            
+            ai_insights = await generate_with_keepalive()
             print(f"Gemini API response: {ai_insights}")
             
             # Store insights in database

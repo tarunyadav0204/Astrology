@@ -2813,12 +2813,14 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
 if __name__ == "__main__":
     import uvicorn
     print("Starting Astrology API server on port 8001...")
-    # Configure uvicorn with longer timeout for AI requests
+    # Configure uvicorn with extended timeouts for AI requests
     uvicorn.run(
         app, 
         host="0.0.0.0", 
         port=8001,
-        timeout_keep_alive=120,  # Keep connections alive for 2 minutes
-        timeout_graceful_shutdown=30,  # Allow 30 seconds for graceful shutdown
-        access_log=True
+        timeout_keep_alive=300,  # Keep connections alive for 5 minutes
+        timeout_graceful_shutdown=60,  # Allow 60 seconds for graceful shutdown
+        access_log=False,  # Disable access logs for performance
+        limit_max_requests=1000,  # Prevent memory leaks
+        limit_concurrency=100  # Limit concurrent connections
     )
