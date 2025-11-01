@@ -73,10 +73,16 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
       // Handle streaming response
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let hasReceivedFinalMessage = false;
       
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          if (!hasReceivedFinalMessage) {
+            throw new Error('Stream ended without final result');
+          }
+          break;
+        }
         
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
@@ -87,13 +93,14 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
               const data = JSON.parse(line.slice(6));
               
               if (data.status === 'processing') {
-                // Update loading message based on server status
                 console.log('Processing:', data.message);
               } else if (data.status === 'complete') {
+                hasReceivedFinalMessage = true;
                 setAiInsights(data.data);
                 setLoading(false);
                 return;
               } else if (data.status === 'error') {
+                hasReceivedFinalMessage = true;
                 throw new Error(data.error);
               }
             } catch (parseError) {

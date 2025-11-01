@@ -172,9 +172,12 @@ async def get_ai_health_insights(request: BirthDetailsRequest):
                 # Send keep-alive messages every 10 seconds
                 while thread.is_alive():
                     yield f"data: {json.dumps({'status': 'processing', 'message': 'AI analysis in progress...'})}\n\n"
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5)
                 
-                thread.join()
+                thread.join(timeout=120)  # 2 minute timeout
+                
+                if thread.is_alive():
+                    raise Exception("AI analysis timed out after 2 minutes")
                 
                 if 'error' in exception:
                     raise exception['error']
