@@ -107,6 +107,7 @@ import asyncio
 @router.post("/ai-insights")
 async def get_ai_health_insights(request: BirthDetailsRequest):
     """Get AI-powered health insights with streaming keep-alive"""
+    print(f"AI insights request received: {request.birth_date} {request.birth_time}")
     
     async def generate_streaming_response():
         import json
@@ -152,7 +153,9 @@ async def get_ai_health_insights(request: BirthDetailsRequest):
             
             # Generate AI insights
             try:
+                print("Initializing Gemini analyzer...")
                 gemini_analyzer = GeminiHealthAnalyzer()
+                print("Gemini analyzer initialized successfully")
                 
                 # Run AI generation with periodic updates
                 import threading
@@ -162,22 +165,30 @@ async def get_ai_health_insights(request: BirthDetailsRequest):
                 
                 def ai_worker():
                     try:
+                        print("Starting Gemini AI generation...")
                         result['data'] = gemini_analyzer.generate_health_insights(health_analysis, chart_data)
+                        print("Gemini AI generation completed")
                     except Exception as e:
+                        print(f"Gemini AI error: {e}")
                         exception['error'] = e
                 
                 thread = threading.Thread(target=ai_worker)
                 thread.start()
                 
-                # Send keep-alive messages every 10 seconds
-                while thread.is_alive():
+                # Send keep-alive messages with timeout
+                count = 0
+                max_iterations = 24  # 2 minutes
+                
+                while thread.is_alive() and count < max_iterations:
                     yield f"data: {json.dumps({'status': 'processing', 'message': 'AI analysis in progress...'})}\n\n"
                     await asyncio.sleep(5)
-                
-                thread.join(timeout=120)  # 2 minute timeout
+                    count += 1
                 
                 if thread.is_alive():
-                    raise Exception("AI analysis timed out after 2 minutes")
+                    yield f"data: {json.dumps({'status': 'error', 'error': 'AI analysis timed out'})}\n\n"
+                    return
+                
+                thread.join(timeout=1)
                 
                 if 'error' in exception:
                     raise exception['error']
