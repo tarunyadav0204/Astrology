@@ -220,7 +220,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         <div className="chat-modal-overlay" onClick={onClose}>
             <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
-                    <h2>🤖 AI Astrologer</h2>
+                    <h2>AstroRoshni - Your Personal Astrologer</h2>
                     <button className="close-btn" onClick={onClose}>×</button>
                 </div>
                 
