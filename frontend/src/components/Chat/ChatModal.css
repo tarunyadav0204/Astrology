@@ -111,17 +111,20 @@
 }
 
 .message-bubble.assistant {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
     color: white;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-left: 4px solid rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.message-content {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
+.message-bubble .message-content {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 16px !important;
 }
 
 .message-text {
