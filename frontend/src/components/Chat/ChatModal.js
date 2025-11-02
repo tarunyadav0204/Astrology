@@ -238,6 +238,22 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
             <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
                     <h2>AstroRoshni - Your Personal Astrologer</h2>
+                    <button 
+                        onClick={() => setShowBirthForm(true)}
+                        style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            marginLeft: 'auto',
+                            marginRight: '60px'
+                        }}
+                    >
+                        👤 Change Person
+                    </button>
                     <button className="close-btn" onClick={onClose}>×</button>
                 </div>
                 

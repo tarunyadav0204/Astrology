@@ -85,7 +85,7 @@ export const SearchInput = styled.input`
 `;
 
 export const ChartsList = styled.div`
-  max-height: 300px;
+  height: 450px;
   overflow-y: auto;
   
   &::-webkit-scrollbar {
@@ -384,6 +384,6 @@ export const TabButton = styled.button`
 `;
 
 export const TabContent = styled.div`
-  flex: 1;
+  height: 600px;
   overflow: auto;
 `;
