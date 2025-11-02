@@ -18,7 +18,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   
   // Function to parse markdown-style bold text
   const parseMarkdown = (text) => {
-    if (!text) return text;
+    if (!text || typeof text !== 'string') return text;
     return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   };
 
@@ -186,10 +186,17 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   // Debug: Log the insights structure
   console.log('Final insights object:', insights);
   
-  // Check if AI response is empty
-  const isEmpty = !insights.health_overview && 
-                  !insights.constitutional_analysis && 
-                  (!insights.key_health_areas || insights.key_health_areas.length === 0);
+  // Check if AI response is empty - check if at least one section has content
+  const hasContent = insights.health_overview || 
+                     insights.constitutional_analysis || 
+                     (insights.key_health_areas && insights.key_health_areas.length > 0) ||
+                     (insights.lifestyle_recommendations && insights.lifestyle_recommendations.length > 0) ||
+                     (insights.preventive_measures && insights.preventive_measures.length > 0) ||
+                     insights.positive_indicators ||
+                     insights.accident_surgery_possibilities ||
+                     insights.health_timeline_2_years;
+  
+  const isEmpty = !hasContent;
   
   if (isEmpty) {
     return (
@@ -302,6 +309,52 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
             <p dangerouslySetInnerHTML={{__html: parseMarkdown(insights.positive_indicators) || 'No positive indicators available'}}></p>
           </div>
         </div>
+
+        {/* Accident & Surgery Possibilities */}
+        {insights.accident_surgery_possibilities && (
+          <div className="insight-card accident-card">
+            <div className="card-header">
+              <div className="card-icon">⚠️</div>
+              <h4>Accident & Surgery Possibilities</h4>
+            </div>
+            <div className="card-content">
+              {Array.isArray(insights.accident_surgery_possibilities) ? (
+                <ul className="insight-list">
+                  {insights.accident_surgery_possibilities.map((item, idx) => (
+                    <li key={idx} dangerouslySetInnerHTML={{__html: parseMarkdown(typeof item === 'string' ? item : JSON.stringify(item))}}></li>
+                  ))}
+                </ul>
+              ) : typeof insights.accident_surgery_possibilities === 'string' ? (
+                <p dangerouslySetInnerHTML={{__html: parseMarkdown(insights.accident_surgery_possibilities)}}></p>
+              ) : (
+                <p>{JSON.stringify(insights.accident_surgery_possibilities)}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Health Timeline */}
+        {insights.health_timeline_2_years && (
+          <div className="insight-card timeline-card">
+            <div className="card-header">
+              <div className="card-icon">📅</div>
+              <h4>Health Timeline (Next 6 Months)</h4>
+            </div>
+            <div className="card-content">
+              {Array.isArray(insights.health_timeline_2_years) ? (
+                <ul className="insight-list">
+                  {insights.health_timeline_2_years.map((item, idx) => (
+                    <li key={idx} dangerouslySetInnerHTML={{__html: parseMarkdown(typeof item === 'string' ? item : JSON.stringify(item))}}></li>
+                  ))}
+                </ul>
+              ) : typeof insights.health_timeline_2_years === 'string' ? (
+                <p dangerouslySetInnerHTML={{__html: parseMarkdown(insights.health_timeline_2_years)}}></p>
+              ) : (
+                <p>{JSON.stringify(insights.health_timeline_2_years)}</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="ai-footer">

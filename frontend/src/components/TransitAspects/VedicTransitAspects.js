@@ -15,14 +15,12 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   const [selectedPeriod, setSelectedPeriod] = useState(null);
 
   useEffect(() => {
-    // Clear cached timelines when birthData changes
     setAspectTimelines({});
     fetchVedicAspects();
     fetchDashaTimeline();
   }, [birthData]);
 
   useEffect(() => {
-    // Scroll current year into view
     const scrollToCurrentYear = () => {
       const activeButton = document.querySelector('.year-scroll-container .active');
       if (activeButton) {
@@ -46,7 +44,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       });
       
       const data = await response.json();
-      
       setAspects(data.aspects || []);
     } catch (error) {
       console.error('Error fetching Vedic aspects:', error);
@@ -112,7 +109,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
 
   const handleYearChange = (year) => {
     setCurrentYear(year);
-    // Clear cached timelines for new year
     setAspectTimelines({});
     aspects.forEach(aspect => {
       loadTimeline(aspect, year);
@@ -169,7 +165,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   };
 
   const getAspectName = (aspectType, enhancementType) => {
-    // Handle nakshatra-only connections
     if (aspectType === 'nakshatra_connection') {
       if (enhancementType === 'star_lord') {
         return 'Nakshatra Lord 🌟';
@@ -185,7 +180,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       return 'Nakshatra Connection';
     }
     
-    // Regular geometric aspects
     const aspectMap = {
       '1th_house': '1st',
       '2th_house': '2nd', 
@@ -201,9 +195,8 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       '12th_house': '12th'
     };
     
-    const baseName = aspectMap[aspectType] || aspectType;
+    const baseName = aspectMap[aspectType] || aspectType.replace('th_house', 'th');
     
-    // Add enhancement indicators to regular aspects
     if (enhancementType === 'star_lord') {
       return `${baseName} 🌟`;
     } else if (enhancementType === 'natal_nakshatra') {
@@ -229,7 +222,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       baseClass = 'future';
     }
     
-    // Add dasha-relevant class
     if (isDashaRelevant(aspect, period)) {
       baseClass += ' dasha-relevant';
     }
@@ -241,7 +233,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     if (!dashaTimeline.length) return null;
     
     const targetDate = new Date(periodDate);
-    // Find the closest dasha entry before or on the target date
     let closestDasha = null;
     
     for (const dasha of dashaTimeline) {
@@ -262,7 +253,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     const periodDashas = getDashaForPeriod(period.start_date);
     if (!periodDashas) return false;
     
-    // Get all dasha levels from the data structure
     const dashaLords = [
       periodDashas.mahadasha,
       periodDashas.antardasha,
@@ -270,8 +260,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       periodDashas.sookshmadasha,
       periodDashas.pranadasha
     ].filter(Boolean);
-    
-
     
     return dashaLords.includes(aspect.planet1) || dashaLords.includes(aspect.planet2);
   };
@@ -293,7 +281,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   };
 
   const getGroupedAspects = () => {
-    // Group aspects by planet pair
     const grouped = {};
     
     aspects.forEach(aspect => {
@@ -321,7 +308,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     aspectGroup.aspects.forEach(aspect => {
       const timeline = aspectTimelines[`${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`] || [];
       timeline.forEach(period => {
-        // Apply dasha filter at the period level, not group level
         if (!showDashaRelevantOnly || isDashaRelevant(aspect, period)) {
           allPeriods.push({
             ...period,
@@ -332,7 +318,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       });
     });
     
-    // Sort by start date
     return allPeriods.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
   };
 
@@ -356,7 +341,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
 
   return (
     <div className="vedic-transit-aspects">
-      {/* Year Navigation */}
       <div className="transit-year-nav">
         <div className="nav-title">Transit Aspects</div>
         
@@ -406,12 +390,10 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
         </div>
       </div>
 
-      {/* Compact Aspects List */}
       <div className="transit-aspects-list">
         {getFilteredAspects().map((aspectGroup, index) => {
           const combinedTimeline = getCombinedTimeline(aspectGroup);
           
-          // Hide rows with no periods
           if (combinedTimeline.length === 0) {
             return null;
           }

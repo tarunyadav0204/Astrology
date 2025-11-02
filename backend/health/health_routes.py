@@ -108,6 +108,7 @@ import asyncio
 async def get_ai_health_insights(request: BirthDetailsRequest):
     """Get AI-powered health insights with streaming keep-alive"""
     print(f"AI insights request received: {request.birth_date} {request.birth_time}")
+    print(f"Debug - Request force_regenerate: {request.force_regenerate}")
     
     async def generate_streaming_response():
         import json
@@ -134,11 +135,16 @@ async def get_ai_health_insights(request: BirthDetailsRequest):
             _init_ai_insights_table()
             
             # Check if we have stored insights (unless force regenerate)
+            print(f"Debug - Force regenerate: {request.force_regenerate}")
             if not request.force_regenerate:
                 stored_insights = _get_stored_ai_insights(birth_hash)
+                print(f"Debug - Found cached insights: {bool(stored_insights)}")
                 if stored_insights:
+                    print(f"Debug - Returning cached data")
                     yield f"data: {json.dumps({'status': 'complete', 'data': stored_insights, 'cached': True})}\n\n"
                     return
+            else:
+                print(f"Debug - Skipping cache due to force regenerate")
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Calculating birth chart...'})}\n\n"
             
@@ -166,10 +172,22 @@ async def get_ai_health_insights(request: BirthDetailsRequest):
                 def ai_worker():
                     try:
                         print("Starting Gemini AI generation...")
-                        result['data'] = gemini_analyzer.generate_health_insights(health_analysis, chart_data)
-                        print("Gemini AI generation completed")
+                        # Pass birth data to Gemini analyzer
+                        health_analysis_with_birth = health_analysis.copy()
+                        health_analysis_with_birth.update({
+                            'name': birth_data.place,
+                            'date': birth_data.date,
+                            'time': birth_data.time,
+                            'latitude': birth_data.latitude,
+                            'longitude': birth_data.longitude,
+                            'timezone': birth_data.timezone
+                        })
+                        
+                        # Generate AI insights (API call commented out inside function)
+                        result['data'] = gemini_analyzer.generate_health_insights(health_analysis_with_birth, chart_data)
+                        print("Mock AI generation completed")
                     except Exception as e:
-                        print(f"Gemini AI error: {e}")
+                        print(f"AI worker error: {e}")
                         exception['error'] = e
                 
                 thread = threading.Thread(target=ai_worker)

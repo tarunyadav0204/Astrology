@@ -98,6 +98,14 @@
   --card-accent: #16a085;
 }
 
+.accident-card {
+  --card-accent: #FF9800;
+}
+
+.timeline-card {
+  --card-accent: #9C27B0;
+}
+
 .card-header {
   display: flex;
   align-items: center;
