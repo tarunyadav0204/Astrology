@@ -49,10 +49,6 @@ async def ask_question(request: ChatRequest):
         print(f"Request question: {request.question}")
         print(f"Request data: {request}")
         try:
-            # Send initial status
-            print("Sending initial status...")
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Analyzing your birth chart...'})}\n\n"
-            
             # Prepare birth data
             from types import SimpleNamespace
             birth_data = {
@@ -68,17 +64,11 @@ async def ask_question(request: ChatRequest):
             
             birth_hash = session_manager.create_birth_hash(birth_data)
             
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Building astrological context...'})}\n\n"
-            
             # Build astrological context
             context = context_builder.build_complete_context(birth_data, request.question)
             
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Retrieving conversation history...'})}\n\n"
-            
             # Get conversation history
             history = session_manager.get_conversation_history(birth_hash)
-            
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating astrological insights...'})}\n\n"
             
             # Generate AI response
             try:

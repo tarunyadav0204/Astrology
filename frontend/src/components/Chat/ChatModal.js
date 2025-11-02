@@ -195,8 +195,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                         );
                                     });
                                 } else if (parsed.status === 'processing') {
-                                    // Ignore processing messages for now
-                                    console.log('Processing:', parsed.message);
+                                    // Ignore backend processing messages - keep frontend loading messages
+                                    console.log('Backend processing (ignored):', parsed.message);
                                 }
                             } catch (e) {
                                 console.error('Error parsing chunk:', e);
