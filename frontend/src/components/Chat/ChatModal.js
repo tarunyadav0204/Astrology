@@ -172,6 +172,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                         if (data === '[DONE]') break;
                         if (data.startsWith('{')) {
                             try {
+                                // Check if JSON is complete before parsing
+                                if (!data.endsWith('}')) {
+                                    continue; // Skip incomplete JSON chunks
+                                }
                                 const parsed = JSON.parse(data);
                                 console.log('Parsed response:', parsed);
                                 
@@ -184,6 +188,15 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                                 : msg
                                         );
                                     });
+                                    
+                                    // Scroll to top of the assistant message
+                                    setTimeout(() => {
+                                        const assistantMessages = document.querySelectorAll('.message-bubble.assistant');
+                                        const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+                                        if (lastAssistantMessage) {
+                                            lastAssistantMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }
+                                    }, 100);
                                 } else if (parsed.status === 'error') {
                                     console.error('AI Error:', parsed.error);
                                     assistantMessage.content = 'Sorry, I encountered an error. Please try again.';
@@ -199,9 +212,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                     console.log('Backend processing (ignored):', parsed.message);
                                 }
                             } catch (e) {
-                                console.error('Error parsing chunk:', e);
-                                console.error('Problematic data:', data);
-                                console.error('Data length:', data.length);
+                                console.warn('Skipping malformed JSON chunk:', data.substring(0, 100) + '...');
+                                continue; // Skip malformed chunks and continue processing
                             }
                         }
                     }
@@ -269,7 +281,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                         <>
                             <div className="chat-messages">
                                 <MessageList messages={messages} />
-                                <div ref={messagesEndRef} />
                             </div>
                             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
                         </>
