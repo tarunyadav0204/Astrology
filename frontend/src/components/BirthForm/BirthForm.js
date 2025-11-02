@@ -5,7 +5,7 @@ import { apiService } from '../../services/apiService';
 import { locationService } from '../../services/locationService';
 import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
-import { TwoPanelContainer, FormPanel, ChartsPanel, FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem } from './BirthForm.styles';
+import { FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem, TabContainer, TabNavigation, TabButton, TabContent } from './BirthForm.styles';
 
 const BirthForm = ({ onSubmit, onLogout }) => {
   const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
@@ -301,14 +301,36 @@ const BirthForm = ({ onSubmit, onLogout }) => {
     }
   };
 
-  return (
-    <TwoPanelContainer style={{ overflow: 'visible' }}>
-      <FormPanel>
-        <FormContainer>
-          <h2 style={{ marginBottom: '20px' }}>Birth Details</h2>
-      
+  const [activeTab, setActiveTab] = useState('new');
 
-      <form onSubmit={handleSubmit}>
+  return (
+    <TabContainer>
+      {/* Tab Navigation */}
+      <TabNavigation>
+        <TabButton
+          type="button"
+          onClick={() => setActiveTab('new')}
+          active={activeTab === 'new'}
+          isFirst={true}
+        >
+          📝 New Chart
+        </TabButton>
+        <TabButton
+          type="button"
+          onClick={() => setActiveTab('saved')}
+          active={activeTab === 'saved'}
+          isLast={true}
+        >
+          📊 Saved Charts
+        </TabButton>
+      </TabNavigation>
+
+      {/* Tab Content */}
+      {activeTab === 'new' ? (
+        <TabContent>
+        <FormContainer style={{ flex: 1, overflow: 'hidden' }}>
+          <h2 style={{ marginBottom: '10px', color: 'white', fontSize: '1.1rem' }}>Birth Details</h2>
+          <form onSubmit={handleSubmit}>
         <FormField>
           <Label>{FORM_FIELDS.name.label}</Label>
           <Input
@@ -392,7 +414,7 @@ const BirthForm = ({ onSubmit, onLogout }) => {
           {errors.place && <span className="error">{errors.place}</span>}
         </FormField>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
           <Button type="submit">
             {editingChart ? 'Update Chart' : 'Calculate Birth Chart'}
           </Button>
@@ -401,51 +423,53 @@ const BirthForm = ({ onSubmit, onLogout }) => {
               Cancel
             </Button>
           )}
-        </div>
-      </form>
-    </FormContainer>
-      </FormPanel>
-      
-      <ChartsPanel>
-        <h3>📊 Saved Charts</h3>
-        <SearchInput
-          type="text"
-          placeholder="Search by name..."
-          value={searchQuery}
-          onChange={handleSearchChange}
-        />
-        <ChartsList>
-          {existingCharts.map(chart => (
-            <ChartItem key={chart.id}>
-              <div onClick={() => selectExistingChart(chart)} style={{ flex: 1, cursor: 'pointer' }}>
-                <strong>{chart.name}</strong><br/>
-                {chart.date} at {chart.time}<br/>
-                <small>Created: {new Date(chart.created_at).toLocaleDateString()}</small>
+          </div>
+          </form>
+        </FormContainer>
+        </TabContent>
+      ) : (
+        <TabContent style={{ padding: '0 10px' }}>
+          <h3 style={{ marginBottom: '10px', color: 'white', fontSize: '1rem' }}>📊 Saved Charts</h3>
+          <SearchInput
+            type="text"
+            placeholder="Search by name..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            style={{ marginBottom: '10px' }}
+          />
+          <ChartsList>
+            {existingCharts.map(chart => (
+              <ChartItem key={chart.id}>
+                <div onClick={() => selectExistingChart(chart)} style={{ flex: 1, cursor: 'pointer' }}>
+                  <strong>{chart.name}</strong><br/>
+                  {chart.date} at {chart.time}<br/>
+                  <small>Created: {new Date(chart.created_at).toLocaleDateString()}</small>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); editChart(chart); setActiveTab('new'); }}
+                    style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteChart(chart.id); }}
+                    style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </ChartItem>
+            ))}
+            {existingCharts.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', padding: '1rem' }}>
+                {searchQuery ? 'No charts found' : 'No saved charts'}
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); editChart(chart); }}
-                  style={{ padding: '4px 8px', fontSize: '12px', background: '#ff6f00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); deleteChart(chart.id); }}
-                  style={{ padding: '4px 8px', fontSize: '12px', background: '#e91e63', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  Delete
-                </button>
-              </div>
-            </ChartItem>
-          ))}
-          {existingCharts.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
-              {searchQuery ? 'No charts found' : 'No saved charts'}
-            </div>
-          )}
-        </ChartsList>
-      </ChartsPanel>
-    </TwoPanelContainer>
+            )}
+          </ChartsList>
+        </TabContent>
+      )}
+    </TabContainer>
   );
 };
 

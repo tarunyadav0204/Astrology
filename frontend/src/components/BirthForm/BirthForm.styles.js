@@ -65,11 +65,11 @@ export const ChartsPanel = styled.div`
 
 export const SearchInput = styled.input`
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border: 2px solid rgba(233, 30, 99, 0.2);
-  border-radius: 12px;
-  font-size: 1rem;
-  margin-bottom: 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
   background: rgba(255, 255, 255, 0.8);
   
   &:focus {
@@ -85,7 +85,7 @@ export const SearchInput = styled.input`
 `;
 
 export const ChartsList = styled.div`
-  max-height: 500px;
+  max-height: 300px;
   overflow-y: auto;
   
   &::-webkit-scrollbar {
@@ -106,7 +106,7 @@ export const ChartsList = styled.div`
 export const FormContainer = styled.div`
   max-width: 500px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 20px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
@@ -116,7 +116,7 @@ export const FormContainer = styled.div`
   overflow: hidden;
   
   @media (max-width: 768px) {
-    padding: 1rem;
+    padding: 0.5rem;
     margin: 0;
     border-radius: 15px;
     max-width: 100%;
@@ -136,16 +136,17 @@ export const FormContainer = styled.div`
   h2 {
     text-align: center;
     color: #e91e63;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    font-size: 1.2rem;
     
     &::before {
       content: '✨';
-      font-size: 1.5rem;
+      font-size: 1.2rem;
     }
   }
 
@@ -153,37 +154,37 @@ export const FormContainer = styled.div`
 `;
 
 export const FormField = styled.div`
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
   
   .error {
     color: #e74c3c;
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
     display: block;
   }
 `;
 
 export const Label = styled.label`
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
   color: #e91e63;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 `;
 
 export const Input = styled.input`
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border: 2px solid ${props => props.error ? '#e74c3c' : 'rgba(233, 30, 99, 0.2)'};
-  border-radius: 12px;
-  font-size: 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
   transition: all 0.3s ease;
   background: rgba(255, 255, 255, 0.8);
-  min-height: 44px;
+  min-height: 36px;
   
   @media (max-width: 768px) {
     font-size: 16px;
-    padding: 1rem;
+    padding: 0.6rem;
   }
   
   &:focus {
@@ -200,13 +201,13 @@ export const Input = styled.input`
 
 export const Select = styled.select`
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border: 2px solid ${props => props.error ? '#e74c3c' : 'rgba(233, 30, 99, 0.2)'};
-  border-radius: 12px;
-  font-size: 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
   transition: all 0.3s ease;
   background: rgba(255, 255, 255, 0.8);
-  min-height: 44px;
+  min-height: 36px;
   cursor: pointer;
   color: #333;
   -webkit-appearance: none;
@@ -214,12 +215,12 @@ export const Select = styled.select`
   appearance: none;
   background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23e91e63" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
   background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 12px;
+  background-position: right 0.5rem center;
+  background-size: 10px;
   
   @media (max-width: 768px) {
     font-size: 16px;
-    padding: 1rem;
+    padding: 0.6rem;
   }
   
   &:focus {
@@ -271,12 +272,12 @@ export const SuggestionItem = styled.li`
 
 export const Button = styled.button`
   width: 100%;
-  padding: 1rem;
+  padding: 0.75rem;
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   color: white;
   border: none;
-  border-radius: 12px;
-  font-size: 1.1rem;
+  border-radius: 8px;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -284,11 +285,11 @@ export const Button = styled.button`
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 48px;
+  min-height: 40px;
   
   @media (max-width: 768px) {
-    padding: 1.25rem;
-    font-size: 1rem;
+    padding: 0.8rem;
+    font-size: 0.9rem;
   }
   
   &::before {
@@ -316,8 +317,8 @@ export const Button = styled.button`
 
 
 export const ChartItem = styled.div`
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
   background: rgba(255, 255, 255, 0.9);
   border: 2px solid rgba(233, 30, 99, 0.2);
   border-radius: 12px;
@@ -347,4 +348,42 @@ export const ChartItem = styled.div`
   &:last-child {
     margin-bottom: 0;
   }
+`;
+
+export const TabContainer = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
+
+export const TabNavigation = styled.div`
+  display: flex;
+  border-bottom: 2px solid rgba(233, 30, 99, 0.2);
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px 8px 0 0;
+`;
+
+export const TabButton = styled.button`
+  flex: 1;
+  padding: 8px 16px;
+  background: ${props => props.active ? 'rgba(233, 30, 99, 0.2)' : 'transparent'};
+  color: ${props => props.active ? '#e91e63' : '#666'};
+  border: none;
+  border-radius: ${props => props.isFirst ? '8px 0 0 0' : props.isLast ? '0 8px 0 0' : '0'};
+  cursor: pointer;
+  font-weight: ${props => props.active ? 'bold' : 'normal'};
+  transition: all 0.3s ease;
+  font-size: 13px;
+  
+  &:hover {
+    background: rgba(233, 30, 99, 0.1);
+    color: #e91e63;
+  }
+`;
+
+export const TabContent = styled.div`
+  flex: 1;
+  overflow: auto;
 `;

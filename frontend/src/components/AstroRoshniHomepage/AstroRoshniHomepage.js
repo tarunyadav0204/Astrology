@@ -760,7 +760,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
       {/* Live Chat Widget */}
       <div className="live-chat-widget">
-        <button className="chat-widget-btn" onClick={() => setShowChatModal(true)}>
+        <button className="chat-widget-btn" onClick={() => user ? setShowChatModal(true) : onLogin()}>
           💬 Ask Question Now
           <span className="chat-pulse"></span>
         </button>

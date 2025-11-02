@@ -11,6 +11,8 @@
     z-index: 10000;
     /* Mobile first - no padding */
     padding: 0;
+    /* Prevent background scrolling */
+    overflow: hidden;
 }
 
 .chat-modal {
@@ -70,9 +72,12 @@
 
 .birth-form-container {
     flex: 1;
-    overflow-y: auto;
-    padding: 0;
-    max-height: calc(90vh - 80px);
+    overflow: hidden;
+    padding: 10px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
 }
 
 .birth-form-container > div {
@@ -222,18 +227,93 @@
     }
 }
 
-/* Override birth form styles for modal */
+/* Override birth form styles for modal - use same styling as other screens */
 .chat-modal .birth-form-container {
-    padding: 20px 20px 40px 20px;
+    padding: 10px;
     margin: 0;
     box-sizing: border-box;
+    background: transparent;
 }
 
+/* Reset birth form styling to match other screens */
 .chat-modal .birth-form-container > div {
-    background: transparent;
-    padding: 0;
-    margin: 0;
-    min-height: auto;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.chat-modal .birth-form-container > div::before {
+    display: none !important;
+}
+
+/* Tab styling override for chat modal */
+.chat-modal .birth-form-container button {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.chat-modal .birth-form-container button[style*="background: rgba(233, 30, 99, 0.2)"] {
+    background: rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
+    font-weight: bold !important;
+}
+
+/* Form elements styling for chat modal */
+.chat-modal .birth-form-container input,
+.chat-modal .birth-form-container select {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    color: #333 !important;
+}
+
+.chat-modal .birth-form-container label {
+    color: #333 !important;
+    text-shadow: none;
+    font-weight: normal;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.chat-modal .birth-form-container h2,
+.chat-modal .birth-form-container h3 {
+    color: #333 !important;
+    text-shadow: none;
+    font-weight: normal;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px 12px;
+    border-radius: 8px;
+    display: inline-block;
+}
+
+/* Fix text color in form containers */
+.chat-modal .birth-form-container div[style*="background"] {
+    color: #333 !important;
+}
+
+/* Fix button text colors */
+.chat-modal .birth-form-container button:not([style*="background: rgba(255, 255, 255, 0.3)"]) {
+    color: white !important;
+}
+
+/* Calculate Birth Chart button styling */
+.chat-modal .birth-form-container button[type="submit"] {
+    background: linear-gradient(135deg, #e91e63 0%, #f06292 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* Error messages */
+.chat-modal .birth-form-container .error {
+    color: #ff4444 !important;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 /* Chat input container - mobile first */
@@ -348,6 +428,9 @@
     
     .birth-form-container {
         padding: 15px;
+        height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
     
     .chat-messages {
