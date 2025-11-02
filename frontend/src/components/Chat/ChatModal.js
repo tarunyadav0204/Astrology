@@ -87,11 +87,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
             '✨ Preparing your personalized insights...',
             '🌙 Reading lunar influences...',
             '☀️ Examining solar aspects...',
-            '♃ Studying Jupiter\'s blessings...',
+            '♃ Studying Jupiter blessings...',
             '♀ Analyzing Venus placements...',
             '♂ Checking Mars energy...',
-            '☿ Decoding Mercury\'s messages...',
-            '♄ Understanding Saturn\'s lessons...',
+            '☿ Decoding Mercury messages...',
+            '♄ Understanding Saturn lessons...',
             '🐉 Exploring Rahu-Ketu axis...',
             '🏠 Examining house strengths...',
             '🔄 Calculating dasha periods...',
@@ -99,21 +99,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
             '🌊 Flowing through nakshatras...',
             '⚖️ Balancing planetary forces...',
             '🎭 Unveiling karmic patterns...',
-            '🗝️ Unlocking hidden potentials...',
-            '🌈 Connecting celestial dots...',
-            '📜 Consulting ancient wisdom...',
-            '🔍 Deep-diving into specifics...',
-            '🎨 Painting your cosmic portrait...',
-            '🧭 Navigating stellar influences...',
-            '💎 Polishing astrological gems...',
-            '🌸 Blooming insights for you...',
-            '🎪 Orchestrating cosmic symphony...',
-            '🔥 Igniting transformative wisdom...',
-            '💫 Weaving your destiny threads...'
+            '🗝️ Unlocking hidden potentials...'
         ];
         
-        let loadingIndex = 0;
-        let typingMessage = { 
+        // Add initial typing message
+        const typingMessageId = Date.now();
+        const typingMessage = { 
+            id: typingMessageId,
             role: 'assistant', 
             content: loadingMessages[0], 
             timestamp: new Date().toISOString(),
@@ -122,16 +114,19 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         
         setMessages(prev => [...prev, typingMessage]);
         
-        // Cycle through loading messages every 2 seconds
+        // Cycle through loading messages
+        let currentIndex = 0;
         const loadingInterval = setInterval(() => {
-            loadingIndex = (loadingIndex + 1) % loadingMessages.length;
-            typingMessage.content = loadingMessages[loadingIndex];
+            currentIndex = (currentIndex + 1) % loadingMessages.length;
+            
             setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = { ...typingMessage };
-                return newMessages;
+                return prev.map(msg => 
+                    msg.id === typingMessageId 
+                        ? { ...msg, content: loadingMessages[currentIndex] }
+                        : msg
+                );
             });
-        }, 2000);
+        }, 3000);
 
         try {
             const response = await fetch('/api/chat/ask', {
@@ -148,13 +143,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
             // Clear loading interval
             clearInterval(loadingInterval);
             
-            let assistantMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() };
+            let assistantMessage = { 
+                id: Date.now(),
+                role: 'assistant', 
+                content: '', 
+                timestamp: new Date().toISOString() 
+            };
             
             // Replace typing message with actual response
             setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = assistantMessage;
-                return newMessages;
+                return prev.map(msg => 
+                    msg.id === typingMessageId 
+                        ? assistantMessage
+                        : msg
+                );
             });
 
             while (true) {
@@ -171,23 +173,35 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                         if (data.startsWith('{')) {
                             try {
                                 const parsed = JSON.parse(data);
+                                console.log('Parsed response:', parsed);
+                                
                                 if (parsed.status === 'complete' && parsed.response) {
                                     assistantMessage.content = parsed.response;
                                     setMessages(prev => {
-                                        const newMessages = [...prev];
-                                        newMessages[newMessages.length - 1] = { ...assistantMessage };
-                                        return newMessages;
+                                        return prev.map(msg => 
+                                            msg.id === assistantMessage.id 
+                                                ? { ...assistantMessage }
+                                                : msg
+                                        );
                                     });
                                 } else if (parsed.status === 'error') {
+                                    console.error('AI Error:', parsed.error);
                                     assistantMessage.content = 'Sorry, I encountered an error. Please try again.';
                                     setMessages(prev => {
-                                        const newMessages = [...prev];
-                                        newMessages[newMessages.length - 1] = { ...assistantMessage };
-                                        return newMessages;
+                                        return prev.map(msg => 
+                                            msg.id === assistantMessage.id 
+                                                ? { ...assistantMessage }
+                                                : msg
+                                        );
                                     });
+                                } else if (parsed.status === 'processing') {
+                                    // Ignore processing messages for now
+                                    console.log('Processing:', parsed.message);
                                 }
                             } catch (e) {
                                 console.error('Error parsing chunk:', e);
+                                console.error('Problematic data:', data);
+                                console.error('Data length:', data.length);
                             }
                         }
                     }
@@ -197,13 +211,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
             console.error('Error sending message:', error);
             clearInterval(loadingInterval);
             setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = { 
-                    role: 'assistant', 
-                    content: 'Sorry, I encountered an error. Please try again.', 
-                    timestamp: new Date().toISOString() 
-                };
-                return newMessages;
+                return prev.map(msg => 
+                    msg.id === typingMessageId 
+                        ? { 
+                            id: Date.now(),
+                            role: 'assistant', 
+                            content: 'Sorry, I encountered an error. Please try again.', 
+                            timestamp: new Date().toISOString() 
+                        }
+                        : msg
+                );
             });
         } finally {
             setIsLoading(false);

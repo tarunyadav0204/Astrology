@@ -5,7 +5,7 @@ const MessageList = ({ messages }) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
-                <MessageBubble key={index} message={message} />
+                <MessageBubble key={message.id || index} message={message} />
             ))}
         </div>
     );

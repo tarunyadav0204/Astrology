@@ -100,8 +100,18 @@ async def ask_question(request: ChatRequest):
                     # Save to conversation history
                     session_manager.add_message(birth_hash, request.question, response_text)
                     
-                    # Send final result
-                    yield f"data: {json.dumps({'status': 'complete', 'response': response_text})}\n\n"
+                    # Send final result with proper JSON escaping
+                    try:
+                        response_json = json.dumps({
+                            'status': 'complete', 
+                            'response': response_text
+                        }, ensure_ascii=False, separators=(',', ':'))
+                        yield f"data: {response_json}\n\n"
+                    except Exception as json_error:
+                        print(f"JSON serialization error: {json_error}")
+                        # Fallback with escaped response
+                        safe_response = response_text.replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+                        yield f"data: {{\"status\": \"complete\", \"response\": \"{safe_response}\"}}\n\n"
                 else:
                     print(f"AI error: {ai_result.get('error')}")
                     yield f"data: {json.dumps({'status': 'error', 'error': ai_result.get('error', 'AI analysis failed')})}\n\n"
