@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../../config/app.config';
 import NavigationHeader from '../Shared/NavigationHeader';
+import ChatModal from '../Chat/ChatModal';
 import './AstroRoshniHomepage.css';
 
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
@@ -11,6 +12,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [horoscopeData, setHoroscopeData] = useState({});
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('daily');
+  const [showChatModal, setShowChatModal] = useState(false);
 
   const bannerSlides = [
     { id: 1, image: '/images/banner-ai-astrologers.jpg', title: 'AI Astrologers Available 24/7' },
@@ -229,6 +231,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <div className="category-content">
                 <h4>Your Health</h4>
                 <p>Wellness & vitality insights</p>
+              </div>
+              <div className="category-arrow">→</div>
+            </div>
+            <div className="life-category" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="category-icon">🤖</div>
+              <div className="category-content">
+                <h4>AI Astrologer</h4>
+                <p>Chat with AI for instant guidance</p>
               </div>
               <div className="category-arrow">→</div>
             </div>
@@ -814,6 +824,12 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
         </div>
       </footer>
+      
+      <ChatModal 
+        isOpen={showChatModal} 
+        onClose={() => setShowChatModal(false)}
+        initialBirthData={null}
+      />
     </div>
   );
 };

@@ -1,0 +1,250 @@
+import React, { useState, useEffect, useRef } from 'react';
+import MessageList from './MessageList';
+import ChatInput from './ChatInput';
+import BirthForm from '../BirthForm/BirthForm';
+import { useAstrology } from '../../context/AstrologyContext';
+import './ChatModal.css';
+
+const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
+    const { birthData, setBirthData } = useAstrology();
+    const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
+    const [messages, setMessages] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+    
+    // Use initial birth data if provided
+    useEffect(() => {
+        if (initialBirthData) {
+            setBirthData(initialBirthData);
+            setShowBirthForm(false);
+        }
+    }, [initialBirthData, setBirthData]);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    useEffect(() => {
+        if (birthData) {
+            setShowBirthForm(false);
+            loadChatHistory();
+            // Add greeting message if no existing messages
+            if (messages.length === 0) {
+                addGreetingMessage();
+            }
+        }
+    }, [birthData]);
+    
+    const addGreetingMessage = () => {
+        const place = birthData.place && !birthData.place.includes(',') ? birthData.place : `${birthData.latitude}, ${birthData.longitude}`;
+        const greetingMessage = {
+            role: 'assistant',
+            content: `Hello ${birthData.name}! I see you were born on ${new Date(birthData.date).toLocaleDateString()} at ${place}. I'm here to help you understand your birth chart and provide astrological guidance. What would you like to know about your cosmic blueprint?`,
+            timestamp: new Date().toISOString()
+        };
+        setMessages([greetingMessage]);
+    };
+
+    const loadChatHistory = async () => {
+        try {
+            const response = await fetch('/api/chat/history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(birthData)
+            });
+            const data = await response.json();
+            const existingMessages = data.messages || [];
+            setMessages(existingMessages);
+            
+            // Add greeting if no existing messages
+            if (existingMessages.length === 0) {
+                addGreetingMessage();
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+            // Add greeting on error too
+            addGreetingMessage();
+        }
+    };
+
+    const handleSendMessage = async (message) => {
+        if (!birthData) return;
+
+        const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
+        setMessages(prev => [...prev, userMessage]);
+        setIsLoading(true);
+
+        // Add typing indicator with engaging messages
+        const loadingMessages = [
+            '🔮 Analyzing your birth chart...',
+            '⭐ Consulting the cosmic energies...',
+            '📊 Calculating planetary positions...',
+            '🌟 Interpreting astrological patterns...',
+            '✨ Preparing your personalized insights...',
+            '🌙 Reading lunar influences...',
+            '☀️ Examining solar aspects...',
+            '♃ Studying Jupiter\'s blessings...',
+            '♀ Analyzing Venus placements...',
+            '♂ Checking Mars energy...',
+            '☿ Decoding Mercury\'s messages...',
+            '♄ Understanding Saturn\'s lessons...',
+            '🐉 Exploring Rahu-Ketu axis...',
+            '🏠 Examining house strengths...',
+            '🔄 Calculating dasha periods...',
+            '🎯 Identifying key yogas...',
+            '🌊 Flowing through nakshatras...',
+            '⚖️ Balancing planetary forces...',
+            '🎭 Unveiling karmic patterns...',
+            '🗝️ Unlocking hidden potentials...',
+            '🌈 Connecting celestial dots...',
+            '📜 Consulting ancient wisdom...',
+            '🔍 Deep-diving into specifics...',
+            '🎨 Painting your cosmic portrait...',
+            '🧭 Navigating stellar influences...',
+            '💎 Polishing astrological gems...',
+            '🌸 Blooming insights for you...',
+            '🎪 Orchestrating cosmic symphony...',
+            '🔥 Igniting transformative wisdom...',
+            '💫 Weaving your destiny threads...'
+        ];
+        
+        let loadingIndex = 0;
+        let typingMessage = { 
+            role: 'assistant', 
+            content: loadingMessages[0], 
+            timestamp: new Date().toISOString(),
+            isTyping: true
+        };
+        
+        setMessages(prev => [...prev, typingMessage]);
+        
+        // Cycle through loading messages every 2 seconds
+        const loadingInterval = setInterval(() => {
+            loadingIndex = (loadingIndex + 1) % loadingMessages.length;
+            typingMessage.content = loadingMessages[loadingIndex];
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = { ...typingMessage };
+                return newMessages;
+            });
+        }, 2000);
+
+        try {
+            const response = await fetch('/api/chat/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...birthData, question: message })
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            // Clear loading interval
+            clearInterval(loadingInterval);
+            
+            let assistantMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() };
+            
+            // Replace typing message with actual response
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = assistantMessage;
+                return newMessages;
+            });
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') break;
+                        if (data.startsWith('{')) {
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.status === 'complete' && parsed.response) {
+                                    assistantMessage.content = parsed.response;
+                                    setMessages(prev => {
+                                        const newMessages = [...prev];
+                                        newMessages[newMessages.length - 1] = { ...assistantMessage };
+                                        return newMessages;
+                                    });
+                                } else if (parsed.status === 'error') {
+                                    assistantMessage.content = 'Sorry, I encountered an error. Please try again.';
+                                    setMessages(prev => {
+                                        const newMessages = [...prev];
+                                        newMessages[newMessages.length - 1] = { ...assistantMessage };
+                                        return newMessages;
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('Error parsing chunk:', e);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+            clearInterval(loadingInterval);
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = { 
+                    role: 'assistant', 
+                    content: 'Sorry, I encountered an error. Please try again.', 
+                    timestamp: new Date().toISOString() 
+                };
+                return newMessages;
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleBirthFormSubmit = () => {
+        setShowBirthForm(false);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="chat-modal-overlay" onClick={onClose}>
+            <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="chat-modal-header">
+                    <h2>🤖 AI Astrologer</h2>
+                    <button className="close-btn" onClick={onClose}>×</button>
+                </div>
+                
+                <div className="chat-modal-content">
+                    {showBirthForm ? (
+                        <div className="birth-form-container">
+                            <BirthForm 
+                                onSubmit={handleBirthFormSubmit}
+                                onLogout={() => {}}
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            <div className="chat-messages">
+                                <MessageList messages={messages} />
+                                <div ref={messagesEndRef} />
+                            </div>
+                            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ChatModal;

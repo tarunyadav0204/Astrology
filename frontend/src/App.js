@@ -23,6 +23,7 @@ import HealthAnalysisPage from './components/HealthAnalysisPage/HealthAnalysisPa
 import PanchangPage from './components/Panchang/PanchangPage';
 import MuhuratFinderPage from './components/MuhuratFinder/MuhuratFinderPage';
 import AdminPanel from './components/Admin/AdminPanel';
+import ChatPage from './components/Chat/ChatPage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -878,6 +879,7 @@ function App() {
               onAdminClick={handleAdminClick} 
             />
           } />
+          <Route path="/chat" element={<ChatPage />} />
 
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={
