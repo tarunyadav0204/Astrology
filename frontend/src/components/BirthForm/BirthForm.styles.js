@@ -365,7 +365,9 @@ export const TabNavigation = styled.div`
   border-radius: 8px 8px 0 0;
 `;
 
-export const TabButton = styled.button`
+export const TabButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => !['isFirst', 'isLast', 'active'].includes(prop)
+})`
   flex: 1;
   padding: 8px 16px;
   background: ${props => props.active ? 'rgba(233, 30, 99, 0.2)' : 'transparent'};

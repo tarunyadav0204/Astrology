@@ -44,26 +44,32 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   const loadAIInsights = async (forceRegenerate = false) => {
     if (!birthDetails) return;
     
+    console.log('loadAIInsights called with forceRegenerate:', forceRegenerate);
+    
     setLoading(true);
     setError(null);
     setCurrentStep(0);
     setDots('');
     
     try {
+      const requestBody = {
+        birth_date: birthDetails.date,
+        birth_time: birthDetails.time,
+        birth_place: birthDetails.place,
+        latitude: birthDetails.latitude,
+        longitude: birthDetails.longitude,
+        timezone: birthDetails.timezone,
+        force_regenerate: forceRegenerate
+      };
+      
+      console.log('Request body:', requestBody);
+      
       const response = await fetch('/api/wealth/ai-insights', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          birth_date: birthDetails.date,
-          birth_time: birthDetails.time,
-          birth_place: birthDetails.place,
-          latitude: birthDetails.latitude,
-          longitude: birthDetails.longitude,
-          timezone: birthDetails.timezone,
-          force_regenerate: forceRegenerate
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
@@ -84,24 +90,27 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
           break;
         }
         
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim());
         
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.trim() && line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.status === 'processing') {
-                console.log('Processing:', data.message);
-              } else if (data.status === 'complete') {
-                hasReceivedFinalMessage = true;
-                setAiInsights(data.data);
-                setLoading(false);
-                return;
-              } else if (data.status === 'error') {
-                hasReceivedFinalMessage = true;
-                throw new Error(data.error);
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr) {
+                const data = JSON.parse(jsonStr);
+                
+                if (data.status === 'processing') {
+                  console.log('Processing:', data.message);
+                } else if (data.status === 'complete') {
+                  hasReceivedFinalMessage = true;
+                  setAiInsights(data.data);
+                  setLoading(false);
+                  return;
+                } else if (data.status === 'error') {
+                  hasReceivedFinalMessage = true;
+                  throw new Error(data.error);
+                }
               }
             } catch (parseError) {
               console.warn('Failed to parse streaming data:', parseError);
@@ -202,7 +211,10 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
         )}
         <button 
           className="regenerate-btn" 
-          onClick={() => loadAIInsights(true)}
+          onClick={() => {
+            console.log('Regenerate button clicked');
+            loadAIInsights(true);
+          }}
           title="Generate fresh analysis"
         >
           🔄 Regenerate Analysis

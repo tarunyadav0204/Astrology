@@ -3,7 +3,7 @@ import { locationService } from '../../services/locationService';
 import { apiService } from '../../services/apiService';
 import { APP_CONFIG } from '../../config/app.config';
 
-const PartnerForm = ({ onSubmit }) => {
+const PartnerForm = ({ onSubmit, user, onLogin }) => {
   const [boyData, setBoyData] = useState({
     name: '',
     date: '',
@@ -183,7 +183,13 @@ const PartnerForm = ({ onSubmit }) => {
               <button 
                 type="button" 
                 className="btn-select-chart"
-                onClick={() => setShowBoyCharts(!showBoyCharts)}
+                onClick={() => {
+                  if (!user) {
+                    onLogin && onLogin();
+                  } else {
+                    setShowBoyCharts(!showBoyCharts);
+                  }
+                }}
               >
                 Select Saved Chart
               </button>
@@ -277,7 +283,13 @@ const PartnerForm = ({ onSubmit }) => {
               <button 
                 type="button" 
                 className="btn-select-chart"
-                onClick={() => setShowGirlCharts(!showGirlCharts)}
+                onClick={() => {
+                  if (!user) {
+                    onLogin && onLogin();
+                  } else {
+                    setShowGirlCharts(!showGirlCharts);
+                  }
+                }}
               >
                 Select Saved Chart
               </button>

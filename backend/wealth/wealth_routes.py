@@ -108,7 +108,9 @@ import asyncio
 async def get_ai_wealth_insights(request: BirthDetailsRequest):
     """Get AI-powered wealth insights with streaming keep-alive"""
     print(f"AI wealth insights request received: {request.birth_date} {request.birth_time}")
+    print(f"Debug - Full request: {request}")
     print(f"Debug - Request force_regenerate: {request.force_regenerate}")
+    print(f"Debug - Request dict: {request.__dict__}")
     
     async def generate_streaming_response():
         import json
@@ -135,8 +137,10 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
             _init_ai_insights_table()
             
             # Check if we have stored insights (unless force regenerate)
-            print(f"Debug - Force regenerate: {request.force_regenerate}")
-            if not request.force_regenerate:
+            force_regen = request.force_regenerate
+            print(f"Debug - Force regenerate: {force_regen}")
+            print(f"Debug - Force regenerate type: {type(force_regen)}")
+            if force_regen is not True:
                 stored_insights = _get_stored_ai_insights(birth_hash)
                 print(f"Debug - Found cached insights: {bool(stored_insights)}")
                 if stored_insights:

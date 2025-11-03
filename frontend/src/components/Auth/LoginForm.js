@@ -2,6 +2,18 @@ import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { authService } from '../../services/authService';
 
+// Get app name based on domain
+const getAppName = () => {
+  const hostname = window.location.hostname;
+  if (hostname.includes('astroroshni')) {
+    return 'AstroRoshni';
+  } else if (hostname.includes('astrovishnu')) {
+    return 'AstroVishnu';
+  }
+  // Default fallback
+  return 'AstroRoshni';
+};
+
 const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [formData, setFormData] = useState({
     phone: '',
@@ -311,7 +323,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         marginBottom: '2rem',
         fontWeight: '700'
       }}>
-        ✨ Login to AstroVishnu
+        ✨ Login to {getAppName()}
       </h2>
 
       <form onSubmit={handleSubmit}>

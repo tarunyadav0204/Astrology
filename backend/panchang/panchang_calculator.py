@@ -386,19 +386,22 @@ class PanchangCalculator:
             weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
             weekday = (weekday + 1) % 7  # Convert to Sunday=0
             
-            # Choghadiya names and qualities
-            choghadiya_names = ['Shubha', 'Labha', 'Amrita', 'Kala', 'Shubha', 'Roga', 'Udvega', 'Chara']
-            choghadiya_qualities = ['Good', 'Gain', 'Best', 'Loss', 'Good', 'Evil', 'Bad', 'Neutral']
+            # Choghadiya names and qualities (correct sequence)
+            choghadiya_names = ['Udvega', 'Chara', 'Labha', 'Amrita', 'Kala', 'Shubha', 'Roga', 'Udvega']
+            choghadiya_qualities = ['Bad', 'Neutral', 'Gain', 'Best', 'Loss', 'Good', 'Evil', 'Bad']
             
-            # Day Choghadiya starts with weekday-specific sequence
-            day_start_indices = [0, 1, 2, 3, 4, 5, 6]  # Sunday to Saturday
-            day_start_index = day_start_indices[weekday]
+            # Day Choghadiya starts with day lord (correct Vedic system)
+            # Sunday=0, Monday=1, etc. - each day starts with its own lord's choghadiya
+            day_start_index = weekday
             
             day_choghadiya = []
             for i in range(8):
                 name_index = (day_start_index + i) % 8
                 name = choghadiya_names[name_index]
                 quality = choghadiya_qualities[name_index]
+                
+                # Map quality to nature for consistency
+                nature = 'Auspicious' if quality in ['Good', 'Best', 'Gain'] else 'Inauspicious'
                 
                 start_jd = sunrise_jd + (i * day_period_duration / 24)
                 end_jd = start_jd + (day_period_duration / 24)
@@ -409,7 +412,8 @@ class PanchangCalculator:
                     'start_time': self._jd_to_iso(start_jd),
                     'end_time': self._jd_to_iso(end_jd),
                     'duration_minutes': int(day_period_duration * 60),
-                    'quality': quality
+                    'quality': quality,
+                    'nature': nature
                 })
             
             # Night Choghadiya follows specific sequence
@@ -454,7 +458,7 @@ class PanchangCalculator:
             
         try:
             date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 12.0)
+            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 0.0)
             
             # Calculate sunrise and sunset
             geopos = [float(longitude), float(latitude), 0.0]
@@ -487,8 +491,8 @@ class PanchangCalculator:
             weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
             weekday = (weekday + 1) % 7  # Convert to Sunday=0
             
-            # Planet sequence for Hora (Chaldean order)
-            planets = ['Sun', 'Venus', 'Mercury', 'Moon', 'Saturn', 'Jupiter', 'Mars']
+            # Planet sequence for Hora (correct Chaldean order)
+            planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
             
             # Swiss Ephemeris calculations are accurate
             
@@ -525,10 +529,6 @@ class PanchangCalculator:
                 start_jd = sunset_jd + (i * night_hora_duration / 24)
                 end_jd = sunset_jd + ((i + 1) * night_hora_duration / 24)
                 
-                # Ensure end time is after start time
-                if end_jd <= start_jd:
-                    end_jd = start_jd + (night_hora_duration / 24)
-                
                 night_horas.append({
                     'hora': i + 8,
                     'planet': planet,
@@ -556,7 +556,7 @@ class PanchangCalculator:
             
         try:
             date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 12.0)
+            julian_day = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 0.0)
             
             # Calculate sunrise and sunset
             geopos = [float(longitude), float(latitude), 0.0]
@@ -569,22 +569,22 @@ class PanchangCalculator:
             sunrise_jd = sunrise_result[1][0]
             sunset_jd = sunset_result[1][0]
             
-            # Calculate previous day sunset for Brahma Muhurta
-            prev_day_sunset_result = swe.rise_trans(julian_day - 1, swe.SUN, swe.CALC_SET, geopos)
+            # Calculate next day sunrise for night duration
+            next_day_sunrise_result = swe.rise_trans(julian_day + 1, swe.SUN, swe.CALC_RISE, geopos)
             
-            if prev_day_sunset_result[0] != 0:
-                raise ValueError("Could not calculate previous day sunset")
+            if next_day_sunrise_result[0] != 0:
+                raise ValueError("Could not calculate next day sunrise")
                 
-            prev_sunset_jd = prev_day_sunset_result[1][0]
+            next_sunrise_jd = next_day_sunrise_result[1][0]
             
-            # Day duration
+            # Day and night durations
             day_duration = (sunset_jd - sunrise_jd) * 24  # in hours
-            night_duration = (sunrise_jd - prev_sunset_jd) * 24  # in hours
+            night_duration = (next_sunrise_jd - sunset_jd) * 24  # in hours
             
             muhurtas = []
             
-            # Brahma Muhurta (last 1/8th of night, approximately 1.5 hours before sunrise)
-            brahma_muhurta_duration = night_duration / 8  # 1/8th of night
+            # Brahma Muhurta (1.5 hours before sunrise)
+            brahma_muhurta_duration = 1.5  # Fixed 1.5 hours
             brahma_muhurta_start_jd = sunrise_jd - (brahma_muhurta_duration / 24)
             brahma_muhurta_end_jd = sunrise_jd
             
@@ -592,7 +592,7 @@ class PanchangCalculator:
                 'name': 'Brahma Muhurta',
                 'start_time': self._jd_to_iso(brahma_muhurta_start_jd),
                 'end_time': self._jd_to_iso(brahma_muhurta_end_jd),
-                'duration_minutes': int(brahma_muhurta_duration * 60),
+                'duration_minutes': 90,  # Fixed 90 minutes
                 'significance': 'Most auspicious time for spiritual practices, meditation, and study',
                 'activities': ['Meditation', 'Prayer', 'Study', 'Yoga'],
                 'quality': 'Highly Auspicious'
@@ -600,24 +600,25 @@ class PanchangCalculator:
             
             # Abhijit Muhurta (middle 1/15th of day, around noon)
             # This is the 8th muhurta of the day (out of 15 muhurtas)
-            muhurta_duration = day_duration / 15  # Each muhurta is 1/15th of day
-            abhijit_start_jd = sunrise_jd + (7 * muhurta_duration / 24)  # 8th muhurta (0-indexed)
-            abhijit_end_jd = sunrise_jd + (8 * muhurta_duration / 24)
+            muhurta_duration_hours = day_duration / 15  # Each muhurta duration in hours
+            
+            abhijit_start_jd = sunrise_jd + (7 * muhurta_duration_hours / 24)  # 8th muhurta (0-indexed)
+            abhijit_end_jd = sunrise_jd + (8 * muhurta_duration_hours / 24)
             
             muhurtas.append({
                 'name': 'Abhijit Muhurta',
                 'start_time': self._jd_to_iso(abhijit_start_jd),
                 'end_time': self._jd_to_iso(abhijit_end_jd),
-                'duration_minutes': int(muhurta_duration * 60),
+                'duration_minutes': int(muhurta_duration_hours * 60),
                 'significance': 'Universal auspicious time, overcomes all doshas',
                 'activities': ['Important meetings', 'New ventures', 'Travel', 'Ceremonies'],
                 'quality': 'Universally Auspicious'
             })
             
             # Godhuli Muhurta (cow dust time - around sunset)
-            godhuli_duration = 0.8  # 48 minutes
-            godhuli_start_jd = sunset_jd - (godhuli_duration / 48)  # 24 minutes before sunset
-            godhuli_end_jd = sunset_jd + (godhuli_duration / 48)   # 24 minutes after sunset
+            godhuli_duration = 0.8  # 48 minutes total
+            godhuli_start_jd = sunset_jd - (0.4 / 24)  # 24 minutes before sunset
+            godhuli_end_jd = sunset_jd + (0.4 / 24)   # 24 minutes after sunset
             
             muhurtas.append({
                 'name': 'Godhuli Muhurta',
@@ -630,14 +631,14 @@ class PanchangCalculator:
             })
             
             # Vijaya Muhurta (victory time - 2nd muhurta of the day)
-            vijaya_start_jd = sunrise_jd + (1 * muhurta_duration / 24)  # 2nd muhurta
-            vijaya_end_jd = sunrise_jd + (2 * muhurta_duration / 24)
+            vijaya_start_jd = sunrise_jd + (1 * muhurta_duration_hours / 24)  # 2nd muhurta
+            vijaya_end_jd = sunrise_jd + (2 * muhurta_duration_hours / 24)
             
             muhurtas.append({
                 'name': 'Vijaya Muhurta',
                 'start_time': self._jd_to_iso(vijaya_start_jd),
                 'end_time': self._jd_to_iso(vijaya_end_jd),
-                'duration_minutes': int(muhurta_duration * 60),
+                'duration_minutes': int(muhurta_duration_hours * 60),
                 'significance': 'Time for victory and success in endeavors',
                 'activities': ['Important tasks', 'Competitions', 'Business deals'],
                 'quality': 'Auspicious'
@@ -655,7 +656,9 @@ class PanchangCalculator:
             raise ValueError(f"Error calculating special muhurtas: {str(e)}")
     
     def _jd_to_iso(self, jd):
-        """Convert Julian Day to ISO format datetime string"""
+        """Convert Julian Day to local time ISO format datetime string"""
         year, month, day, hour, minute, second = swe.jdut1_to_utc(jd, 1)
         dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        return dt.isoformat()
+        # Convert UTC to IST (UTC+5:30)
+        dt_ist = dt + timedelta(hours=5, minutes=30)
+        return dt_ist.isoformat()

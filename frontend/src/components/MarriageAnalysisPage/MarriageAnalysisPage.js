@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
@@ -10,8 +10,17 @@ import './MarriageAnalysisPage.css';
 
 const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { chartData, birthData } = useAstrology();
   const [showForm, setShowForm] = useState(!chartData || !birthData);
+  const [prefilledData, setPrefilledData] = useState(null);
+
+  useEffect(() => {
+    if (location.state?.prefilledData) {
+      setPrefilledData(location.state.prefilledData);
+      setShowForm(true); // Show form with prefilled data
+    }
+  }, [location.state]);
 
 
 
@@ -52,7 +61,7 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
               <div className="form-card">
                 <h2>Enter Your Birth Details</h2>
                 <p>Please provide your birth information to generate your marriage analysis report</p>
-                <BirthForm onSubmit={handleFormSubmit} />
+                <BirthForm onSubmit={handleFormSubmit} prefilledData={prefilledData} />
               </div>
             </div>
           ) : (

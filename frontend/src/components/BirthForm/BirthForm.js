@@ -7,7 +7,7 @@ import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
 import { FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem, TabContainer, TabNavigation, TabButton, TabContent } from './BirthForm.styles';
 
-const BirthForm = ({ onSubmit, onLogout }) => {
+const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
   const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
   
   const [formData, setFormData] = useState({
@@ -45,8 +45,21 @@ const BirthForm = ({ onSubmit, onLogout }) => {
   useEffect(() => {
     loadExistingCharts();
     
+    // Pre-populate form if prefilledData is provided (from homepage matching)
+    if (prefilledData && prefilledData.person1) {
+      setFormData({
+        name: prefilledData.person1.name || '',
+        date: prefilledData.person1.date || '',
+        time: prefilledData.person1.time || '',
+        place: prefilledData.person1.place || '',
+        latitude: null,
+        longitude: null,
+        timezone: '',
+        gender: 'Male'
+      });
+    }
     // Pre-populate form if birthData exists in context (from edit action)
-    if (birthData && birthData.id) {
+    else if (birthData && birthData.id) {
       setEditingChart(birthData);
       setFormData({
         name: birthData.name || '',
@@ -59,7 +72,7 @@ const BirthForm = ({ onSubmit, onLogout }) => {
         gender: birthData.gender || ''
       });
     }
-  }, [birthData]);
+  }, [birthData, prefilledData]);
 
   const loadExistingCharts = async (search = '') => {
     try {
@@ -329,7 +342,14 @@ const BirthForm = ({ onSubmit, onLogout }) => {
       {activeTab === 'new' ? (
         <TabContent>
         <FormContainer style={{ flex: 1, overflow: 'hidden' }}>
-          <h2 style={{ marginBottom: '10px', color: 'white', fontSize: '1.1rem' }}>Birth Details</h2>
+          <h2 style={{ marginBottom: '10px', color: 'white', fontSize: '1.1rem' }}>
+            {prefilledData ? 'Marriage Analysis - Enter Details' : 'Birth Details'}
+          </h2>
+          {prefilledData && (
+            <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50', borderRadius: '8px', color: '#4caf50', fontSize: '0.9rem' }}>
+              ✓ Form pre-filled from homepage. Please verify and complete the details.
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
         <FormField>
           <Label>{FORM_FIELDS.name.label}</Label>
@@ -416,7 +436,7 @@ const BirthForm = ({ onSubmit, onLogout }) => {
 
         <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
           <Button type="submit">
-            {editingChart ? 'Update Chart' : 'Calculate Birth Chart'}
+            {editingChart ? 'Update Chart' : prefilledData ? 'Generate Marriage Analysis' : 'Calculate Birth Chart'}
           </Button>
           {editingChart && (
             <Button type="button" onClick={cancelEdit} style={{ background: '#6c757d' }}>

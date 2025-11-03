@@ -45,8 +45,8 @@ export const getCurrentDomainConfig = () => {
     }
   }
   
-  // Default to AstroClick for localhost/unknown domains
-  return DOMAIN_CONFIG.ASTROCLICK;
+  // Default to AstroRoshni for localhost/unknown domains
+  return DOMAIN_CONFIG.ASTROROSHNI;
 };
 
 // Check if user has access to a platform

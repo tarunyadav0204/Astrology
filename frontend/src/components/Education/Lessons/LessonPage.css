@@ -1,0 +1,266 @@
+.lesson-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%);
+  padding-top: 280px;
+}
+
+.lesson-page .top-bar {
+  padding: 6px 0 !important;
+}
+
+.lesson-page .main-nav {
+  padding: 10px 0 !important;
+}
+
+.lesson-page .navigation {
+  padding: 10px 0 !important;
+}
+
+.lesson-page .container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.back-button-container {
+  margin-bottom: 3.5rem;
+}
+
+.lesson-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1565c0;
+  border: 2px solid #1565c0;
+  padding: 0.5rem 1rem;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: #1565c0;
+  color: white;
+}
+
+.lesson-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.lesson-number {
+  background: linear-gradient(135deg, #2196f3, #1565c0);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.lesson-level {
+  background: rgba(33, 150, 243, 0.1);
+  color: #1565c0;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.lesson-duration {
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.lesson-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  padding: 3rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.lesson-content h1 {
+  color: #1565c0;
+  margin-bottom: 2rem;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.lesson-body h2 {
+  color: #1976d2;
+  margin: 2rem 0 1rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.lesson-body h3 {
+  color: #1976d2;
+  margin: 1.5rem 0 1rem 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.lesson-body h4 {
+  color: #1976d2;
+  margin: 1rem 0 0.5rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.lesson-body p {
+  color: #555;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.lesson-body ul, .lesson-body ol {
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  padding-left: 2rem;
+}
+
+.lesson-body li {
+  margin-bottom: 0.5rem;
+}
+
+.comparison-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.comparison-item {
+  background: rgba(33, 150, 243, 0.05);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border-left: 4px solid #2196f3;
+}
+
+.elements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.element {
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.element.fire {
+  background: rgba(255, 87, 34, 0.1);
+  border-left: 4px solid #ff5722;
+}
+
+.element.earth {
+  background: rgba(76, 175, 80, 0.1);
+  border-left: 4px solid #4caf50;
+}
+
+.element.air {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+}
+
+.element.water {
+  background: rgba(33, 150, 243, 0.1);
+  border-left: 4px solid #2196f3;
+}
+
+.nakshatra-list {
+  margin: 2rem 0;
+}
+
+.nakshatra-item {
+  background: rgba(33, 150, 243, 0.05);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  border-left: 4px solid #2196f3;
+}
+
+.nakshatra-item h4 {
+  color: #1565c0;
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.nakshatra-item p {
+  margin: 0.5rem 0;
+  color: #555;
+  line-height: 1.6;
+}
+
+.lesson-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.nav-btn {
+  background: linear-gradient(135deg, #2196f3, #1565c0);
+  color: white;
+  border: none;
+  padding: 1rem 3rem;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  min-width: 180px;
+}
+
+.nav-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
+}
+
+.prev-btn {
+  margin-right: auto;
+}
+
+.next-btn {
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .lesson-content {
+    padding: 2rem 1.5rem;
+  }
+  
+  .lesson-content h1 {
+    font-size: 2rem;
+  }
+  
+  .comparison-table {
+    grid-template-columns: 1fr;
+  }
+  
+  .elements-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .lesson-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .lesson-navigation {
+    flex-direction: column;
+  }
+}

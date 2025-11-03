@@ -25,6 +25,10 @@ import PanchangPage from './components/Panchang/PanchangPage';
 import MuhuratFinderPage from './components/MuhuratFinder/MuhuratFinderPage';
 import AdminPanel from './components/Admin/AdminPanel';
 import ChatPage from './components/Chat/ChatPage';
+import MythsVsReality from './components/Education/MythsVsReality';
+import AdvancedCourses from './components/Education/AdvancedCourses';
+import BeginnersGuide from './components/Education/BeginnersGuide';
+import LessonPage from './components/Education/Lessons/LessonPage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -55,13 +59,21 @@ function App() {
           return;
         }
         
-        // Set appropriate view based on domain configuration
-        const domainConfig = getCurrentDomainConfig();
+        // Check URL parameters for view override
+        const urlParams = new URLSearchParams(window.location.search);
+        const viewParam = urlParams.get('view');
         
-        if (domainConfig.userType === 'general') {
-          setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
+        if (viewParam === 'dashboard') {
+          setCurrentView('dashboard');
         } else {
-          setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+          // Set appropriate view based on domain configuration
+          const domainConfig = getCurrentDomainConfig();
+          
+          if (domainConfig.userType === 'general') {
+            setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
+          } else {
+            setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+          }
         }
         
         setLoading(false);
@@ -95,13 +107,21 @@ function App() {
       return;
     }
     
-    // Set appropriate view based on domain configuration
-    const domainConfig = getCurrentDomainConfig();
+    // Check URL parameters for view override
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
     
-    if (domainConfig.userType === 'general') {
-      setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
+    if (viewParam === 'dashboard') {
+      setCurrentView('dashboard');
     } else {
-      setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+      // Set appropriate view based on domain configuration
+      const domainConfig = getCurrentDomainConfig();
+      
+      if (domainConfig.userType === 'general') {
+        setCurrentView('astroroshnihomepage'); // AstroRoshni domain shows homepage
+      } else {
+        setCurrentView('selector'); // AstroVishnu/other domains show chart selector
+      }
     }
   };
 
@@ -932,6 +952,10 @@ function App() {
                 )}
               </>
             } />
+            <Route path="/myths-vs-reality" element={<MythsVsReality />} />
+          <Route path="/advanced-courses" element={<AdvancedCourses />} />
+          <Route path="/beginners-guide" element={<BeginnersGuide />} />
+          <Route path="/lesson/:lessonId" element={<LessonPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <ToastContainer />
@@ -1003,7 +1027,13 @@ function App() {
             }}>
 
         {currentView === 'astroroshnihomepage' && (
-          <AstroRoshniHomepage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} onLogin={() => setShowLoginModal(true)} />
+          <AstroRoshniHomepage 
+            user={user} 
+            onLogout={handleLogout} 
+            onAdminClick={handleAdminClick} 
+            onLogin={() => setShowLoginModal(true)}
+            setCurrentView={setCurrentView}
+          />
         )}
         {currentView === 'admin' && (
           <AdminPanel user={user} onLogout={handleLogout} />
@@ -1031,11 +1061,8 @@ function App() {
         )}
         {currentView === 'dashboard' && (
           <Dashboard 
-            onBack={() => setCurrentView('selector')} 
-            onViewAllCharts={() => {
-              console.log('onViewAllCharts called in App.js');
-              setCurrentView('selector');
-            }}
+            onBack={() => setCurrentView('astroroshnihomepage')} 
+            onViewAllCharts={() => setCurrentView('astroroshnihomepage')}
             currentView={currentView} 
             setCurrentView={setCurrentView} 
             onLogout={handleLogout}

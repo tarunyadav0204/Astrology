@@ -44,12 +44,21 @@ class GeminiChatAnalyzer:
     def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None) -> Dict[str, Any]:
         """Generate chat response using astrological context"""
         
-        prompt = self._create_chat_prompt(user_question, astrological_context, conversation_history or [])
+        # Add current date context to prevent AI from making assumptions
+        enhanced_context = astrological_context.copy()
+        enhanced_context['current_date_info'] = {
+            'current_date': datetime.now().strftime("%Y-%m-%d"),
+            'current_year': datetime.now().year,
+            'current_month': datetime.now().strftime("%B"),
+            'note': 'Use this for reference only. Do not assume transit positions.'
+        }
+        
+        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [])
         
         print(f"\n=== SENDING TO AI ===")
         print(f"Question: {user_question}")
         print(f"Prompt length: {len(prompt)} chars")
-        print(f"Context keys: {list(astrological_context.keys()) if astrological_context else 'None'}")
+        print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
         print(f"History messages: {len(conversation_history or [])}")
         
         try:
@@ -81,6 +90,11 @@ class GeminiChatAnalyzer:
             for msg in history[-5:]:  # Last 5 messages for context
                 history_text += f"User: {msg.get('question', '')}\nAssistant: {msg.get('response', '')}\n\n"
         
+        # Get current date and time
+        current_date = datetime.now()
+        current_date_str = current_date.strftime("%B %d, %Y")
+        current_time_str = current_date.strftime("%H:%M UTC")
+        
         # Custom JSON serializer for datetime objects
         def json_serializer(obj):
             if isinstance(obj, datetime):
@@ -88,6 +102,19 @@ class GeminiChatAnalyzer:
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
         
         return f"""You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
+
+IMPORTANT CURRENT DATE INFORMATION:
+- Today's Date: {current_date_str}
+- Current Time: {current_time_str}
+- Current Year: {current_date.year}
+
+CRITICAL INSTRUCTIONS:
+- Use the current date provided above for accurate timing references
+- If transit data is provided in the context, you may discuss current transits using that calculated data
+- If NO transit data is provided but user asks about transits, explain you need calculated transit positions
+- Do NOT guess or assume planetary positions - only use provided calculated data
+- Focus primarily on birth chart analysis and dasha periods
+- For timing questions, prioritize dasha periods but include transit data if available
 
 BIRTH CHART DATA:
 {json.dumps(context, indent=2, default=json_serializer)}
@@ -97,23 +124,33 @@ BIRTH CHART DATA:
 CURRENT QUESTION: {user_question}
 
 GUIDELINES:
-- Use conversational, warm, and encouraging tone
-- Always explain astrological reasoning with specific planetary positions, aspects, and classical principles
-- Reference relevant yogas, dashas, and transits when applicable
-- Provide practical guidance and actionable insights
-- Mention classical sources when relevant (Parashara, Jaimini, etc.)
-- For timing questions, use dasha periods and transit data
-- Be specific about planetary degrees, house positions, and aspects
-- Avoid overly technical jargon - explain concepts clearly
-- Focus on empowerment and positive guidance
+- Use conversational, warm, and encouraging tone with beautiful formatting
+- Always explain astrological reasoning with **bold planetary names** and specific positions
+- Reference relevant *yogas*, *dashas*, and transit data when provided in the context
+- Provide practical guidance with clear bullet points
+- Mention classical sources in *italics* when relevant (*Parashara*, *Jaimini*, etc.)
+- For timing questions, use dasha periods as primary method, supplemented by transit data if available
+- Be specific about planetary degrees, house positions, and aspects from the provided data
+- Use ### headers to organize different topics clearly
+- Focus on empowerment and positive guidance with **bold emphasis**
 - If asked about health, relationships, or career, use relevant chart factors
+- You may discuss transits IF calculated transit data is provided in the context
+- Use emojis sparingly for warmth: ✨ 🌟 💫 (only 1-2 per response)
 
 RESPONSE FORMAT:
-Provide a natural, conversational response (not JSON). Include:
-1. Direct answer to the question
-2. Astrological reasoning with specific chart references
-3. Practical guidance or recommendations
-4. Any relevant timing information if applicable
+Use markdown formatting for beautiful presentation:
+- **Bold text** for important points and planetary names
+- ### Headers for main sections (e.g., ### Current Planetary Influences)
+- • Bullet points for lists and key insights
+- *Italics* for Sanskrit terms and classical references
+- Line breaks between sections for readability
 
-Remember: You're having a conversation, not writing a report. Be personable and insightful while maintaining astrological accuracy.
+Structure your response with:
+1. **Direct Answer** - Bold opening statement addressing the question
+2. ### Astrological Analysis - Header followed by specific chart references
+3. **Key Insights** - Bullet points of important findings
+4. ### Timing & Guidance - Practical recommendations with timing
+5. **Final Thoughts** - Encouraging conclusion
+
+Remember: Be conversational yet structured, insightful yet accessible. Use formatting to make complex astrological information easy to read and visually appealing.
 """

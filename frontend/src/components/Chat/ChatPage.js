@@ -6,6 +6,9 @@ import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
 import './ChatPage.css';
 
+// Enable detailed logging for debugging
+console.log('ChatPage component loaded - debugging enabled');
+
 const ChatPage = () => {
     const location = useLocation();
     const { birthData } = useAstrology();
@@ -42,13 +45,20 @@ const ChatPage = () => {
 
     const loadChatHistory = async () => {
         try {
+            console.log('Loading chat history for:', birthData);
             const response = await fetch('/api/chat/history', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(birthData)
             });
+            
+            if (!response.ok) {
+                console.error('History response error:', response.status, response.statusText);
+            }
+            
             const data = await response.json();
-            const existingMessages = data.messages || [];
+            console.log('Chat history response:', data);
+            const existingMessages = data.history || data.messages || [];
             setMessages(existingMessages);
             
             // Add greeting if no existing messages
@@ -70,58 +80,128 @@ const ChatPage = () => {
         setIsLoading(true);
 
         try {
+            console.log('Sending chat request:', { ...birthData, question: message });
+            
             const response = await fetch('/api/chat/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...birthData, question: message })
             });
 
-            if (!response.ok) throw new Error('Network response was not ok');
+            console.log('Response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Response error:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let assistantMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() };
             
             setMessages(prev => [...prev, assistantMessage]);
+            let hasReceivedContent = false;
+            let streamTimeout;
+            
+            // Mobile-friendly timeout for streaming
+            const resetTimeout = () => {
+                if (streamTimeout) clearTimeout(streamTimeout);
+                streamTimeout = setTimeout(() => {
+                    console.warn('Stream timeout - mobile network issue detected');
+                    if (!hasReceivedContent) {
+                        throw new Error('Stream timeout - please try again');
+                    }
+                }, 30000); // 30 second timeout
+            };
+            
+            resetTimeout();
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    resetTimeout(); // Reset timeout on each chunk
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
+                    const chunk = decoder.decode(value, { stream: true });
+                    console.log('Received chunk:', chunk);
+                    const lines = chunk.split('\n').filter(line => line.trim());
 
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') break;
-                        if (data.startsWith('{')) {
-                            try {
-                                const parsed = JSON.parse(data);
-                                if (parsed.content) {
-                                    assistantMessage.content += parsed.content;
-                                    setMessages(prev => {
-                                        const newMessages = [...prev];
-                                        newMessages[newMessages.length - 1] = { ...assistantMessage };
-                                        return newMessages;
-                                    });
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6).trim();
+                            console.log('Processing data:', data);
+                            
+                            if (data === '[DONE]') break;
+                            if (data && data.startsWith('{')) {
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    console.log('Parsed data:', parsed);
+                                    
+                                    if (parsed.status === 'complete' && parsed.response) {
+                                        assistantMessage.content = parsed.response;
+                                        hasReceivedContent = true;
+                                        setMessages(prev => {
+                                            const newMessages = [...prev];
+                                            newMessages[newMessages.length - 1] = { ...assistantMessage };
+                                            return newMessages;
+                                        });
+                                        clearTimeout(streamTimeout);
+                                        break;
+                                    } else if (parsed.status === 'error') {
+                                        clearTimeout(streamTimeout);
+                                        throw new Error(parsed.error || 'AI analysis failed');
+                                    } else if (parsed.content) {
+                                        assistantMessage.content += parsed.content;
+                                        hasReceivedContent = true;
+                                        setMessages(prev => {
+                                            const newMessages = [...prev];
+                                            newMessages[newMessages.length - 1] = { ...assistantMessage };
+                                            return newMessages;
+                                        });
+                                    }
+                                } catch (parseError) {
+                                    console.error('Error parsing chunk:', parseError, 'Data:', data);
                                 }
-                            } catch (e) {
-                                console.error('Error parsing chunk:', e);
                             }
                         }
                     }
                 }
+            } finally {
+                clearTimeout(streamTimeout);
+            }
+            
+            // Final validation
+            if (!hasReceivedContent || !assistantMessage.content.trim()) {
+                console.error('Empty response detected:', { hasReceivedContent, content: assistantMessage.content });
+                throw new Error('Empty response received - please try again');
             }
         } catch (error) {
-            console.error('Error sending message:', error);
-            setMessages(prev => [...prev, { 
-                role: 'assistant', 
-                content: 'Sorry, I encountered an error. Please try again.', 
-                timestamp: new Date().toISOString() 
-            }]);
+            console.error('Complete error details:', {
+                message: error.message,
+                stack: error.stack,
+                birthData: birthData,
+                question: message,
+                userAgent: navigator.userAgent,
+                isMobile: /Mobi|Android/i.test(navigator.userAgent)
+            });
+            
+            // Remove empty assistant message if it exists
+            setMessages(prev => {
+                const filtered = prev.filter(msg => !(msg.role === 'assistant' && !msg.content.trim()));
+                return [...filtered, { 
+                    role: 'assistant', 
+                    content: `An error occurred: ${error.message}. Please try again.`, 
+                    timestamp: new Date().toISOString() 
+                }];
+            });
         } finally {
             setIsLoading(false);
+            // Ensure no empty bubbles remain
+            setTimeout(() => {
+                setMessages(prev => prev.filter(msg => !(msg.role === 'assistant' && !msg.content.trim())));
+            }, 1000);
         }
     };
 

@@ -1,18 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../../config/app.config';
+import { getCurrentDomainConfig } from '../../config/domains.config';
+import { useAstrology } from '../../context/AstrologyContext';
+import { apiService } from '../../services/apiService';
+import ChartWidget from '../Charts/ChartWidget';
 import NavigationHeader from '../Shared/NavigationHeader';
 import ChatModal from '../Chat/ChatModal';
+import PanchangWidget from '../PanchangWidget/HomePanchangWidget';
+import BirthForm from '../BirthForm/BirthForm';
+import PartnerForm from '../MarriageAnalysis/PartnerForm';
+import LoginForm from '../Auth/LoginForm';
+import RegisterForm from '../Auth/RegisterForm';
 import './AstroRoshniHomepage.css';
 
-const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
   const navigate = useNavigate();
+  const { chartData, birthData } = useAstrology();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedZodiac, setSelectedZodiac] = useState('aries');
   const [horoscopeData, setHoroscopeData] = useState({});
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('daily');
   const [showChatModal, setShowChatModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authView, setAuthView] = useState('login');
+  const [showChartModal, setShowChartModal] = useState(false);
+  const [matchingData, setMatchingData] = useState({
+    boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
+    girl: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' }
+  });
 
   const bannerSlides = [
     { id: 1, image: '/images/banner-ai-astrologers.jpg', title: 'AI Astrologers Available 24/7' },
@@ -83,15 +100,129 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     { title: '50% OFF Premium Reports', desc: 'Valid till midnight today', timer: '11:23:45', color: '#ff9800' }
   ];
 
-  const todaysData = {
-    luckyNumbers: [3, 7, 21, 45],
-    luckyColors: ['Golden', 'Green', 'Blue'],
-    planetaryPositions: [
-      { planet: 'Sun', sign: 'Capricorn', degree: '15°23\'', house: 10 },
-      { planet: 'Moon', sign: 'Pisces', degree: '8°45\'', house: 12 },
-      { planet: 'Mars', sign: 'Aries', degree: '22°10\'', house: 1 }
-    ]
+  const [planetaryPositions, setPlanetaryPositions] = useState([]);
+  const [planetaryLoading, setPlanetaryLoading] = useState(false);
+  const [muhuratData, setMuhuratData] = useState(null);
+  const [muhuratLoading, setMuhuratLoading] = useState(false);
+
+  const generateTodaysData = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const dayOfMonth = today.getDate();
+    const month = today.getMonth();
+    
+    // Planetary rulers for each day
+    const dayRulers = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
+    const rulingPlanet = dayRulers[dayOfWeek];
+    
+    // Generate lucky numbers based on date
+    const baseNumbers = [(dayOfMonth % 9) + 1, ((dayOfMonth + month) % 9) + 1];
+    const luckyNumbers = [...baseNumbers, baseNumbers[0] * 3, baseNumbers[1] * 5].slice(0, 4);
+    
+    // Planet-based attributes
+    const planetAttributes = {
+      'Sun': {
+        colors: ['Golden', 'Orange', 'Red'],
+        direction: 'East',
+        element: 'Fire',
+        gemstone: 'Ruby',
+        mantra: 'Om Surya Namaha',
+        time: '6:00 AM - 12:00 PM',
+        avoidColors: ['Black', 'Dark Blue'],
+        bestActivities: ['Leadership', 'New Beginnings', 'Government Work'],
+        avoidActivities: ['Night Travel', 'Signing Contracts after Sunset']
+      },
+      'Moon': {
+        colors: ['White', 'Silver', 'Light Blue'],
+        direction: 'Northwest',
+        element: 'Water',
+        gemstone: 'Pearl',
+        mantra: 'Om Chandraya Namaha',
+        time: '6:00 PM - 12:00 AM',
+        avoidColors: ['Red', 'Maroon'],
+        bestActivities: ['Meditation', 'Family Time', 'Creative Work'],
+        avoidActivities: ['Important Decisions', 'Surgery']
+      },
+      'Mars': {
+        colors: ['Red', 'Coral', 'Orange'],
+        direction: 'South',
+        element: 'Fire',
+        gemstone: 'Red Coral',
+        mantra: 'Om Mangalaya Namaha',
+        time: '12:00 PM - 6:00 PM',
+        avoidColors: ['Green', 'Light Blue'],
+        bestActivities: ['Sports', 'Competition', 'Property Deals'],
+        avoidActivities: ['Marriage Ceremonies', 'Peace Talks']
+      },
+      'Mercury': {
+        colors: ['Green', 'Emerald', 'Light Green'],
+        direction: 'North',
+        element: 'Earth',
+        gemstone: 'Emerald',
+        mantra: 'Om Budhaya Namaha',
+        time: '9:00 AM - 3:00 PM',
+        avoidColors: ['Red', 'Orange'],
+        bestActivities: ['Communication', 'Learning', 'Business'],
+        avoidActivities: ['Heavy Physical Work', 'Emotional Decisions']
+      },
+      'Jupiter': {
+        colors: ['Yellow', 'Golden', 'Saffron'],
+        direction: 'Northeast',
+        element: 'Space',
+        gemstone: 'Yellow Sapphire',
+        mantra: 'Om Gurave Namaha',
+        time: '10:00 AM - 4:00 PM',
+        avoidColors: ['Black', 'Dark Colors'],
+        bestActivities: ['Education', 'Religious Activities', 'Financial Planning'],
+        avoidActivities: ['Gambling', 'Speculation']
+      },
+      'Venus': {
+        colors: ['Pink', 'White', 'Light Blue'],
+        direction: 'Southeast',
+        element: 'Water',
+        gemstone: 'Diamond',
+        mantra: 'Om Shukraya Namaha',
+        time: '2:00 PM - 8:00 PM',
+        avoidColors: ['Black', 'Brown'],
+        bestActivities: ['Art', 'Romance', 'Beauty Treatments'],
+        avoidActivities: ['Harsh Decisions', 'Conflicts']
+      },
+      'Saturn': {
+        colors: ['Blue', 'Black', 'Dark Purple'],
+        direction: 'West',
+        element: 'Air',
+        gemstone: 'Blue Sapphire',
+        mantra: 'Om Shanaye Namaha',
+        time: '6:00 AM - 10:00 AM',
+        avoidColors: ['Bright Red', 'Orange'],
+        bestActivities: ['Hard Work', 'Discipline', 'Long-term Planning'],
+        avoidActivities: ['Hasty Decisions', 'Luxury Purchases']
+      }
+    };
+    
+    const attrs = planetAttributes[rulingPlanet];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const rashis = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    
+    return {
+      luckyNumbers,
+      luckyColors: attrs.colors,
+      luckyDirection: attrs.direction,
+      luckyTime: attrs.time,
+      luckyGemstone: attrs.gemstone,
+      luckyElement: attrs.element,
+      luckyPlanet: rulingPlanet,
+      luckyDay: dayNames[dayOfWeek],
+      dailyMantra: attrs.mantra,
+      avoidColors: attrs.avoidColors,
+      avoidNumbers: [4, 8, 13, 17].filter(n => !luckyNumbers.includes(n)).slice(0, 2),
+      bestActivities: attrs.bestActivities,
+      avoidActivities: attrs.avoidActivities,
+      rulingRashi: rashis[(dayOfMonth + month) % 12]
+    };
   };
+  
+  const [todaysData, setTodaysData] = useState(generateTodaysData());
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -102,7 +233,209 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
   useEffect(() => {
     fetchHoroscopes();
+    fetchPlanetaryPositions();
+    fetchMuhuratTimes();
+    
+    // Update today's data daily at midnight
+    const updateDailyData = () => {
+      setTodaysData(generateTodaysData());
+    };
+    
+    // Check if we need to update data (new day)
+    const lastUpdate = localStorage.getItem('lastLuckyUpdate');
+    const today = new Date().toDateString();
+    
+    if (lastUpdate !== today) {
+      updateDailyData();
+      localStorage.setItem('lastLuckyUpdate', today);
+    }
+    
+    // Set interval to update at midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    const midnightTimer = setTimeout(() => {
+      updateDailyData();
+      localStorage.setItem('lastLuckyUpdate', new Date().toDateString());
+      
+      // Set daily interval after first midnight update
+      setInterval(updateDailyData, 24 * 60 * 60 * 1000);
+    }, msUntilMidnight);
+    
+    return () => clearTimeout(midnightTimer);
   }, []);
+
+  const fetchPlanetaryPositions = async () => {
+    setPlanetaryLoading(true);
+    try {
+      // Use fallback data for non-authenticated users
+      setPlanetaryPositions([
+        { planet: 'Sun', sign: 'Capricorn', degree: '15.4°', retrograde: false },
+        { planet: 'Moon', sign: 'Pisces', degree: '8.7°', retrograde: false },
+        { planet: 'Mars', sign: 'Aries', degree: '22.1°', retrograde: false },
+        { planet: 'Mercury', sign: 'Sagittarius', degree: '28.3°', retrograde: true },
+        { planet: 'Jupiter', sign: 'Taurus', degree: '12.8°', retrograde: false },
+        { planet: 'Venus', sign: 'Scorpio', degree: '5.2°', retrograde: false },
+        { planet: 'Saturn', sign: 'Aquarius', degree: '18.9°', retrograde: false }
+      ]);
+    } catch (error) {
+      console.error('Error fetching planetary positions:', error);
+    } finally {
+      setPlanetaryLoading(false);
+    }
+  };
+
+  const fetchMuhuratTimes = async () => {
+    setMuhuratLoading(true);
+    const today = new Date().toISOString().split('T')[0];
+    const latitude = 28.6139;
+    const longitude = 77.2090;
+    
+    try {
+      
+      const [choghadiya, hora, specialMuhurtas] = await Promise.all([
+        apiService.calculateChoghadiya(today, latitude, longitude),
+        apiService.calculateHora(today, latitude, longitude),
+        apiService.calculateSpecialMuhurtas(today, latitude, longitude)
+      ]);
+      
+      console.log('API Responses:', { choghadiya, hora, specialMuhurtas });
+      
+      // Debug API calculations
+      console.log('=== API CALCULATION ANALYSIS ===');
+      console.log('Date requested:', today);
+      console.log('Location:', { latitude, longitude });
+      
+      // Check Brahma Muhurta calculation
+      if (specialMuhurtas.muhurtas) {
+        const brahmaMuhurta = specialMuhurtas.muhurtas.find(m => m.name === 'Brahma Muhurta');
+        if (brahmaMuhurta) {
+          console.log('Brahma Muhurta Raw:', brahmaMuhurta);
+          console.log('Start:', new Date(brahmaMuhurta.start_time).toString());
+          console.log('End:', new Date(brahmaMuhurta.end_time).toString());
+          console.log('Duration (hours):', (new Date(brahmaMuhurta.end_time) - new Date(brahmaMuhurta.start_time)) / (1000 * 60 * 60));
+        }
+      }
+      
+      // Check day duration
+      console.log('Day duration (hours):', specialMuhurtas.day_duration_hours);
+      console.log('Night duration (hours):', specialMuhurtas.night_duration_hours);
+      
+      // Check if times are in correct timezone
+      console.log('Current local time:', new Date().toString());
+      console.log('Current UTC time:', new Date().toISOString());
+      
+      console.log('=== END ANALYSIS ===');
+      
+      // Parse choghadiya data (combine day and night)
+      const allChoghadiya = [...(choghadiya.day_choghadiya || []), ...(choghadiya.night_choghadiya || [])];
+      const parsedChoghadiya = allChoghadiya.slice(0, 3).map(item => {
+        const startTime = item.start_time.split('T')[1].substring(0, 5);
+        const endTime = item.end_time.split('T')[1].substring(0, 5);
+        return {
+          name: item.name,
+          time: `${startTime}-${endTime}`,
+          type: item.nature === 'Auspicious' ? 'good' : 'bad'
+        };
+      });
+      
+      // Parse hora data - find current and next hora
+      const allHoras = [...(hora.day_horas || []), ...(hora.night_horas || [])];
+      const now = new Date();
+      
+      const getPlanetaryFavorability = (planet) => {
+        const planetQualities = {
+          'Sun': true, 'Moon': true, 'Mars': false, 'Mercury': true,
+          'Jupiter': true, 'Venus': true, 'Saturn': false
+        };
+        return planetQualities[planet] || false;
+      };
+      
+      // Find current hora
+      let currentHoraIndex = 0;
+      for (let i = 0; i < allHoras.length; i++) {
+        const horaStart = new Date(allHoras[i].start_time);
+        const horaEnd = new Date(allHoras[i].end_time);
+        if (now >= horaStart && now <= horaEnd) {
+          currentHoraIndex = i;
+          break;
+        }
+      }
+      
+      // Get current and next hora
+      const currentHoras = allHoras.slice(currentHoraIndex, currentHoraIndex + 2);
+      const parsedHora = currentHoras.map(item => {
+        const startTime = item.start_time.split('T')[1].substring(0, 5);
+        const endTime = item.end_time.split('T')[1].substring(0, 5);
+        return {
+          planet: item.planet,
+          time: `${startTime}-${endTime}`,
+          favorable: getPlanetaryFavorability(item.planet)
+        };
+      });
+      
+      console.log('Parsed Hora:', parsedHora);
+      
+      // Parse muhurtas data
+      const parsedMuhurtas = specialMuhurtas.muhurtas?.slice(0, 2).map(muhurat => {
+        const startTime = muhurat.start_time.split('T')[1].substring(0, 5);
+        const endTime = muhurat.end_time.split('T')[1].substring(0, 5);
+        return {
+          name: muhurat.name,
+          time: `${startTime}-${endTime}`,
+          purpose: muhurat.purpose || 'Auspicious activities'
+        };
+      }) || [];
+      
+      setMuhuratData({
+        choghadiya: parsedChoghadiya.length > 0 ? parsedChoghadiya : [
+          { name: 'Amrit', time: '06:00-07:30', type: 'good' },
+          { name: 'Kaal', time: '07:30-09:00', type: 'bad' },
+          { name: 'Shubh', time: '09:00-10:30', type: 'good' }
+        ],
+        hora: parsedHora.length > 0 ? parsedHora : [
+          { planet: 'Current', time: 'Loading...', favorable: true },
+          { planet: 'Next', time: 'Loading...', favorable: true }
+        ],
+        special: parsedMuhurtas.length > 0 ? parsedMuhurtas : [
+          { name: 'Abhijit', time: '11:47-12:35', purpose: 'All auspicious works' },
+          { name: 'Brahma', time: '04:24-05:12', purpose: 'Spiritual activities' }
+        ]
+      });
+    } catch (error) {
+      console.error('Error fetching muhurat times:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      console.error('Request params:', { today, latitude, longitude });
+      setMuhuratData({
+        choghadiya: [
+          { name: 'Amrit', time: '06:00-07:30', type: 'good' },
+          { name: 'Kaal', time: '07:30-09:00', type: 'bad' },
+          { name: 'Shubh', time: '09:00-10:30', type: 'good' }
+        ],
+        hora: [
+          { planet: 'API Error', time: 'Check console', favorable: false },
+          { planet: 'Backend Issue', time: '400 Bad Request', favorable: false }
+        ],
+        special: [
+          { name: 'API Error', time: 'Backend 400', purpose: 'Check backend logs' },
+          { name: 'Server Issue', time: 'Bad Request', purpose: 'Fix backend first' }
+        ]
+      });
+    } finally {
+      setMuhuratLoading(false);
+    }
+  };
+
+  const getSignName = (signIndex) => {
+    const signs = [
+      'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+    ];
+    return signs[signIndex] || 'Unknown';
+  };
 
   const fetchHoroscopes = async () => {
     setLoading(true);
@@ -152,6 +485,39 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     if (horoscopeSection) {
       horoscopeSection.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const handleMatchingSubmit = (e) => {
+    e.preventDefault();
+    // Navigate to marriage analysis with pre-populated data
+    navigate('/marriage-analysis', { 
+      state: { 
+        prefilledData: {
+          person1: {
+            name: matchingData.boy.name,
+            date: `${matchingData.boy.year}-${matchingData.boy.month.padStart(2, '0')}-${matchingData.boy.day.padStart(2, '0')}`,
+            time: `${matchingData.boy.hours.padStart(2, '0')}:${matchingData.boy.minutes.padStart(2, '0')}:${matchingData.boy.seconds.padStart(2, '0')}`,
+            place: matchingData.boy.place
+          },
+          person2: {
+            name: matchingData.girl.name,
+            date: `${matchingData.girl.year}-${matchingData.girl.month.padStart(2, '0')}-${matchingData.girl.day.padStart(2, '0')}`,
+            time: `${matchingData.girl.hours.padStart(2, '0')}:${matchingData.girl.minutes.padStart(2, '0')}:${matchingData.girl.seconds.padStart(2, '0')}`,
+            place: matchingData.girl.place
+          }
+        }
+      }
+    });
+  };
+
+  const updateMatchingData = (person, field, value) => {
+    setMatchingData(prev => ({
+      ...prev,
+      [person]: {
+        ...prev[person],
+        [field]: value
+      }
+    }));
   };
 
   return (
@@ -404,103 +770,41 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Main Content */}
       <div className="main-content">
         <div className="container">
+          <div className="vedic-tools-header">
+            <h2 className="vedic-tools-title">📊 Vedic Astrology Tools</h2>
+            <p className="vedic-tools-subtitle">Discover your destiny with authentic Vedic calculations</p>
+            <div className="vedic-tools-divider"></div>
+          </div>
           <div className="content-grid">
             {/* Column 1 - Kundli Form (25%) */}
-            <div className="form-card">
-              <h3>Kundli / Birth Chart</h3>
-              <form className="birth-form">
-                <input type="text" placeholder="Name" />
-                <select>
-                  <option>Male</option>
-                  <option>Female</option>
-                </select>
-                <div className="date-inputs">
-                  <input type="number" placeholder="Day" />
-                  <input type="number" placeholder="Month" />
-                  <input type="number" placeholder="Year" />
-                </div>
-                <div className="time-inputs">
-                  <input type="number" placeholder="Hours" />
-                  <input type="number" placeholder="Minutes" />
-                  <input type="number" placeholder="Seconds" />
-                </div>
-                <input type="text" placeholder="Birth Place" />
-                <button type="submit" className="submit-btn">Get Kundli</button>
-              </form>
+            <div className="form-card birth-chart-widget">
+              <BirthForm 
+                onSubmit={() => {
+                  // Show chart in popup modal instead of dashboard
+                  setShowChartModal(true);
+                }} 
+                user={user}
+                onLogout={onLogout}
+              />
             </div>
 
             {/* Column 2 - Matching Form (50%) */}
             <div className="form-card">
               <h3>Kundli Matching</h3>
-              <form className="matching-form">
-                <div className="matching-container">
-                  <div className="boy-section">
-                    <h4>Boy's Details</h4>
-                    <input type="text" placeholder="Name" />
-                    <div className="date-inputs">
-                      <input type="number" placeholder="Day" />
-                      <input type="number" placeholder="Month" />
-                      <input type="number" placeholder="Year" />
-                    </div>
-                    <div className="time-inputs">
-                      <input type="number" placeholder="Hours" />
-                      <input type="number" placeholder="Minutes" />
-                      <input type="number" placeholder="Seconds" />
-                    </div>
-                    <input type="text" placeholder="Birth Place" />
-                  </div>
-                  
-                  <div className="girl-section">
-                    <h4>Girl's Details</h4>
-                    <input type="text" placeholder="Name" />
-                    <div className="date-inputs">
-                      <input type="number" placeholder="Day" />
-                      <input type="number" placeholder="Month" />
-                      <input type="number" placeholder="Year" />
-                    </div>
-                    <div className="time-inputs">
-                      <input type="number" placeholder="Hours" />
-                      <input type="number" placeholder="Minutes" />
-                      <input type="number" placeholder="Seconds" />
-                    </div>
-                    <input type="text" placeholder="Birth Place" />
-                  </div>
-                </div>
-                <button type="submit" className="submit-btn">Check Compatibility</button>
-              </form>
+              <PartnerForm 
+                onSubmit={() => navigate('/marriage-analysis')} 
+                user={user}
+                onLogin={() => setShowLoginModal(true)}
+              />
             </div>
 
             {/* Column 3 - Panchang (25%) */}
-            <div className="panchang-card">
-              <h3>Panchang</h3>
-              <p><strong>New Delhi, India (Today)</strong></p>
-              <div className="panchang-details">
-                <p><strong>Tithi:</strong> Krishna Amavasya</p>
-                <p><strong>Nakshatra:</strong> Chitra</p>
-                <p><strong>Yoga:</strong> Vishkambha</p>
-                <p><strong>Karan:</strong> Naaga</p>
-              </div>
-              <button className="panchang-btn">Today Panchang</button>
-            </div>
+            <PanchangWidget />
           </div>
         </div>
       </div>
 
-      {/* Services Grid */}
-      <section className="services-section">
-        <div className="container">
-          <h2>Free Horoscope and Astrology Services</h2>
-          <div className="services-grid">
-            {services.map((service, index) => (
-              <div key={index} className="service-card">
-                <div className="service-icon">{service.icon}</div>
-                <h4>{service.title}</h4>
-                <p>{service.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* Horoscope Section */}
       <section className="horoscope-section">
@@ -635,16 +939,60 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Interactive Features */}
       <section className="interactive-section">
         <div className="container">
-          <h2>Today's Cosmic Insights</h2>
+          <div className="cosmic-insights-container">
+            <span className="cosmic-icon cosmic-icon-left">✨</span>
+            <h2 className="cosmic-insights-title">Today's Cosmic Insights</h2>
+            <span className="cosmic-icon cosmic-icon-right">🌟</span>
+          </div>
           <div className="interactive-grid">
             <div className="lucky-widget">
               <h3>🍀 Today's Lucky</h3>
               <div className="lucky-content">
                 <div className="lucky-item">
-                  <strong>Numbers:</strong> {todaysData.luckyNumbers.join(', ')}
+                  <strong>🔢 Numbers:</strong> {todaysData.luckyNumbers.join(', ')}
                 </div>
                 <div className="lucky-item">
-                  <strong>Colors:</strong> {todaysData.luckyColors.join(', ')}
+                  <strong>🎨 Colors:</strong> {todaysData.luckyColors.join(', ')}
+                </div>
+                <div className="lucky-item">
+                  <strong>🧭 Direction:</strong> {todaysData.luckyDirection}
+                </div>
+                <div className="lucky-item">
+                  <strong>⏰ Time:</strong> {todaysData.luckyTime}
+                </div>
+                <div className="lucky-item">
+                  <strong>💎 Gemstone:</strong> {todaysData.luckyGemstone}
+                </div>
+                <div className="lucky-item">
+                  <strong>🌟 Element:</strong> {todaysData.luckyElement}
+                </div>
+                <div className="lucky-item">
+                  <strong>🪐 Planet:</strong> {todaysData.luckyPlanet}
+                </div>
+                <div className="lucky-item">
+                  <strong>📅 Day:</strong> {todaysData.luckyDay}
+                </div>
+                <div className="lucky-item mantra">
+                  <strong>🕉️ Mantra:</strong> {todaysData.dailyMantra}
+                </div>
+                <div className="avoid-section">
+                  <div className="lucky-item avoid">
+                    <strong>❌ Avoid Colors:</strong> {todaysData.avoidColors.join(', ')}
+                  </div>
+                  <div className="lucky-item avoid">
+                    <strong>❌ Avoid Numbers:</strong> {todaysData.avoidNumbers.join(', ')}
+                  </div>
+                </div>
+                <div className="activities-section">
+                  <div className="lucky-item best">
+                    <strong>✅ Best Activities:</strong> {todaysData.bestActivities.join(', ')}
+                  </div>
+                  <div className="lucky-item avoid">
+                    <strong>⚠️ Avoid Activities:</strong> {todaysData.avoidActivities.join(', ')}
+                  </div>
+                </div>
+                <div className="lucky-item rashi">
+                  <strong>🌙 Ruling Rashi:</strong> {todaysData.rulingRashi}
                 </div>
               </div>
             </div>
@@ -652,21 +1000,64 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="planetary-widget">
               <h3>🪐 Live Planetary Positions</h3>
               <div className="planet-list">
-                {todaysData.planetaryPositions.map((planet, index) => (
-                  <div key={index} className="planet-item">
-                    <span className="planet-name">{planet.planet}</span>
-                    <span className="planet-sign">{planet.sign} {planet.degree}</span>
-                  </div>
-                ))}
+                {planetaryLoading ? (
+                  <div className="loading-planets">Loading current positions...</div>
+                ) : (
+                  planetaryPositions.map((planet, index) => (
+                    <div key={index} className="planet-item">
+                      <span className="planet-name">
+                        {planet.planet}
+                        {planet.retrograde && <span className="retrograde-indicator"> ℞</span>}
+                      </span>
+                      <span className="planet-sign">{planet.sign} {planet.degree}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
             
-            <div className="compatibility-widget">
-              <h3>💕 Quick Compatibility</h3>
-              <div className="compat-form">
-                <select><option>Your Sign</option></select>
-                <select><option>Partner's Sign</option></select>
-                <button className="check-compat-btn">Check Match</button>
+            <div className="muhurat-widget">
+              <h3>🕐 Today's Muhurat Times</h3>
+              <div className="muhurat-content">
+                {muhuratLoading ? (
+                  <div className="loading-muhurat">Loading auspicious times...</div>
+                ) : (
+                  <div className="muhurat-sections">
+                    <div className="muhurat-section">
+                      <h4>⏰ Choghadiya</h4>
+                      <div className="muhurat-list">
+                        {muhuratData?.choghadiya?.slice(0, 3).map((item, index) => (
+                          <div key={index} className={`muhurat-item ${item.type}`}>
+                            <span className="muhurat-name">{item.name}</span>
+                            <span className="muhurat-time">{item.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="muhurat-section">
+                      <h4>🪐 Hora</h4>
+                      <div className="muhurat-list">
+                        {muhuratData?.hora?.slice(0, 2).map((item, index) => (
+                          <div key={index} className={`muhurat-item ${item.favorable ? 'good' : 'neutral'}`}>
+                            <span className="muhurat-name">{item.planet}</span>
+                            <span className="muhurat-time">{item.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="muhurat-section">
+                      <h4>✨ Special</h4>
+                      <div className="muhurat-list">
+                        {muhuratData?.special?.slice(0, 2).map((item, index) => (
+                          <div key={index} className="muhurat-item good">
+                            <span className="muhurat-name">{item.name}</span>
+                            <span className="muhurat-time">{item.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -717,6 +1108,30 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
+      {/* Educational Content */}
+      <section className="education-section">
+        <div className="container">
+          <h2>Learn Astrology</h2>
+          <div className="education-grid">
+            <div className="education-card">
+              <h3>🎓 Beginner's Guide</h3>
+              <p>Start your astrology journey with basics</p>
+              <button className="learn-btn" onClick={() => navigate('/beginners-guide')}>Start Learning</button>
+            </div>
+            <div className="education-card">
+              <h3>📚 Advanced Courses</h3>
+              <p>Master complex astrological techniques</p>
+              <button className="learn-btn" onClick={() => navigate('/advanced-courses')}>Explore Courses</button>
+            </div>
+            <div className="education-card">
+              <h3>🔍 Myth vs Reality</h3>
+              <p>Separate facts from misconceptions</p>
+              <button className="learn-btn" onClick={() => navigate('/myths-vs-reality')}>Read Articles</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Mobile App Promotion */}
       <section className="app-section">
         <div className="container">
@@ -742,30 +1157,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      {/* Educational Content */}
-      <section className="education-section">
-        <div className="container">
-          <h2>Learn Astrology</h2>
-          <div className="education-grid">
-            <div className="education-card">
-              <h3>🎓 Beginner's Guide</h3>
-              <p>Start your astrology journey with basics</p>
-              <button className="learn-btn">Start Learning</button>
-            </div>
-            <div className="education-card">
-              <h3>📚 Advanced Courses</h3>
-              <p>Master complex astrological techniques</p>
-              <button className="learn-btn">Explore Courses</button>
-            </div>
-            <div className="education-card">
-              <h3>🔍 Myth vs Reality</h3>
-              <p>Separate facts from misconceptions</p>
-              <button className="learn-btn">Read Articles</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Live Chat Widget */}
       <div className="live-chat-widget">
         <button className="chat-widget-btn" onClick={() => user ? setShowChatModal(true) : onLogin()}>
@@ -774,7 +1165,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </button>
       </div>
 
-      {/* Consultation Section */}
+      {/* Consultation Section - Hidden for AstroRoshni */}
+      {/* 
       <section className="consultation-section">
         <div className="container">
           <h2>Consult Astrologer on Call & Chat</h2>
@@ -811,6 +1203,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
         </div>
       </section>
+      */}
 
       {/* Footer */}
       <footer className="main-footer">
@@ -838,6 +1231,154 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onClose={() => setShowChatModal(false)}
         initialBirthData={null}
       />
+      
+      {showLoginModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '15px',
+            padding: '30px',
+            maxWidth: '450px',
+            width: '90%',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowLoginModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+            >
+              ×
+            </button>
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                <button 
+                  onClick={() => setAuthView('login')}
+                  style={{
+                    padding: '10px 20px',
+                    border: 'none',
+                    background: authView === 'login' ? '#e91e63' : 'transparent',
+                    color: authView === 'login' ? 'white' : '#e91e63',
+                    borderRadius: '25px 0 0 25px',
+                    cursor: 'pointer',
+                    borderRight: '1px solid #e91e63'
+                  }}
+                >
+                  Sign In
+                </button>
+                <button 
+                  onClick={() => setAuthView('register')}
+                  style={{
+                    padding: '10px 20px',
+                    border: 'none',
+                    background: authView === 'register' ? '#e91e63' : 'transparent',
+                    color: authView === 'register' ? 'white' : '#e91e63',
+                    borderRadius: '0 25px 25px 0',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sign Up
+                </button>
+              </div>
+            </div>
+            {authView === 'login' ? (
+              <LoginForm 
+                onLogin={(userData) => {
+                  // Handle login success - this should reload the page or update parent state
+                  setShowLoginModal(false);
+                  window.location.reload(); // Reload to get updated user state
+                }} 
+                onSwitchToRegister={() => setAuthView('register')} 
+              />
+            ) : (
+              <RegisterForm 
+                onRegister={(userData) => {
+                  // Handle registration success - this should reload the page or update parent state
+                  setShowLoginModal(false);
+                  window.location.reload(); // Reload to get updated user state
+                }} 
+                onSwitchToLogin={() => setAuthView('login')} 
+              />
+            )}
+          </div>
+        </div>
+      )}
+      
+      {showChartModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '15px',
+            padding: '20px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowChartModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+            >
+              ×
+            </button>
+            <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Your Birth Chart</h2>
+            {chartData && birthData ? (
+              <ChartWidget 
+                title="Lagna Chart (D1)"
+                chartType="lagna"
+                chartData={chartData}
+                birthData={birthData}
+                defaultStyle="north"
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                📊 Loading Chart...<br/>
+                <small>Please wait while we generate your birth chart</small>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
