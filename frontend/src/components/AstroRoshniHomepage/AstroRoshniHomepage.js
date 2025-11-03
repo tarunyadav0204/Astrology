@@ -564,8 +564,15 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       <section className="life-categories">
         <div className="container">
           <div className="life-categories-header">
+            <span className="life-path-symbol life-path-symbol-1">🌟</span>
+            <span className="life-path-symbol life-path-symbol-2">🔮</span>
+            <span className="life-path-symbol life-path-symbol-3">✨</span>
+            <span className="life-path-symbol life-path-symbol-4">🌙</span>
+            <span className="life-path-symbol life-path-symbol-5">⭐</span>
+            <span className="life-path-symbol life-path-symbol-6">💫</span>
             <h3>✨ Discover Your Life Path</h3>
             <p>Unlock the secrets of your destiny with best in class Vedic Astrology</p>
+            <div className="life-categories-divider"></div>
           </div>
           <div className="life-categories-grid">
             <div className="life-category" onClick={() => user ? navigate('/career-guidance') : onLogin()}>
@@ -725,7 +732,19 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Premium Services - Moved Higher */}
       <section className="premium-services">
         <div className="container">
-          <h2>Astrological Services for Accurate Answers</h2>
+          <div className="premium-services-header">
+            <span className="service-symbol service-symbol-1">🔮</span>
+            <span className="service-symbol service-symbol-2">📊</span>
+            <span className="service-symbol service-symbol-3">💎</span>
+            <span className="service-symbol service-symbol-4">🌟</span>
+            <span className="service-symbol service-symbol-5">📋</span>
+            <span className="service-symbol service-symbol-6">💫</span>
+            <span className="service-symbol service-symbol-7">🎯</span>
+            <span className="service-symbol service-symbol-8">✨</span>
+            <h2 className="premium-services-title">Astrological Services for Accurate Answers</h2>
+            <p className="premium-services-subtitle">Professional insights backed by ancient wisdom and modern precision</p>
+            <div className="premium-services-divider"></div>
+          </div>
           <div className="premium-grid">
             <div className="featured-service">
               <div className="ribbon">33% OFF</div>
@@ -771,6 +790,12 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       <div className="main-content">
         <div className="container">
           <div className="vedic-tools-header">
+            <span className="vedic-symbol vedic-symbol-1">🕉️</span>
+            <span className="vedic-symbol vedic-symbol-2">卍</span>
+            <span className="vedic-symbol vedic-symbol-3">🔱</span>
+            <span className="vedic-symbol vedic-symbol-4">☸️</span>
+            <span className="vedic-symbol vedic-symbol-5">🪔</span>
+            <span className="vedic-symbol vedic-symbol-6">🌸</span>
             <h2 className="vedic-tools-title">📊 Vedic Astrology Tools</h2>
             <p className="vedic-tools-subtitle">Discover your destiny with authentic Vedic calculations</p>
             <div className="vedic-tools-divider"></div>

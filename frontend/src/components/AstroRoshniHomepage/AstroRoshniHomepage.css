@@ -316,6 +316,71 @@
   box-shadow: 0 2px 10px rgba(233, 30, 99, 0.3);
 }
 
+/* Dancing Traditional Symbols around Vedic Tools Header */
+.vedic-symbol {
+  position: absolute;
+  font-size: 1.8rem;
+  color: #ff6f00;
+  filter: drop-shadow(0 0 8px rgba(255, 111, 0, 0.6));
+  animation: vedic-dance 4s ease-in-out infinite;
+  z-index: 5;
+}
+
+.vedic-symbol-1 {
+  top: -20px;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.vedic-symbol-2 {
+  top: -15px;
+  right: 10%;
+  animation-delay: 1s;
+}
+
+.vedic-symbol-3 {
+  top: 20px;
+  left: 5%;
+  animation-delay: 2s;
+}
+
+.vedic-symbol-4 {
+  top: 25px;
+  right: 5%;
+  animation-delay: 3s;
+}
+
+.vedic-symbol-5 {
+  top: -10px;
+  left: 25%;
+  animation-delay: 0.5s;
+}
+
+.vedic-symbol-6 {
+  top: -5px;
+  right: 25%;
+  animation-delay: 1.5s;
+}
+
+@keyframes vedic-dance {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg) scale(1);
+    opacity: 0.7;
+  }
+  25% { 
+    transform: translateY(-8px) rotate(5deg) scale(1.1);
+    opacity: 1;
+  }
+  50% { 
+    transform: translateY(-12px) rotate(-3deg) scale(1.05);
+    opacity: 0.8;
+  }
+  75% { 
+    transform: translateY(-6px) rotate(8deg) scale(1.15);
+    opacity: 1;
+  }
+}
+
 @keyframes shimmer {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.2); }
@@ -843,20 +908,41 @@
 
 .horoscope-tabs {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 30px;
   margin-top: 30px;
+  justify-content: center;
 }
 
 .tab {
   background: rgba(233, 30, 99, 0.1);
-  border: 2px solid rgba(233, 30, 99, 0.2);
-  padding: 10px 20px;
-  border-radius: 25px;
+  border: 2px solid rgba(233, 30, 99, 0.3);
+  padding: 12px 24px;
+  border-radius: 30px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.4s ease;
   color: #e91e63;
   font-weight: bold;
+  font-size: 0.95rem;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(233, 30, 99, 0.1);
+}
+
+.tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.tab:hover::before {
+  left: 100%;
 }
 
 .tab.active,
@@ -864,24 +950,49 @@
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   color: white;
   border-color: #e91e63;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(233, 30, 99, 0.3);
+}
+
+.tab.active {
+  transform: translateY(-2px) scale(1.05);
 }
 
 .zodiac-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 30px;
 }
 
 .zodiac-card {
-  background: rgba(233, 30, 99, 0.1);
-  border: 2px solid rgba(233, 30, 99, 0.2);
-  padding: 15px;
-  border-radius: 15px;
+  background: rgba(233, 30, 99, 0.08);
+  border: 2px solid rgba(233, 30, 99, 0.25);
+  padding: 16px 12px;
+  border-radius: 18px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.4s ease;
   text-align: center;
   color: #e91e63;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 3px 12px rgba(233, 30, 99, 0.08);
+}
+
+.zodiac-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: left 0.6s;
+}
+
+.zodiac-card:hover::before {
+  left: 100%;
 }
 
 .zodiac-card.active,
@@ -889,7 +1000,13 @@
   background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
   color: white;
   border-color: #e91e63;
-  transform: translateY(-2px);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 20px rgba(233, 30, 99, 0.25);
+}
+
+.zodiac-card.active {
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: 0 10px 25px rgba(233, 30, 99, 0.35);
 }
 
 .zodiac-icon {
@@ -1248,6 +1365,122 @@
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(10px);
   margin: 15px 0;
+}
+
+/* Premium Services Header Styling */
+.premium-services-header {
+  text-align: center;
+  margin: 60px 0 40px 0;
+  position: relative;
+}
+
+.premium-services-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  background: linear-gradient(135deg, #9c27b0, #e91e63, #ff6f00, #ffd700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 10px 0;
+  text-shadow: 0 2px 10px rgba(156, 39, 176, 0.3);
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.premium-services-subtitle {
+  color: #666;
+  font-size: 1.1rem;
+  margin: 0;
+  font-style: italic;
+}
+
+.premium-services-divider {
+  width: 120px;
+  height: 3px;
+  background: linear-gradient(90deg, #9c27b0, #e91e63, #ff6f00, #ffd700);
+  margin: 20px auto;
+  border-radius: 2px;
+  box-shadow: 0 2px 10px rgba(156, 39, 176, 0.3);
+}
+
+/* Dancing Service Symbols around Premium Services Header */
+.service-symbol {
+  position: absolute;
+  font-size: 1.6rem;
+  color: #9c27b0;
+  filter: drop-shadow(0 0 8px rgba(156, 39, 176, 0.6));
+  animation: service-dance 5s ease-in-out infinite;
+  z-index: 5;
+}
+
+.service-symbol-1 {
+  top: -25px;
+  left: 8%;
+  animation-delay: 0s;
+}
+
+.service-symbol-2 {
+  top: -20px;
+  right: 8%;
+  animation-delay: 1.2s;
+}
+
+.service-symbol-3 {
+  top: 15px;
+  left: 3%;
+  animation-delay: 2.4s;
+}
+
+.service-symbol-4 {
+  top: 20px;
+  right: 3%;
+  animation-delay: 3.6s;
+}
+
+.service-symbol-5 {
+  top: -15px;
+  left: 22%;
+  animation-delay: 0.6s;
+}
+
+.service-symbol-6 {
+  top: -10px;
+  right: 22%;
+  animation-delay: 1.8s;
+}
+
+.service-symbol-7 {
+  top: 25px;
+  left: 15%;
+  animation-delay: 3s;
+}
+
+.service-symbol-8 {
+  top: 30px;
+  right: 15%;
+  animation-delay: 4.2s;
+}
+
+@keyframes service-dance {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg) scale(1);
+    opacity: 0.6;
+  }
+  20% { 
+    transform: translateY(-10px) rotate(8deg) scale(1.2);
+    opacity: 1;
+  }
+  40% { 
+    transform: translateY(-15px) rotate(-5deg) scale(1.1);
+    opacity: 0.8;
+  }
+  60% { 
+    transform: translateY(-8px) rotate(12deg) scale(1.3);
+    opacity: 1;
+  }
+  80% { 
+    transform: translateY(-12px) rotate(-8deg) scale(1.15);
+    opacity: 0.9;
+  }
 }
 
 .premium-grid {
@@ -2363,35 +2596,42 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 6px 4px;
+  gap: 4px;
+  padding: 12px 8px;
   color: #e91e63;
+  min-height: 70px;
 }
 
-.horoscope-section .zodiac-card:hover {
-  background: rgba(233, 30, 99, 0.1);
-  color: #e91e63;
+.horoscope-section .zodiac-card:hover .zodiac-icon {
+  transform: scale(1.2) rotate(5deg);
+  filter: drop-shadow(0 4px 8px rgba(255, 255, 255, 0.3));
 }
 
-.horoscope-section .zodiac-card.active {
-  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
-  color: white;
+.horoscope-section .zodiac-card.active .zodiac-icon {
+  transform: scale(1.15);
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
 }
 
 .horoscope-section .zodiac-icon {
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 2px 4px rgba(233, 30, 99, 0.2));
+  transition: all 0.3s ease;
 }
 
 .horoscope-section .zodiac-text {
-  font-size: 8px;
-  line-height: 1;
-  font-weight: 600;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 700;
   text-transform: capitalize;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .horoscope-section .zodiac-card.active .zodiac-text {
   color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* Your Life Categories */
@@ -2427,18 +2667,105 @@
 }
 
 .life-categories-header h3 {
-  color: white;
-  font-size: 1.8rem;
+  font-size: 2.8rem;
   margin: 0 0 8px 0;
   font-weight: bold;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #ffd700, #ffeb3b, #fff176, #ffffff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 15px rgba(255, 215, 0, 0.4);
+  animation: shimmer 3s ease-in-out infinite;
 }
 
 .life-categories-header p {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.1rem;
   margin: 0;
   font-style: italic;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+}
+
+.life-categories-divider {
+  width: 140px;
+  height: 3px;
+  background: linear-gradient(90deg, #ffd700, #ffeb3b, #fff176, #ffffff);
+  margin: 20px auto;
+  border-radius: 2px;
+  box-shadow: 0 2px 15px rgba(255, 215, 0, 0.4);
+}
+
+/* Dancing Life Path Symbols */
+.life-path-symbol {
+  position: absolute;
+  font-size: 1.8rem;
+  color: #ffd700;
+  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.7));
+  animation: life-path-dance 6s ease-in-out infinite;
+  z-index: 5;
+}
+
+.life-path-symbol-1 {
+  top: -30px;
+  left: 5%;
+  animation-delay: 0s;
+}
+
+.life-path-symbol-2 {
+  top: -25px;
+  right: 5%;
+  animation-delay: 1.5s;
+}
+
+.life-path-symbol-3 {
+  top: 10px;
+  left: 2%;
+  animation-delay: 3s;
+}
+
+.life-path-symbol-4 {
+  top: 15px;
+  right: 2%;
+  animation-delay: 4.5s;
+}
+
+.life-path-symbol-5 {
+  top: -20px;
+  left: 18%;
+  animation-delay: 0.8s;
+}
+
+.life-path-symbol-6 {
+  top: -15px;
+  right: 18%;
+  animation-delay: 2.3s;
+}
+
+@keyframes life-path-dance {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg) scale(1);
+    opacity: 0.8;
+  }
+  16% { 
+    transform: translateY(-12px) rotate(10deg) scale(1.3);
+    opacity: 1;
+  }
+  33% { 
+    transform: translateY(-18px) rotate(-8deg) scale(1.1);
+    opacity: 0.9;
+  }
+  50% { 
+    transform: translateY(-15px) rotate(15deg) scale(1.4);
+    opacity: 1;
+  }
+  66% { 
+    transform: translateY(-10px) rotate(-12deg) scale(1.2);
+    opacity: 0.85;
+  }
+  83% { 
+    transform: translateY(-8px) rotate(8deg) scale(1.25);
+    opacity: 1;
+  }
 }
 
 .life-categories-grid {
