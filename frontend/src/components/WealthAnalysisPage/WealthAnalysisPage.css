@@ -1,0 +1,130 @@
+.wealth-analysis-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.page-content {
+  padding: 20px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 30px;
+  color: white;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  margin: 10px 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.page-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-section {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.form-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.form-card h2 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.form-card p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.analysis-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.tab-navigation {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 15px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+  background: rgba(108, 117, 125, 0.1);
+  color: #6c757d;
+}
+
+.tab-btn.active {
+  color: #495057;
+  border-bottom-color: #6c757d;
+  background: white;
+}
+
+.tab-content {
+  min-height: 600px;
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 10px;
+  }
+  
+  .page-header h1 {
+    font-size: 2rem;
+  }
+  
+  .tab-btn {
+    padding: 12px 15px;
+    font-size: 14px;
+  }
+}

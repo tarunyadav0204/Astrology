@@ -20,6 +20,7 @@ import AstroRoshniPage from './components/AstroRoshni/AstroRoshniPage';
 import MarriageAnalysisPage from './components/MarriageAnalysisPage/MarriageAnalysisPage';
 import CareerGuidancePage from './components/CareerGuidancePage/CareerGuidancePage';
 import HealthAnalysisPage from './components/HealthAnalysisPage/HealthAnalysisPage';
+import WealthAnalysisPage from './components/WealthAnalysisPage/WealthAnalysisPage';
 import PanchangPage from './components/Panchang/PanchangPage';
 import MuhuratFinderPage from './components/MuhuratFinder/MuhuratFinderPage';
 import AdminPanel from './components/Admin/AdminPanel';
@@ -831,6 +832,106 @@ function App() {
                 )}
               </>
             } />
+            <Route path="/wealth-analysis" element={
+              <>
+                <AstroRoshniHomepage 
+                  user={null} 
+                  onLogin={() => setShowLoginModal(true)} 
+                  showLoginButton={true} 
+                />
+                {showLoginModal && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '15px',
+                      padding: '30px',
+                      maxWidth: '450px',
+                      width: '90%',
+                      position: 'relative'
+                    }}>
+                      <button 
+                        onClick={() => setShowLoginModal(false)}
+                        style={{
+                          position: 'absolute',
+                          top: '15px',
+                          right: '15px',
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '24px',
+                          cursor: 'pointer',
+                          color: '#666'
+                        }}
+                      >
+                        ×
+                      </button>
+                      <div style={{ marginBottom: '20px' }}>
+                        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Login Required</h2>
+                        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>Please login to access Wealth Analysis</p>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                          <button 
+                            onClick={() => setAuthView('login')}
+                            style={{
+                              padding: '10px 20px',
+                              border: 'none',
+                              background: authView === 'login' ? '#e91e63' : 'transparent',
+                              color: authView === 'login' ? 'white' : '#e91e63',
+                              borderRadius: '25px 0 0 25px',
+                              cursor: 'pointer',
+                              borderRight: '1px solid #e91e63'
+                            }}
+                          >
+                            Sign In
+                          </button>
+                          <button 
+                            onClick={() => setAuthView('register')}
+                            style={{
+                              padding: '10px 20px',
+                              border: 'none',
+                              background: authView === 'register' ? '#e91e63' : 'transparent',
+                              color: authView === 'register' ? 'white' : '#e91e63',
+                              borderRadius: '0 25px 25px 0',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Sign Up
+                          </button>
+                        </div>
+                      </div>
+                      {authView === 'login' ? (
+                        <LoginForm 
+                          onLogin={(userData) => {
+                            handleLogin(userData);
+                            setShowLoginModal(false);
+                            window.location.href = '/wealth-analysis';
+                          }} 
+                          onSwitchToRegister={() => setAuthView('register')} 
+                        />
+                      ) : (
+                        <RegisterForm 
+                          onRegister={(userData) => {
+                            handleLogin(userData);
+                            setShowLoginModal(false);
+                            window.location.href = '/wealth-analysis';
+                          }} 
+                          onSwitchToLogin={() => setAuthView('login')} 
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <ToastContainer />
@@ -874,6 +975,13 @@ function App() {
           } />
           <Route path="/muhurat-finder" element={
             <MuhuratFinderPage 
+              user={user} 
+              onLogout={handleLogout} 
+              onAdminClick={handleAdminClick} 
+            />
+          } />
+          <Route path="/wealth-analysis" element={
+            <WealthAnalysisPage 
               user={user} 
               onLogout={handleLogout} 
               onAdminClick={handleAdminClick} 

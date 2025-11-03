@@ -234,21 +234,27 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               </div>
               <div className="category-arrow">→</div>
             </div>
-            <div className="life-category" onClick={() => user ? setShowChatModal(true) : onLogin()}>
-              <div className="category-icon">🤖</div>
-              <div className="category-content">
-                <h4>AI Astrologer</h4>
-                <p>Chat with AI for instant guidance</p>
-              </div>
-              <div className="category-arrow">→</div>
-            </div>
-            <div className="life-category" onClick={() => user ? onLogin() : onLogin()}>
+            <div className="life-category" onClick={() => user ? navigate('/wealth-analysis') : onLogin()}>
               <div className="category-icon">💎</div>
               <div className="category-content">
                 <h4>Your Wealth</h4>
                 <p>Financial prosperity & abundance</p>
               </div>
               <div className="category-arrow">→</div>
+            </div>
+          </div>
+          
+          {/* Full-width Ask Astrologer Banner */}
+          <div className="ask-astrologer-banner" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+            <div className="banner-content">
+              <div className="banner-icon">💬</div>
+              <div className="banner-text">
+                <h3>Deep Vedic Analysis</h3>
+                <p>Get profound insights from ancient wisdom • Expert guidance • Personalized predictions</p>
+              </div>
+              <div className="banner-cta">
+                <span>Start Chat →</span>
+              </div>
             </div>
           </div>
         </div>
@@ -382,6 +388,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                       navigate('/career-guidance');
                     } else if (service.title === 'Health Report') {
                       navigate('/health-analysis');
+                    } else if (service.title === 'Finance Report') {
+                      navigate('/wealth-analysis');
                     }
                   }}
                 >
