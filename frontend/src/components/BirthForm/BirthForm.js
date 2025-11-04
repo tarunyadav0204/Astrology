@@ -43,7 +43,11 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
   }, [formData.place]);
 
   useEffect(() => {
-    loadExistingCharts();
+    // Only load existing charts if user is authenticated
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadExistingCharts();
+    }
     
     // Pre-populate form if prefilledData is provided (from homepage matching)
     if (prefilledData && prefilledData.person1) {
@@ -75,11 +79,18 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
   }, [birthData, prefilledData]);
 
   const loadExistingCharts = async (search = '') => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setExistingCharts([]);
+      return;
+    }
+    
     try {
       const response = await apiService.getExistingCharts(search);
       setExistingCharts(response.charts || []);
     } catch (error) {
       console.error('Failed to load existing charts:', error);
+      setExistingCharts([]);
     }
   };
 

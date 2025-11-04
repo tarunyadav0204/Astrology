@@ -59,15 +59,26 @@ const PartnerForm = ({ onSubmit, user, onLogin }) => {
   }, [girlData.place]);
 
   useEffect(() => {
-    loadSavedCharts();
+    // Only load saved charts if user is authenticated
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadSavedCharts();
+    }
   }, []);
 
   const loadSavedCharts = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setSavedCharts([]);
+      return;
+    }
+    
     try {
       const response = await apiService.getExistingCharts();
       setSavedCharts(response.charts || []);
     } catch (error) {
       console.error('Failed to load saved charts:', error);
+      setSavedCharts([]);
     }
   };
 
