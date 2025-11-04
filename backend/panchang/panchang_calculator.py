@@ -4,6 +4,7 @@ import math
 
 class PanchangCalculator:
     def __init__(self):
+        # Initialize Swiss Ephemeris with Lahiri Ayanamsa for accurate Vedic calculations
         swe.set_sid_mode(swe.SIDM_LAHIRI)
     
     def calculate_panchang(self, date_str, latitude, longitude, timezone):
