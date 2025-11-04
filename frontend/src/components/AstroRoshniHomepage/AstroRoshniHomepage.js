@@ -311,7 +311,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     return () => clearTimeout(midnightTimer);
   }, [generateTodaysData]);
 
-  const fetchPlanetaryPositions = async () => {
+  const fetchPlanetaryPositions = useCallback(async () => {
     setPlanetaryLoading(true);
     try {
       // Use fallback data for non-authenticated users
@@ -329,9 +329,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     } finally {
       setPlanetaryLoading(false);
     }
-  };
+  }, []);
 
-  const fetchMuhuratTimes = async () => {
+  const fetchMuhuratTimes = useCallback(async () => {
     setMuhuratLoading(true);
     const today = new Date().toISOString().split('T')[0];
     const latitude = 28.6139;
@@ -470,7 +470,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     } finally {
       setMuhuratLoading(false);
     }
-  };
+  }, []);
 
   const getSignName = (signIndex) => {
     const signs = [
@@ -480,7 +480,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     return signs[signIndex] || 'Unknown';
   };
 
-  const fetchHoroscopes = async () => {
+  const fetchHoroscopes = useCallback(async () => {
     setLoading(true);
     try {
       const API_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -495,7 +495,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const getCurrentHoroscope = () => {
     if (!horoscopeData[selectedZodiac]) {
