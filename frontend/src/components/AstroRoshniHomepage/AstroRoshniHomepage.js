@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../../config/app.config';
 import { getCurrentDomainConfig } from '../../config/domains.config';
@@ -105,7 +105,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [muhuratData, setMuhuratData] = useState(null);
   const [muhuratLoading, setMuhuratLoading] = useState(false);
 
-  const generateTodaysData = () => {
+  const generateTodaysData = useCallback(() => {
     const today = new Date();
     const dayOfWeek = today.getDay();
     const dayOfMonth = today.getDate();
@@ -220,37 +220,79 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       avoidActivities: attrs.avoidActivities,
       rulingRashi: rashis[(dayOfMonth + month) % 12]
     };
-  };
+  }, []);
   
-  const [todaysData, setTodaysData] = useState(generateTodaysData());
+  const [todaysData, setTodaysData] = useState(() => {
+    // Initialize with cached data or generate new
+    const lastUpdate = localStorage.getItem('lastLuckyUpdate');
+    const today = new Date().toDateString();
+    const cachedData = localStorage.getItem('todaysLuckyData');
+    
+    if (lastUpdate === today && cachedData) {
+      try {
+        return JSON.parse(cachedData);
+      } catch (e) {
+        console.error('Error parsing cached data:', e);
+      }
+    }
+    
+    // Generate new data if no cache or new day
+    const newData = {
+      luckyNumbers: [1, 3, 7, 9],
+      luckyColors: ['Golden', 'Orange', 'Red'],
+      luckyDirection: 'East',
+      luckyTime: '6:00 AM - 12:00 PM',
+      luckyGemstone: 'Ruby',
+      luckyElement: 'Fire',
+      luckyPlanet: 'Sun',
+      luckyDay: 'Today',
+      dailyMantra: 'Om Surya Namaha',
+      avoidColors: ['Black', 'Dark Blue'],
+      avoidNumbers: [4, 8],
+      bestActivities: ['Leadership', 'New Beginnings'],
+      avoidActivities: ['Night Travel'],
+      rulingRashi: 'Aries'
+    };
+    
+    localStorage.setItem('todaysLuckyData', JSON.stringify(newData));
+    localStorage.setItem('lastLuckyUpdate', today);
+    
+    return newData;
+  });
 
+  // Banner slider effect
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % bannerSlides.length);
     }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [bannerSlides.length]);
 
+  // Initial data fetch
   useEffect(() => {
     fetchHoroscopes();
     fetchPlanetaryPositions();
     fetchMuhuratTimes();
-    
-    // Update today's data daily at midnight
-    const updateDailyData = () => {
-      setTodaysData(generateTodaysData());
+  }, []);
+
+  // Daily data update check
+  useEffect(() => {
+    const checkAndUpdateDailyData = () => {
+      const lastUpdate = localStorage.getItem('lastLuckyUpdate');
+      const today = new Date().toDateString();
+      
+      if (lastUpdate !== today) {
+        const newData = generateTodaysData();
+        setTodaysData(newData);
+        localStorage.setItem('todaysLuckyData', JSON.stringify(newData));
+        localStorage.setItem('lastLuckyUpdate', today);
+      }
     };
     
-    // Check if we need to update data (new day)
-    const lastUpdate = localStorage.getItem('lastLuckyUpdate');
-    const today = new Date().toDateString();
+    // Check immediately
+    checkAndUpdateDailyData();
     
-    if (lastUpdate !== today) {
-      updateDailyData();
-      localStorage.setItem('lastLuckyUpdate', today);
-    }
-    
-    // Set interval to update at midnight
+    // Set up midnight check
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
@@ -258,15 +300,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
     
     const midnightTimer = setTimeout(() => {
-      updateDailyData();
-      localStorage.setItem('lastLuckyUpdate', new Date().toDateString());
+      checkAndUpdateDailyData();
       
       // Set daily interval after first midnight update
-      setInterval(updateDailyData, 24 * 60 * 60 * 1000);
+      const dailyInterval = setInterval(checkAndUpdateDailyData, 24 * 60 * 60 * 1000);
+      
+      return () => clearInterval(dailyInterval);
     }, msUntilMidnight);
     
     return () => clearTimeout(midnightTimer);
-  }, []);
+  }, [generateTodaysData]);
 
   const fetchPlanetaryPositions = async () => {
     setPlanetaryLoading(true);
