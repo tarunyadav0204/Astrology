@@ -270,9 +270,19 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
   // Initial data fetch
   useEffect(() => {
-    fetchHoroscopes();
-    fetchPlanetaryPositions();
-    fetchMuhuratTimes();
+    const initializeData = async () => {
+      try {
+        await Promise.all([
+          fetchHoroscopes(),
+          fetchPlanetaryPositions(),
+          fetchMuhuratTimes()
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      }
+    };
+    
+    initializeData();
   }, []);
 
   // Daily data update check
