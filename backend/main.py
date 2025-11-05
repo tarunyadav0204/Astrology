@@ -215,7 +215,7 @@ swe.set_sid_mode(swe.SIDM_LAHIRI)
 # JWT Configuration
 SECRET_KEY = "astrology-app-secret-key-2024"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 43200  # 1 month (30 days)
 security = HTTPBearer()
 
 # Initialize SQLite database
