@@ -1289,6 +1289,121 @@ async def calculate_birth_panchang(birth_data: BirthData):
     )
     return await calculate_panchang(request)
 
+@app.get("/api/choghadiya")
+async def get_choghadiya(date: str, latitude: float, longitude: float):
+    """Get Choghadiya periods"""
+    from panchang.panchang_calculator import PanchangCalculator
+    try:
+        calc = PanchangCalculator()
+        result = calc.calculate_choghadiya(date, latitude, longitude)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/hora")
+async def get_hora(date: str, latitude: float, longitude: float):
+    """Get Hora (planetary hours)"""
+    from panchang.panchang_calculator import PanchangCalculator
+    try:
+        calc = PanchangCalculator()
+        result = calc.calculate_hora(date, latitude, longitude)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/calculate-moon-phase")
+async def calculate_moon_phase_api(request: dict):
+    """Calculate moon phase for given date"""
+    try:
+        date = request.get('date')
+        if not date:
+            raise HTTPException(status_code=400, detail="Date is required")
+        
+        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 12.0)
+        
+        moon_data = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)
+        sun_data = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)
+        
+        moon_pos = moon_data[0][0]
+        sun_pos = sun_data[0][0]
+        
+        phase_angle = (moon_pos - sun_pos) % 360
+        illumination = (1 - math.cos(math.radians(phase_angle))) / 2 * 100
+        
+        phase_names = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
+                      'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent']
+        phase_index = int((phase_angle + 22.5) / 45) % 8
+        
+        return {
+            'phase_name': phase_names[phase_index],
+            'illumination_percentage': round(illumination, 1),
+            'moon_age': round(phase_angle / 12.2, 1)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/calculate-inauspicious-times")
+async def calculate_inauspicious_times_api(request: dict):
+    """Calculate inauspicious times for given date and location"""
+    try:
+        date = request.get('date')
+        latitude = request.get('latitude')
+        longitude = request.get('longitude')
+        
+        if not all([date, latitude, longitude]):
+            raise HTTPException(status_code=400, detail="Date, latitude, and longitude are required")
+        
+        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        
+        # Calculate approximate sunrise
+        lat_rad = math.radians(latitude)
+        sun_decl = math.radians(23.45 * math.sin(math.radians(360 * (284 + date_obj.timetuple().tm_yday) / 365)))
+        hour_angle = math.acos(-math.tan(lat_rad) * math.tan(sun_decl))
+        sunrise_hour = 12 - hour_angle * 12 / math.pi
+        
+        sunrise_time = datetime.combine(date_obj.date(), datetime.min.time()) + timedelta(hours=sunrise_hour)
+        
+        # Rahu Kaal calculation
+        weekday = date_obj.weekday()
+        rahu_periods = [7.5, 1, 6, 4.5, 3, 6, 4.5]  # Sunday to Saturday
+        day_duration = 12  # Approximate
+        rahu_duration = day_duration / 8
+        rahu_start_period = rahu_periods[weekday]
+        
+        rahu_start = sunrise_time + timedelta(hours=rahu_start_period * rahu_duration)
+        rahu_end = rahu_start + timedelta(hours=rahu_duration)
+        
+        return {
+            'rahu_kaal': {
+                'start': rahu_start.strftime('%H:%M'),
+                'end': rahu_end.strftime('%H:%M')
+            },
+            'sunrise': sunrise_time.strftime('%H:%M')
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/special-muhurtas")
+async def get_special_muhurtas(date: str, latitude: float, longitude: float):
+    """Get special muhurtas"""
+    from panchang.panchang_calculator import PanchangCalculator
+    try:
+        calc = PanchangCalculator()
+        result = calc.calculate_special_muhurtas(date, latitude, longitude)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/festivals/{date}")
+async def get_festivals(date: str):
+    """Get festivals for given date"""
+    try:
+        # Return empty list for now - can be enhanced later
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/calculate-divisional-chart")
 async def calculate_divisional_chart(request: dict, current_user: User = Depends(get_current_user)):
     """Calculate accurate divisional charts using proper Vedic formulas"""

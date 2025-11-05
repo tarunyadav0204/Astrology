@@ -422,7 +422,7 @@ export const apiService = {
   },
   
   getFestivals: async (date) => {
-    const response = await apiClient.get(getEndpoint(`/festivals/${date}`));
+    const response = await apiClient.get(getEndpoint(`/panchang/festivals/${date}`));
     return response.data;
   },
   
@@ -436,17 +436,17 @@ export const apiService = {
   },
   
   calculateChoghadiya: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/choghadiya')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    const response = await apiClient.get(`${getEndpoint('/panchang/choghadiya')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
     return response.data;
   },
   
   calculateHora: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/hora')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    const response = await apiClient.get(`${getEndpoint('/panchang/hora')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
     return response.data;
   },
   
   calculateSpecialMuhurtas: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/special-muhurtas')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+    const response = await apiClient.get(`${getEndpoint('/panchang/special-muhurtas')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
     return response.data;
   },
   
