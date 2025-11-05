@@ -145,6 +145,63 @@ CRITICAL INSTRUCTIONS:
 - For timing questions, prioritize dasha periods but include transit data if available
 - NEVER recalculate the ascendant - use the provided ascendant_info section
 
+BHAVAM BHAVESH TECHNIQUE - CRITICAL FOR RELATIVE ANALYSIS:
+When analyzing relatives, ALWAYS apply Bhavam Bhavesh (house becomes ascendant) technique:
+
+PRIMARY RELATIONS:
+- **Spouse** → 7th house as lagna (analyze spouse's life from 7th house perspective)
+- **Children** → 5th house as lagna (analyze child's life from 5th house perspective)
+- **Mother** → 4th house as lagna (analyze mother's life from 4th house perspective)
+- **Father** → 9th house as lagna (analyze father's life from 9th house perspective)
+- **Siblings** → 3rd house as lagna (analyze sibling's life from 3rd house perspective)
+- **Maternal Uncle** → 6th house as lagna (4th from 4th)
+- **Paternal Uncle** → 12th house as lagna (4th from 9th)
+
+EXTENDED RELATIONS:
+- **Mother-in-law** → 10th house as lagna (4th from 7th)
+- **Father-in-law** → 1st house as lagna (7th from 7th)
+- **Spouse's siblings** → 9th house as lagna (3rd from 7th)
+- **Grandchildren** → 9th house as lagna (5th from 5th)
+- **Daughter-in-law** → 11th house as lagna (7th from 5th)
+- **Son-in-law** → 11th house as lagna (7th from 5th)
+
+BUSINESS RELATIONS:
+- **Business Partner** → 7th house as lagna
+- **Employees** → 6th house as lagna
+- **Boss/Employer** → 10th house as lagna
+
+IMPLEMENTATION:
+1. **Dual Analysis Required**: Always analyze BOTH the original house AND the bhavam bhavesh perspective
+2. **Example for Son**: Analyze 5th house (your relationship with son) AND 5th house as lagna (son's own life)
+3. **Rotated Chart Logic**: When 5th becomes lagna for son:
+   - 5th house = Son's 1st house (personality, health, general life)
+   - 6th house = Son's 2nd house (wealth, speech, family)
+   - 7th house = Son's 3rd house (siblings, courage, efforts)
+   - 8th house = Son's 4th house (home, mother, happiness)
+   - 9th house = Son's 5th house (son's children - your grandchildren)
+   - 10th house = Son's 6th house (son's health issues, enemies)
+   - 11th house = Son's 7th house (son's spouse, marriage)
+   - 12th house = Son's 8th house (son's longevity, transformation)
+   - 1st house = Son's 9th house (son's dharma, fortune, father)
+   - 2nd house = Son's 10th house (son's career, reputation)
+   - 3rd house = Son's 11th house (son's gains, elder siblings)
+   - 4th house = Son's 12th house (son's losses, foreign travel)
+
+4. **Complete Perspective**: Provide insights about the relative's own life, not just your relationship with them
+
+ADVANCED ANALYSIS USAGE:
+The context includes advanced_analysis section with:
+- **planetary_wars**: Graha Yuddha when planets are within 1° (winner/loser effects)
+- **vargottama_positions**: Planets in same sign across divisional charts (exceptional strength)
+- **neecha_bhanga**: Cancellation of debilitation conditions (strength restoration)
+- **pancha_mahapurusha**: Five great person yogas (Mars, Mercury, Jupiter, Venus, Saturn)
+
+USE THESE for deeper insights:
+- Reference planetary wars when discussing conflicting influences
+- Mention Vargottama planets as exceptionally strong and reliable
+- Highlight Neecha Bhanga as transformation of weakness into strength
+- Emphasize Pancha Mahapurusha yogas as exceptional personality traits
+
 BIRTH CHART DATA:
 {json.dumps(context, indent=2, default=json_serializer)}
 

@@ -52,22 +52,19 @@ async def get_nakshatra_year_data(
         db_result = cursor.fetchone()
         conn.close()
         
+        # Start with calculator properties (includes symbol)
+        detailed_info = nakshatra_data['properties'].copy()
+        
+        # Merge with database data if available
         if db_result:
-            detailed_info = {
-                'name': db_result[0],
-                'lord': db_result[1],
-                'deity': db_result[2],
-                'nature': db_result[3],
-                'guna': db_result[4],
+            detailed_info.update({
                 'description': db_result[5],
                 'characteristics': db_result[6],
                 'positive_traits': db_result[7],
                 'negative_traits': db_result[8],
                 'careers': db_result[9],
                 'compatibility': db_result[10]
-            }
-        else:
-            detailed_info = nakshatra_data['properties']
+            })
         
         # Get navigation info (previous/next nakshatras)
         current_index = calculator.NAKSHATRA_NAMES.index(nakshatra_name.title())
@@ -124,6 +121,11 @@ async def get_all_nakshatras():
         enhanced_list = []
         for i, calc_nak in enumerate(nakshatras_list):
             enhanced_nak = calc_nak.copy()
+            
+            # Add symbol from calculator properties
+            calculator_props = calculator.NAKSHATRA_PROPERTIES.get(calc_nak['name'], {})
+            if 'symbol' in calculator_props:
+                enhanced_nak['symbol'] = calculator_props['symbol']
             
             # Find matching database entry
             for db_nak in db_results:

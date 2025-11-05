@@ -102,7 +102,10 @@ const NakshatraPage = () => {
       </div>
 
       <div className="nakshatra-header">
-        <h1>{nakshatraData.nakshatra} Nakshatra</h1>
+        <h1>
+          <span className="nakshatra-symbol">{nakshatraData.properties.symbol}</span>
+          {nakshatraData.nakshatra} Nakshatra
+        </h1>
         <div className="nakshatra-properties">
           <div className="property">
             <span className="label">Swami:</span>

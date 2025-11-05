@@ -77,7 +77,10 @@ const NakshatraListPage = () => {
           >
             <div className="nakshatra-number">{nakshatra.index}</div>
             <div className="nakshatra-content">
-              <h3 className="nakshatra-name">{nakshatra.name}</h3>
+              <h3 className="nakshatra-name">
+                <span className="nakshatra-symbol">{nakshatra.symbol}</span>
+                {nakshatra.name}
+              </h3>
               <div className="nakshatra-details">
                 <div className="detail-row">
                   <span className="label">Lord:</span>

@@ -86,6 +86,13 @@
   font-size: 1.4em;
   margin-bottom: 15px;
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nakshatra-symbol {
+  font-size: 1.2em;
 }
 
 .nakshatra-details {

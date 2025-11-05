@@ -16,6 +16,10 @@ from calculators.friendship_calculator import FriendshipCalculator
 from calculators.yoga_calculator import YogaCalculator
 from calculators.argala_calculator import ArgalaCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
+from calculators.planetary_war_calculator import PlanetaryWarCalculator
+from calculators.vargottama_calculator import VargottamaCalculator
+from calculators.neecha_bhanga_calculator import NeechaBhangaCalculator
+from calculators.pancha_mahapurusha_calculator import PanchaMahapurushaCalculator
 from shared.dasha_calculator import DashaCalculator
 
 class ChatContextBuilder:
@@ -64,6 +68,12 @@ class ChatContextBuilder:
         yoga_calc = YogaCalculator(birth_obj, chart_data)
         argala_calc = ArgalaCalculator(chart_data)
         
+        # Advanced calculators
+        planetary_war_calc = PlanetaryWarCalculator(chart_data)
+        vargottama_calc = VargottamaCalculator(chart_data, {})
+        neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, {})
+        pancha_mahapurusha_calc = PanchaMahapurushaCalculator(chart_data)
+        
         # Extract and validate ascendant information
         ascendant_degree = chart_data.get('ascendant', 0)
         ascendant_sign_num = int(ascendant_degree / 30)
@@ -106,14 +116,22 @@ class ChatContextBuilder:
         
         # Calculate divisional charts
         d9_chart = divisional_calc.calculate_divisional_chart(9)
+        d10_chart = divisional_calc.calculate_divisional_chart(10)
+        d12_chart = divisional_calc.calculate_divisional_chart(12)
+        
+        divisional_charts = {
+            "d9_navamsa": d9_chart,
+            "d10_dasamsa": d10_chart,
+            "d12_dwadasamsa": d12_chart
+        }
+        
+        # Update advanced calculators with divisional charts
+        vargottama_calc = VargottamaCalculator(chart_data, divisional_charts)
+        neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, divisional_charts)
         
         context.update({
             # Key divisional charts
-            "divisional_charts": {
-                "d9_navamsa": d9_chart,
-                "d10_dasamsa": divisional_calc.calculate_divisional_chart(10),
-                "d12_dwadasamsa": divisional_calc.calculate_divisional_chart(12)
-            },
+            "divisional_charts": divisional_charts,
             
             # Planetary analysis
             "planetary_analysis": {},
@@ -132,7 +150,15 @@ class ChatContextBuilder:
             "yogas": yoga_calc.calculate_all_yogas(),
             
             # Chara Karakas
-            "chara_karakas": chara_karaka_calc.calculate_chara_karakas()
+            "chara_karakas": chara_karaka_calc.calculate_chara_karakas(),
+            
+            # Advanced Analysis
+            "advanced_analysis": {
+                "planetary_wars": planetary_war_calc.get_war_summary(),
+                "vargottama_positions": vargottama_calc.get_vargottama_summary(),
+                "neecha_bhanga": neecha_bhanga_calc.get_neecha_bhanga_summary(),
+                "pancha_mahapurusha": pancha_mahapurusha_calc.get_pancha_mahapurusha_summary()
+            }
         })
         
         # Add planetary analysis for all planets

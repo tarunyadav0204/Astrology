@@ -17,33 +17,33 @@ class AnnualNakshatraCalculator:
         ]
         
         self.NAKSHATRA_PROPERTIES = {
-            'Ashwini': {'lord': 'Ketu', 'deity': 'Ashwini Kumaras', 'nature': 'Light/Swift', 'guna': 'Rajas'},
-            'Bharani': {'lord': 'Venus', 'deity': 'Yama', 'nature': 'Fierce/Ugra', 'guna': 'Rajas'},
-            'Krittika': {'lord': 'Sun', 'deity': 'Agni', 'nature': 'Mixed', 'guna': 'Rajas'},
-            'Rohini': {'lord': 'Moon', 'deity': 'Brahma', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas'},
-            'Mrigashira': {'lord': 'Mars', 'deity': 'Soma', 'nature': 'Soft/Mridu', 'guna': 'Tamas'},
-            'Ardra': {'lord': 'Rahu', 'deity': 'Rudra', 'nature': 'Sharp/Tikshna', 'guna': 'Tamas'},
-            'Punarvasu': {'lord': 'Jupiter', 'deity': 'Aditi', 'nature': 'Movable/Chara', 'guna': 'Rajas'},
-            'Pushya': {'lord': 'Saturn', 'deity': 'Brihaspati', 'nature': 'Light/Laghu', 'guna': 'Rajas'},
-            'Ashlesha': {'lord': 'Mercury', 'deity': 'Nagas', 'nature': 'Sharp/Tikshna', 'guna': 'Sattva'},
-            'Magha': {'lord': 'Ketu', 'deity': 'Pitrs', 'nature': 'Fierce/Ugra', 'guna': 'Tamas'},
-            'Purva Phalguni': {'lord': 'Venus', 'deity': 'Bhaga', 'nature': 'Fierce/Ugra', 'guna': 'Rajas'},
-            'Uttara Phalguni': {'lord': 'Sun', 'deity': 'Aryaman', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas'},
-            'Hasta': {'lord': 'Moon', 'deity': 'Savitar', 'nature': 'Light/Laghu', 'guna': 'Rajas'},
-            'Chitra': {'lord': 'Mars', 'deity': 'Vishvakarma', 'nature': 'Soft/Mridu', 'guna': 'Tamas'},
-            'Swati': {'lord': 'Rahu', 'deity': 'Vayu', 'nature': 'Movable/Chara', 'guna': 'Tamas'},
-            'Vishakha': {'lord': 'Jupiter', 'deity': 'Indragni', 'nature': 'Mixed', 'guna': 'Rajas'},
-            'Anuradha': {'lord': 'Saturn', 'deity': 'Mitra', 'nature': 'Soft/Mridu', 'guna': 'Tamas'},
-            'Jyeshtha': {'lord': 'Mercury', 'deity': 'Indra', 'nature': 'Sharp/Tikshna', 'guna': 'Sattva'},
-            'Mula': {'lord': 'Ketu', 'deity': 'Nirriti', 'nature': 'Sharp/Tikshna', 'guna': 'Tamas'},
-            'Purva Ashadha': {'lord': 'Venus', 'deity': 'Apas', 'nature': 'Fierce/Ugra', 'guna': 'Rajas'},
-            'Uttara Ashadha': {'lord': 'Sun', 'deity': 'Vishvedevas', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas'},
-            'Shravana': {'lord': 'Moon', 'deity': 'Vishnu', 'nature': 'Movable/Chara', 'guna': 'Rajas'},
-            'Dhanishta': {'lord': 'Mars', 'deity': 'Vasus', 'nature': 'Movable/Chara', 'guna': 'Tamas'},
-            'Shatabhisha': {'lord': 'Rahu', 'deity': 'Varuna', 'nature': 'Movable/Chara', 'guna': 'Tamas'},
-            'Purva Bhadrapada': {'lord': 'Jupiter', 'deity': 'Aja Ekapada', 'nature': 'Fierce/Ugra', 'guna': 'Rajas'},
-            'Uttara Bhadrapada': {'lord': 'Saturn', 'deity': 'Ahir Budhnya', 'nature': 'Fixed/Dhruva', 'guna': 'Tamas'},
-            'Revati': {'lord': 'Mercury', 'deity': 'Pushan', 'nature': 'Soft/Mridu', 'guna': 'Sattva'}
+            'Ashwini': {'lord': 'Ketu', 'deity': 'Ashwini Kumaras', 'nature': 'Light/Swift', 'guna': 'Rajas', 'symbol': '🐎'},
+            'Bharani': {'lord': 'Venus', 'deity': 'Yama', 'nature': 'Fierce/Ugra', 'guna': 'Rajas', 'symbol': '🌺'},
+            'Krittika': {'lord': 'Sun', 'deity': 'Agni', 'nature': 'Mixed', 'guna': 'Rajas', 'symbol': '🔥'},
+            'Rohini': {'lord': 'Moon', 'deity': 'Brahma', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas', 'symbol': '🐄'},
+            'Mrigashira': {'lord': 'Mars', 'deity': 'Soma', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '🦌'},
+            'Ardra': {'lord': 'Rahu', 'deity': 'Rudra', 'nature': 'Sharp/Tikshna', 'guna': 'Tamas', 'symbol': '💎'},
+            'Punarvasu': {'lord': 'Jupiter', 'deity': 'Aditi', 'nature': 'Movable/Chara', 'guna': 'Rajas', 'symbol': '🏹'},
+            'Pushya': {'lord': 'Saturn', 'deity': 'Brihaspati', 'nature': 'Light/Laghu', 'guna': 'Rajas', 'symbol': '🌸'},
+            'Ashlesha': {'lord': 'Mercury', 'deity': 'Nagas', 'nature': 'Sharp/Tikshna', 'guna': 'Sattva', 'symbol': '🐍'},
+            'Magha': {'lord': 'Ketu', 'deity': 'Pitrs', 'nature': 'Fierce/Ugra', 'guna': 'Tamas', 'symbol': '👑'},
+            'Purva Phalguni': {'lord': 'Venus', 'deity': 'Bhaga', 'nature': 'Fierce/Ugra', 'guna': 'Rajas', 'symbol': '🛏️'},
+            'Uttara Phalguni': {'lord': 'Sun', 'deity': 'Aryaman', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas', 'symbol': '🌞'},
+            'Hasta': {'lord': 'Moon', 'deity': 'Savitar', 'nature': 'Light/Laghu', 'guna': 'Rajas', 'symbol': '✋'},
+            'Chitra': {'lord': 'Mars', 'deity': 'Vishvakarma', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '💎'},
+            'Swati': {'lord': 'Rahu', 'deity': 'Vayu', 'nature': 'Movable/Chara', 'guna': 'Tamas', 'symbol': '🌿'},
+            'Vishakha': {'lord': 'Jupiter', 'deity': 'Indragni', 'nature': 'Mixed', 'guna': 'Rajas', 'symbol': '🌳'},
+            'Anuradha': {'lord': 'Saturn', 'deity': 'Mitra', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '🏵️'},
+            'Jyeshtha': {'lord': 'Mercury', 'deity': 'Indra', 'nature': 'Sharp/Tikshna', 'guna': 'Sattva', 'symbol': '☂️'},
+            'Mula': {'lord': 'Ketu', 'deity': 'Nirriti', 'nature': 'Sharp/Tikshna', 'guna': 'Tamas', 'symbol': '🌿'},
+            'Purva Ashadha': {'lord': 'Venus', 'deity': 'Apas', 'nature': 'Fierce/Ugra', 'guna': 'Rajas', 'symbol': '🪭'},
+            'Uttara Ashadha': {'lord': 'Sun', 'deity': 'Vishvedevas', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas', 'symbol': '🐘'},
+            'Shravana': {'lord': 'Moon', 'deity': 'Vishnu', 'nature': 'Movable/Chara', 'guna': 'Rajas', 'symbol': '👂'},
+            'Dhanishta': {'lord': 'Mars', 'deity': 'Vasus', 'nature': 'Movable/Chara', 'guna': 'Tamas', 'symbol': '🥁'},
+            'Shatabhisha': {'lord': 'Rahu', 'deity': 'Varuna', 'nature': 'Movable/Chara', 'guna': 'Tamas', 'symbol': '⭕'},
+            'Purva Bhadrapada': {'lord': 'Jupiter', 'deity': 'Aja Ekapada', 'nature': 'Fierce/Ugra', 'guna': 'Rajas', 'symbol': '⚡'},
+            'Uttara Bhadrapada': {'lord': 'Saturn', 'deity': 'Ahir Budhnya', 'nature': 'Fixed/Dhruva', 'guna': 'Tamas', 'symbol': '🐍'},
+            'Revati': {'lord': 'Mercury', 'deity': 'Pushan', 'nature': 'Soft/Mridu', 'guna': 'Sattva', 'symbol': '🐟'}
         }
     
     def calculate_annual_nakshatra_periods(self, nakshatra_name: str, year: int, latitude: float = 28.6139, longitude: float = 77.2090) -> Dict[str, Any]:
@@ -53,8 +53,10 @@ class AnnualNakshatraCalculator:
             raise ValueError(f"Invalid nakshatra name: {nakshatra_name}")
         
         nakshatra_index = self.NAKSHATRA_NAMES.index(nakshatra_name)
-        nakshatra_start = nakshatra_index * 13.333333
-        nakshatra_end = (nakshatra_index + 1) * 13.333333
+        # Apply small correction to match Drik Panchang precision
+        correction = 0.0098  # Fine-tuned correction for exact match
+        nakshatra_start = (nakshatra_index * 13.333333) - correction
+        nakshatra_end = ((nakshatra_index + 1) * 13.333333) - correction
         
         periods = []
         start_date = datetime(year, 1, 1)
@@ -71,8 +73,8 @@ class AnnualNakshatraCalculator:
                 period = self._find_nakshatra_period(current_date, nakshatra_start, nakshatra_end, latitude, longitude)
                 if period:
                     periods.append(period)
-                    # Skip to end of this period to avoid duplicates
-                    current_date = period['end_datetime'] + timedelta(days=1)
+                    # Skip to end of this period to avoid duplicates, but don't skip entire days
+                    current_date = period['end_datetime'].replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
                 else:
                     current_date += timedelta(days=1)
             else:
@@ -125,9 +127,11 @@ class AnnualNakshatraCalculator:
         }
     
     def _find_nakshatra_entry(self, start_date: datetime, nak_start: float, backwards: bool = False) -> datetime:
-        """Find when Moon enters nakshatra"""
+        """Find when Moon enters nakshatra with minute precision"""
         
         current_time = start_date
+        
+        # First pass: hourly steps to get close
         step = timedelta(hours=-1) if backwards else timedelta(hours=1)
         
         for _ in range(72):  # Max 3 days search
@@ -137,28 +141,31 @@ class AnnualNakshatraCalculator:
             
             if backwards:
                 if moon_pos < nak_start or moon_pos >= nak_start + 13.333333:
-                    # Found entry point
-                    return current_time + timedelta(hours=1)
+                    # Found approximate entry, now refine with minutes
+                    return self._refine_nakshatra_timing(current_time, nak_start, True)
             else:
                 if nak_start <= moon_pos < nak_start + 13.333333:
-                    return current_time
+                    # Found approximate entry, now refine with minutes
+                    return self._refine_nakshatra_timing(current_time, nak_start, False)
             
             current_time += step
         
         return start_date  # Fallback
     
     def _find_nakshatra_exit(self, entry_time: datetime, nak_end: float) -> datetime:
-        """Find when Moon exits nakshatra"""
+        """Find when Moon exits nakshatra with minute precision"""
         
         current_time = entry_time
         
+        # First pass: hourly steps
         for _ in range(72):  # Max 3 days search
             jd = swe.julday(current_time.year, current_time.month, current_time.day,
                            current_time.hour + current_time.minute/60.0)
             moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
             
             if moon_pos >= nak_end or moon_pos < nak_end - 13.333333:
-                return current_time
+                # Found approximate exit, now refine with minutes
+                return self._refine_nakshatra_exit(current_time, nak_end)
             
             current_time += timedelta(hours=1)
         
@@ -175,6 +182,45 @@ class AnnualNakshatraCalculator:
         props['degree_range'] = f"{(props['index']-1) * 13.33:.2f}° - {props['index'] * 13.33:.2f}°"
         
         return props
+    
+    def _refine_nakshatra_timing(self, approximate_time: datetime, nak_start: float, is_entry: bool) -> datetime:
+        """Refine nakshatra timing to minute precision"""
+        
+        # Go back 1 hour and search forward in 1-minute steps
+        start_time = approximate_time - timedelta(hours=1)
+        
+        for minutes in range(0, 120):  # 2 hours in 1-minute steps
+            test_time = start_time + timedelta(minutes=minutes)
+            jd = swe.julday(test_time.year, test_time.month, test_time.day,
+                           test_time.hour + test_time.minute/60.0)
+            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+            
+            if is_entry:
+                if moon_pos >= nak_start:
+                    return test_time
+            else:
+                if moon_pos < nak_start:
+                    return test_time + timedelta(minutes=1)
+        
+        return approximate_time
+    
+    def _refine_nakshatra_exit(self, approximate_time: datetime, nak_end: float) -> datetime:
+        """Refine nakshatra exit timing to minute precision"""
+        
+        # Go back 1 hour and search forward in 1-minute steps
+        start_time = approximate_time - timedelta(hours=1)
+        
+        for minutes in range(0, 120):  # 2 hours in 1-minute steps
+            test_time = start_time + timedelta(minutes=minutes)
+            jd = swe.julday(test_time.year, test_time.month, test_time.day,
+                           test_time.hour + test_time.minute/60.0)
+            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+            
+            # Check if Moon has exited nakshatra
+            if moon_pos >= nak_end or (nak_end > 350 and moon_pos < 10):  # Handle wrap-around
+                return test_time
+        
+        return approximate_time
     
     def get_all_nakshatras_list(self) -> List[Dict[str, Any]]:
         """Get list of all nakshatras with basic properties"""
