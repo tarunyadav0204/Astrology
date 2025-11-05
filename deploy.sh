@@ -59,7 +59,7 @@ sleep 3
 if ps -p $BACKEND_PID > /dev/null; then
     echo "✅ Backend started successfully on port 8001"
     # Test health endpoint
-    curl -f http://localhost:8001/health || echo "⚠️ Health check failed"
+    curl -f http://localhost:8001/api/health || echo "⚠️ Health check failed"
 else
     echo "❌ Backend failed to start. Check logs:"
     tail -20 ../logs/backend.log
