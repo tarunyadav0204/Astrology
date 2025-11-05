@@ -33,6 +33,7 @@ import BeginnersGuide from './components/Education/BeginnersGuide';
 import LessonPage from './components/Education/Lessons/LessonPage';
 import NakshatraPage from './components/Nakshatra/NakshatraPage';
 import NakshatraListPage from './components/Nakshatra/NakshatraListPage';
+import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -964,6 +965,7 @@ function App() {
           <Route path="/lesson/:lessonId" element={<LessonPage />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
+          <Route path="/monthly-panchang" element={<MonthlyPanchangPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <ToastContainer />
@@ -1024,6 +1026,7 @@ function App() {
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
+          <Route path="/monthly-panchang" element={<MonthlyPanchangPage />} />
 
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={

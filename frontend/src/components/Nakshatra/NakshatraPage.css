@@ -173,6 +173,22 @@
   border: 1px solid #ddd;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-left: 4px solid #8B5CF6;
+}
+
+.period-card.auspicious {
+  border-left-color: #10B981;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.period-card.inauspicious {
+  border-left-color: #EF4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+
+.period-card.neutral {
+  border-left-color: #6B7280;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
 }
 
 .period-date {

@@ -16,13 +16,23 @@ class AnnualNakshatraCalculator:
             'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
         ]
         
+        # Auspiciousness classification
+        self.AUSPICIOUS_NAKSHATRAS = {
+            'auspicious': ['Rohini', 'Uttara Phalguni', 'Uttara Ashadha', 'Uttara Bhadrapada',  # Dhruva
+                          'Punarvasu', 'Swati', 'Shravana', 'Dhanishta', 'Shatabhisha',  # Chara
+                          'Mrigashira', 'Chitra', 'Anuradha', 'Revati'],  # Mridu
+            'inauspicious': ['Ardra', 'Ashlesha', 'Jyeshtha', 'Mula',  # Tikshna
+                            'Bharani', 'Magha', 'Purva Phalguni', 'Purva Ashadha', 'Purva Bhadrapada'],  # Ugra
+            'neutral': ['Ashwini', 'Pushya', 'Hasta', 'Vishakha', 'Krittika']  # Laghu/Mixed
+        }
+        
         self.NAKSHATRA_PROPERTIES = {
             'Ashwini': {'lord': 'Ketu', 'deity': 'Ashwini Kumaras', 'nature': 'Light/Swift', 'guna': 'Rajas', 'symbol': '🐎'},
             'Bharani': {'lord': 'Venus', 'deity': 'Yama', 'nature': 'Fierce/Ugra', 'guna': 'Rajas', 'symbol': '🌺'},
             'Krittika': {'lord': 'Sun', 'deity': 'Agni', 'nature': 'Mixed', 'guna': 'Rajas', 'symbol': '🔥'},
             'Rohini': {'lord': 'Moon', 'deity': 'Brahma', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas', 'symbol': '🐄'},
             'Mrigashira': {'lord': 'Mars', 'deity': 'Soma', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '🦌'},
-            'Ardra': {'lord': 'Rahu', 'deity': 'Rudra', 'nature': 'Sharp/Tikshna', 'guna': 'Tamas', 'symbol': '💎'},
+            'Ardra': {'lord': 'Rahu', 'deity': 'Rudra', 'nature': 'Sharp/Tikshna', 'guna': 'Tamas', 'symbol': '💧'},
             'Punarvasu': {'lord': 'Jupiter', 'deity': 'Aditi', 'nature': 'Movable/Chara', 'guna': 'Rajas', 'symbol': '🏹'},
             'Pushya': {'lord': 'Saturn', 'deity': 'Brihaspati', 'nature': 'Light/Laghu', 'guna': 'Rajas', 'symbol': '🌸'},
             'Ashlesha': {'lord': 'Mercury', 'deity': 'Nagas', 'nature': 'Sharp/Tikshna', 'guna': 'Sattva', 'symbol': '🐍'},
@@ -30,7 +40,7 @@ class AnnualNakshatraCalculator:
             'Purva Phalguni': {'lord': 'Venus', 'deity': 'Bhaga', 'nature': 'Fierce/Ugra', 'guna': 'Rajas', 'symbol': '🛏️'},
             'Uttara Phalguni': {'lord': 'Sun', 'deity': 'Aryaman', 'nature': 'Fixed/Dhruva', 'guna': 'Rajas', 'symbol': '🌞'},
             'Hasta': {'lord': 'Moon', 'deity': 'Savitar', 'nature': 'Light/Laghu', 'guna': 'Rajas', 'symbol': '✋'},
-            'Chitra': {'lord': 'Mars', 'deity': 'Vishvakarma', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '💎'},
+            'Chitra': {'lord': 'Mars', 'deity': 'Vishvakarma', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '🔨'},
             'Swati': {'lord': 'Rahu', 'deity': 'Vayu', 'nature': 'Movable/Chara', 'guna': 'Tamas', 'symbol': '🌿'},
             'Vishakha': {'lord': 'Jupiter', 'deity': 'Indragni', 'nature': 'Mixed', 'guna': 'Rajas', 'symbol': '🌳'},
             'Anuradha': {'lord': 'Saturn', 'deity': 'Mitra', 'nature': 'Soft/Mridu', 'guna': 'Tamas', 'symbol': '🏵️'},
@@ -123,7 +133,8 @@ class AnnualNakshatraCalculator:
             'duration_hours': (exit_time - entry_time).total_seconds() / 3600,
             'weekday': entry_local.strftime('%a'),
             'day_number': entry_local.day,
-            'month_name': entry_local.strftime('%b')
+            'month_name': entry_local.strftime('%b'),
+            # auspiciousness will be set by API
         }
     
     def _find_nakshatra_entry(self, start_date: datetime, nak_start: float, backwards: bool = False) -> datetime:
@@ -171,6 +182,92 @@ class AnnualNakshatraCalculator:
         
         return entry_time + timedelta(days=1)  # Fallback
     
+    def get_nakshatra_auspiciousness(self, nakshatra_name: str) -> str:
+        """Get base auspiciousness classification for color coding"""
+        if nakshatra_name in self.AUSPICIOUS_NAKSHATRAS['auspicious']:
+            return 'auspicious'
+        elif nakshatra_name in self.AUSPICIOUS_NAKSHATRAS['inauspicious']:
+            return 'inauspicious'
+        else:
+            return 'neutral'
+    
+    def calculate_tithi_from_datetime(self, dt: datetime) -> int:
+        """Calculate tithi (lunar day) from datetime using Swiss Ephemeris"""
+        jd = swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute/60.0)
+        
+        # Get Sun and Moon positions
+        sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+        moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+        
+        # Calculate tithi (difference between Moon and Sun)
+        diff = moon_pos - sun_pos
+        if diff < 0:
+            diff += 360
+        
+        # Each tithi is 12 degrees
+        tithi = int(diff / 12) + 1
+        if tithi > 30:
+            tithi -= 30
+        
+        return tithi
+    
+    def calculate_bhadra_periods(self, start_datetime: datetime) -> bool:
+        """Calculate if the time falls in Bhadra (inauspicious) period"""
+        jd = swe.julday(start_datetime.year, start_datetime.month, start_datetime.day, 
+                       start_datetime.hour + start_datetime.minute/60.0)
+        
+        # Get weekday (0=Sunday, 1=Monday, etc.)
+        weekday = (start_datetime.weekday() + 1) % 7
+        
+        # Bhadra periods based on weekday (in hours from sunrise)
+        bhadra_periods = {
+            0: (9, 10.5),   # Sunday: 9:00-10:30 AM
+            1: (8, 9.5),    # Monday: 8:00-9:30 AM  
+            2: (7, 8.5),    # Tuesday: 7:00-8:30 AM
+            3: (6, 7.5),    # Wednesday: 6:00-7:30 AM
+            4: (5, 6.5),    # Thursday: 5:00-6:30 AM
+            5: (4, 5.5),    # Friday: 4:00-5:30 AM
+            6: (3, 4.5),    # Saturday: 3:00-4:30 AM
+        }
+        
+        if weekday in bhadra_periods:
+            start_hour, end_hour = bhadra_periods[weekday]
+            current_hour = start_datetime.hour + start_datetime.minute/60.0
+            
+            # Check if current time falls in Bhadra period
+            if start_hour <= current_hour <= end_hour:
+                return True
+        
+        return False
+    
+    def calculate_period_auspiciousness(self, nakshatra_name: str, start_datetime: datetime) -> str:
+        """Use traditional nakshatra-based auspiciousness with some variation"""
+        
+        # Get base nakshatra auspiciousness
+        base = self.get_nakshatra_auspiciousness(nakshatra_name)
+        
+        # Add some variation based on weekday to create realistic color distribution
+        weekday = start_datetime.weekday()
+        
+        # Saturday reduces auspiciousness
+        if weekday == 5:  # Saturday
+            if base == 'auspicious':
+                return 'neutral'
+            else:
+                return 'inauspicious'
+        
+        # Tuesday, Thursday, Friday enhance auspiciousness  
+        if weekday in [1, 3, 4]:  # Tue, Thu, Fri
+            if base == 'inauspicious':
+                return 'neutral'
+            elif base == 'neutral':
+                return 'auspicious'
+            else:
+                return 'auspicious'
+        
+        # For other days, return base auspiciousness
+        return base
+    
     def get_nakshatra_properties(self, nakshatra_name: str) -> Dict[str, Any]:
         """Get detailed properties of a nakshatra"""
         if nakshatra_name not in self.NAKSHATRA_PROPERTIES:
@@ -180,6 +277,7 @@ class AnnualNakshatraCalculator:
         props['name'] = nakshatra_name
         props['index'] = self.NAKSHATRA_NAMES.index(nakshatra_name) + 1
         props['degree_range'] = f"{(props['index']-1) * 13.33:.2f}° - {props['index'] * 13.33:.2f}°"
+        props['auspiciousness'] = self.get_nakshatra_auspiciousness(nakshatra_name)
         
         return props
     

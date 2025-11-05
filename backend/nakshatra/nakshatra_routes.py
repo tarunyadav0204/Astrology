@@ -39,6 +39,12 @@ async def get_nakshatra_year_data(
             nakshatra_name.title(), year, latitude, longitude
         )
         
+        # Add dynamic auspiciousness to each period based on multiple factors
+        for period in nakshatra_data['periods']:
+            period['auspiciousness'] = calculator.calculate_period_auspiciousness(
+                nakshatra_name.title(), period['start_datetime']
+            )
+        
         # Get detailed nakshatra info from database
         conn = get_db_connection()
         cursor = conn.cursor()

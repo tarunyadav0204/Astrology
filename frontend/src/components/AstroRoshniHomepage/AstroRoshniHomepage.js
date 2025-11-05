@@ -903,20 +903,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="vedic-tools-divider"></div>
           </div>
           <div className="content-grid">
-            {/* Column 1 - Kundli Form (20%) */}
-            <div className="form-card birth-chart-widget">
-              <BirthForm 
-                onSubmit={() => {
-                  // Show chart in popup modal instead of dashboard
-                  setShowChartModal(true);
-                }} 
-                user={user}
-                onLogout={onLogout}
-              />
-            </div>
-
-            {/* Column 2 - Matching Form (40%) */}
-            <div className="form-card">
+            {/* Column 1 - Kundli Matching (40%) */}
+            <div className="form-card matching-compact">
               <h3>Kundli Matching</h3>
               <PartnerForm 
                 onSubmit={() => navigate('/marriage-analysis')} 
@@ -925,21 +913,37 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               />
             </div>
 
+            {/* Column 2 - Chart Widget (20%) */}
+            <div className="form-card birth-chart-widget">
+              <BirthForm 
+                onSubmit={() => {
+                  setShowChartModal(true);
+                }} 
+                user={user}
+                onLogout={onLogout}
+              />
+            </div>
+
             {/* Column 3 - Nakshatra Widget (20%) */}
             <div className="form-card nakshatra-widget">
-              <h3>🌟 Nakshatra Guide</h3>
+              <h3>Nakshatra Guide</h3>
               <div className="nakshatra-content">
-                <p>Discover the 27 lunar mansions and their influence on your life</p>
+                <p>Discover the 27 lunar mansions and their influence</p>
                 <div className="nakshatra-features">
                   <div className="feature-item">📅 Annual Periods</div>
                   <div className="feature-item">⭐ Characteristics</div>
                   <div className="feature-item">🔮 Predictions</div>
+                  <div className="feature-item">🎯 Lucky Periods</div>
+                </div>
+                <div className="nakshatra-info">
+                  <p><strong>Total:</strong> 27 Nakshatras</p>
+                  <p><strong>Year:</strong> 2025 Calendar</p>
                 </div>
                 <button 
                   className="nakshatra-btn"
                   onClick={() => navigate('/nakshatras')}
                 >
-                  Explore Nakshatras →
+                  Explore Now
                 </button>
               </div>
             </div>

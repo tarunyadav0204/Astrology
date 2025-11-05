@@ -5,26 +5,42 @@ import styled from 'styled-components';
 
 const PanchangContainer = styled.div`
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(233, 30, 99, 0.2);
-  height: 100%;
+  border-radius: 15px;
+  padding: 18px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  height: 550px;
+  display: flex;
+  flex-direction: column;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #e91e63, #f06292, #ff6f00, #ff8a65, #ffab91);
+  }
   
   h3 {
     color: #e91e63;
-    margin-bottom: 1rem;
+    margin: 0 0 16px 0;
     font-size: 1.1rem;
-    font-weight: 600;
+    font-weight: bold;
+    padding-bottom: 8px;
+    border-bottom: 2px solid rgba(233, 30, 99, 0.2);
+    line-height: 1.2;
+    min-height: 32px;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    
-    &::before {
-      content: '📅';
-      font-size: 1rem;
-    }
+    justify-content: center;
+    text-align: center;
   }
 `;
 

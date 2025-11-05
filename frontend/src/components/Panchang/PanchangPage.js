@@ -233,6 +233,11 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
           <div className="page-header">
             <h1>Today's Panchang</h1>
             <p>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • {location.name}</p>
+            <div className="panchang-navigation">
+              <a href="/monthly-panchang" className="monthly-panchang-link">
+                📅 View Monthly Panchang Calendar
+              </a>
+            </div>
           </div>
 
           <div className="panchang-section">

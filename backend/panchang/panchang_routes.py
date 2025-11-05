@@ -5,9 +5,11 @@ from datetime import datetime, timedelta
 import swisseph as swe
 import math
 from .panchang_calculator import PanchangCalculator
+from .monthly_panchang_calculator import MonthlyPanchangCalculator
 
 router = APIRouter()
 panchang_calc = PanchangCalculator()
+monthly_panchang_calc = MonthlyPanchangCalculator()
 
 class PanchangRequest(BaseModel):
     transit_date: str
@@ -366,6 +368,37 @@ async def get_special_muhurtas(
     """Get special muhurtas like Abhijit, Brahma Muhurta using Swiss Ephemeris calculations"""
     try:
         result = panchang_calc.calculate_special_muhurtas(date, float(latitude), float(longitude))
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/monthly")
+async def get_monthly_panchang(
+    year: int,
+    month: int,
+    latitude: float,
+    longitude: float
+):
+    """Get complete monthly panchang with daily details"""
+    try:
+        result = monthly_panchang_calc.calculate_monthly_panchang(
+            year, month, float(latitude), float(longitude)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/daily-detailed")
+async def get_daily_detailed_panchang(
+    date: str,
+    latitude: float,
+    longitude: float
+):
+    """Get detailed panchang for a single day with all elements"""
+    try:
+        result = monthly_panchang_calc.calculate_daily_panchang(
+            date, float(latitude), float(longitude)
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

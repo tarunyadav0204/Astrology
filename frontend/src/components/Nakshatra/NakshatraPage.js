@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SEOHead from '../SEO/SEOHead';
+import ColorLegend from './ColorLegend';
 import './NakshatraPage.css';
 
 const NakshatraPage = () => {
@@ -9,7 +10,7 @@ const NakshatraPage = () => {
   const [nakshatraData, setNakshatraData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(year || new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(parseInt(year) || new Date().getFullYear());
 
   useEffect(() => {
     fetchNakshatraData();
@@ -34,8 +35,9 @@ const NakshatraPage = () => {
   };
 
   const handleYearChange = (newYear) => {
-    setSelectedYear(newYear);
-    navigate(`/nakshatra/${nakshatraName}/${newYear}`);
+    const yearNum = parseInt(newYear);
+    setSelectedYear(yearNum);
+    navigate(`/nakshatra/${nakshatraName}/${yearNum}`);
   };
 
   if (loading) {
@@ -143,6 +145,8 @@ const NakshatraPage = () => {
         <h2>{nakshatraData.nakshatra} Nakshatra in {selectedYear}</h2>
         <p>This page lists all {nakshatraData.nakshatra} Nakshatra in the year {selectedYear} with their begin and end timings.</p>
         
+        <ColorLegend />
+        
         {nakshatraData.periods.length === 0 ? (
           <div className="no-periods">
             No {nakshatraData.nakshatra} nakshatra periods found for {selectedYear}.
@@ -150,7 +154,7 @@ const NakshatraPage = () => {
         ) : (
           <div className="periods-list">
             {nakshatraData.periods.map((period, index) => (
-              <div key={index} className="period-card">
+              <div key={index} className={`period-card ${period.auspiciousness}`}>
                 <div className="period-date">
                   <div className="day">{period.day_number || new Date(period.start_datetime).getDate()}</div>
                   <div className="month">{period.month_name || new Date(period.start_datetime).toLocaleDateString('en-US', { month: 'short' })}</div>
