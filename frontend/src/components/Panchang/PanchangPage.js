@@ -9,8 +9,10 @@ import LunarInformation from './components/LunarInformation';
 import PlanetaryPositions from './components/PlanetaryPositions';
 import InauspiciousTimings from './components/InauspiciousTimings';
 import AuspiciousTimings from './components/AuspiciousTimings';
+import SEOHead from '../SEO/SEOHead';
 import { panchangService } from './services/panchangService';
 import { CALENDAR_SYSTEMS } from './config/panchangConfig';
+import { generatePageSEO } from '../../config/seo.config';
 import './PanchangPage.css';
 
 const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
@@ -188,8 +190,24 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
     );
   }
 
+  const seoData = generatePageSEO('panchang', { path: '/panchang' });
+
   return (
     <div className="panchang-page">
+      <SEOHead 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Daily Panchang",
+          "description": "Complete Hindu calendar with Tithi, Nakshatra, Yoga, Karana and muhurat times",
+          "applicationCategory": "LifestyleApplication",
+          "operatingSystem": "Web"
+        }}
+      />
       <NavigationHeader 
         showZodiacSelector={false}
         user={user}

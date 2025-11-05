@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
+import { HelmetProvider } from 'react-helmet-async';
+import AnalyticsTracker from './components/Analytics/AnalyticsTracker';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/mobile-fixes.css';
 import BirthForm from './components/BirthForm/BirthForm';
@@ -29,6 +31,8 @@ import MythsVsReality from './components/Education/MythsVsReality';
 import AdvancedCourses from './components/Education/AdvancedCourses';
 import BeginnersGuide from './components/Education/BeginnersGuide';
 import LessonPage from './components/Education/Lessons/LessonPage';
+import NakshatraPage from './components/Nakshatra/NakshatraPage';
+import NakshatraListPage from './components/Nakshatra/NakshatraListPage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -146,8 +150,10 @@ function App() {
     const domainConfig = getCurrentDomainConfig();
     
     return (
-      <Router>
-        <AstrologyProvider>
+      <HelmetProvider>
+        <Router>
+          <AstrologyProvider>
+          <AnalyticsTracker user={user} />
           <Routes>
             <Route path="/" element={
               domainConfig.userType === 'general' ? (
@@ -956,17 +962,21 @@ function App() {
           <Route path="/advanced-courses" element={<AdvancedCourses />} />
           <Route path="/beginners-guide" element={<BeginnersGuide />} />
           <Route path="/lesson/:lessonId" element={<LessonPage />} />
+          <Route path="/nakshatras" element={<NakshatraListPage />} />
+          <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <ToastContainer />
         </AstrologyProvider>
       </Router>
-    );
+    </HelmetProvider>
+  );
   }
 
   return (
-    <Router>
-      <AstrologyProvider>
+    <HelmetProvider>
+      <Router>
+        <AstrologyProvider>
         <Routes>
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
           <Route path="/marriage-analysis" element={
@@ -1012,6 +1022,8 @@ function App() {
             />
           } />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/nakshatras" element={<NakshatraListPage />} />
+          <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
 
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={
@@ -1088,8 +1100,9 @@ function App() {
           } />
         </Routes>
       </AstrologyProvider>
-    </Router>
-  );
+        </Router>
+      </HelmetProvider>
+    );
 }
 
 export default App;

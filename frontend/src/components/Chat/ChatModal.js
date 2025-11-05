@@ -168,38 +168,48 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
+                        const data = line.slice(6).trim();
                         if (data === '[DONE]') break;
-                        if (data.startsWith('{')) {
+                        if (data && data.length > 0) {
                             try {
-                                // Check if JSON is complete before parsing
-                                if (!data.endsWith('}')) {
-                                    continue; // Skip incomplete JSON chunks
-                                }
                                 const parsed = JSON.parse(data);
                                 console.log('Parsed response:', parsed);
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
-                                    assistantMessage.content = parsed.response;
-                                    setMessages(prev => {
-                                        return prev.map(msg => 
-                                            msg.id === assistantMessage.id 
-                                                ? { ...assistantMessage }
-                                                : msg
-                                        );
-                                    });
-                                    
-                                    // Scroll to top of the assistant message
-                                    setTimeout(() => {
-                                        const assistantMessages = document.querySelectorAll('.message-bubble.assistant');
-                                        const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
-                                        if (lastAssistantMessage) {
-                                            lastAssistantMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                        }
-                                    }, 100);
+                                    // Ensure response is not empty
+                                    const responseText = parsed.response.trim();
+                                    if (responseText.length > 0) {
+                                        assistantMessage.content = responseText;
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === assistantMessage.id 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                        
+                                        // Scroll to message
+                                        setTimeout(() => {
+                                            const assistantMessages = document.querySelectorAll('.message-bubble.assistant');
+                                            const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+                                            if (lastAssistantMessage) {
+                                                lastAssistantMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }
+                                        }, 100);
+                                    } else {
+                                        console.warn('Empty response received');
+                                        assistantMessage.content = 'I received your question but my response seems to be empty. Please try asking again.';
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === assistantMessage.id 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                    }
                                 } else if (parsed.status === 'error') {
                                     console.error('AI Error:', parsed.error);
-                                    assistantMessage.content = 'Sorry, I encountered an error. Please try again.';
+                                    assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
                                     setMessages(prev => {
                                         return prev.map(msg => 
                                             msg.id === assistantMessage.id 
@@ -208,12 +218,25 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                         );
                                     });
                                 } else if (parsed.status === 'processing') {
-                                    // Ignore backend processing messages - keep frontend loading messages
                                     console.log('Backend processing (ignored):', parsed.message);
                                 }
                             } catch (e) {
-                                console.warn('Skipping malformed JSON chunk:', data.substring(0, 100) + '...');
-                                continue; // Skip malformed chunks and continue processing
+                                console.warn('JSON parse error:', e.message, 'Data:', data.substring(0, 100));
+                                // Try to handle as plain text if JSON parsing fails
+                                if (data.includes('response') && data.includes('complete')) {
+                                    console.log('Attempting to extract response from malformed JSON');
+                                    const responseMatch = data.match(/"response"\s*:\s*"([^"]+)"/); 
+                                    if (responseMatch && responseMatch[1]) {
+                                        assistantMessage.content = responseMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === assistantMessage.id 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                    }
+                                }
                             }
                         }
                     }

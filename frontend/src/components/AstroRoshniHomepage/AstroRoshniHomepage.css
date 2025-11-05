@@ -388,7 +388,7 @@
 
 .content-grid {
   display: grid;
-  grid-template-columns: calc(30% - 13.33px) calc(50% - 13.33px) calc(20% - 13.33px);
+  grid-template-columns: calc(25% - 15px) calc(40% - 15px) calc(17.5% - 15px) calc(17.5% - 15px);
   gap: 20px;
   width: 100%;
   align-items: start;
@@ -865,6 +865,114 @@
 
 .panchang-btn:hover {
   transform: translateY(-3px);
+}
+
+/* Nakshatra Widget Styling */
+.nakshatra-widget {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nakshatra-widget::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #9c27b0, #e91e63, #ff6f00, #ffd700);
+}
+
+.nakshatra-widget h3 {
+  color: #9c27b0;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.nakshatra-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.nakshatra-content p {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 0;
+  text-align: center;
+}
+
+.nakshatra-features {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.feature-item {
+  background: rgba(156, 39, 176, 0.1);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #9c27b0;
+  font-weight: 500;
+  border-left: 3px solid #9c27b0;
+  text-align: center;
+}
+
+.nakshatra-btn {
+  background: linear-gradient(135deg, #9c27b0 0%, #e91e63 50%, #ff6f00 100%);
+  color: white;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  font-size: 0.85rem;
+  min-height: 40px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nakshatra-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(156, 39, 176, 0.3);
+}
+
+@media (max-width: 768px) {
+  .nakshatra-widget {
+    padding: 15px;
+  }
+  
+  .nakshatra-widget h3 {
+    font-size: 1.1rem;
+  }
+  
+  .nakshatra-content p {
+    font-size: 0.85rem;
+  }
+  
+  .feature-item {
+    font-size: 0.75rem;
+    padding: 6px 8px;
+  }
+  
+  .nakshatra-btn {
+    font-size: 0.8rem;
+    padding: 10px 14px;
+  }
 }
 
 /* Services Grid */
@@ -2291,6 +2399,14 @@
   .content-grid {
     grid-template-columns: 1fr;
     gap: 15px;
+  }
+  
+  .nakshatra-widget {
+    order: 3;
+  }
+  
+  .panchang-card {
+    order: 4;
   }
   
   .matching-container {

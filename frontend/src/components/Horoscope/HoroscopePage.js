@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
 import { API_BASE_URL } from '../../config';
+import { generatePageSEO } from '../../config/seo.config';
 import './HoroscopePage.css';
 
 const HoroscopePage = () => {
@@ -54,8 +56,29 @@ const HoroscopePage = () => {
 
   const getCurrentZodiac = () => zodiacSigns.find(z => z.name === selectedZodiac);
 
+  const currentZodiac = getCurrentZodiac();
+  const seoData = generatePageSEO('dailyHoroscope', { 
+    path: `/horoscope/${selectedPeriod}`,
+    title: `${currentZodiac?.displayName} ${selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope | AstroRoshni`,
+    description: `Read your ${selectedPeriod} ${currentZodiac?.displayName} horoscope predictions for love, career, health and finance. Accurate astrology forecasts updated daily.`
+  });
+
   return (
     <div className="horoscope-page">
+      <SEOHead 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={`${currentZodiac?.displayName.toLowerCase()} horoscope, ${selectedPeriod} horoscope, ${currentZodiac?.displayName.toLowerCase()} predictions, astrology forecast`}
+        canonical={seoData.canonical}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Article",
+          "headline": seoData.title,
+          "description": seoData.description,
+          "author": { "@type": "Organization", "name": "AstroRoshni" },
+          "publisher": { "@type": "Organization", "name": "AstroRoshni" }
+        }}
+      />
       <NavigationHeader onPeriodChange={setSelectedPeriod} />
       
       <div className="container">

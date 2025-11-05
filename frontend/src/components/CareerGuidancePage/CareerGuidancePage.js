@@ -4,8 +4,10 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import CareerAnalysisTab from '../Career/CareerAnalysisTab';
 import BirthForm from '../BirthForm/BirthForm';
+import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
+import { generatePageSEO } from '../../config/seo.config';
 import './CareerGuidancePage.css';
 
 const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
@@ -23,8 +25,23 @@ const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
     setShowForm(false);
   };
 
+  const seoData = generatePageSEO('careerGuidance', { path: '/career-guidance' });
+
   return (
     <div className="career-guidance-page">
+      <SEOHead 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          "name": "Career Guidance Report",
+          "description": "Professional career guidance based on Vedic astrology for job prospects and business success",
+          "provider": { "@type": "Organization", "name": "AstroRoshni" }
+        }}
+      />
       <NavigationHeader 
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}

@@ -50,7 +50,7 @@ mkdir -p ../logs
 
 # Start backend with better error handling
 echo "Starting backend..."
-nohup ./venv/bin/python main.py > ../logs/backend.log 2>&1 &
+nohup python main.py > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
 sleep 3

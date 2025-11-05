@@ -4,6 +4,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
 import BirthForm from '../BirthForm/BirthForm';
+import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
 import './MarriageAnalysisPage.css';
@@ -36,6 +37,27 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
 
   return (
     <div className="marriage-analysis-page">
+      <SEOHead 
+        title="Marriage Analysis Report - Vedic Astrology Compatibility | AstroRoshni"
+        description="Get detailed marriage analysis and compatibility report based on Vedic astrology. Discover spouse characteristics, marriage timing, and relationship insights."
+        keywords="marriage analysis, horoscope matching, kundli matching, marriage compatibility, spouse prediction, marriage astrology, vedic marriage analysis"
+        canonical="https://astroroshni.com/marriage-analysis"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          "name": "Marriage Analysis Report",
+          "description": "Comprehensive Vedic astrology marriage analysis including compatibility, spouse characteristics, and marriage timing predictions",
+          "provider": {
+            "@type": "Organization",
+            "name": "AstroRoshni"
+          },
+          "offers": {
+            "@type": "Offer",
+            "price": "199",
+            "priceCurrency": "INR"
+          }
+        }}
+      />
       <NavigationHeader 
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}

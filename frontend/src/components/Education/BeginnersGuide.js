@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
 import './BeginnersGuide.css';
 
 const BeginnersGuide = () => {
@@ -96,6 +97,21 @@ const BeginnersGuide = () => {
 
   return (
     <div className="beginners-guide-page">
+      <SEOHead 
+        title="Beginner's Guide to Astrology - Learn Vedic Astrology Basics | AstroRoshni"
+        description="Complete beginner's guide to astrology with step-by-step lessons. Learn zodiac signs, birth charts, planets, houses and Vedic astrology fundamentals."
+        keywords="astrology for beginners, learn astrology, vedic astrology basics, zodiac signs guide, birth chart tutorial, astrology lessons"
+        canonical="https://astroroshni.com/beginners-guide"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Course",
+          "name": "Beginner's Guide to Astrology",
+          "description": "Complete astrology course for beginners covering zodiac signs, birth charts, planets and Vedic astrology",
+          "provider": { "@type": "Organization", "name": "AstroRoshni" },
+          "courseMode": "online",
+          "educationalLevel": "Beginner"
+        }}
+      />
       <NavigationHeader 
         onPeriodChange={() => {}}
         showZodiacSelector={false}

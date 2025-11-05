@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
 import './MythsVsReality.css';
 
 const MythsVsReality = () => {
@@ -82,6 +83,20 @@ const MythsVsReality = () => {
 
   return (
     <div className="myths-reality-page">
+      <SEOHead 
+        title="Astrology Myths vs Reality - Facts About Vedic Astrology | AstroRoshni"
+        description="Separate astrology facts from fiction. Evidence-based explanations debunking common myths about Vedic astrology, zodiac signs, and horoscopes."
+        keywords="astrology myths, astrology facts, vedic astrology truth, astrology science, zodiac myths debunked, astrology misconceptions"
+        canonical="https://astroroshni.com/myths-vs-reality"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Article",
+          "headline": "Astrology Myths vs Reality - Facts About Vedic Astrology",
+          "description": "Evidence-based explanations debunking common myths about astrology",
+          "author": { "@type": "Organization", "name": "AstroRoshni" },
+          "publisher": { "@type": "Organization", "name": "AstroRoshni" }
+        }}
+      />
       <NavigationHeader 
         onPeriodChange={() => {}}
         showZodiacSelector={false}

@@ -92,16 +92,36 @@ async def ask_question(request: ChatRequest):
                     
                     # Send final result with proper JSON escaping
                     try:
+                        # Clean and validate response text
+                        if not response_text or response_text.strip() == '':
+                            response_text = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
+                        
+                        # Ensure response is properly formatted
+                        clean_response = response_text.strip()
+                        
                         response_json = json.dumps({
                             'status': 'complete', 
-                            'response': response_text
+                            'response': clean_response
                         }, ensure_ascii=False, separators=(',', ':'))
+                        
+                        print(f"Sending response length: {len(clean_response)}")
+                        print(f"Response preview: {clean_response[:100]}...")
+                        
                         yield f"data: {response_json}\n\n"
+                        
                     except Exception as json_error:
                         print(f"JSON serialization error: {json_error}")
-                        # Fallback with escaped response
-                        safe_response = response_text.replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
-                        yield f"data: {{\"status\": \"complete\", \"response\": \"{safe_response}\"}}\n\n"
+                        print(f"Problematic response: {response_text[:200]}...")
+                        
+                        # Fallback with manual escaping
+                        try:
+                            safe_response = response_text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                            fallback_json = f'{{"status": "complete", "response": "{safe_response}"}}'
+                            yield f"data: {fallback_json}\n\n"
+                        except Exception as fallback_error:
+                            print(f"Fallback error: {fallback_error}")
+                            error_json = json.dumps({'status': 'error', 'error': 'Response formatting failed'})
+                            yield f"data: {error_json}\n\n"
                 else:
                     print(f"AI error: {ai_result.get('error')}")
                     yield f"data: {json.dumps({'status': 'error', 'error': ai_result.get('error', 'AI analysis failed')})}\n\n"

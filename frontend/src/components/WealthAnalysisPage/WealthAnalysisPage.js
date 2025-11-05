@@ -5,8 +5,10 @@ import NativeSelector from '../Shared/NativeSelector';
 import CompleteWealthAnalysisTab from '../Wealth/CompleteWealthAnalysisTab';
 import AIInsightsTab from '../Wealth/AIInsightsTab';
 import BirthForm from '../BirthForm/BirthForm';
+import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
+import { generatePageSEO } from '../../config/seo.config';
 import './WealthAnalysisPage.css';
 
 const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
@@ -25,8 +27,23 @@ const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
     setShowForm(false);
   };
 
+  const seoData = generatePageSEO('wealthAnalysis', { path: '/wealth-analysis' });
+
   return (
     <div className="wealth-analysis-page">
+      <SEOHead 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          "name": "Wealth Analysis Report",
+          "description": "Detailed wealth and finance analysis based on Vedic astrology for financial growth",
+          "provider": { "@type": "Organization", "name": "AstroRoshni" }
+        }}
+      />
       <NavigationHeader 
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}

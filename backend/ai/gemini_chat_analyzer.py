@@ -63,14 +63,33 @@ class GeminiChatAnalyzer:
         
         try:
             response = self.model.generate_content(prompt)
+            
+            # Validate response
+            if not response or not hasattr(response, 'text') or not response.text:
+                print(f"\n=== EMPTY AI RESPONSE ===")
+                return {
+                    'success': False,
+                    'response': "I apologize, but I couldn't generate a response. Please try asking your question again.",
+                    'error': 'Empty response from AI'
+                }
+            
+            response_text = response.text.strip()
+            if len(response_text) == 0:
+                print(f"\n=== BLANK AI RESPONSE ===")
+                return {
+                    'success': False,
+                    'response': "I received your question but couldn't generate a proper response. Please try rephrasing your question.",
+                    'error': 'Blank response from AI'
+                }
+            
             print(f"\n=== RECEIVED FROM AI ===")
-            print(f"Response length: {len(response.text)} chars")
-            print(f"Response preview: {response.text[:200]}...")
+            print(f"Response length: {len(response_text)} chars")
+            print(f"Response preview: {response_text[:200]}...")
             
             return {
                 'success': True,
-                'response': response.text,
-                'raw_response': response.text
+                'response': response_text,
+                'raw_response': response_text
             }
         except Exception as e:
             print(f"\n=== AI ERROR ===")
@@ -95,6 +114,10 @@ class GeminiChatAnalyzer:
         current_date_str = current_date.strftime("%B %d, %Y")
         current_time_str = current_date.strftime("%H:%M UTC")
         
+        # Extract key chart information for emphasis
+        ascendant_info = context.get('ascendant_info', {})
+        ascendant_summary = f"ASCENDANT: {ascendant_info.get('sign_name', 'Unknown')} at {ascendant_info.get('exact_degree_in_sign', 0):.2f}°"
+        
         # Custom JSON serializer for datetime objects
         def json_serializer(obj):
             if isinstance(obj, datetime):
@@ -108,13 +131,19 @@ IMPORTANT CURRENT DATE INFORMATION:
 - Current Time: {current_time_str}
 - Current Year: {current_date.year}
 
+CRITICAL CHART INFORMATION:
+{ascendant_summary}
+
 CRITICAL INSTRUCTIONS:
+- ALWAYS use the EXACT ascendant information provided in the context - DO NOT calculate or guess
+- The ascendant has been calculated using Swiss Ephemeris with Lahiri Ayanamsa - trust this calculation
 - Use the current date provided above for accurate timing references
 - If transit data is provided in the context, you may discuss current transits using that calculated data
 - If NO transit data is provided but user asks about transits, explain you need calculated transit positions
 - Do NOT guess or assume planetary positions - only use provided calculated data
 - Focus primarily on birth chart analysis and dasha periods
 - For timing questions, prioritize dasha periods but include transit data if available
+- NEVER recalculate the ascendant - use the provided ascendant_info section
 
 BIRTH CHART DATA:
 {json.dumps(context, indent=2, default=json_serializer)}

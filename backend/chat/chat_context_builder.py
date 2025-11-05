@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
 from calculators.chart_calculator import ChartCalculator
 from calculators.planet_analyzer import PlanetAnalyzer
@@ -63,6 +64,21 @@ class ChatContextBuilder:
         yoga_calc = YogaCalculator(birth_obj, chart_data)
         argala_calc = ArgalaCalculator(chart_data)
         
+        # Extract and validate ascendant information
+        ascendant_degree = chart_data.get('ascendant', 0)
+        ascendant_sign_num = int(ascendant_degree / 30)
+        ascendant_sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                               'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        ascendant_sign_name = ascendant_sign_names[ascendant_sign_num]
+        
+        # Validate ascendant calculation
+        try:
+            from chart_validator import validate_ascendant_calculation
+            validation = validate_ascendant_calculation(birth_data, ascendant_degree)
+            ascendant_validation_note = f"Validation: {'PASSED' if validation['is_valid'] else 'FAILED'} - Difference: {validation['difference_degrees']:.4f}°"
+        except Exception as e:
+            ascendant_validation_note = f"Validation unavailable: {str(e)}"
+        
         # Build comprehensive context
         context = {
             # Basic chart
@@ -72,6 +88,17 @@ class ChatContextBuilder:
                 "place": birth_data.get('place', birth_data.get('name', 'Unknown')),
                 "latitude": birth_data.get('latitude'),
                 "longitude": birth_data.get('longitude')
+            },
+            
+            # Validated ascendant information
+            "ascendant_info": {
+                "degree": ascendant_degree,
+                "sign_number": ascendant_sign_num + 1,
+                "sign_name": ascendant_sign_name,
+                "exact_degree_in_sign": ascendant_degree % 30,
+                "note": "This is the calculated Sidereal/Vedic ascendant using Swiss Ephemeris with Lahiri Ayanamsa",
+                "validation": ascendant_validation_note,
+                "formatted": f"{ascendant_sign_name} {ascendant_degree % 30:.2f}°"
             },
             
             "d1_chart": chart_data,

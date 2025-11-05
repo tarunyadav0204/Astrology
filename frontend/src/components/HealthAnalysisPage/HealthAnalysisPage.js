@@ -5,8 +5,10 @@ import NativeSelector from '../Shared/NativeSelector';
 import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
 import AIInsightsTab from '../Health/AIInsightsTab';
 import BirthForm from '../BirthForm/BirthForm';
+import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
+import { generatePageSEO } from '../../config/seo.config';
 import './HealthAnalysisPage.css';
 
 const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
@@ -25,8 +27,23 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
     setShowForm(false);
   };
 
+  const seoData = generatePageSEO('healthAnalysis', { path: '/health-analysis' });
+
   return (
     <div className="health-analysis-page">
+      <SEOHead 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          "name": "Health Analysis Report",
+          "description": "Comprehensive health analysis using Vedic medical astrology for wellness insights",
+          "provider": { "@type": "Organization", "name": "AstroRoshni" }
+        }}
+      />
       <NavigationHeader 
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}

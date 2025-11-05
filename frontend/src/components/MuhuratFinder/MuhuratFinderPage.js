@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { muhuratService } from '../../services/muhuratService';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
+import { generatePageSEO } from '../../config/seo.config';
 import './MuhuratFinderPage.css';
 
 const MuhuratFinderPage = () => {
@@ -82,8 +84,23 @@ const MuhuratFinderPage = () => {
 
   const currentMuhurat = getCurrentMuhurat();
 
+  const seoData = generatePageSEO('muhuratFinder', { path: '/muhurat-finder' });
+
   return (
     <div className="muhurat-finder-page">
+      <SEOHead 
+        title={seoData.title}
+        description={seoData.description}
+        keywords={seoData.keywords}
+        canonical={seoData.canonical}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Muhurat Finder",
+          "description": "Find auspicious muhurat times for marriage, business, travel and important events",
+          "applicationCategory": "LifestyleApplication"
+        }}
+      />
       <NavigationHeader />
       <div className="container">
         <div className="page-header">

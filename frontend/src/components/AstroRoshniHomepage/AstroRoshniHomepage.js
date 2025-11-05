@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { APP_CONFIG } from '../../config/app.config';
 import { getCurrentDomainConfig } from '../../config/domains.config';
+import { SEO_CONFIG, generatePageSEO } from '../../config/seo.config';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 import { apiService } from '../../services/apiService';
 import ChartWidget from '../Charts/ChartWidget';
 import NavigationHeader from '../Shared/NavigationHeader';
@@ -17,6 +20,7 @@ import './AstroRoshniHomepage.css';
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
+  const { trackEvent } = useAnalytics();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedZodiac, setSelectedZodiac] = useState('aries');
   const [horoscopeData, setHoroscopeData] = useState({});
@@ -533,6 +537,12 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
   const handlePeriodChange = (period) => {
     setSelectedPeriod(period);
+    
+    // Track horoscope period change
+    if (trackEvent) {
+      trackEvent('horoscope_period_changed', 'astrology', period);
+    }
+    
     // Scroll to horoscope section
     const horoscopeSection = document.querySelector('.horoscope-section');
     if (horoscopeSection) {
@@ -573,8 +583,47 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     }));
   };
 
+  const seoData = generatePageSEO('home');
+
   return (
     <div className="investor-homepage">
+      <Helmet>
+        <title>{seoData.title}</title>
+        <meta name="description" content={seoData.description} />
+        <meta name="keywords" content={seoData.keywords} />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={seoData.canonical} />
+        <meta property="og:title" content={seoData.title} />
+        <meta property="og:description" content={seoData.description} />
+        <meta property="og:image" content={seoData.ogImage} />
+        <meta property="og:site_name" content={SEO_CONFIG.site.name} />
+        
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={seoData.canonical} />
+        <meta property="twitter:title" content={seoData.title} />
+        <meta property="twitter:description" content={seoData.description} />
+        <meta property="twitter:image" content={seoData.twitterImage} />
+        
+        {/* Additional SEO Meta Tags */}
+        <meta name="robots" content="index, follow" />
+        <meta name="author" content={SEO_CONFIG.site.author} />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content={SEO_CONFIG.site.themeColor} />
+        <link rel="canonical" href={seoData.canonical} />
+        
+        {/* Structured Data - Organization */}
+        <script type="application/ld+json">
+          {JSON.stringify(SEO_CONFIG.structuredData.organization)}
+        </script>
+        
+        {/* Structured Data - Website */}
+        <script type="application/ld+json">
+          {JSON.stringify(SEO_CONFIG.structuredData.website)}
+        </script>
+      </Helmet>
       {/* Animated Solar System */}
       <div className="solar-system">
         <div className="sun"></div>
@@ -854,7 +903,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="vedic-tools-divider"></div>
           </div>
           <div className="content-grid">
-            {/* Column 1 - Kundli Form (25%) */}
+            {/* Column 1 - Kundli Form (20%) */}
             <div className="form-card birth-chart-widget">
               <BirthForm 
                 onSubmit={() => {
@@ -866,7 +915,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               />
             </div>
 
-            {/* Column 2 - Matching Form (50%) */}
+            {/* Column 2 - Matching Form (40%) */}
             <div className="form-card">
               <h3>Kundli Matching</h3>
               <PartnerForm 
@@ -876,7 +925,26 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               />
             </div>
 
-            {/* Column 3 - Panchang (25%) */}
+            {/* Column 3 - Nakshatra Widget (20%) */}
+            <div className="form-card nakshatra-widget">
+              <h3>🌟 Nakshatra Guide</h3>
+              <div className="nakshatra-content">
+                <p>Discover the 27 lunar mansions and their influence on your life</p>
+                <div className="nakshatra-features">
+                  <div className="feature-item">📅 Annual Periods</div>
+                  <div className="feature-item">⭐ Characteristics</div>
+                  <div className="feature-item">🔮 Predictions</div>
+                </div>
+                <button 
+                  className="nakshatra-btn"
+                  onClick={() => navigate('/nakshatras')}
+                >
+                  Explore Nakshatras →
+                </button>
+              </div>
+            </div>
+
+            {/* Column 4 - Panchang (20%) */}
             <PanchangWidget />
           </div>
         </div>
