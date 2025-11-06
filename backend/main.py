@@ -516,16 +516,15 @@ async def login(user_data: UserLogin):
             print(f"User not found for phone: {user_data.phone}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        print(f"Debug - Input password: '{user_data.password}'")
-        print(f"Debug - Stored hash: '{user[3]}'")
-        print(f"Debug - Hash length: {len(user[3])}")
-        
         password_valid = verify_password(user_data.password, user[3])
-        print(f"Debug - Password verification result: {password_valid}")
+        
+        if not password_valid:
+            print(f"CRITICAL: Password verification failed for user: {user_data.phone}")
+            print(f"Hash: {user[3][:20]}...")
+            print(f"Hash format valid: {user[3].startswith('$2b$')}")
         
         if not password_valid:
             conn.close()
-            print(f"Password verification failed for user: {user_data.phone}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
         # Get user's active subscriptions
@@ -587,6 +586,45 @@ async def login(user_data: UserLogin):
 @app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@app.get("/api/admin/check-password-hashes")
+async def check_password_hashes():
+    """Admin endpoint to check password hash integrity"""
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT userid, phone, password, created_at FROM users")
+    users = cursor.fetchall()
+    conn.close()
+    
+    results = []
+    for user in users:
+        userid, phone, password_hash, created_at = user
+        
+        # Check hash format
+        is_bcrypt = password_hash.startswith('$2b$')
+        hash_length = len(password_hash)
+        
+        # Test with a dummy password to see if hash structure is valid
+        try:
+            bcrypt.checkpw(b'test', password_hash.encode('utf-8'))
+            hash_structure_valid = True
+        except Exception as e:
+            hash_structure_valid = False
+            
+        results.append({
+            'userid': userid,
+            'phone': phone[-4:],  # Only show last 4 digits
+            'created_at': created_at,
+            'is_bcrypt_format': is_bcrypt,
+            'hash_length': hash_length,
+            'hash_structure_valid': hash_structure_valid,
+            'hash_preview': password_hash[:20] + '...' if len(password_hash) > 20 else password_hash
+        })
+    
+    return {'users': results, 'total_users': len(results)}
+
+
 
 # Subscription Management APIs
 @app.get("/api/subscription-plans")
