@@ -624,6 +624,37 @@ async def check_password_hashes():
     
     return {'users': results, 'total_users': len(results)}
 
+@app.post("/api/admin/test-password")
+async def test_password(request: dict):
+    """Test if a password works for a specific user"""
+    phone = request.get('phone')
+    test_passwords = request.get('passwords', [])
+    
+    if not phone or not test_passwords:
+        raise HTTPException(status_code=400, detail="Phone and passwords array required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT password FROM users WHERE phone = ?", (phone,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    stored_hash = user[0]
+    results = []
+    
+    for pwd in test_passwords:
+        try:
+            is_valid = verify_password(pwd, stored_hash)
+            results.append({'password': pwd, 'valid': is_valid})
+        except Exception as e:
+            results.append({'password': pwd, 'valid': False, 'error': str(e)})
+    
+    return {'phone': phone[-4:], 'results': results}
+
 
 
 # Subscription Management APIs
