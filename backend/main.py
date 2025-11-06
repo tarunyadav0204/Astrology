@@ -798,17 +798,18 @@ async def send_reset_code(request: SendResetCode):
     from sms_service import sms_service
     sms_sent = sms_service.send_reset_code(request.phone, code)
     
-    response_data = {
+    response = {
         "message": f"Reset code sent to {request.phone}",
         "user_name": user[1]
     }
     
-    # Include code in response only if SMS failed (for testing)
-    if not sms_sent:
-        response_data["code"] = code
-        response_data["message"] += " (SMS service unavailable - code shown for testing)"
+    # Development mode: show code if SMS failed and not in production
+    is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
+    if not sms_sent and is_development:
+        response["dev_code"] = code
+        response["message"] += " (Development: SMS disabled, code shown below)"
     
-    return response_data
+    return response
 
 @app.post("/api/verify-reset-code")
 async def verify_reset_code(request: VerifyResetCode):

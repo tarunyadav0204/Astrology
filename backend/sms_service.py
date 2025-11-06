@@ -27,7 +27,7 @@ class SMSService:
     def send_reset_code(self, phone_number: str, code: str) -> bool:
         """Send password reset code via SMS"""
         if not self.client:
-            print(f"SMS disabled - would send code {code} to {phone_number}")
+            print(f"SMS disabled - would send code to {phone_number}")
             return False
         
         try:
