@@ -1024,16 +1024,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
 
             <div className="festivals-sidebar">
-              <h3>Festivals</h3>
+              <h3>Festivals & Nakshatras</h3>
               <div className="festival-tabs">
-                <button className="tab active">Festival 2025</button>
-                <button className="tab">Holidays 2025</button>
+                <button className="tab active" onClick={() => navigate('/festivals')}>Festivals</button>
+                <button className="tab" onClick={() => navigate('/nakshatras')}>Nakshatras</button>
               </div>
               <div className="festival-list">
-                <a href="#diwali">Diwali 2025</a>
-                <a href="#navratri">Navratri 2025</a>
-                <a href="#dussehra">Dussehra 2025</a>
-                <a href="#karva">Karva Chauth 2025</a>
+                <a href="/festivals">🎊 Daily Festivals</a>
+                <a href="/festivals/monthly">📅 Monthly Calendar</a>
+                <a href="/nakshatras">⭐ Nakshatra Guide</a>
+                <a href="/nakshatra/ashwini/2025">🌟 2025 Predictions</a>
               </div>
             </div>
           </div>

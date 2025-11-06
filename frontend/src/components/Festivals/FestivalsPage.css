@@ -1,0 +1,270 @@
+.festivals-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
+  padding: 20px;
+}
+
+.festivals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.header-content h1 {
+  margin: 0;
+  color: #d84315;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.header-content p {
+  margin: 5px 0 0 0;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.date-selector .date-input {
+  padding: 10px 15px;
+  border: 2px solid #ff6b35;
+  border-radius: 10px;
+  font-size: 16px;
+  background: white;
+  color: #333;
+}
+
+.festivals-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.today-section h2 {
+  color: #d84315;
+  font-size: 2rem;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.date-display {
+  text-align: center;
+  font-size: 1.3rem;
+  color: #666;
+  margin-bottom: 30px;
+  font-weight: 600;
+}
+
+.loading {
+  text-align: center;
+  padding: 50px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #ff6b35;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.festivals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 25px;
+  margin-bottom: 40px;
+}
+
+.festival-card {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #ff6b35;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.festival-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+}
+
+.festival-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.festival-icon {
+  font-size: 2.5rem;
+  margin-right: 15px;
+}
+
+.festival-title h3 {
+  margin: 0;
+  color: #d84315;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.festival-type {
+  background: #fff3e0;
+  color: #e65100;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin-top: 5px;
+  display: inline-block;
+}
+
+.festival-description {
+  margin-bottom: 20px;
+}
+
+.festival-description p {
+  color: #555;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.festival-significance,
+.festival-rituals {
+  margin-bottom: 20px;
+}
+
+.festival-significance h4,
+.festival-rituals h4 {
+  color: #d84315;
+  font-size: 1.1rem;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.festival-significance p {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.festival-rituals ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.festival-rituals li {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 5px;
+}
+
+.no-festivals {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.no-festivals-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.no-festivals h3 {
+  color: #d84315;
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+}
+
+.no-festivals p {
+  color: #666;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.quick-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 40px;
+}
+
+.action-btn {
+  padding: 15px 30px;
+  border: none;
+  border-radius: 25px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monthly-btn {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: white;
+}
+
+.search-btn {
+  background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+  color: white;
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+  .festivals-page {
+    padding: 15px;
+  }
+  
+  .festivals-header {
+    flex-direction: column;
+    gap: 20px;
+    text-align: center;
+  }
+  
+  .header-content h1 {
+    font-size: 2rem;
+  }
+  
+  .festivals-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .festival-card {
+    padding: 20px;
+  }
+  
+  .quick-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .action-btn {
+    width: 100%;
+    max-width: 300px;
+  }
+}

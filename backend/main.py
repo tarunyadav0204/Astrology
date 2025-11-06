@@ -39,6 +39,7 @@ from health.health_routes import router as health_router
 from wealth.wealth_routes import router as wealth_router
 from chat.chat_routes import router as chat_router
 from nakshatra.nakshatra_routes import router as nakshatra_router
+from festivals.routes import router as festivals_router
 import math
 from datetime import timedelta
 
@@ -119,6 +120,7 @@ app.include_router(health_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(nakshatra_router, prefix="/api")
+app.include_router(festivals_router, prefix="/api")
 
 
 # Root endpoint for health check
