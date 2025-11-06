@@ -511,8 +511,14 @@ async def login(user_data: UserLogin):
         cursor.execute("SELECT userid, name, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
         user = cursor.fetchone()
         
-        if not user or not verify_password(user_data.password, user[3]):
+        if not user:
             conn.close()
+            print(f"User not found for phone: {user_data.phone}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        if not verify_password(user_data.password, user[3]):
+            conn.close()
+            print(f"Password verification failed for user: {user_data.phone}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
         # Get user's active subscriptions
@@ -559,7 +565,13 @@ async def login(user_data: UserLogin):
             }
         }
     except Exception as e:
-        print(f"Login error: {str(e)}")
+        import traceback
+        error_details = {
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'traceback': traceback.format_exc()
+        }
+        print(f"Login error details: {error_details}")
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.get("/api/me")
