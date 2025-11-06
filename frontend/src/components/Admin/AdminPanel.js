@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
+import AdminChatHistory from './AdminChatHistory';
 import './AdminPanel.css';
 
 const AdminPanel = ({ user, onLogout }) => {
@@ -122,6 +123,12 @@ const AdminPanel = ({ user, onLogout }) => {
           onClick={() => setActiveTab('charts')}
         >
           Birth Charts Management
+        </button>
+        <button 
+          className={`tab ${activeTab === 'chat' ? 'active' : ''}`}
+          onClick={() => setActiveTab('chat')}
+        >
+          Chat History
         </button>
       </div>
 
@@ -303,6 +310,10 @@ const AdminPanel = ({ user, onLogout }) => {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'chat' && (
+          <AdminChatHistory />
         )}
       </div>
     </div>

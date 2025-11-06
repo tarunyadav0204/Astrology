@@ -26,7 +26,9 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
           <div className="auth-section">
             {user ? (
               <div className="user-menu">
-                <span className="user-name">👤 {user.name || user.phone}</span>
+                <button className="profile-btn" onClick={() => navigate('/profile')}>
+                  👤 {user.name || user.phone}
+                </button>
                 {user.role === 'admin' && (
                   <button className="admin-btn" onClick={onAdminClick}>
                     ⚙️ Admin
@@ -56,7 +58,9 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
           <div className="mobile-auth">
             {user ? (
               <div className="user-menu">
-                <span className="user-name">👤 {user.name || user.phone}</span>
+                <button className="profile-btn" onClick={() => navigate('/profile')}>
+                  👤 {user.name || user.phone}
+                </button>
                 {user.role === 'admin' && (
                   <button className="admin-btn" onClick={onAdminClick}>
                     ⚙️ Admin

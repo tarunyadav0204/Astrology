@@ -36,6 +36,7 @@ import NakshatraListPage from './components/Nakshatra/NakshatraListPage';
 import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPage';
 import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
+import ProfilePage from './components/Profile/ProfilePage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
@@ -1028,6 +1029,7 @@ function App() {
             />
           } />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
           <Route path="/monthly-panchang" element={<MonthlyPanchangPage />} />

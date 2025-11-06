@@ -10,6 +10,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [sessionId, setSessionId] = useState(null);
     const messagesEndRef = useRef(null);
     
     // Use initial birth data if provided
@@ -71,11 +72,64 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         }
     };
 
+    const createSession = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('http://localhost:8001/api/chat/session', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                setSessionId(data.session_id);
+                return data.session_id;
+            }
+        } catch (error) {
+            console.error('Error creating session:', error);
+        }
+        return null;
+    };
+
+    const saveMessage = async (sessionId, sender, content) => {
+        try {
+            const token = localStorage.getItem('token');
+            await fetch('http://localhost:8001/api/chat/message', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    sender: sender,
+                    content: content
+                })
+            });
+        } catch (error) {
+            console.error('Error saving message:', error);
+        }
+    };
+
     const handleSendMessage = async (message) => {
         if (!birthData) return;
 
+        // Create session if first message
+        let currentSessionId = sessionId;
+        if (!currentSessionId) {
+            currentSessionId = await createSession();
+            if (!currentSessionId) return;
+        }
+
         const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
         setMessages(prev => [...prev, userMessage]);
+        
+        // Save user message
+        await saveMessage(currentSessionId, 'user', message);
+        
         setTimeout(scrollToBottom, 100);
         setIsLoading(true);
 
@@ -188,6 +242,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                                     : msg
                                             );
                                         });
+                                        
+                                        // Save assistant message
+                                        await saveMessage(currentSessionId, 'assistant', responseText);
                                         
                                         // Scroll to message
                                         setTimeout(() => {

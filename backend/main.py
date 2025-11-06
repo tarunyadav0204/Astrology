@@ -40,6 +40,8 @@ from wealth.wealth_routes import router as wealth_router
 from chat.chat_routes import router as chat_router
 from nakshatra.nakshatra_routes import router as nakshatra_router
 from festivals.routes import router as festivals_router
+from chat_history.routes import router as chat_history_router, init_chat_tables
+from chat_history.admin_routes import router as chat_admin_router
 import math
 from datetime import timedelta
 
@@ -121,6 +123,8 @@ app.include_router(wealth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(nakshatra_router, prefix="/api")
 app.include_router(festivals_router, prefix="/api")
+app.include_router(chat_history_router, prefix="/api")
+app.include_router(chat_admin_router, prefix="/api")
 
 
 # Root endpoint for health check
@@ -394,6 +398,7 @@ def init_db():
 
 try:
     init_db()
+    init_chat_tables()
     print("Database initialized successfully")
 except Exception as e:
     print(f"Database initialization failed: {str(e)}")
@@ -2595,9 +2600,10 @@ async def startup_event():
     # Initialize house combinations database
     try:
         init_house_combinations_db()
-        print("House combinations database initialized")
+        init_chat_tables()
+        print("House combinations and chat history databases initialized")
     except Exception as e:
-        print(f"Warning: Could not initialize house combinations database: {e}")
+        print(f"Warning: Could not initialize additional databases: {e}")
 
 # Horoscope endpoints
 @app.get("/api/horoscope/daily/{zodiac_sign}")
