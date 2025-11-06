@@ -2,23 +2,64 @@ import React from 'react';
 
 const MessageBubble = ({ message }) => {
     const formatContent = (content) => {
-        return content
-            // Headers with colored styling
-            .replace(/### (.*?)\n/g, '<h3 class="chat-header">$1</h3>')
-            // Bold text
-            .replace(/\*\*(.*?)\*\*/g, '<strong class="chat-bold">$1</strong>')
-            // Italics for Sanskrit terms
-            .replace(/\*(.*?)\*/g, '<em class="chat-italic">$1</em>')
-            // Bullet points
-            .replace(/• (.*?)\n/g, '<li class="chat-bullet">$1</li>')
-            .replace(/(<li class="chat-bullet">.*<\/li>)/gs, '<ul class="chat-list">$1</ul>')
-            // Final thoughts/summary detection
-            .replace(/(Final Thoughts|Conclusion|Summary)(.*?)(?=\n\n|$)/gs, '<div class="chat-summary"><h4>$1</h4><p>$2</p></div>')
-            // Key insights box
-            .replace(/(Key Insights[^:]*:)(.*?)(?=###|Final|Conclusion|$)/gs, '<div class="chat-insights"><h4>$1</h4><div class="insights-content">$2</div></div>')
-            // Line breaks
-            .replace(/\n\n/g, '<br><br>')
-            .replace(/\n/g, '<br>');
+        // First, normalize line breaks
+        let formatted = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        // Process headers first with symbols
+        formatted = formatted.replace(/### (.*?)\n/g, '<h3 class="chat-header">◆ $1 ◆</h3>\n\n');
+        
+        // Process bold text
+        formatted = formatted.replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>');
+        
+        // Process italics (single asterisks not part of bold)
+        formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
+        
+        // Split into paragraphs and process each
+        const paragraphs = formatted.split(/\n\s*\n/);
+        
+        return paragraphs.map(paragraph => {
+            paragraph = paragraph.trim();
+            if (!paragraph) return '';
+            
+            // Check if it's a numbered list paragraph
+            if (/^\d+\./m.test(paragraph)) {
+                const items = paragraph.split(/\n(?=\d+\.)/)
+                    .map(item => {
+                        const match = item.match(/^(\d+\.)\s*(.*)$/s);
+                        if (match) {
+                            return `<li class="chat-numbered">▸ ${match[2].replace(/\n/g, ' ').trim()}</li>`;
+                        }
+                        return '';
+                    })
+                    .filter(item => item);
+                return `<ol class="chat-numbered-list">${items.join('')}</ol>`;
+            }
+            
+            // Check if it's a bullet list paragraph
+            if (/^[•*]/m.test(paragraph)) {
+                const items = paragraph.split(/\n(?=[•*])/)
+                    .map(item => {
+                        const match = item.match(/^[•*]\s*(.*)$/s);
+                        if (match) {
+                            return `<li class="chat-bullet">• ${match[1].replace(/\n/g, ' ').trim()}</li>`;
+                        }
+                        return '';
+                    })
+                    .filter(item => item);
+                return `<ul class="chat-list">${items.join('')}</ul>`;
+            }
+            
+            // Check for Key Insights section
+            if (paragraph.startsWith('Key Insights')) {
+                const lines = paragraph.split('\n');
+                const title = lines[0];
+                const body = lines.slice(1).join(' ').trim();
+                return `<div class="chat-insights"><h4>★ ${title}</h4><div class="insights-content">${body}</div></div>`;
+            }
+            
+            // Regular paragraph - replace single line breaks with spaces
+            return `<p class="chat-paragraph">${paragraph.replace(/\n/g, ' ')}</p>`;
+        }).filter(p => p).join('');
     };
 
     return (

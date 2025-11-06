@@ -88,8 +88,24 @@ const MonthlyPanchangPage = () => {
           <div className="day-number">{day}</div>
           {dayData && (
             <div className="day-info">
-              <div className="tithi">{dayData.basic_panchang.tithi.name}</div>
-              <div className="nakshatra">{dayData.basic_panchang.nakshatra.name}</div>
+              <div className="sun-times">
+                <div className="sunrise">🌅 {dayData.sunrise_sunset?.sunrise?.slice(0,5) || 'N/A'}</div>
+                <div className="sunset">🌇 {dayData.sunrise_sunset?.sunset?.slice(0,5) || 'N/A'}</div>
+              </div>
+              <div className="tithi-info">
+                <span className="tithi">{dayData.basic_panchang?.tithi?.name} {dayData.calendar_info?.paksha}</span>
+              </div>
+              <div className="moon-info">
+                <span className="moon-sign">🌙 {dayData.moon_info?.moon_sign}</span>
+              </div>
+              <div className="nakshatra-info">
+                <span className="nakshatra">⭐ {dayData.basic_panchang?.nakshatra?.name}</span>
+              </div>
+              {dayData.festivals && dayData.festivals.length > 0 && (
+                <div className="festivals">
+                  <span className="festival">🎉 {dayData.festivals[0]}</span>
+                </div>
+              )}
             </div>
           )}
         </div>

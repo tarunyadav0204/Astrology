@@ -27,7 +27,7 @@
   display: grid;
   grid-template-columns: 1fr 400px;
   gap: 30px;
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -105,7 +105,7 @@
 }
 
 .calendar-day {
-  min-height: 80px;
+  min-height: 140px;
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(233, 30, 99, 0.2);
   border-radius: 8px;
@@ -113,6 +113,7 @@
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
+  overflow: hidden;
 }
 
 .calendar-day:hover {
@@ -146,16 +147,55 @@
 }
 
 .day-info {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.tithi, .nakshatra {
-  color: #666;
-  margin: 1px 0;
+.sun-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  margin-bottom: 2px;
+}
+
+.sunrise, .sunset {
+  color: #ff6f00;
+  font-weight: 500;
+}
+
+.tithi-info, .moon-info, .nakshatra-info {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin: 1px 0;
+}
+
+.tithi {
+  color: #e91e63;
+  font-weight: 600;
+}
+
+.moon-sign {
+  color: #3f51b5;
+  font-weight: 500;
+}
+
+.nakshatra {
+  color: #4caf50;
+  font-weight: 500;
+}
+
+.festivals {
+  margin-top: 2px;
+}
+
+.festival {
+  color: #f44336;
+  font-weight: 600;
+  font-size: 0.6rem;
 }
 
 .calendar-day.today .tithi,
@@ -178,7 +218,7 @@
   padding: 25px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.3);
-  max-height: 80vh;
+  height: 150vh;
   overflow-y: auto;
 }
 
@@ -345,12 +385,21 @@
   }
   
   .calendar-day {
-    min-height: 60px;
-    padding: 5px;
+    min-height: 100px;
+    padding: 4px;
   }
   
   .day-info {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
+    gap: 1px;
+  }
+  
+  .sun-times {
+    font-size: 0.5rem;
+  }
+  
+  .festival {
+    font-size: 0.5rem;
   }
   
   .section {
@@ -373,15 +422,27 @@
   }
   
   .calendar-day {
-    min-height: 50px;
-    padding: 3px;
+    min-height: 80px;
+    padding: 2px;
   }
   
   .day-number {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
   
   .day-info {
+    font-size: 0.5rem;
+  }
+  
+  .sun-times {
+    font-size: 0.45rem;
+  }
+  
+  .tithi-info, .moon-info, .nakshatra-info {
+    font-size: 0.45rem;
+  }
+  
+  .festival {
     display: none;
   }
   

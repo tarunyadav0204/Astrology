@@ -124,20 +124,46 @@ async def ask_question(request: ChatRequest):
                             yield f"data: {error_json}\n\n"
                 else:
                     print(f"AI error: {ai_result.get('error')}")
-                    yield f"data: {json.dumps({'status': 'error', 'error': ai_result.get('error', 'AI analysis failed')})}\n\n"
+                    
+                    # Convert AI errors to user-friendly messages
+                    ai_error = ai_result.get('error', 'AI analysis failed')
+                    user_error = "I'm having trouble processing your question right now. Please try rephrasing it or try again later."
+                    
+                    if "timeout" in str(ai_error).lower():
+                        user_error = "Your question is taking longer than expected to process. Please try again."
+                    elif "rate limit" in str(ai_error).lower():
+                        user_error = "I'm processing many requests right now. Please wait a moment and try again."
+                    
+                    yield f"data: {json.dumps({'status': 'error', 'error': user_error})}\n\n"
                     
             except Exception as e:
                 print(f"Chat route exception: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+                
+                # Convert technical errors to user-friendly messages
+                error_message = "I'm having trouble connecting right now. Please try again in a moment."
+                
+                if "timeout" in str(e).lower() or "503" in str(e):
+                    error_message = "The service is temporarily busy. Please try again in a few moments."
+                elif "connection" in str(e).lower() or "connect" in str(e).lower():
+                    error_message = "I'm having connection issues. Please check your internet and try again."
+                elif "rate limit" in str(e).lower() or "quota" in str(e).lower():
+                    error_message = "I'm receiving too many requests right now. Please wait a moment and try again."
+                elif "authentication" in str(e).lower() or "unauthorized" in str(e).lower():
+                    error_message = "There's a temporary service issue. Please try again shortly."
+                
+                yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
                 
         except Exception as e:
             print(f"\n=== STREAMING ERROR ===")
             print(f"Error: {str(e)}")
             import traceback
             traceback.print_exc()
-            yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+            
+            # User-friendly error for outer exceptions
+            user_error = "Something went wrong while processing your request. Please try again."
+            yield f"data: {json.dumps({'status': 'error', 'error': user_error})}\n\n"
     
     return StreamingResponse(
         generate_streaming_response(),

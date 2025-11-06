@@ -76,6 +76,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
 
         const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
         setMessages(prev => [...prev, userMessage]);
+        setTimeout(scrollToBottom, 100);
         setIsLoading(true);
 
         // Add typing indicator with engaging messages

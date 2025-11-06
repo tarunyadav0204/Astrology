@@ -5,7 +5,7 @@
 }
 
 .panchang-content {
-  padding: 20px 0;
+  padding: 10px 0;
 }
 
 .container {
@@ -16,18 +16,18 @@
 
 .page-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 15px;
 }
 
 .page-header h1 {
   color: #e91e63;
-  margin-bottom: 10px;
-  font-size: 2.5rem;
+  margin-bottom: 5px;
+  font-size: 2rem;
 }
 
 .page-header p {
   color: #666;
-  font-size: 1.1rem;
+  font-size: 1rem;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -132,10 +132,10 @@
 /* Header Styles */
 .panchang-header {
   background: white;
-  border-radius: 15px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 10px;
+  box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+  padding: 15px;
+  margin-bottom: 15px;
 }
 
 .header-row {
@@ -317,21 +317,21 @@
 .panchang-sections {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 15px;
 }
 
 .panchang-section {
   background: white;
-  border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-  margin-bottom: 20px;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+  margin-bottom: 10px;
   overflow: hidden;
 }
 
 .section-header {
   background: linear-gradient(135deg, #e91e63, #ff6f00);
   color: white !important;
-  padding: 20px 30px;
+  padding: 12px 20px;
   margin: 0;
 }
 
@@ -365,13 +365,25 @@
 }
 
 .section-content {
-  padding: 30px;
+  padding: 20px;
 }
 
 .panchang-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 10px !important;
+}
+
+@media (max-width: 1200px) {
+  .panchang-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .panchang-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .timing-grid {
@@ -402,7 +414,7 @@
 }
 
 .timing-section {
-  margin-bottom: 25px;
+  margin-bottom: 15px;
 }
 
 .timing-section h4 {
@@ -429,10 +441,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 15px;
+  padding: 8px 12px;
   background: #f8f9fa;
   border: 1px solid #e9ecef;
-  border-radius: 8px;
+  border-radius: 6px;
   transition: all 0.2s ease;
 }
 
@@ -745,21 +757,24 @@
 }
 
 .planets-grid {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 6px;
-  margin-bottom: 20px;
+  display: grid !important;
+  grid-template-columns: repeat(9, 1fr) !important;
+  gap: 4px !important;
+  margin-bottom: 15px !important;
 }
 
-.planet-card {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 6px;
-  text-align: center;
-  transition: all 0.2s ease;
-  min-width: 0;
-  position: relative;
+.planetary-positions .planet-card {
+  background: white !important;
+  border: 1px solid #e9ecef !important;
+  border-radius: 4px !important;
+  padding: 2px !important;
+  text-align: center !important;
+  transition: all 0.2s ease !important;
+  min-width: 0 !important;
+  position: relative !important;
+  height: 50px !important;
+  max-height: 50px !important;
+  overflow: hidden !important;
 }
 
 .planet-card:hover {
@@ -769,21 +784,21 @@
 }
 
 .planet-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 4px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin-bottom: 1px !important;
 }
 
 .planet-header .planet-icon {
-  font-size: 14px;
-  margin-bottom: 2px;
+  font-size: 14px !important;
+  margin-bottom: 1px !important;
 }
 
 .planet-header .planet-name {
-  font-weight: 600;
-  color: #333;
-  font-size: 12px;
+  font-weight: 600 !important;
+  color: #333 !important;
+  font-size: 12px !important;
 }
 
 .status-badges {
@@ -812,22 +827,22 @@
 }
 
 .planet-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 0px !important;
 }
 
 .planet-info .sign {
-  font-weight: 500;
-  color: #4a5568;
-  font-size: 11px;
+  font-weight: 500 !important;
+  color: #4a5568 !important;
+  font-size: 11px !important;
 }
 
 .planet-info .degree {
-  color: #718096;
-  font-size: 10px;
-  font-family: monospace;
+  color: #718096 !important;
+  font-size: 10px !important;
+  font-family: monospace !important;
 }
 
 .timings-grid {
@@ -1135,10 +1150,6 @@
     grid-template-columns: 1fr;
   }
   
-  .panchang-grid {
-    grid-template-columns: 1fr;
-  }
-  
   .section-content {
     padding: 20px;
   }
@@ -1296,8 +1307,8 @@
 .panchang-element {
   background: white;
   border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
+  border-radius: 6px;
+  padding: 10px;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
@@ -1311,8 +1322,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1356,11 +1367,11 @@
 .time-range {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .progress-container {
-  margin: 10px 0;
+  margin: 8px 0;
 }
 
 .progress-bar {
@@ -1393,7 +1404,7 @@
 .ruling-planet, .ruling-deity, .lord, .deity, .nature, .effect, .quality {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .pada-info {
@@ -1587,16 +1598,13 @@
     font-size: 1.5rem;
   }
   
-  .panchang-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
+
   
   .panchang-element {
-    padding: 15px;
+    padding: 8px;
   }
   
   .main-value {
-    font-size: 1.3rem;
+    font-size: 1rem;
   }
 }

@@ -104,15 +104,15 @@ const CorePanchangElements = ({ panchangData }) => {
             
             <div className="day-recommendations">
               <div className="favorable">
-                <strong>Favorable:</strong> {panchangData.vara.favorable_activities.join(', ')}
+                <strong>Favorable:</strong> {panchangData.vara.favorable_activities ? panchangData.vara.favorable_activities.join(', ') : 'N/A'}
               </div>
               <div className="colors">
                 <strong>Lucky Color:</strong> 
                 <span 
                   className="color-swatch"
-                  style={{ backgroundColor: panchangData.vara.lucky_color }}
+                  style={{ backgroundColor: panchangData.vara.lucky_color || '#ccc' }}
                 ></span>
-                {panchangData.vara.lucky_color}
+                {panchangData.vara.lucky_color || 'N/A'}
               </div>
             </div>
           </div>
@@ -198,14 +198,14 @@ const CorePanchangElements = ({ panchangData }) => {
               </div>
               <div className="quality">
                 <strong>Quality:</strong> 
-                <span className={`quality-badge ${panchangData.yoga.quality.toLowerCase()}`}>
-                  {panchangData.yoga.quality}
+                <span className={`quality-badge ${panchangData.yoga.quality ? panchangData.yoga.quality.toLowerCase() : 'unknown'}`}>
+                  {panchangData.yoga.quality || 'N/A'}
                 </span>
               </div>
             </div>
             
             <div className="recommended-activities">
-              <strong>Recommended:</strong> {panchangData.yoga.recommended_activities.join(', ')}
+              <strong>Recommended:</strong> {panchangData.yoga.recommended_activities ? panchangData.yoga.recommended_activities.join(', ') : 'N/A'}
             </div>
             
             <div className="spiritual-practice">
@@ -242,7 +242,7 @@ const CorePanchangElements = ({ panchangData }) => {
             </div>
             
             <div className="suitable-activities">
-              <strong>Suitable For:</strong> {panchangData.karana.suitable_activities.join(', ')}
+              <strong>Suitable For:</strong> {panchangData.karana.suitable_activities ? panchangData.karana.suitable_activities.join(', ') : 'N/A'}
             </div>
             
             <div className="business-recommendation">

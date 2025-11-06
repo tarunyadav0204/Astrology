@@ -397,7 +397,7 @@ export const apiService = {
   
   // Panchang APIs
   calculateSunriseSunset: async (date, latitude, longitude) => {
-    const response = await apiClient.post(getEndpoint('/calculate-sunrise-sunset'), {
+    const response = await apiClient.post(getEndpoint('/panchang/calculate-sunrise-sunset'), {
       date: date,
       latitude: latitude,
       longitude: longitude
@@ -406,14 +406,14 @@ export const apiService = {
   },
   
   calculateMoonPhase: async (date) => {
-    const response = await apiClient.post(getEndpoint('/calculate-moon-phase'), {
+    const response = await apiClient.post(getEndpoint('/panchang/calculate-moon-phase'), {
       date: date
     });
     return response.data;
   },
   
   calculateInauspiciousTimes: async (date, latitude, longitude) => {
-    const response = await apiClient.post(getEndpoint('/calculate-inauspicious-times'), {
+    const response = await apiClient.post(getEndpoint('/panchang/calculate-inauspicious-times'), {
       date: date,
       latitude: latitude,
       longitude: longitude
@@ -427,7 +427,7 @@ export const apiService = {
   },
   
   calculateRahuKaal: async (date, latitude, longitude) => {
-    const response = await apiClient.post(getEndpoint('/calculate-rahu-kaal'), {
+    const response = await apiClient.post(getEndpoint('/panchang/calculate-rahu-kaal'), {
       date: date,
       latitude: latitude,
       longitude: longitude

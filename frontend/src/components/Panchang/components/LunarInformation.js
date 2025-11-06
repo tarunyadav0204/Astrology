@@ -167,7 +167,7 @@ const LunarInformation = ({ lunarData, panchangData }) => {
           </div>
           <div className="timing-item">
             <span className="timing-name">Compatible Nakshatras</span>
-            <span className="timing-description">{panchangData.nakshatra.compatible_nakshatras.join(', ')}</span>
+            <span className="timing-description">{panchangData.nakshatra.compatible_nakshatras ? panchangData.nakshatra.compatible_nakshatras.join(', ') : 'N/A'}</span>
           </div>
         </div>
       </div>
@@ -175,14 +175,14 @@ const LunarInformation = ({ lunarData, panchangData }) => {
       <div className="timing-section">
         <h4>Lunar Yogas</h4>
         <div className="timing-list">
-          {lunarData.lunar_yogas.map((yoga, index) => (
+          {lunarData.lunar_yogas && lunarData.lunar_yogas.map((yoga, index) => (
             <div key={index} className="timing-item">
               <span className="timing-name">🧘 {yoga.name}</span>
               <span className="timing-description">{yoga.description} - {yoga.effect}</span>
             </div>
           ))}
           
-          {lunarData.lunar_yogas.length === 0 && (
+          {(!lunarData.lunar_yogas || lunarData.lunar_yogas.length === 0) && (
             <div className="timing-item">
               <span className="timing-name">🧘 No special lunar yogas today</span>
             </div>

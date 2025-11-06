@@ -98,7 +98,7 @@ const PlanetaryPositions = ({ planetaryData }) => {
           const isCombust = getCombustionStatus(planet, sunLongitude, planetData.longitude);
 
           return (
-            <div key={planet} className="planet-card">
+            <div key={planet} className="planet-card-compact" style={{height: '110px', maxHeight: '110px', padding: '4px', overflow: 'hidden', lineHeight: '1.1', fontSize: '14px', background: 'white', border: '1px solid #e9ecef', borderRadius: '4px', textAlign: 'center', position: 'relative', minWidth: '0'}}>
               <div className="status-badges">
                 {planetData.retrograde && <span className="badge retrograde">R</span>}
                 {isCombust && <span className="badge combust">C</span>}
