@@ -516,7 +516,14 @@ async def login(user_data: UserLogin):
             print(f"User not found for phone: {user_data.phone}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        if not verify_password(user_data.password, user[3]):
+        print(f"Debug - Input password: '{user_data.password}'")
+        print(f"Debug - Stored hash: '{user[3]}'")
+        print(f"Debug - Hash length: {len(user[3])}")
+        
+        password_valid = verify_password(user_data.password, user[3])
+        print(f"Debug - Password verification result: {password_valid}")
+        
+        if not password_valid:
             conn.close()
             print(f"Password verification failed for user: {user_data.phone}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -564,6 +571,9 @@ async def login(user_data: UserLogin):
                 "subscriptions": user_subscriptions
             }
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 401) without modification
+        raise
     except Exception as e:
         import traceback
         error_details = {
