@@ -126,36 +126,70 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get session info
+        # First try new system
         cursor.execute("SELECT * FROM chat_sessions WHERE session_id = ?", (session_id,))
         session = cursor.fetchone()
         
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+        if session:
+            cursor.execute("""
+                SELECT sender, content, timestamp 
+                FROM chat_messages 
+                WHERE session_id = ? 
+                ORDER BY timestamp ASC
+            """, (session_id,))
+            
+            messages = []
+            for row in cursor.fetchall():
+                messages.append({
+                    'sender': row['sender'],
+                    'content': row['content'],
+                    'timestamp': row['timestamp']
+                })
+            
+            conn.close()
+            return {
+                "session_id": session['session_id'],
+                "user_id": session['user_id'],
+                "created_at": session['created_at'],
+                "messages": messages
+            }
         
-        # Get all messages for the session
-        cursor.execute("""
-            SELECT sender, content, timestamp 
-            FROM chat_messages 
-            WHERE session_id = ? 
-            ORDER BY timestamp ASC
-        """, (session_id,))
+        # Try legacy system
+        cursor.execute("SELECT * FROM chat_conversations WHERE birth_hash = ?", (session_id,))
+        legacy_conv = cursor.fetchone()
         
-        messages = []
-        for row in cursor.fetchall():
-            messages.append({
-                'sender': row['sender'],
-                'content': row['content'],
-                'timestamp': row['timestamp']
-            })
+        if legacy_conv:
+            try:
+                conv_data = json.loads(legacy_conv['conversation_data'])
+                messages = []
+                
+                for msg in conv_data.get('messages', []):
+                    if msg.get('question'):
+                        messages.append({
+                            'sender': 'user',
+                            'content': msg['question'],
+                            'timestamp': msg.get('timestamp', legacy_conv['updated_at'])
+                        })
+                    
+                    if msg.get('response'):
+                        messages.append({
+                            'sender': 'assistant',
+                            'content': msg['response'],
+                            'timestamp': msg.get('timestamp', legacy_conv['updated_at'])
+                        })
+                
+                conn.close()
+                return {
+                    "session_id": session_id,
+                    "user_id": "legacy",
+                    "created_at": legacy_conv['updated_at'],
+                    "messages": messages
+                }
+            except Exception:
+                pass
         
         conn.close()
-        return {
-            "session_id": session['session_id'],
-            "user_id": session['user_id'],
-            "created_at": session['created_at'],
-            "messages": messages
-        }
+        raise HTTPException(status_code=404, detail="Session not found")
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching session details: {str(e)}")

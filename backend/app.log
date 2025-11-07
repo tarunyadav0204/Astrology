@@ -1,0 +1,114 @@
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/google/api_core/_python_version_support.py:252: FutureWarning: You are using a Python version (3.9.6) past its end of life. Google will update google.api_core with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade to the latest Python version, or at least Python 3.10, and then update google.api_core.
+  warnings.warn(message, FutureWarning)
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py:167: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+  @validator('timezone')
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py:2691: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [83842]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+Warning: Could not initialize house combinations database: name 'init_house_combinations_db' is not defined
+An error occurred: module 'importlib.metadata' has no attribute 'packages_distributions'
+Loaded .env from: .env
+Loaded .env from: .env
+Loaded environment variables from .env file
+Database initialized successfully
+Starting Astrology API server on port 8001...
+Daily prediction engine initialized with updated rules
+House combinations and chat history databases initialized
+INFO:     127.0.0.1:49291 - "OPTIONS /api/me HTTP/1.1" 200 OK
+[2025-11-07 15:49:37] GET /api/me - Client: 127.0.0.1
+[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49291 - "GET /api/me HTTP/1.1" 200 OK
+[2025-11-07 15:49:37] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49293 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49298 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49300 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49301 - "OPTIONS /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49293 - "OPTIONS /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49291 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-07 15:49:37] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-07 15:49:37] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-07 15:49:37] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-07 15:49:37] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-07 15:49:37] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-07 15:49:37] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49296 - "GET /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 15:49:37] Response: 422 - Time: 0.01s
+[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-07 15:49:37] GET /api/panchang/hora - Client: 127.0.0.1
+[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49300 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:49301 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
+[2025-11-07 15:49:37] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49298 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49293 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49291 - "GET /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 15:49:37] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-07 15:49:37] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49296 - "GET /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 15:49:38] GET /logo192.png - Client: None
+[2025-11-07 15:49:38] Response: 404 - Time: 0.00s
+INFO:     None:0 - "GET /logo192.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49296 - "OPTIONS /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49291 - "OPTIONS /api/admin/subscription-plans HTTP/1.1" 200 OK
+[2025-11-07 15:49:41] GET /api/admin/users - Client: 127.0.0.1
+[2025-11-07 15:49:41] GET /api/admin/subscription-plans - Client: 127.0.0.1
+[2025-11-07 15:49:41] Response: 200 - Time: 0.02s
+[2025-11-07 15:49:41] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:49291 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /api/admin/subscription-plans HTTP/1.1" 200 OK
+[2025-11-07 15:49:42] GET /api/admin/chat/all-history - Client: None
+[2025-11-07 15:49:42] Response: 200 - Time: 0.02s
+INFO:     None:0 - "GET /api/admin/chat/all-history HTTP/1.1" 200 OK
+[2025-11-07 15:49:43] GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db - Client: None
+[2025-11-07 15:49:43] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db HTTP/1.1" 200 OK
+[2025-11-07 15:49:44] GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb - Client: None
+[2025-11-07 15:49:44] Response: 200 - Time: 0.02s
+INFO:     None:0 - "GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb HTTP/1.1" 200 OK
+[2025-11-07 15:49:49] GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf - Client: None
+[2025-11-07 15:49:49] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
+[2025-11-07 15:49:50] GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d - Client: None
+[2025-11-07 15:49:50] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d HTTP/1.1" 200 OK
+[2025-11-07 15:49:53] GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 - Client: None
+[2025-11-07 15:49:53] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 HTTP/1.1" 200 OK
+[2025-11-07 15:49:57] GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db - Client: None
+[2025-11-07 15:49:57] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db HTTP/1.1" 200 OK
+[2025-11-07 15:49:57] GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb - Client: None
+[2025-11-07 15:49:57] Response: 200 - Time: 0.02s
+INFO:     None:0 - "GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb HTTP/1.1" 200 OK
+[2025-11-07 15:49:58] GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf - Client: None
+[2025-11-07 15:49:58] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
+[2025-11-07 15:49:58] GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d - Client: None
+[2025-11-07 15:49:58] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d HTTP/1.1" 200 OK
+[2025-11-07 15:49:59] GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 - Client: None
+[2025-11-07 15:49:59] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 HTTP/1.1" 200 OK
+[2025-11-07 15:50:40] GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db - Client: None
+[2025-11-07 15:50:40] Response: 200 - Time: 0.01s
+INFO:     None:0 - "GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db HTTP/1.1" 200 OK
