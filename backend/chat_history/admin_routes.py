@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any
 import sqlite3
+import json
 from datetime import datetime
 from auth import get_current_user
 
@@ -56,17 +57,18 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get all sessions with user info
+        # Get new system sessions
         cursor.execute("""
             SELECT cs.session_id, cs.user_id, cs.created_at, u.name, u.phone,
                    (SELECT content FROM chat_messages 
                     WHERE session_id = cs.session_id 
                     AND sender = 'user' 
-                    ORDER BY timestamp ASC LIMIT 1) as preview
+                    ORDER BY timestamp ASC LIMIT 1) as preview,
+                   'new' as system_type
             FROM chat_sessions cs
             LEFT JOIN users u ON cs.user_id = u.userid
+            WHERE cs.created_at >= datetime('now', '-30 days')
             ORDER BY cs.created_at DESC
-            LIMIT 100
         """)
         
         sessions = []
@@ -77,11 +79,42 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                 'user_name': row['name'],
                 'user_phone': row['phone'],
                 'created_at': row['created_at'],
-                'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview']
+                'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview'],
+                'system_type': row['system_type']
             })
         
+        # Get old system conversations
+        cursor.execute("""
+            SELECT cc.birth_hash, cc.conversation_data, cc.updated_at,
+                   'old' as system_type
+            FROM chat_conversations cc
+            WHERE cc.updated_at >= datetime('now', '-30 days')
+            ORDER BY cc.updated_at DESC
+        """)
+        
+        for row in cursor.fetchall():
+            try:
+                conv_data = json.loads(row['conversation_data'])
+                messages = conv_data.get('messages', [])
+                if messages:
+                    first_question = messages[0].get('question', 'Chat conversation')
+                    sessions.append({
+                        'session_id': row['birth_hash'],
+                        'user_id': 'unknown',
+                        'user_name': 'Legacy User',
+                        'user_phone': 'N/A',
+                        'created_at': row['updated_at'],
+                        'preview': first_question[:100] + '...' if len(first_question) > 100 else first_question,
+                        'system_type': row['system_type']
+                    })
+            except:
+                pass
+        
+        # Sort all sessions by date
+        sessions.sort(key=lambda x: x['created_at'], reverse=True)
+        
         conn.close()
-        return {"sessions": sessions}
+        return {"sessions": sessions[:500]}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching all chat history: {str(e)}")
