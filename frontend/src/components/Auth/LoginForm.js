@@ -20,6 +20,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
@@ -368,26 +369,45 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
           }}>
             Password
           </label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            placeholder="Enter your password"
-            required
-            autoComplete="current-password"
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '2px solid rgba(233, 30, 99, 0.2)',
-              borderRadius: '12px',
-              fontSize: '16px',
-              background: 'rgba(255, 255, 255, 0.8)',
-              WebkitAppearance: 'none',
-              WebkitUserSelect: 'text',
-              WebkitTouchCallout: 'default'
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder="Enter your password"
+              required
+              autoComplete="current-password"
+              style={{
+                width: '100%',
+                padding: '0.75rem 3rem 0.75rem 0.75rem',
+                border: '2px solid rgba(233, 30, 99, 0.2)',
+                borderRadius: '12px',
+                fontSize: '16px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                WebkitAppearance: 'none',
+                WebkitUserSelect: 'text',
+                WebkitTouchCallout: 'default'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                color: '#666'
+              }}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
         </div>
 
         <button

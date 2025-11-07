@@ -1,0 +1,107 @@
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/google/api_core/_python_version_support.py:252: FutureWarning: You are using a Python version (3.9.6) past its end of life. Google will update google.api_core with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade to the latest Python version, or at least Python 3.10, and then update google.api_core.
+  warnings.warn(message, FutureWarning)
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+INFO:     Started server process [34929]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+Warning: Could not initialize house combinations database: name 'init_house_combinations_db' is not defined
+An error occurred: module 'importlib.metadata' has no attribute 'packages_distributions'
+Loaded .env from: .env
+Loaded .env from: .env
+Loaded environment variables from .env file
+Database initialized successfully
+Daily prediction engine initialized with updated rules
+House combinations and chat history databases initialized
+[2025-11-07 10:47:28] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-07 10:47:28] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:63255 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63260 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63261 - "OPTIONS /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63262 - "OPTIONS /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63263 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 10:47:28] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-07 10:47:28] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+INFO:     127.0.0.1:63253 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-07 10:47:28] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-07 10:47:28] Response: 200 - Time: 0.00s
+[2025-11-07 10:47:28] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-07 10:47:28] Response: 422 - Time: 0.01s
+[2025-11-07 10:47:28] Response: 200 - Time: 0.01s
+[2025-11-07 10:47:28] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:63263 - "GET /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63260 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:63255 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-07 10:47:28] GET /api/panchang/hora - Client: 127.0.0.1
+INFO:     127.0.0.1:63262 - "GET /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 10:47:28] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:63253 - "GET /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 10:47:29] GET /favicon.ico - Client: None
+[2025-11-07 10:47:29] Response: 404 - Time: 0.00s
+INFO:     None:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+[2025-11-07 10:47:29] GET /logo192.png - Client: None
+[2025-11-07 10:47:29] Response: 404 - Time: 0.00s
+INFO:     None:0 - "GET /logo192.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63342 - "OPTIONS /api/login HTTP/1.1" 200 OK
+[2025-11-07 10:47:51] POST /api/login - Client: 127.0.0.1
+[2025-11-07 10:47:51] Response: 200 - Time: 0.24s
+INFO:     127.0.0.1:63342 - "POST /api/login HTTP/1.1" 200 OK
+[2025-11-07 10:47:51] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-07 10:47:51] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:63344 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63349 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63350 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63351 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63352 - "OPTIONS /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63344 - "OPTIONS /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63349 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63342 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-07 10:47:51] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-07 10:47:51] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-07 10:47:51] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-07 10:47:51] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-07 10:47:51] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-07 10:47:51] Response: 200 - Time: 0.04s
+[2025-11-07 10:47:51] Response: 422 - Time: 0.04s
+[2025-11-07 10:47:51] Response: 200 - Time: 0.04s
+INFO:     127.0.0.1:63352 - "GET /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-07 10:47:51] GET /api/panchang/hora - Client: 127.0.0.1
+[2025-11-07 10:47:51] Response: 200 - Time: 0.04s
+INFO:     127.0.0.1:63351 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:63350 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-07 10:47:51] Response: 200 - Time: 0.04s
+[2025-11-07 10:47:51] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:63344 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63349 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63342 - "GET /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-07 10:47:51] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-07 10:47:51] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:63352 - "GET /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64824 - "OPTIONS /api/admin/users HTTP/1.1" 200 OK
+[2025-11-07 10:57:01] GET /api/admin/users - Client: 127.0.0.1
+[2025-11-07 10:57:01] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64824 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64824 - "OPTIONS /api/admin/chat/history/2 HTTP/1.1" 200 OK
+[2025-11-07 10:57:02] GET /api/admin/chat/history/2 - Client: 127.0.0.1
+[2025-11-07 10:57:02] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64824 - "GET /api/admin/chat/history/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64824 - "OPTIONS /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
+[2025-11-07 10:57:03] GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf - Client: 127.0.0.1
+[2025-11-07 10:57:03] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64824 - "GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
+[2025-11-07 10:57:53] GET /api/admin/users - Client: 127.0.0.1
+[2025-11-07 10:57:53] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64969 - "GET /api/admin/users HTTP/1.1" 200 OK
+[2025-11-07 10:57:55] GET /api/admin/chat/history/2 - Client: 127.0.0.1
+[2025-11-07 10:57:55] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64969 - "GET /api/admin/chat/history/2 HTTP/1.1" 200 OK
+[2025-11-07 10:57:56] GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf - Client: 127.0.0.1
+[2025-11-07 10:57:56] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64969 - "GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
