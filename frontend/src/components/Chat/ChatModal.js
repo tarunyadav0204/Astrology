@@ -75,7 +75,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
     const createSession = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:8001/api/chat/session', {
+            const response = await fetch('/api/chat/session', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -97,7 +97,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
     const saveMessage = async (sessionId, sender, content) => {
         try {
             const token = localStorage.getItem('token');
-            await fetch('http://localhost:8001/api/chat/message', {
+            await fetch('/api/chat/message', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -184,13 +184,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         }, 3000);
 
         try {
+            console.log('Sending chat request:', { ...birthData, question: message });
             const response = await fetch('/api/chat/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...birthData, question: message })
             });
 
-            if (!response.ok) throw new Error('Network response was not ok');
+            console.log('Chat response status:', response.status);
+            if (!response.ok) {
+                console.error('Chat API error:', response.status, response.statusText);
+                throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+            }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -227,11 +232,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                         if (data === '[DONE]') break;
                         if (data && data.length > 0) {
                             try {
-                                const parsed = JSON.parse(data);
-                                console.log('Parsed response:', parsed);
+                                const cleanData = data.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+                                const parsed = JSON.parse(cleanData);
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
-                                    // Ensure response is not empty
                                     const responseText = parsed.response.trim();
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
@@ -242,31 +246,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                                     : msg
                                             );
                                         });
-                                        
-                                        // Save assistant message
                                         await saveMessage(currentSessionId, 'assistant', responseText);
-                                        
-                                        // Scroll to message
-                                        setTimeout(() => {
-                                            const assistantMessages = document.querySelectorAll('.message-bubble.assistant');
-                                            const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
-                                            if (lastAssistantMessage) {
-                                                lastAssistantMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                            }
-                                        }, 100);
-                                    } else {
-                                        console.warn('Empty response received');
-                                        assistantMessage.content = 'I received your question but my response seems to be empty. Please try asking again.';
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
                                     }
                                 } else if (parsed.status === 'error') {
-                                    console.error('AI Error:', parsed.error);
                                     assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
                                     setMessages(prev => {
                                         return prev.map(msg => 
@@ -275,25 +257,22 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                                 : msg
                                         );
                                     });
-                                } else if (parsed.status === 'processing') {
-                                    console.log('Backend processing (ignored):', parsed.message);
                                 }
                             } catch (e) {
-                                console.warn('JSON parse error:', e.message, 'Data:', data.substring(0, 100));
-                                // Try to handle as plain text if JSON parsing fails
-                                if (data.includes('response') && data.includes('complete')) {
-                                    console.log('Attempting to extract response from malformed JSON');
-                                    const responseMatch = data.match(/"response"\s*:\s*"([^"]+)"/); 
-                                    if (responseMatch && responseMatch[1]) {
-                                        assistantMessage.content = responseMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
-                                    }
+                                const statusMatch = data.match(/"status"\s*:\s*"([^"]+)"/);
+                                const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                                
+                                if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
+                                    const response = responseMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                                    assistantMessage.content = response;
+                                    setMessages(prev => {
+                                        return prev.map(msg => 
+                                            msg.id === assistantMessage.id 
+                                                ? { ...assistantMessage }
+                                                : msg
+                                        );
+                                    });
+                                    await saveMessage(currentSessionId, 'assistant', response);
                                 }
                             }
                         }
@@ -303,13 +282,24 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         } catch (error) {
             console.error('Error sending message:', error);
             clearInterval(loadingInterval);
+            
+            let errorMessage = 'Sorry, I encountered an error. Please try again.';
+            
+            if (error.message.includes('404')) {
+                errorMessage = 'Chat service is temporarily unavailable. Please try again later.';
+            } else if (error.message.includes('500')) {
+                errorMessage = 'Server error occurred. Please try again in a few moments.';
+            } else if (error.message.includes('Network')) {
+                errorMessage = 'Network connection issue. Please check your internet and try again.';
+            }
+            
             setMessages(prev => {
                 return prev.map(msg => 
                     msg.id === typingMessageId 
                         ? { 
                             id: Date.now(),
                             role: 'assistant', 
-                            content: 'Sorry, I encountered an error. Please try again.', 
+                            content: errorMessage, 
                             timestamp: new Date().toISOString() 
                         }
                         : msg

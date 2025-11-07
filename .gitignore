@@ -120,3 +120,6 @@ venv.bak/
 
 # Astrology specific
 astrology.db
+# Log files
+backend/backend.log
+frontend/frontend.log
