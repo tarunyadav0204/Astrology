@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 import swisseph as swe
 import sqlite3
 import os
@@ -159,6 +159,16 @@ class BirthData(BaseModel):
     timezone: str
     place: str = ""
     gender: str = ""
+    
+    class Config:
+        # Allow string coercion for timezone field
+        str_strip_whitespace = True
+        
+    @validator('timezone')
+    def validate_timezone(cls, v):
+        if v is None:
+            return "UTC+5:30"  # Default to IST
+        return str(v).strip()
 
 class TransitRequest(BaseModel):
     birth_data: BirthData
