@@ -9,14 +9,14 @@ const AdminChatHistory = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
+    fetchAllChatHistory();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchAllChatHistory = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/admin/users', {
+      const response = await fetch('/api/admin/chat/all-history', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -25,10 +25,10 @@ const AdminChatHistory = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.users || []);
+        setSessions(data.sessions || []);
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching all chat history:', error);
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ const AdminChatHistory = () => {
   const fetchSessionDetails = async (sessionId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/admin/chat/session/${sessionId}`, {
+      const response = await fetch(`/api/admin/chat/session/${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -109,45 +109,28 @@ const AdminChatHistory = () => {
       <h2>User Chat History</h2>
       
       <div className="admin-chat-content">
-        <div className="users-list">
-          <h3>Users</h3>
-          {loading && !selectedUser ? (
-            <div className="loading">Loading users...</div>
+        <div className="sessions-list">
+          <h3>All Chat Sessions</h3>
+          {loading ? (
+            <div className="loading">Loading chat history...</div>
+          ) : sessions.length === 0 ? (
+            <div className="no-sessions">No chat sessions found</div>
           ) : (
-            users.map(user => (
+            sessions.map(session => (
               <div 
-                key={user.userid}
-                className={`user-card ${selectedUser === user.userid ? 'active' : ''}`}
-                onClick={() => fetchUserChatHistory(user.userid)}
+                key={session.session_id}
+                className={`session-card ${selectedSession?.session_id === session.session_id ? 'active' : ''}`}
+                onClick={() => fetchSessionDetails(session.session_id)}
               >
-                <div className="user-name">{user.name || user.phone}</div>
-                <div className="user-phone">{user.phone}</div>
+                <div className="session-user">
+                  <strong>{session.user_name || 'Unknown'}</strong> ({session.user_phone})
+                </div>
+                <div className="session-date">{formatDate(session.created_at)}</div>
+                <div className="session-preview">{session.preview || 'Chat session'}</div>
               </div>
             ))
           )}
         </div>
-
-        {selectedUser && (
-          <div className="sessions-list">
-            <h3>Chat Sessions</h3>
-            {loading ? (
-              <div className="loading">Loading sessions...</div>
-            ) : sessions.length === 0 ? (
-              <div className="no-sessions">No chat sessions found</div>
-            ) : (
-              sessions.map(session => (
-                <div 
-                  key={session.session_id}
-                  className={`session-card ${selectedSession?.session_id === session.session_id ? 'active' : ''}`}
-                  onClick={() => fetchSessionDetails(session.session_id)}
-                >
-                  <div className="session-date">{formatDate(session.created_at)}</div>
-                  <div className="session-preview">{session.preview || 'Chat session'}</div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
 
         {selectedSession && (
           <div className="session-details">

@@ -49,6 +49,43 @@ async def get_user_chat_history(user_id: int, current_user: dict = Depends(requi
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching chat history: {str(e)}")
 
+@router.get("/admin/chat/all-history")
+async def get_all_chat_history(current_user: dict = Depends(require_admin)):
+    """Get chat history for all users (admin only)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get all sessions with user info
+        cursor.execute("""
+            SELECT cs.session_id, cs.user_id, cs.created_at, u.name, u.phone,
+                   (SELECT content FROM chat_messages 
+                    WHERE session_id = cs.session_id 
+                    AND sender = 'user' 
+                    ORDER BY timestamp ASC LIMIT 1) as preview
+            FROM chat_sessions cs
+            LEFT JOIN users u ON cs.user_id = u.userid
+            ORDER BY cs.created_at DESC
+            LIMIT 100
+        """)
+        
+        sessions = []
+        for row in cursor.fetchall():
+            sessions.append({
+                'session_id': row['session_id'],
+                'user_id': row['user_id'],
+                'user_name': row['name'],
+                'user_phone': row['phone'],
+                'created_at': row['created_at'],
+                'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview']
+            })
+        
+        conn.close()
+        return {"sessions": sessions}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching all chat history: {str(e)}")
+
 @router.get("/admin/chat/session/{session_id}")
 async def get_session_details(session_id: str, current_user: dict = Depends(require_admin)):
     """Get detailed messages for a specific session (admin only)"""
