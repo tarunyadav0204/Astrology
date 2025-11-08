@@ -3,6 +3,7 @@ import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
+import { showToast } from '../../utils/toast';
 
 import './ChatModal.css';
 
@@ -15,6 +16,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
     const [language, setLanguage] = useState('english');
     const [responseStyle, setResponseStyle] = useState('detailed');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [hoveredMessage, setHoveredMessage] = useState(null);
+    const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
+    const [copySuccess, setCopySuccess] = useState(false);
     
     const getNextLanguage = (current) => {
         const languages = ['english', 'hindi', 'telugu', 'gujarati', 'tamil'];
@@ -503,6 +507,30 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMobileMenu]);
     
+    const handleCopyMessage = async () => {
+        if (!hoveredMessage) return;
+        
+        try {
+            const cleanText = hoveredMessage.content
+                .replace(/\*\*(.*?)\*\*/g, '$1')
+                .replace(/\*(.*?)\*/g, '$1')
+                .replace(/###\s*(.*?)$/gm, '$1')
+                .replace(/<div class="quick-answer-card">(.*?)<\/div>/g, '$1')
+                .replace(/<div class="final-thoughts-card">(.*?)<\/div>/g, '$1')
+                .replace(/•\s*/g, '• ')
+                .replace(/\n\s*\n/g, '\n\n')
+                .trim();
+                
+            await navigator.clipboard.writeText(cleanText);
+            setCopySuccess(true);
+            showToast('Message copied!', 'success');
+            setTimeout(() => setCopySuccess(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            showToast('Copy failed', 'error');
+        }
+    };
+    
     if (!isOpen) return null;
 
     return (
@@ -618,7 +646,46 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                     ) : (
                         <>
                             <div className="chat-messages">
-                                <MessageList messages={messages} language={language} />
+                                <MessageList 
+                                    messages={messages} 
+                                    language={language} 
+                                    onMessageHover={(message, element) => {
+                                        setHoveredMessage(message);
+                                        if (message && element) {
+                                            const rect = element.getBoundingClientRect();
+                                            setButtonPosition({
+                                                top: rect.top + 5,
+                                                left: rect.left - 10
+                                            });
+                                        }
+                                    }}
+                                />
+                                {hoveredMessage && (
+                                    <button 
+                                        className="floating-copy-btn"
+                                        onClick={handleCopyMessage}
+                                        onMouseEnter={() => setHoveredMessage(hoveredMessage)}
+                                        title="Copy message"
+                                        style={{
+                                            position: 'fixed',
+                                            top: `${buttonPosition.top}px`,
+                                            left: `${buttonPosition.left}px`,
+                                            zIndex: 10001,
+                                            background: '#e91e63',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            width: 'auto',
+                                            height: 'auto'
+                                        }}
+                                    >
+                                        {copySuccess ? 'Copied!' : 'Copy'}
+                                    </button>
+                                )}
                             </div>
                             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
                         </>

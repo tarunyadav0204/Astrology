@@ -1,11 +1,17 @@
 import React from 'react';
 import MessageBubble from './MessageBubble';
 
-const MessageList = ({ messages, language = 'english' }) => {
+const MessageList = ({ messages, language = 'english', onMessageHover }) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
-                <MessageBubble key={message.id || index} message={message} language={language} />
+                <div 
+                    key={message.id || index}
+                    onMouseEnter={(e) => onMessageHover && onMessageHover(message, e.currentTarget)}
+                    onMouseLeave={() => onMessageHover && onMessageHover(null, null)}
+                >
+                    <MessageBubble message={message} language={language} />
+                </div>
             ))}
         </div>
     );

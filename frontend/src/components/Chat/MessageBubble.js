@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import textToSpeech from '../../utils/textToSpeech';
+import { showToast } from '../../utils/toast';
 
 const MessageBubble = ({ message, language = 'english' }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -8,6 +9,8 @@ const MessageBubble = ({ message, language = 'english' }) => {
     const [voices, setVoices] = useState([]);
     const [currentChunk, setCurrentChunk] = useState(0);
     const [totalChunks, setTotalChunks] = useState(0);
+    const [showActions, setShowActions] = useState(false);
+    const messageRef = useRef(null);
     
     React.useEffect(() => {
         const loadVoices = () => {
@@ -74,6 +77,71 @@ const MessageBubble = ({ message, language = 'english' }) => {
             }
         }
     }, [language, voices, selectedVoice]);
+    
+    const cleanTextForCopy = (content) => {
+        return content
+            .replace(/\*\*(.*?)\*\*/g, '$1')     // Remove bold
+            .replace(/\*(.*?)\*/g, '$1')       // Remove italics
+            .replace(/###\s*(.*?)$/gm, '$1')   // Remove headers
+            .replace(/<div class="quick-answer-card">(.*?)<\/div>/g, '$1') // Remove quick answer wrapper
+            .replace(/<div class="final-thoughts-card">(.*?)<\/div>/g, '$1') // Remove final thoughts wrapper
+            .replace(/•\s*/g, '• ')            // Normalize bullets
+            .replace(/\n\s*\n/g, '\n\n')       // Normalize line breaks
+            .trim();
+    };
+    
+    const handleWhatsAppShare = () => {
+        const cleanText = cleanTextForCopy(message.content);
+        const shareText = `🔮 *AstroRoshni Prediction*\n\n${cleanText}\n\n_Shared from AstroRoshni App_`;
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+        window.open(whatsappUrl, '_blank');
+        showToast('Opening WhatsApp...', 'success');
+        setShowActions(false);
+    };
+    
+    const handleLongPress = () => {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(50);
+        }
+        setShowActions(true);
+    };
+    
+    const isMobile = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    };
+    
+    // Close actions menu when clicking outside on mobile
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showActions && isMobile() && !event.target.closest('.message-actions')) {
+                setShowActions(false);
+            }
+        };
+        
+        if (showActions && isMobile()) {
+            document.addEventListener('touchstart', handleClickOutside);
+            return () => document.removeEventListener('touchstart', handleClickOutside);
+        }
+    }, [showActions]);
+    
+    // Show actions only on mobile for WhatsApp sharing
+    React.useEffect(() => {
+        if (!isMobile()) return;
+        
+        const messageElement = messageRef.current;
+        if (!messageElement) return;
+        
+        const handleMouseEnter = () => setShowActions(true);
+        const handleMouseLeave = () => setShowActions(false);
+        
+        messageElement.addEventListener('mouseenter', handleMouseEnter);
+        messageElement.addEventListener('mouseleave', handleMouseLeave);
+        
+        return () => {
+            messageElement.removeEventListener('mouseenter', handleMouseEnter);
+            messageElement.removeEventListener('mouseleave', handleMouseLeave);
+        };
+    }, []);
     const formatContent = (content) => {
         // First, normalize line breaks
         let formatted = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -218,7 +286,25 @@ const MessageBubble = ({ message, language = 'english' }) => {
     };
 
     return (
-        <div className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''}`}>
+        <div 
+            ref={messageRef}
+            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''}`}
+            onTouchStart={isMobile() ? handleLongPress : undefined}
+            onClick={() => isMobile() && showActions && setShowActions(false)}
+        >
+            {/* Action buttons */}
+            {showActions && !message.isTyping && isMobile() && (
+                <div className="message-actions">
+                    <button 
+                        className="action-btn whatsapp-btn"
+                        onClick={handleWhatsAppShare}
+                        title="Share on WhatsApp"
+                    >
+                        📱
+                    </button>
+                </div>
+            )}
+            
             <div className="message-content">
                 {message.role === 'assistant' && !message.isTyping && textToSpeech.isSupported && message.content && (
                     <div style={{ clearfix: 'both', marginBottom: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

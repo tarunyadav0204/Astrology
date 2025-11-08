@@ -201,7 +201,7 @@ Provide ONLY a Quick Answer section (2-3 sentences max) with:
 - Age-appropriate guidance
 
 Do NOT include detailed analysis, multiple sections, or extensive explanations.
-Format: **Quick Answer**: [Direct response with key insight and one classical reference]
+Format: <div class="quick-answer-card">**Quick Answer**: [Direct response with key insight and one classical reference]</div>
 
 """
         else:
@@ -209,7 +209,7 @@ Format: **Quick Answer**: [Direct response with key insight and one classical re
 RESPONSE FORMAT - DETAILED MODE:
 Start with Quick Answer (2-3 sentences) then provide full analysis:
 
-**Quick Answer**: [Direct response with key insight and classical reference]
+<div class="quick-answer-card">**Quick Answer**: [Direct response with key insight and classical reference]</div>
 
 ### [Continue with full detailed sections as normal]
 
@@ -407,7 +407,7 @@ Structure your response with:
 5. **Key Insights** - Bullet points with supporting classical authorities
 6. ### Classical Authority - MANDATORY section citing specific texts, chapters, and verses
 7. ### Timing & Guidance - Age-appropriate recommendations with classical timing methods
-8. **Final Thoughts** - Balanced conclusion with classical wisdom, realistic outlook, and life stage awareness
+8. <div class="final-thoughts-card">**Final Thoughts** - Balanced conclusion with classical wisdom, realistic outlook, and life stage awareness</div>
 
 Remember: Be conversational yet structured, insightful yet accessible. Use formatting to make complex astrological information easy to read and visually appealing.
 """
