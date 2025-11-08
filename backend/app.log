@@ -722,3 +722,36 @@ INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
 [2025-11-08 21:38:46] POST /api/chat/message - Client: None
 [2025-11-08 21:38:47] Response: 200 - Time: 0.01s
 INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-08 21:44:06] POST /api/chat/message - Client: None
+[2025-11-08 21:44:06] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-08 21:44:06] POST /api/chat/ask - Client: None
+
+=== STREAMING STARTED ===
+Request question: When is a good time for marriage?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender=None question='When is a good time for marriage?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: When is a good time for marriage?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': None}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: When is a good time for marriage?
+Prompt length: 145074 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 11237 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: The period of **Saturn Mahadasha** and **Venus Antardasha**, commencing around December 2025 and extending until February 2029, presents a significant ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 11237
+Response preview: <div class="quick-answer-card">**Quick Answer**: The period of **Saturn Mahadasha** and **Venus Anta...
+[2025-11-08 21:44:38] Response: 200 - Time: 32.08s
+INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-08 21:44:38] POST /api/chat/message - Client: None
+[2025-11-08 21:44:38] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK

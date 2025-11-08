@@ -146,7 +146,17 @@ const MessageBubble = ({ message, language = 'english' }) => {
         // First, normalize line breaks
         let formatted = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         
-        // Process headers first with symbols
+        // Handle Final Thoughts section specially
+        formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
+            const cleanContent = finalThoughts
+                .replace(/### Final Thoughts\n?/, '')
+                .replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>')
+                .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>')
+                .trim();
+            return `<div class="final-thoughts-card"><strong>Final Thoughts</strong><br><br>${cleanContent}</div>`;
+        });
+        
+        // Process other headers with symbols
         formatted = formatted.replace(/### (.*?)\n/g, '<h3 class="chat-header">◆ $1 ◆</h3>\n\n');
         
         // Process bold text
@@ -161,6 +171,11 @@ const MessageBubble = ({ message, language = 'english' }) => {
         return paragraphs.map(paragraph => {
             paragraph = paragraph.trim();
             if (!paragraph) return '';
+            
+            // Skip if already processed as final-thoughts-card
+            if (paragraph.includes('final-thoughts-card')) {
+                return paragraph;
+            }
             
             // Check if it's a numbered list paragraph
             if (/^\d+\./m.test(paragraph)) {
