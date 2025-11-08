@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import textToSpeech from '../../utils/textToSpeech';
 
-const MessageBubble = ({ message }) => {
+const MessageBubble = ({ message, language = 'english' }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [hasError, setHasError] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState(null);
@@ -26,6 +26,54 @@ const MessageBubble = ({ message }) => {
         loadVoices();
         window.speechSynthesis.onvoiceschanged = loadVoices;
     }, [selectedVoice]);
+    
+    // Auto-select appropriate voice based on language
+    React.useEffect(() => {
+        if (voices.length > 0) {
+            if (language === 'hindi') {
+                const hindiVoice = voices.find(voice => 
+                    voice.lang.startsWith('hi') || 
+                    voice.name.toLowerCase().includes('hindi') ||
+                    voice.name.toLowerCase().includes('devanagari')
+                );
+                if (hindiVoice && selectedVoice !== hindiVoice) {
+                    setSelectedVoice(hindiVoice);
+                }
+            } else if (language === 'telugu') {
+                const teluguVoice = voices.find(voice => 
+                    voice.lang.startsWith('te') || 
+                    voice.name.toLowerCase().includes('telugu')
+                );
+                if (teluguVoice && selectedVoice !== teluguVoice) {
+                    setSelectedVoice(teluguVoice);
+                }
+            } else if (language === 'gujarati') {
+                const gujaratiVoice = voices.find(voice => 
+                    voice.lang.startsWith('gu') || 
+                    voice.name.toLowerCase().includes('gujarati')
+                );
+                if (gujaratiVoice && selectedVoice !== gujaratiVoice) {
+                    setSelectedVoice(gujaratiVoice);
+                }
+            } else if (language === 'tamil') {
+                const tamilVoice = voices.find(voice => 
+                    voice.lang.startsWith('ta') || 
+                    voice.name.toLowerCase().includes('tamil')
+                );
+                if (tamilVoice && selectedVoice !== tamilVoice) {
+                    setSelectedVoice(tamilVoice);
+                }
+            } else {
+                const englishVoice = voices.find(voice => 
+                    voice.name.includes('Google US English') || 
+                    (voice.lang === 'en-US' && voice.name.includes('Google'))
+                );
+                if (englishVoice && selectedVoice !== englishVoice) {
+                    setSelectedVoice(englishVoice);
+                }
+            }
+        }
+    }, [language, voices, selectedVoice]);
     const formatContent = (content) => {
         // First, normalize line breaks
         let formatted = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');

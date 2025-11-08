@@ -41,7 +41,7 @@ class GeminiChatAnalyzer:
         if not self.model:
             raise ValueError("No available Gemini model found")
     
-    def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None) -> Dict[str, Any]:
+    def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english') -> Dict[str, Any]:
         """Generate chat response using astrological context"""
         
         # Add current date context and calculate native's age
@@ -70,7 +70,7 @@ class GeminiChatAnalyzer:
             'note': 'Use this for reference only. Do not assume transit positions.'
         }
         
-        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [])
+        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language)
         
         print(f"\n=== SENDING TO AI ===")
         print(f"Question: {user_question}")
@@ -117,7 +117,7 @@ class GeminiChatAnalyzer:
                 'error': str(e)
             }
     
-    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict]) -> str:
+    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english') -> str:
         """Create comprehensive chat prompt for Gemini"""
         
         history_text = ""
@@ -141,7 +141,56 @@ class GeminiChatAnalyzer:
                 return obj.isoformat()
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
         
-        return f"""You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
+        # Language-specific instructions
+        language_instruction = ""
+        if language == 'hindi':
+            language_instruction = """LANGUAGE REQUIREMENT - CRITICAL:
+You MUST respond in HINDI (हिंदी) language. Use Devanagari script throughout your response.
+- Write all explanations in Hindi
+- Use Hindi astrological terms: ग्रह (planets), राशि (signs), भाव (houses), दशा (dasha), योग (yoga)
+- Classical text names in Hindi: बृहत् पाराशर होरा शास्त्र, फलदीपिका, सारावली
+- Keep technical terms in Sanskrit but explain in Hindi
+- Use respectful Hindi addressing: आपका, आपके लिए
+- Structure should remain the same but content in Hindi
+
+"""
+        elif language == 'telugu':
+            language_instruction = """LANGUAGE REQUIREMENT - CRITICAL:
+You MUST respond in TELUGU (తెలుగు) language. Use Telugu script throughout your response.
+- Write all explanations in Telugu
+- Use Telugu astrological terms: గ్రహాలు (planets), రాశిలు (signs), భావాలు (houses), దశ (dasha), యోగాలు (yogas)
+- Classical text names in Telugu: బృహత్ పారాశర హోరా శాస్త్రం, ఫలదీపిక, సారావళి
+- Keep technical terms in Sanskrit but explain in Telugu
+- Use respectful Telugu addressing: మీ (మీరు), మీ కోసం
+- Structure should remain the same but content in Telugu
+
+"""
+        elif language == 'gujarati':
+            language_instruction = """LANGUAGE REQUIREMENT - CRITICAL:
+You MUST respond in GUJARATI (ગુજરાતી) language. Use Gujarati script throughout your response.
+- Write all explanations in Gujarati
+- Use Gujarati astrological terms: ગ્રહો (planets), રાશિઓ (signs), ભાવો (houses), દશા (dasha), યોગો (yogas)
+- Classical text names in Gujarati: બ્રુહત્ પારાશર હોરા શાસ્ત્ર, ફળદીપિકા, સારાવળી
+- Keep technical terms in Sanskrit but explain in Gujarati
+- Use respectful Gujarati addressing: તમારા, તમારા માટે
+- Structure should remain the same but content in Gujarati
+
+"""
+        elif language == 'tamil':
+            language_instruction = """LANGUAGE REQUIREMENT - CRITICAL:
+You MUST respond in TAMIL (தமிழ்) language. Use Tamil script throughout your response.
+- Write all explanations in Tamil
+- Use Tamil astrological terms: கிரகங்கள் (planets), ராசிகள் (signs), பாவங்கள் (houses), தசை (dasha), யோகங்கள் (yogas)
+- Classical text names in Tamil: பிருஹத் பாராசர ஹோரா சாஸ்திரம், பலதீபிகா, சாராவளி
+- Keep technical terms in Sanskrit but explain in Tamil
+- Use respectful Tamil addressing: உங்கள், உங்களுக்காக
+- Structure should remain the same but content in Tamil
+
+"""
+        else:
+            language_instruction = "LANGUAGE: Respond in English.\n\n"
+        
+        return f"""{language_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
 
 CLASSICAL TEXT REFERENCES - MANDATORY REQUIREMENT:
 You MUST reference classical Vedic texts to support your predictions and analysis. Use these authoritative sources:

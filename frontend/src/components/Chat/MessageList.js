@@ -1,11 +1,11 @@
 import React from 'react';
 import MessageBubble from './MessageBubble';
 
-const MessageList = ({ messages }) => {
+const MessageList = ({ messages, language = 'english' }) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
-                <MessageBubble key={message.id || index} message={message} />
+                <MessageBubble key={message.id || index} message={message} language={language} />
             ))}
         </div>
     );

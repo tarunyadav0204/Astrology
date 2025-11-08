@@ -12,6 +12,24 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId, setSessionId] = useState(null);
+    const [language, setLanguage] = useState('english');
+    
+    const getNextLanguage = (current) => {
+        const languages = ['english', 'hindi', 'telugu', 'gujarati', 'tamil'];
+        const currentIndex = languages.indexOf(current);
+        return languages[(currentIndex + 1) % languages.length];
+    };
+    
+    const getLanguageDisplay = (lang) => {
+        switch(lang) {
+            case 'english': return '🇺🇸 English';
+            case 'hindi': return '🇮🇳 हिंदी';
+            case 'telugu': return '🇮🇳 తెలుగు';
+            case 'gujarati': return '🇮🇳 ગુજરાતી';
+            case 'tamil': return '🇮🇳 தமிழ்';
+            default: return '🇺🇸 English';
+        }
+    };
     const messagesEndRef = useRef(null);
     
     // Use initial birth data if provided
@@ -185,11 +203,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         }, 3000);
 
         try {
-            console.log('Sending chat request:', { ...birthData, question: message });
+            console.log('Sending chat request:', { ...birthData, question: message, language });
             const response = await fetch('/api/chat/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...birthData, question: message })
+                body: JSON.stringify({ ...birthData, question: message, language })
             });
 
             console.log('Chat response status:', response.status);
@@ -315,6 +333,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         setShowBirthForm(false);
     };
 
+    // Cleanup speech when modal closes
+    React.useEffect(() => {
+        if (!isOpen) {
+            window.speechSynthesis.cancel();
+        }
+    }, [isOpen]);
+    
     if (!isOpen) return null;
 
     return (
@@ -322,24 +347,41 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
             <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
                     <h2>AstroRoshni - Your Personal Astrologer</h2>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
-                        <button 
-                            onClick={() => setShowBirthForm(true)}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            👤 Change Person
-                        </button>
-
-                        <button className="close-btn" onClick={onClose}>×</button>
-                    </div>
+                    <button 
+                        onClick={() => setLanguage(getNextLanguage(language))}
+                        style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            position: 'absolute',
+                            right: '200px',
+                            top: '20px'
+                        }}
+                    >
+                        {getLanguageDisplay(getNextLanguage(language))}
+                    </button>
+                    <button 
+                        onClick={() => setShowBirthForm(true)}
+                        style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            position: 'absolute',
+                            right: '70px',
+                            top: '20px'
+                        }}
+                    >
+                        👤 Change Person
+                    </button>
+                    <button className="close-btn" onClick={onClose}>×</button>
                 </div>
                 
                 <div className="chat-modal-content">
@@ -353,7 +395,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                     ) : (
                         <>
                             <div className="chat-messages">
-                                <MessageList messages={messages} />
+                                <MessageList messages={messages} language={language} />
                             </div>
                             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
                         </>
