@@ -213,6 +213,15 @@ Start with Quick Answer (2-3 sentences) then provide full analysis:
 
 ### [Continue with full detailed sections as normal]
 
+FOLLOW-UP QUESTIONS - MANDATORY:
+End your response with 3-4 relevant follow-up questions in this exact format:
+<div class="follow-up-questions">
+📅 When will this happen?
+🔮 What remedies can help?
+💼 How to maximize success?
+🌟 What should I focus on?
+</div>
+
 """
         
         return f"""{language_instruction}{response_format_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.

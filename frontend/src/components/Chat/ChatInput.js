@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const ChatInput = ({ onSendMessage, isLoading }) => {
+const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {} }) => {
     const [message, setMessage] = useState('');
+    
+    useEffect(() => {
+        if (followUpQuestion) {
+            setMessage(followUpQuestion);
+            onFollowUpUsed();
+        }
+    }, [followUpQuestion, onFollowUpUsed]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -43,6 +50,7 @@ const ChatInput = ({ onSendMessage, isLoading }) => {
                     placeholder={isLoading ? "Analyzing your chart..." : "Ask me about your birth chart..."}
                     disabled={isLoading}
                     className="chat-input"
+
                 />
                 <button 
                     type="submit" 

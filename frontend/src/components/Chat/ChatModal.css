@@ -276,7 +276,7 @@
     border-radius: 16px;
     padding: 20px 24px;
     margin: 16px 0 24px 0;
-    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     position: relative;
     backdrop-filter: blur(10px);
     color: #2c1810 !important;
@@ -305,7 +305,7 @@
 }
 
 .quick-answer-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     box-shadow: 0 12px 40px rgba(255, 215, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -344,7 +344,7 @@
     border-radius: 16px;
     padding: 20px 24px;
     margin: 24px 0 16px 0;
-    box-shadow: 0 8px 32px rgba(173, 216, 230, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 16px rgba(173, 216, 230, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     position: relative;
     backdrop-filter: blur(10px);
     color: #2c3e50 !important;
@@ -394,7 +394,7 @@
 }
 
 .final-thoughts-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     box-shadow: 0 12px 40px rgba(173, 216, 230, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -930,6 +930,45 @@
         font-size: 18px;
         border-radius: 12px;
     }
+}
+
+/* Follow-up Questions Styling */
+.follow-up-questions {
+    margin: 16px 0 8px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.follow-up-btn {
+    background: rgba(248, 250, 252, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #334155;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-weight: 500;
+}
+
+.follow-up-btn:hover {
+    background: rgba(241, 245, 249, 1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.user .follow-up-btn {
+    background: rgba(255, 107, 53, 0.9);
+    border-color: rgba(255, 107, 53, 0.3);
+    color: white;
+}
+
+.user .follow-up-btn:hover {
+    background: rgba(255, 107, 53, 1);
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
 }
 
 /* Desktop improvements */

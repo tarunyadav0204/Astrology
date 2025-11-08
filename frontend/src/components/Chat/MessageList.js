@@ -1,7 +1,7 @@
 import React from 'react';
 import MessageBubble from './MessageBubble';
 
-const MessageList = ({ messages, language = 'english', onMessageHover }) => {
+const MessageList = ({ messages, language = 'english', onMessageHover, onFollowUpClick }) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
@@ -10,7 +10,11 @@ const MessageList = ({ messages, language = 'english', onMessageHover }) => {
                     onMouseEnter={(e) => onMessageHover && onMessageHover(message, e.currentTarget)}
                     onMouseLeave={() => onMessageHover && onMessageHover(null, null)}
                 >
-                    <MessageBubble message={message} language={language} />
+                    <MessageBubble 
+                        message={message} 
+                        language={language} 
+                        onFollowUpClick={onFollowUpClick}
+                    />
                 </div>
             ))}
         </div>

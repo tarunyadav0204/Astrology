@@ -531,6 +531,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         }
     };
     
+    const [followUpQuestion, setFollowUpQuestion] = useState('');
+    
+    const handleFollowUpClick = (question) => {
+        setFollowUpQuestion(question);
+    };
+    
     if (!isOpen) return null;
 
     return (
@@ -659,6 +665,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                             });
                                         }
                                     }}
+                                    onFollowUpClick={handleFollowUpClick}
                                 />
                                 {hoveredMessage && (
                                     <button 
@@ -687,7 +694,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                     </button>
                                 )}
                             </div>
-                            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                            <ChatInput 
+                                onSendMessage={handleSendMessage} 
+                                isLoading={isLoading} 
+                                followUpQuestion={followUpQuestion}
+                                onFollowUpUsed={() => setFollowUpQuestion('')}
+                            />
                         </>
                     )}
                 </div>

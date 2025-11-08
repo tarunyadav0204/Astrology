@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
 
-const MessageBubble = ({ message, language = 'english' }) => {
+const MessageBubble = ({ message, language = 'english', onFollowUpClick }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [hasError, setHasError] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState(null);
@@ -146,6 +146,15 @@ const MessageBubble = ({ message, language = 'english' }) => {
         // First, normalize line breaks
         let formatted = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         
+        // Handle Follow-up Questions section
+        formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
+            const questionList = questions.trim().split('\n')
+                .filter(q => q.trim())
+                .map(q => `<button class="follow-up-btn">${q.trim()}</button>`)
+                .join('');
+            return `<div class="follow-up-questions">${questionList}</div>`;
+        });
+        
         // Handle Final Thoughts section specially
         formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
             const cleanContent = finalThoughts
@@ -156,8 +165,14 @@ const MessageBubble = ({ message, language = 'english' }) => {
             return `<div class="final-thoughts-card"><strong>Final Thoughts</strong><br><br>${cleanContent}</div>`;
         });
         
-        // Process other headers with symbols
+        // Process headers - handle both ### and standalone # symbols
         formatted = formatted.replace(/### (.*?)\n/g, '<h3 class="chat-header">◆ $1 ◆</h3>\n\n');
+        
+        // Remove standalone # symbols that appear alone on lines
+        formatted = formatted.replace(/^\s*#\s*$/gm, '');
+        
+        // Clean up any remaining # symbols at start of lines
+        formatted = formatted.replace(/^\s*#+\s*/gm, '');
         
         // Process bold text
         formatted = formatted.replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>');
@@ -165,7 +180,8 @@ const MessageBubble = ({ message, language = 'english' }) => {
         // Process italics (single asterisks not part of bold)
         formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
         
-        // Split into paragraphs and process each
+        // Clean up multiple line breaks and split into paragraphs
+        formatted = formatted.replace(/\n\s*\n\s*\n+/g, '\n\n');
         const paragraphs = formatted.split(/\n\s*\n/);
         
         return paragraphs.map(paragraph => {
@@ -362,6 +378,12 @@ const MessageBubble = ({ message, language = 'english' }) => {
                 <div 
                     className="message-text enhanced-formatting"
                     dangerouslySetInnerHTML={{ __html: formatContent(message.content) }}
+                    onClick={(e) => {
+                        if (e.target.classList.contains('follow-up-btn')) {
+                            const question = e.target.textContent.replace(/^[\u{1F300}-\u{1F9FF}\s]+/u, '').trim();
+                            onFollowUpClick && onFollowUpClick(question);
+                        }
+                    }}
                 />
                 {message.isTyping && (
                     <div className="typing-indicator">
