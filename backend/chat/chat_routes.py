@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
     gender: Optional[str] = None
     question: str
     language: Optional[str] = 'english'
+    response_style: Optional[str] = 'detailed'
 
 class ClearChatRequest(BaseModel):
     name: Optional[str] = None
@@ -80,7 +81,7 @@ async def ask_question(request: ChatRequest):
                 print(f"History length: {len(history)}")
                 
                 gemini_analyzer = GeminiChatAnalyzer()
-                ai_result = gemini_analyzer.generate_chat_response(request.question, context, history, request.language)
+                ai_result = gemini_analyzer.generate_chat_response(request.question, context, history, request.language, request.response_style)
                 
                 print(f"AI result success: {ai_result.get('success')}")
                 print(f"AI result keys: {list(ai_result.keys())}")

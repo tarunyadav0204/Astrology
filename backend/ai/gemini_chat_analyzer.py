@@ -41,7 +41,7 @@ class GeminiChatAnalyzer:
         if not self.model:
             raise ValueError("No available Gemini model found")
     
-    def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english') -> Dict[str, Any]:
+    def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed') -> Dict[str, Any]:
         """Generate chat response using astrological context"""
         
         # Add current date context and calculate native's age
@@ -70,7 +70,7 @@ class GeminiChatAnalyzer:
             'note': 'Use this for reference only. Do not assume transit positions.'
         }
         
-        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language)
+        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style)
         
         print(f"\n=== SENDING TO AI ===")
         print(f"Question: {user_question}")
@@ -117,7 +117,7 @@ class GeminiChatAnalyzer:
                 'error': str(e)
             }
     
-    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english') -> str:
+    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed') -> str:
         """Create comprehensive chat prompt for Gemini"""
         
         history_text = ""
@@ -190,7 +190,32 @@ You MUST respond in TAMIL (தமிழ்) language. Use Tamil script throughou
         else:
             language_instruction = "LANGUAGE: Respond in English.\n\n"
         
-        return f"""{language_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
+        # Response style instructions
+        response_format_instruction = ""
+        if response_style == 'concise':
+            response_format_instruction = """
+RESPONSE FORMAT - CONCISE MODE:
+Provide ONLY a Quick Answer section (2-3 sentences max) with:
+- Direct answer to the question
+- Key astrological factor with classical reference
+- Age-appropriate guidance
+
+Do NOT include detailed analysis, multiple sections, or extensive explanations.
+Format: **Quick Answer**: [Direct response with key insight and one classical reference]
+
+"""
+        else:
+            response_format_instruction = """
+RESPONSE FORMAT - DETAILED MODE:
+Start with Quick Answer (2-3 sentences) then provide full analysis:
+
+**Quick Answer**: [Direct response with key insight and classical reference]
+
+### [Continue with full detailed sections as normal]
+
+"""
+        
+        return f"""{language_instruction}{response_format_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
 
 CLASSICAL TEXT REFERENCES - MANDATORY REQUIREMENT:
 You MUST reference classical Vedic texts to support your predictions and analysis. Use these authoritative sources:

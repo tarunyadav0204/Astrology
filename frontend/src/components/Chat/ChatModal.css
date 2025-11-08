@@ -33,6 +33,7 @@
     padding: 20px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     position: relative;
 }
@@ -559,6 +560,19 @@
         border-radius: 20px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     }
+    
+    .desktop-buttons {
+        display: block !important;
+    }
+    
+    .desktop-buttons button {
+        position: absolute;
+        top: 20px;
+    }
+    
+    .mobile-menu {
+        display: none !important;
+    }
 }
 
 /* Mobile adjustments */
@@ -570,22 +584,16 @@
     
     .chat-modal-header h2 {
         font-size: 16px;
-        margin-right: 80px;
+        margin-right: 90px;
+        padding-right: 0;
     }
     
-    /* Mobile button positioning - stack language and change person to left of cross */
-    .chat-modal-header button[style*="right: 200px"] {
-        right: 75px !important;
-        top: 15px !important;
-        padding: 3px 5px !important;
-        font-size: 8px !important;
+    .desktop-buttons {
+        display: none !important;
     }
     
-    .chat-modal-header button[style*="right: 70px"] {
-        right: 75px !important;
-        top: 40px !important;
-        padding: 3px 5px !important;
-        font-size: 8px !important;
+    .mobile-menu {
+        display: block !important;
     }
     
     .close-btn {
