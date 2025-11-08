@@ -4,14 +4,14 @@
   warnings.warn(
 /Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py:167: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
   @validator('timezone')
-/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py:2691: DeprecationWarning: 
+/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py:2640: DeprecationWarning: 
         on_event is deprecated, use lifespan event handlers instead.
 
         Read more about it in the
         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
         
   @app.on_event("startup")
-INFO:     Started server process [83842]
+INFO:     Started server process [53936]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
@@ -24,91 +24,264 @@ Database initialized successfully
 Starting Astrology API server on port 8001...
 Daily prediction engine initialized with updated rules
 House combinations and chat history databases initialized
-INFO:     127.0.0.1:49291 - "OPTIONS /api/me HTTP/1.1" 200 OK
-[2025-11-07 15:49:37] GET /api/me - Client: 127.0.0.1
-[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
-INFO:     127.0.0.1:49291 - "GET /api/me HTTP/1.1" 200 OK
-[2025-11-07 15:49:37] GET /api/horoscope/all-signs - Client: 127.0.0.1
-[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
-INFO:     127.0.0.1:49293 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49296 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49298 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49300 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49301 - "OPTIONS /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49293 - "OPTIONS /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49296 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49291 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
-[2025-11-07 15:49:37] POST /api/calculate-panchang - Client: 127.0.0.1
-[2025-11-07 15:49:37] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
-[2025-11-07 15:49:37] GET /api/birth-charts - Client: 127.0.0.1
-[2025-11-07 15:49:37] GET /api/birth-charts - Client: 127.0.0.1
-[2025-11-07 15:49:37] GET /api/panchang/choghadiya - Client: 127.0.0.1
-[2025-11-07 15:49:37] Response: 200 - Time: 0.00s
-INFO:     127.0.0.1:49296 - "GET /api/panchang/choghadiya?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
-[2025-11-07 15:49:37] Response: 422 - Time: 0.01s
-[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49711 - "OPTIONS /api/me HTTP/1.1" 200 OK
+[2025-11-08 16:21:30] GET /api/me - Client: 127.0.0.1
+[2025-11-08 16:21:30] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49711 - "GET /api/me HTTP/1.1" 200 OK
+[2025-11-08 16:21:30] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-08 16:21:30] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49713 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49717 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49719 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49720 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49721 - "OPTIONS /api/panchang/choghadiya?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49713 - "OPTIONS /api/panchang/hora?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49717 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49711 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-08 16:21:30] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-08 16:21:30] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-08 16:21:30] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-08 16:21:30] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-08 16:21:30] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-08 16:21:30] Response: 200 - Time: 0.00s
+[2025-11-08 16:21:30] Response: 422 - Time: 0.01s
+INFO:     127.0.0.1:49717 - "GET /api/panchang/choghadiya?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
 Search query: '', Limit: 50
 No search query, returning all charts
 Found 9 charts
+[2025-11-08 16:21:30] Response: 200 - Time: 0.01s
 Search query: '', Limit: 50
 No search query, returning all charts
 Found 9 charts
-[2025-11-07 15:49:37] GET /api/panchang/hora - Client: 127.0.0.1
-[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
-INFO:     127.0.0.1:49300 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
-INFO:     127.0.0.1:49301 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
-[2025-11-07 15:49:37] Response: 200 - Time: 0.01s
-[2025-11-07 15:49:37] Response: 200 - Time: 0.00s
-INFO:     127.0.0.1:49298 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49293 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49291 - "GET /api/panchang/hora?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
-[2025-11-07 15:49:37] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
-[2025-11-07 15:49:37] Response: 200 - Time: 0.00s
-INFO:     127.0.0.1:49296 - "GET /api/panchang/special-muhurtas?date=2025-11-07&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
-[2025-11-07 15:49:38] GET /logo192.png - Client: None
-[2025-11-07 15:49:38] Response: 404 - Time: 0.00s
+[2025-11-08 16:21:30] Response: 200 - Time: 0.01s
+[2025-11-08 16:21:30] GET /api/panchang/hora - Client: 127.0.0.1
+INFO:     127.0.0.1:49719 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+[2025-11-08 16:21:30] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49713 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49720 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-08 16:21:30] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49721 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49711 - "GET /api/panchang/hora?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-08 16:21:30] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-08 16:21:30] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49717 - "GET /api/panchang/special-muhurtas?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-08 16:21:31] GET /logo192.png - Client: None
+[2025-11-08 16:21:31] Response: 404 - Time: 0.00s
 INFO:     None:0 - "GET /logo192.png HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:49296 - "OPTIONS /api/admin/users HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49291 - "OPTIONS /api/admin/subscription-plans HTTP/1.1" 200 OK
-[2025-11-07 15:49:41] GET /api/admin/users - Client: 127.0.0.1
-[2025-11-07 15:49:41] GET /api/admin/subscription-plans - Client: 127.0.0.1
-[2025-11-07 15:49:41] Response: 200 - Time: 0.02s
-[2025-11-07 15:49:41] Response: 200 - Time: 0.02s
-INFO:     127.0.0.1:49291 - "GET /api/admin/users HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49296 - "GET /api/admin/subscription-plans HTTP/1.1" 200 OK
-[2025-11-07 15:49:42] GET /api/admin/chat/all-history - Client: None
-[2025-11-07 15:49:42] Response: 200 - Time: 0.02s
-INFO:     None:0 - "GET /api/admin/chat/all-history HTTP/1.1" 200 OK
-[2025-11-07 15:49:43] GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db - Client: None
-[2025-11-07 15:49:43] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db HTTP/1.1" 200 OK
-[2025-11-07 15:49:44] GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb - Client: None
-[2025-11-07 15:49:44] Response: 200 - Time: 0.02s
-INFO:     None:0 - "GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb HTTP/1.1" 200 OK
-[2025-11-07 15:49:49] GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf - Client: None
-[2025-11-07 15:49:49] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
-[2025-11-07 15:49:50] GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d - Client: None
-[2025-11-07 15:49:50] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d HTTP/1.1" 200 OK
-[2025-11-07 15:49:53] GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 - Client: None
-[2025-11-07 15:49:53] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 HTTP/1.1" 200 OK
-[2025-11-07 15:49:57] GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db - Client: None
-[2025-11-07 15:49:57] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db HTTP/1.1" 200 OK
-[2025-11-07 15:49:57] GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb - Client: None
-[2025-11-07 15:49:57] Response: 200 - Time: 0.02s
-INFO:     None:0 - "GET /api/admin/chat/session/ef5814f5584c51bab13e42d469c065db71bd4fa2a4445894eb27411a5cadbbbb HTTP/1.1" 200 OK
-[2025-11-07 15:49:58] GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf - Client: None
-[2025-11-07 15:49:58] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/8f5394f4-61e4-4d84-864c-b6663b992daf HTTP/1.1" 200 OK
-[2025-11-07 15:49:58] GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d - Client: None
-[2025-11-07 15:49:58] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/2d73d5e53337f1cc272b290f55f451fa9956ac1466fca8c7389dabd00b1e002d HTTP/1.1" 200 OK
-[2025-11-07 15:49:59] GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 - Client: None
-[2025-11-07 15:49:59] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/e664e84dc1b7534eb7341b052a66417d9ebe53b688bd8cfceff41edae9ba1244 HTTP/1.1" 200 OK
-[2025-11-07 15:50:40] GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db - Client: None
-[2025-11-07 15:50:40] Response: 200 - Time: 0.01s
-INFO:     None:0 - "GET /api/admin/chat/session/d50ffa19-d928-4eb9-b0b0-5d214dd502db HTTP/1.1" 200 OK
+[2025-11-08 16:21:32] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-08 16:21:32] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49717 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49717 - "OPTIONS /api/calculate-chart?node_type=mean HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49711 - "OPTIONS /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-08 16:21:35] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-08 16:21:35] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-08 16:21:35] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49711 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-08 16:21:35] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49717 - "POST /api/calculate-chart?node_type=mean HTTP/1.1" 200 OK
+[2025-11-08 16:21:35] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-08 16:21:35] POST /api/chat/history - Client: None
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-08 16:21:35] Response: 200 - Time: 0.01s
+[2025-11-08 16:21:35] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49717 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-08 16:21:41] POST /api/chat/session - Client: None
+[2025-11-08 16:21:41] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/session HTTP/1.1" 200 OK
+[2025-11-08 16:21:41] POST /api/chat/message - Client: None
+[2025-11-08 16:21:41] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-08 16:21:41] POST /api/chat/ask - Client: None
+
+=== STREAMING STARTED ===
+Request question: How will be my husband
+Request data: name='Meghna Yadav' date='1985-03-07' time='16:03' place='26.8651374, 75.7119952' latitude=26.8651374 longitude=75.7119952 timezone='UTC+5' gender=None question='How will be my husband'
+DEBUG: Valid planets in chart: ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+DEBUG: Sun - House: 8, Sign: 10
+DEBUG: Moon - House: 2, Sign: 4
+DEBUG: Mars - House: 10, Sign: 0
+DEBUG: Mercury - House: 9, Sign: 11
+DEBUG: Jupiter - House: 7, Sign: 9
+DEBUG: Venus - House: 9, Sign: 11
+DEBUG: Saturn - House: 5, Sign: 7
+DEBUG: Houses occupied: {2, 5, 7, 8, 9, 10}
+DEBUG: Found 6 Raj Yogas
+
+=== CHAT ROUTE DEBUG ===
+Question: How will be my husband
+Birth data: {'name': 'Meghna Yadav', 'date': '1985-03-07', 'time': '16:03', 'place': '26.8651374, 75.7119952', 'latitude': 26.8651374, 'longitude': 75.7119952, 'timezone': 'UTC+5', 'gender': None}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: How will be my husband
+Prompt length: 121768 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 14731 chars
+Response preview: My dear, it is indeed a profound aspect of Vedic astrology to understand the nature of one's spouse through the lens of the birth chart. At your current age of 40 years, you are in a life stage where ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14731
+Response preview: My dear, it is indeed a profound aspect of Vedic astrology to understand the nature of one's spouse ...
+[2025-11-08 16:22:23] Response: 200 - Time: 41.74s
+INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-08 16:22:23] POST /api/chat/message - Client: None
+[2025-11-08 16:22:23] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-08 16:27:42] POST /api/chat/history - Client: None
+[2025-11-08 16:27:42] Response: 200 - Time: 0.00s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-08 16:28:13] POST /api/chat/history - Client: None
+[2025-11-08 16:28:13] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-08 16:30:28] POST /api/chat/history - Client: None
+[2025-11-08 16:30:28] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-08 16:30:43] POST /api/chat/session - Client: None
+[2025-11-08 16:30:43] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/session HTTP/1.1" 200 OK
+[2025-11-08 16:30:43] POST /api/chat/message - Client: None
+[2025-11-08 16:30:43] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-08 16:30:43] POST /api/chat/ask - Client: None
+
+=== STREAMING STARTED ===
+Request question: Tell me about my husband
+Request data: name='Meghna Yadav' date='1985-03-07' time='16:03' place='26.8651374, 75.7119952' latitude=26.8651374 longitude=75.7119952 timezone='UTC+5' gender=None question='Tell me about my husband'
+
+=== CHAT ROUTE DEBUG ===
+Question: Tell me about my husband
+Birth data: {'name': 'Meghna Yadav', 'date': '1985-03-07', 'time': '16:03', 'place': '26.8651374, 75.7119952', 'latitude': 26.8651374, 'longitude': 75.7119952, 'timezone': 'UTC+5', 'gender': None}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: Tell me about my husband
+Prompt length: 121770 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 15415 chars
+Response preview: At your current age of 40 years, the question about your husband delves into the ongoing dynamics of your established marriage, his personal development, career trajectory, and overall well-being. Ast...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15415
+Response preview: At your current age of 40 years, the question about your husband delves into the ongoing dynamics of...
+[2025-11-08 16:31:33] Response: 200 - Time: 49.75s
+INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-08 16:31:33] POST /api/chat/message - Client: None
+[2025-11-08 16:31:33] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52951 - "OPTIONS /api/me HTTP/1.1" 200 OK
+[2025-11-08 16:34:22] GET /api/me - Client: 127.0.0.1
+[2025-11-08 16:34:22] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52951 - "GET /api/me HTTP/1.1" 200 OK
+[2025-11-08 16:34:22] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-08 16:34:22] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:52953 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52955 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52957 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52960 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52961 - "OPTIONS /api/panchang/choghadiya?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52953 - "OPTIONS /api/panchang/hora?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52955 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52951 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-08 16:34:22] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-08 16:34:22] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-08 16:34:22] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-08 16:34:22] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-08 16:34:22] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-08 16:34:22] Response: 200 - Time: 0.00s
+[2025-11-08 16:34:22] Response: 422 - Time: 0.01s
+INFO:     127.0.0.1:52955 - "GET /api/panchang/choghadiya?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-08 16:34:22] Response: 200 - Time: 0.01s
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-08 16:34:22] GET /api/panchang/hora - Client: 127.0.0.1
+INFO:     127.0.0.1:52957 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+[2025-11-08 16:34:22] Response: 200 - Time: 0.02s
+[2025-11-08 16:34:22] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:52953 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-08 16:34:22] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52960 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52961 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52951 - "GET /api/panchang/hora?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-08 16:34:22] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-08 16:34:22] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52955 - "GET /api/panchang/special-muhurtas?date=2025-11-08&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-08 16:34:23] GET /logo192.png - Client: None
+[2025-11-08 16:34:23] Response: 404 - Time: 0.00s
+INFO:     None:0 - "GET /logo192.png HTTP/1.1" 404 Not Found
+[2025-11-08 16:34:23] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-08 16:34:23] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52955 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52955 - "OPTIONS /api/calculate-chart?node_type=mean HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52951 - "OPTIONS /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-08 16:34:26] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-08 16:34:26] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-08 16:34:26] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52951 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-08 16:34:26] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:52955 - "POST /api/calculate-chart?node_type=mean HTTP/1.1" 200 OK
+[2025-11-08 16:34:26] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-08 16:34:26] POST /api/chat/history - Client: None
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-08 16:34:26] Response: 200 - Time: 0.01s
+[2025-11-08 16:34:26] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52955 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-08 16:34:34] POST /api/chat/session - Client: None
+[2025-11-08 16:34:34] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/session HTTP/1.1" 200 OK
+[2025-11-08 16:34:34] POST /api/chat/message - Client: None
+[2025-11-08 16:34:34] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-08 16:34:34] POST /api/chat/ask - Client: None
+
+=== STREAMING STARTED ===
+Request question: Tell me about my husband
+Request data: name='Meghna Yadav' date='1985-03-07' time='16:03' place='26.8651374, 75.7119952' latitude=26.8651374 longitude=75.7119952 timezone='UTC+5' gender=None question='Tell me about my husband'
+
+=== CHAT ROUTE DEBUG ===
+Question: Tell me about my husband
+Birth data: {'name': 'Meghna Yadav', 'date': '1985-03-07', 'time': '16:03', 'place': '26.8651374, 75.7119952', 'latitude': 26.8651374, 'longitude': 75.7119952, 'timezone': 'UTC+5', 'gender': None}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: Tell me about my husband
+Prompt length: 121770 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 18876 chars
+Response preview: My dear, at your current age of 40 years, you are in a phase of life typically focused on career growth, family responsibilities, and establishing your legacy. Understanding your husband's astrologica...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 18876
+Response preview: My dear, at your current age of 40 years, you are in a phase of life typically focused on career gro...
+[2025-11-08 16:35:30] Response: 200 - Time: 56.14s
+INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-08 16:35:30] POST /api/chat/message - Client: None
+[2025-11-08 16:35:30] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK

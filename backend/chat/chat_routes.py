@@ -87,8 +87,7 @@ async def ask_question(request: ChatRequest):
                 if ai_result['success']:
                     response_text = ai_result['response']
                     
-                    # Save to conversation history
-                    session_manager.add_message(birth_hash, request.question, response_text)
+                    # Note: Message saving handled by ChatModal via /api/chat/message endpoint
                     
                     # Send final result with proper JSON escaping
                     try:

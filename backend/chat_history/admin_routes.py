@@ -101,8 +101,8 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                     sessions.append({
                         'session_id': row['birth_hash'],
                         'user_id': 'unknown',
-                        'user_name': 'Legacy User',
-                        'user_phone': 'N/A',
+                        'user_name': f'Legacy User #{row["birth_hash"][:8]}',
+                        'user_phone': 'Legacy System',
                         'created_at': row['updated_at'],
                         'preview': first_question[:100] + '...' if len(first_question) > 100 else first_question,
                         'system_type': row['system_type']

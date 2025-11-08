@@ -1335,74 +1335,23 @@ async def get_dasha(birth_data: BirthData):
 @app.post("/api/calculate-panchang")
 async def calculate_panchang(request: TransitRequest):
     try:
-        # Validate transit_date format
-        if not request.transit_date or len(request.transit_date.split('-')) != 3:
-            raise HTTPException(status_code=422, detail="Invalid date format. Expected YYYY-MM-DD")
+        from panchang.panchang_calculator import PanchangCalculator
         
-        date_parts = request.transit_date.split('-')
-        year, month, day = int(date_parts[0]), int(date_parts[1]), int(date_parts[2])
+        birth_data = request.birth_data
+        panchang_calc = PanchangCalculator()
         
-        # Validate date ranges
-        if not (1900 <= year <= 2100):
-            raise HTTPException(status_code=422, detail="Year must be between 1900 and 2100")
-        if not (1 <= month <= 12):
-            raise HTTPException(status_code=422, detail="Month must be between 1 and 12")
-        if not (1 <= day <= 31):
-            raise HTTPException(status_code=422, detail="Day must be between 1 and 31")
+        # Use comprehensive panchang calculation
+        panchang_data = panchang_calc.calculate_panchang(
+            request.transit_date,
+            birth_data.latitude,
+            birth_data.longitude,
+            birth_data.timezone
+        )
         
-        jd = swe.julday(year, month, day, 12.0)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid date values: {str(e)}")
+        return panchang_data
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating panchang: {str(e)}")
-    
-    sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    
-    # Tithi (Lunar day) - difference between Moon and Sun
-    tithi_deg = (moon_pos - sun_pos) % 360
-    tithi_num = int(tithi_deg / 12) + 1
-    
-    from event_prediction.config import TITHI_NAMES, VARA_NAMES, NAKSHATRA_NAMES, YOGA_NAMES, KARANA_NAMES
-    
-    # Vara (Weekday)
-    vara_index = int((jd + 1.5) % 7)
-    
-    # Nakshatra
-    nakshatra_index = int(moon_pos / 13.333333)
-    
-    # Yoga - sum of Sun and Moon longitudes
-    yoga_deg = (sun_pos + moon_pos) % 360
-    yoga_index = int(yoga_deg / 13.333333)
-    
-    # Karana - half of Tithi
-    karana_index = int(tithi_deg / 6) % 11
-    
-    return {
-        "tithi": {
-            "number": tithi_num,
-            "name": TITHI_NAMES[min(tithi_num - 1, 14)],
-            "degrees": round(tithi_deg, 2)
-        },
-        "vara": {
-            "number": vara_index + 1,
-            "name": VARA_NAMES[vara_index]
-        },
-        "nakshatra": {
-            "number": nakshatra_index + 1,
-            "name": NAKSHATRA_NAMES[nakshatra_index],
-            "degrees": round(moon_pos % 13.333333, 2)
-        },
-        "yoga": {
-            "number": yoga_index + 1,
-            "name": YOGA_NAMES[min(yoga_index, 26)],
-            "degrees": round(yoga_deg, 2)
-        },
-        "karana": {
-            "number": karana_index + 1,
-            "name": KARANA_NAMES[karana_index]
-        }
-    }
 
 @app.post("/api/calculate-birth-panchang")
 async def calculate_birth_panchang(birth_data: BirthData):
