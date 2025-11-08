@@ -26,7 +26,7 @@ import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem 
 
 
 
-const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
+const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefHighlight }) => {
   const [selectedChart, setSelectedChart] = useState('navamsa');
   const [showDropdown, setShowDropdown] = useState(false);
   const isMobile = window.innerWidth <= 768;
@@ -119,6 +119,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
             birthData={birthData}
             division={currentChart?.division || 9}
             defaultStyle={defaultStyle}
+            chartRefHighlight={chartRefHighlight}
           />
         </div>
       </div>
@@ -159,6 +160,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle }) => {
       birthData={birthData}
       division={currentChart?.division || 9}
       defaultStyle={defaultStyle}
+      chartRefHighlight={chartRefHighlight}
     />
   );
 };
@@ -173,6 +175,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileSubTab, setMobileSubTab] = useState('lagna');
   const [userSettings, setUserSettings] = useState({ node_type: 'mean', default_chart_style: 'north' });
+  const [chartRefHighlight, setChartRefHighlight] = useState(null);
 
   useEffect(() => {
     // Load saved layout from localStorage
@@ -426,6 +429,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     chartData={chartData}
                     birthData={birthData}
                     defaultStyle={userSettings.default_chart_style}
+                    chartRefHighlight={chartRefHighlight}
                   />
                 </div>
               )}
@@ -437,6 +441,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     chartData={chartData}
                     birthData={birthData}
                     defaultStyle={userSettings.default_chart_style}
+                    chartRefHighlight={chartRefHighlight}
                   />
                 </div>
               )}
@@ -455,6 +460,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                       birthData={birthData}
                       transitDate={transitDate}
                       defaultStyle={userSettings.default_chart_style}
+                      chartRefHighlight={chartRefHighlight}
                     />
                   </div>
                 </div>
@@ -465,6 +471,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                     chartData={chartData}
                     birthData={birthData}
                     defaultStyle={userSettings.default_chart_style}
+                    chartRefHighlight={chartRefHighlight}
                   />
                 </div>
               )}
@@ -626,6 +633,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 chartData={chartData}
                 birthData={birthData}
                 defaultStyle={userSettings.default_chart_style}
+                chartRefHighlight={chartRefHighlight}
               />
             </GridItem>
             
@@ -636,6 +644,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 chartData={chartData}
                 birthData={birthData}
                 defaultStyle={userSettings.default_chart_style}
+                chartRefHighlight={chartRefHighlight}
               />
             </GridItem>
             
@@ -647,6 +656,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 birthData={birthData}
                 transitDate={transitDate}
                 defaultStyle={userSettings.default_chart_style}
+                chartRefHighlight={chartRefHighlight}
               />
             </GridItem>
             
@@ -655,6 +665,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
                 chartData={chartData}
                 birthData={birthData}
                 defaultStyle={userSettings.default_chart_style}
+                chartRefHighlight={chartRefHighlight}
               />
             </GridItem>
             

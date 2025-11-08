@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
 
-const MessageBubble = ({ message, language = 'english', onFollowUpClick }) => {
+const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [hasError, setHasError] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState(null);
@@ -382,6 +382,11 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick }) => {
                         if (e.target.classList.contains('follow-up-btn')) {
                             const question = e.target.textContent.replace(/^[\u{1F300}-\u{1F9FF}\s]+/u, '').trim();
                             onFollowUpClick && onFollowUpClick(question);
+                        } else if (e.target.classList.contains('chart-ref')) {
+                            const type = e.target.dataset.planet ? 'planet' : 
+                                        e.target.dataset.house ? 'house' : 'sign';
+                            const value = e.target.dataset.planet || e.target.dataset.house || e.target.dataset.sign;
+                            onChartRefClick && onChartRefClick({ type, value });
                         }
                     }}
                 />

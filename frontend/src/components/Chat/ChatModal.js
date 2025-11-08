@@ -7,7 +7,7 @@ import { showToast } from '../../utils/toast';
 
 import './ChatModal.css';
 
-const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
+const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: parentChartRefClick }) => {
     const { birthData, setBirthData } = useAstrology();
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
@@ -507,6 +507,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMobileMenu]);
     
+    // Clear hovered message when mobile menu is open to prevent action buttons
+    React.useEffect(() => {
+        if (showMobileMenu) {
+            setHoveredMessage(null);
+        }
+    }, [showMobileMenu]);
+    
     const handleCopyMessage = async () => {
         if (!hoveredMessage) return;
         
@@ -532,14 +539,47 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
     };
     
     const [followUpQuestion, setFollowUpQuestion] = useState('');
+    const [chartRefHighlight, setChartRefHighlight] = useState(null);
     
     const handleFollowUpClick = (question) => {
         setFollowUpQuestion(question);
     };
     
+    const handleChartRefClick = (chartRef) => {
+        // If parent has chart ref handler, use it (for Dashboard integration)
+        if (parentChartRefClick) {
+            parentChartRefClick(chartRef);
+            return;
+        }
+        
+        // Fallback: local handling with toast only
+        setChartRefHighlight(chartRef);
+        // Show notification to user about chart reference
+        const { type, value } = chartRef;
+        let message = '';
+        if (type === 'planet') {
+            message = `🪐 ${value.charAt(0).toUpperCase() + value.slice(1)} highlighted! Check your birth chart to see this planet's position.`;
+        } else if (type === 'house') {
+            message = `🏠 House ${value} highlighted! This represents specific life areas in your chart.`;
+        } else if (type === 'sign') {
+            const signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+            const signName = signs[parseInt(value) - 1] || value;
+            message = `♈ ${signName} highlighted! This zodiac sign influences your personality and life path.`;
+        }
+        
+        // Show toast notification
+        import('../../utils/toast').then(({ showToast }) => {
+            showToast(message, 'info');
+        });
+        
+        // Auto-clear highlight after 5 seconds
+        setTimeout(() => setChartRefHighlight(null), 5000);
+    };
+    
     if (!isOpen) return null;
 
     return (
+        <>
         <div className="chat-modal-overlay" onClick={onClose}>
             <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
@@ -558,7 +598,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 fontSize: '12px',
                                 cursor: 'pointer',
                                 position: 'absolute',
-                                right: '520px',
+                                right: '650px',
                                 top: '20px'
                             }}
                         >
@@ -575,7 +615,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 fontSize: '12px',
                                 cursor: 'pointer',
                                 position: 'absolute',
-                                right: '380px',
+                                right: '520px',
                                 top: '20px'
                             }}
                         >
@@ -592,11 +632,31 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 fontSize: '12px',
                                 cursor: 'pointer',
                                 position: 'absolute',
-                                right: '240px',
+                                right: '390px',
                                 top: '20px'
                             }}
                         >
                             📄 Download PDF
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const event = new CustomEvent('openChartModal');
+                                window.dispatchEvent(event);
+                            }}
+                            style={{
+                                background: 'rgba(255,255,255,0.2)',
+                                border: '1px solid rgba(255,255,255,0.3)',
+                                color: 'white',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                position: 'absolute',
+                                right: '260px',
+                                top: '20px'
+                            }}
+                        >
+                            📊 View Chart
                         </button>
                         <button 
                             onClick={() => setShowBirthForm(true)}
@@ -656,18 +716,21 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                     messages={messages} 
                                     language={language} 
                                     onMessageHover={(message, element) => {
-                                        setHoveredMessage(message);
-                                        if (message && element) {
-                                            const rect = element.getBoundingClientRect();
-                                            setButtonPosition({
-                                                top: rect.top + 5,
-                                                left: rect.left - 10
-                                            });
+                                        if (!showMobileMenu) {
+                                            setHoveredMessage(message);
+                                            if (message && element) {
+                                                const rect = element.getBoundingClientRect();
+                                                setButtonPosition({
+                                                    top: rect.top + 5,
+                                                    left: rect.left - 10
+                                                });
+                                            }
                                         }
                                     }}
                                     onFollowUpClick={handleFollowUpClick}
+                                    onChartRefClick={handleChartRefClick}
                                 />
-                                {hoveredMessage && (
+                                {hoveredMessage && !showMobileMenu && (
                                     <button 
                                         className="floating-copy-btn"
                                         onClick={handleCopyMessage}
@@ -704,22 +767,25 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                     )}
                 </div>
             </div>
-            
-            {/* Mobile dropdown rendered outside modal */}
-            {showMobileMenu && (
-                <div style={{
-                    position: 'fixed',
-                    right: '15px',
-                    top: '60px',
-                    background: 'rgba(255,255,255,0.95)',
-                    border: '1px solid rgba(0,0,0,0.1)',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    zIndex: 100000,
-                    minWidth: '150px'
-                }}>
+        </div>
+        
+        {/* Mobile dropdown rendered completely outside modal */}
+        {showMobileMenu && (
+            <div style={{
+                position: 'fixed',
+                right: '15px',
+                top: '60px',
+                background: 'rgba(255,255,255,0.95)',
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                zIndex: 200000,
+                minWidth: '150px',
+                pointerEvents: 'auto'
+            }}>
                     <button 
-                        onClick={() => { setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed'); setShowMobileMenu(false); }}
+                        onClick={(e) => { e.stopPropagation(); setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed'); setShowMobileMenu(false); }}
+                        onTouchEnd={(e) => { e.stopPropagation(); setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed'); setShowMobileMenu(false); }}
                         style={{
                             width: '100%',
                             padding: '10px 15px',
@@ -729,13 +795,26 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                             fontSize: '12px',
                             cursor: 'pointer',
                             textAlign: 'left',
-                            borderBottom: '1px solid rgba(0,0,0,0.1)'
+                            borderBottom: '1px solid rgba(0,0,0,0.1)',
+                            touchAction: 'manipulation',
+                            userSelect: 'none'
                         }}
                     >
                         {responseStyle === 'detailed' ? '⚡ Quick Mode' : '📋 Detailed Mode'}
                     </button>
                     <button 
-                        onClick={() => { setShowBirthForm(true); setShowMobileMenu(false); }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const event = new CustomEvent('openChartModal');
+                            window.dispatchEvent(event);
+                            setShowMobileMenu(false);
+                        }}
+                        onTouchEnd={(e) => {
+                            e.stopPropagation();
+                            const event = new CustomEvent('openChartModal');
+                            window.dispatchEvent(event);
+                            setShowMobileMenu(false);
+                        }}
                         style={{
                             width: '100%',
                             padding: '10px 15px',
@@ -745,13 +824,35 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                             fontSize: '12px',
                             cursor: 'pointer',
                             textAlign: 'left',
-                            borderBottom: '1px solid rgba(0,0,0,0.1)'
+                            borderBottom: '1px solid rgba(0,0,0,0.1)',
+                            touchAction: 'manipulation',
+                            userSelect: 'none'
+                        }}
+                    >
+                        📊 View Chart
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setShowBirthForm(true); setShowMobileMenu(false); }}
+                        onTouchEnd={(e) => { e.stopPropagation(); setShowBirthForm(true); setShowMobileMenu(false); }}
+                        style={{
+                            width: '100%',
+                            padding: '10px 15px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#333',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            borderBottom: '1px solid rgba(0,0,0,0.1)',
+                            touchAction: 'manipulation',
+                            userSelect: 'none'
                         }}
                     >
                         👤 Change Person
                     </button>
                     <button 
-                        onClick={downloadChatPDF}
+                        onClick={(e) => { e.stopPropagation(); downloadChatPDF(); setShowMobileMenu(false); }}
+                        onTouchEnd={(e) => { e.stopPropagation(); downloadChatPDF(); setShowMobileMenu(false); }}
                         style={{
                             width: '100%',
                             padding: '10px 15px',
@@ -761,7 +862,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                             fontSize: '12px',
                             cursor: 'pointer',
                             textAlign: 'left',
-                            borderBottom: '1px solid rgba(0,0,0,0.1)'
+                            borderBottom: '1px solid rgba(0,0,0,0.1)',
+                            touchAction: 'manipulation',
+                            userSelect: 'none'
                         }}
                     >
                         📄 Download Chat
@@ -776,7 +879,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                             🌐 Language
                         </div>
                         <button 
-                            onClick={() => { setLanguage('english'); setShowMobileMenu(false); }}
+                            onClick={(e) => { e.stopPropagation(); setLanguage('english'); setShowMobileMenu(false); }}
+                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('english'); setShowMobileMenu(false); }}
                             style={{
                                 width: '100%',
                                 padding: '8px 25px',
@@ -785,13 +889,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 color: language === 'english' ? '#ff6b35' : '#333',
                                 fontSize: '11px',
                                 cursor: 'pointer',
-                                textAlign: 'left'
+                                textAlign: 'left',
+                                touchAction: 'manipulation',
+                                userSelect: 'none'
                             }}
                         >
                             🇺🇸 English
                         </button>
                         <button 
-                            onClick={() => { setLanguage('hindi'); setShowMobileMenu(false); }}
+                            onClick={(e) => { e.stopPropagation(); setLanguage('hindi'); setShowMobileMenu(false); }}
+                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('hindi'); setShowMobileMenu(false); }}
                             style={{
                                 width: '100%',
                                 padding: '8px 25px',
@@ -800,13 +907,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 color: language === 'hindi' ? '#ff6b35' : '#333',
                                 fontSize: '11px',
                                 cursor: 'pointer',
-                                textAlign: 'left'
+                                textAlign: 'left',
+                                touchAction: 'manipulation',
+                                userSelect: 'none'
                             }}
                         >
                             🇮🇳 हिंदी
                         </button>
                         <button 
-                            onClick={() => { setLanguage('telugu'); setShowMobileMenu(false); }}
+                            onClick={(e) => { e.stopPropagation(); setLanguage('telugu'); setShowMobileMenu(false); }}
+                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('telugu'); setShowMobileMenu(false); }}
                             style={{
                                 width: '100%',
                                 padding: '8px 25px',
@@ -815,13 +925,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 color: language === 'telugu' ? '#ff6b35' : '#333',
                                 fontSize: '11px',
                                 cursor: 'pointer',
-                                textAlign: 'left'
+                                textAlign: 'left',
+                                touchAction: 'manipulation',
+                                userSelect: 'none'
                             }}
                         >
                             🇮🇳 తెలుగు
                         </button>
                         <button 
-                            onClick={() => { setLanguage('gujarati'); setShowMobileMenu(false); }}
+                            onClick={(e) => { e.stopPropagation(); setLanguage('gujarati'); setShowMobileMenu(false); }}
+                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('gujarati'); setShowMobileMenu(false); }}
                             style={{
                                 width: '100%',
                                 padding: '8px 25px',
@@ -830,13 +943,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 color: language === 'gujarati' ? '#ff6b35' : '#333',
                                 fontSize: '11px',
                                 cursor: 'pointer',
-                                textAlign: 'left'
+                                textAlign: 'left',
+                                touchAction: 'manipulation',
+                                userSelect: 'none'
                             }}
                         >
                             🇮🇳 ગુજરાતી
                         </button>
                         <button 
-                            onClick={() => { setLanguage('tamil'); setShowMobileMenu(false); }}
+                            onClick={(e) => { e.stopPropagation(); setLanguage('tamil'); setShowMobileMenu(false); }}
+                            onTouchEnd={(e) => { e.stopPropagation(); setLanguage('tamil'); setShowMobileMenu(false); }}
                             style={{
                                 width: '100%',
                                 padding: '8px 25px',
@@ -845,15 +961,17 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null }) => {
                                 color: language === 'tamil' ? '#ff6b35' : '#333',
                                 fontSize: '11px',
                                 cursor: 'pointer',
-                                textAlign: 'left'
+                                textAlign: 'left',
+                                touchAction: 'manipulation',
+                                userSelect: 'none'
                             }}
                         >
                             🇮🇳 தமிழ்
                         </button>
                     </div>
-                </div>
-            )}
-        </div>
+            </div>
+        )}
+        </>
     );
 };
 

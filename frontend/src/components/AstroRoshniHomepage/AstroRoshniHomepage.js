@@ -15,6 +15,7 @@ import BirthForm from '../BirthForm/BirthForm';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
+import { showToast } from '../../utils/toast';
 import './AstroRoshniHomepage.css';
 
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
@@ -30,6 +31,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
   const [showChartModal, setShowChartModal] = useState(false);
+  const [chartRefHighlight, setChartRefHighlight] = useState(null);
   const [matchingData, setMatchingData] = useState({
     boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
     girl: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' }
@@ -287,6 +289,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     };
     
     initializeData();
+  }, []);
+
+  // Listen for chart modal open event from chat
+  useEffect(() => {
+    const handleOpenChartModal = () => {
+      setShowChartModal(true);
+    };
+    
+    window.addEventListener('openChartModal', handleOpenChartModal);
+    return () => window.removeEventListener('openChartModal', handleOpenChartModal);
   }, []);
 
   // Daily data update check
@@ -1380,6 +1392,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         isOpen={showChatModal} 
         onClose={() => setShowChatModal(false)}
         initialBirthData={null}
+        onChartRefClick={(chartRef) => {
+          setChartRefHighlight(chartRef);
+          setShowChartModal(true);
+          setTimeout(() => setChartRefHighlight(null), 5000);
+        }}
       />
       
       {showLoginModal && (
@@ -1484,7 +1501,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 100001
         }}>
           <div style={{
             background: 'white',
@@ -1519,6 +1536,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 chartData={chartData}
                 birthData={birthData}
                 defaultStyle="north"
+                chartRefHighlight={chartRefHighlight}
               />
             ) : (
               <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>

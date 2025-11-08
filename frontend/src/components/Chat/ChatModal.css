@@ -195,10 +195,13 @@
 }
 
 .message-text p,
-.message-text div,
-.message-text span {
+.message-text div {
     width: 100%;
     display: block;
+}
+
+.message-text span {
+    display: inline;
 }
 
 .message-text h3 {
@@ -915,13 +918,14 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.9);
+        background: rgba(255, 255, 255, 0.95);
         padding: 16px;
         border-radius: 12px;
         flex-direction: column;
         gap: 12px;
         backdrop-filter: blur(20px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border: 2px solid #e91e63;
     }
     
     .action-btn {
@@ -929,6 +933,8 @@
         height: 48px;
         font-size: 18px;
         border-radius: 12px;
+        background: #e91e63;
+        color: white;
     }
 }
 
@@ -969,6 +975,104 @@
 .user .follow-up-btn:hover {
     background: rgba(255, 107, 53, 1);
     box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+/* Chart Reference Styling */
+.chart-ref {
+    display: inline;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 12px;
+    transition: background-color 0.2s ease;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    margin: 0 1px;
+    font-size: 0.9em;
+    line-height: 1;
+    vertical-align: baseline;
+    position: static;
+}
+
+.chart-ref:hover {
+    opacity: 0.8;
+}
+
+.chart-ref.planet {
+    background: rgba(255, 107, 53, 0.9);
+    color: white;
+    border: 1px solid rgba(255, 107, 53, 0.8);
+}
+
+.chart-ref.house {
+    background: rgba(76, 175, 80, 0.9);
+    color: white;
+    border: 1px solid rgba(76, 175, 80, 0.8);
+}
+
+.chart-ref.sign {
+    background: rgba(156, 39, 176, 0.9);
+    color: white;
+    border: 1px solid rgba(156, 39, 176, 0.8);
+}
+
+.user .chart-ref.planet {
+    background: rgba(255, 107, 53, 1);
+    color: white;
+    border: 1px solid rgba(255, 107, 53, 1);
+}
+
+.user .chart-ref.house {
+    background: rgba(76, 175, 80, 1);
+    color: white;
+    border: 1px solid rgba(76, 175, 80, 1);
+}
+
+.user .chart-ref.sign {
+    background: rgba(156, 39, 176, 1);
+    color: white;
+    border: 1px solid rgba(156, 39, 176, 1);
+}
+
+/* Chart references inside Quick Answer and Final Thoughts cards */
+.quick-answer-card .chart-ref,
+.final-thoughts-card .chart-ref {
+    position: static !important;
+    display: inline !important;
+    float: none !important;
+    transform: none !important;
+    margin: 0 1px !important;
+    vertical-align: baseline !important;
+    z-index: auto !important;
+    backdrop-filter: none !important;
+}
+
+.quick-answer-card .chart-ref:hover,
+.final-thoughts-card .chart-ref:hover {
+    transform: none !important;
+    position: static !important;
+    z-index: auto !important;
+}
+
+/* Additional specific rules for Quick Answer card */
+.quick-answer-card,
+.quick-answer-card *,
+.quick-answer-card span,
+.quick-answer-card .chart-ref {
+    position: static !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+    float: none !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+}
+
+.quick-answer-card span.chart-ref {
+    display: inline !important;
+    vertical-align: baseline !important;
 }
 
 /* Desktop improvements */

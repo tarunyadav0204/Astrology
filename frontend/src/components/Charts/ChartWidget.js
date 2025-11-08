@@ -8,7 +8,7 @@ import { WidgetContainer, WidgetHeader, WidgetTitle, StyleToggle, ChartContainer
 import AshtakavargaModal from '../Ashtakavarga/AshtakavargaModal';
 import ShadbalaModal from '../Shadbala/ShadbalaModal';
 
-const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, division, defaultStyle }) => {
+const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, division, defaultStyle, chartRefHighlight = null }) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle || 'north');
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
   const [showMaximized, setShowMaximized] = useState(false);
@@ -958,6 +958,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
                     chartType={chartType}
                     birthData={birthData}
                     showDegreeNakshatra={showDegreeNakshatra}
+                    chartRefHighlight={chartRefHighlight}
                   />
                 </div>
               ) : (
@@ -967,6 +968,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
                     chartType={chartType}
                     birthData={birthData}
                     showDegreeNakshatra={showDegreeNakshatra}
+                    chartRefHighlight={chartRefHighlight}
                   />
                 </div>
               )}

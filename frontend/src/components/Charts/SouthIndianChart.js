@@ -5,7 +5,7 @@ import { apiService } from '../../services/apiService';
 import HouseContextMenu from './HouseContextMenu';
 import HouseAnalysisModal from './HouseAnalysisModal';
 
-const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) => {
+const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, chartRefHighlight = null }) => {
   const { signs, planets } = CHART_CONFIG;
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
@@ -19,6 +19,17 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
   const [houseSignificationsModal, setHouseSignificationsModal] = useState({ show: false, houseNumber: null, signName: null });
   const [aspectsHighlight, setAspectsHighlight] = useState({ show: false, houseNumber: null });
   const [houseStrengthModal, setHouseStrengthModal] = useState({ show: false, houseNumber: null, signName: null });
+  const [chartRefHighlightState, setChartRefHighlightState] = useState(null);
+  
+  // Handle chart reference highlighting from chat
+  useEffect(() => {
+    if (chartRefHighlight) {
+      setChartRefHighlightState(chartRefHighlight);
+      // Auto-clear after 3 seconds
+      const timer = setTimeout(() => setChartRefHighlightState(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [chartRefHighlight]);
   
   // South Indian chart - fixed 4x4 grid positions (signs don't rotate)
   const gridPositions = [
@@ -467,6 +478,20 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
           <g key={index}>
             {pos.sign !== -1 && (
               <>
+                {/* Chart reference highlighting from chat */}
+                {chartRefHighlightState?.type === 'house' && parseInt(chartRefHighlightState.value) === houseNumber && (
+                  <rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4}
+                        fill="rgba(76, 175, 80, 0.3)" stroke="#4caf50" strokeWidth="3" strokeDasharray="6,3">
+                    <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
+                  </rect>
+                )}
+                
+                {chartRefHighlightState?.type === 'sign' && pos.sign === parseInt(chartRefHighlightState.value) - 1 && (
+                  <rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4}
+                        fill="rgba(156, 39, 176, 0.3)" stroke="#9c27b0" strokeWidth="3" strokeDasharray="4,2">
+                    <animate attributeName="opacity" values="0.7;0.3;0.7" dur="1.8s" repeatCount="indefinite"/>
+                  </rect>
+                )}
                 {/* House number */}
                 <text x={pos.x + 8} y={pos.y + 18} 
                       fontSize="12" 
@@ -521,6 +546,19 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                                 stroke={aspectingPlanet.isPositive ? '#4caf50' : '#f44336'} 
                                 strokeWidth="1.5" 
                                 strokeDasharray="2,1"/>
+                      )}
+                      
+                      {/* Chart reference planet highlighting */}
+                      {chartRefHighlightState?.type === 'planet' && 
+                       planet.name.toLowerCase() === chartRefHighlightState.value.toLowerCase() && (
+                        <circle cx={planetX} cy={planetY} r="12" 
+                                fill="rgba(255, 107, 53, 0.4)" 
+                                stroke="#ff6b35" 
+                                strokeWidth="2" 
+                                strokeDasharray="3,1">
+                          <animate attributeName="r" values="10;15;10" dur="1.5s" repeatCount="indefinite"/>
+                          <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
+                        </circle>
                       )}
                       {/* Planet symbol */}
                       <text x={planetX} 

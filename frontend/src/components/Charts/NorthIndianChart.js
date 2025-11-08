@@ -52,7 +52,7 @@ import HouseAnalysisModal from './HouseAnalysisModal';
  * See: docs/NORTH_INDIAN_CHART_POSITIONING.md for complete reference
  */
 
-const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) => {
+const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, chartRefHighlight = null }) => {
   const { signs, planets } = CHART_CONFIG;
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, planet: null, rashi: null, type: null });
@@ -66,6 +66,17 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
   const [houseSignificationsModal, setHouseSignificationsModal] = useState({ show: false, houseNumber: null, signName: null });
   const [aspectsHighlight, setAspectsHighlight] = useState({ show: false, houseNumber: null });
   const [houseStrengthModal, setHouseStrengthModal] = useState({ show: false, houseNumber: null, signName: null });
+  const [chartRefHighlightState, setChartRefHighlightState] = useState(null);
+  
+  // Handle chart reference highlighting from chat
+  useEffect(() => {
+    if (chartRefHighlight) {
+      setChartRefHighlightState(chartRefHighlight);
+      // Auto-clear after 3 seconds
+      const timer = setTimeout(() => setChartRefHighlightState(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [chartRefHighlight]);
 
   
 
@@ -545,6 +556,23 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                       fill="rgba(233, 30, 99, 0.2)" stroke="#e91e63" strokeWidth="3" strokeDasharray="5,5"/>
             )}
             
+            {/* Chart reference highlighting from chat */}
+            {chartRefHighlightState?.type === 'house' && parseInt(chartRefHighlightState.value) === houseNumber && (
+              <circle cx={houseData.center.x} cy={houseData.center.y} r="40" 
+                      fill="rgba(76, 175, 80, 0.3)" stroke="#4caf50" strokeWidth="4" strokeDasharray="8,4">
+                <animate attributeName="r" values="35;45;35" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
+              </circle>
+            )}
+            
+            {chartRefHighlightState?.type === 'sign' && rashiIndex === parseInt(chartRefHighlightState.value) - 1 && (
+              <circle cx={houseData.center.x} cy={houseData.center.y} r="38" 
+                      fill="rgba(156, 39, 176, 0.3)" stroke="#9c27b0" strokeWidth="4" strokeDasharray="6,3">
+                <animate attributeName="r" values="33;43;33" dur="1.8s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.7;0.3;0.7" dur="1.8s" repeatCount="indefinite"/>
+              </circle>
+            )}
+            
             {/* Rashi number (Aries=1, Taurus=2, etc.) */}
             <text x={houseNumber === 1 ? houseData.center.x - 5 :
                      houseNumber === 2 ? houseData.center.x - 10 :
@@ -704,6 +732,19 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                             stroke={aspectingPlanet.isPositive ? '#4caf50' : '#f44336'} 
                             strokeWidth="2" 
                             strokeDasharray="3,2"/>
+                  )}
+                  
+                  {/* Chart reference planet highlighting */}
+                  {chartRefHighlightState?.type === 'planet' && 
+                   planet.name.toLowerCase() === chartRefHighlightState.value.toLowerCase() && (
+                    <circle cx={planetX} cy={planetY} r="18" 
+                            fill="rgba(255, 107, 53, 0.4)" 
+                            stroke="#ff6b35" 
+                            strokeWidth="3" 
+                            strokeDasharray="4,2">
+                      <animate attributeName="r" values="15;22;15" dur="1.5s" repeatCount="indefinite"/>
+                      <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
                   )}
                   {/* Planet symbol */}
                   <text x={planetX} 

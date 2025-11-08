@@ -11,12 +11,28 @@ export const showToast = (message, type = 'success', duration = 2000) => {
     toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
     
+    // Get background color based on type
+    let backgroundColor;
+    switch(type) {
+        case 'success':
+            backgroundColor = '#4CAF50';
+            break;
+        case 'error':
+            backgroundColor = '#f44336';
+            break;
+        case 'info':
+            backgroundColor = '#2196F3';
+            break;
+        default:
+            backgroundColor = '#4CAF50';
+    }
+    
     // Style the toast
     Object.assign(toast.style, {
         position: 'fixed',
         top: '20px',
         right: '20px',
-        background: type === 'success' ? '#4CAF50' : '#f44336',
+        background: backgroundColor,
         color: 'white',
         padding: '12px 20px',
         borderRadius: '8px',

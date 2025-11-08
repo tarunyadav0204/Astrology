@@ -213,6 +213,8 @@ Start with Quick Answer (2-3 sentences) then provide full analysis:
 
 ### [Continue with full detailed sections as normal]
 
+
+
 FOLLOW-UP QUESTIONS - MANDATORY:
 End your response with 3-4 relevant follow-up questions in this exact format:
 <div class="follow-up-questions">
