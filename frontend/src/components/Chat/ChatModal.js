@@ -427,14 +427,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         .replace(/&nbsp;/g, ' ')
                                         .trim();
                                     
+                                    console.log('Decoded response text:', responseText.substring(0, 200));
+                                    console.log('Response text length:', responseText.length);
+                                    
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
+                                        console.log('Setting assistant message content:', assistantMessage);
                                         setMessages(prev => {
-                                            return prev.map(msg => 
+                                            const updated = prev.map(msg => 
                                                 msg.id === assistantMessage.id 
                                                     ? { ...assistantMessage }
                                                     : msg
                                             );
+                                            console.log('Updated messages:', updated);
+                                            return updated;
                                         });
                                         await saveMessage(currentSessionId, 'assistant', responseText);
                                     }

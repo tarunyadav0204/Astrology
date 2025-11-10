@@ -143,6 +143,13 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         };
     }, []);
     const formatContent = (content) => {
+        console.log('MessageBubble formatContent called with:', content?.substring(0, 200));
+        
+        if (!content || content.trim() === '') {
+            console.log('Empty content received in formatContent');
+            return '';
+        }
+        
         // First decode HTML entities
         let formatted = content
             .replace(/&quot;/g, '"')
@@ -151,6 +158,8 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             .replace(/&gt;/g, '>')
             .replace(/&#39;/g, "'")
             .replace(/&nbsp;/g, ' ');
+        
+        console.log('After HTML entity decoding:', formatted.substring(0, 200));
         
         // Then normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
