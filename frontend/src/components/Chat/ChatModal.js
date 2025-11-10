@@ -421,10 +421,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         };
         
         try {
+            console.log('DEBUG: Starting streaming response processing');
             const response = await retryRequest();
+            console.log('DEBUG: Got response from retryRequest');
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
+            let reader, decoder;
+            try {
+                reader = response.body.getReader();
+                decoder = new TextDecoder();
+                console.log('DEBUG: Stream reader initialized successfully');
+            } catch (streamError) {
+                console.error('STREAM INIT ERROR:', streamError);
+                console.error('Stream error stack:', streamError.stack);
+                throw streamError;
+            }
             
             // Clear loading interval
             clearInterval(loadingInterval);
@@ -437,20 +447,48 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             };
             
             let messageAdded = false;
+            console.log('DEBUG: Starting stream reading loop');
 
             while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                let readResult;
+                try {
+                    readResult = await reader.read();
+                    console.log('DEBUG: Read chunk, done:', readResult.done, 'value length:', readResult.value?.length);
+                } catch (readError) {
+                    console.error('STREAM READ ERROR:', readError);
+                    console.error('Read error stack:', readError.stack);
+                    break;
+                }
+                
+                const { done, value } = readResult;
+                if (done) {
+                    console.log('DEBUG: Stream reading completed');
+                    break;
+                }
 
-                const chunk = decoder.decode(value);
+                let chunk;
+                try {
+                    chunk = decoder.decode(value);
+                    console.log('DEBUG: Decoded chunk length:', chunk.length, 'preview:', chunk.substring(0, 100));
+                } catch (decodeError) {
+                    console.error('DECODE ERROR:', decodeError);
+                    continue;
+                }
+                
                 const lines = chunk.split('\n');
+                console.log('DEBUG: Processing', lines.length, 'lines');
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6).trim();
-                        if (data === '[DONE]') break;
+                        console.log('DEBUG: Processing data line, length:', data.length);
+                        if (data === '[DONE]') {
+                            console.log('DEBUG: Received [DONE] marker');
+                            break;
+                        }
                         if (data && data.length > 0) {
-                                try {
+                            try {
+                                console.log('DEBUG: Attempting to parse JSON data');
                                 // Decode HTML entities in the raw data
                                 const decodeHtmlEntities = (text) => {
                                     const textarea = document.createElement('textarea');
@@ -462,19 +500,24 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 let parsed;
                                 try {
                                     parsed = JSON.parse(data);
+                                    console.log('DEBUG: JSON parsed successfully, status:', parsed.status);
                                 } catch (parseError) {
+                                    console.log('DEBUG: Direct JSON parse failed, trying with HTML decode');
                                     // If direct parsing fails, try decoding first
                                     const decodedData = decodeHtmlEntities(data);
                                     parsed = JSON.parse(decodedData);
+                                    console.log('DEBUG: JSON parsed after HTML decode, status:', parsed.status);
                                 }
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
+                                    console.log('DEBUG: Processing complete response');
                                     // Decode HTML entities in the response content
                                     let responseText = parsed.response;
                                     
                                     // Check if response contains HTML entities and decode them
                                     if (responseText.includes('&lt;') || responseText.includes('&gt;') || responseText.includes('&quot;') || responseText.includes('&#39;')) {
                                         responseText = decodeHtmlEntities(responseText);
+                                        console.log('DEBUG: HTML entities decoded');
                                     }
                                     
                                     responseText = responseText.trim();
@@ -487,78 +530,126 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         console.log('PROD - typingMessageId:', typingMessageId);
                                     }
                                     
+                                    console.log('DEBUG: Response text length:', responseText.length);
+                                    
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
+                                        console.log('DEBUG: Set assistant message content');
                                         
                                         if (!messageAdded) {
+                                            console.log('DEBUG: Adding new message to replace typing indicator');
                                             // Replace typing message with actual response
+                                            try {
+                                                setMessages(prev => {
+                                                    console.log('DEBUG: setMessages called, prev length:', prev.length);
+                                                    const updated = prev.map(msg => 
+                                                        msg.id === typingMessageId 
+                                                            ? { ...assistantMessage }
+                                                            : msg
+                                                    );
+                                                    
+                                                    console.log('DEBUG: Messages updated, new length:', updated.length);
+                                                    
+                                                    if (window.location.hostname === 'astroroshni.com') {
+                                                        console.log('PROD - Updated messages count:', updated.length);
+                                                        console.log('PROD - Assistant message in array:', updated.find(m => m.id === assistantMessage.id));
+                                                    }
+                                                    
+                                                    return updated;
+                                                });
+                                                messageAdded = true;
+                                                console.log('DEBUG: Message added successfully');
+                                            } catch (setMessageError) {
+                                                console.error('SET MESSAGE ERROR:', setMessageError);
+                                                console.error('SetMessage error stack:', setMessageError.stack);
+                                            }
+                                        } else {
+                                            console.log('DEBUG: Updating existing message');
+                                            // Update existing message
+                                            try {
+                                                setMessages(prev => {
+                                                    return prev.map(msg => 
+                                                        msg.id === assistantMessage.id 
+                                                            ? { ...assistantMessage }
+                                                            : msg
+                                                    );
+                                                });
+                                            } catch (updateError) {
+                                                console.error('UPDATE MESSAGE ERROR:', updateError);
+                                            }
+                                        }
+                                        
+                                        try {
+                                            await saveMessage(currentSessionId, 'assistant', responseText);
+                                            console.log('DEBUG: Message saved to backend');
+                                        } catch (saveError) {
+                                            console.error('SAVE MESSAGE ERROR:', saveError);
+                                        }
+                                    }
+                                } else if (parsed.status === 'error') {
+                                    console.log('DEBUG: Processing error response');
+                                    assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
+                                    
+                                    if (!messageAdded) {
+                                        try {
                                             setMessages(prev => {
-                                                const updated = prev.map(msg => 
+                                                return prev.map(msg => 
                                                     msg.id === typingMessageId 
                                                         ? { ...assistantMessage }
                                                         : msg
                                                 );
-                                                
-                                                if (window.location.hostname === 'astroroshni.com') {
-                                                    console.log('PROD - Updated messages count:', updated.length);
-                                                    console.log('PROD - Assistant message in array:', updated.find(m => m.id === assistantMessage.id));
-                                                }
-                                                
-                                                return updated;
                                             });
                                             messageAdded = true;
-                                        } else {
-                                            // Update existing message
-                                            setMessages(prev => {
-                                                return prev.map(msg => 
-                                                    msg.id === assistantMessage.id 
-                                                        ? { ...assistantMessage }
-                                                        : msg
-                                                );
-                                            });
+                                        } catch (errorSetError) {
+                                            console.error('ERROR SET MESSAGE ERROR:', errorSetError);
                                         }
-                                        await saveMessage(currentSessionId, 'assistant', responseText);
-                                    }
-                                } else if (parsed.status === 'error') {
-                                    assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
-                                    
-                                    if (!messageAdded) {
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === typingMessageId 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
-                                        messageAdded = true;
                                     }
                                 }
-                            } catch (e) {
-                                const statusMatch = data.match(/"status"\s*:\s*"([^"]+)"/);
-                                const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                            } catch (parseError) {
+                                console.log('DEBUG: JSON parsing failed, trying regex fallback');
+                                console.error('JSON PARSE ERROR:', parseError);
+                                console.error('Parse error stack:', parseError.stack);
+                                console.log('Problematic data:', data.substring(0, 200));
                                 
-                                if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
-                                    let response = responseMatch[1]
-                                        .replace(/\\n/g, '\n')
-                                        .replace(/\\"/g, '"');
+                                try {
+                                    const statusMatch = data.match(/"status"\s*:\s*"([^"]+)"/);
+                                    const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                                     
-                                    // Check if response contains HTML entities and decode them
-                                    if (response.includes('&lt;') || response.includes('&gt;') || response.includes('&quot;') || response.includes('&#39;')) {
-                                        response = decodeHtmlEntities(response);
+                                    if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
+                                        console.log('DEBUG: Regex fallback successful');
+                                        let response = responseMatch[1]
+                                            .replace(/\\n/g, '\n')
+                                            .replace(/\\"/g, '"');
+                                        
+                                        // Check if response contains HTML entities and decode them
+                                        if (response.includes('&lt;') || response.includes('&gt;') || response.includes('&quot;') || response.includes('&#39;')) {
+                                            response = decodeHtmlEntities(response);
+                                        }
+                                        assistantMessage.content = response;
+                                        
+                                        if (!messageAdded) {
+                                            try {
+                                                setMessages(prev => {
+                                                    return prev.map(msg => 
+                                                        msg.id === typingMessageId 
+                                                            ? { ...assistantMessage }
+                                                            : msg
+                                                    );
+                                                });
+                                                messageAdded = true;
+                                            } catch (regexSetError) {
+                                                console.error('REGEX SET MESSAGE ERROR:', regexSetError);
+                                            }
+                                        }
+                                        
+                                        try {
+                                            await saveMessage(currentSessionId, 'assistant', response);
+                                        } catch (regexSaveError) {
+                                            console.error('REGEX SAVE ERROR:', regexSaveError);
+                                        }
                                     }
-                                    assistantMessage.content = response;
-                                    
-                                    if (!messageAdded) {
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === typingMessageId 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
-                                        messageAdded = true;
-                                    }
-                                    await saveMessage(currentSessionId, 'assistant', response);
+                                } catch (regexError) {
+                                    console.error('REGEX FALLBACK ERROR:', regexError);
                                 }
                             }
                         }
@@ -566,12 +657,22 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 }
             }
             
+            console.log('DEBUG: Stream processing completed, messageAdded:', messageAdded);
+            
             // If no message was added, remove the typing indicator
             if (!messageAdded) {
-                setMessages(prev => prev.filter(msg => msg.id !== typingMessageId));
+                console.log('DEBUG: No message added, removing typing indicator');
+                try {
+                    setMessages(prev => prev.filter(msg => msg.id !== typingMessageId));
+                } catch (removeTypingError) {
+                    console.error('REMOVE TYPING ERROR:', removeTypingError);
+                }
             }
         } catch (error) {
-            console.error('Error sending message after retries:', error);
+            console.error('MAIN STREAMING ERROR:', error);
+            console.error('Main error stack:', error.stack);
+            console.error('Main error name:', error.name);
+            console.error('Main error message:', error.message);
             clearInterval(loadingInterval);
             
             let errorMessage = 'Sorry, I encountered an error after multiple attempts. Please try again.';
