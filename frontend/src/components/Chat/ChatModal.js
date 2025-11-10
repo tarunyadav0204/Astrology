@@ -458,12 +458,26 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     return textarea.value;
                                 };
                                 
-                                const decodedData = decodeHtmlEntities(data);
-                                const parsed = JSON.parse(decodedData);
+                                // First try to parse as-is, then decode if needed
+                                let parsed;
+                                try {
+                                    parsed = JSON.parse(data);
+                                } catch (parseError) {
+                                    // If direct parsing fails, try decoding first
+                                    const decodedData = decodeHtmlEntities(data);
+                                    parsed = JSON.parse(decodedData);
+                                }
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
                                     // Decode HTML entities in the response content
-                                    let responseText = decodeHtmlEntities(parsed.response).trim();
+                                    let responseText = parsed.response;
+                                    
+                                    // Check if response contains HTML entities and decode them
+                                    if (responseText.includes('&lt;') || responseText.includes('&gt;') || responseText.includes('&quot;') || responseText.includes('&#39;')) {
+                                        responseText = decodeHtmlEntities(responseText);
+                                    }
+                                    
+                                    responseText = responseText.trim();
                                     
                                     // Debug for production
                                     if (window.location.hostname === 'astroroshni.com') {
@@ -527,7 +541,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     let response = responseMatch[1]
                                         .replace(/\\n/g, '\n')
                                         .replace(/\\"/g, '"');
-                                    response = decodeHtmlEntities(response);
+                                    
+                                    // Check if response contains HTML entities and decode them
+                                    if (response.includes('&lt;') || response.includes('&gt;') || response.includes('&quot;') || response.includes('&#39;')) {
+                                        response = decodeHtmlEntities(response);
+                                    }
                                     assistantMessage.content = response;
                                     
                                     if (!messageAdded) {

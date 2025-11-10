@@ -84,7 +84,25 @@ class GeminiChatAnalyzer:
             import concurrent.futures
             
             def _sync_generate_content():
-                return self.model.generate_content(prompt)
+                try:
+                    print(f"\n=== CALLING GEMINI API ===")
+                    print(f"Model: {self.model._model_name if hasattr(self.model, '_model_name') else 'Unknown'}")
+                    print(f"Prompt length: {len(prompt)} characters")
+                    
+                    response = self.model.generate_content(prompt)
+                    
+                    print(f"\n=== GEMINI API RESPONSE ===")
+                    print(f"Response type: {type(response)}")
+                    print(f"Has text: {hasattr(response, 'text')}")
+                    if hasattr(response, 'text'):
+                        print(f"Text length: {len(response.text) if response.text else 0}")
+                    
+                    return response
+                except Exception as api_error:
+                    print(f"\n=== GEMINI API ERROR ===")
+                    print(f"API Error type: {type(api_error).__name__}")
+                    print(f"API Error message: {str(api_error)}")
+                    raise api_error
             
             # Execute in thread pool with timeout
             loop = asyncio.get_event_loop()
@@ -130,11 +148,28 @@ class GeminiChatAnalyzer:
             }
         except Exception as e:
             print(f"\n=== AI ERROR (ASYNC) ===")
-            print(f"Error: {str(e)}")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            
+            # More specific error handling
+            error_message = "I'm having trouble processing your question right now. Please try rephrasing it or try again later."
+            
+            if "quota" in str(e).lower() or "rate limit" in str(e).lower():
+                error_message = "I'm receiving too many requests right now. Please wait a moment and try again."
+            elif "api key" in str(e).lower() or "authentication" in str(e).lower():
+                error_message = "There's a temporary service configuration issue. Please try again shortly."
+            elif "content" in str(e).lower() or "safety" in str(e).lower():
+                error_message = "I couldn't process this question due to content guidelines. Please try rephrasing your question."
+            elif "timeout" in str(e).lower():
+                error_message = "Your question is taking too long to process. Please try a more specific question."
+            elif "model" in str(e).lower() or "unavailable" in str(e).lower():
+                error_message = "The AI service is temporarily unavailable. Please try again in a few minutes."
+            
             return {
                 'success': False,
-                'response': f"I apologize, but I'm having trouble analyzing your chart right now. Please try again.",
-                'error': str(e)
+                'response': error_message,
+                'error': str(e),
+                'error_type': type(e).__name__
             }
     
     def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed') -> str:

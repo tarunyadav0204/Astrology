@@ -97,16 +97,19 @@ async def ask_question(request: ChatRequest):
                         if not response_text or response_text.strip() == '':
                             response_text = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
                         
-                        # Ensure response is properly formatted
-                        clean_response = response_text.strip()
+                        # Ensure response is properly formatted and decode any HTML entities
+                        clean_response = html.unescape(response_text.strip())
+                        
+                        print(f"Before JSON serialization: {clean_response[:100]}...")
                         
                         response_json = json.dumps({
                             'status': 'complete', 
                             'response': clean_response
                         }, ensure_ascii=False, separators=(',', ':'))
                         
+                        print(f"After JSON serialization: {response_json[:200]}...")
                         print(f"Sending response length: {len(clean_response)}")
-                        print(f"Response preview: {clean_response[:100]}...")
+                        print(f"Response preview: {clean_response[:100]}..."
                         
                         yield f"data: {response_json}\n\n"
                         
