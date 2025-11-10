@@ -106,7 +106,8 @@ class GeminiChatAnalyzer:
                         if response.text:
                             print(f"Response ends with: '{response.text[-50:]}'")
                             print(f"Contains null bytes: {chr(0) in response.text}")
-                            print(f"Contains control chars: {any(ord(c) < 32 and c not in '\n\r\t' for c in response.text)}")
+                            control_chars = '\n\r\t'
+                            print(f"Contains control chars: {any(ord(c) < 32 and c not in control_chars for c in response.text)}")
                     
                     return response
                 except Exception as api_error:
@@ -150,7 +151,8 @@ class GeminiChatAnalyzer:
             
             # Clean response text to prevent JSON issues
             # Remove any control characters except newlines, tabs, and carriage returns
-            cleaned_text = ''.join(char for char in response_text if ord(char) >= 32 or char in '\n\r\t')
+            allowed_chars = '\n\r\t'
+            cleaned_text = ''.join(char for char in response_text if ord(char) >= 32 or char in allowed_chars)
             
             # Ensure response doesn't end abruptly (minimum length check)
             if len(cleaned_text) < 50:
