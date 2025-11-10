@@ -234,11 +234,27 @@ export default function ChatScreen({ navigation }) {
               if (data === '[DONE]') break;
               if (data && data.length > 0) {
                 try {
-                  const cleanData = data.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+                  // First decode HTML entities in the raw data
+                  const cleanData = data
+                    .replace(/&quot;/g, '"')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&#39;/g, "'")
+                    .replace(/&nbsp;/g, ' ');
                   const parsed = JSON.parse(cleanData);
                   
                   if (parsed.status === 'complete' && parsed.response) {
-                    const responseText = parsed.response.trim();
+                    // Decode HTML entities in the response content
+                    let responseText = parsed.response
+                      .replace(/&quot;/g, '"')
+                      .replace(/&amp;/g, '&')
+                      .replace(/&lt;/g, '<')
+                      .replace(/&gt;/g, '>')
+                      .replace(/&#39;/g, "'")
+                      .replace(/&nbsp;/g, ' ')
+                      .trim();
+                    
                     if (responseText.length > 0) {
                       assistantMessage.content = responseText;
                       setMessages(prev => 
@@ -268,7 +284,15 @@ export default function ChatScreen({ navigation }) {
                   const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                   
                   if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
-                    const response = responseMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    let response = responseMatch[1]
+                      .replace(/\\n/g, '\n')
+                      .replace(/\\"/g, '"')
+                      .replace(/&quot;/g, '"')
+                      .replace(/&amp;/g, '&')
+                      .replace(/&lt;/g, '<')
+                      .replace(/&gt;/g, '>')
+                      .replace(/&#39;/g, "'")
+                      .replace(/&nbsp;/g, ' ');
                     assistantMessage.content = response;
                     setMessages(prev => 
                       prev.map(msg => 
@@ -298,7 +322,15 @@ export default function ChatScreen({ navigation }) {
                   const parsed = JSON.parse(data);
                   console.log('Parsed SSE data:', parsed);
                   if (parsed.status === 'complete' && parsed.response) {
-                    assistantMessage.content = parsed.response;
+                    // Decode HTML entities in response
+                    let responseText = parsed.response
+                      .replace(/&quot;/g, '"')
+                      .replace(/&amp;/g, '&')
+                      .replace(/&lt;/g, '<')
+                      .replace(/&gt;/g, '>')
+                      .replace(/&#39;/g, "'")
+                      .replace(/&nbsp;/g, ' ');
+                    assistantMessage.content = responseText;
                     setMessages(prev => 
                       prev.map(msg => 
                         msg.id === assistantMessage.id ? { ...assistantMessage } : msg
@@ -318,7 +350,15 @@ export default function ChatScreen({ navigation }) {
             const data = JSON.parse(responseText);
             console.log('Parsed JSON data:', data);
             if (data.response) {
-              assistantMessage.content = data.response;
+              // Decode HTML entities in response
+              let responseText = data.response
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'")
+                .replace(/&nbsp;/g, ' ');
+              assistantMessage.content = responseText;
             } else if (data.error) {
               assistantMessage.content = `Sorry, I encountered an error: ${data.error}. Please try again.`;
             } else {

@@ -2427,3 +2427,146 @@ No search query, returning all charts
 Found 13 charts
 [2025-11-10 22:18:39] Response: 200 - Time: 0.04s
 INFO:     127.0.0.1:64897 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 22:26:48] GET /api/horoscope/all-signs - Client: 127.0.0.1
+INFO:     127.0.0.1:52557 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52558 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52560 - "OPTIONS /api/panchang/choghadiya?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52562 - "OPTIONS /api/panchang/hora?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52563 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-10 22:26:48] Response: 200 - Time: 0.03s
+[2025-11-10 22:26:48] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-10 22:26:48] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-10 22:26:48] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-10 22:26:48] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-10 22:26:48] GET /api/panchang/choghadiya - Client: 127.0.0.1
+INFO:     127.0.0.1:52553 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-10 22:26:48] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52563 - "GET /api/panchang/choghadiya?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-10 22:26:48] Response: 422 - Time: 0.01s
+[2025-11-10 22:26:48] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52560 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:52562 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-10 22:26:48] GET /api/panchang/hora - Client: 127.0.0.1
+[2025-11-10 22:26:48] Response: 200 - Time: 0.00s
+[2025-11-10 22:26:48] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+INFO:     127.0.0.1:52553 - "GET /api/panchang/hora?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-10 22:26:48] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52563 - "GET /api/panchang/special-muhurtas?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+[2025-11-10 22:26:48] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:52557 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+[2025-11-10 22:26:48] Response: 200 - Time: 0.04s
+INFO:     127.0.0.1:52558 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52558 - "OPTIONS /api/me HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] GET /api/me - Client: 127.0.0.1
+[2025-11-10 22:31:15] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52558 - "GET /api/me HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] GET /api/horoscope/all-signs - Client: 127.0.0.1
+INFO:     127.0.0.1:52557 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52553 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] Response: 200 - Time: 0.02s
+[2025-11-10 22:31:15] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-10 22:31:15] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-10 22:31:15] GET /api/panchang/hora - Client: 127.0.0.1
+[2025-11-10 22:31:15] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-10 22:31:15] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-10 22:31:15] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52558 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] Response: 200 - Time: 0.00s
+[2025-11-10 22:31:15] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52560 - "GET /api/panchang/hora?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] Response: 422 - Time: 0.01s
+[2025-11-10 22:31:15] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52557 - "GET /api/panchang/choghadiya?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52553 - "GET /api/panchang/special-muhurtas?date=2025-11-10&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52563 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:52562 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-10 22:31:15] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+[2025-11-10 22:31:15] Response: 200 - Time: 0.01s
+[2025-11-10 22:31:15] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52558 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52560 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 22:31:15] GET /logo192.png - Client: None
+[2025-11-10 22:31:15] Response: 404 - Time: 0.00s
+INFO:     None:0 - "GET /logo192.png HTTP/1.1" 404 Not Found
+[2025-11-10 22:31:18] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+[2025-11-10 22:31:18] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52560 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52560 - "OPTIONS /api/calculate-chart?node_type=mean HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52558 - "OPTIONS /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-10 22:31:20] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 22:31:20] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-10 22:31:20] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52558 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-10 22:31:20] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:52560 - "POST /api/calculate-chart?node_type=mean HTTP/1.1" 200 OK
+[2025-11-10 22:31:20] POST /api/chat/history - Client: None
+[2025-11-10 22:31:20] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+[2025-11-10 22:31:20] Response: 200 - Time: 0.01s
+[2025-11-10 22:31:20] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52560 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 22:31:23] POST /api/chat/session - Client: None
+[2025-11-10 22:31:23] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/session HTTP/1.1" 200 OK
+[2025-11-10 22:31:23] POST /api/chat/message - Client: None
+[2025-11-10 22:31:23] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-10 22:31:23] POST /api/chat/ask - Client: None
+
+=== STREAMING STARTED ===
+Request question: What are my health vulnerabilities?
+Request data: name='Deepika Yadav' date='1981-03-22' time='10:37' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender=None question='What are my health vulnerabilities?' language='english' response_style='detailed'
+DEBUG: Valid planets in chart: ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+DEBUG: Sun - House: 11, Sign: 11
+DEBUG: Moon - House: 5, Sign: 5
+DEBUG: Mars - House: 11, Sign: 11
+DEBUG: Mercury - House: 10, Sign: 10
+DEBUG: Jupiter - House: 5, Sign: 5
+DEBUG: Venus - House: 11, Sign: 11
+DEBUG: Saturn - House: 5, Sign: 5
+DEBUG: Houses occupied: {10, 11, 5}
+DEBUG: Found 3 Raj Yogas
+
+=== CHAT ROUTE DEBUG ===
+Question: What are my health vulnerabilities?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '10:37', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': None}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What are my health vulnerabilities?
+Prompt length: 144739 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 15217 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your primary health vulnerabilities stem from the combustion of **Venus** (Lagna and 6th lord) and **Mars** (12th lord), indicating a delicate constitu...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15217
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your primary health vulnerabilities stem from the c...
+[2025-11-10 22:32:11] Response: 200 - Time: 47.68s
+INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 22:32:11] POST /api/chat/message - Client: None
+[2025-11-10 22:32:11] Response: 200 - Time: 0.02s
+INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK

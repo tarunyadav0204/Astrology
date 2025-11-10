@@ -143,8 +143,17 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         };
     }, []);
     const formatContent = (content) => {
-        // First, normalize line breaks
-        let formatted = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        // First decode HTML entities
+        let formatted = content
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ');
+        
+        // Then normalize line breaks
+        formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         
         // Handle Follow-up Questions section
         formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
