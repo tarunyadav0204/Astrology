@@ -57,6 +57,15 @@ except Exception as e:
     print(f"Warning loading environment variables: {e}")
     pass
 
+# Install psutil if not available
+try:
+    import psutil
+except ImportError:
+    print("Installing psutil for memory monitoring...")
+    import subprocess
+    subprocess.check_call(["pip", "install", "psutil"])
+    import psutil
+
 app = FastAPI()
 horoscope_api = HoroscopeAPI()
 
@@ -78,6 +87,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         import time
+        import gc
         start_time = time.time()
         
         # Log incoming request
@@ -85,9 +95,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         
         response = await call_next(request)
         
-        # Log response
+        # Log response and cleanup
         process_time = time.time() - start_time
         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Response: {response.status_code} - Time: {process_time:.2f}s")
+        
+        # Force garbage collection after heavy requests
+        if process_time > 5.0 or request.url.path in ["/api/calculate-chart", "/api/chat", "/api/ai-insights"]:
+            gc.collect()
         
         return response
 
@@ -906,6 +920,28 @@ async def api_health():
         return {"status": "healthy", "message": "Astrology API is running", "users": user_count}
     except Exception as e:
         return {"status": "unhealthy", "message": f"Database error: {str(e)}"}
+
+@app.get("/api/system-status")
+async def system_status():
+    try:
+        import psutil
+        import gc
+        
+        # Get memory usage
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        cpu_percent = process.cpu_percent()
+        
+        # Force garbage collection
+        gc.collect()
+        
+        return {
+            "memory_mb": round(memory_mb, 2),
+            "cpu_percent": cpu_percent,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
@@ -2917,9 +2953,9 @@ if __name__ == "__main__":
         app, 
         host="0.0.0.0", 
         port=8001,
-        timeout_keep_alive=300,  # Keep connections alive for 5 minutes
-        timeout_graceful_shutdown=60,  # Allow 60 seconds for graceful shutdown
+        timeout_keep_alive=120,  # Reduced to 2 minutes
+        timeout_graceful_shutdown=30,  # Reduced shutdown time
         access_log=True,  # Enable access logs to see requests
-        limit_max_requests=1000,  # Prevent memory leaks
-        limit_concurrency=100  # Limit concurrent connections
+        limit_max_requests=500,  # Reduced to prevent memory leaks
+        limit_concurrency=50  # Reduced concurrent connections
     )

@@ -918,23 +918,41 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(255, 255, 255, 0.95);
-        padding: 16px;
-        border-radius: 12px;
+        background: transparent;
+        padding: 0;
+        border-radius: 0;
         flex-direction: column;
-        gap: 12px;
-        backdrop-filter: blur(20px);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        border: 2px solid #e91e63;
+        gap: 0;
+        backdrop-filter: none;
+        box-shadow: none;
+        border: none;
     }
     
     .action-btn {
-        width: 48px;
-        height: 48px;
-        font-size: 18px;
-        border-radius: 12px;
-        background: #e91e63;
-        color: white;
+        width: 64px !important;
+        height: 64px !important;
+        min-width: 64px !important;
+        min-height: 64px !important;
+        max-width: 64px !important;
+        max-height: 64px !important;
+        font-size: 0 !important;
+        border-radius: 8px !important;
+        background: #25D366 !important;
+        color: white !important;
+        border: none !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4) !important;
+        flex-shrink: 0 !important;
+        aspect-ratio: 1 !important;
+    }
+    
+    .action-btn svg {
+        width: 32px;
+        height: 32px;
+        fill: white;
     }
 }
 

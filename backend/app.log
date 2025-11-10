@@ -335,3 +335,2095 @@ Found 9 charts
 [2025-11-08 23:08:42] Response: 200 - Time: 0.01s
 INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50950 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50950 - "OPTIONS /api/calculate-friendship HTTP/1.1" 200 OK
+[2025-11-08 23:09:39] POST /api/calculate-friendship - Client: 127.0.0.1
+[2025-11-08 23:09:39] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50950 - "POST /api/calculate-friendship HTTP/1.1" 200 OK
+[2025-11-08 23:09:47] POST /api/calculate-friendship - Client: 127.0.0.1
+[2025-11-08 23:09:47] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50950 - "POST /api/calculate-friendship HTTP/1.1" 200 OK
+[2025-11-08 23:09:51] POST /api/calculate-friendship - Client: 127.0.0.1
+[2025-11-08 23:09:51] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50950 - "POST /api/calculate-friendship HTTP/1.1" 200 OK
+[2025-11-08 23:09:52] POST /api/calculate-friendship - Client: 127.0.0.1
+[2025-11-08 23:09:52] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-friendship HTTP/1.1" 200 OK
+[2025-11-08 23:09:54] POST /api/calculate-friendship - Client: 127.0.0.1
+[2025-11-08 23:09:54] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-friendship HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51594 - "OPTIONS /api/calculate-ashtakavarga HTTP/1.1" 200 OK
+[2025-11-08 23:09:55] POST /api/calculate-ashtakavarga - Client: 127.0.0.1
+[2025-11-08 23:09:55] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-ashtakavarga HTTP/1.1" 200 OK
+[2025-11-08 23:10:03] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-08 23:10:03] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51594 - "OPTIONS /api/badhaka-maraka-analysis HTTP/1.1" 200 OK
+[2025-11-08 23:10:03] POST /api/badhaka-maraka-analysis - Client: 127.0.0.1
+[2025-11-08 23:10:03] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:51594 - "POST /api/badhaka-maraka-analysis HTTP/1.1" 200 OK
+[2025-11-08 23:10:04] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-08 23:10:04] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-08 23:10:04] POST /api/badhaka-maraka-analysis - Client: 127.0.0.1
+[2025-11-08 23:10:04] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51594 - "POST /api/badhaka-maraka-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51594 - "OPTIONS /api/planetary-dignities HTTP/1.1" 200 OK
+[2025-11-08 23:10:07] POST /api/planetary-dignities - Client: 127.0.0.1
+[2025-11-08 23:10:07] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51594 - "POST /api/planetary-dignities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51594 - "OPTIONS /api/chara-karakas HTTP/1.1" 200 OK
+[2025-11-08 23:10:08] POST /api/chara-karakas - Client: 127.0.0.1
+[2025-11-08 23:10:08] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51594 - "POST /api/chara-karakas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51594 - "OPTIONS /api/calculate-classical-shadbala HTTP/1.1" 200 OK
+[2025-11-08 23:10:09] POST /api/calculate-classical-shadbala - Client: 127.0.0.1
+[2025-11-08 23:10:09] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-classical-shadbala HTTP/1.1" 200 OK
+[2025-11-08 23:10:10] POST /api/calculate-ashtakavarga - Client: 127.0.0.1
+[2025-11-08 23:10:10] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:51594 - "POST /api/calculate-ashtakavarga HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52453 - "OPTIONS /auth/login HTTP/1.1" 200 OK
+[2025-11-09 11:29:57] POST /auth/login - Client: 127.0.0.1
+[2025-11-09 11:29:57] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:52453 - "POST /auth/login HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52453 - "OPTIONS /api/login HTTP/1.1" 200 OK
+[2025-11-09 11:31:22] POST /api/login - Client: 127.0.0.1
+[2025-11-09 11:31:22] Response: 200 - Time: 0.24s
+INFO:     127.0.0.1:52453 - "POST /api/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52453 - "OPTIONS /api/charts HTTP/1.1" 200 OK
+[2025-11-09 11:31:38] GET /api/charts - Client: 127.0.0.1
+[2025-11-09 11:31:38] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:52453 - "GET /api/charts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52453 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 11:33:14] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 11:33:14] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52453 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52453 - "OPTIONS /api/calculate-chart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54039 - "OPTIONS /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-09 11:33:17] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 11:33:17] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-09 11:33:17] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:54039 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-09 11:33:17] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52453 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58187 - "OPTIONS /api/chat/session HTTP/1.1" 200 OK
+[2025-11-09 11:42:01] POST /api/chat/session - Client: 127.0.0.1
+[2025-11-09 11:42:01] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:58187 - "POST /api/chat/session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58187 - "OPTIONS /api/chat/message HTTP/1.1" 200 OK
+[2025-11-09 11:42:01] POST /api/chat/message - Client: 127.0.0.1
+[2025-11-09 11:42:01] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:58187 - "POST /api/chat/message HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58187 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:42:01] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:42:01] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:58187 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 11:42:46] POST /api/chat/message - Client: 127.0.0.1
+[2025-11-09 11:42:46] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:58187 - "POST /api/chat/message HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:42:46] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What will happen tomorrow?
+
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What will happen tomorrow?\n' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:42:46] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:58187 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 11:46:18] POST /api/chat/message - Client: 127.0.0.1
+[2025-11-09 11:46:18] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:58187 - "POST /api/chat/message HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:46:18] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: How are 
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='How are ' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:46:18] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:58187 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61669 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 11:50:50] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 11:50:50] Response: 422 - Time: 0.01s
+INFO:     127.0.0.1:61669 - "POST /api/chat/history HTTP/1.1" 422 Unprocessable Entity
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:50:53] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 11:50:53] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61669 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:13:31] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:13:31] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:62709 - "POST /api/chat/history HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:13:33] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:13:33] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62709 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:14:38] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:14:38] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:62709 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62709 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:14:40] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:14:40] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62709 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:17:17] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:17:17] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62709 - "POST /api/chat/history HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:17:19] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:17:19] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62709 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:18:20] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:18:20] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:62709 - "POST /api/chat/history HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 11, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:18:27] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='1970-01-01T10:37:00.000Z' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: could not convert string to float: '1970-01-01T10'
+[2025-11-09 12:18:27] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62709 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:21:12] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:21:12] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/history HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_routes.py", line 70, in generate_streaming_response
+    context = context_builder.build_complete_context(birth_data, request.question)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 39, in build_complete_context
+    self.static_cache[birth_hash] = self._build_static_context(birth_data)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/chat/chat_context_builder.py", line 59, in _build_static_context
+    chart_data = chart_calc.calculate_chart(birth_obj)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/calculators/chart_calculator.py", line 34, in calculate_chart
+    int(birth_data.date.split('-')[2]),
+ValueError: invalid literal for int() with base 10: '22T00:00:00.000Z'
+[2025-11-09 12:21:14] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22T00:00:00.000Z' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== STREAMING ERROR ===
+Error: invalid literal for int() with base 10: '22T00:00:00.000Z'
+[2025-11-09 12:21:14] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49775 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:22:47] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:22:47] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:22:49] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 14584 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart for a Leo Ascendant points towards a career path marked by significant transformations, deep research, and potential involvement in es...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14584
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart for a Leo Ascendant points towards...
+[2025-11-09 12:23:30] Response: 200 - Time: 40.89s
+INFO:     127.0.0.1:49775 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:26:33] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:26:33] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49775 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:26:37] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 23777 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path influenced by both significant potential and underlying challenges, especially concerning wealth and transform...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 23777
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path influenced...
+[2025-11-09 12:27:15] Response: 200 - Time: 38.39s
+INFO:     127.0.0.1:49775 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:27:55] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:27:55] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:27:58] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 14198 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by significant transformation and deep, perhaps unconventional, areas of expertise, ultimately leading ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14198
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 12:28:38] Response: 200 - Time: 39.95s
+INFO:     127.0.0.1:49775 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:31:17] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:31:17] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:31:22] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 14542 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by significant transformations, deep responsibilities, and success achieved through overcoming obstacle...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14542
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 12:32:07] Response: 200 - Time: 45.60s
+INFO:     127.0.0.1:49775 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:32:12] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:32:12] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49775 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:32:14] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 16187 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path characterized by significant transformation, analytical skill, and a disciplined pursuit of wealth, often invo...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 16187
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path characteri...
+[2025-11-09 12:33:03] Response: 200 - Time: 48.24s
+INFO:     127.0.0.1:49775 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55149 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:33:12] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:33:12] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:55149 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:33:17] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 15614 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path (Karma Bhava) for this Leo Ascendant chart, especially at your current age of 44, is marked by significant transformation and potentia...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15614
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path (Karma Bhava) for this Leo Ascenda...
+[2025-11-09 12:33:59] Response: 200 - Time: 42.29s
+INFO:     127.0.0.1:55149 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:36:03] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:36:03] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:55149 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:36:09] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 15851 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path, at 44, shows significant potential for growth and transformation despite challenges, mainly influenced by the ongoing **Saturn Mahada...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15851
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path, at 44, shows significant potentia...
+[2025-11-09 12:36:45] Response: 200 - Time: 36.22s
+INFO:     127.0.0.1:55149 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59882 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:44:19] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:44:19] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:59882 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59882 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:44:21] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 17523 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with **Leo** ascendant, points to a career path marked by deep transformations and the need for resilience, due to the 10th lord **Ve...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 17523
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with **Leo** ascendant, points to...
+[2025-11-09 12:45:07] Response: 200 - Time: 45.72s
+INFO:     127.0.0.1:59882 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:47:59] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:47:59] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:61376 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:48:01] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 11739 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with **Leo Ascendant**, points towards a career path deeply entwined with transformation, research, or fields involving hidden knowle...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 11739
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with **Leo Ascendant**, points to...
+[2025-11-09 12:48:50] Response: 200 - Time: 48.58s
+INFO:     127.0.0.1:61376 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:51:24] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: When is a good time for marriage?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='When is a good time for marriage?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: When is a good time for marriage?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: When is a good time for marriage?
+Prompt length: 145334 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 12125 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: The most favorable period for marriage or significant marital commitment appears to be during your upcoming **Saturn** Mahadasha, **Venus** Antardasha,...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 12125
+Response preview: <div class="quick-answer-card">**Quick Answer**: The most favorable period for marriage or significa...
+[2025-11-09 12:52:03] Response: 200 - Time: 39.34s
+INFO:     127.0.0.1:62460 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:53:36] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:53:36] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62460 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:53:40] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 18356 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path significantly marked by transformation, research, and unconventional methods, with potential for significant g...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 18356
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path significan...
+[2025-11-09 12:54:26] Response: 200 - Time: 46.44s
+INFO:     127.0.0.1:62460 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62460 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:55:26] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:55:26] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:62460 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62460 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:55:28] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 11149 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by deep transformation and unconventional endeavors, where success emerges after overcoming significant...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 11149
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 12:56:21] Response: 200 - Time: 52.76s
+INFO:     127.0.0.1:62460 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:57:05] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:57:05] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62460 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:57:57] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 13498 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path is marked by significant transformation and a need for resilience, largely influenced by the 10th lord **Venus** and Lagna lord **Sun*...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 13498
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path is marked by significant transform...
+[2025-11-09 12:58:38] Response: 200 - Time: 41.48s
+INFO:     127.0.0.1:62460 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 12:59:38] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 12:59:38] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:62460 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 12:59:40] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 15287 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by significant transformation and deep work, likely in areas requiring research, unconventional approac...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15287
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 13:00:23] Response: 200 - Time: 43.53s
+INFO:     127.0.0.1:62460 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 13:29:14] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 13:29:14] Response: 200 - Time: 0.05s
+INFO:     127.0.0.1:49992 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49992 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 13:31:34] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 13:31:34] Response: 200 - Time: 0.03s
+INFO:     127.0.0.1:50722 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50722 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 13:31:37] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145346 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 17007 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path deeply entwined with transformation, research, or hidden knowledge, leading to eventual success despite signif...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 17007
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path deeply ent...
+[2025-11-09 13:32:24] Response: 200 - Time: 47.15s
+INFO:     127.0.0.1:50722 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59728 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:37:29] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:37:29] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:59728 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59728 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 21:37:34] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145343 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 13618 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by significant transformation, requiring resilience and a focus on deeper, perhaps unconventional, area...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 13618
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 21:41:17] Response: 200 - Time: 223.61s
+[2025-11-09 21:41:17] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:41:17] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145343 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 16460 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by deep analysis, transformation, and significant responsibilities, particularly prominent during your ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 16460
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 21:42:08] Response: 200 - Time: 50.66s
+[2025-11-09 21:42:08] Response: 200 - Time: 50.66s
+INFO:     127.0.0.1:61231 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61328 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 21:43:51] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:43:51] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61328 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:43:53] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145343 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 19894 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart reveals a complex yet ultimately strong career path, guided by a diligent work ethic and a transformative journey. Despite initial cha...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 19894
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart reveals a complex yet ultimately s...
+[2025-11-09 21:44:44] Response: 200 - Time: 51.14s
+INFO:     127.0.0.1:61328 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 21:45:25] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:45:25] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61328 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:45:27] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145343 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 18251 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path (Karma Bhava) marked by significant transformation, research, and the potential for substantial gains, though ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 18251
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path (Karma Bha...
+[2025-11-09 21:46:19] Response: 200 - Time: 52.35s
+INFO:     127.0.0.1:61328 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61328 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:49:45] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:49:45] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49273 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 21:49:47] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145343 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 16348 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ambition, intellect, and periods of significant transformation, often related to wealth and partners...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 16348
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path marked by ...
+[2025-11-09 21:50:37] Response: 200 - Time: 49.99s
+INFO:     127.0.0.1:49273 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 21:54:12] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:54:12] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:55:15] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:55:15] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:55:51] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:55:51] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:56:43] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:56:43] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:57:37] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:57:37] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 21:57:59] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 21:57:59] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49273 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 21:58:39] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 21:58:39] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 21:59:19] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='hindi' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 145812 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 12834 chars
+Response preview: <div class="quick-answer-card">**त्वरित उत्तर**: आपकी कुंडली में **सिंह लग्न** (Leo Ascendant) और **दशमेश शुक्र** (10th lord Venus) का **अष्टम भाव** (8th house) में **मीन राशि** (Pisces sign) में उच्च...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 12834
+Response preview: <div class="quick-answer-card">**त्वरित उत्तर**: आपकी कुंडली में **सिंह लग्न** (Leo Ascendant) और **...
+[2025-11-09 22:00:05] Response: 200 - Time: 46.03s
+INFO:     127.0.0.1:49273 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49273 - "OPTIONS /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 22:01:30] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: When is a good time for marriage?
+Request data: name='Deepika Yadav' date='1981-03-22' time='16:07' place='28.1956468, 76.6165179' latitude=28.1956468 longitude=76.6165179 timezone='UTC+5' gender='' question='When is a good time for marriage?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: When is a good time for marriage?
+Birth data: {'name': 'Deepika Yadav', 'date': '1981-03-22', 'time': '16:07', 'place': '28.1956468, 76.6165179', 'latitude': 28.1956468, 'longitude': 76.6165179, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 0
+
+=== SENDING TO AI ===
+Question: When is a good time for marriage?
+Prompt length: 145331 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 0
+
+=== RECEIVED FROM AI ===
+Response length: 13910 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: For a native with **Leo Ascendant** at 44 years of age, the most propitious period for marriage is likely during the **Saturn Mahadasha**, specifically...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 13910
+Response preview: <div class="quick-answer-card">**Quick Answer**: For a native with **Leo Ascendant** at 44 years of ...
+[2025-11-09 22:02:05] Response: 200 - Time: 35.29s
+INFO:     127.0.0.1:49273 - "POST /api/chat/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49273 - "OPTIONS /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 22:04:19] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 22:04:19] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 22:05:52] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 22:05:52] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 22:06:45] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 22:06:45] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 22:06:48] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 22:06:48] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 22:07:23] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 22:07:23] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 22:07:25] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 22:07:25] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 22:07:42] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 22:07:42] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49273 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 22:07:45] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 22:07:45] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49273 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:00:47] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:00:47] Response: 200 - Time: 0.03s
+INFO:     127.0.0.1:59892 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59892 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:00:49] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:00:49] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:59892 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:02:54] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:02:54] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:60923 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:02:57] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:02:57] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:60923 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:10:18] POST /api/login - Client: 127.0.0.1
+[2025-11-09 23:10:18] Response: 200 - Time: 0.24s
+INFO:     127.0.0.1:64539 - "POST /api/login HTTP/1.1" 200 OK
+[2025-11-09 23:10:18] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:10:18] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64551 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:12:55] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:12:55] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49304 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:14:50] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:14:50] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50171 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:16:00] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:16:00] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:50719 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:16:04] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:16:04] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50763 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:17:08] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:17:08] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51269 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:17:14] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:17:14] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51322 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:18:24] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:18:24] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:51886 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:19:23] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:19:23] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52362 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:20:01] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:20:01] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52671 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:20:34] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:20:34] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52953 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:21:19] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:21:19] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:53318 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:22:19] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:22:19] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:53801 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:22:23] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:22:23] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:53841 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:23:25] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:23:25] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:54340 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:23:41] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:23:41] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:54463 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:23:45] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:23:45] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:54506 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:23:56] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:23:56] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:54596 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:25:21] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:25:21] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:55277 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:25:39] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:25:39] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:55419 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:25:50] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:25:50] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-09 23:25:50] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:55508 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-09 23:25:50] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:55507 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:26:49] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:26:49] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:55997 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:27:01] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:27:01] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:56088 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:27:05] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:27:05] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-09 23:27:05] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:56131 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-09 23:27:05] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:56130 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:27:29] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:27:29] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:56322 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:27:51] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 9 charts
+[2025-11-09 23:27:51] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:56511 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-09 23:27:55] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:27:55] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-09 23:27:55] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:56539 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-09 23:27:55] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:56538 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:29:00] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:29:00] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:57065 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:29:00] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:29:00] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:57067 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:30:51] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:30:51] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:58003 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:31:29] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:31:29] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:58311 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:32:32] GET /chart - Client: 127.0.0.1
+[2025-11-09 23:32:32] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:58837 - "GET /chart?name=Tarun&date=1980-04-02&time=14%3A55&latitude=29.2396596&longitude=75.8174505&timezone=UTC%2B5&place=29.2396596%2C+75.8174505&gender= HTTP/1.1" 404 Not Found
+[2025-11-09 23:32:55] GET /chart - Client: 127.0.0.1
+[2025-11-09 23:32:55] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:58837 - "GET /chart?name=Tarun&date=1980-04-02&time=14%3A55&latitude=29.2396596&longitude=75.8174505&timezone=UTC%2B5&place=29.2396596%2C+75.8174505&gender= HTTP/1.1" 404 Not Found
+[2025-11-09 23:35:33] GET / - Client: 127.0.0.1
+[2025-11-09 23:35:33] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:60316 - "GET /?name=Tarun&date=1980-04-02&time=14%3A55&latitude=29.2396596&longitude=75.8174505&timezone=UTC%2B5&place=29.2396596%2C+75.8174505&gender= HTTP/1.1" 200 OK
+[2025-11-09 23:36:35] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-09 23:36:35] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:60825 - "OPTIONS /api/calculate-panchang HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60830 - "OPTIONS /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60831 - "OPTIONS /api/panchang/choghadiya?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60832 - "OPTIONS /api/panchang/hora?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60833 - "OPTIONS /api/panchang/special-muhurtas?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60823 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+[2025-11-09 23:36:35] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-09 23:36:35] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-09 23:36:35] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-09 23:36:35] GET /api/panchang/hora - Client: 127.0.0.1
+[2025-11-09 23:36:35] Response: 200 - Time: 0.00s
+[2025-11-09 23:36:35] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-09 23:36:35] Response: 200 - Time: 0.00s
+[2025-11-09 23:36:35] Response: 422 - Time: 0.01s
+INFO:     127.0.0.1:60836 - "GET /api/panchang/choghadiya?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-09 23:36:35] Response: 200 - Time: 0.00s
+[2025-11-09 23:36:35] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:60837 - "GET /api/panchang/hora?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60834 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:60838 - "GET /api/panchang/special-muhurtas?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60835 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-09 23:36:56] GET /api/horoscope/all-signs - Client: 127.0.0.1
+[2025-11-09 23:36:56] Response: 200 - Time: 0.01s
+[2025-11-09 23:36:56] POST /api/calculate-panchang - Client: 127.0.0.1
+[2025-11-09 23:36:56] POST /api/panchang/calculate-sunrise-sunset - Client: 127.0.0.1
+[2025-11-09 23:36:56] GET /api/panchang/choghadiya - Client: 127.0.0.1
+[2025-11-09 23:36:56] GET /api/panchang/hora - Client: 127.0.0.1
+[2025-11-09 23:36:56] GET /api/panchang/special-muhurtas - Client: 127.0.0.1
+[2025-11-09 23:36:56] Response: 200 - Time: 0.01s
+[2025-11-09 23:36:56] Response: 200 - Time: 0.01s
+[2025-11-09 23:36:56] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:60823 - "GET /api/horoscope/all-signs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60836 - "GET /api/panchang/choghadiya?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60837 - "GET /api/panchang/hora?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60838 - "GET /api/panchang/special-muhurtas?date=2025-11-09&latitude=28.6139&longitude=77.209 HTTP/1.1" 200 OK
+[2025-11-09 23:36:56] Response: 422 - Time: 0.02s
+[2025-11-09 23:36:56] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:60834 - "POST /api/calculate-panchang HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:60835 - "POST /api/panchang/calculate-sunrise-sunset HTTP/1.1" 200 OK
+[2025-11-09 23:38:13] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:38:13] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61650 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:38:28] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:38:28] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61780 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:41:50] POST /api/calculate-chart - Client: 127.0.0.1
+INFO:     127.0.0.1:63389 - "POST /api/calculate-chart HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 93, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 118, in receive
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/protocols/http/h11_impl.py", line 408, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/applications.py", line 1106, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/applications.py", line 122, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 184, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 75, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 86, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__
+    await self.app(scope, receive, sender)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__
+    raise e
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__
+    await route.handle(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app
+    response = await func(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 274, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 925, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T09'
+[2025-11-09 23:42:06] POST /api/calculate-chart - Client: 127.0.0.1
+INFO:     127.0.0.1:63523 - "POST /api/calculate-chart HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 93, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 118, in receive
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/protocols/http/h11_impl.py", line 408, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/applications.py", line 1106, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/applications.py", line 122, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 184, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 75, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 86, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__
+    await self.app(scope, receive, sender)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__
+    raise e
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__
+    await route.handle(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app
+    response = await func(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 274, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 925, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T09'
+[2025-11-09 23:42:33] POST /api/calculate-chart - Client: 127.0.0.1
+INFO:     127.0.0.1:63746 - "POST /api/calculate-chart HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 93, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 118, in receive
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/protocols/http/h11_impl.py", line 408, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/applications.py", line 1106, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/applications.py", line 122, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 184, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 75, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 86, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__
+    await self.app(scope, receive, sender)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__
+    raise e
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__
+    await route.handle(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app
+    response = await func(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 274, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 925, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T09'
+[2025-11-09 23:42:44] POST /api/calculate-chart - Client: 127.0.0.1
+INFO:     127.0.0.1:63831 - "POST /api/calculate-chart HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 93, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/anyio/streams/memory.py", line 118, in receive
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/protocols/http/h11_impl.py", line 408, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/applications.py", line 1106, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/applications.py", line 122, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 184, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 75, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 86, in dispatch
+    response = await call_next(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__
+    raise exc
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__
+    await self.app(scope, receive, sender)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__
+    raise e
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__
+    await route.handle(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app
+    response = await func(request)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 274, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/venv/lib/python3.9/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+  File "/Users/tarunydv/Desktop/Code/AstrologyApp/backend/main.py", line 925, in calculate_chart
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+ValueError: could not convert string to float: '1970-01-01T09'
+[2025-11-09 23:43:49] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:43:49] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:64368 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:45:51] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:45:51] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:65358 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:46:32] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:46:32] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49323 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:47:01] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-09 23:47:01] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49555 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-09 23:47:39] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What will happen tomorrow. 
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What will happen tomorrow. ' language='english' response_style='detailed'
+DEBUG: Valid planets in chart: ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+DEBUG: Sun - House: 9, Sign: 11
+DEBUG: Moon - House: 4, Sign: 6
+DEBUG: Mars - House: 2, Sign: 4
+DEBUG: Mercury - House: 8, Sign: 10
+DEBUG: Jupiter - House: 2, Sign: 4
+DEBUG: Venus - House: 11, Sign: 1
+DEBUG: Saturn - House: 2, Sign: 4
+DEBUG: Houses occupied: {2, 4, 8, 9, 11}
+DEBUG: Found 1 Raj Yogas
+
+=== CHAT ROUTE DEBUG ===
+Question: What will happen tomorrow. 
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What will happen tomorrow. 
+Prompt length: 168674 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 9107 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Tomorrow, November 10, 2025, your day will be significantly influenced by the sub-periods of **Moon** and **Sun**, operating under the overarching them...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 9107
+Response preview: <div class="quick-answer-card">**Quick Answer**: Tomorrow, November 10, 2025, your day will be signi...
+[2025-11-09 23:48:05] Response: 200 - Time: 25.94s
+INFO:     127.0.0.1:49865 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 23:49:15] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:49:15] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50641 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:49:15] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:49:15] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:50643 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:49:23] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 15504 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with a powerful stellium of **Mars, Jupiter, Saturn, and Rahu** in the 2nd house and **Mercury** as your *Amatyakaraka* in the transf...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15504
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with a powerful stellium of **Mar...
+[2025-11-09 23:49:49] Response: 200 - Time: 26.00s
+INFO:     127.0.0.1:50709 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 23:50:13] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:50:13] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:51120 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:50:13] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:50:13] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:51122 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:50:22] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 14845 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart points to a career defined by deep research, strategic problem-solving, and managing complex information or resources, often in unconv...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14845
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart points to a career defined by deep...
+[2025-11-09 23:50:47] Response: 200 - Time: 24.97s
+INFO:     127.0.0.1:51196 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 23:52:17] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 18072 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path, at 45 years old, is defined by intense discipline, deep analytical ability, and a transformative nature, often leading to unconventio...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 18072
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path, at 45 years old, is defined by in...
+[2025-11-09 23:52:48] Response: 200 - Time: 30.93s
+INFO:     127.0.0.1:52126 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 23:53:49] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:53:49] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52870 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:53:49] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:53:49] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:52872 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-09 23:53:54] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 21028 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path is marked by profound analytical depth, strategic problem-solving, and a capacity to thrive in roles involving complex information and...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 21028
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path is marked by profound analytical d...
+[2025-11-09 23:54:30] Response: 200 - Time: 36.14s
+INFO:     127.0.0.1:52916 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-09 23:57:30] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-09 23:57:30] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:54672 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 00:17:21] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 16829 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with a Cancer Ascendant, points to a career path characterized by profound discipline, strategic analysis, and a capacity for transfo...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 16829
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart, with a Cancer Ascendant, points t...
+[2025-11-10 00:17:50] Response: 200 - Time: 28.86s
+INFO:     127.0.0.1:63791 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:21:57] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-10 00:21:57] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:49609 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 00:21:57] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-10 00:21:57] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:49611 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 00:22:07] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 22055 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path is marked by profound discipline, a drive for unconventional success, and a remarkable ability to transform challenges into unique str...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 22055
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path is marked by profound discipline, ...
+[2025-11-10 00:22:48] Response: 200 - Time: 41.21s
+INFO:     127.0.0.1:49690 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:23:29] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: How can I best utilize the upcoming Jupiter transit to maximize my career success?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='How can I best utilize the upcoming Jupiter transit to maximize my career success?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: How can I best utilize the upcoming Jupiter transit to maximize my career success?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: How can I best utilize the upcoming Jupiter transit to maximize my career success?
+Prompt length: 171066 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 11646 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: To maximize career success during the upcoming **Jupiter** transit (Dec 2025 - Jun 2026), focus on deep research, strategic analysis, and transforming ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 11646
+Response preview: <div class="quick-answer-card">**Quick Answer**: To maximize career success during the upcoming **Ju...
+[2025-11-10 00:23:52] Response: 200 - Time: 22.79s
+INFO:     127.0.0.1:50388 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:24:27] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What remedies can help?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What remedies can help?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What remedies can help?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What remedies can help?
+Prompt length: 168670 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 14237 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: At 45 years old, your chart calls for specific Vedic remedies to mitigate challenges from **Mars**, **Saturn**, and **Mercury**, and enhance emotional ...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14237
+Response preview: <div class="quick-answer-card">**Quick Answer**: At 45 years old, your chart calls for specific Vedi...
+[2025-11-10 00:24:54] Response: 200 - Time: 27.05s
+INFO:     127.0.0.1:50852 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:25:30] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: How can I balance my ambitious career drive with the need for emotional well-being?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='How can I balance my ambitious career drive with the need for emotional well-being?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: How can I balance my ambitious career drive with the need for emotional well-being?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: How can I balance my ambitious career drive with the need for emotional well-being?
+Prompt length: 171067 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 16784 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Balancing your ambitious career drive with emotional well-being requires conscious effort due to the strong, yet challenged, planetary forces in your c...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 16784
+Response preview: <div class="quick-answer-card">**Quick Answer**: Balancing your ambitious career drive with emotiona...
+[2025-11-10 00:25:58] Response: 200 - Time: 28.80s
+INFO:     127.0.0.1:51349 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:27:10] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What should I focus on?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What should I focus on?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What should I focus on?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What should I focus on?
+Prompt length: 168670 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 14233 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: At 45, your primary focus should be on **disciplined, strategic career growth and deep intellectual pursuits**, transforming challenges into unique suc...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 14233
+Response preview: <div class="quick-answer-card">**Quick Answer**: At 45, your primary focus should be on **discipline...
+[2025-11-10 00:27:39] Response: 200 - Time: 29.06s
+INFO:     127.0.0.1:52153 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:28:49] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-10 00:28:49] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:52956 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 00:29:03] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 17029 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path demanding deep analytical prowess, strategic problem-solving, and resilience, particularly in fields involving...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 17029
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a career path demanding ...
+[2025-11-10 00:29:35] Response: 200 - Time: 31.14s
+INFO:     127.0.0.1:53068 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:31:09] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What does my birth chart say about my career?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What does my birth chart say about my career?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What does my birth chart say about my career?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What does my birth chart say about my career?
+Prompt length: 171029 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'transit_activations', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 18466 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path, observed at your current age, is marked by a deep capacity for strategic thinking, profound analytical work, and transformative leade...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 18466
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your career path, observed at your current age, is ...
+[2025-11-10 00:31:44] Response: 200 - Time: 35.06s
+INFO:     127.0.0.1:54120 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 00:33:15] POST /api/chat/ask - Client: 127.0.0.1
+
+=== STREAMING STARTED ===
+Request question: What specific leadership or innovative roles would be most aligned with my unique astrological blueprint?
+Request data: name='Tarun' date='1980-04-02' time='14:55' place='29.2396596, 75.8174505' latitude=29.2396596 longitude=75.8174505 timezone='UTC+5' gender='' question='What specific leadership or innovative roles would be most aligned with my unique astrological blueprint?' language='english' response_style='detailed'
+
+=== CHAT ROUTE DEBUG ===
+Question: What specific leadership or innovative roles would be most aligned with my unique astrological blueprint?
+Birth data: {'name': 'Tarun', 'date': '1980-04-02', 'time': '14:55', 'place': '29.2396596, 75.8174505', 'latitude': 29.2396596, 'longitude': 75.8174505, 'timezone': 'UTC+5', 'gender': ''}
+Context type: <class 'dict'>
+History length: 10
+
+=== SENDING TO AI ===
+Question: What specific leadership or innovative roles would be most aligned with my unique astrological blueprint?
+Prompt length: 168752 chars
+Context keys: ['birth_details', 'ascendant_info', 'd1_chart', 'divisional_charts', 'planetary_analysis', 'special_points', 'relationships', 'yogas', 'chara_karakas', 'advanced_analysis', 'current_dashas', 'current_date_info']
+History messages: 10
+
+=== RECEIVED FROM AI ===
+Response length: 15138 chars
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a powerful alignment for leadership and innovation, particularly in fields requiring deep strategic analysis and transformat...
+AI result success: True
+AI result keys: ['success', 'response', 'raw_response']
+Sending response length: 15138
+Response preview: <div class="quick-answer-card">**Quick Answer**: Your birth chart indicates a powerful alignment for...
+[2025-11-10 00:33:41] Response: 200 - Time: 26.87s
+INFO:     127.0.0.1:55141 - "POST /api/chat/ask HTTP/1.1" 200 OK
+[2025-11-10 07:48:26] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 11 charts
+[2025-11-10 07:48:26] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:58225 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 07:48:40] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:48:40] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-10 07:48:40] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:58350 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-10 07:48:40] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:58349 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:48:47] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:48:47] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:58414 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:50:29] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:50:29] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:59257 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:51:35] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:51:35] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:59777 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:51:56] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:51:56] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:59948 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:53:03] GET /api/birth-charts - Client: 127.0.0.1
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 12 charts
+[2025-11-10 07:53:03] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:60459 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 07:53:06] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:53:06] POST /api/calculate-yogi - Client: 127.0.0.1
+[2025-11-10 07:53:06] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:60488 - "POST /api/calculate-yogi HTTP/1.1" 200 OK
+[2025-11-10 07:53:06] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:60487 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:53:12] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:53:12] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:60532 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:54:45] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:54:45] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61255 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:55:59] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:55:59] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:61839 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:57:35] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:57:35] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:62578 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:58:32] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:58:32] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:63012 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 07:59:31] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 07:59:31] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:63500 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 08:00:22] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-10 08:00:22] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:63949 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 08:00:26] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 08:00:26] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:63998 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 08:13:59] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-10 08:14:00] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:53869 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 08:14:08] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 08:14:08] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:53931 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 08:16:28] POST /api/chat/history - Client: 127.0.0.1
+[2025-11-10 08:16:28] Response: 200 - Time: 0.00s
+INFO:     127.0.0.1:54994 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 08:17:14] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 08:17:14] Response: 200 - Time: 0.02s
+INFO:     127.0.0.1:55340 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 08:20:08] POST /api/calculate-chart - Client: 127.0.0.1
+[2025-11-10 08:20:08] Response: 200 - Time: 0.01s
+INFO:     127.0.0.1:56690 - "POST /api/calculate-chart HTTP/1.1" 200 OK
+[2025-11-10 08:20:37] POST /api/calculate-navamsa - Client: 127.0.0.1
+[2025-11-10 08:20:37] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:56915 - "POST /api/calculate-navamsa HTTP/1.1" 404 Not Found
+[2025-11-10 08:20:37] POST /api/calculate-transit - Client: 127.0.0.1
+[2025-11-10 08:20:37] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:56917 - "POST /api/calculate-transit HTTP/1.1" 404 Not Found
+[2025-11-10 08:20:39] POST /api/calculate-navamsa - Client: 127.0.0.1
+[2025-11-10 08:20:39] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:56941 - "POST /api/calculate-navamsa HTTP/1.1" 404 Not Found
+[2025-11-10 08:20:43] POST /api/calculate-transit - Client: 127.0.0.1
+[2025-11-10 08:20:43] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:56972 - "POST /api/calculate-transit HTTP/1.1" 404 Not Found
+[2025-11-10 08:20:45] POST /api/calculate-navamsa - Client: 127.0.0.1
+[2025-11-10 08:20:45] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:56990 - "POST /api/calculate-navamsa HTTP/1.1" 404 Not Found
+[2025-11-10 08:20:45] POST /api/calculate-transit - Client: 127.0.0.1
+[2025-11-10 08:20:45] Response: 404 - Time: 0.00s
+INFO:     127.0.0.1:56992 - "POST /api/calculate-transit HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64897 - "OPTIONS /api/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64897 - "OPTIONS /api/birth-charts?limit=50 HTTP/1.1" 200 OK
+[2025-11-10 22:18:39] GET /api/birth-charts - Client: 127.0.0.1
+[2025-11-10 22:18:39] GET /logo192.png - Client: None
+[2025-11-10 22:18:39] Response: 404 - Time: 0.00s
+INFO:     None:0 - "GET /logo192.png HTTP/1.1" 404 Not Found
+Search query: '', Limit: 50
+No search query, returning all charts
+Found 13 charts
+[2025-11-10 22:18:39] Response: 200 - Time: 0.04s
+INFO:     127.0.0.1:64897 - "GET /api/birth-charts?limit=50 HTTP/1.1" 200 OK
