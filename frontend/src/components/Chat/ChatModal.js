@@ -436,14 +436,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 timestamp: new Date().toISOString() 
             };
             
-            // Replace typing message with actual response
-            setMessages(prev => {
-                return prev.map(msg => 
-                    msg.id === typingMessageId 
-                        ? assistantMessage
-                        : msg
-                );
-            });
+            let messageAdded = false;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -472,32 +465,44 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     // Decode HTML entities in the response content
                                     let responseText = decodeHtmlEntities(parsed.response).trim();
                                     
-                                    console.log('Decoded response text:', responseText.substring(0, 200));
-                                    console.log('Response text length:', responseText.length);
-                                    
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
-                                        console.log('Setting assistant message content:', assistantMessage);
-                                        setMessages(prev => {
-                                            const updated = prev.map(msg => 
-                                                msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                            console.log('Updated messages:', updated);
-                                            return updated;
-                                        });
+                                        
+                                        if (!messageAdded) {
+                                            // Replace typing message with actual response
+                                            setMessages(prev => {
+                                                return prev.map(msg => 
+                                                    msg.id === typingMessageId 
+                                                        ? { ...assistantMessage }
+                                                        : msg
+                                                );
+                                            });
+                                            messageAdded = true;
+                                        } else {
+                                            // Update existing message
+                                            setMessages(prev => {
+                                                return prev.map(msg => 
+                                                    msg.id === assistantMessage.id 
+                                                        ? { ...assistantMessage }
+                                                        : msg
+                                                );
+                                            });
+                                        }
                                         await saveMessage(currentSessionId, 'assistant', responseText);
                                     }
                                 } else if (parsed.status === 'error') {
                                     assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
-                                    setMessages(prev => {
-                                        return prev.map(msg => 
-                                            msg.id === assistantMessage.id 
-                                                ? { ...assistantMessage }
-                                                : msg
-                                        );
-                                    });
+                                    
+                                    if (!messageAdded) {
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === typingMessageId 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                        messageAdded = true;
+                                    }
                                 }
                             } catch (e) {
                                 const statusMatch = data.match(/"status"\s*:\s*"([^"]+)"/);
@@ -509,19 +514,28 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         .replace(/\\"/g, '"');
                                     response = decodeHtmlEntities(response);
                                     assistantMessage.content = response;
-                                    setMessages(prev => {
-                                        return prev.map(msg => 
-                                            msg.id === assistantMessage.id 
-                                                ? { ...assistantMessage }
-                                                : msg
-                                        );
-                                    });
+                                    
+                                    if (!messageAdded) {
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === typingMessageId 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                        messageAdded = true;
+                                    }
                                     await saveMessage(currentSessionId, 'assistant', response);
                                 }
                             }
                         }
                     }
                 }
+            }
+            
+            // If no message was added, remove the typing indicator
+            if (!messageAdded) {
+                setMessages(prev => prev.filter(msg => msg.id !== typingMessageId));
             }
         } catch (error) {
             console.error('Error sending message after retries:', error);
