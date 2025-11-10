@@ -254,10 +254,17 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             setIsSpeaking(false);
         } else {
             if (message.content && message.content.trim()) {
-                // Clean the text first
+                // Clean the text first - remove HTML entities and tags
                 let cleanText = message.content
-                    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
-                    .replace(/\*(.*?)\*/g, '$1')     // Remove italics
+                    .replace(/&quot;/g, '"')         // Decode HTML entities
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&#39;/g, "'")
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/<[^>]*>/g, '')         // Remove all HTML tags
+                    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
+                    .replace(/\*(.*?)\*/g, '$1')     // Remove italics markdown
                     .replace(/###\s*(.*?)$/gm, '$1') // Remove headers
                     .replace(/•\s*/g, '')            // Remove bullets
                     .replace(/\n+/g, '. ')           // Replace line breaks

@@ -406,11 +406,27 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         if (data === '[DONE]') break;
                         if (data && data.length > 0) {
                             try {
-                                const cleanData = data.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+                                // Decode HTML entities in the raw data
+                                const cleanData = data
+                                    .replace(/&quot;/g, '"')
+                                    .replace(/&amp;/g, '&')
+                                    .replace(/&lt;/g, '<')
+                                    .replace(/&gt;/g, '>')
+                                    .replace(/&#39;/g, "'")
+                                    .replace(/&nbsp;/g, ' ');
                                 const parsed = JSON.parse(cleanData);
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
-                                    const responseText = parsed.response.trim();
+                                    // Decode HTML entities in the response content
+                                    let responseText = parsed.response
+                                        .replace(/&quot;/g, '"')
+                                        .replace(/&amp;/g, '&')
+                                        .replace(/&lt;/g, '<')
+                                        .replace(/&gt;/g, '>')
+                                        .replace(/&#39;/g, "'")
+                                        .replace(/&nbsp;/g, ' ')
+                                        .trim();
+                                    
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
                                         setMessages(prev => {
@@ -437,7 +453,15 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                                 
                                 if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
-                                    const response = responseMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                                    let response = responseMatch[1]
+                                        .replace(/\\n/g, '\n')
+                                        .replace(/\\"/g, '"')
+                                        .replace(/&quot;/g, '"')
+                                        .replace(/&amp;/g, '&')
+                                        .replace(/&lt;/g, '<')
+                                        .replace(/&gt;/g, '>')
+                                        .replace(/&#39;/g, "'")
+                                        .replace(/&nbsp;/g, ' ');
                                     assistantMessage.content = response;
                                     setMessages(prev => {
                                         return prev.map(msg => 

@@ -2570,3 +2570,15 @@ INFO:     None:0 - "POST /api/chat/ask HTTP/1.1" 200 OK
 [2025-11-10 22:32:11] POST /api/chat/message - Client: None
 [2025-11-10 22:32:11] Response: 200 - Time: 0.02s
 INFO:     None:0 - "POST /api/chat/message HTTP/1.1" 200 OK
+[2025-11-10 22:44:05] POST /api/chat/history - Client: None
+[2025-11-10 22:44:05] Response: 200 - Time: 0.02s
+[2025-11-10 22:44:05] POST /api/chat/history - Client: None
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 22:44:05] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 22:44:14] POST /api/chat/history - Client: None
+[2025-11-10 22:44:14] Response: 200 - Time: 0.01s
+[2025-11-10 22:44:14] POST /api/chat/history - Client: None
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 22:44:14] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
