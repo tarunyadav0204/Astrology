@@ -41,8 +41,8 @@ class GeminiChatAnalyzer:
         if not self.model:
             raise ValueError("No available Gemini model found")
     
-    def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed') -> Dict[str, Any]:
-        """Generate chat response using astrological context"""
+    async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed') -> Dict[str, Any]:
+        """Generate chat response using astrological context - ASYNC VERSION"""
         
         # Add current date context and calculate native's age
         enhanced_context = astrological_context.copy()
@@ -72,14 +72,34 @@ class GeminiChatAnalyzer:
         
         prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style)
         
-        print(f"\n=== SENDING TO AI ===")
+        print(f"\n=== SENDING TO AI (ASYNC) ===")
         print(f"Question: {user_question}")
         print(f"Prompt length: {len(prompt)} chars")
         print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
         print(f"History messages: {len(conversation_history or [])}")
         
         try:
-            response = self.model.generate_content(prompt)
+            # Run the synchronous Gemini API call in a thread pool to avoid blocking
+            import asyncio
+            import concurrent.futures
+            
+            def _sync_generate_content():
+                return self.model.generate_content(prompt)
+            
+            # Execute in thread pool with timeout
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = loop.run_in_executor(executor, _sync_generate_content)
+                try:
+                    # 60 second timeout for Gemini API
+                    response = await asyncio.wait_for(future, timeout=60.0)
+                except asyncio.TimeoutError:
+                    print(f"\n=== AI TIMEOUT ===")
+                    return {
+                        'success': False,
+                        'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
+                        'error': 'AI request timeout'
+                    }
             
             # Validate response
             if not response or not hasattr(response, 'text') or not response.text:
@@ -99,7 +119,7 @@ class GeminiChatAnalyzer:
                     'error': 'Blank response from AI'
                 }
             
-            print(f"\n=== RECEIVED FROM AI ===")
+            print(f"\n=== RECEIVED FROM AI (ASYNC) ===")
             print(f"Response length: {len(response_text)} chars")
             print(f"Response preview: {response_text[:200]}...")
             
@@ -109,7 +129,7 @@ class GeminiChatAnalyzer:
                 'raw_response': response_text
             }
         except Exception as e:
-            print(f"\n=== AI ERROR ===")
+            print(f"\n=== AI ERROR (ASYNC) ===")
             print(f"Error: {str(e)}")
             return {
                 'success': False,

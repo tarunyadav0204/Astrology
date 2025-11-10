@@ -143,10 +143,7 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         };
     }, []);
     const formatContent = (content) => {
-        console.log('MessageBubble formatContent called with:', content?.substring(0, 200));
-        
         if (!content || content.trim() === '') {
-            console.log('Empty content received in formatContent');
             return '';
         }
         
@@ -158,8 +155,6 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             .replace(/&gt;/g, '>')
             .replace(/&#39;/g, "'")
             .replace(/&nbsp;/g, ' ');
-        
-        console.log('After HTML entity decoding:', formatted.substring(0, 200));
         
         // Then normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -253,7 +248,6 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
     };
 
     const handleSpeak = () => {
-        console.log('Speak button clicked for message:', message);
         setHasError(false);
         
         // Always cancel any existing speech first
@@ -280,8 +274,6 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                     .replace(/\s+/g, ' ')            // Normalize spaces
                     .trim();
                 
-                console.log('Full text length for speech:', cleanText.length);
-                
                 // Break text into chunks for reliable speech synthesis
                 const chunkSize = 1000; // Characters per chunk
                 const chunks = [];
@@ -291,11 +283,9 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                 
                 setTotalChunks(chunks.length);
                 setCurrentChunk(0);
-                console.log(`Breaking into ${chunks.length} chunks for speech`);
                 
                 const speakChunk = (chunkIndex) => {
                     if (chunkIndex >= chunks.length) {
-                        console.log('All chunks completed');
                         setIsSpeaking(false);
                         setCurrentChunk(0);
                         return;
@@ -311,20 +301,17 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                     }
                     
                     utterance.onstart = () => {
-                        console.log(`Speaking chunk ${chunkIndex + 1}/${chunks.length}`);
                         setIsSpeaking(true);
                         setCurrentChunk(chunkIndex + 1);
                     };
                     
                     utterance.onend = () => {
-                        console.log(`Chunk ${chunkIndex + 1} completed`);
                         // Speak next chunk after a brief pause
                         setTimeout(() => speakChunk(chunkIndex + 1), 100);
                     };
                     
                     utterance.onerror = (error) => {
                         if (error.error !== 'interrupted') {
-                            console.error('Speech error:', error);
                             setHasError(true);
                         }
                         setIsSpeaking(false);
@@ -335,8 +322,6 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                 
                 // Start speaking from first chunk
                 speakChunk(0);
-            } else {
-                console.warn('No content to speak');
             }
         }
     };

@@ -81,7 +81,7 @@ async def ask_question(request: ChatRequest):
                 print(f"History length: {len(history)}")
                 
                 gemini_analyzer = GeminiChatAnalyzer()
-                ai_result = gemini_analyzer.generate_chat_response(request.question, context, history, request.language, request.response_style)
+                ai_result = await gemini_analyzer.generate_chat_response(request.question, context, history, request.language, request.response_style)
                 
                 print(f"AI result success: {ai_result.get('success')}")
                 print(f"AI result keys: {list(ai_result.keys())}")

@@ -450,8 +450,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         const data = line.slice(6).trim();
                         if (data === '[DONE]') break;
                         if (data && data.length > 0) {
-                            console.log('Processing data chunk:', data.substring(0, 100));
-                            try {
+                                try {
                                 // Decode HTML entities in the raw data
                                 const decodeHtmlEntities = (text) => {
                                     const textarea = document.createElement('textarea');
@@ -460,35 +459,26 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 };
                                 
                                 const decodedData = decodeHtmlEntities(data);
-                                console.log('Decoded data:', decodedData.substring(0, 100));
                                 const parsed = JSON.parse(decodedData);
-                                console.log('Parsed status:', parsed.status);
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
-                                    console.log('Complete response received, length:', parsed.response.length);
                                     // Decode HTML entities in the response content
                                     let responseText = decodeHtmlEntities(parsed.response).trim();
-                                    console.log('Final response text length:', responseText.length);
                                     
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
-                                        console.log('Adding message, messageAdded flag:', messageAdded);
                                         
                                         if (!messageAdded) {
-                                            console.log('Replacing typing message with response');
                                             // Replace typing message with actual response
                                             setMessages(prev => {
-                                                const updated = prev.map(msg => 
+                                                return prev.map(msg => 
                                                     msg.id === typingMessageId 
                                                         ? { ...assistantMessage }
                                                         : msg
                                                 );
-                                                console.log('Messages updated:', updated.length);
-                                                return updated;
                                             });
                                             messageAdded = true;
                                         } else {
-                                            console.log('Updating existing message');
                                             // Update existing message
                                             setMessages(prev => {
                                                 return prev.map(msg => 
@@ -499,8 +489,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             });
                                         }
                                         await saveMessage(currentSessionId, 'assistant', responseText);
-                                    } else {
-                                        console.log('Response text is empty after decoding');
                                     }
                                 } else if (parsed.status === 'error') {
                                     assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
