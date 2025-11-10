@@ -6,6 +6,7 @@ import sys
 import os
 import json
 import asyncio
+import html
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -109,7 +110,7 @@ async def ask_question(request: ChatRequest):
                         
                         print(f"After JSON serialization: {response_json[:200]}...")
                         print(f"Sending response length: {len(clean_response)}")
-                        print(f"Response preview: {clean_response[:100]}..."
+                        print(f"Response preview: {clean_response[:100]}...")
                         
                         yield f"data: {response_json}\n\n"
                         
