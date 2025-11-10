@@ -516,32 +516,61 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     if (!assistantMessage.chunks) {
                                         assistantMessage.chunks = new Array(parsed.total_chunks);
                                     }
-                                    assistantMessage.chunks[parsed.chunk_index] = parsed.response;
+                                    
+                                    // Decode HTML entities in chunk before storing
+                                    let chunkText = parsed.response;
+                                    if (chunkText.includes('&lt;') || chunkText.includes('&gt;') || chunkText.includes('&quot;') || chunkText.includes('&#39;')) {
+                                        chunkText = decodeHtmlEntities(chunkText);
+                                    }
+                                    
+                                    assistantMessage.chunks[parsed.chunk_index] = chunkText;
+                                    console.log('DEBUG: Stored chunk', parsed.chunk_index, 'length:', chunkText.length);
+                                    
+                                    // Update display with partial content as chunks arrive
+                                    const currentContent = assistantMessage.chunks.filter(c => c !== undefined).join('');
+                                    assistantMessage.content = currentContent;
+                                    
+                                    if (!messageAdded) {
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === typingMessageId 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                        messageAdded = true;
+                                        console.log('DEBUG: Added message with partial content');
+                                    } else {
+                                        // Update existing message with accumulated content
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === assistantMessage.id 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                        console.log('DEBUG: Updated message with chunk', parsed.chunk_index);
+                                    }
                                     
                                     // Check if all chunks received
                                     const allChunksReceived = assistantMessage.chunks.every(chunk => chunk !== undefined);
                                     if (allChunksReceived) {
-                                        let responseText = assistantMessage.chunks.join('');
+                                        const completeText = assistantMessage.chunks.join('');
+                                        console.log('DEBUG: All chunks received, complete length:', completeText.length);
                                         
-                                        // Decode HTML entities
-                                        if (responseText.includes('&lt;') || responseText.includes('&gt;') || responseText.includes('&quot;') || responseText.includes('&#39;')) {
-                                            responseText = decodeHtmlEntities(responseText);
-                                        }
+                                        assistantMessage.content = completeText.trim();
                                         
-                                        assistantMessage.content = responseText.trim();
+                                        // Final update with complete content
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === assistantMessage.id 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
                                         
-                                        if (!messageAdded) {
-                                            setMessages(prev => {
-                                                return prev.map(msg => 
-                                                    msg.id === typingMessageId 
-                                                        ? { ...assistantMessage }
-                                                        : msg
-                                                );
-                                            });
-                                            messageAdded = true;
-                                        }
-                                        
-                                        await saveMessage(currentSessionId, 'assistant', responseText);
+                                        await saveMessage(currentSessionId, 'assistant', completeText);
+                                        console.log('DEBUG: Saved complete message to backend');
                                     }
                                 } else if (parsed.status === 'complete' && parsed.response) {
                                     console.log('DEBUG: Processing complete response');
@@ -609,8 +638,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     }
                                 } else if (parsed.status === 'complete' && !parsed.response) {
                                     console.log('DEBUG: Processing completion signal for chunked response');
-                                    // This is just a completion signal for chunked responses
-                                    // The actual message should already be assembled from chunks
+                                    // Ensure final message state is correct
+                                    if (assistantMessage.chunks && assistantMessage.chunks.length > 0) {
+                                        const completeText = assistantMessage.chunks.join('');
+                                        assistantMessage.content = completeText.trim();
+                                        
+                                        setMessages(prev => {
+                                            return prev.map(msg => 
+                                                msg.id === assistantMessage.id 
+                                                    ? { ...assistantMessage }
+                                                    : msg
+                                            );
+                                        });
+                                        console.log('DEBUG: Final update with complete chunked response');
+                                    }
                                 } else if (parsed.status === 'error') {
                                     console.log('DEBUG: Processing error response');
                                     assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
