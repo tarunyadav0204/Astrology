@@ -443,7 +443,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 id: Date.now(),
                 role: 'assistant', 
                 content: '', 
-                timestamp: new Date().toISOString() 
+                timestamp: new Date().toISOString(),
+                chunks: null
             };
             
             let messageAdded = false;
@@ -509,7 +510,40 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     console.log('DEBUG: JSON parsed after HTML decode, status:', parsed.status);
                                 }
                                 
-                                if (parsed.status === 'complete' && parsed.response) {
+                                if (parsed.status === 'chunk') {
+                                    console.log('DEBUG: Processing chunk response', parsed.chunk_index, 'of', parsed.total_chunks);
+                                    // Accumulate chunks
+                                    if (!assistantMessage.chunks) {
+                                        assistantMessage.chunks = new Array(parsed.total_chunks);
+                                    }
+                                    assistantMessage.chunks[parsed.chunk_index] = parsed.response;
+                                    
+                                    // Check if all chunks received
+                                    const allChunksReceived = assistantMessage.chunks.every(chunk => chunk !== undefined);
+                                    if (allChunksReceived) {
+                                        let responseText = assistantMessage.chunks.join('');
+                                        
+                                        // Decode HTML entities
+                                        if (responseText.includes('&lt;') || responseText.includes('&gt;') || responseText.includes('&quot;') || responseText.includes('&#39;')) {
+                                            responseText = decodeHtmlEntities(responseText);
+                                        }
+                                        
+                                        assistantMessage.content = responseText.trim();
+                                        
+                                        if (!messageAdded) {
+                                            setMessages(prev => {
+                                                return prev.map(msg => 
+                                                    msg.id === typingMessageId 
+                                                        ? { ...assistantMessage }
+                                                        : msg
+                                                );
+                                            });
+                                            messageAdded = true;
+                                        }
+                                        
+                                        await saveMessage(currentSessionId, 'assistant', responseText);
+                                    }
+                                } else if (parsed.status === 'complete' && parsed.response) {
                                     console.log('DEBUG: Processing complete response');
                                     // Decode HTML entities in the response content
                                     let responseText = parsed.response;
@@ -521,14 +555,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     }
                                     
                                     responseText = responseText.trim();
-                                    
-                                    // Debug for production
-                                    if (window.location.hostname === 'astroroshni.com') {
-                                        console.log('PROD - Response text length:', responseText.length);
-                                        console.log('PROD - messageAdded flag:', messageAdded);
-                                        console.log('PROD - assistantMessage ID:', assistantMessage.id);
-                                        console.log('PROD - typingMessageId:', typingMessageId);
-                                    }
                                     
                                     console.log('DEBUG: Response text length:', responseText.length);
                                     
@@ -549,11 +575,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                                     );
                                                     
                                                     console.log('DEBUG: Messages updated, new length:', updated.length);
-                                                    
-                                                    if (window.location.hostname === 'astroroshni.com') {
-                                                        console.log('PROD - Updated messages count:', updated.length);
-                                                        console.log('PROD - Assistant message in array:', updated.find(m => m.id === assistantMessage.id));
-                                                    }
                                                     
                                                     return updated;
                                                 });
@@ -586,6 +607,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             console.error('SAVE MESSAGE ERROR:', saveError);
                                         }
                                     }
+                                } else if (parsed.status === 'complete' && !parsed.response) {
+                                    console.log('DEBUG: Processing completion signal for chunked response');
+                                    // This is just a completion signal for chunked responses
+                                    // The actual message should already be assembled from chunks
                                 } else if (parsed.status === 'error') {
                                     console.log('DEBUG: Processing error response');
                                     assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;

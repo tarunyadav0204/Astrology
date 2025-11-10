@@ -106,6 +106,7 @@ async def ask_question(request: ChatRequest):
                         
                         print(f"Cleaned response length: {len(clean_response)}")
                         print(f"Response preview: {clean_response[:100]}...")
+                        print(f"Will chunk response: {len(clean_response) > 4000}")
                         
                         # Use json.dumps with proper error handling
                         response_data = {
@@ -113,16 +114,40 @@ async def ask_question(request: ChatRequest):
                             'response': clean_response
                         }
                         
-                        # Serialize with strict ASCII to avoid encoding issues
-                        response_json = json.dumps(response_data, ensure_ascii=True, separators=(',', ':'))
+                        # Split long responses into chunks to prevent truncation
+                        max_chunk_size = 4000  # Safe chunk size for streaming
                         
-                        print(f"JSON length: {len(response_json)}")
-                        print(f"JSON preview: {response_json[:200]}...")
-                        
-                        # Validate JSON by parsing it back
-                        json.loads(response_json)
-                        
-                        yield f"data: {response_json}\n\n"
+                        if len(clean_response) > max_chunk_size:
+                            print(f"Response too long ({len(clean_response)} chars), splitting into chunks")
+                            
+                            # Send response in chunks
+                            chunks = [clean_response[i:i+max_chunk_size] for i in range(0, len(clean_response), max_chunk_size)]
+                            
+                            for i, chunk in enumerate(chunks):
+                                chunk_data = {
+                                    'status': 'chunk',
+                                    'chunk_index': i,
+                                    'total_chunks': len(chunks),
+                                    'response': chunk
+                                }
+                                chunk_json = json.dumps(chunk_data, ensure_ascii=True, separators=(',', ':'))
+                                yield f"data: {chunk_json}\n\n"
+                            
+                            # Send completion signal
+                            complete_data = {'status': 'complete'}
+                            complete_json = json.dumps(complete_data, ensure_ascii=True)
+                            yield f"data: {complete_json}\n\n"
+                        else:
+                            # Send as single response if small enough
+                            response_json = json.dumps(response_data, ensure_ascii=True, separators=(',', ':'))
+                            
+                            print(f"JSON length: {len(response_json)}")
+                            print(f"JSON preview: {response_json[:200]}...")
+                            
+                            # Validate JSON by parsing it back
+                            json.loads(response_json)
+                            
+                            yield f"data: {response_json}\n\n"
                         
                     except Exception as json_error:
                         print(f"JSON serialization error: {json_error}")
