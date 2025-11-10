@@ -146,14 +146,17 @@ app.include_router(chat_admin_router, prefix="/api")
 async def root():
     return {"message": "Astrology API", "docs": "/api/docs", "version": "1.0.0"}
 
+# Additional health check endpoint at root level for GCP
+@app.get("/health")
+async def root_health():
+    return {"status": "healthy", "message": "Astrology API is running"}
+
 @app.get("/api/test")
 async def test_endpoint():
     return {"status": "ok", "message": "API is working", "timestamp": datetime.now().isoformat()}
 
-# Health check endpoint for load balancer
-@app.get("/docs")
-async def health_docs():
-    return {"status": "healthy", "message": "Astrology API is running"}
+# Remove custom /docs override - let FastAPI handle it automatically
+# GCP health checks will use the default FastAPI /docs endpoint
 
 @app.get("/api/status")
 async def api_status():
@@ -942,6 +945,11 @@ async def system_status():
         }
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/api/keepalive")
+async def keepalive():
+    """Simple endpoint to keep server alive"""
+    return {"status": "alive", "timestamp": datetime.now().isoformat()}
 
 @app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):

@@ -2588,3 +2588,9 @@ INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
 [2025-11-10 22:51:30] Response: 200 - Time: 0.01s
 INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
 INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+[2025-11-10 23:02:01] POST /api/chat/history - Client: None
+[2025-11-10 23:02:01] POST /api/chat/history - Client: None
+[2025-11-10 23:02:01] Response: 200 - Time: 0.01s
+[2025-11-10 23:02:01] Response: 200 - Time: 0.01s
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK
+INFO:     None:0 - "POST /api/chat/history HTTP/1.1" 200 OK

@@ -171,35 +171,85 @@ export default function ChatScreen({ navigation }) {
       });
     }, 3000);
 
+    // Retry function with exponential backoff
+    const retryRequest = async (attempt = 1) => {
+      try {
+        // Fix date and time formats to match web version
+        const fixedBirthData = { ...birthData };
+        
+        // Fix date format - extract YYYY-MM-DD from ISO string
+        if (fixedBirthData.date && fixedBirthData.date.includes('T')) {
+          fixedBirthData.date = fixedBirthData.date.split('T')[0]; // Extract YYYY-MM-DD
+        }
+        
+        // Fix time format - extract HH:MM from ISO string
+        if (fixedBirthData.time && fixedBirthData.time.includes('T')) {
+          const timeDate = new Date(fixedBirthData.time);
+          fixedBirthData.time = timeDate.toTimeString().slice(0, 5); // Extract HH:MM
+        }
+        
+        const requestBody = { ...fixedBirthData, question: messageText, language, response_style: 'detailed' };
+        console.log(`Sending chat request (attempt ${attempt}):`, JSON.stringify(requestBody, null, 2));
+        
+        // Update loading message for retries
+        if (attempt > 1) {
+          setMessages(prev => {
+            return prev.map(msg => 
+              msg.id === typingMessageId 
+                ? { ...msg, content: `🔄 Server busy, retrying... (attempt ${attempt} of 3)` }
+                : msg
+            );
+          });
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/api/chat/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log('Chat response status:', response.status);
+
+        // Check for server errors that should trigger retry
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(`Chat API error: ${response.status}`);
+        }
+        
+        return response;
+      } catch (error) {
+        const isRetryableError = error.message.includes('502') || 
+                               error.message.includes('503') || 
+                               error.message.includes('504') || 
+                               error.message.includes('upstream') ||
+                               error.message.includes('Network') ||
+                               error.message.includes('fetch');
+        
+        if (isRetryableError && attempt < 3) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000); // 1s, 2s, 4s
+          console.log(`Retrying in ${delay}ms due to:`, error.message);
+          
+          // Show retry message
+          setMessages(prev => {
+            return prev.map(msg => 
+              msg.id === typingMessageId 
+                ? { ...msg, content: `⏳ Connection issue detected, retrying in ${delay/1000}s...` }
+                : msg
+            );
+          });
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return retryRequest(attempt + 1);
+        }
+        throw error;
+      }
+    };
+    
     try {
-      // Fix date and time formats to match web version
-      const fixedBirthData = { ...birthData };
-      
-      // Fix date format - extract YYYY-MM-DD from ISO string
-      if (fixedBirthData.date && fixedBirthData.date.includes('T')) {
-        fixedBirthData.date = fixedBirthData.date.split('T')[0]; // Extract YYYY-MM-DD
-      }
-      
-      // Fix time format - extract HH:MM from ISO string
-      if (fixedBirthData.time && fixedBirthData.time.includes('T')) {
-        const timeDate = new Date(fixedBirthData.time);
-        fixedBirthData.time = timeDate.toTimeString().slice(0, 5); // Extract HH:MM
-      }
-      
-      const requestBody = { ...fixedBirthData, question: messageText, language, response_style: 'detailed' };
-      console.log('Sending chat request:', JSON.stringify(requestBody, null, 2));
-      
-      const response = await fetch(`${API_BASE_URL}/api/chat/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log('Chat response status:', response.status);
-
-      if (!response.ok) {
-        throw new Error(`Chat API error: ${response.status}`);
-      }
+      const response = await retryRequest();
 
       let assistantMessage = {
         id: Date.now().toString(),
@@ -380,12 +430,20 @@ export default function ChatScreen({ navigation }) {
         console.log('Final assistant message:', assistantMessage);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error sending message after retries:', error);
       clearInterval(loadingInterval);
+      
+      let errorContent = 'Sorry, I encountered an error after multiple attempts. Please try again.';
+      
+      if (error.message.includes('502') || error.message.includes('503') || error.message.includes('upstream')) {
+        errorContent = 'Server is experiencing high load. Please try again in a few moments.';
+      } else if (error.message.includes('Network')) {
+        errorContent = 'Network connection issue. Please check your internet and try again.';
+      }
       
       const errorMessage = {
         id: Date.now().toString(),
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: errorContent,
         role: 'assistant',
         timestamp: new Date().toISOString(),
       };

@@ -357,19 +357,71 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             });
         }, 3000);
 
-        try {
-            console.log('Sending chat request:', { ...birthData, question: message, language, response_style: responseStyle });
-            const response = await fetch('/api/chat/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...birthData, question: message, language, response_style: responseStyle })
-            });
+        // Retry function with exponential backoff
+        const retryRequest = async (attempt = 1) => {
+            try {
+                console.log(`Sending chat request (attempt ${attempt}):`, { ...birthData, question: message, language, response_style: responseStyle });
+                
+                // Update loading message for retries
+                if (attempt > 1) {
+                    setMessages(prev => {
+                        return prev.map(msg => 
+                            msg.id === typingMessageId 
+                                ? { ...msg, content: `🔄 Server busy, retrying... (attempt ${attempt} of 3)` }
+                                : msg
+                        );
+                    });
+                }
+                
+                const response = await fetch('/api/chat/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...birthData, question: message, language, response_style: responseStyle })
+                });
 
-            console.log('Chat response status:', response.status);
-            if (!response.ok) {
-                console.error('Chat API error:', response.status, response.statusText);
-                throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+                console.log('Chat response status:', response.status);
+                
+                // Check for server errors that should trigger retry
+                if (response.status === 502 || response.status === 503 || response.status === 504) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                if (!response.ok) {
+                    console.error('Chat API error:', response.status, response.statusText);
+                    throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+                }
+                
+                return response;
+            } catch (error) {
+                const isRetryableError = error.message.includes('502') || 
+                                       error.message.includes('503') || 
+                                       error.message.includes('504') || 
+                                       error.message.includes('upstream') ||
+                                       error.message.includes('Network') ||
+                                       error.message.includes('fetch');
+                
+                if (isRetryableError && attempt < 3) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000); // 1s, 2s, 4s
+                    console.log(`Retrying in ${delay}ms due to:`, error.message);
+                    
+                    // Show retry message
+                    setMessages(prev => {
+                        return prev.map(msg => 
+                            msg.id === typingMessageId 
+                                ? { ...msg, content: `⏳ Connection issue detected, retrying in ${delay/1000}s...` }
+                                : msg
+                        );
+                    });
+                    
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return retryRequest(attempt + 1);
+                }
+                throw error;
             }
+        };
+        
+        try {
+            const response = await retryRequest();
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -484,12 +536,14 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 }
             }
         } catch (error) {
-            console.error('Error sending message:', error);
+            console.error('Error sending message after retries:', error);
             clearInterval(loadingInterval);
             
-            let errorMessage = 'Sorry, I encountered an error. Please try again.';
+            let errorMessage = 'Sorry, I encountered an error after multiple attempts. Please try again.';
             
-            if (error.message.includes('404')) {
+            if (error.message.includes('502') || error.message.includes('503') || error.message.includes('upstream')) {
+                errorMessage = 'Server is experiencing high load. Please try again in a few moments.';
+            } else if (error.message.includes('404')) {
                 errorMessage = 'Chat service is temporarily unavailable. Please try again later.';
             } else if (error.message.includes('500')) {
                 errorMessage = 'Server error occurred. Please try again in a few moments.';
