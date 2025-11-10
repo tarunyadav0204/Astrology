@@ -459,25 +459,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         if (data && data.length > 0) {
                             try {
                                 // Decode HTML entities in the raw data
-                                const cleanData = data
-                                    .replace(/&quot;/g, '"')
-                                    .replace(/&amp;/g, '&')
-                                    .replace(/&lt;/g, '<')
-                                    .replace(/&gt;/g, '>')
-                                    .replace(/&#39;/g, "'")
-                                    .replace(/&nbsp;/g, ' ');
-                                const parsed = JSON.parse(cleanData);
+                                const decodeHtmlEntities = (text) => {
+                                    const textarea = document.createElement('textarea');
+                                    textarea.innerHTML = text;
+                                    return textarea.value;
+                                };
+                                
+                                const decodedData = decodeHtmlEntities(data);
+                                const parsed = JSON.parse(decodedData);
                                 
                                 if (parsed.status === 'complete' && parsed.response) {
                                     // Decode HTML entities in the response content
-                                    let responseText = parsed.response
-                                        .replace(/&quot;/g, '"')
-                                        .replace(/&amp;/g, '&')
-                                        .replace(/&lt;/g, '<')
-                                        .replace(/&gt;/g, '>')
-                                        .replace(/&#39;/g, "'")
-                                        .replace(/&nbsp;/g, ' ')
-                                        .trim();
+                                    let responseText = decodeHtmlEntities(parsed.response).trim();
                                     
                                     console.log('Decoded response text:', responseText.substring(0, 200));
                                     console.log('Response text length:', responseText.length);
@@ -513,13 +506,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
                                     let response = responseMatch[1]
                                         .replace(/\\n/g, '\n')
-                                        .replace(/\\"/g, '"')
-                                        .replace(/&quot;/g, '"')
-                                        .replace(/&amp;/g, '&')
-                                        .replace(/&lt;/g, '<')
-                                        .replace(/&gt;/g, '>')
-                                        .replace(/&#39;/g, "'")
-                                        .replace(/&nbsp;/g, ' ');
+                                        .replace(/\\"/g, '"');
+                                    response = decodeHtmlEntities(response);
                                     assistantMessage.content = response;
                                     setMessages(prev => {
                                         return prev.map(msg => 

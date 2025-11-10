@@ -284,26 +284,24 @@ export default function ChatScreen({ navigation }) {
               if (data === '[DONE]') break;
               if (data && data.length > 0) {
                 try {
-                  // First decode HTML entities in the raw data
-                  const cleanData = data
-                    .replace(/&quot;/g, '"')
-                    .replace(/&amp;/g, '&')
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>')
-                    .replace(/&#39;/g, "'")
-                    .replace(/&nbsp;/g, ' ');
-                  const parsed = JSON.parse(cleanData);
-                  
-                  if (parsed.status === 'complete' && parsed.response) {
-                    // Decode HTML entities in the response content
-                    let responseText = parsed.response
+                  // Decode HTML entities in the raw data
+                  const decodeHtmlEntities = (text) => {
+                    // For React Native, use simple string replacement
+                    return text
                       .replace(/&quot;/g, '"')
                       .replace(/&amp;/g, '&')
                       .replace(/&lt;/g, '<')
                       .replace(/&gt;/g, '>')
                       .replace(/&#39;/g, "'")
-                      .replace(/&nbsp;/g, ' ')
-                      .trim();
+                      .replace(/&nbsp;/g, ' ');
+                  };
+                  
+                  const decodedData = decodeHtmlEntities(data);
+                  const parsed = JSON.parse(decodedData);
+                  
+                  if (parsed.status === 'complete' && parsed.response) {
+                    // Decode HTML entities in the response content
+                    let responseText = decodeHtmlEntities(parsed.response).trim();
                     
                     if (responseText.length > 0) {
                       assistantMessage.content = responseText;
@@ -336,13 +334,8 @@ export default function ChatScreen({ navigation }) {
                   if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
                     let response = responseMatch[1]
                       .replace(/\\n/g, '\n')
-                      .replace(/\\"/g, '"')
-                      .replace(/&quot;/g, '"')
-                      .replace(/&amp;/g, '&')
-                      .replace(/&lt;/g, '<')
-                      .replace(/&gt;/g, '>')
-                      .replace(/&#39;/g, "'")
-                      .replace(/&nbsp;/g, ' ');
+                      .replace(/\\"/g, '"');
+                    response = decodeHtmlEntities(response);
                     assistantMessage.content = response;
                     setMessages(prev => 
                       prev.map(msg => 
@@ -373,13 +366,16 @@ export default function ChatScreen({ navigation }) {
                   console.log('Parsed SSE data:', parsed);
                   if (parsed.status === 'complete' && parsed.response) {
                     // Decode HTML entities in response
-                    let responseText = parsed.response
-                      .replace(/&quot;/g, '"')
-                      .replace(/&amp;/g, '&')
-                      .replace(/&lt;/g, '<')
-                      .replace(/&gt;/g, '>')
-                      .replace(/&#39;/g, "'")
-                      .replace(/&nbsp;/g, ' ');
+                    const decodeHtmlEntities = (text) => {
+                      return text
+                        .replace(/&quot;/g, '"')
+                        .replace(/&amp;/g, '&')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&#39;/g, "'")
+                        .replace(/&nbsp;/g, ' ');
+                    };
+                    let responseText = decodeHtmlEntities(parsed.response);
                     assistantMessage.content = responseText;
                     setMessages(prev => 
                       prev.map(msg => 
@@ -401,13 +397,16 @@ export default function ChatScreen({ navigation }) {
             console.log('Parsed JSON data:', data);
             if (data.response) {
               // Decode HTML entities in response
-              let responseText = data.response
-                .replace(/&quot;/g, '"')
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&#39;/g, "'")
-                .replace(/&nbsp;/g, ' ');
+              const decodeHtmlEntities = (text) => {
+                return text
+                  .replace(/&quot;/g, '"')
+                  .replace(/&amp;/g, '&')
+                  .replace(/&lt;/g, '<')
+                  .replace(/&gt;/g, '>')
+                  .replace(/&#39;/g, "'")
+                  .replace(/&nbsp;/g, ' ');
+              };
+              let responseText = decodeHtmlEntities(data.response);
               assistantMessage.content = responseText;
             } else if (data.error) {
               assistantMessage.content = `Sorry, I encountered an error: ${data.error}. Please try again.`;
