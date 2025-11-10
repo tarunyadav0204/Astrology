@@ -465,17 +465,32 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     // Decode HTML entities in the response content
                                     let responseText = decodeHtmlEntities(parsed.response).trim();
                                     
+                                    // Debug for production
+                                    if (window.location.hostname === 'astroroshni.com') {
+                                        console.log('PROD - Response text length:', responseText.length);
+                                        console.log('PROD - messageAdded flag:', messageAdded);
+                                        console.log('PROD - assistantMessage ID:', assistantMessage.id);
+                                        console.log('PROD - typingMessageId:', typingMessageId);
+                                    }
+                                    
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
                                         
                                         if (!messageAdded) {
                                             // Replace typing message with actual response
                                             setMessages(prev => {
-                                                return prev.map(msg => 
+                                                const updated = prev.map(msg => 
                                                     msg.id === typingMessageId 
                                                         ? { ...assistantMessage }
                                                         : msg
                                                 );
+                                                
+                                                if (window.location.hostname === 'astroroshni.com') {
+                                                    console.log('PROD - Updated messages count:', updated.length);
+                                                    console.log('PROD - Assistant message in array:', updated.find(m => m.id === assistantMessage.id));
+                                                }
+                                                
+                                                return updated;
                                             });
                                             messageAdded = true;
                                         } else {
