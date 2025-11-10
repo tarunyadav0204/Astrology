@@ -92,41 +92,47 @@ async def ask_question(request: ChatRequest):
                     
                     # Note: Message saving handled by ChatModal via /api/chat/message endpoint
                     
-                    # Send final result with proper JSON escaping
+                    # Send final result with robust JSON handling
                     try:
                         # Clean and validate response text
                         if not response_text or response_text.strip() == '':
                             response_text = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
                         
-                        # Ensure response is properly formatted and decode any HTML entities
-                        clean_response = html.unescape(response_text.strip())
+                        # Clean response text - remove any problematic characters
+                        clean_response = response_text.strip()
                         
-                        print(f"Before JSON serialization: {clean_response[:100]}...")
+                        # Remove any null bytes or control characters that could break JSON
+                        clean_response = ''.join(char for char in clean_response if ord(char) >= 32 or char in '\n\r\t')
                         
-                        response_json = json.dumps({
+                        print(f"Cleaned response length: {len(clean_response)}")
+                        print(f"Response preview: {clean_response[:100]}...")
+                        
+                        # Use json.dumps with proper error handling
+                        response_data = {
                             'status': 'complete', 
                             'response': clean_response
-                        }, ensure_ascii=False, separators=(',', ':'))
+                        }
                         
-                        print(f"After JSON serialization: {response_json[:200]}...")
-                        print(f"Sending response length: {len(clean_response)}")
-                        print(f"Response preview: {clean_response[:100]}...")
+                        # Serialize with strict ASCII to avoid encoding issues
+                        response_json = json.dumps(response_data, ensure_ascii=True, separators=(',', ':'))
+                        
+                        print(f"JSON length: {len(response_json)}")
+                        print(f"JSON preview: {response_json[:200]}...")
+                        
+                        # Validate JSON by parsing it back
+                        json.loads(response_json)
                         
                         yield f"data: {response_json}\n\n"
                         
                     except Exception as json_error:
                         print(f"JSON serialization error: {json_error}")
-                        print(f"Problematic response: {response_text[:200]}...")
+                        print(f"Error type: {type(json_error).__name__}")
                         
-                        # Fallback with manual escaping
-                        try:
-                            safe_response = response_text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-                            fallback_json = f'{{"status": "complete", "response": "{safe_response}"}}'
-                            yield f"data: {fallback_json}\n\n"
-                        except Exception as fallback_error:
-                            print(f"Fallback error: {fallback_error}")
-                            error_json = json.dumps({'status': 'error', 'error': 'Response formatting failed'})
-                            yield f"data: {error_json}\n\n"
+                        # Create safe fallback response
+                        safe_message = "I generated a response but encountered a formatting issue. Please try asking your question again."
+                        fallback_data = {'status': 'error', 'error': safe_message}
+                        fallback_json = json.dumps(fallback_data, ensure_ascii=True)
+                        yield f"data: {fallback_json}\n\n"
                 else:
                     print(f"AI error: {ai_result.get('error')}")
                     

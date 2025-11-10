@@ -70,6 +70,13 @@ class GeminiChatAnalyzer:
             'note': 'Use this for reference only. Do not assume transit positions.'
         }
         
+        # Add response format instruction to prevent truncation
+        enhanced_context['response_format'] = {
+            'instruction': 'Provide complete response. Do not truncate mid-sentence.',
+            'max_length': 'Aim for comprehensive but concise responses under 4000 characters.',
+            'format': 'Use proper formatting with **bold** and *italic* text as needed.'
+        }
+        
         prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style)
         
         print(f"\n=== SENDING TO AI (ASYNC) ===")
@@ -96,6 +103,10 @@ class GeminiChatAnalyzer:
                     print(f"Has text: {hasattr(response, 'text')}")
                     if hasattr(response, 'text'):
                         print(f"Text length: {len(response.text) if response.text else 0}")
+                        if response.text:
+                            print(f"Response ends with: '{response.text[-50:]}'")
+                            print(f"Contains null bytes: {chr(0) in response.text}")
+                            print(f"Contains control chars: {any(ord(c) < 32 and c not in '\n\r\t' for c in response.text)}")
                     
                     return response
                 except Exception as api_error:
@@ -137,13 +148,29 @@ class GeminiChatAnalyzer:
                     'error': 'Blank response from AI'
                 }
             
+            # Clean response text to prevent JSON issues
+            # Remove any control characters except newlines, tabs, and carriage returns
+            cleaned_text = ''.join(char for char in response_text if ord(char) >= 32 or char in '\n\r\t')
+            
+            # Ensure response doesn't end abruptly (minimum length check)
+            if len(cleaned_text) < 50:
+                print(f"\n=== SUSPICIOUSLY SHORT AI RESPONSE ===")
+                print(f"Original length: {len(response_text)}, Cleaned length: {len(cleaned_text)}")
+                return {
+                    'success': False,
+                    'response': "I received a partial response. Please try asking your question again.",
+                    'error': 'Response too short or corrupted'
+                }
+            
             print(f"\n=== RECEIVED FROM AI (ASYNC) ===")
-            print(f"Response length: {len(response_text)} chars")
-            print(f"Response preview: {response_text[:200]}...")
+            print(f"Original length: {len(response_text)} chars")
+            print(f"Cleaned length: {len(cleaned_text)} chars")
+            print(f"Response preview: {cleaned_text[:200]}...")
+            print(f"Response ends with: '{cleaned_text[-50:]}'")
             
             return {
                 'success': True,
-                'response': response_text,
+                'response': cleaned_text,
                 'raw_response': response_text
             }
         except Exception as e:
