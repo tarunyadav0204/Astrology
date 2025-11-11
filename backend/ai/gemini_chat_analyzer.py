@@ -74,7 +74,8 @@ class GeminiChatAnalyzer:
         enhanced_context['response_format'] = {
             'instruction': 'Provide complete response. Do not truncate mid-sentence.',
             'max_length': 'Aim for comprehensive but concise responses under 4000 characters.',
-            'format': 'Use proper formatting with **bold** and *italic* text as needed.'
+            'format': 'Use proper formatting with **bold** and *italic* text as needed.',
+            'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.'
         }
         
         prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style)
@@ -84,6 +85,20 @@ class GeminiChatAnalyzer:
         print(f"Prompt length: {len(prompt)} chars")
         print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
         print(f"History messages: {len(conversation_history or [])}")
+        print(f"Language: {language}, Response style: {response_style}")
+        
+        # Log nakshatra data availability
+        planetary_analysis = enhanced_context.get('planetary_analysis', {})
+        nakshatra_count = sum(1 for planet_data in planetary_analysis.values() 
+                             if isinstance(planet_data, dict) and 'nakshatra' in planet_data)
+        print(f"Nakshatra data available for {nakshatra_count} planets")
+        
+        # Log if Moon nakshatra is available (most important)
+        moon_data = planetary_analysis.get('Moon', {})
+        moon_nakshatra = moon_data.get('nakshatra', {}) if isinstance(moon_data, dict) else {}
+        print(f"Moon nakshatra available: {bool(moon_nakshatra)}")
+        if moon_nakshatra:
+            print(f"Moon nakshatra: {moon_nakshatra.get('name', 'Unknown')}")
         
         try:
             # Run the synchronous Gemini API call in a thread pool to avoid blocking
@@ -169,6 +184,13 @@ class GeminiChatAnalyzer:
             print(f"Cleaned length: {len(cleaned_text)} chars")
             print(f"Response preview: {cleaned_text[:200]}...")
             print(f"Response ends with: '{cleaned_text[-50:]}'")
+            
+            # Check for specific sections to debug missing content
+            has_nakshatra = 'nakshatra' in cleaned_text.lower() or 'नक्षत्र' in cleaned_text
+            has_analysis_header = '### nakshatra insights' in cleaned_text.lower()
+            print(f"Contains nakshatra content: {has_nakshatra}")
+            print(f"Contains nakshatra header: {has_analysis_header}")
+            print(f"Response sections count: {cleaned_text.count('###')}")
             
             return {
                 'success': True,

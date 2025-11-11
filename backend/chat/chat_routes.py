@@ -115,7 +115,7 @@ async def ask_question(request: ChatRequest):
                         }
                         
                         # Split long responses into chunks to prevent truncation
-                        max_chunk_size = 4000  # Safe chunk size for streaming
+                        max_chunk_size = 2000  # Smaller chunk size to prevent streaming truncation
                         
                         if len(clean_response) > max_chunk_size:
                             print(f"Response too long ({len(clean_response)} chars), splitting into chunks")

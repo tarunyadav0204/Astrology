@@ -526,11 +526,10 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     assistantMessage.chunks[parsed.chunk_index] = chunkText;
                                     console.log('DEBUG: Stored chunk', parsed.chunk_index, 'length:', chunkText.length);
                                     
-                                    // Update display with partial content as chunks arrive
-                                    const currentContent = assistantMessage.chunks.filter(c => c !== undefined).join('');
-                                    assistantMessage.content = currentContent;
-                                    
+                                    // Only add message once, then update with complete content when all chunks received
                                     if (!messageAdded) {
+                                        // Add placeholder message
+                                        assistantMessage.content = 'Loading response...';
                                         setMessages(prev => {
                                             return prev.map(msg => 
                                                 msg.id === typingMessageId 
@@ -539,34 +538,30 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             );
                                         });
                                         messageAdded = true;
-                                        console.log('DEBUG: Added message with partial content');
-                                    } else {
-                                        // Update existing message with accumulated content
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
-                                        console.log('DEBUG: Updated message with chunk', parsed.chunk_index);
+                                        console.log('DEBUG: Added placeholder message for chunks');
                                     }
                                     
                                     // Check if all chunks received
                                     const allChunksReceived = assistantMessage.chunks.every(chunk => chunk !== undefined);
+                                    console.log('DEBUG: Chunks status:', assistantMessage.chunks.map((c, i) => `${i}: ${c ? 'received' : 'missing'}`));
+                                    
                                     if (allChunksReceived) {
                                         const completeText = assistantMessage.chunks.join('');
                                         console.log('DEBUG: All chunks received, complete length:', completeText.length);
+                                        console.log('DEBUG: Complete text preview:', completeText.substring(0, 200));
+                                        console.log('DEBUG: Complete text contains nakshatra:', completeText.toLowerCase().includes('nakshatra'));
                                         
                                         assistantMessage.content = completeText.trim();
                                         
                                         // Final update with complete content
                                         setMessages(prev => {
-                                            return prev.map(msg => 
+                                            const updated = prev.map(msg => 
                                                 msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage }
+                                                    ? { ...assistantMessage, content: completeText.trim() }
                                                     : msg
                                             );
+                                            console.log('DEBUG: Updated message with complete content');
+                                            return updated;
                                         });
                                         
                                         await saveMessage(currentSessionId, 'assistant', completeText);
