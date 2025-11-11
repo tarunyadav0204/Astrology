@@ -13,7 +13,6 @@ import {
   Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -175,7 +174,7 @@ export default function BirthFormScreen({ navigation }) {
           [
             {
               text: 'OK',
-              onPress: () => navigation.goBack(),
+              onPress: () => navigation.navigate('Chat'),
             },
           ]
         );
@@ -222,7 +221,7 @@ export default function BirthFormScreen({ navigation }) {
         
         addWelcomeMessage(prev => [...prev, welcomeMessage]);
       }
-      navigation.goBack();
+      navigation.navigate('Chat');
     } catch (error) {
       Alert.alert('Error', 'Failed to load chart');
     }

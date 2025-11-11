@@ -25,6 +25,22 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  
+  React.useEffect(() => {
+    // Check if biometric authentication is supported
+    const checkBiometric = async () => {
+      if (window.PublicKeyCredential && navigator.credentials) {
+        try {
+          const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          setBiometricSupported(available);
+        } catch (error) {
+          setBiometricSupported(false);
+        }
+      }
+    };
+    checkBiometric();
+  }, []);
 
   const handleInputChange = (e) => {
     setFormData(prev => ({
@@ -46,6 +62,16 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       
       localStorage.setItem('token', response.access_token);
       localStorage.setItem('user', JSON.stringify(userWithAdmin));
+      
+      // Save user data for biometric login if supported
+      if (biometricSupported && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        localStorage.setItem('biometric_user', JSON.stringify({
+          ...userWithAdmin,
+          token: response.access_token,
+          phone: formData.phone
+        }));
+      }
+      
       toast.success('Login successful!');
       onLogin(userWithAdmin);
     } catch (error) {
@@ -110,6 +136,70 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       setResetToken('');
     } catch (error) {
       toast.error(error.message || 'Password reset failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleBiometricLogin = async () => {
+    setLoading(true);
+    
+    try {
+      // Check if user has saved credentials
+      const savedUser = localStorage.getItem('biometric_user');
+      if (!savedUser) {
+        toast.error('Please login with password first to enable biometric authentication');
+        setLoading(false);
+        return;
+      }
+      
+      const userData = JSON.parse(savedUser);
+      
+      // Create credential request
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: new Uint8Array(32),
+          rp: {
+            name: getAppName(),
+            id: window.location.hostname
+          },
+          user: {
+            id: new TextEncoder().encode(userData.phone),
+            name: userData.phone,
+            displayName: userData.name || userData.phone
+          },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required'
+          },
+          timeout: 60000,
+          attestation: 'direct'
+        }
+      });
+      
+      if (credential) {
+        // Store biometric credential
+        localStorage.setItem('biometric_credential', JSON.stringify({
+          id: credential.id,
+          rawId: Array.from(new Uint8Array(credential.rawId)),
+          type: credential.type
+        }));
+        
+        // Auto-login with saved user data
+        localStorage.setItem('token', userData.token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        toast.success('Biometric login successful!');
+        onLogin(userData);
+      }
+    } catch (error) {
+      if (error.name === 'NotAllowedError') {
+        toast.error('Biometric authentication was cancelled');
+      } else if (error.name === 'NotSupportedError') {
+        toast.error('Biometric authentication not supported on this device');
+      } else {
+        toast.error('Biometric authentication failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -429,6 +519,33 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         >
           {loading ? 'Logging in...' : '🚀 Login'}
         </button>
+        
+        {biometricSupported && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+          <button
+            type="button"
+            onClick={handleBiometricLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '1rem',
+              background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            {/iPhone|iPad|iPod/i.test(navigator.userAgent) ? '🔐 Face ID / Touch ID' : '🔐 Fingerprint / Face Login'}
+          </button>
+        )}
 
         <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
           <button

@@ -108,7 +108,9 @@ export default function ChatScreen({ navigation }) {
   };
 
   const sendMessage = async (messageText = inputText) => {
-    if (!messageText.trim() || !birthData) return;
+    if (!messageText.trim() || !birthData) {
+      return;
+    }
 
     const userMessage = {
       id: Date.now().toString(),
@@ -120,6 +122,11 @@ export default function ChatScreen({ navigation }) {
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setLoading(true);
+    
+    // Scroll to bottom when user sends a message
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
 
     // Add typing indicator with engaging messages like web version
     const loadingMessages = [
@@ -188,7 +195,7 @@ export default function ChatScreen({ navigation }) {
           fixedBirthData.time = timeDate.toTimeString().slice(0, 5); // Extract HH:MM
         }
         
-        const requestBody = { ...fixedBirthData, question: messageText, language, response_style: 'detailed' };
+        const requestBody = { ...fixedBirthData, question: messageText, language: language || 'english', response_style: 'detailed' };
         console.log(`Sending chat request (attempt ${attempt}):`, JSON.stringify(requestBody, null, 2));
         
         // Update loading message for retries
@@ -265,139 +272,28 @@ export default function ChatScreen({ navigation }) {
         assistantMessage
       ]);
 
-      // Check if response supports streaming
-      if (response.body && response.body.getReader) {
-        // Handle streaming response
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') break;
-              if (data && data.length > 0) {
-                try {
-                  // Decode HTML entities in the raw data
-                  const decodeHtmlEntities = (text) => {
-                    // For React Native, use simple string replacement
-                    return text
-                      .replace(/&quot;/g, '"')
-                      .replace(/&amp;/g, '&')
-                      .replace(/&lt;/g, '<')
-                      .replace(/&gt;/g, '>')
-                      .replace(/&#39;/g, "'")
-                      .replace(/&nbsp;/g, ' ');
-                  };
-                  
-                  const decodedData = decodeHtmlEntities(data);
-                  const parsed = JSON.parse(decodedData);
-                  
-                  if (parsed.status === 'complete' && parsed.response) {
-                    // Decode HTML entities in the response content
-                    let responseText = decodeHtmlEntities(parsed.response).trim();
-                    
-                    if (responseText.length > 0) {
-                      assistantMessage.content = responseText;
-                      setMessages(prev => 
-                        prev.map(msg => 
-                          msg.id === assistantMessage.id ? { ...assistantMessage } : msg
-                        )
-                      );
-                    }
-                  } else if (parsed.status === 'error') {
-                    console.log('API Error:', parsed.error);
-                    assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === assistantMessage.id ? { ...assistantMessage } : msg
-                      )
-                    );
-                  } else if (parsed.status === 'streaming' && parsed.content) {
-                    assistantMessage.content += parsed.content;
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === assistantMessage.id ? { ...assistantMessage } : msg
-                      )
-                    );
-                  }
-                } catch (e) {
-                  const statusMatch = data.match(/"status"\s*:\s*"([^"]+)"/);
-                  const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                  
-                  if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
-                    let response = responseMatch[1]
-                      .replace(/\\n/g, '\n')
-                      .replace(/\\"/g, '"');
-                    response = decodeHtmlEntities(response);
-                    assistantMessage.content = response;
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === assistantMessage.id ? { ...assistantMessage } : msg
-                      )
-                    );
-                  }
-                }
-              }
-            }
-          }
-        }
-      } else {
-        // Handle non-streaming response (fallback)
-        const responseText = await response.text();
-        
-        console.log('Response text:', responseText.substring(0, 200));
-        
-        // Check if it's SSE format
-        if (responseText.includes('data:')) {
-          const lines = responseText.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data && data !== '[DONE]') {
-                try {
-                  const parsed = JSON.parse(data);
-                  console.log('Parsed SSE data:', parsed);
-                  if (parsed.status === 'complete' && parsed.response) {
-                    // Decode HTML entities in response
-                    const decodeHtmlEntities = (text) => {
-                      return text
-                        .replace(/&quot;/g, '"')
-                        .replace(/&amp;/g, '&')
-                        .replace(/&lt;/g, '<')
-                        .replace(/&gt;/g, '>')
-                        .replace(/&#39;/g, "'")
-                        .replace(/&nbsp;/g, ' ');
-                    };
-                    let responseText = decodeHtmlEntities(parsed.response);
-                    assistantMessage.content = responseText;
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === assistantMessage.id ? { ...assistantMessage } : msg
-                      )
-                    );
-                    break;
-                  }
-                } catch (e) {
-                  console.log('Parse error for line:', data);
-                }
-              }
-            }
-          }
-        } else {
-          // Try parsing as regular JSON
-          try {
-            const data = JSON.parse(responseText);
-            console.log('Parsed JSON data:', data);
-            if (data.response) {
-              // Decode HTML entities in response
+      // Handle response exactly like web version
+      const responseText = await response.text();
+      console.log('Full response text:', responseText);
+      
+      let hasReceivedContent = false;
+      
+      // Process SSE format exactly like web
+      const lines = responseText.split('\n').filter(line => line.trim());
+      console.log('Total lines to process:', lines.length);
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          console.log('Processing data:', data);
+          
+          if (data === '[DONE]') break;
+          if (data && data.length > 0) {
+            try {
+              console.log('DEBUG: Attempting to parse JSON data');
+              // Decode HTML entities exactly like web version
               const decodeHtmlEntities = (text) => {
+                // For React Native, we can't use textarea, so use manual replacement
                 return text
                   .replace(/&quot;/g, '"')
                   .replace(/&amp;/g, '&')
@@ -406,33 +302,107 @@ export default function ChatScreen({ navigation }) {
                   .replace(/&#39;/g, "'")
                   .replace(/&nbsp;/g, ' ');
               };
-              let responseText = decodeHtmlEntities(data.response);
-              assistantMessage.content = responseText;
-            } else if (data.error) {
-              assistantMessage.content = `Sorry, I encountered an error: ${data.error}. Please try again.`;
-            } else {
-              assistantMessage.content = 'No response received from server.';
+              
+              // First try to parse as-is, then decode if needed (exactly like web)
+              let parsed;
+              try {
+                parsed = JSON.parse(data);
+                console.log('DEBUG: JSON parsed successfully, status:', parsed.status);
+              } catch (parseError) {
+                console.log('DEBUG: Direct JSON parse failed, trying with HTML decode');
+                // If direct parsing fails, try decoding first
+                const decodedData = decodeHtmlEntities(data);
+                parsed = JSON.parse(decodedData);
+                console.log('DEBUG: JSON parsed after HTML decode, status:', parsed.status);
+              }
+              
+              console.log('Parsed data:', parsed);
+              
+              // Handle chunks like web version
+              if (parsed.status === 'chunk') {
+                console.log('DEBUG: Processing chunk response', parsed.chunk_index, 'of', parsed.total_chunks);
+                // Decode HTML entities in chunk content
+                let chunkContent = parsed.response || '';
+                if (chunkContent.includes('&lt;') || chunkContent.includes('&gt;') || chunkContent.includes('&quot;') || chunkContent.includes('&#39;')) {
+                  chunkContent = decodeHtmlEntities(chunkContent);
+                }
+                assistantMessage.content += chunkContent;
+                hasReceivedContent = true;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  newMessages[newMessages.length - 1] = { ...assistantMessage };
+                  return newMessages;
+                });
+              } else if (parsed.status === 'complete' && parsed.response) {
+                // Decode HTML entities in complete response
+                let responseContent = parsed.response;
+                if (responseContent.includes('&lt;') || responseContent.includes('&gt;') || responseContent.includes('&quot;') || responseContent.includes('&#39;')) {
+                  responseContent = decodeHtmlEntities(responseContent);
+                }
+                assistantMessage.content = responseContent;
+                hasReceivedContent = true;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  newMessages[newMessages.length - 1] = { ...assistantMessage };
+                  return newMessages;
+                });
+                break;
+              } else if (parsed.status === 'complete') {
+                // Complete without response means use accumulated content
+                console.log('DEBUG: Complete status without response, using accumulated content');
+                break;
+              } else if (parsed.status === 'error') {
+                throw new Error(parsed.error || 'AI analysis failed');
+              } else if (parsed.content) {
+                // Decode HTML entities in content like web version
+                let content = parsed.content;
+                if (content.includes('&lt;') || content.includes('&gt;') || content.includes('&quot;') || content.includes('&#39;')) {
+                  content = decodeHtmlEntities(content);
+                }
+                assistantMessage.content += content;
+                hasReceivedContent = true;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  newMessages[newMessages.length - 1] = { ...assistantMessage };
+                  return newMessages;
+                });
+              }
+            } catch (parseError) {
+              console.error('Error parsing chunk:', parseError);
+              console.log('Raw data causing error:', data);
+              
+              // Try regex extraction as fallback
+              const contentMatch = data.match(/["']content["']\s*:\s*["']((?:[^"'\\]|\\.)*)['"]/i);
+              if (contentMatch) {
+                const content = contentMatch[1]
+                  .replace(/\\n/g, '\n')
+                  .replace(/\\"/g, '"')
+                  .replace(/\\\\/g, '/');
+                console.log('Extracted content via regex:', content.substring(0, 100));
+                assistantMessage.content += content;
+                hasReceivedContent = true;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  newMessages[newMessages.length - 1] = { ...assistantMessage };
+                  return newMessages;
+                });
+              }
             }
-          } catch (e) {
-            console.log('JSON parse failed, using raw text');
-            // If all else fails, use the raw text
-            assistantMessage.content = responseText || 'Sorry, I received an invalid response. Please try again.';
           }
-          
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === assistantMessage.id ? { ...assistantMessage } : msg
-            )
-          );
         }
-        
-        console.log('Final assistant message:', assistantMessage);
       }
+      
+      // Final validation like web version
+      if (!hasReceivedContent || !assistantMessage.content.trim()) {
+        console.error('Empty response detected:', { hasReceivedContent, content: assistantMessage.content });
+        throw new Error('Empty response received - please try again');
+      }
+
     } catch (error) {
       console.error('Error sending message after retries:', error);
       clearInterval(loadingInterval);
       
-      let errorContent = 'Sorry, I encountered an error after multiple attempts. Please try again.';
+      let errorContent = 'Sorry, I encountered an error. Please try again.';
       
       if (error.message.includes('502') || error.message.includes('503') || error.message.includes('upstream')) {
         errorContent = 'Server is experiencing high load. Please try again in a few moments.';
@@ -440,19 +410,22 @@ export default function ChatScreen({ navigation }) {
         errorContent = 'Network connection issue. Please check your internet and try again.';
       }
       
-      const errorMessage = {
-        id: Date.now().toString(),
-        content: errorContent,
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages(prev => [
-        ...prev.filter(msg => msg.id !== typingMessageId),
-        errorMessage
-      ]);
+      // Remove empty assistant message and add error message
+      setMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== typingMessageId && !(msg.role === 'assistant' && !msg.content.trim()));
+        return [...filtered, {
+          id: Date.now().toString(),
+          content: errorContent,
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+        }];
+      });
     } finally {
       setLoading(false);
+      // Clean up any empty messages
+      setTimeout(() => {
+        setMessages(prev => prev.filter(msg => !(msg.role === 'assistant' && !msg.content.trim())));
+      }, 1000);
     }
   };
 
@@ -550,7 +523,7 @@ export default function ChatScreen({ navigation }) {
           style={styles.messagesContainer}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+
         >
           {messages.map((item) => (
             <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
@@ -728,146 +701,202 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   headerButtons: {
     flexDirection: 'row',
   },
   headerButton: {
-    marginLeft: 15,
-    padding: 5,
+    marginLeft: 12,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   messagesContainer: {
     flex: 1,
-    height: Platform.OS === 'web' ? 'calc(100vh - 200px)' : undefined,
-    maxHeight: Platform.OS === 'web' ? 'calc(100vh - 200px)' : undefined,
+    paddingHorizontal: 4,
   },
   messagesContent: {
-    padding: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     flexGrow: 1,
   },
   suggestionsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   suggestionsContent: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
   },
   suggestionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginRight: 10,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   suggestionText: {
     color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'flex-end',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 0,
-    marginRight: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    marginRight: 12,
     fontSize: 16,
-    height: 50,
+    minHeight: 50,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sendButton: {
     backgroundColor: COLORS.white,
     borderRadius: 25,
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    height: 50,
+    minHeight: 50,
+    minWidth: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   sendButtonText: {
     color: COLORS.primary,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 20,
-    width: '80%',
-    maxHeight: '70%',
+    borderRadius: 24,
+    padding: 24,
+    width: '88%',
+    maxHeight: '75%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: COLORS.primary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   languageOption: {
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
     backgroundColor: COLORS.lightGray,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   languageOptionSelected: {
     backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: COLORS.primary,
   },
   languageText: {
     fontSize: 16,
+    fontWeight: '600',
     color: COLORS.black,
   },
   menuOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
     backgroundColor: COLORS.lightGray,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   menuText: {
     fontSize: 16,
+    fontWeight: '600',
     color: COLORS.black,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   modalCloseButton: {
     backgroundColor: COLORS.primary,
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
   },
   modalCloseText: {
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });

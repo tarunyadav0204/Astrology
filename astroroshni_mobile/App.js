@@ -11,6 +11,10 @@ import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
 const Stack = createStackNavigator();
 
 export default function App() {
+  React.useEffect(() => {
+    console.log('App.js loaded');
+  }, []);
+  
   return (
     <SafeAreaProvider>
       <NavigationContainer>
