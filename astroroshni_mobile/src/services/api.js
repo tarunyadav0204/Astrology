@@ -1,17 +1,13 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../utils/constants';
-
-// Helper function to add /api prefix for localhost endpoints
-const getEndpoint = (path) => {
-  if (API_BASE_URL.includes('localhost')) {
-    return `${API_BASE_URL}/api${path}`;
-  }
-  return `/api${path}`;
-};
+import { API_BASE_URL, getEndpoint } from '../utils/constants';
 
 const api = axios.create({
+  baseURL: API_BASE_URL,
   timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  }
 });
 
 // Add auth token to requests
@@ -21,11 +17,28 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // Set the full URL with proper endpoint
+  // Use the endpoint helper for proper URL construction
   config.url = getEndpoint(config.url);
+  
+  console.log('API Request:', config.method?.toUpperCase(), config.url);
   
   return config;
 });
+
+// Handle response errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.log('API Error:', error.response?.status, error.response?.data);
+    
+    if (error.response?.status === 401) {
+      // Clear invalid token
+      AsyncStorage.removeItem('authToken');
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 export const authAPI = {
   login: (credentials) => api.post('/login', credentials),

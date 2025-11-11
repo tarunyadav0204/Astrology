@@ -50,13 +50,25 @@ const NorthIndianChart = ({ chartData, birthData }) => {
       return (customAscendant + houseIndex) % 12;
     }
     
-    const ascendantSign = 4; // Leo
+    // Use the actual sign from the houses array provided by API
+    if (chartData && chartData.houses && chartData.houses[houseIndex]) {
+      const sign = chartData.houses[houseIndex].sign;
+      console.log(`House ${houseIndex + 1}: API sign=${sign} (${rashiNames[sign]})`);
+      return sign;
+    }
+    
+    // Fallback calculation
+    const ascendantSign = getAscendantSign();
     return (ascendantSign + houseIndex) % 12;
   };
 
-  // Get the actual ascendant sign (Leo)
+  // Get the actual ascendant sign from chart data
   const getAscendantSign = () => {
-    return 4; // Leo
+    if (!chartData || !chartData.houses || !chartData.houses[0]) {
+      return 4; // Fallback to Leo
+    }
+    // First house sign is the ascendant
+    return chartData.houses[0].sign;
   };
 
   const getPlanetStatus = (planet) => {

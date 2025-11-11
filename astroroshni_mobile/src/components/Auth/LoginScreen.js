@@ -42,17 +42,20 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
+    console.log('🔐 Attempting login with:', { phone, isLogin });
     setLoading(true);
     try {
       const response = isLogin 
         ? await authAPI.login({ phone, password })
         : await authAPI.register({ phone, password });
 
+      console.log('✅ Login successful:', response.data);
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
       
       navigation.replace('Chat');
     } catch (error) {
+      console.log('❌ Login failed:', error.response?.data || error.message);
       Alert.alert('Error', error.response?.data?.message || 'Authentication failed');
     } finally {
       setLoading(false);

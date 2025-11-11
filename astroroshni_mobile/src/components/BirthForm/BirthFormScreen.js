@@ -207,7 +207,7 @@ export default function BirthFormScreen({ navigation }) {
       await storage.setBirthDetails({
         ...birthData,
         date: new Date(chart.date),
-        time: new Date(`1970-01-01T${chart.time}`)
+        time: chart.time // Keep original time format
       });
 
       // Add welcome message to chat if callback exists
@@ -232,7 +232,7 @@ export default function BirthFormScreen({ navigation }) {
     setFormData({
       name: chart.name,
       date: new Date(chart.date),
-      time: new Date(`1970-01-01T${chart.time}`),
+      time: chart.time.includes(':') ? new Date(`1970-01-01T${chart.time}`) : new Date(chart.time),
       place: chart.place || `${chart.latitude}, ${chart.longitude}`,
       latitude: chart.latitude,
       longitude: chart.longitude,

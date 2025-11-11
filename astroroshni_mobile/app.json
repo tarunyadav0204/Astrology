@@ -16,7 +16,15 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.astroroshni.mobile"
+      "bundleIdentifier": "com.astroroshni.mobile",
+      "buildNumber": "1",
+      "deploymentTarget": "13.4",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -27,6 +35,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8e33070b-ac6c-42e0-a089-bd830019bb1a"
+      }
     }
   }
 }

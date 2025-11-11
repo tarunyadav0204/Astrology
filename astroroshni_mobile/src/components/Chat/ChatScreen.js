@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MessageBubble from './MessageBubble';
 import { storage } from '../../services/storage';
-import { COLORS, LANGUAGES, API_BASE_URL } from '../../utils/constants';
+import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import ChartScreen from '../Chart/ChartScreen';
 
 export default function ChatScreen({ navigation }) {
@@ -80,7 +80,7 @@ export default function ChatScreen({ navigation }) {
   const loadChatHistory = async () => {
     try {
       if (!birthData) return;
-      const response = await fetch(`${API_BASE_URL}/api/chat/history`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/history')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(birthData)
@@ -108,7 +108,10 @@ export default function ChatScreen({ navigation }) {
   };
 
   const sendMessage = async (messageText = inputText) => {
+    console.log('🚀 sendMessage called with:', { messageText, birthData: !!birthData });
+    
     if (!messageText.trim() || !birthData) {
+      console.log('❌ Validation failed:', { hasText: !!messageText.trim(), hasBirthData: !!birthData });
       return;
     }
 
@@ -196,7 +199,10 @@ export default function ChatScreen({ navigation }) {
         }
         
         const requestBody = { ...fixedBirthData, question: messageText, language: language || 'english', response_style: 'detailed' };
-        console.log(`Sending chat request (attempt ${attempt}):`, JSON.stringify(requestBody, null, 2));
+        const fullUrl = `${API_BASE_URL}${getEndpoint('/chat/ask')}`;
+        console.log(`🌐 NETWORK REQUEST (attempt ${attempt})`);
+        console.log(`📍 Full URL: ${fullUrl}`);
+        console.log(`📦 Request Body:`, JSON.stringify(requestBody, null, 2));
         
         // Update loading message for retries
         if (attempt > 1) {
@@ -209,13 +215,15 @@ export default function ChatScreen({ navigation }) {
           });
         }
         
-        const response = await fetch(`${API_BASE_URL}/api/chat/ask`, {
+        const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/ask')}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody)
         });
 
-        console.log('Chat response status:', response.status);
+        console.log(`✅ NETWORK RESPONSE: ${response.status}`);
+        console.log(`🔗 Response URL: ${response.url}`);
+        console.log(`📊 Response Headers:`, response.headers);
 
         // Check for server errors that should trigger retry
         if (response.status === 502 || response.status === 503 || response.status === 504) {

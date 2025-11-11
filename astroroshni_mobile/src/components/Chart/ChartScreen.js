@@ -52,21 +52,74 @@ export default function ChartScreen({ visible, onClose }) {
       console.log('Birth data being sent:', JSON.stringify(data, null, 2));
       
       // Ensure proper date/time format
+      let formattedDate = data.date;
+      let formattedTime = data.time;
+      
+      // Fix date format
+      if (typeof data.date === 'string' && data.date.includes('T')) {
+        formattedDate = data.date.split('T')[0];
+      }
+      
+      // Fix time format - extract HH:MM from various formats
+      if (typeof data.time === 'string') {
+        if (data.time.includes('T')) {
+          // Extract time from datetime string like "1970-01-01T09:25:00.000Z"
+          const timePart = data.time.split('T')[1];
+          if (timePart) {
+            formattedTime = timePart.slice(0, 5); // Get HH:MM
+          }
+        } else if (data.time.includes(':')) {
+          // Already in HH:MM format
+          formattedTime = data.time.slice(0, 5);
+        }
+      }
+      
       const formattedData = {
         ...data,
-        date: typeof data.date === 'string' ? data.date.split('T')[0] : data.date,
-        time: typeof data.time === 'string' ? data.time.split('T')[1]?.slice(0, 5) || data.time : data.time,
+        date: formattedDate,
+        time: formattedTime,
         latitude: parseFloat(data.latitude),
         longitude: parseFloat(data.longitude),
-        timezone: data.timezone || 'Asia/Kolkata'
+        timezone: 'Asia/Kolkata' // Always use proper timezone
       };
       
-      console.log('Formatted data:', JSON.stringify(formattedData, null, 2));
+      console.log('=== FORMATTED DATA FOR CHART API ===');
+      console.log('Original date:', data.date);
+      console.log('Original time:', data.time);
+      console.log('Formatted date:', formattedDate);
+      console.log('Formatted time:', formattedTime);
+      console.log('Full formatted data:', JSON.stringify(formattedData, null, 2));
       
-      const response = await chartAPI.calculateChart(formattedData);
+      // Compare with expected format
+      console.log('Expected format should be:');
+      console.log('date: "1980-04-02"');
+      console.log('time: "09:25"');
+      console.log('timezone: "Asia/Kolkata"');
+      
+      // Get auth token for authenticated request
+      const token = await storage.getAuthToken();
+      console.log('Using auth token:', token ? 'Present' : 'Missing');
+      
+      // Use direct fetch with auth token
+      const response = await fetch(`https://astroroshni.com/api/calculate-chart`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify(formattedData)
+      });
+      
+      console.log('Chart API response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Chart API error: ${response.status}`);
+      }
+      
+      const chartResult = await response.json();
       console.log('=== CHART API RESPONSE ===');
-      console.log('Chart response:', JSON.stringify(response.data, null, 2));
-      setChartData(response.data);
+      console.log('Chart response:', JSON.stringify(chartResult, null, 2));
+      setChartData(chartResult);
     } catch (error) {
       console.error('=== CHART CALCULATION ERROR ===');
       console.error('Error calculating chart:', error);

@@ -22,9 +22,26 @@ export const COLORS = {
 
 import { Platform } from 'react-native';
 
-export const API_BASE_URL = __DEV__ 
-  ? (Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001')
-  : 'https://astroroshni.com';
+// API Configuration matching web version
+const getApiUrl = () => {
+  // TEMPORARY: Use full astroroshni.com URL for testing
+  return 'https://astroroshni.com';
+  
+  // Original logic:
+  // if (__DEV__) {
+  //   return Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001';
+  // } else {
+  //   return '';
+  // }
+};
+
+export const API_BASE_URL = getApiUrl();
+
+// Helper function to handle API endpoints for both dev and production
+export const getEndpoint = (path) => {
+  // TEMPORARY: Use /api prefix for astroroshni.com testing
+  return `/api${path}`;
+};
 
 export const LANGUAGES = [
   { code: 'english', name: 'English', flag: '🇺🇸' },
