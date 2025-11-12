@@ -123,3 +123,5 @@ astrology.db
 # Log files
 backend/backend.log
 frontend/frontend.log
+backend/server_shutdown.log
+*.log

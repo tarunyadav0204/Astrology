@@ -104,38 +104,6 @@ horoscope_api = HoroscopeAPI()
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from collections import defaultdict
-import time
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, calls: int = 10, period: int = 60):
-        super().__init__(app)
-        self.calls = calls
-        self.period = period
-        self.clients = defaultdict(list)
-    
-    async def dispatch(self, request: Request, call_next):
-        client_ip = request.client.host if request.client else 'unknown'
-        now = time.time()
-        
-        # Special rate limiting for /docs endpoint
-        if request.url.path == '/docs':
-            # Allow 3 requests per 60 seconds for /docs (health checks)
-            client_requests = self.clients[f"{client_ip}_docs"]
-            client_requests[:] = [req_time for req_time in client_requests if now - req_time < 60]
-            
-            if len(client_requests) >= 3:
-                from fastapi.responses import JSONResponse
-                return JSONResponse(
-                    status_code=200,  # Return 200 to keep health checks happy
-                    content={"message": "Rate limited but healthy"}
-                )
-            
-            client_requests.append(now)
-        
-        response = await call_next(request)
-        return response
-
 class TimeoutMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Set longer timeout for AI endpoints
@@ -170,7 +138,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
-app.add_middleware(RateLimitMiddleware, calls=10, period=60)
 
 app.add_middleware(
     CORSMiddleware,
@@ -210,10 +177,26 @@ app.include_router(chat_admin_router, prefix="/api")
 async def root():
     return {"message": "Astrology API", "docs": "/api/docs", "version": "1.0.0"}
 
-# Additional health check endpoint at root level for GCP
+# Dedicated health check endpoint for GCP
 @app.get("/health")
 async def root_health():
     return {"status": "healthy", "message": "Astrology API is running"}
+
+@app.get("/healthz")
+async def kubernetes_health():
+    return {"status": "ok"}
+
+@app.get("/readiness")
+async def readiness_check():
+    try:
+        # Quick database check
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        return {"status": "ready"}
+    except:
+        return {"status": "not ready"}, 503
 
 @app.get("/api/test")
 async def test_endpoint():
