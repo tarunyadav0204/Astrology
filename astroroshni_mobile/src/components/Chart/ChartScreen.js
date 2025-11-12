@@ -100,23 +100,12 @@ export default function ChartScreen({ visible, onClose }) {
       const token = await storage.getAuthToken();
       console.log('Using auth token:', token ? 'Present' : 'Missing');
       
-      // Use direct fetch with auth token
-      const response = await fetch(`https://astroroshni.com/api/calculate-chart`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify(formattedData)
-      });
+      // Use chartAPI service instead of hardcoded URL
+      const response = await chartAPI.calculateChart(formattedData);
       
       console.log('Chart API response status:', response.status);
       
-      if (!response.ok) {
-        throw new Error(`Chart API error: ${response.status}`);
-      }
-      
-      const chartResult = await response.json();
+      const chartResult = response.data;
       console.log('=== CHART API RESPONSE ===');
       console.log('Chart response:', JSON.stringify(chartResult, null, 2));
       setChartData(chartResult);
@@ -132,9 +121,9 @@ export default function ChartScreen({ visible, onClose }) {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Birth Chart</Text>
+          <Text style={styles.headerTitle}>Vedic Charts</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color={COLORS.white} />
+            <Ionicons name="close" size={24} color={COLORS.accent} />
           </TouchableOpacity>
         </View>
 
@@ -145,8 +134,6 @@ export default function ChartScreen({ visible, onClose }) {
         ) : chartData && birthData ? (
           <ScrollView style={styles.chartContainer}>
             <ChartWidget 
-              title="Lagna Chart"
-              chartType="lagna"
               chartData={chartData}
               birthData={birthData}
               defaultStyle="north"
@@ -188,7 +175,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.white,
+    color: COLORS.textPrimary,
   },
   closeButton: {
     padding: 5,
@@ -221,7 +208,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: COLORS.white,
+    color: COLORS.textPrimary,
     fontSize: 16,
   },
 });

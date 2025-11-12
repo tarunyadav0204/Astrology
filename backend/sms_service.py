@@ -39,7 +39,7 @@ class SMSService:
             print(f"Attempting to send SMS to {phone_number} from {self.from_number}")
             
             message = self.client.messages.create(
-                body=f"Your AstroVishnu password reset code is: {code}. Valid for 10 minutes.",
+                body=f"Your AstroRoshni password reset code is: {code}. Valid for 10 minutes.",
                 from_=self.from_number,
                 to=phone_number
             )

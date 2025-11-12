@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 
-const NorthIndianChart = ({ chartData, birthData }) => {
+const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) => {
   console.log('=== NORTH INDIAN CHART RENDER ===');
   console.log('chartData:', chartData);
   console.log('birthData:', birthData);
@@ -13,7 +13,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
   const [aspectsHighlight, setAspectsHighlight] = useState({ show: false, houseNumber: null, aspectingPlanets: [] });
 
   const handlePlanetPress = (planet) => {
-    const tooltipText = `${planet.name}: ${planet.degree}°`;
+    const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
     setTooltip({ show: true, text: tooltipText });
     setTimeout(() => setTooltip({ show: false, text: '' }), 2000);
   };
@@ -112,6 +112,34 @@ const NorthIndianChart = ({ chartData, birthData }) => {
     return symbol;
   };
 
+  const getNakshatra = (longitude) => {
+    const nakshatras = [
+      'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+      'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+      'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+      'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+      'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
+    ];
+    const nakshatraIndex = Math.floor(longitude / 13.333333);
+    return nakshatras[nakshatraIndex] || 'Unknown';
+  };
+
+  const getShortNakshatra = (longitude) => {
+    const shortNakshatras = [
+      'Ash', 'Bha', 'Kri', 'Roh', 'Mri', 'Ard',
+      'Pun', 'Pus', 'Asl', 'Mag', 'PPh', 'UPh',
+      'Has', 'Chi', 'Swa', 'Vis', 'Anu', 'Jye',
+      'Mul', 'PAs', 'UAs', 'Shr', 'Dha', 'Sha',
+      'PBh', 'UBh', 'Rev'
+    ];
+    const nakshatraIndex = Math.floor(longitude / 13.333333);
+    return shortNakshatras[nakshatraIndex] || 'Unk';
+  };
+
+  const formatDegree = (degree) => {
+    return degree.toFixed(2) + '°';
+  };
+
   const getPlanetsInHouse = (houseIndex) => {
     if (!chartData.planets) return [];
     
@@ -127,7 +155,10 @@ const NorthIndianChart = ({ chartData, birthData }) => {
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
-          longitude: data.longitude || 0
+          longitude: data.longitude || 0,
+          nakshatra: getNakshatra(data.longitude || 0),
+          shortNakshatra: getShortNakshatra(data.longitude || 0),
+          formattedDegree: formatDegree(data.degree || 0)
         };
       });
   };
@@ -262,7 +293,7 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                   <G key={pIndex}>
                     <SvgText 
                       x={planetX} 
-                      y={planetY} 
+                      y={planetY - 8} 
                       fontSize={totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14"} 
                       fill={getPlanetColor(planet)}
                       fontWeight="900"
@@ -270,6 +301,18 @@ const NorthIndianChart = ({ chartData, birthData }) => {
                       onPress={() => handlePlanetPress(planet)}>
                       {getPlanetSymbolWithStatus(planet)}
                     </SvgText>
+                    {showDegreeNakshatra && (
+                      <SvgText 
+                        x={planetX} 
+                        y={planetY + 8} 
+                        fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
+                        fill="#666"
+                        fontWeight="500"
+                        textAnchor="middle"
+                        onPress={() => handlePlanetPress(planet)}>
+                        {planet.formattedDegree} {planet.shortNakshatra}
+                      </SvgText>
+                    )}
                   </G>
                 );
               })}

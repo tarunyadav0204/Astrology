@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
 import LoginScreen from './src/components/Auth/LoginScreen';
 import ChatScreen from './src/components/Chat/ChatScreen';
 import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
@@ -20,7 +21,7 @@ export default function App() {
       <NavigationContainer>
         <StatusBar style="light" backgroundColor="#ff6b35" />
         <Stack.Navigator
-          initialRouteName="Login"
+          initialRouteName="Welcome"
           screenOptions={{
             headerStyle: {
               backgroundColor: '#ff6b35',
@@ -31,6 +32,11 @@ export default function App() {
             },
           }}
         >
+          <Stack.Screen 
+            name="Welcome" 
+            component={WelcomeScreen}
+            options={{ headerShown: false }}
+          />
           <Stack.Screen 
             name="Login" 
             component={LoginScreen}

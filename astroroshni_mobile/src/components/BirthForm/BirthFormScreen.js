@@ -357,7 +357,10 @@ export default function BirthFormScreen({ navigation }) {
   );
 
   return (
-    <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+    <LinearGradient 
+      colors={[COLORS.gradientStart, COLORS.gradientEnd]} 
+      style={styles.container}
+    >
       <View style={styles.safeArea}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoid}
@@ -437,7 +440,7 @@ export default function BirthFormScreen({ navigation }) {
                     onPress={() => setShowDatePicker(true)}
                   >
                     <Text style={styles.dateTimeText}>{formatDate(formData.date)}</Text>
-                    <Ionicons name="calendar" size={16} color={COLORS.primary} />
+                    <Ionicons name="calendar" size={16} color={COLORS.accent} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -465,7 +468,7 @@ export default function BirthFormScreen({ navigation }) {
                     onPress={() => setShowTimePicker(true)}
                   >
                     <Text style={styles.dateTimeText}>{formatTime(formData.time)}</Text>
-                    <Ionicons name="time" size={16} color={COLORS.primary} />
+                    <Ionicons name="time" size={16} color={COLORS.accent} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -672,9 +675,16 @@ const styles = StyleSheet.create({
   },
   tabNavigation: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: COLORS.surface,
     margin: 10,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tabButton: {
     flex: 1,
@@ -683,10 +693,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeTab: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: COLORS.accent,
   },
   tabText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: COLORS.textPrimary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -698,14 +708,21 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     padding: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: COLORS.surface,
     margin: 15,
-    borderRadius: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.accent,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -715,19 +732,25 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.3)',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: COLORS.textPrimary,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   dateTimeButton: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.3)',
     borderRadius: 8,
@@ -735,10 +758,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   dateTimeText: {
     fontSize: 16,
-    color: COLORS.black,
+    color: COLORS.textPrimary,
   },
   genderButtons: {
     flexDirection: 'row',
@@ -746,19 +774,29 @@ const styles = StyleSheet.create({
   },
   genderButton: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.3)',
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   genderButtonSelected: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
   },
   genderButtonText: {
     fontSize: 16,
-    color: COLORS.black,
+    color: COLORS.textPrimary,
   },
   genderButtonTextSelected: {
     color: COLORS.white,
@@ -767,18 +805,23 @@ const styles = StyleSheet.create({
   suggestionItem: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 107, 53, 0.1)',
+    borderBottomColor: 'rgba(255, 107, 53, 0.2)',
   },
   suggestionText: {
     fontSize: 14,
-    color: COLORS.black,
+    color: COLORS.textPrimary,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
     marginTop: 15,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   submitButtonDisabled: {
     opacity: 0.6,
@@ -798,10 +841,18 @@ const styles = StyleSheet.create({
 
   searchInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 15,
+    color: COLORS.textPrimary,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   chartItem: {
@@ -811,6 +862,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   chartInfo: {
     flex: 1,
@@ -818,17 +876,17 @@ const styles = StyleSheet.create({
   chartName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.black,
+    color: COLORS.textPrimary,
     marginBottom: 5,
   },
   chartDetails: {
     fontSize: 14,
-    color: COLORS.gray,
+    color: COLORS.textSecondary,
     marginBottom: 3,
   },
   chartCreated: {
     fontSize: 12,
-    color: COLORS.gray,
+    color: COLORS.textSecondary,
   },
   chartActions: {
     flexDirection: 'row',
@@ -840,10 +898,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   editButton: {
-    backgroundColor: '#ff6f00',
+    backgroundColor: COLORS.accent,
   },
   deleteButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.error,
   },
   actionButtonText: {
     color: COLORS.white,
@@ -856,7 +914,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: COLORS.textSecondary,
     fontSize: 16,
   },
   pickerModal: {
@@ -865,13 +923,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   pickerContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   pickerDone: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',

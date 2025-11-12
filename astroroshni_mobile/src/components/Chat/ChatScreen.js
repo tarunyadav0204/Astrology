@@ -44,7 +44,15 @@ export default function ChatScreen({ navigation }) {
   useEffect(() => {
     checkBirthData();
     loadLanguagePreference();
-  }, []);
+    
+    // Add focus listener to re-check birth data when returning to screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 Chat screen focused, re-checking birth data...');
+      checkBirthData();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     if (birthData) {
@@ -66,13 +74,32 @@ export default function ChatScreen({ navigation }) {
   const checkBirthData = async () => {
     try {
       const savedBirthData = await storage.getBirthDetails();
-      if (savedBirthData) {
+      console.log('📊 Raw birth data from storage:', savedBirthData);
+      console.log('📊 Birth data type:', typeof savedBirthData);
+      console.log('📊 Birth data keys:', savedBirthData ? Object.keys(savedBirthData) : 'null');
+      
+      if (savedBirthData && typeof savedBirthData === 'object' && savedBirthData.name && savedBirthData.name.trim()) {
+        console.log('✅ Valid birth data found:', {
+          name: savedBirthData.name,
+          hasDate: !!savedBirthData.date,
+          hasTime: !!savedBirthData.time,
+          hasPlace: !!savedBirthData.place,
+          hasCoords: !!(savedBirthData.latitude && savedBirthData.longitude)
+        });
         setBirthData(savedBirthData);
       } else {
+        console.log('❌ Invalid birth data:', {
+          exists: !!savedBirthData,
+          type: typeof savedBirthData,
+          hasName: savedBirthData?.name,
+          nameLength: savedBirthData?.name?.length
+        });
+        setBirthData(null);
         navigation.navigate('BirthForm');
       }
     } catch (error) {
-      console.error('Error checking birth data:', error);
+      console.error('❌ Error checking birth data:', error);
+      setBirthData(null);
       navigation.navigate('BirthForm');
     }
   };
@@ -514,13 +541,13 @@ export default function ChatScreen({ navigation }) {
               style={styles.headerButton}
               onPress={() => setShowLanguageModal(true)}
             >
-              <Ionicons name="language" size={24} color={COLORS.white} />
+              <Ionicons name="language" size={24} color={COLORS.accent} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerButton}
               onPress={() => setShowMenu(true)}
             >
-              <Ionicons name="menu" size={24} color={COLORS.white} />
+              <Ionicons name="menu" size={24} color={COLORS.accent} />
             </TouchableOpacity>
           </View>
         </View>
@@ -633,7 +660,7 @@ export default function ChatScreen({ navigation }) {
                   setShowChart(true);
                 }}
               >
-                <Ionicons name="bar-chart" size={20} color={COLORS.primary} />
+                <Ionicons name="bar-chart" size={20} color={COLORS.accent} />
                 <Text style={styles.menuText}>View Chart</Text>
               </TouchableOpacity>
 
@@ -645,7 +672,7 @@ export default function ChatScreen({ navigation }) {
                   navigation.navigate('BirthForm');
                 }}
               >
-                <Ionicons name="person" size={20} color={COLORS.primary} />
+                <Ionicons name="person" size={20} color={COLORS.accent} />
                 <Text style={styles.menuText}>Birth Details</Text>
               </TouchableOpacity>
 
@@ -656,7 +683,7 @@ export default function ChatScreen({ navigation }) {
                   shareChat();
                 }}
               >
-                <Ionicons name="share" size={20} color={COLORS.primary} />
+                <Ionicons name="share" size={20} color={COLORS.accent} />
                 <Text style={styles.menuText}>Share Chat</Text>
               </TouchableOpacity>
 
@@ -715,9 +742,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    borderBottomColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -727,10 +754,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: COLORS.textPrimary,
   },
   headerButtons: {
     flexDirection: 'row',
@@ -739,7 +763,9 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     padding: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: COLORS.lightGray,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   messagesContainer: {
     flex: 1,
@@ -751,18 +777,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   suggestionsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: COLORS.surface,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: COLORS.border,
   },
   suggestionsContent: {
     paddingHorizontal: 16,
   },
   suggestionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: COLORS.accent,
     borderRadius: 25,
     paddingHorizontal: 18,
     paddingVertical: 10,
@@ -774,7 +800,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   suggestionText: {
-    color: COLORS.white,
+    color: COLORS.accent,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
@@ -783,13 +809,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: COLORS.border,
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: COLORS.surface,
     borderRadius: 25,
     paddingHorizontal: 18,
     paddingVertical: 12,
@@ -798,7 +824,8 @@ const styles = StyleSheet.create({
     minHeight: 50,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: COLORS.border,
+    color: COLORS.textPrimary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -806,7 +833,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sendButton: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.accent,
     borderRadius: 25,
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -814,18 +841,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 50,
     minWidth: 50,
-    shadowColor: '#000',
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     elevation: 4,
   },
   sendButtonDisabled: {
     opacity: 0.6,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: COLORS.gray,
   },
   sendButtonText: {
-    color: COLORS.primary,
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -836,12 +863,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 24,
     padding: 24,
     width: '88%',
     maxHeight: '75%',
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -850,7 +879,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.accent,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -864,7 +893,7 @@ const styles = StyleSheet.create({
   },
   languageOptionSelected: {
     backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderColor: COLORS.primary,
+    borderColor: COLORS.accent,
   },
   languageText: {
     fontSize: 16,
@@ -891,16 +920,16 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   modalCloseButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   modalCloseText: {
     color: COLORS.white,

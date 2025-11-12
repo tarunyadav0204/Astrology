@@ -1,46 +1,53 @@
 export const COLORS = {
-  primary: '#ff6b35',
-  secondary: '#f7931e',
+  // Premium Pink Orange Sunset Theme
+  primary: '#f97316',
+  secondary: '#ec4899',
   white: '#ffffff',
-  black: '#000000',
-  gray: '#666666',
-  lightGray: '#f0f0f0',
-  success: '#4CAF50',
-  error: '#e74c3c',
+  black: '#0d1117',
+  gray: '#656d76',
+  lightGray: '#fef7f0',
+  success: '#238636',
+  error: '#da3633',
   whatsapp: '#25D366',
   
-  // Gradient colors
-  gradientStart: '#ff6b35',
-  gradientEnd: '#f7931e',
+  // Premium sunset colors
+  background: '#fefcfb',
+  surface: '#ffffff',
+  accent: '#f97316',
+  textPrimary: '#1a1a1a',
+  textSecondary: '#6b7280',
+  border: '#fed7d7',
   
-  // Card colors
-  quickAnswerStart: 'rgba(255, 215, 0, 0.9)',
-  quickAnswerEnd: 'rgba(255, 165, 0, 0.9)',
-  finalThoughtsStart: 'rgba(173, 216, 230, 0.9)',
-  finalThoughtsEnd: 'rgba(135, 206, 235, 0.9)',
+  // Gradient colors - sunset premium
+  gradientStart: '#fefcfb',
+  gradientEnd: '#fef7f0',
+  
+  // Card colors - sunset gradients
+  quickAnswerStart: 'rgba(249, 115, 22, 0.1)',
+  quickAnswerEnd: 'rgba(236, 72, 153, 0.1)',
+  finalThoughtsStart: 'rgba(254, 247, 240, 0.9)',
+  finalThoughtsEnd: 'rgba(254, 215, 215, 0.9)',
 };
 
 import { Platform } from 'react-native';
 
 // API Configuration matching web version
 const getApiUrl = () => {
-  // TEMPORARY: Use full astroroshni.com URL for testing
-  return 'https://astroroshni.com';
-  
-  // Original logic:
-  // if (__DEV__) {
-  //   return Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001';
-  // } else {
-  //   return '';
-  // }
+  if (__DEV__) {
+    return Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001';
+  } else {
+    return 'https://astroroshni.com';
+  }
 };
 
 export const API_BASE_URL = getApiUrl();
 
 // Helper function to handle API endpoints for both dev and production
 export const getEndpoint = (path) => {
-  // TEMPORARY: Use /api prefix for astroroshni.com testing
-  return `/api${path}`;
+  if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('192.168')) {
+    return `/api${path}`; // /api prefix for localhost (matching web version)
+  }
+  return `/api${path}`; // /api prefix for production
 };
 
 export const LANGUAGES = [

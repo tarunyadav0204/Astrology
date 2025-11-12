@@ -104,6 +104,37 @@ horoscope_api = HoroscopeAPI()
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from collections import defaultdict
+import time
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, calls: int = 10, period: int = 60):
+        super().__init__(app)
+        self.calls = calls
+        self.period = period
+        self.clients = defaultdict(list)
+    
+    async def dispatch(self, request: Request, call_next):
+        client_ip = request.client.host if request.client else 'unknown'
+        now = time.time()
+        
+        # Special rate limiting for /docs endpoint
+        if request.url.path == '/docs':
+            # Allow 3 requests per 60 seconds for /docs (health checks)
+            client_requests = self.clients[f"{client_ip}_docs"]
+            client_requests[:] = [req_time for req_time in client_requests if now - req_time < 60]
+            
+            if len(client_requests) >= 3:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=200,  # Return 200 to keep health checks happy
+                    content={"message": "Rate limited but healthy"}
+                )
+            
+            client_requests.append(now)
+        
+        response = await call_next(request)
+        return response
 
 class TimeoutMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -139,6 +170,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
+app.add_middleware(RateLimitMiddleware, calls=10, period=60)
 
 app.add_middleware(
     CORSMiddleware,
@@ -819,6 +851,52 @@ async def forgot_password(request: ForgotPassword):
         raise HTTPException(status_code=404, detail="Phone number not found")
     
     return {"message": "Password reset available", "user_name": user[1]}
+
+@app.post("/api/send-registration-otp")
+async def send_registration_otp(request: SendResetCode):
+    import random
+    import secrets
+    from datetime import datetime, timedelta
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    # Check if phone already exists
+    cursor.execute("SELECT userid FROM users WHERE phone = ?", (request.phone,))
+    existing_user = cursor.fetchone()
+    
+    if existing_user:
+        conn.close()
+        raise HTTPException(status_code=409, detail="Phone number already registered")
+    
+    # Generate 6-digit code and secure token
+    code = str(random.randint(100000, 999999))
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
+    
+    # Store registration OTP code
+    cursor.execute(
+        "INSERT INTO password_reset_codes (phone, code, token, expires_at) VALUES (?, ?, ?, ?)",
+        (request.phone, code, token, expires_at)
+    )
+    conn.commit()
+    conn.close()
+    
+    # Send SMS with code
+    from sms_service import sms_service
+    sms_sent = sms_service.send_reset_code(request.phone, code)
+    
+    response = {
+        "message": f"Registration OTP sent to {request.phone}"
+    }
+    
+    # Development mode: show code if SMS failed and not in production
+    is_development = os.getenv('ENVIRONMENT', 'development') == 'development'
+    if not sms_sent and is_development:
+        response["dev_code"] = code
+        response["message"] += " (Development: SMS disabled, code shown below)"
+    
+    return response
 
 @app.post("/api/send-reset-code")
 async def send_reset_code(request: SendResetCode):

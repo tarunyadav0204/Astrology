@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line } from 'react-native-svg';
 
-const SouthIndianChart = ({ chartData }) => {
+const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
   // Fixed sign positions in South Indian chart
   const gridPositions = [
     { x: 0, y: 0, width: 85, height: 85, sign: 11 },     // Pisces
@@ -19,6 +19,34 @@ const SouthIndianChart = ({ chartData }) => {
     { x: 255, y: 255, width: 85, height: 85, sign: 5 }   // Virgo
   ];
 
+  const getNakshatra = (longitude) => {
+    const nakshatras = [
+      'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+      'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+      'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+      'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+      'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
+    ];
+    const nakshatraIndex = Math.floor(longitude / 13.333333);
+    return nakshatras[nakshatraIndex] || 'Unknown';
+  };
+
+  const getShortNakshatra = (longitude) => {
+    const shortNakshatras = [
+      'Ash', 'Bha', 'Kri', 'Roh', 'Mri', 'Ard',
+      'Pun', 'Pus', 'Asl', 'Mag', 'PPh', 'UPh',
+      'Has', 'Chi', 'Swa', 'Vis', 'Anu', 'Jye',
+      'Mul', 'PAs', 'UAs', 'Shr', 'Dha', 'Sha',
+      'PBh', 'UBh', 'Rev'
+    ];
+    const nakshatraIndex = Math.floor(longitude / 13.333333);
+    return shortNakshatras[nakshatraIndex] || 'Unk';
+  };
+
+  const formatDegree = (degree) => {
+    return degree.toFixed(2) + '°';
+  };
+
   const getPlanetsInSign = (signIndex) => {
     if (!chartData.planets || signIndex === -1) return [];
     const planets = ['Su', 'Mo', 'Ma', 'Me', 'Ju', 'Ve', 'Sa', 'Ra', 'Ke', 'Gu', 'Ma'];
@@ -31,7 +59,11 @@ const SouthIndianChart = ({ chartData }) => {
         return {
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
-          degree: data.degree ? data.degree.toFixed(1) : '0.0'
+          degree: data.degree ? data.degree.toFixed(2) : '0.00',
+          longitude: data.longitude || 0,
+          nakshatra: getNakshatra(data.longitude || 0),
+          shortNakshatra: getShortNakshatra(data.longitude || 0),
+          formattedDegree: formatDegree(data.degree || 0)
         };
       });
   };
@@ -82,16 +114,28 @@ const SouthIndianChart = ({ chartData }) => {
               
               {/* Planets */}
               {planetsInSign.map((planet, pIndex) => (
-                <SvgText 
-                  key={pIndex}
-                  x={pos.x + pos.width / 2} 
-                  y={pos.y + pos.height / 2 + (pIndex * 15)} 
-                  fontSize="12" 
-                  fill="#333"
-                  fontWeight="bold"
-                  textAnchor="middle">
-                  {planet.symbol}
-                </SvgText>
+                <G key={pIndex}>
+                  <SvgText 
+                    x={pos.x + pos.width / 2} 
+                    y={pos.y + 20 + (pIndex * 20)} 
+                    fontSize="12" 
+                    fill="#333"
+                    fontWeight="bold"
+                    textAnchor="middle">
+                    {planet.symbol}
+                  </SvgText>
+                  {showDegreeNakshatra && (
+                    <SvgText 
+                      x={pos.x + pos.width / 2} 
+                      y={pos.y + 31 + (pIndex * 20)} 
+                      fontSize="8" 
+                      fill="#666"
+                      fontWeight="500"
+                      textAnchor="middle">
+                      {planet.formattedDegree} {planet.shortNakshatra}
+                    </SvgText>
+                  )}
+                </G>
               ))}
             </G>
           );

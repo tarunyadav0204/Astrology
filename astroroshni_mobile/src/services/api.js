@@ -44,6 +44,7 @@ export const authAPI = {
   login: (credentials) => api.post('/login', credentials),
   register: (userData) => api.post('/register', userData),
   logout: () => api.post('/logout'),
+  sendRegistrationOtp: (data) => api.post('/send-registration-otp', data),
   sendResetCode: (data) => api.post('/send-reset-code', data),
   verifyResetCode: (data) => api.post('/verify-reset-code', data),
   resetPasswordWithToken: (data) => api.post('/reset-password-with-token', data),
@@ -61,8 +62,10 @@ export const chatAPI = {
 
 export const chartAPI = {
   calculateChart: (birthData) => api.post('/calculate-chart', birthData),
-  calculateNavamsa: (birthData) => api.post('/calculate-navamsa', birthData),
-  calculateTransit: (birthData) => api.post('/calculate-transit', birthData),
+  calculateDivisionalChart: (birthData, division = 9) => 
+    api.post('/calculate-divisional-chart', { birth_data: birthData, division }),
+  calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => 
+    api.post('/calculate-transits', { birth_data: birthData, transit_date: transitDate }),
   calculateYogi: (birthData) => api.post('/calculate-yogi', birthData),
   getExistingCharts: (search = '') => {
     const params = new URLSearchParams();
