@@ -71,6 +71,20 @@ cd ../frontend
 nohup npx serve -s build -l 3001 > ../logs/frontend.log 2>&1 &
 echo "✅ Frontend started on port 3001"
 
+# Start auto-restart monitor
+echo "🔄 Starting auto-restart monitor..."
+cd ..
+
+# Kill existing restart monitor if running
+pkill -f restart_server.sh 2>/dev/null || true
+sleep 2
+
+# Start the restart monitor in background
+nohup ./restart_server.sh > logs/monitor.log 2>&1 &
+MONITOR_PID=$!
+echo "✅ Auto-restart monitor started with PID: $MONITOR_PID"
+
 echo "🎉 Deployment completed successfully!"
 echo "📊 Backend: http://localhost:8001"
 echo "🌐 Frontend: http://localhost:3001"
+echo "🔄 Monitor: PID $MONITOR_PID (logs/monitor.log)"
