@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Auto-restart script for Astrology API
-APP_DIR="/Users/tarunydv/Desktop/Code/AstrologyApp"
+APP_DIR="$(pwd)"
 HEALTH_URL="http://localhost:8001/docs"
 LOG_FILE="$APP_DIR/logs/restart.log"
 
