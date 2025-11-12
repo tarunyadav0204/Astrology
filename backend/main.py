@@ -44,6 +44,38 @@ from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
 import math
 from datetime import timedelta
+import signal
+import sys
+import atexit
+import logging
+
+# Configure logging for shutdown events
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('server_shutdown.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+def log_shutdown(reason):
+    logger.critical(f"SERVER SHUTDOWN: {reason}")
+    try:
+        logger.critical(f"Memory: {psutil.Process().memory_info().rss / 1024 / 1024:.2f}MB")
+        logger.critical(f"Connections: {len(psutil.Process().connections())}")
+    except:
+        pass
+
+def signal_handler(signum, frame):
+    signal_names = {signal.SIGTERM: "SIGTERM", signal.SIGINT: "SIGINT"}
+    log_shutdown(f"Signal {signal_names.get(signum, signum)}")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+atexit.register(lambda: logger.critical("Server shutdown completed"))
 
 
 # Load environment variables explicitly
@@ -2955,15 +2987,19 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting Astrology API server on port 8001...")
-    # Configure uvicorn with extended timeouts for AI requests
-    uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=8001,
-        timeout_keep_alive=120,  # Reduced to 2 minutes
-        timeout_graceful_shutdown=30,  # Reduced shutdown time
-        access_log=True,  # Enable access logs to see requests
-        limit_max_requests=500,  # Reduced to prevent memory leaks
-        limit_concurrency=50  # Reduced concurrent connections
-    )
+    logger.info("Starting Astrology API server on port 8001...")
+    
+    try:
+        uvicorn.run(
+            app, 
+            host="0.0.0.0", 
+            port=8001,
+            timeout_keep_alive=120,
+            timeout_graceful_shutdown=30,
+            access_log=True,
+            limit_max_requests=500,
+            limit_concurrency=50
+        )
+    except Exception as e:
+        log_shutdown(f"Exception: {str(e)}")
+        raise

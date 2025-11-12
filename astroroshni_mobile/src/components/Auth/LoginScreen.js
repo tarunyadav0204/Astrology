@@ -24,6 +24,7 @@ export default function LoginScreen({ navigation }) {
   const [resetData, setResetData] = useState({ phone: '', code: '', newPassword: '' });
   const [resetStep, setResetStep] = useState(1);
   const [resetToken, setResetToken] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
     checkAuthStatus();
@@ -43,6 +44,7 @@ export default function LoginScreen({ navigation }) {
     }
 
     console.log('🔐 Attempting login with:', { phone, isLogin });
+    console.log('📱 Device info:', Platform.OS, Platform.Version);
     setLoading(true);
     try {
       const response = isLogin 
@@ -55,8 +57,17 @@ export default function LoginScreen({ navigation }) {
       
       navigation.replace('Chat');
     } catch (error) {
-      console.log('❌ Login failed:', error.response?.data || error.message);
-      Alert.alert('Error', error.response?.data?.message || 'Authentication failed');
+      const debugText = `Error: ${error.message}\nCode: ${error.code}\nStatus: ${error.response?.status}\nResponse: ${JSON.stringify(error.response?.data)}`;
+      setDebugInfo(debugText);
+      
+      let errorMessage = 'Authentication failed';
+      if (error.code === 'NETWORK_ERROR' || error.message.includes('Network')) {
+        errorMessage = 'Network connection failed. Please check your internet connection.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      Alert.alert('Login Error', `${errorMessage}\n\nDebug: ${debugText}`);
     } finally {
       setLoading(false);
     }
@@ -292,6 +303,15 @@ export default function LoginScreen({ navigation }) {
               {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
             </Text>
           </TouchableOpacity>
+          
+          {debugInfo ? (
+            <View style={styles.debugContainer}>
+              <Text style={styles.debugText}>{debugInfo}</Text>
+              <TouchableOpacity onPress={() => setDebugInfo('')}>
+                <Text style={styles.clearDebug}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -385,5 +405,23 @@ const styles = StyleSheet.create({
   switchText: {
     color: COLORS.primary,
     fontSize: 14,
+  },
+  debugContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    width: '100%',
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#333',
+    fontFamily: 'monospace',
+  },
+  clearDebug: {
+    color: COLORS.primary,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 5,
   },
 });

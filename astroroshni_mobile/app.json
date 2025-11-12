@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "deploymentTarget": "13.4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
