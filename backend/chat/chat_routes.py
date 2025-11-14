@@ -44,6 +44,41 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 context_builder = ChatContextBuilder()
 session_manager = ChatSessionManager()
 
+def _smart_chunk_response(response_text: str, max_size: int) -> List[str]:
+    """Smart chunking that preserves markdown section integrity with multiple break points"""
+    chunks = []
+    current_chunk = ""
+    
+    # Multiple break points in order of preference
+    break_points = ['###', '◆', '•', '\n\n', '\n']
+    
+    def find_best_break(text: str, max_pos: int) -> int:
+        """Find the best break point before max_pos"""
+        for break_point in break_points:
+            # Find last occurrence of break point before max_pos
+            last_pos = text.rfind(break_point, 0, max_pos)
+            if last_pos > max_pos * 0.5:  # Don't break too early
+                return last_pos + len(break_point)
+        return max_pos
+    
+    while len(response_text) > max_size:
+        # Find best break point
+        break_pos = find_best_break(response_text, max_size)
+        
+        # Extract chunk
+        chunk = response_text[:break_pos].strip()
+        if chunk:
+            chunks.append(chunk)
+        
+        # Remove processed text
+        response_text = response_text[break_pos:].strip()
+    
+    # Add remaining text
+    if response_text.strip():
+        chunks.append(response_text.strip())
+    
+    return chunks
+
 @router.post("/ask")
 async def ask_question(request: ChatRequest):
     """Ask astrological question with streaming response"""
@@ -53,6 +88,10 @@ async def ask_question(request: ChatRequest):
         print(f"Request question: {request.question}")
         print(f"Request data: {request}")
         try:
+            # Import json at function level
+            import json
+            import re
+            
             # Prepare birth data
             from types import SimpleNamespace
             birth_data = {
@@ -101,8 +140,6 @@ async def ask_question(request: ChatRequest):
                     
                     # Check if Gemini requested transit data via JSON and make second call if needed
                     if ai_result.get('has_transit_request', False):
-                        import json
-                        import re
                         
                         # Look for JSON transit request in response
                         json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
@@ -175,14 +212,14 @@ async def ask_question(request: ChatRequest):
                             'response': clean_response
                         }
                         
-                        # Split long responses into chunks to prevent truncation
-                        max_chunk_size = 2000  # Smaller chunk size to prevent streaming truncation
+                        # Smart chunking that preserves markdown structure
+                        max_chunk_size = 2000
                         
                         if len(clean_response) > max_chunk_size:
-                            print(f"Response too long ({len(clean_response)} chars), splitting into chunks")
+                            print(f"Response too long ({len(clean_response)} chars), using smart chunking")
                             
-                            # Send response in chunks
-                            chunks = [clean_response[i:i+max_chunk_size] for i in range(0, len(clean_response), max_chunk_size)]
+                            # Smart chunking that respects markdown sections
+                            chunks = _smart_chunk_response(clean_response, max_chunk_size)
                             
                             for i, chunk in enumerate(chunks):
                                 chunk_data = {
