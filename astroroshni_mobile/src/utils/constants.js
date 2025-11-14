@@ -33,10 +33,13 @@ import { Platform } from 'react-native';
 
 // API Configuration matching web version
 const getApiUrl = () => {
-  if (__DEV__) {
-    return Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001';
-  } else {
+  console.log('Environment check - NODE_ENV:', process.env.NODE_ENV, '__DEV__:', __DEV__);
+  
+  // Use production URL for builds, development URL for dev
+  if (!__DEV__) {
     return 'https://astroroshni.com';
+  } else {
+    return Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001';
   }
 };
 

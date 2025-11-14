@@ -18,7 +18,9 @@
   },
   "scripts": {
     "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "build:dev": "NODE_ENV=development react-scripts build",
+    "build:prod": "NODE_ENV=production react-scripts build"
   },
   "browserslist": {
     "production": [

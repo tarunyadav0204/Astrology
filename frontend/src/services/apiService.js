@@ -5,6 +5,9 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? APP_CONFIG.api.prod 
   : APP_CONFIG.api.dev;
 
+console.log('Environment:', process.env.NODE_ENV);
+console.log('API Base URL:', API_BASE_URL);
+
 // Helper function to handle API endpoints for both dev and production
 const getEndpoint = (path) => {
   // For localhost development, add /api prefix

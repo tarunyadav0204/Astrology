@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
   api: {
     dev: 'http://localhost:8001',
-prod: '',  // Use empty string so /api prefix in code works correctly
+    prod: 'https://astroroshni.com',  // Production API base URL
     timeout: 30000,
     retries: 3
   },

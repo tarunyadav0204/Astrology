@@ -11,6 +11,7 @@ import {
   Modal,
   Share,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -533,6 +534,11 @@ export default function ChatScreen({ navigation }) {
   return (
     <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>🔮 AstroRoshni</Text>
@@ -724,6 +730,7 @@ export default function ChatScreen({ navigation }) {
           visible={showChart} 
           onClose={() => setShowChart(false)} 
         />
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -734,6 +741,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
     flex: 1,
   },
   header: {

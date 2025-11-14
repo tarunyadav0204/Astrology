@@ -17,10 +17,8 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // Use the endpoint helper for proper URL construction
-  config.url = getEndpoint(config.url);
-  
   console.log('API Request:', config.method?.toUpperCase(), config.url);
+  console.log('Full URL:', config.baseURL + config.url);
   
   return config;
 });
@@ -41,40 +39,40 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (credentials) => api.post('/login', credentials),
-  register: (userData) => api.post('/register', userData),
-  logout: () => api.post('/logout'),
-  sendRegistrationOtp: (data) => api.post('/send-registration-otp', data),
-  sendResetCode: (data) => api.post('/send-reset-code', data),
-  verifyResetCode: (data) => api.post('/verify-reset-code', data),
-  resetPasswordWithToken: (data) => api.post('/reset-password-with-token', data),
+  login: (credentials) => api.post(getEndpoint('/login'), credentials),
+  register: (userData) => api.post(getEndpoint('/register'), userData),
+  logout: () => api.post(getEndpoint('/logout')),
+  sendRegistrationOtp: (data) => api.post(getEndpoint('/send-registration-otp'), data),
+  sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data),
+  verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data),
+  resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data),
 };
 
 export const chatAPI = {
   sendMessage: (message, language = 'english') => 
-    api.post('/chat/ask', { question: message, language }),
-  getChatHistory: (birthData) => api.post('/chat/history', birthData),
-  clearHistory: () => api.delete('/chat/history'),
-  createSession: () => api.post('/chat/session'),
+    api.post(getEndpoint('/chat/ask'), { question: message, language }),
+  getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
+  clearHistory: () => api.delete(getEndpoint('/chat/history')),
+  createSession: () => api.post(getEndpoint('/chat/session')),
   saveMessage: (sessionId, sender, content) => 
-    api.post('/chat/message', { session_id: sessionId, sender, content }),
+    api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
 };
 
 export const chartAPI = {
-  calculateChart: (birthData) => api.post('/calculate-chart', birthData),
+  calculateChart: (birthData) => api.post(getEndpoint('/calculate-chart'), birthData),
   calculateDivisionalChart: (birthData, division = 9) => 
-    api.post('/calculate-divisional-chart', { birth_data: birthData, division }),
+    api.post(getEndpoint('/calculate-divisional-chart'), { birth_data: birthData, division }),
   calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => 
-    api.post('/calculate-transits', { birth_data: birthData, transit_date: transitDate }),
-  calculateYogi: (birthData) => api.post('/calculate-yogi', birthData),
+    api.post(getEndpoint('/calculate-transits'), { birth_data: birthData, transit_date: transitDate }),
+  calculateYogi: (birthData) => api.post(getEndpoint('/calculate-yogi'), birthData),
   getExistingCharts: (search = '') => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     params.append('limit', '50');
-    return api.get(`/birth-charts?${params}`);
+    return api.get(`${getEndpoint('/birth-charts')}?${params}`);
   },
-  updateChart: (id, data) => api.put(`/birth-charts/${id}`, data),
-  deleteChart: (id) => api.delete(`/birth-charts/${id}`),
+  updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),
+  deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`),
 };
 
 export default api;
