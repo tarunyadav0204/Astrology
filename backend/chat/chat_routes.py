@@ -127,7 +127,7 @@ async def ask_question(request: ChatRequest):
                                 )
                                 
                                 # Make second API call with transit data
-                                enhanced_question = request.question + "\n\nIMPORTANT: For PRECISE event prediction, use the advanced methodology in transit_data_availability. When dasha planets recreate their natal relationships through transits, events manifest with highest probability. Use the provided transit data to identify exact correlation periods and predict specific events by combining house significations."
+                                enhanced_question = request.question + "\n\nIMPORTANT: Use the provided transit_activations data to predict SPECIFIC EVENTS with EXACT DATES. In your Quick Answer, provide 2-3 concrete events (like 'property purchase', 'job promotion', 'relationship milestone') with precise date ranges from the transit data. Focus on house significations of activated planets and combine with dasha context for accurate predictions."
                                 
                                 second_ai_result = await gemini_analyzer.generate_chat_response(
                                     enhanced_question, transit_context, history, request.language, request.response_style

@@ -284,7 +284,14 @@ class ChatContextBuilder:
                     "data_format": "Each entry shows 'transit_planet -> natal_planet (dates)' meaning the transiting planet is activating the natal planet during those dates.",
                     "correct_approach": "1) Identify which natal planet is activated, 2) Use activation period dates, 3) Combine natal planet significations with dasha context for predictions.",
                     "forbidden": "Never calculate or assume: transit house positions, aspect types (7th/5th/9th), conjunctions, or transit degrees.",
-                    "example": "'Jupiter -> Mars (2027-01-01 to 2027-01-25)' = Transiting Jupiter activates natal Mars from Jan 1-25, 2027. Focus on Mars significations (energy, action, siblings, property) being enhanced by Jupiter's benefic influence during this period."
+                    "example": "'Jupiter -> Mars (2027-01-01 to 2027-01-25)' = Transiting Jupiter activates natal Mars from Jan 1-25, 2027. Focus on Mars significations (energy, action, siblings, property) being enhanced by Jupiter's benefic influence during this period.",
+                    "quick_answer_requirements": {
+                        "mandatory_content": "In Quick Answer section, you MUST provide 2-3 SPECIFIC events with EXACT dates based on transit activations.",
+                        "format": "Example: 'Jan 5-15: Property opportunity through Mars activation (2nd house wealth). Feb 20-28: Communication breakthrough via Mercury transit (3rd house). Mar 10-18: Career advancement when Jupiter activates Sun (10th house authority).'",
+                        "house_focus": "Identify which houses are activated by transits and predict specific events for those house significations.",
+                        "date_precision": "Use the exact start_date and end_date from transit_activations for each predicted event.",
+                        "event_specificity": "Don't say 'good period' - say 'property purchase opportunity', 'job promotion', 'relationship milestone', 'health improvement', etc."
+                    }
                 }
                 
                 # Log transit data being sent
