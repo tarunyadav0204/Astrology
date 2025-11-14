@@ -5,7 +5,7 @@ Used by both main.py and classical engine to ensure consistent calculations
 
 import swisseph as swe
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class DashaCalculator:
     def __init__(self):
@@ -263,3 +263,56 @@ class DashaCalculator:
     def calculate_dashas_for_date(self, target_date: datetime, birth_data: Dict) -> Dict[str, Any]:
         """Calculate dashas for a specific date"""
         return self.calculate_current_dashas(birth_data, target_date)
+    
+    def get_dasha_periods_for_range(self, birth_data: Dict, start_date: datetime, end_date: datetime) -> List[Dict]:
+        """Get all dasha period changes within a date range"""
+        print(f"           Getting dasha periods from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+        
+        periods = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            dashas = self.calculate_current_dashas(birth_data, current_date)
+            print(f"           {current_date.strftime('%Y-%m-%d')}: {dashas['mahadasha']['planet']}-{dashas['antardasha']['planet']}-{dashas['pratyantardasha']['planet']}")
+            
+            # Find when current pratyantardasha ends
+            next_change = self._find_next_dasha_change(birth_data, current_date)
+            period_end = min(next_change, end_date)
+            
+            print(f"           Period: {current_date.strftime('%Y-%m-%d')} to {period_end.strftime('%Y-%m-%d')}")
+            
+            periods.append({
+                'start_date': current_date.strftime('%Y-%m-%d'),
+                'end_date': period_end.strftime('%Y-%m-%d'),
+                'mahadasha': dashas['mahadasha']['planet'],
+                'antardasha': dashas['antardasha']['planet'],
+                'pratyantardasha': dashas['pratyantardasha']['planet'],
+                'sookshma': dashas['sookshma']['planet'],
+                'prana': dashas['prana']['planet']
+            })
+            
+            current_date = period_end + timedelta(days=1)
+            
+            # Prevent infinite loop
+            if len(periods) > 100:
+                print(f"           WARNING: Breaking loop after 100 periods to prevent infinite loop")
+                break
+        
+        print(f"           Total dasha periods found: {len(periods)}")
+        return periods
+    
+    def _find_next_dasha_change(self, birth_data: Dict, current_date: datetime) -> datetime:
+        """Find the next dasha change date"""
+        # Check every day for the next 30 days to find change
+        current_dashas = self.calculate_current_dashas(birth_data, current_date)
+        current_pratyantar = current_dashas['pratyantardasha']['planet']
+        
+        for days_ahead in range(1, 31):
+            test_date = current_date + timedelta(days=days_ahead)
+            test_dashas = self.calculate_current_dashas(birth_data, test_date)
+            
+            if test_dashas['pratyantardasha']['planet'] != current_pratyantar:
+                return test_date
+        
+        # Default to 30 days ahead if no change found
+        return current_date + timedelta(days=30)

@@ -7,6 +7,8 @@ import {
   Linking,
   Alert,
   Animated,
+  Clipboard,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +32,7 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
       }),
     ]).start();
   }, []);
-  const shareToWhatsApp = async () => {
+  const copyToClipboard = async () => {
     try {
       const cleanText = message.content
         .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -40,17 +42,30 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
         .replace(/•\s*/g, '• ')
         .trim();
 
-      const shareText = `🔮 *AstroRoshni Prediction*\n\n${cleanText}\n\n_Shared from AstroRoshni App_`;
-      const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(shareText)}`;
-      
-      const supported = await Linking.canOpenURL(whatsappUrl);
-      if (supported) {
-        await Linking.openURL(whatsappUrl);
-      } else {
-        Alert.alert('WhatsApp not installed', 'Please install WhatsApp to share messages');
-      }
+      await Clipboard.setString(cleanText);
+      Alert.alert('Copied!', 'Message copied to clipboard');
     } catch (error) {
-      console.error('Error sharing to WhatsApp:', error);
+      console.error('Error copying to clipboard:', error);
+    }
+  };
+
+  const shareMessage = async () => {
+    try {
+      const cleanText = message.content
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/###\s*(.*?)$/gm, '$1')
+        .replace(/<[^>]*>/g, '')
+        .replace(/•\s*/g, '• ')
+        .trim();
+
+      const shareText = `🔮 AstroRoshni Prediction\n\n${cleanText}\n\nShared from AstroRoshni App`;
+      
+      await Share.share({
+        message: shareText,
+      });
+    } catch (error) {
+      console.error('Error sharing message:', error);
     }
   };
 
@@ -266,10 +281,10 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
         
         let questions = [];
         
-        // Try different parsing methods
-        if (questionsText.match(/[🔮🌟⭐💫✨]/)) {
+        // Try different parsing methods - handle both emoji and text patterns
+        if (questionsText.match(/[🔮🌟⭐💫✨📅💼]/)) {
           questions = questionsText
-            .split(/(?=[🔮🌟⭐💫✨])/)
+            .split(/(?=[🔮🌟⭐💫✨📅💼])/)
             .map(q => q.trim())
             .filter(q => q.length > 3);
         } else if (questionsText.includes('\n')) {
@@ -278,7 +293,13 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
             .map(q => q.trim())
             .filter(q => q.length > 3 && q.includes('?'));
         } else if (questionsText.includes('?') && questionsText.length > 10) {
-          questions = [questionsText];
+          // Split by common question patterns
+          const patterns = /(?=When will|What remedies|How to|What should)/g;
+          if (questionsText.match(patterns)) {
+            questions = questionsText.split(patterns).filter(q => q.trim().length > 3);
+          } else {
+            questions = [questionsText];
+          }
         }
         
         if (questions.length > 0) {
@@ -286,7 +307,7 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
             <View key={`followup-${currentIndex++}`} style={styles.followUpContainer}>
               {questions.map((question, index) => {
                 const cleanQuestion = question
-                  .replace(/^[\s🔮🌟⭐💫✨]+/, '')
+                  .replace(/^[\s🔮🌟⭐💫✨📅💼]+/, '')
                   .replace(/&quot;/g, '"')
                   .replace(/&amp;/g, '&')
                   .replace(/&lt;/g, '<')
@@ -642,12 +663,20 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
         </View>
 
         {message.role === 'assistant' && !message.isTyping && (
-          <TouchableOpacity
-            style={styles.shareButton}
-            onPress={shareToWhatsApp}
-          >
-            <Ionicons name="logo-whatsapp" size={14} color={COLORS.white} />
-          </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={copyToClipboard}
+            >
+              <Ionicons name="copy-outline" size={16} color={COLORS.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={shareMessage}
+            >
+              <Ionicons name="share-outline" size={16} color={COLORS.accent} />
+            </TouchableOpacity>
+          </View>
         )}
 
         <Text style={styles.timestamp}>
@@ -840,16 +869,21 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     zIndex: 1,
   },
-  shareButton: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: COLORS.whatsapp,
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    gap: 8,
+  },
+  actionButton: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderRadius: 12,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
   },
   timestamp: {
     fontSize: 11,

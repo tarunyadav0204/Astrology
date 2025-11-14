@@ -35,12 +35,8 @@ import { Platform } from 'react-native';
 const getApiUrl = () => {
   console.log('Environment check - NODE_ENV:', process.env.NODE_ENV, '__DEV__:', __DEV__);
   
-  // Use production URL for builds, development URL for dev
-  if (!__DEV__) {
-    return 'https://astroroshni.com';
-  } else {
-    return Platform.OS === 'web' ? 'http://localhost:8001' : 'http://192.168.68.102:8001';
-  }
+  // Always use astroroshni.com for mobile app
+  return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();

@@ -7,6 +7,7 @@ import os
 import json
 import asyncio
 import html
+import re
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -67,8 +68,11 @@ async def ask_question(request: ChatRequest):
             
             birth_hash = session_manager.create_birth_hash(birth_data)
             
-            # Build astrological context
-            context = context_builder.build_complete_context(birth_data, request.question)
+            # Build astrological context (no pre-processing needed for JSON format)
+            requested_period = None
+            
+            # Build astrological context with requested period
+            context = context_builder.build_complete_context(birth_data, request.question, requested_period=requested_period)
             
             # Get conversation history
             history = session_manager.get_conversation_history(birth_hash)
@@ -81,14 +85,71 @@ async def ask_question(request: ChatRequest):
                 print(f"Context type: {type(context)}")
                 print(f"History length: {len(history)}")
                 
+                # Add instruction for Gemini about transit data requests
+                enhanced_question = request.question
+                if not requested_period and context.get('transit_data_availability'):
+                    enhanced_question += "\n\nIMPORTANT: For PRECISE event prediction, use the advanced methodology in transit_data_availability. When dasha planets recreate their natal relationships through transits, events manifest with highest probability. For timing questions, you MUST request transit data using the JSON format. Do NOT provide a complete response - only request the transit data."
+                
                 gemini_analyzer = GeminiChatAnalyzer()
-                ai_result = await gemini_analyzer.generate_chat_response(request.question, context, history, request.language, request.response_style)
+                ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style)
                 
                 print(f"AI result success: {ai_result.get('success')}")
                 print(f"AI result keys: {list(ai_result.keys())}")
                 
                 if ai_result['success']:
                     response_text = ai_result['response']
+                    
+                    # Check if Gemini requested transit data via JSON and make second call if needed
+                    if ai_result.get('has_transit_request', False):
+                        import json
+                        import re
+                        
+                        # Look for JSON transit request in response
+                        json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
+                        json_matches = re.findall(json_pattern, response_text)
+                        
+                        if json_matches:
+                            try:
+                                transit_request = json.loads(json_matches[0])
+                                start_year = transit_request.get('startYear')
+                                end_year = transit_request.get('endYear')
+                                specific_months = transit_request.get('specificMonths', [])
+                                
+                                print(f"🔄 MAKING SECOND CALL WITH TRANSIT DATA: {start_year}-{end_year}")
+                                print(f"   Specific months: {specific_months}")
+                                print(f"   NOT SENDING FIRST RESPONSE TO FRONTEND - Contains transit request")
+                                
+                                # Build context with transit data
+                                transit_context = context_builder.build_complete_context(
+                                    birth_data, 
+                                    request.question, 
+                                    requested_period={'start_year': start_year, 'end_year': end_year}
+                                )
+                                
+                                # Make second API call with transit data
+                                enhanced_question = request.question + "\n\nIMPORTANT: For PRECISE event prediction, use the advanced methodology in transit_data_availability. When dasha planets recreate their natal relationships through transits, events manifest with highest probability. Use the provided transit data to identify exact correlation periods and predict specific events by combining house significations."
+                                
+                                second_ai_result = await gemini_analyzer.generate_chat_response(
+                                    enhanced_question, transit_context, history, request.language, request.response_style
+                                )
+                                
+                                if second_ai_result['success']:
+                                    response_text = second_ai_result['response']
+                                    print(f"✅ SECOND CALL SUCCESSFUL - Response length: {len(response_text)}")
+                                    print(f"   SENDING FINAL RESPONSE TO FRONTEND")
+                                else:
+                                    print(f"❌ SECOND CALL FAILED: {second_ai_result.get('error')}")
+                                    # Send error message instead of first response
+                                    response_text = "I'm having trouble calculating precise transit data for your timing question. Please try again."
+                                    
+                            except json.JSONDecodeError as e:
+                                print(f"❌ FAILED TO PARSE TRANSIT REQUEST JSON: {e}")
+                                # Send error message instead of first response
+                                response_text = "I encountered an issue processing your timing question. Please try rephrasing it."
+                        else:
+                            print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
+                            # Send error message instead of first response
+                            response_text = "I need to request additional data for your timing question but encountered a formatting issue. Please try again."
                     
                     # Note: Message saving handled by ChatModal via /api/chat/message endpoint
                     

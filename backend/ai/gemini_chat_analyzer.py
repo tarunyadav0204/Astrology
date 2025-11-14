@@ -123,6 +123,27 @@ class GeminiChatAnalyzer:
                             print(f"Contains null bytes: {chr(0) in response.text}")
                             control_chars = '\n\r\t'
                             print(f"Contains control chars: {any(ord(c) < 32 and c not in control_chars for c in response.text)}")
+                            
+                            # Check for JSON transit data requests
+                            if "transitRequest" in response.text:
+                                import re
+                                json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
+                                json_matches = re.findall(json_pattern, response.text)
+                                if json_matches:
+                                    try:
+                                        import json
+                                        transit_request = json.loads(json_matches[0])
+                                        start_year = transit_request.get('startYear')
+                                        end_year = transit_request.get('endYear')
+                                        months = transit_request.get('specificMonths', [])
+                                        print(f"🎯 GEMINI REQUESTED TRANSIT DATA: {start_year}-{end_year} ({', '.join(months)})")
+                                    except:
+                                        print(f"🎯 GEMINI MADE TRANSIT REQUEST (JSON parse failed)")
+                                else:
+                                    print(f"🎯 GEMINI MENTIONED TRANSIT REQUEST (no valid JSON)")
+                            
+                            # Log first 500 characters to see content
+                            print(f"Response preview (first 500 chars): {response.text[:500]}")
                     
                     return response
                 except Exception as api_error:
@@ -185,6 +206,24 @@ class GeminiChatAnalyzer:
             print(f"Response preview: {cleaned_text[:200]}...")
             print(f"Response ends with: '{cleaned_text[-50:]}'")
             
+            # Final check for JSON transit requests in cleaned text
+            if "transitRequest" in cleaned_text:
+                import re
+                json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
+                json_matches = re.findall(json_pattern, cleaned_text)
+                if json_matches:
+                    try:
+                        import json
+                        transit_request = json.loads(json_matches[0])
+                        start_year = transit_request.get('startYear')
+                        end_year = transit_request.get('endYear')
+                        months = transit_request.get('specificMonths', [])
+                        print(f"🎯 FINAL: GEMINI REQUESTED TRANSIT DATA: {start_year}-{end_year} ({', '.join(months)})")
+                    except:
+                        print(f"🎯 FINAL: GEMINI MADE TRANSIT REQUEST (JSON parse failed)")
+                else:
+                    print(f"🎯 FINAL: GEMINI MENTIONED TRANSIT REQUEST (no valid JSON)")
+            
             # Check for specific sections to debug missing content
             has_nakshatra = 'nakshatra' in cleaned_text.lower() or 'नक्षत्र' in cleaned_text
             has_analysis_header = '### nakshatra insights' in cleaned_text.lower()
@@ -192,10 +231,14 @@ class GeminiChatAnalyzer:
             print(f"Contains nakshatra header: {has_analysis_header}")
             print(f"Response sections count: {cleaned_text.count('###')}")
             
+            # Check if response contains JSON transit data request
+            has_transit_request = "transitRequest" in cleaned_text and '"requestType"' in cleaned_text
+            
             return {
                 'success': True,
                 'response': cleaned_text,
-                'raw_response': response_text
+                'raw_response': response_text,
+                'has_transit_request': has_transit_request
             }
         except Exception as e:
             print(f"\n=== AI ERROR (ASYNC) ===")
@@ -403,6 +446,15 @@ CRITICAL INSTRUCTIONS:
 - Focus primarily on birth chart analysis and dasha periods
 - For timing questions, prioritize dasha periods but include transit data if available
 - NEVER recalculate the ascendant - use the provided ascendant_info section
+
+CRITICAL TRANSIT DATA USAGE RULES:
+- When transit_activations are provided, each entry shows 'transit_planet -> natal_planet (dates)'
+- This means the TRANSITING planet is activating/aspecting the NATAL planet during those dates
+- DO NOT assume: transit house positions, aspect types (7th/5th/9th), conjunctions, or transit degrees
+- DO NOT calculate where transiting planets are positioned in houses
+- ONLY use: which natal planet is activated, the activation dates, and natal planet's significations
+- Example: 'Jupiter -> Mars (2027-01-01 to 2027-01-25)' = Jupiter activates natal Mars Jan 1-25, focus on Mars significations being enhanced
+- FORBIDDEN: Saying 'Jupiter transits 1st house' or 'Jupiter aspects with 7th aspect' - these are NOT provided in the data
 
 BHAVAM BHAVESH TECHNIQUE - CRITICAL FOR RELATIVE ANALYSIS:
 When analyzing relatives, ALWAYS apply Bhavam Bhavesh (house becomes ascendant) technique:
