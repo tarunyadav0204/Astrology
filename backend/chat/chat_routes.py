@@ -45,37 +45,29 @@ context_builder = ChatContextBuilder()
 session_manager = ChatSessionManager()
 
 def _smart_chunk_response(response_text: str, max_size: int) -> List[str]:
-    """Smart chunking that preserves markdown section integrity with multiple break points"""
+    """Simple chunking that breaks at paragraph boundaries"""
     chunks = []
+    
+    # Split at double newlines (paragraph breaks)
+    paragraphs = response_text.split('\n\n')
     current_chunk = ""
     
-    # Multiple break points in order of preference
-    break_points = ['###', '◆', '•', '\n\n', '\n']
+    for para in paragraphs:
+        # If adding this paragraph would exceed max size
+        if len(current_chunk + '\n\n' + para) > max_size and current_chunk:
+            # Save current chunk
+            chunks.append(current_chunk.strip())
+            current_chunk = para
+        else:
+            # Add paragraph to current chunk
+            if current_chunk:
+                current_chunk += '\n\n' + para
+            else:
+                current_chunk = para
     
-    def find_best_break(text: str, max_pos: int) -> int:
-        """Find the best break point before max_pos"""
-        for break_point in break_points:
-            # Find last occurrence of break point before max_pos
-            last_pos = text.rfind(break_point, 0, max_pos)
-            if last_pos > max_pos * 0.5:  # Don't break too early
-                return last_pos + len(break_point)
-        return max_pos
-    
-    while len(response_text) > max_size:
-        # Find best break point
-        break_pos = find_best_break(response_text, max_size)
-        
-        # Extract chunk
-        chunk = response_text[:break_pos].strip()
-        if chunk:
-            chunks.append(chunk)
-        
-        # Remove processed text
-        response_text = response_text[break_pos:].strip()
-    
-    # Add remaining text
-    if response_text.strip():
-        chunks.append(response_text.strip())
+    # Add final chunk
+    if current_chunk.strip():
+        chunks.append(current_chunk.strip())
     
     return chunks
 
@@ -84,9 +76,9 @@ async def ask_question(request: ChatRequest):
     """Ask astrological question with streaming response"""
     
     async def generate_streaming_response():
-        print(f"\n=== STREAMING STARTED ===")
-        print(f"Request question: {request.question}")
-        print(f"Request data: {request}")
+        # print(f"\n=== STREAMING STARTED ===")
+        # print(f"Request question: {request.question}")
+        # print(f"Request data: {request}")
         try:
             # Import json at function level
             import json
@@ -118,11 +110,11 @@ async def ask_question(request: ChatRequest):
             
             # Generate AI response
             try:
-                print(f"\n=== CHAT ROUTE DEBUG ===")
-                print(f"Question: {request.question}")
-                print(f"Birth data: {birth_data}")
-                print(f"Context type: {type(context)}")
-                print(f"History length: {len(history)}")
+                # print(f"\n=== CHAT ROUTE DEBUG ===")
+                # print(f"Question: {request.question}")
+                # print(f"Birth data: {birth_data}")
+                # print(f"Context type: {type(context)}")
+                # print(f"History length: {len(history)}")
                 
                 # Add instruction for Gemini about transit data requests
                 enhanced_question = request.question
@@ -132,8 +124,8 @@ async def ask_question(request: ChatRequest):
                 gemini_analyzer = GeminiChatAnalyzer()
                 ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style)
                 
-                print(f"AI result success: {ai_result.get('success')}")
-                print(f"AI result keys: {list(ai_result.keys())}")
+                # print(f"AI result success: {ai_result.get('success')}")
+                # print(f"AI result keys: {list(ai_result.keys())}")
                 
                 if ai_result['success']:
                     response_text = ai_result['response']
@@ -152,9 +144,9 @@ async def ask_question(request: ChatRequest):
                                 end_year = transit_request.get('endYear')
                                 specific_months = transit_request.get('specificMonths', [])
                                 
-                                print(f"🔄 MAKING SECOND CALL WITH TRANSIT DATA: {start_year}-{end_year}")
-                                print(f"   Specific months: {specific_months}")
-                                print(f"   NOT SENDING FIRST RESPONSE TO FRONTEND - Contains transit request")
+                                # print(f"🔄 MAKING SECOND CALL WITH TRANSIT DATA: {start_year}-{end_year}")
+                                # print(f"   Specific months: {specific_months}")
+                                # print(f"   NOT SENDING FIRST RESPONSE TO FRONTEND - Contains transit request")
                                 
                                 # Build context with transit data
                                 transit_context = context_builder.build_complete_context(
@@ -172,19 +164,19 @@ async def ask_question(request: ChatRequest):
                                 
                                 if second_ai_result['success']:
                                     response_text = second_ai_result['response']
-                                    print(f"✅ SECOND CALL SUCCESSFUL - Response length: {len(response_text)}")
-                                    print(f"   SENDING FINAL RESPONSE TO FRONTEND")
+                                    # print(f"✅ SECOND CALL SUCCESSFUL - Response length: {len(response_text)}")
+                                    # print(f"   SENDING FINAL RESPONSE TO FRONTEND")
                                 else:
-                                    print(f"❌ SECOND CALL FAILED: {second_ai_result.get('error')}")
+                                    # print(f"❌ SECOND CALL FAILED: {second_ai_result.get('error')}")
                                     # Send error message instead of first response
                                     response_text = "I'm having trouble calculating precise transit data for your timing question. Please try again."
                                     
                             except json.JSONDecodeError as e:
-                                print(f"❌ FAILED TO PARSE TRANSIT REQUEST JSON: {e}")
+                                # print(f"❌ FAILED TO PARSE TRANSIT REQUEST JSON: {e}")
                                 # Send error message instead of first response
                                 response_text = "I encountered an issue processing your timing question. Please try rephrasing it."
                         else:
-                            print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
+                            # print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
                             # Send error message instead of first response
                             response_text = "I need to request additional data for your timing question but encountered a formatting issue. Please try again."
                     
@@ -202,9 +194,14 @@ async def ask_question(request: ChatRequest):
                         # Remove any null bytes or control characters that could break JSON
                         clean_response = ''.join(char for char in clean_response if ord(char) >= 32 or char in '\n\r\t')
                         
-                        print(f"Cleaned response length: {len(clean_response)}")
-                        print(f"Response preview: {clean_response[:100]}...")
-                        print(f"Will chunk response: {len(clean_response) > 4000}")
+                        # Replace problematic quotes and characters
+                        clean_response = clean_response.replace('"', '"').replace('"', '"')
+                        clean_response = clean_response.replace(''', "'").replace(''', "'")
+                        clean_response = clean_response.replace('–', '-').replace('—', '-')
+                        
+                        # print(f"Cleaned response length: {len(clean_response)}")
+                        # print(f"Response preview: {clean_response[:100]}...")
+                        # print(f"Will chunk response: {len(clean_response) > max_chunk_size}")
                         
                         # Use json.dumps with proper error handling
                         response_data = {
@@ -213,10 +210,10 @@ async def ask_question(request: ChatRequest):
                         }
                         
                         # Smart chunking that preserves markdown structure
-                        max_chunk_size = 2000
+                        max_chunk_size = 3500
                         
                         if len(clean_response) > max_chunk_size:
-                            print(f"Response too long ({len(clean_response)} chars), using smart chunking")
+                            # print(f"Response too long ({len(clean_response)} chars), using smart chunking")
                             
                             # Smart chunking that respects markdown sections
                             chunks = _smart_chunk_response(clean_response, max_chunk_size)
@@ -239,8 +236,8 @@ async def ask_question(request: ChatRequest):
                             # Send as single response if small enough
                             response_json = json.dumps(response_data, ensure_ascii=True, separators=(',', ':'))
                             
-                            print(f"JSON length: {len(response_json)}")
-                            print(f"JSON preview: {response_json[:200]}...")
+                            # print(f"JSON length: {len(response_json)}")
+                            # print(f"JSON preview: {response_json[:200]}...")
                             
                             # Validate JSON by parsing it back
                             json.loads(response_json)
@@ -248,16 +245,26 @@ async def ask_question(request: ChatRequest):
                             yield f"data: {response_json}\n\n"
                         
                     except Exception as json_error:
-                        print(f"JSON serialization error: {json_error}")
-                        print(f"Error type: {type(json_error).__name__}")
+                        # print(f"JSON serialization error: {json_error}")
+                        # print(f"Error type: {type(json_error).__name__}")
+                        # print(f"Problematic response length: {len(clean_response)}")
+                        # print(f"First 500 chars: {repr(clean_response[:500])}")
                         
-                        # Create safe fallback response
-                        safe_message = "I generated a response but encountered a formatting issue. Please try asking your question again."
-                        fallback_data = {'status': 'error', 'error': safe_message}
-                        fallback_json = json.dumps(fallback_data, ensure_ascii=True)
-                        yield f"data: {fallback_json}\n\n"
+                        # Try to send response without chunking as fallback
+                        try:
+                            # Further clean the response
+                            safe_response = clean_response.encode('ascii', 'ignore').decode('ascii')
+                            safe_data = {'status': 'complete', 'response': safe_response}
+                            safe_json = json.dumps(safe_data, ensure_ascii=True)
+                            yield f"data: {safe_json}\n\n"
+                        except:
+                            # Ultimate fallback
+                            safe_message = "I generated a response but encountered a formatting issue. Please try asking your question again."
+                            fallback_data = {'status': 'error', 'error': safe_message}
+                            fallback_json = json.dumps(fallback_data, ensure_ascii=True)
+                            yield f"data: {fallback_json}\n\n"
                 else:
-                    print(f"AI error: {ai_result.get('error')}")
+                    # print(f"AI error: {ai_result.get('error')}")
                     
                     # Convert AI errors to user-friendly messages
                     ai_error = ai_result.get('error', 'AI analysis failed')
@@ -271,9 +278,10 @@ async def ask_question(request: ChatRequest):
                     yield f"data: {json.dumps({'status': 'error', 'error': user_error})}\n\n"
                     
             except Exception as e:
-                print(f"Chat route exception: {str(e)}")
-                import traceback
-                traceback.print_exc()
+                # print(f"Chat route exception: {str(e)}")
+                # import traceback
+                # traceback.print_exc()
+                pass
                 
                 # Convert technical errors to user-friendly messages
                 error_message = "I'm having trouble connecting right now. Please try again in a moment."
@@ -290,10 +298,11 @@ async def ask_question(request: ChatRequest):
                 yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
                 
         except Exception as e:
-            print(f"\n=== STREAMING ERROR ===")
-            print(f"Error: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            # print(f"\n=== STREAMING ERROR ===")
+            # print(f"Error: {str(e)}")
+            # import traceback
+            # traceback.print_exc()
+            pass
             
             # User-friendly error for outer exceptions
             user_error = "Something went wrong while processing your request. Please try again."
@@ -364,7 +373,7 @@ async def clear_chat_history(request: ClearChatRequest):
 @router.get("/test")
 async def test_chat_routes():
     """Test endpoint to verify chat routes are working"""
-    print("Chat test endpoint called")
+    # print("Chat test endpoint called")
     return {"status": "success", "message": "Chat routes are working"}
 
 @router.get("/suggestions")

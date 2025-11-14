@@ -127,7 +127,7 @@ class RealTransitCalculator:
         else:
             step_days = 15  # Bi-weekly for long periods
         
-        print(f"   Calculating {transit_planet}->{natal_planet} aspect {aspect_number} from {start_year} to {start_year + year_range} (step: {step_days} days)")
+        # print(f"   Calculating {transit_planet}->{natal_planet} aspect {aspect_number} from {start_year} to {start_year + year_range} (step: {step_days} days)")
         
         # Check if aspect is already active at start of period
         initial_longitude = self.get_planet_position(start_date, transit_planet)
@@ -226,12 +226,12 @@ class RealTransitCalculator:
     def _calculate_natal_positions(self, birth_data: Dict) -> Dict:
         """Calculate natal planetary positions"""
         try:
-            print(f"     Calculating natal positions for: {birth_data.get('date')} {birth_data.get('time')}")
+            # print(f"     Calculating natal positions for: {birth_data.get('date')} {birth_data.get('time')}")
             
             # Parse birth data
             time_parts = birth_data['time'].split(':')
             hour = float(time_parts[0]) + float(time_parts[1])/60
-            print(f"     Parsed time: {hour} hours")
+            # print(f"     Parsed time: {hour} hours")
             
             # Handle timezone
             if 6.0 <= birth_data['latitude'] <= 37.0 and 68.0 <= birth_data['longitude'] <= 97.0:
@@ -246,7 +246,7 @@ class RealTransitCalculator:
                         parts = tz_str[1:].split(':')
                         tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
             
-            print(f"     Timezone offset: {tz_offset} hours")
+            # print(f"     Timezone offset: {tz_offset} hours")
 
             
             utc_hour = hour - tz_offset
@@ -281,13 +281,14 @@ class RealTransitCalculator:
                     'degree': longitude % 30
                 }
             
-            print(f"     Successfully calculated {len(positions)} positions")
+            # print(f"     Successfully calculated {len(positions)} positions")
             return positions
             
         except Exception as e:
-            print(f"     ❌ Error calculating natal positions: {e}")
-            import traceback
-            traceback.print_exc()
+            # print(f"     ❌ Error calculating natal positions: {e}")
+            # import traceback
+            # traceback.print_exc()
+            pass
             return {}
     
     def _natal_aspect_existed(self, planet1: str, planet2: str, aspect_number: int, natal_positions: Dict, ascendant_longitude: float) -> bool:
@@ -323,11 +324,11 @@ class RealTransitCalculator:
                                        start_date: datetime, end_date: datetime,
                                        natal_positions: Dict, ascendant_longitude: float) -> Dict:
         """Get comprehensive transit data including conjunctions and all aspects"""
-        print(f"         Getting comprehensive data for {transit_planet} in house {transit_house}")
+        # print(f"         Getting comprehensive data for {transit_planet} in house {transit_house}")
         
         # Find all natal planets in the same house as transit planet (conjunctions)
         conjunct_planets = []
-        print(f"         Checking for conjunctions in house {transit_house}:")
+        # print(f"         Checking for conjunctions in house {transit_house}:")
         
         for planet_name, planet_data in natal_positions.items():
             if planet_name == 'ascendant_longitude':
@@ -337,17 +338,17 @@ class RealTransitCalculator:
                 planet_data['longitude'], ascendant_longitude
             )
             
-            print(f"           {planet_name} in house {planet_house}")
+            # print(f"           {planet_name} in house {planet_house}")
             
             if planet_house == transit_house:
                 conjunct_planets.append(planet_name)
-                print(f"           -> CONJUNCTION with {planet_name}")
+                # print(f"           -> CONJUNCTION with {planet_name}")
         
-        print(f"         Total conjunctions: {len(conjunct_planets)} - {conjunct_planets}")
+        # print(f"         Total conjunctions: {len(conjunct_planets)} - {conjunct_planets}")
         
         # Calculate all aspects cast by transit planet
         available_aspects = self.vedic_aspects.get(transit_planet, [1, 7])
-        print(f"         {transit_planet} can cast aspects: {available_aspects}")
+        # print(f"         {transit_planet} can cast aspects: {available_aspects}")
         
         all_aspects = []
         
@@ -361,11 +362,11 @@ class RealTransitCalculator:
                         'target_house': transit_house,
                         'target_planets': conjunct_planets
                     })
-                    print(f"           Added conjunction aspect to house {transit_house}")
+                    # print(f"           Added conjunction aspect to house {transit_house}")
             else:
                 # Calculate which house this aspect targets
                 target_house = ((transit_house + aspect_num - 2) % 12) + 1
-                print(f"           {aspect_num}th aspect from house {transit_house} targets house {target_house}")
+                # print(f"           {aspect_num}th aspect from house {transit_house} targets house {target_house}")
                 
                 # Find natal planets in target house
                 target_planets = []
@@ -379,7 +380,7 @@ class RealTransitCalculator:
                     
                     if planet_house == target_house:
                         target_planets.append(planet_name)
-                        print(f"             -> Aspects {planet_name} in house {target_house}")
+                        # print(f"             -> Aspects {planet_name} in house {target_house}")
                 
                 all_aspects.append({
                     'aspect_type': f'{aspect_num}th_aspect',
@@ -388,7 +389,7 @@ class RealTransitCalculator:
                     'target_planets': target_planets
                 })
         
-        print(f"         Total aspects cast: {len(all_aspects)}")
+        # print(f"         Total aspects cast: {len(all_aspects)}")
         
         return {
             'conjunct_planets': conjunct_planets,

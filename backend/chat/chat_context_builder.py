@@ -169,7 +169,7 @@ class ChatContextBuilder:
             try:
                 context["planetary_analysis"][planet] = planet_analyzer.analyze_planet(planet)
             except Exception as e:
-                print(f"Error analyzing {planet}: {e}")
+                # print(f"Error analyzing {planet}: {e}")
                 continue
         
         return context
@@ -215,52 +215,54 @@ class ChatContextBuilder:
             start_year = requested_period.get('start_year', current_year)
             end_year = requested_period.get('end_year', current_year + 2)
             year_range = end_year - start_year
-            print(f"🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
+            # print(f"🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
             
             try:
                 real_calc = RealTransitCalculator()
                 aspects = real_calc.find_real_aspects(birth_data)
-                print(f"   Found {len(aspects)} potential aspects")
+                # print(f"   Found {len(aspects)} potential aspects")
                 
                 transit_activations = []
                 
                 for i, aspect in enumerate(aspects):
-                    print(f"   Processing aspect {i+1}/{len(aspects)}: {aspect['transit_planet']} -> {aspect['natal_planet']}")
-                    print(f"     Aspect details: {aspect}")
+                    # print(f"   Processing aspect {i+1}/{len(aspects)}: {aspect['transit_planet']} -> {aspect['natal_planet']}")
+                    # print(f"     Aspect details: {aspect}")
                     try:
                         timeline = real_calc.calculate_aspect_timeline(aspect, start_year, year_range, birth_data)
-                        print(f"     Timeline periods found: {len(timeline)}")
+                        # print(f"     Timeline periods found: {len(timeline)}")
                         
                         for j, period in enumerate(timeline):
-                            print(f"     Period {j+1}: {period['start_date']} to {period['end_date']}")
-                            print(f"       Transit house: {period.get('transit_house')}, Natal house: {period.get('natal_house')}")
-                            print(f"       Conjunct planets: {period.get('conjunct_natal_planets', [])}")
-                            print(f"       All aspects cast: {len(period.get('all_aspects_cast', []))} aspects")
+                            # print(f"     Period {j+1}: {period['start_date']} to {period['end_date']}")
+                            # print(f"       Transit house: {period.get('transit_house')}, Natal house: {period.get('natal_house')}")
+                            # print(f"       Conjunct planets: {period.get('conjunct_natal_planets', [])}")
+                            # print(f"       All aspects cast: {len(period.get('all_aspects_cast', []))} aspects")
                             
                             # Log each aspect cast
                             for aspect_cast in period.get('all_aspects_cast', []):
-                                print(f"         {aspect_cast['aspect_type']} -> House {aspect_cast['target_house']} (planets: {aspect_cast['target_planets']})")
+                                # print(f"         {aspect_cast['aspect_type']} -> House {aspect_cast['target_house']} (planets: {aspect_cast['target_planets']})")
+                                pass
                             
                             # Add dasha correlation for this transit period
                             start_date_obj = datetime.strptime(period['start_date'], '%Y-%m-%d')
                             end_date_obj = datetime.strptime(period['end_date'], '%Y-%m-%d')
                             
-                            print(f"       Calculating dashas for {start_date_obj.strftime('%Y-%m-%d')} to {end_date_obj.strftime('%Y-%m-%d')}")
+                            # print(f"       Calculating dashas for {start_date_obj.strftime('%Y-%m-%d')} to {end_date_obj.strftime('%Y-%m-%d')}")
                             dasha_periods = dasha_calc.get_dasha_periods_for_range(
                                 birth_data, start_date_obj, end_date_obj
                             )
-                            print(f"       Dasha periods found: {len(dasha_periods)}")
+                            # print(f"       Dasha periods found: {len(dasha_periods)}")
                             
                             for k, dasha_period in enumerate(dasha_periods):
-                                print(f"         Dasha {k+1}: {dasha_period['start_date']} to {dasha_period['end_date']}")
-                                print(f"           Maha: {dasha_period['mahadasha']}, Antar: {dasha_period['antardasha']}, Pratyantar: {dasha_period['pratyantardasha']}")
-                                print(f"           Sookshma: {dasha_period['sookshma']}, Prana: {dasha_period['prana']}")
+                                # print(f"         Dasha {k+1}: {dasha_period['start_date']} to {dasha_period['end_date']}")
+                                # print(f"           Maha: {dasha_period['mahadasha']}, Antar: {dasha_period['antardasha']}, Pratyantar: {dasha_period['pratyantardasha']}")
+                                # print(f"           Sookshma: {dasha_period['sookshma']}, Prana: {dasha_period['prana']}")
+                                pass
                             
                             # Analyze dasha significance
                             significance = self._analyze_dasha_transit_significance(
                                 aspect['transit_planet'], aspect['natal_planet'], dasha_periods
                             )
-                            print(f"       Dasha significance: {significance}")
+                            # print(f"       Dasha significance: {significance}")
                             
                             transit_activations.append({
                                 **period,
@@ -271,9 +273,10 @@ class ChatContextBuilder:
                                 'dasha_significance': significance
                             })
                     except Exception as aspect_error:
-                        print(f"     ❌ Error calculating timeline: {aspect_error}")
-                        import traceback
-                        traceback.print_exc()
+                        # print(f"     ❌ Error calculating timeline: {aspect_error}")
+                        # import traceback
+                        # traceback.print_exc()
+                        pass
                         continue
                 
                 context['transit_activations'] = transit_activations
@@ -295,16 +298,16 @@ class ChatContextBuilder:
                 }
                 
                 # Log transit data being sent
-                print(f"📊 TRANSIT DATA SENT TO GEMINI:")
-                print(f"   Period: {start_year}-{end_year}")
-                print(f"   Total activations: {len(transit_activations)}")
-                for i, activation in enumerate(transit_activations[:5]):
-                    print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']})")
-                if len(transit_activations) > 5:
-                    print(f"     ... and {len(transit_activations) - 5} more")
+                # print(f"📊 TRANSIT DATA SENT TO GEMINI:")
+                # print(f"   Period: {start_year}-{end_year}")
+                # print(f"   Total activations: {len(transit_activations)}")
+                # for i, activation in enumerate(transit_activations[:5]):
+                #     print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']})")
+                # if len(transit_activations) > 5:
+                #     print(f"     ... and {len(transit_activations) - 5} more")
                     
             except Exception as e:
-                print(f"❌ Error calculating transit activations: {e}")
+                # print(f"❌ Error calculating transit activations: {e}")
                 context['transit_activations'] = []
         
         return context
@@ -319,10 +322,10 @@ class ChatContextBuilder:
     
     def _analyze_dasha_transit_significance(self, transit_planet: str, natal_planet: str, dasha_periods: List[Dict]) -> str:
         """Analyze the significance of transit based on current dasha periods"""
-        print(f"         Analyzing significance for {transit_planet} -> {natal_planet}")
+        # print(f"         Analyzing significance for {transit_planet} -> {natal_planet}")
         
         if not dasha_periods:
-            print(f"         No dasha periods provided, returning moderate")
+            # print(f"         No dasha periods provided, returning moderate")
             return "moderate"
         
         max_significance = "moderate"
@@ -337,20 +340,20 @@ class ChatContextBuilder:
                 period.get('prana')
             ]
             
-            print(f"         Period {i+1} active planets: {active_planets}")
+            # print(f"         Period {i+1} active planets: {active_planets}")
             
             transit_in_dasha = transit_planet in active_planets
             natal_in_dasha = natal_planet in active_planets
             
-            print(f"         {transit_planet} in dasha: {transit_in_dasha}, {natal_planet} in dasha: {natal_in_dasha}")
+            # print(f"         {transit_planet} in dasha: {transit_in_dasha}, {natal_planet} in dasha: {natal_in_dasha}")
             
             if transit_in_dasha and natal_in_dasha:
-                print(f"         Both planets in dasha - MAXIMUM significance")
+                # print(f"         Both planets in dasha - MAXIMUM significance")
                 max_significance = "maximum"
             elif transit_in_dasha or natal_in_dasha:
                 if max_significance != "maximum":
-                    print(f"         One planet in dasha - HIGH significance")
+                    # print(f"         One planet in dasha - HIGH significance")
                     max_significance = "high"
         
-        print(f"         Final significance: {max_significance}")
+        # print(f"         Final significance: {max_significance}")
         return max_significance

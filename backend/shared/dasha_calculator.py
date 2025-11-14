@@ -131,7 +131,7 @@ class DashaCalculator:
             }
             
         except Exception as e:
-            print(f"Error calculating dashas: {e}")
+            # print(f"Error calculating dashas: {e}")
             return {
                 'mahadasha': {'planet': 'Sun'},
                 'antardasha': {'planet': 'Moon'},
@@ -266,20 +266,20 @@ class DashaCalculator:
     
     def get_dasha_periods_for_range(self, birth_data: Dict, start_date: datetime, end_date: datetime) -> List[Dict]:
         """Get all dasha period changes within a date range"""
-        print(f"           Getting dasha periods from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+        # print(f"           Getting dasha periods from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
         
         periods = []
         current_date = start_date
         
         while current_date <= end_date:
             dashas = self.calculate_current_dashas(birth_data, current_date)
-            print(f"           {current_date.strftime('%Y-%m-%d')}: {dashas['mahadasha']['planet']}-{dashas['antardasha']['planet']}-{dashas['pratyantardasha']['planet']}")
+            # print(f"           {current_date.strftime('%Y-%m-%d')}: {dashas['mahadasha']['planet']}-{dashas['antardasha']['planet']}-{dashas['pratyantardasha']['planet']}")
             
             # Find when current pratyantardasha ends
             next_change = self._find_next_dasha_change(birth_data, current_date)
             period_end = min(next_change, end_date)
             
-            print(f"           Period: {current_date.strftime('%Y-%m-%d')} to {period_end.strftime('%Y-%m-%d')}")
+            # print(f"           Period: {current_date.strftime('%Y-%m-%d')} to {period_end.strftime('%Y-%m-%d')}")
             
             periods.append({
                 'start_date': current_date.strftime('%Y-%m-%d'),
@@ -295,10 +295,10 @@ class DashaCalculator:
             
             # Prevent infinite loop
             if len(periods) > 100:
-                print(f"           WARNING: Breaking loop after 100 periods to prevent infinite loop")
+                # print(f"           WARNING: Breaking loop after 100 periods to prevent infinite loop")
                 break
         
-        print(f"           Total dasha periods found: {len(periods)}")
+        # print(f"           Total dasha periods found: {len(periods)}")
         return periods
     
     def _find_next_dasha_change(self, birth_data: Dict, current_date: datetime) -> datetime:
