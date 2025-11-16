@@ -1756,7 +1756,7 @@
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     padding: 8px;
-    min-height: 44px;
+    min-height: 64px;
     margin-left: 10px;
     flex: 1;
     min-width: 1200px;
@@ -1772,7 +1772,7 @@
 
 .period-row {
     position: relative;
-    height: 36px;
+    height: 56px;
     margin-bottom: 4px;
 }
 
@@ -1783,8 +1783,8 @@
 .timeline-period {
     position: absolute;
     top: 2px;
-    height: 32px;
-    border-radius: 16px;
+    height: 52px;
+    border-radius: 12px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1795,6 +1795,8 @@
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
     min-width: 180px;
     z-index: 2;
+    padding: 4px 8px;
+    box-sizing: border-box;
 }
 
 .timeline-maximum .timeline-period {
@@ -1832,14 +1834,67 @@
     box-shadow: 0 8px 25px rgba(55, 66, 250, 0.6);
 }
 
-.period-label {
-    color: rgba(0, 0, 0, 0.8);
+.period-chip-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    padding: 2px 0;
+}
+
+.period-main-text {
+    color: rgba(0, 0, 0, 0.9);
     font-size: 11px;
     font-weight: 800;
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.period-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 4px;
+}
+
+.period-date-range {
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 7px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0 8px;
-    letter-spacing: 0.3px;
+    flex: 1;
+    text-align: left;
+}
+
+.period-aspect-info {
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 7px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
 }
 
 .view-toggle {
@@ -1946,6 +2001,7 @@
     .track-periods {
         width: 600px;
         min-width: 600px;
+        min-height: 56px;
     }
     
     .track-label {
@@ -1962,16 +2018,29 @@
     }
     
     .timeline-period {
-        min-width: 100px;
-        height: 24px;
+        min-width: 120px;
+        height: 44px;
+        padding: 2px 6px;
     }
     
     .period-row {
-        height: 28px;
+        height: 48px;
     }
     
     .timeline-period {
         top: 2px;
+    }
+    
+    .period-main-text {
+        font-size: 9px;
+    }
+    
+    .period-date-range {
+        font-size: 6px;
+    }
+    
+    .period-aspect-info {
+        font-size: 6px;
     }
     
     .periods-grid {

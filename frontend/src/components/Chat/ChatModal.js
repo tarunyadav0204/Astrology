@@ -902,6 +902,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     
                     {/* Desktop buttons */}
                     <div className="desktop-buttons">
+                        {(chatMode === 'question' || chatMode === 'periods') && (
+                            <button onClick={handleBackToGreeting}>
+                                ← Back
+                            </button>
+                        )}
                         <button onClick={() => setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed')}>
                             {responseStyle === 'detailed' ? '⚡ Quick' : '📋 Detailed'}
                         </button>
@@ -920,11 +925,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         <button onClick={() => setShowBirthForm(true)}>
                             👤 Change Person
                         </button>
-                        {(chatMode === 'question' || chatMode === 'periods') && (
-                            <button onClick={handleBackToGreeting}>
-                                ← Options
-                            </button>
-                        )}
                     </div>
                     
                     {/* Mobile menu */}

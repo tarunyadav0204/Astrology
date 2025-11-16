@@ -259,11 +259,41 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                                                                             className="timeline-period"
                                                                             style={style}
                                                                             onClick={() => onPeriodSelect(period)}
-                                                                            title={`${period.transit_planet} → ${period.natal_planet}\n${formatDate(period.start_date)} - ${formatDate(period.end_date)}`}
+                                                                            title={`${period.life_areas && period.life_areas.length > 0 ? period.life_areas.join(' & ') : period.transit_planet + ' → ' + period.natal_planet}\n${formatDate(period.start_date)} - ${formatDate(period.end_date)}`}
                                                                         >
-                                                                            <span className="period-label">
-                                                                                {period.transit_planet}→{period.natal_planet}
-                                                                            </span>
+                                                                            <div className="period-chip-content">
+                                                                                <div className="period-main-text">
+                                                                                    {(() => {
+                                                                                        if (period.life_areas && period.life_areas.length > 0) {
+                                                                                            return period.life_areas.slice(0, 2).join(' & ');
+                                                                                        }
+                                                                                        return `${period.transit_planet}→${period.natal_planet}`;
+                                                                                    })()
+                                                                                    }
+                                                                                </div>
+                                                                                <div className="period-bottom-row">
+                                                                                    <div className="period-date-range">
+                                                                                        {(() => {
+                                                                                            const start = new Date(period.start_date);
+                                                                                            const end = new Date(period.end_date);
+                                                                                            const startMonth = start.toLocaleDateString('en-US', {month: 'short'});
+                                                                                            const endMonth = end.toLocaleDateString('en-US', {month: 'short'});
+                                                                                            const startDay = start.getDate();
+                                                                                            const endDay = end.getDate();
+                                                                                            
+                                                                                            if (startMonth === endMonth) {
+                                                                                                return `${startMonth} ${startDay}-${endDay}`;
+                                                                                            } else {
+                                                                                                return `${startMonth} ${startDay}-${endMonth} ${endDay}`;
+                                                                                            }
+                                                                                        })()
+                                                                                        }
+                                                                                    </div>
+                                                                                    <div className="period-aspect-info">
+                                                                                        {period.transit_planet}→{period.natal_planet}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
                                                                         </div>
                                                                     );
                                                                 })}
@@ -286,10 +316,15 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                             <div className="periods-grid">
                             {periods.map((period) => {
                         const getLifeAreaDescription = () => {
+                            // Use life areas calculated by backend
+                            if (period.life_areas && period.life_areas.length > 0) {
+                                return period.life_areas.join(" & ");
+                            }
+                            
+                            // Fallback to house-based calculation if life_areas not available
                             const transitHouse = period.period_data?.transit_house;
                             const natalHouse = period.period_data?.natal_house;
                             
-                            // Simple life area mapping for laymen
                             const houseAreas = {
                                 1: "Personal growth & health",
                                 2: "Money & family matters", 

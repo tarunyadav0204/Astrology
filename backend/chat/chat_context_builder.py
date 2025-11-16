@@ -605,6 +605,15 @@ class ChatContextBuilder:
                 
 
                 
+                # Calculate life areas affected by this transit
+                life_areas = self._calculate_life_areas(
+                    activation['transit_planet'],
+                    activation['natal_planet'], 
+                    transit_house,
+                    natal_house,
+                    context.get('house_lordships', {})
+                )
+                
                 periods.append({
                     'id': f"{activation['transit_planet']}-{activation['natal_planet']}-{activation['start_date']}",
                     'label': f"{activation['start_date']} to {activation['end_date']}: {activation['transit_planet']}→{activation['natal_planet']}",
@@ -613,11 +622,13 @@ class ChatContextBuilder:
                     'transit_planet': activation['transit_planet'],
                     'natal_planet': activation['natal_planet'],
                     'significance': activation['dasha_significance'],
+                    'life_areas': life_areas,
                     'period_data': {
                         **activation,
                         'aspect_number': aspect_number,
                         'overlapping_dashas': overlapping_dashas,
-                        'transit_planet_dashas': transit_planet_dashas
+                        'transit_planet_dashas': transit_planet_dashas,
+                        'life_areas': life_areas
                     }
                 })
                 
@@ -648,3 +659,57 @@ class ChatContextBuilder:
             house_lordships[lord].append(house)
         
         return house_lordships
+    
+    def _calculate_life_areas(self, transit_planet: str, natal_planet: str, transit_house: int, natal_house: int, house_lordships: Dict) -> List[str]:
+        """Calculate life areas affected by transit activation"""
+        
+        # Comprehensive house signification mapping for all life areas
+        house_areas = {
+            1: ["Self", "Health", "Personality", "Appearance", "Vitality", "Leadership", "Independence", "Identity"],
+            2: ["Wealth", "Family", "Speech", "Values", "Food", "Savings", "Possessions", "Financial Security", "Material Assets"],
+            3: ["Siblings", "Courage", "Communication", "Short Travel", "Efforts", "Neighbors", "Writing", "Media", "Skills", "Hobbies"],
+            4: ["Home", "Mother", "Education", "Property", "Vehicles", "Happiness", "Domestic Life", "Real Estate", "Comfort", "Inner Peace"],
+            5: ["Children", "Creativity", "Intelligence", "Romance", "Speculation", "Entertainment", "Sports", "Gambling", "Love Affairs", "Pregnancy"],
+            6: ["Health Issues", "Enemies", "Service", "Daily Work", "Debts", "Diseases", "Employment", "Medical Treatment", "Competition", "Pets"],
+            7: ["Marriage", "Partnerships", "Business", "Spouse", "Public Relations", "Contracts", "Legal Matters", "Cooperation", "Negotiations"],
+            8: ["Transformation", "Occult", "Longevity", "Inheritance", "Accidents", "Research", "Surgery", "Insurance", "Taxes", "Joint Resources"],
+            9: ["Fortune", "Dharma", "Higher Learning", "Father", "Spirituality", "Long Travel", "Philosophy", "Religion", "Foreign Countries", "Teaching"],
+            10: ["Career", "Reputation", "Authority", "Public Image", "Government", "Profession", "Status", "Recognition", "Boss", "Fame"],
+            11: ["Gains", "Friends", "Aspirations", "Elder Siblings", "Income", "Fulfillment", "Social Networks", "Hopes", "Profits", "Community"],
+            12: ["Losses", "Spirituality", "Foreign Lands", "Expenses", "Isolation", "Moksha", "Hospitals", "Meditation", "Charity", "Liberation"]
+        }
+        
+        affected_houses = set()
+        
+        # Add primary houses
+        if transit_house:
+            affected_houses.add(transit_house)
+        if natal_house:
+            affected_houses.add(natal_house)
+        
+        # Add lordship houses
+        if transit_planet in house_lordships:
+            affected_houses.update(house_lordships[transit_planet])
+        if natal_planet in house_lordships:
+            affected_houses.update(house_lordships[natal_planet])
+        
+        # Convert to life areas and prioritize
+        life_areas = []
+        priority_houses = [transit_house, natal_house] if transit_house and natal_house else []
+        
+        # Add primary areas first (top 2 from each priority house)
+        for house in priority_houses:
+            if house in house_areas:
+                house_significations = house_areas[house][:2]  # Take top 2 significations
+                for area in house_significations:
+                    if area not in life_areas:
+                        life_areas.append(area)
+        
+        # Add secondary areas from lordships (1 from each house)
+        for house in sorted(affected_houses):
+            if house in house_areas and house not in priority_houses:
+                area = house_areas[house][0]  # Take primary signification
+                if area not in life_areas and len(life_areas) < 4:
+                    life_areas.append(area)
+        
+        return life_areas[:4]  # Return top 4 most relevant areas
