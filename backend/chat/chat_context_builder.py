@@ -193,20 +193,20 @@ class ChatContextBuilder:
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
         context['house_lordships'] = self._get_house_lordships(ascendant_sign)
         
-        # Add comprehensive house significations
+        # Add comprehensive house significations with ALL possible meanings
         context['house_significations'] = {
-            1: "Self, personality, health, appearance, vitality, general well-being",
-            2: "Wealth, family, speech, values, food, accumulated resources, face, right eye", 
-            3: "Siblings, courage, communication, short travels, hands, efforts, neighbors",
-            4: "Home, mother, education, property, vehicles, happiness, chest, heart",
-            5: "Children, creativity, intelligence, romance, speculation, stomach, past life karma",
-            6: "Health issues, enemies, service, daily work, debts, diseases, obstacles",
-            7: "Marriage, partnerships, business, spouse, public relations, lower abdomen",
-            8: "Transformation, occult, longevity, inheritance, accidents, hidden things, research",
-            9: "Fortune, dharma, higher learning, father, spirituality, long travels, thighs",
-            10: "Career, reputation, authority, public image, government, knees, profession",
-            11: "Gains, friends, aspirations, elder siblings, income, fulfillment of desires",
-            12: "Losses, spirituality, foreign lands, expenses, isolation, feet, moksha"
+            1: "Self, personality, health, appearance, vitality, general well-being, head, brain, identity, first impressions, leadership, independence, new beginnings, personal initiatives",
+            2: "Wealth, family, speech, values, food, accumulated resources, face, right eye, savings, possessions, family traditions, oral communication, eating habits, financial security, material assets", 
+            3: "Siblings, courage, communication, short travels, hands, efforts, neighbors, writing, media, local transport, hobbies, skills, manual dexterity, correspondence, nearby places, small journeys",
+            4: "Home, mother, education, property, vehicles, happiness, chest, heart, domestic life, real estate, academic learning, emotional security, homeland, comfort, private life, inner peace",
+            5: "Children, creativity, intelligence, romance, speculation, stomach, past life karma, entertainment, sports, gambling, artistic expression, love affairs, pregnancy, mental abilities, fun activities",
+            6: "Health issues, enemies, service, daily work, debts, diseases, obstacles, employment, routine tasks, medical treatment, litigation, competition, pets, subordinates, work environment, health maintenance",
+            7: "Marriage, partnerships, business, spouse, public relations, lower abdomen, contracts, legal matters, open enemies, cooperation, negotiations, public image, business partnerships, marital harmony",
+            8: "Transformation, occult, longevity, inheritance, accidents, hidden things, research, surgery, insurance, taxes, spouse's money, mysteries, psychology, death and rebirth, joint resources, investigations",
+            9: "Fortune, dharma, higher learning, father, spirituality, long travels, thighs, philosophy, religion, foreign countries, publishing, teaching, law, ethics, pilgrimage, wisdom, higher education, mentors",
+            10: "Career, reputation, authority, public image, government, knees, profession, status, recognition, achievements, boss, public service, political power, social standing, professional success, fame",
+            11: "Gains, friends, aspirations, elder siblings, income, fulfillment of desires, social networks, hopes, large organizations, profits, achievements of goals, community involvement, group activities",
+            12: "Losses, spirituality, foreign lands, expenses, isolation, feet, moksha, hospitals, prisons, meditation, charity, hidden enemies, subconscious mind, sleep, dreams, liberation, sacrifice, foreign settlement"
         }
         
         # Add transit data availability info with enhanced methodology
@@ -228,10 +228,11 @@ class ChatContextBuilder:
                 ],
                 "example_analysis": "Mars (lord 5th,10th, natal 2nd) transits 6th aspecting natal Sun (9th house, lord 1st): Houses involved = 1st,2nd,5th,6th,9th,10th = self,wealth,children,health,father,career. Possible events: health issues affecting father, career conflicts requiring courage, children's education expenses, property disputes, work-related stress affecting family finances.",
                 "quick_answer_requirements": {
-                    "must_include": "2-3 SPECIFIC life events with exact dates from transit periods",
-                    "event_examples": "Property purchase opportunity, job promotion, relationship milestone, health checkup needed, father's travel, children's achievement, financial gain through work, etc.",
+                    "must_include": "4-6 SPECIFIC life events with exact dates from transit periods - predict MORE events by combining house meanings",
+                    "event_examples": "Property purchase opportunity, job promotion, relationship milestone, health checkup needed, father's travel for medical treatment, children's achievement ceremony, financial gain through work, legal matter resolution, vehicle purchase, educational course enrollment, long distance travel for work, family medical expenses, etc.",
                     "avoid_generic_terms": "Do NOT use vague terms like 'good period', 'challenges', 'growth'. Use specific event predictions.",
-                    "house_synthesis": "Combine multiple house meanings: 2nd+10th = career income, 4th+7th = home with spouse, 6th+9th = health issues with father, etc.",
+                    "house_synthesis_mandatory": "MUST combine multiple house meanings: 2nd+10th = career income, 4th+7th = home with spouse, 6th+9th = father's health + long travel = father's medical travel, 5th+12th = children's expenses, 3rd+9th = communication with father/mentor, 1st+6th = personal health from work, 6th+9th = service-related long travel, health issues requiring travel, father's work problems, etc.",
+                    "comprehensive_event_prediction": "For each transit, predict events from ALL house combinations, not just obvious ones. Example: 6th+9th houses = father's health issues, father's work problems, long travel for medical treatment, legal issues with father, father's service to others, health expenses, work-related travel, educational travel, spiritual journey for healing, etc.",
                     "laymen_summary_mandatory": {
                         "purpose": "Quick Answer section MUST provide a clear, simple summary for non-astrologers",
                         "format": "Write as if explaining to someone who knows nothing about astrology",
@@ -252,9 +253,11 @@ class ChatContextBuilder:
                             "Philosophical or spiritual language"
                         ],
                         "required_language": "Use everyday language: 'career opportunities', 'family matters', 'health concerns', 'financial gains', 'relationship changes', 'property matters', 'travel plans', etc."
-                    }
+                    },
+
                 },
-                "instruction": "MANDATORY: For ALL timing questions, request transit data using JSON format. After receiving transit data, provide comprehensive analysis using ALL house significations. ALWAYS start response with laymen-friendly Quick Answer section."
+                "instruction": "MANDATORY: For ALL timing questions, request transit data using JSON format. After receiving transit data, provide comprehensive analysis using ALL house significations. RESPONSE MUST HAVE EXACTLY 6 SECTIONS IN THIS ORDER: 1) Quick Answer paragraph 2) ## Key Insights 3) ## Astrological Analysis 4) ## Nakshatra Insights 5) ## Timing & Guidance 6) ## Final Thoughts. Use standard markdown formatting only.",
+
             }
         }
         
@@ -331,14 +334,15 @@ class ChatContextBuilder:
                 
                 # Add comprehensive transit analysis instructions
                 context['comprehensive_transit_analysis'] = {
-                    "mandatory_approach": "For each transit activation, analyze ALL connected houses and predict specific life events",
+                    "mandatory_approach": "For each transit activation, analyze ALL connected houses and predict MULTIPLE specific life events by combining house meanings",
                     "analysis_steps": [
                         "1. Identify transit planet's natal house + lordship houses",
                         "2. Identify natal planet's house + lordship houses", 
                         "3. Note the transit house where activation occurs",
-                        "4. Combine ALL house significations from steps 1-3",
-                        "5. Apply planetary natures (benefic/malefic) for outcome polarity",
-                        "6. Predict specific events in affected life areas"
+                        "4. List ALL significations from each house (use complete house meanings provided)",
+                        "5. Create event combinations by mixing house significations (e.g., 6th+9th = father's health + long travel = father's medical travel)",
+                        "6. Apply planetary natures (benefic/malefic) for outcome polarity",
+                        "7. Predict MINIMUM 3-5 specific events per transit activation, not just 1-2"
                     ],
                     "example_comprehensive_analysis": {
                         "scenario": "Saturn (natal 8th house, lord 9th,10th) transits 6th house aspecting natal Mars (2nd house, lord 5th,12th)",
@@ -436,18 +440,24 @@ class ChatContextBuilder:
                 "instruction": "Focus ONLY on specific event predictions for the selected period. Use the response_format_for_period_predictions template. Skip general chart analysis sections."
             }
         
-        # Add universal laymen summary requirements for ALL responses
-        context['universal_response_requirements'] = {
-            "quick_answer_section": {
-                "mandatory": "EVERY response MUST include a Quick Answer section",
-                "purpose": "Summarize the entire analysis in simple terms for non-astrologers",
-                "format": "Start with 'Based on your birth chart and upcoming planetary movements:' and list specific events with dates",
-                "language": "Use everyday language - career opportunities, family matters, health concerns, financial gains, relationship changes, property matters, travel plans",
-                "forbidden_terms": "Do NOT use: houses, aspects, dashas, transits, conjunctions, benefic, malefic, or any astrological jargon",
-                "length": "2-4 sentences maximum, focus on what will actually happen in their life"
-            },
-            "detailed_sections_purpose": "Provide technical astrological analysis for those who want deeper understanding",
-            "section_order": "Always start with Quick Answer, then provide detailed technical analysis"
+        # ESSENTIAL STRUCTURE ONLY
+        context['RESPONSE_STRUCTURE_REQUIRED'] = {
+            "sections_in_order": [
+                "Quick Answer (paragraph)",
+                "## Key Insights",
+                "## Astrological Analysis", 
+                "## Nakshatra Insights",
+                "## Timing & Guidance",
+                "## Final Thoughts"
+            ],
+            "formatting": "Standard markdown only: ## for headers, - for bullets",
+            "critical_requirements": [
+                "NEVER use HTML entities like &#39; or &amp; - use plain text apostrophes and ampersands",
+                "ALL section headers MUST start with ## followed by space",
+                "Use standard bullet points with - or • symbols only",
+                "No special Unicode symbols like ◆ or ▸",
+                "In Astrological Analysis section: start new paragraph for each major topic"
+            ]
         }
         
         return context
