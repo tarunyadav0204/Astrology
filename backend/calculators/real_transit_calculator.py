@@ -52,6 +52,9 @@ class RealTransitCalculator:
         planet_sign = int(longitude / 30)
         ascendant_sign = int(ascendant_longitude / 30)
         house = ((planet_sign - ascendant_sign) % 12) + 1
+        
+
+        
         return house
     
     def find_real_aspects(self, birth_data: Dict) -> List[Dict]:
@@ -149,6 +152,7 @@ class RealTransitCalculator:
             if initial_aspecting:
                 in_aspect = True
                 aspect_start = start_date
+                aspect_start_house = initial_house  # Capture initial house
         
         # Check every 3 days for aspect formation
         while current_date <= end_date:
@@ -167,11 +171,14 @@ class RealTransitCalculator:
                     # Calculate which house transit planet aspects from its current position
                     aspected_house = ((transit_house + aspect_number - 2) % 12) + 1
                     is_aspecting = (aspected_house == natal_house)
+                    
+
                 
                 if is_aspecting and not in_aspect:
                     # Start of aspect period
                     in_aspect = True
                     aspect_start = current_date
+                    aspect_start_house = transit_house  # Capture house when aspect starts
                 elif not is_aspecting and in_aspect:
                     # End of aspect period
                     in_aspect = False
@@ -179,9 +186,10 @@ class RealTransitCalculator:
                         # Get natal positions from birth data
                         natal_positions = self._calculate_natal_positions(birth_data) if birth_data else {}
                         
-                        # Get comprehensive transit data for this period
+                        # Get comprehensive transit data for this period using start house
+                        start_house = aspect_start_house if 'aspect_start_house' in locals() else transit_house
                         transit_data = self._get_comprehensive_transit_data(
-                            transit_planet, transit_house, aspect_start, current_date, 
+                            transit_planet, start_house, aspect_start, current_date, 
                             natal_positions, ascendant_longitude
                         )
                         
@@ -190,7 +198,7 @@ class RealTransitCalculator:
                             'end_date': current_date.strftime('%Y-%m-%d'),
                             'peak_date': aspect_start.strftime('%Y-%m-%d'),
                             'aspect_type': f'{aspect_number}{"st" if aspect_number == 1 else "th"}_house',
-                            'transit_house': transit_house,
+                            'transit_house': start_house,  # Use house from when aspect started
                             'natal_house': natal_house,
                             'conjunct_natal_planets': transit_data['conjunct_planets'],
                             'all_aspects_cast': transit_data['all_aspects']
@@ -203,10 +211,10 @@ class RealTransitCalculator:
             # Get natal positions for ongoing aspect
             natal_positions = self._calculate_natal_positions(birth_data) if birth_data else {}
             
-            # Get comprehensive transit data for ongoing aspect
-            final_transit_house = transit_house if 'transit_house' in locals() else natal_house
+            # Use house from when aspect started
+            ongoing_house = aspect_start_house if 'aspect_start_house' in locals() else (transit_house if 'transit_house' in locals() else natal_house)
             transit_data = self._get_comprehensive_transit_data(
-                transit_planet, final_transit_house, aspect_start, end_date,
+                transit_planet, ongoing_house, aspect_start, end_date,
                 natal_positions, ascendant_longitude
             )
             
@@ -215,7 +223,7 @@ class RealTransitCalculator:
                 'end_date': end_date.strftime('%Y-%m-%d'),
                 'peak_date': aspect_start.strftime('%Y-%m-%d'),
                 'aspect_type': f'{aspect_number}{"st" if aspect_number == 1 else "th"}_house',
-                'transit_house': final_transit_house,
+                'transit_house': ongoing_house,  # Use house from when aspect started
                 'natal_house': natal_house,
                 'conjunct_natal_planets': transit_data['conjunct_planets'],
                 'all_aspects_cast': transit_data['all_aspects']

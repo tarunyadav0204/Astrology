@@ -573,7 +573,7 @@ Structure your response with:
 2. ### Life Stage Context - MANDATORY acknowledgment of native's current age and appropriate predictions
 3. ### Astrological Analysis - Header followed by specific chart references WITH classical text citations
 4. ### Nakshatra Insights - MANDATORY section with nakshatra analysis and classical references
-5. **Key Insights** - Bullet points with supporting classical authorities
+5. **Key Insights** - MANDATORY bullet points format: Each insight MUST start with • symbol, followed by specific prediction with date ranges and classical authority
 6. ### Classical Authority - MANDATORY section citing specific texts, chapters, and verses
 7. ### Timing & Guidance - Age-appropriate recommendations with classical timing methods
 8. <div class="final-thoughts-card">**Final Thoughts** - Balanced conclusion with classical wisdom, realistic outlook, and life stage awareness</div>

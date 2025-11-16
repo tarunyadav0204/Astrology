@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     question: str
     language: Optional[str] = 'english'
     response_style: Optional[str] = 'detailed'
+    selected_period: Optional[Dict] = None
 
 class ClearChatRequest(BaseModel):
     name: Optional[str] = None
@@ -37,6 +38,7 @@ class ClearChatRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
+    selectedYear: Optional[int] = None
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -101,6 +103,10 @@ async def ask_question(request: ChatRequest):
             
             # Build astrological context (no pre-processing needed for JSON format)
             requested_period = None
+            
+            # Set selected period if provided
+            if request.selected_period:
+                context_builder.set_selected_period(request.selected_period)
             
             # Build astrological context with requested period
             context = context_builder.build_complete_context(birth_data, request.question, requested_period=requested_period)
@@ -375,6 +381,46 @@ async def test_chat_routes():
     """Test endpoint to verify chat routes are working"""
     # print("Chat test endpoint called")
     return {"status": "success", "message": "Chat routes are working"}
+
+@router.post("/event-periods")
+async def get_event_periods(request: ClearChatRequest):
+    """Get high-significance event periods for next 2 years"""
+    try:
+        print(f"📅 Event periods request: {request}")
+        
+        # Normalize date format from ISO to YYYY-MM-DD
+        date_str = request.date
+        if 'T' in date_str:
+            date_str = date_str.split('T')[0]
+        
+        birth_data = {
+            'name': request.name,
+            'date': date_str,
+            'time': request.time,
+            'place': request.place,
+            'latitude': request.latitude or 28.6139,
+            'longitude': request.longitude or 77.2090,
+            'timezone': request.timezone or 'UTC+5:30',
+            'gender': request.gender
+        }
+        
+        print(f"📊 Birth data prepared: {birth_data}")
+        print(f"📅 Selected year: {request.selectedYear}")
+        
+        periods = context_builder.get_high_significance_periods(birth_data, selected_year=request.selectedYear)
+        
+        print(f"✅ Periods calculated: {len(periods)} periods")
+        
+        return {
+            "status": "success",
+            "periods": periods
+        }
+        
+    except Exception as e:
+        print(f"❌ Event periods error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/suggestions")
 async def get_question_suggestions():

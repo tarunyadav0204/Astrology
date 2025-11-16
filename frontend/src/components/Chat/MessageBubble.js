@@ -181,6 +181,8 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         // Process headers - handle both ### and standalone # symbols
         formatted = formatted.replace(/### (.*?)\n/g, '<h3 class="chat-header">◆ $1 ◆</h3>\n\n');
         
+
+        
         // Remove standalone # symbols that appear alone on lines
         formatted = formatted.replace(/^\s*#\s*$/gm, '');
         
@@ -193,18 +195,23 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         // Process italics (single asterisks not part of bold)
         formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
         
+
         // Clean up multiple line breaks and split into paragraphs
         formatted = formatted.replace(/\n\s*\n\s*\n+/g, '\n\n');
-        const paragraphs = formatted.split(/\n\s*\n/);
+        formatted = formatted.replace(/^\s*\n+/, ''); // Remove leading whitespace and newlines
+        formatted = formatted.trim(); // Remove trailing whitespace
+        const paragraphs = formatted.split(/\n\s*\n/).filter(p => p.trim());
         
-        return paragraphs.map(paragraph => {
+        return paragraphs.map((paragraph, index) => {
             paragraph = paragraph.trim();
             if (!paragraph) return '';
             
-            // Skip if already processed as final-thoughts-card
-            if (paragraph.includes('final-thoughts-card')) {
+            // Skip if already processed
+            if (paragraph.includes('final-thoughts-card') || paragraph.includes('chat-insights') || paragraph.includes('chat-header')) {
                 return paragraph;
             }
+            
+
             
             // Check if it's a numbered list paragraph
             if (/^\d+\./m.test(paragraph)) {
@@ -234,17 +241,11 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                 return `<ul class="chat-list">${items.join('')}</ul>`;
             }
             
-            // Check for Key Insights section
-            if (paragraph.startsWith('Key Insights')) {
-                const lines = paragraph.split('\n');
-                const title = lines[0];
-                const body = lines.slice(1).join(' ').trim();
-                return `<div class="chat-insights"><h4>★ ${title}</h4><div class="insights-content">${body}</div></div>`;
-            }
+
             
             // Regular paragraph - replace single line breaks with spaces
             return `<p class="chat-paragraph">${paragraph.replace(/\n/g, ' ')}</p>`;
-        }).filter(p => p).join('');
+        }).join('').replace(/^<p class="chat-paragraph">\s*<\/p>/, ''); // Remove first empty paragraph
     };
 
     const handleSpeak = () => {

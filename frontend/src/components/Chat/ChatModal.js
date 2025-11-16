@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import BirthForm from '../BirthForm/BirthForm';
+import ChatGreeting from './ChatGreeting';
+import EventPeriods from './EventPeriods';
 import { useAstrology } from '../../context/AstrologyContext';
 import { showToast } from '../../utils/toast';
 
@@ -19,6 +21,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [hoveredMessage, setHoveredMessage] = useState(null);
     const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
     const [copySuccess, setCopySuccess] = useState(false);
+    const [chatMode, setChatMode] = useState('greeting'); // 'greeting', 'question', 'periods'
+    const [eventPeriods, setEventPeriods] = useState([]);
     
     const getNextLanguage = (current) => {
         const languages = ['english', 'hindi', 'telugu', 'gujarati', 'tamil'];
@@ -215,13 +219,36 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     }, [birthData]);
     
     const addGreetingMessage = () => {
-        const place = birthData.place && !birthData.place.includes(',') ? birthData.place : `${birthData.latitude}, ${birthData.longitude}`;
-        const greetingMessage = {
-            role: 'assistant',
-            content: `Hello ${birthData.name}! I see you were born on ${new Date(birthData.date).toLocaleDateString()} at ${place}. I'm here to help you understand your birth chart and provide astrological guidance. What would you like to know about your cosmic blueprint?`,
-            timestamp: new Date().toISOString()
-        };
-        setMessages([greetingMessage]);
+        // Set greeting mode instead of adding message
+        setChatMode('greeting');
+        setMessages([]);
+    };
+    
+    const handleOptionSelect = async (option) => {
+        if (option === 'periods') {
+            setChatMode('periods');
+        } else {
+            setChatMode('question');
+            // Add opening message for question mode
+            const openingMessage = {
+                role: 'assistant',
+                content: `Hello ${birthData?.name || 'there'}! I'm here to help you understand your birth chart and provide astrological guidance. Feel free to ask me anything about your personality, relationships, career, health, or future predictions. What would you like to know?`,
+                timestamp: new Date().toISOString()
+            };
+            setMessages([openingMessage]);
+        }
+    };
+    
+    const handlePeriodSelect = (period) => {
+        setChatMode('question');
+        const question = `Predict specific events for this period: ${period.label}`;
+        // Scroll to bottom when switching to question mode from period selection
+        setTimeout(scrollToBottom, 100);
+        handleSendMessage(question, { selected_period: period.period_data });
+    };
+    
+    const handleBackToGreeting = () => {
+        setChatMode('greeting');
     };
 
     const loadChatHistory = async () => {
@@ -288,7 +315,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         }
     };
 
-    const handleSendMessage = async (message) => {
+    const handleSendMessage = async (message, options = {}) => {
         if (!birthData) return;
 
         // Create session if first message
@@ -304,6 +331,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         // Save user message
         await saveMessage(currentSessionId, 'user', message);
         
+        // Scroll to bottom after user message is added
         setTimeout(scrollToBottom, 100);
         setIsLoading(true);
 
@@ -376,7 +404,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 const response = await fetch('/api/chat/ask', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...birthData, question: message, language, response_style: responseStyle })
+                    body: JSON.stringify({ 
+                        ...birthData, 
+                        question: message, 
+                        language, 
+                        response_style: responseStyle,
+                        selected_period: options.selected_period 
+                    })
                 });
 
                 console.log('Chat response status:', response.status);
@@ -867,113 +901,37 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     <h2>AstroRoshni - Your Personal Astrologer</h2>
                     
                     {/* Desktop buttons */}
-                    <div className="desktop-buttons" style={{ display: 'none' }}>
-                        <button 
-                            onClick={() => setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed')}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                position: 'absolute',
-                                right: '650px',
-                                top: '20px'
-                            }}
-                        >
+                    <div className="desktop-buttons">
+                        <button onClick={() => setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed')}>
                             {responseStyle === 'detailed' ? '⚡ Quick' : '📋 Detailed'}
                         </button>
-                        <button 
-                            onClick={() => setLanguage(getNextLanguage(language))}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                position: 'absolute',
-                                right: '520px',
-                                top: '20px'
-                            }}
-                        >
+                        <button onClick={() => setLanguage(getNextLanguage(language))}>
                             {getLanguageDisplay(getNextLanguage(language))}
                         </button>
-                        <button 
-                            onClick={downloadChatPDF}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                position: 'absolute',
-                                right: '390px',
-                                top: '20px'
-                            }}
-                        >
+                        <button onClick={downloadChatPDF}>
                             📄 Download PDF
                         </button>
-                        <button 
-                            onClick={() => {
-                                const event = new CustomEvent('openChartModal');
-                                window.dispatchEvent(event);
-                            }}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                position: 'absolute',
-                                right: '260px',
-                                top: '20px'
-                            }}
-                        >
+                        <button onClick={() => {
+                            const event = new CustomEvent('openChartModal');
+                            window.dispatchEvent(event);
+                        }}>
                             📊 View Chart
                         </button>
-                        <button 
-                            onClick={() => setShowBirthForm(true)}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                position: 'absolute',
-                                right: '100px',
-                                top: '20px'
-                            }}
-                        >
+                        <button onClick={() => setShowBirthForm(true)}>
                             👤 Change Person
                         </button>
+                        {(chatMode === 'question' || chatMode === 'periods') && (
+                            <button onClick={handleBackToGreeting}>
+                                ← Options
+                            </button>
+                        )}
                     </div>
                     
                     {/* Mobile menu */}
                     <div className="mobile-menu">
                         <button 
                             onClick={() => setShowMobileMenu(!showMobileMenu)}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                color: 'white',
-                                padding: '6px 8px',
-                                borderRadius: '6px',
-                                fontSize: '16px',
-                                cursor: 'pointer',
-                                position: 'absolute',
-                                right: '70px',
-                                top: '20px'
-                            }}
+                            className="mobile-menu-btn"
                         >
                             ⋮
                         </button>
@@ -992,58 +950,102 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         </div>
                     ) : (
                         <>
-                            <div className="chat-messages">
-                                <MessageList 
-                                    messages={messages} 
-                                    language={language} 
-                                    onMessageHover={(message, element) => {
-                                        if (!showMobileMenu) {
-                                            setHoveredMessage(message);
-                                            if (message && element) {
-                                                const rect = element.getBoundingClientRect();
-                                                setButtonPosition({
-                                                    top: rect.top + 5,
-                                                    left: rect.left - 10
-                                                });
-                                            }
-                                        }
-                                    }}
-                                    onFollowUpClick={handleFollowUpClick}
-                                    onChartRefClick={handleChartRefClick}
-                                />
-                                {hoveredMessage && !showMobileMenu && (
-                                    <button 
-                                        className="floating-copy-btn"
-                                        onClick={handleCopyMessage}
-                                        onMouseEnter={() => setHoveredMessage(hoveredMessage)}
-                                        title="Copy message"
-                                        style={{
-                                            position: 'fixed',
-                                            top: `${buttonPosition.top}px`,
-                                            left: `${buttonPosition.left}px`,
-                                            zIndex: 10001,
-                                            background: '#e91e63',
-                                            color: 'white',
-                                            border: 'none',
-                                            padding: '6px 12px',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            fontWeight: '600',
-                                            cursor: 'pointer',
-                                            width: 'auto',
-                                            height: 'auto'
-                                        }}
-                                    >
-                                        {copySuccess ? 'Copied!' : 'Copy'}
-                                    </button>
-                                )}
-                            </div>
-                            <ChatInput 
-                                onSendMessage={handleSendMessage} 
-                                isLoading={isLoading} 
-                                followUpQuestion={followUpQuestion}
-                                onFollowUpUsed={() => setFollowUpQuestion('')}
-                            />
+                            {chatMode === 'greeting' && (
+                                <div className="chat-messages">
+                                    <ChatGreeting 
+                                        birthData={birthData}
+                                        onOptionSelect={handleOptionSelect}
+                                    />
+                                </div>
+                            )}
+                            
+                            {chatMode === 'periods' && (
+                                <div className="chat-messages">
+                                    <EventPeriods 
+                                        birthData={birthData}
+                                        onPeriodSelect={handlePeriodSelect}
+                                        onBack={handleBackToGreeting}
+                                    />
+                                </div>
+                            )}
+                            
+                            {chatMode === 'question' && (
+                                <>
+                                    <div className="chat-messages">
+                                        <div style={{
+                                            padding: '10px 0',
+                                            borderBottom: '1px solid rgba(255,255,255,0.2)',
+                                            marginBottom: '15px'
+                                        }}>
+                                            <button 
+                                                onClick={handleBackToGreeting}
+                                                style={{
+                                                    background: 'rgba(255,255,255,0.2)',
+                                                    border: '1px solid rgba(255,255,255,0.3)',
+                                                    color: 'white',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                            >
+                                                ← Back to Options
+                                            </button>
+                                        </div>
+                                        <MessageList 
+                                            messages={messages} 
+                                            language={language} 
+                                            onMessageHover={(message, element) => {
+                                                if (!showMobileMenu) {
+                                                    setHoveredMessage(message);
+                                                    if (message && element) {
+                                                        const rect = element.getBoundingClientRect();
+                                                        setButtonPosition({
+                                                            top: rect.top + 5,
+                                                            left: rect.left - 10
+                                                        });
+                                                    }
+                                                }
+                                            }}
+                                            onFollowUpClick={handleFollowUpClick}
+                                            onChartRefClick={handleChartRefClick}
+                                        />
+                                        {hoveredMessage && !showMobileMenu && (
+                                            <button 
+                                                className="floating-copy-btn"
+                                                onClick={handleCopyMessage}
+                                                onMouseEnter={() => setHoveredMessage(hoveredMessage)}
+                                                title="Copy message"
+                                                style={{
+                                                    position: 'fixed',
+                                                    top: `${buttonPosition.top}px`,
+                                                    left: `${buttonPosition.left}px`,
+                                                    zIndex: 10001,
+                                                    background: '#e91e63',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    width: 'auto',
+                                                    height: 'auto'
+                                                }}
+                                            >
+                                                {copySuccess ? 'Copied!' : 'Copy'}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <ChatInput 
+                                        onSendMessage={handleSendMessage} 
+                                        isLoading={isLoading} 
+                                        followUpQuestion={followUpQuestion}
+                                        onFollowUpUsed={() => setFollowUpQuestion('')}
+                                    />
+                                </>
+                            )}
                         </>
                     )}
                 </div>
@@ -1131,6 +1133,27 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     >
                         👤 Change Person
                     </button>
+                    {(chatMode === 'question' || chatMode === 'periods') && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleBackToGreeting(); setShowMobileMenu(false); }}
+                            onTouchEnd={(e) => { e.stopPropagation(); handleBackToGreeting(); setShowMobileMenu(false); }}
+                            style={{
+                                width: '100%',
+                                padding: '10px 15px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#333',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                borderBottom: '1px solid rgba(0,0,0,0.1)',
+                                touchAction: 'manipulation',
+                                userSelect: 'none'
+                            }}
+                        >
+                            ← Back to Options
+                        </button>
+                    )}
                     <button 
                         onClick={(e) => { e.stopPropagation(); downloadChatPDF(); setShowMobileMenu(false); }}
                         onTouchEnd={(e) => { e.stopPropagation(); downloadChatPDF(); setShowMobileMenu(false); }}

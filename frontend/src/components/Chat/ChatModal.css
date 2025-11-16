@@ -57,9 +57,10 @@
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     padding: 20px;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
-    justify-content: space-between;
+    gap: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     position: relative;
 }
@@ -743,16 +744,55 @@
     }
     
     .desktop-buttons {
-        display: block !important;
+        display: flex !important;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        z-index: 20;
+        position: relative;
+        margin-right: 60px;
     }
     
     .desktop-buttons button {
-        position: absolute;
-        top: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .desktop-buttons button:hover {
+        background: rgba(0, 0, 0, 0.9);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     
     .mobile-menu {
         display: none !important;
+    }
+    
+    .mobile-menu-btn {
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 6px 8px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .mobile-menu-btn:hover {
+        background: rgba(0, 0, 0, 0.9);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
 }
 
@@ -791,6 +831,24 @@
     
     .mobile-menu {
         display: block !important;
+    }
+    
+    .mobile-menu-btn {
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 6px 8px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .mobile-menu-btn:hover {
+        background: rgba(0, 0, 0, 0.9);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     
     .close-btn {
@@ -1145,5 +1203,977 @@
     .chat-messages {
         width: 100% !important;
         max-width: none !important;
+    }
+}
+
+/* Chat Greeting Styles */
+.chat-greeting {
+    padding: 20px;
+    text-align: center;
+}
+
+.greeting-message {
+    margin-bottom: 30px;
+}
+
+.greeting-message h3 {
+    color: white;
+    margin-bottom: 10px;
+    font-size: 24px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.greeting-message p {
+    color: white;
+    margin-bottom: 8px;
+    line-height: 1.5;
+    opacity: 0.9;
+}
+
+.greeting-options h4 {
+    color: white;
+    margin-bottom: 20px;
+    font-size: 18px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.option-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.option-btn {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+}
+
+.option-btn:hover {
+    border-color: #ff6b35;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.2);
+}
+
+.option-icon {
+    font-size: 32px;
+    margin-right: 20px;
+    min-width: 50px;
+}
+
+.option-text {
+    flex: 1;
+}
+
+.option-text strong {
+    display: block;
+    color: #333;
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+.option-text span {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Event Periods Styles */
+.event-periods {
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.periods-header {
+    margin-bottom: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.periods-header h4 {
+    color: white;
+    margin: 10px 0;
+    font-size: 20px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.periods-header p {
+    color: white;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.year-selector {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.year-selector label {
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.year-select {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    min-width: 80px;
+}
+
+.year-select-inline {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 16px;
+    color: #ff6b35;
+    cursor: pointer;
+    min-width: 70px;
+    font-weight: 700;
+    margin: 0 5px;
+}
+
+.header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.title-controls h4 {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    font-size: 18px;
+}
+
+.title-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    justify-content: center;
+}
+
+.explanation-text {
+    text-align: center;
+    margin: 8px 0;
+}
+
+.explanation-text p {
+    font-size: 13px;
+    color: white !important;
+    margin: 0;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+.instruction-text {
+    font-size: 13px;
+    margin: 0;
+    opacity: 0.8;
+}
+
+.toggle-btn-header {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-btn-header:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.year-select:focus {
+    outline: none;
+    border-color: #ff6b35;
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+}
+
+.year-select-inline:focus {
+    outline: none;
+    border-color: #ff6b35;
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+    background: rgba(255, 255, 255, 1);
+}
+
+.back-btn {
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 15px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.event-periods-loading {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.loading-spinner {
+    font-size: 48px;
+    animation: spin 2s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.loading-subtext {
+    color: #999;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.event-periods-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #e74c3c;
+}
+
+.no-periods {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.periods-grid-container {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.periods-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    column-gap: 6px;
+    row-gap: 15px;
+    min-height: 100%;
+}
+
+.period-chip-rect {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    height: auto;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    color: #333;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.period-chip-rect:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 1);
+}
+
+.chip-header {
+    border-bottom: 2px solid rgba(255, 107, 53, 0.2);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.period-dates-header {
+    color: #ff6b35;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+    text-align: center;
+}
+
+.chip-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    flex: 1;
+}
+
+.life-area-description {
+    flex: 1;
+}
+
+.life-area-description p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.simple-description {
+    font-size: 13px !important;
+    color: #666 !important;
+    font-weight: 400 !important;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+.technical-details {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 107, 53, 0.1);
+}
+
+.technical-details .aspect-description {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #555;
+    margin: 0 0 6px 0;
+    font-weight: 500;
+}
+
+.technical-details .dasha-description {
+    font-size: 11px;
+    line-height: 1.3;
+    color: #777;
+    margin: 0 0 8px 0;
+    font-style: italic;
+}
+
+.technical-details .period-summary {
+    background: rgba(255, 107, 53, 0.08);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 107, 53, 0.15);
+}
+
+.technical-details .planet-activation {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ff6b35;
+    margin-bottom: 6px;
+}
+
+.technical-details .house-details {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.technical-details .house-details span {
+    font-size: 10px;
+    background: rgba(255, 107, 53, 0.12);
+    padding: 2px 6px;
+    border-radius: 8px;
+    color: #ff6b35;
+    font-weight: 600;
+}
+
+.technical-details .dasha-summary {
+    font-size: 11px;
+    color: #666;
+    font-weight: 600;
+}
+
+.chip-footer {
+    border-top: 1px solid rgba(255, 107, 53, 0.1);
+    padding-top: 12px;
+    text-align: center;
+}
+
+.significance-badge-bottom {
+    color: white;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    display: inline-block;
+}
+
+/* Timeline Visualization */
+.timeline-container {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.timeline-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.timeline-header h5 {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 3px 6px rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 16px;
+    border-radius: 8px;
+    display: inline-block;
+}
+
+.timeline-visualization {
+    position: relative;
+    min-height: 300px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    width: 1400px;
+    overflow-x: visible;
+}
+
+.timeline-months {
+    position: relative;
+    height: 30px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    margin-bottom: 20px;
+    margin-left: 148px;
+    width: 1200px;
+}
+
+.month-marker {
+    position: absolute;
+    top: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.year-indicator {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+    background: rgba(255, 107, 53, 0.8);
+    padding: 1px 4px;
+    border-radius: 3px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.month-marker::after {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    width: 1px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.timeline-track {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    min-height: 50px;
+    width: 1360px;
+}
+
+.track-label {
+    width: 100px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-top: 8px;
+}
+
+.significance-icon {
+    font-size: 16px;
+}
+
+.significance-text {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.track-periods {
+    position: relative;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 8px;
+    min-height: 44px;
+    margin-left: 10px;
+    flex: 1;
+    min-width: 1200px;
+}
+
+.track-periods:empty {
+    display: none;
+}
+
+.timeline-track:has(.track-periods:empty) {
+    display: none;
+}
+
+.period-row {
+    position: relative;
+    height: 36px;
+    margin-bottom: 4px;
+}
+
+.period-row:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-period {
+    position: absolute;
+    top: 2px;
+    height: 32px;
+    border-radius: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+    min-width: 180px;
+    z-index: 2;
+}
+
+.timeline-maximum .timeline-period {
+    background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+    box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+    border: 2px solid rgba(220, 38, 38, 0.4);
+}
+
+.timeline-high .timeline-period {
+    background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+    box-shadow: 0 4px 15px rgba(234, 88, 12, 0.3);
+    border: 2px solid rgba(234, 88, 12, 0.4);
+}
+
+.timeline-moderate .timeline-period {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    border: 2px solid rgba(37, 99, 235, 0.4);
+}
+
+.timeline-period:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.timeline-maximum .timeline-period:hover {
+    box-shadow: 0 8px 25px rgba(255, 71, 87, 0.6);
+}
+
+.timeline-high .timeline-period:hover {
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.6);
+}
+
+.timeline-moderate .timeline-period:hover {
+    box-shadow: 0 8px 25px rgba(55, 66, 250, 0.6);
+}
+
+.period-label {
+    color: rgba(0, 0, 0, 0.8);
+    font-size: 11px;
+    font-weight: 800;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+    padding: 0 8px;
+    letter-spacing: 0.3px;
+}
+
+.view-toggle {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.toggle-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Compact Mobile Header */
+.mobile-compact-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 15px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.back-btn-compact {
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    min-width: 40px;
+}
+
+.year-select-compact {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #ff6b35;
+    cursor: pointer;
+    font-weight: 700;
+    flex: 1;
+    margin: 0 10px;
+    text-align: center;
+}
+
+.toggle-btn-compact {
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    min-width: 40px;
+}
+
+/* Mobile responsiveness for timeline */
+@media (max-width: 768px) {
+    .event-periods {
+        padding: 10px;
+    }
+    
+    .periods-header {
+        margin-bottom: 10px;
+    }
+    
+    .timeline-container {
+        padding: 10px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .timeline-visualization {
+        width: 800px;
+        min-width: 800px;
+    }
+    
+    .timeline-track {
+        width: 800px;
+    }
+    
+    .timeline-months {
+        width: 600px;
+        margin-left: 100px;
+    }
+    
+    .track-periods {
+        width: 600px;
+        min-width: 600px;
+    }
+    
+    .track-label {
+        width: 70px;
+        font-size: 10px;
+    }
+    
+    .significance-text {
+        font-size: 9px;
+    }
+    
+    .period-label {
+        font-size: 9px;
+    }
+    
+    .timeline-period {
+        min-width: 100px;
+        height: 24px;
+    }
+    
+    .period-row {
+        height: 28px;
+    }
+    
+    .timeline-period {
+        top: 2px;
+    }
+    
+    .periods-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .period-chip-rect {
+        min-height: 120px;
+        padding: 12px;
+    }
+    
+    .chip-header {
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .period-dates-header {
+        font-size: 14px;
+    }
+    
+    .life-area-description p {
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    
+    .simple-description {
+        font-size: 12px !important;
+    }
+    
+    .technical-details {
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+    
+    .aspect-description {
+        font-size: 11px;
+        margin-bottom: 4px;
+    }
+    
+    .dasha-description {
+        font-size: 10px;
+        margin-bottom: 4px;
+    }
+    
+    .period-summary {
+        padding: 6px;
+    }
+    
+    .planet-activation {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    
+    .house-details span {
+        font-size: 9px;
+        padding: 2px 4px;
+    }
+    
+    .significance-badge-bottom {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+}
+
+.period-description {
+    flex: 1;
+}
+
+.aspect-description {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #444;
+    margin: 0 0 8px 0;
+    font-weight: 500;
+}
+
+.dasha-description {
+    font-size: 12px;
+    line-height: 1.3;
+    color: #666;
+    margin: 0;
+    font-style: italic;
+}
+
+.period-summary {
+    background: rgba(255, 107, 53, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 107, 53, 0.2);
+}
+
+.planet-activation {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ff6b35;
+    margin-bottom: 8px;
+}
+
+.house-details {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.house-details span {
+    font-size: 11px;
+    background: rgba(255, 107, 53, 0.15);
+    padding: 3px 8px;
+    border-radius: 10px;
+    color: #ff6b35;
+    font-weight: 600;
+}
+
+.dasha-summary {
+    font-size: 12px;
+    color: #666;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.period-dates {
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+    text-align: center;
+}
+
+.significance-badge-rect {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 16px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    z-index: 2;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.period-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.period-dates {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+.significance-badge {
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.period-activation {
+    margin-bottom: 4px;
+}
+
+.period-activation strong {
+    color: #333;
+    font-size: 16px;
+}
+
+.period-description {
+    color: #666;
+    font-size: 13px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .option-buttons {
+        max-width: 100%;
+    }
+    
+    .option-btn {
+        padding: 15px;
+    }
+    
+    .option-icon {
+        font-size: 28px;
+        margin-right: 15px;
+        min-width: 40px;
+    }
+    
+    .periods-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        max-height: 350px;
+    }
+    
+    .period-chip {
+        padding: 10px;
+        min-height: 90px;
     }
 }

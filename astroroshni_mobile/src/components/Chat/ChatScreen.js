@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MessageBubble from './MessageBubble';
+import EventPeriods from './EventPeriods';
+import ChatGreeting from './ChatGreeting';
 import { storage } from '../../services/storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import ChartScreen from '../Chart/ChartScreen';
@@ -30,6 +32,8 @@ export default function ChatScreen({ navigation }) {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showChart, setShowChart] = useState(false);
+  const [showEventPeriods, setShowEventPeriods] = useState(false);
+  const [showGreeting, setShowGreeting] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const scrollViewRef = useRef(null);
 
@@ -39,6 +43,7 @@ export default function ChatScreen({ navigation }) {
     "What are my health vulnerabilities?",
     "Tell me about my current dasha period",
     "What do the current transits mean for me?",
+    "Show me significant periods in my life",
     "What are my strengths and weaknesses?"
   ];
 
@@ -61,15 +66,16 @@ export default function ChatScreen({ navigation }) {
     }
   }, [birthData]);
 
-  const addGreetingMessage = () => {
-    const place = birthData.place && !birthData.place.includes(',') ? birthData.place : `${birthData.latitude}, ${birthData.longitude}`;
-    const greetingMessage = {
-      id: 'greeting-' + Date.now(),
-      role: 'assistant',
-      content: `Hello ${birthData.name}! I see you were born on ${new Date(birthData.date).toLocaleDateString()} at ${place}. I'm here to help you understand your birth chart and provide astrological guidance. What would you like to know about your cosmic blueprint?`,
-      timestamp: new Date().toISOString()
-    };
-    setMessages([greetingMessage]);
+  const handleGreetingOptionSelect = (option) => {
+    console.log('🎯 Greeting option selected:', option);
+    if (option.action === 'periods') {
+      console.log('📅 Opening Event Periods modal');
+      console.log('📊 Birth data available:', !!birthData);
+      setShowEventPeriods(true);
+    } else {
+      console.log('💬 Going to chat mode');
+      setShowGreeting(false);
+    }
   };
 
   const checkBirthData = async () => {
@@ -117,14 +123,16 @@ export default function ChatScreen({ navigation }) {
       const existingMessages = data.messages || [];
       setMessages(existingMessages);
       
-      // Add greeting if no existing messages
+      // Show greeting if no existing messages, otherwise go to chat
       if (existingMessages.length === 0) {
-        addGreetingMessage();
+        setShowGreeting(true);
+      } else {
+        setShowGreeting(false);
       }
     } catch (error) {
       console.error('Error loading chat history:', error);
-      // Add greeting on error too
-      addGreetingMessage();
+      // Show greeting on error too
+      setShowGreeting(true);
     }
   };
 
@@ -142,6 +150,9 @@ export default function ChatScreen({ navigation }) {
       console.log('❌ Validation failed:', { hasText: !!messageText.trim(), hasBirthData: !!birthData });
       return;
     }
+
+    // Hide greeting when sending first message
+    setShowGreeting(false);
 
     const userMessage = {
       id: Date.now().toString(),
@@ -558,21 +569,27 @@ export default function ChatScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Messages */}
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
+        {/* Content */}
+        {showGreeting ? (
+          <ChatGreeting 
+            birthData={birthData}
+            onOptionSelect={handleGreetingOptionSelect}
+          />
+        ) : (
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.messagesContainer}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {messages.map((item) => (
+              <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
+            ))}
+          </ScrollView>
+        )}
 
-        >
-          {messages.map((item) => (
-            <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
-          ))}
-        </ScrollView>
-
-        {/* Suggestions (only show when not loading) */}
-        {!loading && (
+        {/* Suggestions (only show when not loading and not showing greeting) */}
+        {!loading && !showGreeting && (
           <View style={styles.suggestionsContainer}>
             <ScrollView
               horizontal
@@ -592,27 +609,29 @@ export default function ChatScreen({ navigation }) {
           </View>
         )}
 
-        {/* Input */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={loading ? "Analyzing your chart..." : "Ask me about your birth chart..."}
-            placeholderTextColor={COLORS.gray}
-            maxLength={500}
-            editable={!loading}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (loading || !inputText.trim()) && styles.sendButtonDisabled]}
-            onPress={() => sendMessage()}
-            disabled={loading || !inputText.trim()}
-          >
-            <Text style={styles.sendButtonText}>
-              {loading ? '...' : 'Send'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Input (only show when not showing greeting) */}
+        {!showGreeting && (
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder={loading ? "Analyzing your chart..." : "Ask me about your birth chart..."}
+              placeholderTextColor={COLORS.gray}
+              maxLength={500}
+              editable={!loading}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, (loading || !inputText.trim()) && styles.sendButtonDisabled]}
+              onPress={() => sendMessage()}
+              disabled={loading || !inputText.trim()}
+            >
+              <Text style={styles.sendButtonText}>
+                {loading ? '...' : 'Send'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Language Modal */}
         <Modal
@@ -674,6 +693,17 @@ export default function ChatScreen({ navigation }) {
                 style={styles.menuOption}
                 onPress={() => {
                   setShowMenu(false);
+                  setShowEventPeriods(true);
+                }}
+              >
+                <Ionicons name="calendar" size={20} color={COLORS.accent} />
+                <Text style={styles.menuText}>Event Periods</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  setShowMenu(false);
                   navigation.setOptions({ addWelcomeMessage: setMessages });
                   navigation.navigate('BirthForm');
                 }}
@@ -691,6 +721,18 @@ export default function ChatScreen({ navigation }) {
               >
                 <Ionicons name="share" size={20} color={COLORS.accent} />
                 <Text style={styles.menuText}>Share Chat</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  setShowMenu(false);
+                  setShowGreeting(true);
+                  setMessages([]);
+                }}
+              >
+                <Ionicons name="home" size={20} color={COLORS.accent} />
+                <Text style={styles.menuText}>Back to Home</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -730,6 +772,25 @@ export default function ChatScreen({ navigation }) {
           visible={showChart} 
           onClose={() => setShowChart(false)} 
         />
+
+        {/* Event Periods Modal */}
+        {showEventPeriods && (
+          <EventPeriods 
+            visible={showEventPeriods} 
+            onClose={() => {
+              console.log('📅 Closing Event Periods modal');
+              setShowEventPeriods(false);
+            }}
+            birthData={birthData}
+            onPeriodSelect={(period) => {
+              console.log('🎯 Period selected:', period);
+              setShowEventPeriods(false);
+              setShowGreeting(false);
+              const periodQuestion = `Tell me more about the period from ${new Date(period.start_date).toLocaleDateString()} to ${new Date(period.end_date).toLocaleDateString()} when ${period.transit_planet} activates ${period.natal_planet}. What specific events should I expect?`;
+              sendMessage(periodQuestion);
+            }}
+          />
+        )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>

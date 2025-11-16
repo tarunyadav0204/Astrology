@@ -35,7 +35,12 @@ import { Platform } from 'react-native';
 const getApiUrl = () => {
   console.log('Environment check - NODE_ENV:', process.env.NODE_ENV, '__DEV__:', __DEV__);
   
-  // Always use astroroshni.com for mobile app
+  // Use local backend for development
+  if (__DEV__) {
+    return 'http://localhost:8001';
+  }
+  
+  // Use production URL for release builds
   return 'https://astroroshni.com';
 };
 
