@@ -266,12 +266,14 @@ class ChatContextBuilder:
             start_year = requested_period.get('start_year', current_year)
             end_year = requested_period.get('end_year', current_year + 2)
             year_range = end_year - start_year
-            # print(f"🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
+            print(f"🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
             
             try:
+                print(f"📊 Initializing RealTransitCalculator...")
                 real_calc = RealTransitCalculator()
+                print(f"🔍 Finding real aspects for birth data...")
                 aspects = real_calc.find_real_aspects(birth_data)
-                # print(f"   Found {len(aspects)} potential aspects")
+                print(f"   Found {len(aspects)} potential aspects")
                 
                 transit_activations = []
                 
@@ -331,6 +333,13 @@ class ChatContextBuilder:
                         continue
                 
                 context['transit_activations'] = transit_activations
+                print(f"📊 TRANSIT DATA SENT TO GEMINI:")
+                print(f"   Period: {start_year}-{end_year}")
+                print(f"   Total activations: {len(transit_activations)}")
+                for i, activation in enumerate(transit_activations[:3]):
+                    print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']})")
+                if len(transit_activations) > 3:
+                    print(f"     ... and {len(transit_activations) - 3} more")
                 
                 # Add comprehensive transit analysis instructions
                 context['comprehensive_transit_analysis'] = {
@@ -429,7 +438,9 @@ class ChatContextBuilder:
                 #     print(f"     ... and {len(transit_activations) - 5} more")
                     
             except Exception as e:
-                # print(f"❌ Error calculating transit activations: {e}")
+                print(f"❌ Error calculating transit activations: {e}")
+                import traceback
+                traceback.print_exc()
                 context['transit_activations'] = []
         
         # Add period focus instructions if this is for a specific period

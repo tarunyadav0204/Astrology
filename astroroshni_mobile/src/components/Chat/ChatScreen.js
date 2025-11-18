@@ -22,6 +22,8 @@ import MessageBubble from './MessageBubble';
 import EventPeriods from './EventPeriods';
 import ChatGreeting from './ChatGreeting';
 import { storage } from '../../services/storage';
+import { chatAPI } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import ChartScreen from '../Chart/ChartScreen';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
@@ -141,13 +143,8 @@ export default function ChatScreen({ navigation }) {
   const loadChatHistory = async () => {
     try {
       if (!birthData) return;
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/history')}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(birthData)
-      });
-      const data = await response.json();
-      const existingMessages = data.messages || [];
+      const response = await chatAPI.getChatHistory(birthData);
+      const existingMessages = response.data.messages || [];
       setMessages(existingMessages);
       
       // Show greeting if no existing messages, otherwise go to chat
@@ -173,22 +170,11 @@ export default function ChatScreen({ navigation }) {
     try {
       if (!birthData) return;
       
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/save-message')}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...birthData,
-          message: {
-            role: message.role,
-            content: message.content,
-            timestamp: message.timestamp
-          }
-        })
+      await chatAPI.saveMessage(birthData, {
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp
       });
-      
-      if (!response.ok) {
-        console.warn('Failed to save message to history:', response.status);
-      }
     } catch (error) {
       console.warn('Error saving message to history:', error);
     }
@@ -308,9 +294,16 @@ export default function ChatScreen({ navigation }) {
           });
         }
         
+        // Get auth token for authenticated request
+        const token = await AsyncStorage.getItem('authToken');
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        };
+        
         const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/ask')}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(requestBody)
         });
 

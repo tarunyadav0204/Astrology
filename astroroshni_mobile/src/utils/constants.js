@@ -33,8 +33,8 @@ import { Platform } from 'react-native';
 
 // API Configuration matching web version
 const getApiUrl = () => {
-  // Use localhost for testing
-  return 'http://localhost:8001';
+  // Production server
+  return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();

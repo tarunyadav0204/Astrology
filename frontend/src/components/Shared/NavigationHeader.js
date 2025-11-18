@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCredits } from '../../context/CreditContext';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton }) => {
+const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick }) => {
   const navigate = useNavigate();
+  const { credits, loading: creditsLoading } = useCredits();
 
 
 
@@ -26,6 +28,11 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
           <div className="auth-section">
             {user ? (
               <div className="user-menu">
+                {!creditsLoading && onCreditsClick && (
+                  <button className="credits-btn" onClick={onCreditsClick}>
+                    💳 {credits}
+                  </button>
+                )}
                 <button className="profile-btn" onClick={() => navigate('/profile')}>
                   👤 {user.name || user.phone}
                 </button>
@@ -58,6 +65,11 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
           <div className="mobile-auth">
             {user ? (
               <div className="user-menu">
+                {!creditsLoading && onCreditsClick && (
+                  <button className="credits-btn mobile" onClick={onCreditsClick}>
+                    💳 {credits}
+                  </button>
+                )}
                 <button className="profile-btn" onClick={() => navigate('/profile')}>
                   👤 {user.name || user.phone}
                 </button>

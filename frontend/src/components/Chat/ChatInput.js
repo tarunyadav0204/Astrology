@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useCredits } from '../../context/CreditContext';
 
-const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {} }) => {
+const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {}, onOpenCreditsModal }) => {
+    const { credits, chatCost, loading: creditsLoading } = useCredits();
     const [message, setMessage] = useState('');
     
     useEffect(() => {
@@ -12,7 +14,7 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (message.trim() && !isLoading) {
+        if (message.trim() && !isLoading && credits >= chatCost) {
             onSendMessage(message.trim());
             setMessage('');
         }
@@ -42,24 +44,36 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
                     ))}
                 </div>
             )}
+            {!creditsLoading && credits < chatCost && (
+                <div className="credit-warning">
+                    <span>Insufficient credits ({credits}/{chatCost} required)</span>
+                    <button onClick={onOpenCreditsModal} className="get-credits-btn">
+                        Get Credits
+                    </button>
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="chat-input-form">
                 <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder={isLoading ? "Analyzing your chart..." : "Ask me about your birth chart..."}
-                    disabled={isLoading}
+                    placeholder={isLoading ? "Analyzing your chart..." : credits < chatCost ? "Insufficient credits" : "Ask me about your birth chart..."}
+                    disabled={isLoading || credits < chatCost}
                     className="chat-input"
-
                 />
                 <button 
                     type="submit" 
-                    disabled={!message.trim() || isLoading}
+                    disabled={!message.trim() || isLoading || credits < chatCost}
                     className="send-button"
                 >
-                    {isLoading ? '...' : 'Send'}
+                    {isLoading ? '...' : credits < chatCost ? 'No Credits' : 'Send'}
                 </button>
             </form>
+            {!creditsLoading && (
+                <div className="credit-info">
+                    Credits: {credits} | Cost per question: {chatCost}
+                </div>
+            )}
         </div>
     );
 };

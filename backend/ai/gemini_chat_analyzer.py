@@ -157,14 +157,14 @@ class GeminiChatAnalyzer:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = loop.run_in_executor(executor, _sync_generate_content)
                 try:
-                    # 60 second timeout for Gemini API
-                    response = await asyncio.wait_for(future, timeout=60.0)
+                    # 90 second timeout for Gemini API (longer for transit requests)
+                    response = await asyncio.wait_for(future, timeout=90.0)
                 except asyncio.TimeoutError:
                     print(f"\n=== AI TIMEOUT ===")
                     return {
                         'success': False,
                         'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
-                        'error': 'AI request timeout'
+                        'error': 'AI request timeout (90s)'
                     }
             
             # Validate response
@@ -189,6 +189,9 @@ class GeminiChatAnalyzer:
             # Remove any control characters except newlines, tabs, and carriage returns
             allowed_chars = '\n\r\t'
             cleaned_text = ''.join(char for char in response_text if ord(char) >= 32 or char in allowed_chars)
+            
+            # Fix formatting issues - ensure proper markdown headers
+            cleaned_text = self._fix_response_formatting(cleaned_text)
             
             # Ensure response doesn't end abruptly (minimum length check)
             if len(cleaned_text) < 50:
@@ -265,6 +268,40 @@ class GeminiChatAnalyzer:
                 'error': str(e),
                 'error_type': type(e).__name__
             }
+    
+    def _fix_response_formatting(self, response_text: str) -> str:
+        """Fix common formatting issues in Gemini responses"""
+        
+        # Define sections that should be headers
+        sections_to_fix = [
+            'Key Insights',
+            'Astrological Analysis', 
+            'Nakshatra Insights',
+            'Timing & Guidance',
+            'Final Thoughts'
+        ]
+        
+        # Fix each section if it appears without proper markdown header
+        for section in sections_to_fix:
+            # Pattern: section name at start of line without ###
+            pattern = f'^{section}$'
+            replacement = f'### {section}'
+            
+            # Use multiline regex to match section names at start of lines
+            import re
+            response_text = re.sub(pattern, replacement, response_text, flags=re.MULTILINE)
+            
+            # Also fix cases where section appears after newlines
+            pattern = f'\n{section}\n'
+            replacement = f'\n### {section}\n'
+            response_text = response_text.replace(pattern, replacement)
+            
+            # Fix cases where section appears after newlines without trailing newline
+            pattern = f'\n{section}'
+            if not f'### {section}' in response_text:
+                response_text = response_text.replace(pattern, f'\n### {section}')
+        
+        return response_text
     
     def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed') -> str:
         """Create comprehensive chat prompt for Gemini"""
@@ -360,9 +397,19 @@ Start with Quick Answer (2-3 sentences) then provide full analysis:
 
 <div class="quick-answer-card">**Quick Answer**: [Direct response with key insight and classical reference]</div>
 
-### [Continue with full detailed sections as normal]
+### Key Insights
+[Bullet points with specific predictions]
 
+### Astrological Analysis
+[Detailed chart analysis with classical references]
 
+### Nakshatra Insights
+[Nakshatra analysis with classical authority]
+
+### Timing & Guidance
+[Age-appropriate recommendations]
+
+<div class="final-thoughts-card">**Final Thoughts**: [Balanced conclusion]</div>
 
 FOLLOW-UP QUESTIONS - MANDATORY:
 End your response with 3-4 relevant follow-up questions in this exact format:
@@ -560,23 +607,42 @@ GUIDELINES:
 - You may discuss transits IF calculated transit data is provided in the context
 - Avoid excessive emojis - use sparingly and only when appropriate
 
-RESPONSE FORMAT:
-Use markdown formatting for beautiful presentation:
+RESPONSE FORMAT - CRITICAL:
+You MUST use these EXACT markdown headers (with ### symbols):
+- ### Key Insights (MANDATORY header)
+- ### Astrological Analysis (MANDATORY header)
+- ### Nakshatra Insights (MANDATORY header)
+- ### Timing & Guidance (MANDATORY header)
+
+Formatting requirements:
 - **Bold text** for important points and planetary names
-- ### Headers for main sections (e.g., ### Current Planetary Influences)
+- ### Headers MUST include the ### symbols for proper formatting
 - • Bullet points for lists and key insights
 - *Italics* for Sanskrit terms and classical references
 - Line breaks between sections for readability
 
+CRITICAL FORMATTING REQUIREMENTS:
+You MUST use these EXACT section headers with proper markdown formatting:
+
+### Key Insights
+[Bullet points starting with • symbol]
+
+### Astrological Analysis
+[Detailed analysis with classical references]
+
+### Nakshatra Insights
+[Nakshatra analysis section]
+
+### Timing & Guidance
+[Recommendations and timing]
+
 Structure your response with:
-1. **Direct Answer** - Bold opening statement addressing the question WITH age consideration
-2. ### Life Stage Context - MANDATORY acknowledgment of native's current age and appropriate predictions
+1. **Quick Answer** - Bold opening statement in div card
+2. ### Key Insights - MANDATORY bullet points format with • symbol
 3. ### Astrological Analysis - Header followed by specific chart references WITH classical text citations
 4. ### Nakshatra Insights - MANDATORY section with nakshatra analysis and classical references
-5. **Key Insights** - MANDATORY bullet points format: Each insight MUST start with • symbol, followed by specific prediction with date ranges and classical authority
-6. ### Classical Authority - MANDATORY section citing specific texts, chapters, and verses
-7. ### Timing & Guidance - Age-appropriate recommendations with classical timing methods
-8. <div class="final-thoughts-card">**Final Thoughts** - Balanced conclusion with classical wisdom, realistic outlook, and life stage awareness</div>
+5. ### Timing & Guidance - Age-appropriate recommendations with classical timing methods
+6. <div class="final-thoughts-card">**Final Thoughts** - Balanced conclusion with classical wisdom</div>
 
 Remember: Be conversational yet structured, insightful yet accessible. Use formatting to make complex astrological information easy to read and visually appealing.
 """

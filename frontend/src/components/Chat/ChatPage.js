@@ -4,6 +4,8 @@ import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useCredits } from '../../context/CreditContext';
+import CreditsModal from '../Credits/CreditsModal';
 import './ChatPage.css';
 
 // Enable detailed logging for debugging
@@ -12,10 +14,12 @@ console.log('ChatPage component loaded - debugging enabled');
 const ChatPage = () => {
     const location = useLocation();
     const { birthData } = useAstrology();
+    const { credits, chatCost, fetchBalance } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [showCreditsModal, setShowCreditsModal] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -46,9 +50,13 @@ const ChatPage = () => {
     const loadChatHistory = async () => {
         try {
             console.log('Loading chat history for:', birthData);
+            const token = localStorage.getItem('token');
             const response = await fetch('/api/chat/history', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                },
                 body: JSON.stringify(birthData)
             });
             
@@ -82,17 +90,39 @@ const ChatPage = () => {
         try {
             console.log('Sending chat request:', { ...birthData, question: message });
             
+            const token = localStorage.getItem('token');
+            console.log('Token exists:', !!token);
+            console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
+            
             const response = await fetch('/api/chat/ask', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                },
                 body: JSON.stringify({ ...birthData, question: message })
             });
 
             console.log('Response status:', response.status, response.statusText);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
             
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Response error:', errorText);
+                console.error('Full response details:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    body: errorText
+                });
+                
+                // If 402 Payment Required, refresh credit balance
+                if (response.status === 402) {
+                    console.log('🔄 402 error detected, refreshing credit balance...');
+                    fetchBalance();
+                }
+                
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
@@ -177,6 +207,9 @@ const ChatPage = () => {
                 console.error('Empty response detected:', { hasReceivedContent, content: assistantMessage.content });
                 throw new Error('Empty response received - please try again');
             }
+            
+            // Update credit balance after successful response
+            fetchBalance();
         } catch (error) {
             console.error('Complete error details:', {
                 message: error.message,
@@ -184,7 +217,9 @@ const ChatPage = () => {
                 birthData: birthData,
                 question: message,
                 userAgent: navigator.userAgent,
-                isMobile: /Mobi|Android/i.test(navigator.userAgent)
+                isMobile: /Mobi|Android/i.test(navigator.userAgent),
+                hasToken: !!localStorage.getItem('token'),
+                tokenPreview: localStorage.getItem('token') ? localStorage.getItem('token').substring(0, 20) + '...' : 'No token'
             });
             
             // Remove empty assistant message if it exists
@@ -223,14 +258,37 @@ const ChatPage = () => {
     return (
         <div className="chat-page">
             <div className="chat-header">
-                <h1>Astrological Consultation</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h1 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : 'Consultation'}</h1>
+                    <div style={{
+                        background: 'rgba(255,107,53,0.1)',
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: '#ff6b35',
+                        border: '1px solid rgba(255,107,53,0.3)'
+                    }}>
+                        💳 {credits} credits | {chatCost} per question
+                    </div>
+                </div>
                 <p>Ask me anything about your birth chart and life guidance</p>
             </div>
             <div className="chat-container">
                 <MessageList messages={messages} />
                 <div ref={messagesEndRef} />
             </div>
-            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+            <ChatInput 
+                onSendMessage={handleSendMessage} 
+                isLoading={isLoading} 
+                onOpenCreditsModal={() => setShowCreditsModal(true)}
+            />
+            
+            {/* Credits Modal */}
+            <CreditsModal 
+                isOpen={showCreditsModal} 
+                onClose={() => setShowCreditsModal(false)} 
+            />
         </div>
     );
 };

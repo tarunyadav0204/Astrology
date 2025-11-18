@@ -44,13 +44,13 @@ export const authAPI = {
 };
 
 export const chatAPI = {
-  sendMessage: (message, language = 'english') => 
-    api.post(getEndpoint('/chat/ask'), { question: message, language }),
+  sendMessage: (birthData, message, language = 'english') => 
+    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed' }),
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
   clearHistory: () => api.delete(getEndpoint('/chat/history')),
   createSession: () => api.post(getEndpoint('/chat/session')),
-  saveMessage: (sessionId, sender, content) => 
-    api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
+  saveMessage: (birthData, message) => 
+    api.post(getEndpoint('/chat/save-message'), { ...birthData, message }),
 };
 
 export const chartAPI = {

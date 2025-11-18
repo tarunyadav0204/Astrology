@@ -10,6 +10,7 @@ import { apiService } from '../../services/apiService';
 import ChartWidget from '../Charts/ChartWidget';
 import NavigationHeader from '../Shared/NavigationHeader';
 import ChatModal from '../Chat/ChatModal';
+import CreditsModal from '../Credits/CreditsModal';
 import PanchangWidget from '../PanchangWidget/HomePanchangWidget';
 import BirthForm from '../BirthForm/BirthForm';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
@@ -28,6 +29,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('daily');
   const [showChatModal, setShowChatModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
   const [showChartModal, setShowChartModal] = useState(false);
@@ -672,6 +674,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onLogout={onLogout}
         onLogin={onLogin}
         showLoginButton={showLoginButton}
+        onCreditsClick={() => setShowCreditsModal(true)}
       />
 
       {/* Your Life Categories */}
@@ -1397,6 +1400,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           setShowChartModal(true);
           setTimeout(() => setChartRefHighlight(null), 5000);
         }}
+      />
+      
+      <CreditsModal 
+        isOpen={showCreditsModal} 
+        onClose={() => setShowCreditsModal(false)} 
       />
       
       {showLoginModal && (

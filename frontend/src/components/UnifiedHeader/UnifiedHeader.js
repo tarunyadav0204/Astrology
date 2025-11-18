@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useCredits } from '../../context/CreditContext';
+import CreditsModal from '../Credits/CreditsModal';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
 
 const UnifiedHeader = ({ 
@@ -15,7 +17,9 @@ const UnifiedHeader = ({
   onResetToToday,
   onSettings
 }) => {
+  const { credits, loading: creditsLoading } = useCredits();
   const [showMenu, setShowMenu] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
 
@@ -439,6 +443,28 @@ const UnifiedHeader = ({
           </div>
         )}
 
+        {/* Credits Display */}
+        {!creditsLoading && (
+          <button
+            onClick={() => setShowCreditsModal(true)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              color: 'white',
+              padding: isMobile ? '6px 10px' : '8px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: isMobile ? '12px' : '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            💳 {credits}
+          </button>
+        )}
+
         {/* User Menu (Desktop) */}
         {!isMobile && (
           <div style={{
@@ -475,6 +501,11 @@ const UnifiedHeader = ({
           </button>
         )}
       </div>
+      
+      <CreditsModal 
+        isOpen={showCreditsModal} 
+        onClose={() => setShowCreditsModal(false)} 
+      />
     </div>
   );
 };

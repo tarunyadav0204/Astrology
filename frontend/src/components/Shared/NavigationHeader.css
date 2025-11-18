@@ -122,6 +122,28 @@
   gap: 15px;
 }
 
+.credits-btn {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.credits-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(255, 107, 53, 0.3);
+}
+
+.credits-btn.mobile {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
 .user-name {
   color: white;
   font-weight: bold;

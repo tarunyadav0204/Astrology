@@ -38,6 +38,7 @@ import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import { AstrologyProvider } from './context/AstrologyContext';
+import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
 import { authService } from './services/authService';
 import { getCurrentDomainConfig, hasAccess, getRedirectUrl } from './config/domains.config';
@@ -157,7 +158,8 @@ function App() {
       <HelmetProvider>
         <Router>
           <AstrologyProvider>
-          <AnalyticsTracker user={user} />
+            <CreditProvider>
+              <AnalyticsTracker user={user} />
           <Routes>
             <Route path="/" element={
               domainConfig.userType === 'general' ? (
@@ -973,9 +975,10 @@ function App() {
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <ToastContainer />
-        </AstrologyProvider>
-      </Router>
+              <ToastContainer />
+            </CreditProvider>
+          </AstrologyProvider>
+        </Router>
     </HelmetProvider>
   );
   }
@@ -984,7 +987,8 @@ function App() {
     <HelmetProvider>
       <Router>
         <AstrologyProvider>
-        <Routes>
+          <CreditProvider>
+            <Routes>
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
           <Route path="/marriage-analysis" element={
             <MarriageAnalysisPage 
@@ -1109,9 +1113,10 @@ function App() {
 
             </div>
           } />
-        </Routes>
-      </AstrologyProvider>
-        </Router>
+            </Routes>
+          </CreditProvider>
+        </AstrologyProvider>
+      </Router>
       </HelmetProvider>
     );
 }

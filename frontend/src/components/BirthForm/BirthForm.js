@@ -328,7 +328,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
   const [activeTab, setActiveTab] = useState('new');
 
   return (
-    <TabContainer>
+    <TabContainer key="fixed-tabs-v2">
       {/* Tab Navigation */}
       <TabNavigation>
         <TabButton
@@ -353,7 +353,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
       {activeTab === 'new' ? (
         <TabContent>
         <FormContainer style={{ flex: 1, overflow: 'hidden' }}>
-          <h2 style={{ marginBottom: '10px', color: 'white', fontSize: '1.1rem' }}>
+          <h2>
             {prefilledData ? 'Marriage Analysis - Enter Details' : 'Birth Details'}
           </h2>
           {prefilledData && (
@@ -460,13 +460,13 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
         </TabContent>
       ) : (
         <TabContent style={{ padding: '0 10px' }}>
-          <h3 style={{ marginBottom: '10px', color: 'white', fontSize: '1rem' }}>📊 Saved Charts</h3>
+          <h3>📊 Saved Charts</h3>
           <SearchInput
             type="text"
             placeholder="Search by name..."
             value={searchQuery}
             onChange={handleSearchChange}
-            style={{ marginBottom: '10px' }}
+
           />
           <ChartsList>
             {existingCharts.map(chart => (

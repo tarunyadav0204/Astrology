@@ -84,7 +84,14 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
+    print(f"💳 CREDIT CHECK DEBUG:")
+    print(f"   User ID: {current_user.userid}")
+    print(f"   Chat cost: {chat_cost} credits")
+    print(f"   User balance: {user_balance} credits")
+    print(f"   Has sufficient credits: {user_balance >= chat_cost}")
+    
     if user_balance < chat_cost:
+        print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
         raise HTTPException(
             status_code=402, 
             detail=f"Insufficient credits. You need {chat_cost} credits but have {user_balance}."
@@ -159,58 +166,93 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         
                         if json_matches:
                             try:
+                                print(f"🔍 TRANSIT REQUEST DEBUG: Found JSON match: {json_matches[0]}")
                                 transit_request = json.loads(json_matches[0])
                                 start_year = transit_request.get('startYear')
                                 end_year = transit_request.get('endYear')
                                 specific_months = transit_request.get('specificMonths', [])
                                 
-                                # print(f"🔄 MAKING SECOND CALL WITH TRANSIT DATA: {start_year}-{end_year}")
-                                # print(f"   Specific months: {specific_months}")
-                                # print(f"   NOT SENDING FIRST RESPONSE TO FRONTEND - Contains transit request")
+                                print(f"🔄 MAKING SECOND CALL WITH TRANSIT DATA: {start_year}-{end_year}")
+                                print(f"   Specific months: {specific_months}")
+                                print(f"   Birth data: {birth_data}")
                                 
-                                # Build context with transit data
-                                transit_context = context_builder.build_complete_context(
-                                    birth_data, 
-                                    request.question, 
-                                    requested_period={'start_year': start_year, 'end_year': end_year}
-                                )
-                                
-                                # Make second API call with transit data
-                                enhanced_question = request.question + "\n\nIMPORTANT: Use the provided transit_activations data to predict SPECIFIC EVENTS with EXACT DATES. In your Quick Answer, provide 2-3 concrete events (like 'property purchase', 'job promotion', 'relationship milestone') with precise date ranges from the transit data. Focus on house significations of activated planets and combine with dasha context for accurate predictions."
-                                
-                                second_ai_result = await gemini_analyzer.generate_chat_response(
-                                    enhanced_question, transit_context, history, request.language, request.response_style
-                                )
-                                
-                                if second_ai_result['success']:
-                                    response_text = second_ai_result['response']
-                                    # print(f"✅ SECOND CALL SUCCESSFUL - Response length: {len(response_text)}")
-                                    # print(f"   SENDING FINAL RESPONSE TO FRONTEND")
+                                # Validate years
+                                if not start_year or not end_year or start_year < 1900 or end_year > 2100:
+                                    print(f"❌ INVALID YEAR RANGE: {start_year}-{end_year}")
+                                    response_text = "Invalid year range requested for transit data. Please try again."
                                 else:
-                                    # print(f"❌ SECOND CALL FAILED: {second_ai_result.get('error')}")
-                                    # Send error message instead of first response
-                                    response_text = "I'm having trouble calculating precise transit data for your timing question. Please try again."
+                                    try:
+                                        # Build context with transit data
+                                        print(f"🏗️ Building transit context...")
+                                        transit_context = context_builder.build_complete_context(
+                                            birth_data, 
+                                            request.question, 
+                                            requested_period={'start_year': start_year, 'end_year': end_year}
+                                        )
+                                        
+                                        print(f"✅ Transit context built successfully")
+                                        print(f"   Transit activations found: {len(transit_context.get('transit_activations', []))}")
+                                        
+                                        # Make second API call with transit data
+                                        enhanced_question = request.question + "\n\nIMPORTANT: Use the provided transit_activations data to predict SPECIFIC EVENTS with EXACT DATES. In your Quick Answer, provide 2-3 concrete events (like 'property purchase', 'job promotion', 'relationship milestone') with precise date ranges from the transit data. Focus on house significations of activated planets and combine with dasha context for accurate predictions."
+                                        
+                                        print(f"🤖 Making second Gemini call...")
+                                        second_ai_result = await gemini_analyzer.generate_chat_response(
+                                            enhanced_question, transit_context, history, request.language, request.response_style
+                                        )
+                                        
+                                        if second_ai_result['success']:
+                                            response_text = second_ai_result['response']
+                                            print(f"✅ SECOND CALL SUCCESSFUL - Response length: {len(response_text)}")
+                                            # Only deduct credits on successful second call
+                                            should_deduct_credits = True
+                                        else:
+                                            print(f"❌ SECOND CALL FAILED: {second_ai_result.get('error')}")
+                                            response_text = f"I'm having trouble calculating precise transit data for your timing question. Error: {second_ai_result.get('error', 'Unknown error')}. Please try again."
+                                            # Don't deduct credits if second call fails
+                                            should_deduct_credits = False
+                                    
+                                    except Exception as context_error:
+                                        print(f"❌ CONTEXT BUILDING ERROR: {context_error}")
+                                        import traceback
+                                        traceback.print_exc()
+                                        response_text = f"I encountered an error building transit context: {str(context_error)}. Please try again."
                                     
                             except json.JSONDecodeError as e:
-                                # print(f"❌ FAILED TO PARSE TRANSIT REQUEST JSON: {e}")
-                                # Send error message instead of first response
+                                print(f"❌ FAILED TO PARSE TRANSIT REQUEST JSON: {e}")
+                                print(f"   Raw JSON: {json_matches[0]}")
                                 response_text = "I encountered an issue processing your timing question. Please try rephrasing it."
+                            except Exception as e:
+                                print(f"❌ UNEXPECTED ERROR IN TRANSIT PROCESSING: {e}")
+                                import traceback
+                                traceback.print_exc()
+                                response_text = f"Unexpected error in transit processing: {str(e)}. Please try again."
                         else:
-                            # print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
-                            # Send error message instead of first response
+                            print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
+                            print(f"   Response text preview: {response_text[:200]}...")
                             response_text = "I need to request additional data for your timing question but encountered a formatting issue. Please try again."
                     
-                    # Deduct credits after successful response
-                    success = credit_service.spend_credits(
-                        current_user.userid, 
-                        chat_cost, 
-                        'chat_question', 
-                        f"Chat question: {request.question[:50]}..."
-                    )
+                    # Only deduct credits if response was successful (including second AI call)
+                    should_deduct = locals().get('should_deduct_credits', True)
                     
-                    if not success:
-                        # This shouldn't happen as we checked balance earlier
-                        response_text = "Credit deduction failed. Please try again."
+                    if should_deduct:
+                        print(f"💰 DEDUCTING CREDITS: {chat_cost} credits for user {current_user.userid}")
+                        success = credit_service.spend_credits(
+                            current_user.userid, 
+                            chat_cost, 
+                            'chat_question', 
+                            f"Chat question: {request.question[:50]}..."
+                        )
+                        
+                        if not success:
+                            print(f"❌ CREDIT DEDUCTION FAILED for user {current_user.userid}")
+                            response_text = "Credit deduction failed. Please try again."
+                        else:
+                            print(f"✅ CREDITS DEDUCTED SUCCESSFULLY")
+                            new_balance = credit_service.get_user_credits(current_user.userid)
+                            print(f"   New balance: {new_balance} credits")
+                    else:
+                        print(f"⚠️ NOT DEDUCTING CREDITS due to second AI call failure")
                     
                     # Note: Message saving handled by ChatModal via /api/chat/message endpoint
                     
@@ -296,7 +338,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                             fallback_json = json.dumps(fallback_data, ensure_ascii=True)
                             yield f"data: {fallback_json}\n\n"
                 else:
-                    # print(f"AI error: {ai_result.get('error')}")
+                    print(f"❌ AI ERROR: {ai_result.get('error')}")
                     
                     # Convert AI errors to user-friendly messages
                     ai_error = ai_result.get('error', 'AI analysis failed')
@@ -306,6 +348,9 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         user_error = "Your question is taking longer than expected to process. Please try again."
                     elif "rate limit" in str(ai_error).lower():
                         user_error = "I'm processing many requests right now. Please wait a moment and try again."
+                    
+                    # Don't deduct credits if AI fails
+                    print(f"⚠️ NOT DEDUCTING CREDITS due to AI failure")
                     
                     yield f"data: {json.dumps({'status': 'error', 'error': user_error})}\n\n"
                     

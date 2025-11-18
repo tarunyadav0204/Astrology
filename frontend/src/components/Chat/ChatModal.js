@@ -5,12 +5,15 @@ import BirthForm from '../BirthForm/BirthForm';
 import ChatGreeting from './ChatGreeting';
 import EventPeriods from './EventPeriods';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useCredits } from '../../context/CreditContext';
 import { showToast } from '../../utils/toast';
+import CreditsModal from '../Credits/CreditsModal';
 
 import './ChatModal.css';
 
 const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: parentChartRefClick }) => {
     const { birthData, setBirthData } = useAstrology();
+    const { credits, chatCost, fetchBalance } = useCredits();
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -401,9 +404,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     });
                 }
                 
+                const token = localStorage.getItem('token');
                 const response = await fetch('/api/chat/ask', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    },
                     body: JSON.stringify({ 
                         ...birthData, 
                         question: message, 
@@ -422,6 +429,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 
                 if (!response.ok) {
                     console.error('Chat API error:', response.status, response.statusText);
+                    
+                    // If 402 Payment Required, refresh credit balance
+                    if (response.status === 402) {
+                        console.log('🔄 402 error detected, refreshing credit balance...');
+                        fetchBalance();
+                    }
+                    
                     throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
                 }
                 
@@ -855,6 +869,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     
     const [followUpQuestion, setFollowUpQuestion] = useState('');
     const [chartRefHighlight, setChartRefHighlight] = useState(null);
+    const [showCreditsModal, setShowCreditsModal] = useState(false);
     
     const handleFollowUpClick = (question) => {
         setFollowUpQuestion(question);
@@ -898,7 +913,19 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         <div className="chat-modal-overlay" onClick={onClose}>
             <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
-                    <h2>AstroRoshni - Your Personal Astrologer</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+                        <h2 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : '- Your Personal Astrologer'}</h2>
+                        <div style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            padding: '4px 12px',
+                            borderRadius: '15px',
+                            fontSize: '12px',
+                            color: 'white',
+                            fontWeight: 'bold'
+                        }}>
+                            💳 {credits} credits | {chatCost} per question
+                        </div>
+                    </div>
                     
                     {/* Desktop buttons */}
                     <div className="desktop-buttons">
@@ -942,7 +969,30 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 
                 <div className="chat-modal-content">
                     {showBirthForm ? (
-                        <div className="birth-form-container">
+                        <div className="birth-form-container" style={{ position: 'relative' }}>
+                            <button 
+                                onClick={() => setShowBirthForm(false)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '10px',
+                                    right: '10px',
+                                    background: 'rgba(255,255,255,0.9)',
+                                    border: 'none',
+                                    color: '#333',
+                                    width: '30px',
+                                    height: '30px',
+                                    borderRadius: '50%',
+                                    cursor: 'pointer',
+                                    fontSize: '18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1000,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                                }}
+                            >
+                                ×
+                            </button>
                             <BirthForm 
                                 onSubmit={handleBirthFormSubmit}
                                 onLogout={() => {}}
@@ -1043,6 +1093,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         isLoading={isLoading} 
                                         followUpQuestion={followUpQuestion}
                                         onFollowUpUsed={() => setFollowUpQuestion('')}
+                                        onOpenCreditsModal={() => setShowCreditsModal(true)}
                                     />
                                 </>
                             )}
@@ -1275,6 +1326,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     </div>
             </div>
         )}
+        
+        {/* Credits Modal */}
+        <CreditsModal 
+            isOpen={showCreditsModal} 
+            onClose={() => setShowCreditsModal(false)} 
+        />
         </>
     );
 };

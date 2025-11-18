@@ -366,6 +366,37 @@
     box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
 }
 
+.credit-warning {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 0, 0, 0.1);
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.get-credits-btn {
+    background: #ff6b35;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.credit-info {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+    margin-top: 10px;
+}
+
 @media (max-width: 768px) {
     .message-content {
         max-width: 85%;
@@ -389,5 +420,11 @@
     .form-row {
         grid-template-columns: 1fr;
         gap: 10px;
+    }
+    
+    .credit-warning {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
     }
 }

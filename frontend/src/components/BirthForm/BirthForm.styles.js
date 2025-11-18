@@ -27,60 +27,47 @@ export const FormPanel = styled.div`
 export const ChartsPanel = styled.div`
   flex: 1;
   min-width: 300px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 20px;
-  padding: 1.5rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(20px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  position: relative;
-  overflow: hidden;
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
   
   @media (max-width: 768px) {
     min-width: unset;
-    padding: 1rem;
-    border-radius: 15px;
-  }
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #e91e63, #f06292, #ff6f00, #ff8a65, #ffab91);
-    z-index: 1;
+    padding: 20px;
+    border-radius: 12px;
   }
   
   h3 {
-    color: #e91e63;
-    margin-bottom: 1rem;
+    color: #1f2937;
+    margin-bottom: 20px;
     font-weight: 600;
+    font-size: 18px;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
   }
 `;
 
 export const SearchInput = styled.input`
   width: 100%;
-  padding: 0.5rem;
-  border: 2px solid rgba(233, 30, 99, 0.2);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-  background: rgba(255, 255, 255, 0.8);
+  padding: 12px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  background: white;
+  color: #1f2937;
   
   &:focus {
     outline: none;
-    border-color: #e91e63;
-    box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.1);
-    background: rgba(255, 255, 255, 1);
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
   
   &::placeholder {
-    color: #ff8a65;
+    color: #9ca3af;
   }
 `;
 
@@ -93,145 +80,131 @@ export const ChartsList = styled.div`
   }
   
   &::-webkit-scrollbar-track {
-    background: rgba(233, 30, 99, 0.1);
+    background: #f3f4f6;
     border-radius: 3px;
   }
   
   &::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #e91e63, #ff6f00);
+    background: #d1d5db;
     border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
   }
 `;
 
 export const FormContainer = styled.div`
-  max-width: 500px;
+  max-width: 480px;
   margin: 0 auto;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(20px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  position: relative;
-  overflow: hidden;
+  padding: 24px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
   
   @media (max-width: 768px) {
-    padding: 0.5rem;
+    padding: 20px;
     margin: 0;
-    border-radius: 15px;
+    border-radius: 12px;
     max-width: 100%;
-  }
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #e91e63, #f06292, #ff6f00, #ff8a65, #ffab91);
-    z-index: 1;
   }
   
   h2 {
     text-align: center;
-    color: #e91e63;
-    margin-bottom: 1rem;
-    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 24px;
+    font-weight: 600;
+    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    font-size: 1.2rem;
+    gap: 8px;
     
     &::before {
-      content: '✨';
-      font-size: 1.2rem;
+      content: '🌟';
+      font-size: 20px;
     }
   }
-
-
 `;
 
 export const FormField = styled.div`
-  margin-bottom: 0.75rem;
+  margin-bottom: 20px;
   
   .error {
-    color: #e74c3c;
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
+    color: #ef4444;
+    font-size: 13px;
+    margin-top: 6px;
     display: block;
+    font-weight: 500;
   }
 `;
 
 export const Label = styled.label`
   display: block;
-  margin-bottom: 0.25rem;
-  color: #e91e63;
-  font-weight: 600;
-  font-size: 0.85rem;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 500;
+  font-size: 14px;
 `;
 
 export const Input = styled.input`
   width: 100%;
-  padding: 0.5rem;
-  border: 2px solid ${props => props.error ? '#e74c3c' : 'rgba(233, 30, 99, 0.2)'};
-  border-radius: 8px;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.8);
-  min-height: 36px;
+  padding: 12px 16px;
+  border: 2px solid ${props => props.error ? '#ef4444' : '#d1d5db'};
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  background: white;
+  color: #1f2937;
   
   @media (max-width: 768px) {
     font-size: 16px;
-    padding: 0.6rem;
+    padding: 14px 16px;
   }
   
   &:focus {
     outline: none;
-    border-color: ${props => props.error ? '#e74c3c' : '#e91e63'};
-    box-shadow: 0 0 0 3px ${props => props.error ? 'rgba(231, 76, 60, 0.1)' : 'rgba(233, 30, 99, 0.1)'};
-    background: rgba(255, 255, 255, 1);
+    border-color: ${props => props.error ? '#ef4444' : '#2563eb'};
+    box-shadow: 0 0 0 3px ${props => props.error ? 'rgba(239, 68, 68, 0.1)' : 'rgba(37, 99, 235, 0.1)'};
   }
   
   &::placeholder {
-    color: #ff8a65;
+    color: #9ca3af;
   }
 `;
 
 export const Select = styled.select`
   width: 100%;
-  padding: 0.5rem;
-  border: 2px solid ${props => props.error ? '#e74c3c' : 'rgba(233, 30, 99, 0.2)'};
-  border-radius: 8px;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.8);
-  min-height: 36px;
+  padding: 12px 16px;
+  border: 2px solid ${props => props.error ? '#ef4444' : '#d1d5db'};
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  background: white;
   cursor: pointer;
-  color: #333;
+  color: #1f2937;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23e91e63" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%236b7280" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
   background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 10px;
+  background-position: right 16px center;
+  background-size: 12px;
   
   @media (max-width: 768px) {
     font-size: 16px;
-    padding: 0.6rem;
+    padding: 14px 16px;
   }
   
   &:focus {
     outline: none;
-    border-color: ${props => props.error ? '#e74c3c' : '#e91e63'};
-    box-shadow: 0 0 0 3px ${props => props.error ? 'rgba(231, 76, 60, 0.1)' : 'rgba(233, 30, 99, 0.1)'};
-    background: rgba(255, 255, 255, 1);
+    border-color: ${props => props.error ? '#ef4444' : '#2563eb'};
+    box-shadow: 0 0 0 3px ${props => props.error ? 'rgba(239, 68, 68, 0.1)' : 'rgba(37, 99, 235, 0.1)'};
   }
   
   option {
-    color: #333;
+    color: #1f2937;
     background: white;
   }
 `;
@@ -272,39 +245,38 @@ export const SuggestionItem = styled.li`
 
 export const Button = styled.button`
   width: 100%;
-  padding: 0.75rem;
-  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  padding: 14px 24px;
+  background: #2563eb;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 700;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  min-height: 40px;
+  gap: 8px;
   
   @media (max-width: 768px) {
-    padding: 0.8rem;
-    font-size: 0.9rem;
+    padding: 16px 24px;
+    font-size: 16px;
   }
   
   &::before {
-    content: '🚀';
-    font-size: 1.2rem;
+    content: '✨';
+    font-size: 16px;
   }
   
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(233, 30, 99, 0.4);
-    background: linear-gradient(135deg, #ff6f00 0%, #e91e63 100%);
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   }
   
   &:active {
-    transform: translateY(-1px);
+    transform: translateY(0);
   }
   
   &:disabled {
@@ -317,12 +289,12 @@ export const Button = styled.button`
 
 
 export const ChartItem = styled.div`
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(233, 30, 99, 0.2);
+  padding: 16px;
+  margin-bottom: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -330,7 +302,7 @@ export const ChartItem = styled.div`
   @media (max-width: 768px) {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 12px;
     
     > div:last-child {
       align-self: stretch;
@@ -339,10 +311,10 @@ export const ChartItem = styled.div`
   }
   
   &:hover {
-    background: linear-gradient(135deg, rgba(233, 30, 99, 0.1) 0%, rgba(255, 111, 0, 0.1) 100%);
-    border-color: #e91e63;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(233, 30, 99, 0.2);
+    background: #f3f4f6;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
   &:last-child {
@@ -359,33 +331,56 @@ export const TabContainer = styled.div`
 
 export const TabNavigation = styled.div`
   display: flex;
-  border-bottom: 2px solid rgba(233, 30, 99, 0.2);
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px 8px 0 0;
+  background: #f8f9fa !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  border-bottom: 2px solid #e5e7eb !important;
+  padding: 0 !important;
 `;
 
 export const TabButton = styled.button.withConfig({
   shouldForwardProp: (prop) => !['isFirst', 'isLast', 'active'].includes(prop)
 })`
   flex: 1;
-  padding: 8px 16px;
-  background: ${props => props.active ? 'rgba(233, 30, 99, 0.2)' : 'transparent'};
-  color: ${props => props.active ? '#e91e63' : '#666'};
-  border: none;
-  border-radius: ${props => props.isFirst ? '8px 0 0 0' : props.isLast ? '0 8px 0 0' : '0'};
+  padding: 12px 20px !important;
+  background: ${props => props.active ? 'white !important' : 'transparent !important'};
+  color: ${props => props.active ? '#2563eb !important' : '#6b7280 !important'};
+  border: none !important;
+  border-radius: 0 !important;
   cursor: pointer;
-  font-weight: ${props => props.active ? 'bold' : 'normal'};
-  transition: all 0.3s ease;
-  font-size: 13px;
+  font-weight: ${props => props.active ? '600' : '500'};
+  transition: all 0.2s ease;
+  font-size: 14px;
+  border-bottom: ${props => props.active ? '2px solid #2563eb !important' : '2px solid transparent !important'};
+  margin: 0 !important;
   
   &:hover {
-    background: rgba(233, 30, 99, 0.1);
-    color: #e91e63;
+    background: ${props => props.active ? 'white !important' : 'rgba(255, 255, 255, 0.7) !important'};
+    color: #2563eb !important;
   }
 `;
 
 export const TabContent = styled.div`
   height: 600px;
   overflow: auto;
+  padding: 20px;
+  background: white;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
 `;
