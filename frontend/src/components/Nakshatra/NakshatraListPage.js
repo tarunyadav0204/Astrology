@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import './NakshatraListPage.css';
 
@@ -8,7 +9,21 @@ const NakshatraListPage = () => {
   const [nakshatras, setNakshatras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
   const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        // Invalid user data
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchNakshatras();
@@ -58,6 +73,16 @@ const NakshatraListPage = () => {
         title="27 Nakshatras - Complete Vedic Astrology Guide"
         description="Explore all 27 nakshatras in Vedic astrology. Learn about nakshatra lords, deities, characteristics, and their significance in your horoscope."
         keywords="nakshatras, vedic astrology, moon signs, nakshatra list, astrology guide"
+      />
+      <NavigationHeader 
+        user={user}
+        onLogin={() => navigate('/')}
+        onLogout={() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          navigate('/');
+        }}
       />
       
       <div className="page-header">

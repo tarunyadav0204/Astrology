@@ -112,7 +112,7 @@ const HomePanchangWidget = () => {
             time: '12:00',
             latitude: 28.6139,
             longitude: 77.2090,
-            timezone: 5.5,
+            timezone: 'UTC+5:30',
             place: 'New Delhi, India'
           }
         }),
@@ -122,6 +122,19 @@ const HomePanchangWidget = () => {
       setSunriseData(sunrise);
     } catch (error) {
       console.error('Error fetching panchang data:', error);
+      // Set fallback data to prevent empty widget
+      setPanchangData({
+        tithi: { name: 'Loading...' },
+        nakshatra: { name: 'Loading...' },
+        yoga: { name: 'Loading...' },
+        karana: { name: 'Loading...' },
+        vara: { name: new Date().toLocaleDateString('en-US', { weekday: 'long' }) }
+      });
+      setSunriseData({
+        sunrise: null,
+        sunset: null,
+        moon_phase: 'Loading...'
+      });
     } finally {
       setLoading(false);
     }
@@ -141,14 +154,14 @@ const HomePanchangWidget = () => {
       <h3>Panchang</h3>
       <LocationText>New Delhi, India (Today)</LocationText>
       <PanchangDetails>
-        <p><strong>Tithi:</strong> {panchangData?.tithi?.name || 'N/A'}</p>
-        <p><strong>Nakshatra:</strong> {panchangData?.nakshatra?.name || 'N/A'}</p>
-        <p><strong>Yoga:</strong> {panchangData?.yoga?.name || 'N/A'}</p>
-        <p><strong>Karana:</strong> {panchangData?.karana?.name || 'N/A'}</p>
+        <p><strong>Tithi:</strong> {panchangData?.tithi?.name || 'Loading...'}</p>
+        <p><strong>Nakshatra:</strong> {panchangData?.nakshatra?.name || 'Loading...'}</p>
+        <p><strong>Yoga:</strong> {panchangData?.yoga?.name || 'Loading...'}</p>
+        <p><strong>Karana:</strong> {panchangData?.karana?.name || 'Loading...'}</p>
         <p><strong>Vara:</strong> {panchangData?.vara?.name || new Date().toLocaleDateString('en-US', { weekday: 'long' })}</p>
-        <p><strong>Sunrise:</strong> {sunriseData?.sunrise ? new Date(sunriseData.sunrise).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</p>
-        <p><strong>Sunset:</strong> {sunriseData?.sunset ? new Date(sunriseData.sunset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</p>
-        <p><strong>Moon Phase:</strong> {sunriseData?.moon_phase || 'N/A'}</p>
+        <p><strong>Sunrise:</strong> {sunriseData?.sunrise ? new Date(sunriseData.sunrise).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Loading...'}</p>
+        <p><strong>Sunset:</strong> {sunriseData?.sunset ? new Date(sunriseData.sunset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Loading...'}</p>
+        <p><strong>Moon Phase:</strong> {sunriseData?.moon_phase || 'Loading...'}</p>
       </PanchangDetails>
       <PanchangButton onClick={() => navigate('/panchang')}>
         Today's Panchang

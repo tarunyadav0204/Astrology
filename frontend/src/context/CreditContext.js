@@ -18,22 +18,37 @@ export const CreditProvider = ({ children }) => {
     const fetchBalance = async () => {
         try {
             const token = localStorage.getItem('token');
+            
+            // Only fetch balance if user is authenticated
+            if (!token) {
+                console.log('🔄 No token found, skipping credit balance fetch');
+                setCredits(0);
+                return;
+            }
+            
             console.log('🔄 Fetching credit balance...', { hasToken: !!token });
             const response = await fetch('/api/credits/balance', {
                 headers: {
-                    ...(token && { 'Authorization': `Bearer ${token}` })
+                    'Authorization': `Bearer ${token}`
                 }
             });
             console.log('💳 Credit balance response:', { status: response.status, ok: response.ok });
+            
             if (response.ok) {
                 const data = await response.json();
                 console.log('💳 Credit balance data:', data);
                 setCredits(data.credits || 0);
+            } else if (response.status === 403 || response.status === 401) {
+                // User not authenticated or token expired
+                console.log('💳 Authentication failed, setting credits to 0');
+                setCredits(0);
             } else {
                 console.error('Credit balance fetch failed:', response.status, response.statusText);
+                setCredits(0);
             }
         } catch (error) {
             console.error('Error fetching credit balance:', error);
+            setCredits(0);
         }
     };
 

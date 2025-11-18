@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import NavigationHeader from '../Shared/NavigationHeader';
 import './FestivalsPage.css';
 
 const FestivalsPage = () => {
@@ -13,10 +14,8 @@ const FestivalsPage = () => {
   const fetchTodayFestivals = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/festivals/today`, {
+      const response = await fetch(`/api/festivals/today`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -24,9 +23,13 @@ const FestivalsPage = () => {
       if (response.ok) {
         const data = await response.json();
         setTodayFestivals(data.festivals || []);
+      } else {
+        console.error('API response error:', response.status, response.statusText);
+        setTodayFestivals([]);
       }
     } catch (error) {
       console.error('Error fetching festivals:', error);
+      setTodayFestivals([]);
     } finally {
       setLoading(false);
     }
@@ -108,6 +111,7 @@ const FestivalsPage = () => {
 
   return (
     <div className="festivals-page">
+      <NavigationHeader />
       <div className="festivals-header">
         <div className="header-content">
           <h1>🎊 Hindu Festivals & Vrats</h1>

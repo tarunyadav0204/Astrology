@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import NavigationHeader from '../Shared/NavigationHeader';
 import './MonthlyFestivalsPage.css';
 
 const MonthlyFestivalsPage = () => {
@@ -16,23 +17,32 @@ const MonthlyFestivalsPage = () => {
   const fetchMonthlyFestivals = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       
-      const response = await fetch(`http://localhost:8001/api/festivals/month/${year}/${month}`, {
+      console.log(`Fetching festivals for ${year}-${month}`);
+      
+      const response = await fetch(`/api/festivals/month/${year}/${month}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Festivals data received:', data);
         setMonthlyData(data);
+      } else {
+        console.error('API response error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error details:', errorText);
+        // Set empty data to prevent crashes
+        setMonthlyData({ festivals: [], vrats: [] });
       }
     } catch (error) {
       console.error('Error fetching monthly festivals:', error);
+      // Set empty data to prevent crashes
+      setMonthlyData({ festivals: [], vrats: [] });
     } finally {
       setLoading(false);
     }
@@ -140,6 +150,7 @@ const MonthlyFestivalsPage = () => {
 
   return (
     <div className="monthly-festivals-page">
+      <NavigationHeader />
       <div className="calendar-header">
         <button 
           className="nav-btn"

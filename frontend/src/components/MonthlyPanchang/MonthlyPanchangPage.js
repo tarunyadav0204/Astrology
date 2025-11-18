@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import NavigationHeader from '../Shared/NavigationHeader';
 import './MonthlyPanchangPage.css';
 
-const MonthlyPanchangPage = () => {
+const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(propUser);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [monthlyData, setMonthlyData] = useState(null);
   const [selectedDayData, setSelectedDayData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [location] = useState({ latitude: 28.6139, longitude: 77.2090 }); // Default Delhi
+
+  useEffect(() => {
+    if (!propUser) {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+      if (token && savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (e) {
+          // Invalid user data
+        }
+      }
+    } else {
+      setUser(propUser);
+    }
+  }, [propUser]);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -322,8 +342,27 @@ const MonthlyPanchangPage = () => {
     );
   };
 
+  const handleAdminClick = () => {
+    if (onAdminClick) {
+      onAdminClick();
+    }
+  };
+
   return (
     <div className="monthly-panchang-page">
+      <NavigationHeader 
+        showZodiacSelector={false}
+        user={user}
+        onAdminClick={handleAdminClick}
+        onLogout={onLogout || (() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          navigate('/');
+        })}
+        onLogin={onLogin || (() => navigate('/'))}
+        showLoginButton={showLoginButton}
+      />
       <div className="page-header">
         <h1>Monthly Panchang</h1>
         <p>Complete Vedic calendar with daily panchang details</p>

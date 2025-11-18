@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { muhuratService } from '../../services/muhuratService';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
@@ -6,12 +7,27 @@ import { generatePageSEO } from '../../config/seo.config';
 import './MuhuratFinderPage.css';
 
 const MuhuratFinderPage = () => {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [location, setLocation] = useState({ latitude: 28.6139, longitude: 77.2090, name: 'New Delhi' });
   const [selectedMuhurat, setSelectedMuhurat] = useState('vivah');
   const [muhuratData, setMuhuratData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        // Invalid user data
+      }
+    }
+  }, []);
 
   const muhuratTypes = [
     { id: 'vivah', name: 'Marriage Muhurat', icon: '💒', description: 'Auspicious times for wedding ceremonies' },
@@ -101,7 +117,16 @@ const MuhuratFinderPage = () => {
           "applicationCategory": "LifestyleApplication"
         }}
       />
-      <NavigationHeader />
+      <NavigationHeader 
+        user={user}
+        onLogin={() => navigate('/')}
+        onLogout={() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          navigate('/');
+        }}
+      />
       <div className="container">
         <div className="page-header">
           <h1>🕉️ Muhurat Finder</h1>

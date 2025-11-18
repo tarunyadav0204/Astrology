@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import NavigationHeader from '../Shared/NavigationHeader';
 import PanchangHeader from './components/PanchangHeader';
@@ -15,7 +16,25 @@ import { CALENDAR_SYSTEMS } from './config/panchangConfig';
 import { generatePageSEO } from '../../config/seo.config';
 import './PanchangPage.css';
 
-const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(propUser);
+
+  useEffect(() => {
+    if (!propUser) {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+      if (token && savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (e) {
+          // Invalid user data
+        }
+      }
+    } else {
+      setUser(propUser);
+    }
+  }, [propUser]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [location, setLocation] = useState({
     name: 'New Delhi, India',
@@ -50,7 +69,50 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
     try {
       const dateString = selectedDate.toISOString().split('T')[0];
       
-      // Load all data in parallel
+      // Load data with error handling for each service
+      const results = await Promise.allSettled([
+        panchangService.calculatePanchang(
+          dateString, 
+          location.latitude, 
+          location.longitude, 
+          location.timezone
+        ).catch(() => null),
+        panchangService.calculateSunriseSunset(
+          dateString,
+          location.latitude,
+          location.longitude
+        ).catch(() => null),
+        panchangService.calculateMoonPhase(dateString).catch(() => null),
+        panchangService.calculatePlanetaryPositions(
+          dateString,
+          location.latitude,
+          location.longitude,
+          location.timezone
+        ).catch(() => null),
+        panchangService.getInauspiciousTimes(
+          dateString,
+          location.latitude,
+          location.longitude
+        ).catch(() => null),
+        panchangService.calculateChoghadiya(
+          dateString,
+          location.latitude,
+          location.longitude
+        ).catch(() => null),
+        panchangService.calculateHora(
+          dateString,
+          location.latitude,
+          location.longitude
+        ).catch(() => null),
+        panchangService.calculateSpecialMuhurtas(
+          dateString,
+          location.latitude,
+          location.longitude
+        ).catch(() => null),
+        panchangService.getFestivals(dateString).catch(() => [])
+      ]);
+
+      // Extract successful results
       const [
         panchang,
         sunriseSunset,
@@ -61,47 +123,7 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
         hora,
         muhurta,
         festivalData
-      ] = await Promise.all([
-        panchangService.calculatePanchang(
-          dateString, 
-          location.latitude, 
-          location.longitude, 
-          location.timezone
-        ),
-        panchangService.calculateSunriseSunset(
-          dateString,
-          location.latitude,
-          location.longitude
-        ),
-        panchangService.calculateMoonPhase(dateString),
-        panchangService.calculatePlanetaryPositions(
-          dateString,
-          location.latitude,
-          location.longitude,
-          location.timezone
-        ),
-        panchangService.getInauspiciousTimes(
-          dateString,
-          location.latitude,
-          location.longitude
-        ),
-        panchangService.calculateChoghadiya(
-          dateString,
-          location.latitude,
-          location.longitude
-        ),
-        panchangService.calculateHora(
-          dateString,
-          location.latitude,
-          location.longitude
-        ),
-        panchangService.calculateSpecialMuhurtas(
-          dateString,
-          location.latitude,
-          location.longitude
-        ),
-        panchangService.getFestivals(dateString).catch(() => [])
-      ]);
+      ] = results.map(result => result.status === 'fulfilled' ? result.value : null);
 
       setPanchangData(panchang);
       setSunriseSunsetData(sunriseSunset);
@@ -111,11 +133,11 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
       setChoghadiyaData(choghadiya);
       setHoraData(hora);
       setMuhurtaData(muhurta);
-      setFestivals(festivalData);
+      setFestivals(festivalData || []);
 
     } catch (err) {
-      setError(err.message);
-      toast.error(`Failed to load Panchang data: ${err.message}`);
+      console.error('Panchang loading error:', err);
+      // Don't show error toast for API failures, just log them
     } finally {
       setLoading(false);
     }
@@ -151,8 +173,13 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
           showZodiacSelector={false}
           user={user}
           onAdminClick={handleAdminClick}
-          onLogout={onLogout}
-          onLogin={onLogin}
+          onLogout={onLogout || (() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+            navigate('/');
+          })}
+          onLogin={onLogin || (() => navigate('/'))}
           showLoginButton={showLoginButton}
         />
         <div className="loading-container">
@@ -170,8 +197,13 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
           showZodiacSelector={false}
           user={user}
           onAdminClick={handleAdminClick}
-          onLogout={onLogout}
-          onLogin={onLogin}
+          onLogout={onLogout || (() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+            navigate('/');
+          })}
+          onLogin={onLogin || (() => navigate('/'))}
           showLoginButton={showLoginButton}
         />
         <div className="error-container">
@@ -212,8 +244,13 @@ const PanchangPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }
         showZodiacSelector={false}
         user={user}
         onAdminClick={handleAdminClick}
-        onLogout={onLogout}
-        onLogin={onLogin}
+        onLogout={onLogout || (() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          navigate('/');
+        })}
+        onLogin={onLogin || (() => navigate('/'))}
         showLoginButton={showLoginButton}
       />
 

@@ -1241,7 +1241,7 @@ async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
     }
 
 @app.post("/api/calculate-transits")
-async def calculate_transits(request: TransitRequest, current_user: User = Depends(get_current_user)):
+async def calculate_transits(request: TransitRequest):
     jd = swe.julday(
         int(request.transit_date.split('-')[0]),
         int(request.transit_date.split('-')[1]),
@@ -1488,27 +1488,50 @@ async def calculate_panchang(request: TransitRequest):
         birth_data = request.birth_data
         panchang_calc = PanchangCalculator()
         
+        # Validate required fields
+        if not hasattr(birth_data, 'latitude') or not hasattr(birth_data, 'longitude'):
+            raise HTTPException(status_code=422, detail="Missing latitude or longitude in birth_data")
+        
+        # Handle timezone conversion
+        timezone = birth_data.timezone if birth_data.timezone else 'UTC+5:30'
+        if isinstance(timezone, (int, float)):
+            if timezone >= 0:
+                hours = int(timezone)
+                minutes = int((timezone - hours) * 60)
+                timezone = f'UTC+{hours}:{minutes:02d}'
+            else:
+                hours = int(abs(timezone))
+                minutes = int((abs(timezone) - hours) * 60)
+                timezone = f'UTC-{hours}:{minutes:02d}'
+        
         # Use comprehensive panchang calculation
         panchang_data = panchang_calc.calculate_panchang(
             request.transit_date,
-            birth_data.latitude,
-            birth_data.longitude,
-            birth_data.timezone
+            float(birth_data.latitude),
+            float(birth_data.longitude),
+            str(timezone)
         )
         
         return panchang_data
         
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid data format: {str(e)}")
+    except AttributeError as e:
+        raise HTTPException(status_code=422, detail=f"Missing required field: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating panchang: {str(e)}")
 
 @app.post("/api/calculate-birth-panchang")
 async def calculate_birth_panchang(birth_data: BirthData):
-    # Use existing calculate_panchang with birth date as transit date
-    request = TransitRequest(
-        birth_data=birth_data,
-        transit_date=birth_data.date
-    )
-    return await calculate_panchang(request)
+    try:
+        # Use existing calculate_panchang with birth date as transit date
+        request = TransitRequest(
+            birth_data=birth_data,
+            transit_date=birth_data.date
+        )
+        return await calculate_panchang(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating birth panchang: {str(e)}")
 
 
 
@@ -2742,7 +2765,7 @@ async def get_nakshatras(current_user: User = Depends(get_current_user)):
     return {"nakshatras": nakshatras}
 
 @app.get("/api/nakshatras-public")
-async def get_nakshatras_public(current_user: User = Depends(get_current_user)):
+async def get_nakshatras_public():
     """Public endpoint to get detailed nakshatra data for UI"""
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()

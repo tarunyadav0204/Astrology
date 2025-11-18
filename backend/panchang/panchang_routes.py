@@ -32,13 +32,45 @@ class InauspiciousTimesRequest(BaseModel):
 async def calculate_panchang(request: PanchangRequest):
     try:
         birth_data = request.birth_data
+        
+        # Handle different request formats
+        if isinstance(birth_data, dict):
+            latitude = birth_data.get('latitude')
+            longitude = birth_data.get('longitude')
+            timezone = birth_data.get('timezone', 'UTC+5:30')
+        else:
+            # Fallback for other formats
+            latitude = getattr(birth_data, 'latitude', None)
+            longitude = getattr(birth_data, 'longitude', None)
+            timezone = getattr(birth_data, 'timezone', 'UTC+5:30')
+        
+        # Convert numeric timezone to string format
+        if isinstance(timezone, (int, float)):
+            if timezone >= 0:
+                hours = int(timezone)
+                minutes = int((timezone - hours) * 60)
+                timezone = f'UTC+{hours}:{minutes:02d}'
+            else:
+                hours = int(abs(timezone))
+                minutes = int((abs(timezone) - hours) * 60)
+                timezone = f'UTC-{hours}:{minutes:02d}'
+        
+        if latitude is None or longitude is None:
+            raise HTTPException(status_code=422, detail="Missing latitude or longitude in birth_data")
+        
+        # Ensure timezone is a string
+        if not isinstance(timezone, str):
+            timezone = 'UTC+5:30'  # Default fallback
+        
         panchang_data = panchang_calc.calculate_panchang(
             request.transit_date,
-            birth_data['latitude'],
-            birth_data['longitude'],
-            birth_data['timezone']
+            float(latitude),
+            float(longitude),
+            str(timezone)
         )
         return panchang_data
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid data format: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
