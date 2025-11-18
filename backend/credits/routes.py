@@ -1,0 +1,192 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+import sqlite3
+from auth import get_current_user, User
+from .credit_service import CreditService
+from .admin.promo_manager import PromoCodeManager
+
+router = APIRouter()
+credit_service = CreditService()
+promo_manager = PromoCodeManager()
+
+class PromoCodeRequest(BaseModel):
+    code: str
+
+class CreatePromoCodeRequest(BaseModel):
+    code: str
+    credits: int
+    max_uses: int = 1
+    expires_at: Optional[str] = None
+
+@router.get("/balance")
+async def get_credit_balance(current_user: User = Depends(get_current_user)):
+    balance = credit_service.get_user_credits(current_user.userid)
+    return {"credits": balance}
+
+@router.get("/history")
+async def get_credit_history(current_user: User = Depends(get_current_user)):
+    transactions = credit_service.get_transaction_history(current_user.userid)
+    return {"transactions": transactions}
+
+@router.post("/redeem")
+async def redeem_promo_code(request: PromoCodeRequest, current_user: User = Depends(get_current_user)):
+    code = request.code.strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Promo code is required")
+    
+    result = credit_service.redeem_promo_code(current_user.userid, code)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    return result
+
+@router.post("/spend")
+async def spend_credits(request: dict, current_user: User = Depends(get_current_user)):
+    amount = request.get("amount")
+    feature = request.get("feature")
+    description = request.get("description")
+    
+    if not amount or not feature:
+        raise HTTPException(status_code=400, detail="Amount and feature are required")
+    
+    success = credit_service.spend_credits(current_user.userid, amount, feature, description)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail="Insufficient credits")
+    
+    return {"success": True, "message": f"Successfully spent {amount} credits"}
+
+# Admin endpoints
+@router.post("/admin/promo-codes")
+async def create_promo_code(request: CreatePromoCodeRequest, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            INSERT INTO promo_codes (code, credits, max_uses, expires_at, created_by)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            request.code.upper(),
+            request.credits,
+            request.max_uses,
+            request.expires_at,
+            current_user.userid
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "Promo code created successfully"}
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Promo code already exists")
+
+@router.get("/admin/promo-codes")
+async def get_promo_codes(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT code, credits, max_uses, used_count, is_active, expires_at, created_at
+        FROM promo_codes 
+        ORDER BY created_at DESC
+    """)
+    
+    codes = []
+    for row in cursor.fetchall():
+        codes.append({
+            "code": row[0],
+            "credits": row[1],
+            "max_uses": row[2],
+            "used_count": row[3],
+            "is_active": row[4],
+            "expires_at": row[5],
+            "created_at": row[6]
+        })
+    
+    conn.close()
+    return {"promo_codes": codes}
+
+@router.post("/admin/add-credits")
+async def admin_add_credits(request: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    userid = request.get("userid")
+    amount = request.get("amount")
+    description = request.get("description", "Admin credit adjustment")
+    
+    if not userid or not amount:
+        raise HTTPException(status_code=400, detail="User ID and amount are required")
+    
+    success = credit_service.add_credits(userid, amount, 'admin_adjustment', None, description)
+    
+    if success:
+        return {"message": f"Successfully added {amount} credits to user {userid}"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to add credits")
+
+@router.get("/admin/settings")
+async def get_credit_settings(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    settings = credit_service.get_all_credit_settings()
+    return {"settings": settings}
+
+@router.put("/admin/settings")
+async def update_credit_settings(request: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    settings = request.get("settings", [])
+    updated_count = 0
+    
+    for setting in settings:
+        key = setting.get("key")
+        value = setting.get("value")
+        if key and value is not None:
+            success = credit_service.update_credit_setting(key, int(value))
+            if success:
+                updated_count += 1
+    
+    return {"message": f"Updated {updated_count} settings"}
+
+@router.get("/settings/chat-cost")
+async def get_chat_cost():
+    cost = credit_service.get_credit_setting('chat_question_cost')
+    return {"cost": cost}
+
+@router.post("/admin/bulk-promo-codes")
+async def create_bulk_promo_codes(request: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    prefix = request.get("prefix", "PROMO")
+    count = request.get("count", 10)
+    credits = request.get("credits", 100)
+    max_uses = request.get("max_uses", 1)
+    expires_days = request.get("expires_days", 30)
+    
+    codes = promo_manager.create_bulk_codes(prefix, count, credits, max_uses, expires_days)
+    
+    return {
+        "message": f"Created {len(codes)} promo codes",
+        "codes": codes
+    }
+
+@router.get("/admin/stats")
+async def get_credit_stats(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    stats = promo_manager.get_usage_stats()
+    return stats

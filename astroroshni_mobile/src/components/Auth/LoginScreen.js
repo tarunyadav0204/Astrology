@@ -131,7 +131,6 @@ export default function LoginScreen({ navigation }) {
       
       // If OTP is valid, proceed with registration
       const response = await authAPI.register(registrationData);
-      console.log('✅ Registration successful:', response.data);
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
       

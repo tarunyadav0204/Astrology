@@ -31,6 +31,17 @@ export const storage = {
     return data ? JSON.parse(data) : [];
   },
   
+  // Chart data
+  setChartData: (chartData) => AsyncStorage.setItem('chartData', JSON.stringify(chartData)),
+  getChartData: async () => {
+    const data = await AsyncStorage.getItem('chartData');
+    return data ? JSON.parse(data) : null;
+  },
+  clearChartData: () => AsyncStorage.removeItem('chartData'),
+  
+  // Clear birth details
+  clearBirthDetails: () => AsyncStorage.removeItem('birthDetails'),
+  
   // Clear all data
   clearAll: () => AsyncStorage.clear(),
 };

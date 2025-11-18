@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -8,6 +8,8 @@ import json
 import asyncio
 import html
 import re
+from auth import get_current_user, User
+from credits.credit_service import CreditService
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -45,6 +47,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # Initialize components
 context_builder = ChatContextBuilder()
 session_manager = ChatSessionManager()
+credit_service = CreditService()
 
 def _smart_chunk_response(response_text: str, max_size: int) -> List[str]:
     """Simple chunking that breaks at paragraph boundaries"""
@@ -74,7 +77,18 @@ def _smart_chunk_response(response_text: str, max_size: int) -> List[str]:
     return chunks
 
 @router.post("/ask")
-async def ask_question(request: ChatRequest):
+async def ask_question(request: ChatRequest, current_user: User = Depends(get_current_user)):
+    """Ask astrological question with streaming response - requires credits"""
+    
+    # Check credit cost and user balance
+    chat_cost = credit_service.get_credit_setting('chat_question_cost')
+    user_balance = credit_service.get_user_credits(current_user.userid)
+    
+    if user_balance < chat_cost:
+        raise HTTPException(
+            status_code=402, 
+            detail=f"Insufficient credits. You need {chat_cost} credits but have {user_balance}."
+        )
     """Ask astrological question with streaming response"""
     
     async def generate_streaming_response():
@@ -185,6 +199,18 @@ async def ask_question(request: ChatRequest):
                             # print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
                             # Send error message instead of first response
                             response_text = "I need to request additional data for your timing question but encountered a formatting issue. Please try again."
+                    
+                    # Deduct credits after successful response
+                    success = credit_service.spend_credits(
+                        current_user.userid, 
+                        chat_cost, 
+                        'chat_question', 
+                        f"Chat question: {request.question[:50]}..."
+                    )
+                    
+                    if not success:
+                        # This shouldn't happen as we checked balance earlier
+                        response_text = "Credit deduction failed. Please try again."
                     
                     # Note: Message saving handled by ChatModal via /api/chat/message endpoint
                     
@@ -393,10 +419,16 @@ async def get_event_periods(request: ClearChatRequest):
         if 'T' in date_str:
             date_str = date_str.split('T')[0]
         
+        # Normalize time format from ISO to HH:MM
+        time_str = request.time
+        if 'T' in time_str:
+            time_part = time_str.split('T')[1]
+            time_str = time_part[:5]  # Extract HH:MM
+        
         birth_data = {
             'name': request.name,
             'date': date_str,
-            'time': request.time,
+            'time': time_str,
             'place': request.place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
@@ -443,3 +475,32 @@ async def get_question_suggestions():
         "status": "success",
         "suggestions": suggestions
     }
+
+@router.post("/save-message")
+async def save_message(request: dict):
+    """Save individual message to chat history"""
+    try:
+        birth_data = {
+            'name': request.get('name'),
+            'date': request.get('date'),
+            'time': request.get('time'),
+            'place': request.get('place'),
+            'latitude': request.get('latitude', 28.6139),
+            'longitude': request.get('longitude', 77.2090),
+            'timezone': request.get('timezone', 'UTC+5:30'),
+            'gender': request.get('gender')
+        }
+        
+        message = request.get('message', {})
+        birth_hash = session_manager.create_birth_hash(birth_data)
+        
+        # Add message to session manager
+        session_manager.add_individual_message(birth_hash, message)
+        
+        return {
+            "status": "success",
+            "message": "Message saved"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

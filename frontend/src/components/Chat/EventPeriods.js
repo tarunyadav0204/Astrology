@@ -4,39 +4,97 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
     const [periods, setPeriods] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedYear, setSelectedYear] = useState(2024); // Start with 2024 instead of current year
     const [viewMode, setViewMode] = useState(window.innerWidth <= 768 ? 'cards' : 'timeline');
+    
+    console.log('EventPeriods component rendered with birthData:', birthData);
+    console.log('Selected year:', selectedYear);
 
     useEffect(() => {
-        loadEventPeriods();
-    }, [selectedYear]);
+        console.log('EventPeriods useEffect triggered, birthData:', birthData, 'selectedYear:', selectedYear);
+        if (birthData) {
+            loadEventPeriods();
+        } else {
+            console.error('No birth data provided to EventPeriods');
+            setError('Birth data is missing');
+            setLoading(false);
+        }
+    }, [selectedYear, birthData]);
 
     const loadEventPeriods = async () => {
         try {
             setLoading(true);
+            setError(null);
+            console.log('Loading event periods for:', { birthData, selectedYear });
+            
+            // Fix time format for API call
+            let cleanTime = birthData.time;
+            let cleanDate = birthData.date;
+            
+            // Handle ISO datetime strings
+            if (birthData.time.includes('T')) {
+                const timePart = birthData.time.split('T')[1];
+                cleanTime = timePart.substring(0, 5); // Extract HH:MM
+            }
+            
+            if (birthData.date.includes('T')) {
+                cleanDate = birthData.date.split('T')[0]; // Extract YYYY-MM-DD
+            }
+            
+            const apiData = {
+                ...birthData,
+                selectedYear,
+                time: cleanTime,
+                date: cleanDate
+            };
+            
+            console.log('Cleaned API data:', apiData);
+            
             const response = await fetch('/api/chat/event-periods', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...birthData, selectedYear })
+                body: JSON.stringify(apiData)
             });
 
+            console.log('Response status:', response.status, response.statusText);
+            
             if (!response.ok) {
-                throw new Error('Failed to load event periods');
+                const errorText = await response.text();
+                console.error('API Error:', errorText);
+                throw new Error(`Failed to load event periods: ${response.status}`);
             }
 
             const data = await response.json();
             console.log('Event periods API response:', data);
+            console.log('Total periods received:', data.periods?.length || 0);
+            
             // Filter periods for selected year and sort by date
-            const filteredPeriods = (data.periods || []).filter(period => {
+            const allPeriods = data.periods || [];
+            console.log('All periods before filtering:', allPeriods.map(p => ({ start: p.start_date, year: new Date(p.start_date).getFullYear() })));
+            
+            const filteredPeriods = allPeriods.filter(period => {
                 const periodYear = new Date(period.start_date).getFullYear();
+                console.log(`Period ${period.start_date} year: ${periodYear}, selected: ${selectedYear}, match: ${periodYear === selectedYear}`);
                 return periodYear === selectedYear;
             }).sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-            console.log('Filtered periods:', filteredPeriods);
-            if (filteredPeriods.length > 0) {
-                console.log('Sample period data:', filteredPeriods[0]);
+            
+            console.log('Filtered periods for year', selectedYear, ':', filteredPeriods.length);
+            
+            if (filteredPeriods.length === 0 && allPeriods.length > 0) {
+                console.log('No periods found for selected year, showing all periods');
+                // If no periods for selected year, show all periods and update year selector
+                const firstPeriodYear = new Date(allPeriods[0].start_date).getFullYear();
+                console.log('Setting year to first period year:', firstPeriodYear);
+                setSelectedYear(firstPeriodYear);
+                setPeriods(allPeriods.sort((a, b) => new Date(a.start_date) - new Date(b.start_date)));
+            } else {
+                if (filteredPeriods.length > 0) {
+                    console.log('Sample period data:', filteredPeriods[0]);
+                }
+                setPeriods(filteredPeriods);
             }
-            setPeriods(filteredPeriods);
         } catch (err) {
+            console.error('Error in loadEventPeriods:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -80,6 +138,7 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                 <div className="loading-spinner">🔮</div>
                 <p>Analyzing your chart for significant periods...</p>
                 <p className="loading-subtext">This may take a moment as we calculate transit activations</p>
+                <button onClick={onBack} className="back-btn">← Back to Options</button>
             </div>
         );
     }
@@ -89,6 +148,7 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
             <div className="event-periods-error">
                 <h4>Unable to Load Event Periods</h4>
                 <p>{error}</p>
+                <button onClick={loadEventPeriods} className="retry-btn">🔄 Retry</button>
                 <button onClick={onBack} className="back-btn">← Back to Options</button>
             </div>
         );
@@ -104,7 +164,10 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                     <button onClick={onBack} className="back-btn-compact">←</button>
                     <select 
                         value={selectedYear} 
-                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        onChange={(e) => {
+                            console.log('Year changed to:', e.target.value);
+                            setSelectedYear(parseInt(e.target.value));
+                        }}
                         className="year-select-compact"
                     >
                         {yearOptions.map(year => (
@@ -114,6 +177,9 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                     <button onClick={() => setViewMode(viewMode === 'timeline' ? 'cards' : 'timeline')} className="toggle-btn-compact">
                         {viewMode === 'timeline' ? '📋' : '📊'}
                     </button>
+                </div>
+                <div style={{fontSize: '12px', color: '#ccc', marginTop: '5px'}}>
+                    Debug: {periods.length} periods loaded for {selectedYear}
                 </div>
             </div>
 
@@ -313,6 +379,9 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                 </div>
             ) : (
                 <div className="periods-grid-container">
+                    <div style={{fontSize: '12px', color: '#999', marginBottom: '10px'}}>
+                        Showing {periods.length} periods in cards view
+                    </div>
                             <div className="periods-grid">
                             {periods.map((period) => {
                         const getLifeAreaDescription = () => {
@@ -421,6 +490,15 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                         );
                             })}
                             </div>
+                            {periods.length === 0 && (
+                                <div style={{textAlign: 'center', padding: '20px', color: '#666'}}>
+                                    <p>No periods to display</p>
+                                    <button onClick={() => {
+                                        console.log('Raw periods data:', periods);
+                                        alert(`Periods: ${JSON.stringify(periods, null, 2)}`);
+                                    }}>Show Raw Data</button>
+                                </div>
+                            )}
                 </div>
             )}
         </div>

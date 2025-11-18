@@ -16,9 +16,6 @@ import { chartAPI } from '../../services/api';
 import ChartWidget from './ChartWidget';
 
 export default function ChartScreen({ visible, onClose }) {
-  console.log('=== CHART SCREEN RENDER ===');
-  console.log('visible:', visible);
-  
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -30,26 +27,48 @@ export default function ChartScreen({ visible, onClose }) {
   }, [visible]);
 
   const loadBirthData = async () => {
-    console.log('=== LOADING BIRTH DATA ===');
     try {
       setLoading(true);
+      
+      // First try to get fresh data from database
+      try {
+        const response = await chartAPI.getExistingCharts('');
+        const charts = response.data.charts || [];
+        if (charts.length > 0) {
+          // Use the most recent chart from database
+          const latestChart = charts[0];
+          const freshData = {
+            name: latestChart.name,
+            date: latestChart.date,
+            time: latestChart.time,
+            latitude: latestChart.latitude,
+            longitude: latestChart.longitude,
+            timezone: latestChart.timezone,
+            place: latestChart.place || '',
+            gender: latestChart.gender || ''
+          };
+          setBirthData(freshData);
+          await calculateChart(freshData);
+          return;
+        }
+      } catch (dbError) {
+      }
+      
+      // Fallback to local storage if database fetch fails
       const data = await storage.getBirthDetails();
-      console.log('Birth data loaded:', data);
       if (data) {
         setBirthData(data);
         await calculateChart(data);
       }
     } catch (error) {
-      console.error('Error loading birth data:', error);
+      // Error loading birth data
     } finally {
       setLoading(false);
     }
   };
 
   const calculateChart = async (data) => {
-    console.log('=== CALCULATING CHART ===');
     try {
-      console.log('Birth data being sent:', JSON.stringify(data, null, 2));
       
       // Ensure proper date/time format
       let formattedDate = data.date;
@@ -83,37 +102,26 @@ export default function ChartScreen({ visible, onClose }) {
         timezone: 'Asia/Kolkata' // Always use proper timezone
       };
       
-      console.log('=== FORMATTED DATA FOR CHART API ===');
-      console.log('Original date:', data.date);
-      console.log('Original time:', data.time);
-      console.log('Formatted date:', formattedDate);
-      console.log('Formatted time:', formattedTime);
-      console.log('Full formatted data:', JSON.stringify(formattedData, null, 2));
-      
-      // Compare with expected format
-      console.log('Expected format should be:');
-      console.log('date: "1980-04-02"');
-      console.log('time: "09:25"');
-      console.log('timezone: "Asia/Kolkata"');
-      
       // Get auth token for authenticated request
       const token = await storage.getAuthToken();
-      console.log('Using auth token:', token ? 'Present' : 'Missing');
       
-      // Use chartAPI service instead of hardcoded URL
-      const response = await chartAPI.calculateChart(formattedData);
+      // Clear any cached chart data to ensure fresh calculation
+      await storage.clearChartData();
       
-      console.log('Chart API response status:', response.status);
+      // Always calculate fresh chart data without saving to database
+      const response = await chartAPI.calculateChartOnly(formattedData);
       
       const chartResult = response.data;
-      console.log('=== CHART API RESPONSE ===');
-      console.log('Chart response:', JSON.stringify(chartResult, null, 2));
+      
+      // Store chart data for future use
+      await storage.setChartData({
+        birthData: formattedData,
+        chartData: chartResult
+      });
+      
       setChartData(chartResult);
     } catch (error) {
-      console.error('=== CHART CALCULATION ERROR ===');
-      console.error('Error calculating chart:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
+      // Error calculating chart
     }
   };
 

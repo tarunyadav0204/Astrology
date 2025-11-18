@@ -3,9 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-na
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 
 const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) => {
-  console.log('=== NORTH INDIAN CHART RENDER ===');
-  console.log('chartData:', chartData);
-  console.log('birthData:', birthData);
   
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, houseNumber: null, signName: null });
@@ -46,20 +43,27 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
   };
 
   const getRashiForHouse = (houseIndex) => {
+    if (!chartData.houses || !chartData.houses[houseIndex]) return houseIndex;
+    
     if (customAscendant !== null) {
+      // Recalculate house-rashi mapping based on custom ascendant
       return (customAscendant + houseIndex) % 12;
     }
     
-    // Use the actual sign from the houses array provided by API
-    if (chartData && chartData.houses && chartData.houses[houseIndex]) {
-      const sign = chartData.houses[houseIndex].sign;
-      console.log(`House ${houseIndex + 1}: API sign=${sign} (${rashiNames[sign]})`);
-      return sign;
-    }
+    // Default: use original chart data
+    return chartData.houses[houseIndex].sign;
+  };
+
+  const getHouseForRashi = (rashiIndex) => {
+    if (!chartData.houses) return null;
     
-    // Fallback calculation
-    const ascendantSign = getAscendantSign();
-    return (ascendantSign + houseIndex) % 12;
+    // Find which house contains this rashi
+    for (let i = 0; i < chartData.houses.length; i++) {
+      if (chartData.houses[i].sign === rashiIndex) {
+        return i + 1; // Return house number (1-12)
+      }
+    }
+    return null;
   };
 
   // Get the actual ascendant sign from chart data
@@ -143,7 +147,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
   const getPlanetsInHouse = (houseIndex) => {
     if (!chartData.planets) return [];
     
-    const planets = ['Su', 'Mo', 'Ma', 'Me', 'Ju', 'Ve', 'Sa', 'Ra', 'Ke', 'Gu', 'Ma'];
+    const planets = ['Su', 'Mo', 'Ma', 'Me', 'Ju', 'Ve', 'Sa', 'Ra', 'Ke', 'Gu', 'Mn'];
     const rashiForThisHouse = getRashiForHouse(houseIndex);
     
     return Object.entries(chartData.planets)
@@ -217,8 +221,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                    houseNumber === 12 ? houseData.center.y + 20 :
                    houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
                 fontSize="18" 
-                fill={rashiIndex === getAscendantSign() ? "#e91e63" : "#333"} 
-                fontWeight={rashiIndex === getAscendantSign() ? "900" : "bold"}
+                fill={rashiIndex === chartData.houses[0].sign ? "#e91e63" : "#333"} 
+                fontWeight={rashiIndex === chartData.houses[0].sign ? "900" : "bold"}
                 onPress={() => handleRashiPress(houseNumber, rashiIndex)}>
                 {rashiIndex + 1}
               </SvgText>
@@ -259,33 +263,84 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 10;
                   }
+                } else if (totalPlanets <= 4) {
+                  // Houses 3, 5, 9, 11: Vertical arrangement (single column)
+                  if ([3, 5, 9, 11].includes(houseNumber)) {
+                    const rowSpacing = 35;
+                    if (houseNumber === 3) {
+                      planetX = houseData.center.x - 35;
+                      planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                    } else if (houseNumber === 5) {
+                      planetX = houseData.center.x - 25;
+                      planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
+                    } else if (houseNumber === 9) {
+                      planetX = houseData.center.x + 45;
+                      planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                    } else if (houseNumber === 11) {
+                      planetX = houseData.center.x + 35;
+                      planetY = houseData.center.y - 45 + (pIndex * rowSpacing);
+                    }
+                  } else {
+                    // Other houses: 2-column arrangement
+                    const row = Math.floor(pIndex / 2);
+                    const col = pIndex % 2;
+                    const spacing = 25;
+                    const rowSpacing = 32;
+                    
+                    if (houseNumber === 1) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 20 + (row * rowSpacing);
+                    } else if (houseNumber === 4) {
+                      planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y + 5 + (row * rowSpacing);
+                    } else if ([6, 7, 8].includes(houseNumber)) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y + 25 + (row * rowSpacing);
+                    } else if (houseNumber === 10) {
+                      planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 25 + (row * rowSpacing);
+                    } else if (houseNumber === 12) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 15 + (row * rowSpacing);
+                    } else if (houseNumber === 2) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 40 + (row * rowSpacing);
+                    } else {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 25 + (row * rowSpacing);
+                    }
+                  }
                 } else {
-                  const row = Math.floor(pIndex / 2);
-                  const col = pIndex % 2;
-                  const spacing = 25;
-                  const rowSpacing = 32;
+                  // For 5+ planets - arrange in single column
+                  const rowSpacing = 26;
                   
                   if (houseNumber === 1) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 20 + (row * rowSpacing);
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
                   } else if ([3, 4, 5].includes(houseNumber)) {
-                    planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y + 5 + (row * rowSpacing);
+                    planetX = houseData.center.x - 25;
+                    planetY = houseData.center.y + 0 + (pIndex * rowSpacing);
                   } else if ([6, 7, 8].includes(houseNumber)) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y + 25 + (row * rowSpacing);
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y + 20 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 9) {
+                    planetX = houseData.center.x + 35;
+                    planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
                   } else if (houseNumber === 10) {
-                    planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 25 + (row * rowSpacing);
+                    planetX = houseData.center.x + 15;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 11) {
+                    planetX = houseData.center.x + 25;
+                    planetY = houseData.center.y - 15 + (pIndex * rowSpacing);
                   } else if (houseNumber === 12) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 15 + (row * rowSpacing);
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 5 + (pIndex * rowSpacing);
                   } else if (houseNumber === 2) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 40 + (row * rowSpacing);
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 35 + (pIndex * rowSpacing);
                   } else {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 25 + (row * rowSpacing);
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                   }
                 }
                 

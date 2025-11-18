@@ -17,7 +17,7 @@ from .argala_calculator import ArgalaCalculator
 from .profession_calculator import ProfessionCalculator
 # Import these only when needed to avoid import errors
 # from ..shared.dasha_calculator import DashaCalculator
-# from ..ashtakavarga import AshtakavargaCalculator
+# from ..calculators.ashtakavarga import AshtakavargaCalculator
 # from ..event_prediction.universal_house_analyzer import UniversalHouseAnalyzer
 # from ..horoscope.utils.planetary_calculator import PlanetaryCalculator
 

@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 import MessageBubble from './MessageBubble';
 import EventPeriods from './EventPeriods';
@@ -23,8 +24,12 @@ import ChatGreeting from './ChatGreeting';
 import { storage } from '../../services/storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import ChartScreen from '../Chart/ChartScreen';
+import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
+import { useCredits } from '../../credits/CreditContext';
 
 export default function ChatScreen({ navigation }) {
+  const { credits, fetchBalance } = useCredits();
+  const [chatCost, setChatCost] = useState(1);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,6 +38,7 @@ export default function ChatScreen({ navigation }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showChart, setShowChart] = useState(false);
   const [showEventPeriods, setShowEventPeriods] = useState(false);
+  const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const scrollViewRef = useRef(null);
@@ -50,6 +56,7 @@ export default function ChatScreen({ navigation }) {
   useEffect(() => {
     checkBirthData();
     loadLanguagePreference();
+    fetchChatCost();
     
     // Add focus listener to re-check birth data when returning to screen
     const unsubscribe = navigation.addListener('focus', () => {
@@ -59,6 +66,16 @@ export default function ChatScreen({ navigation }) {
     
     return unsubscribe;
   }, [navigation]);
+
+  const fetchChatCost = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/chat-cost')}`);
+      const data = await response.json();
+      setChatCost(data.cost || 1);
+    } catch (error) {
+      console.error('Error fetching chat cost:', error);
+    }
+  };
 
   useEffect(() => {
     if (birthData) {
@@ -75,6 +92,16 @@ export default function ChatScreen({ navigation }) {
     } else {
       console.log('💬 Going to chat mode');
       setShowGreeting(false);
+      
+      // Add welcome message when entering chat mode
+      const welcomeMessage = {
+        id: Date.now().toString(),
+        content: `🌟 Welcome to your personalized astrological consultation, ${birthData?.name}!\n\nI'm here to help you understand your birth chart and provide insights about your life path. Feel free to ask me anything about:\n\n• Your personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits affecting you\n• Your strengths and areas for growth\n\nWhat would you like to explore first?`,
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages([welcomeMessage]);
     }
   };
 
@@ -130,7 +157,6 @@ export default function ChatScreen({ navigation }) {
         setShowGreeting(false);
       }
     } catch (error) {
-      console.error('Error loading chat history:', error);
       // Show greeting on error too
       setShowGreeting(true);
     }
@@ -140,6 +166,31 @@ export default function ChatScreen({ navigation }) {
     const savedLanguage = await storage.getLanguage();
     if (savedLanguage) {
       setLanguage(savedLanguage);
+    }
+  };
+
+  const saveMessageToHistory = async (message) => {
+    try {
+      if (!birthData) return;
+      
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/save-message')}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...birthData,
+          message: {
+            role: message.role,
+            content: message.content,
+            timestamp: message.timestamp
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        console.warn('Failed to save message to history:', response.status);
+      }
+    } catch (error) {
+      console.warn('Error saving message to history:', error);
     }
   };
 
@@ -164,6 +215,9 @@ export default function ChatScreen({ navigation }) {
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setLoading(true);
+    
+    // Save user message to database
+    await saveMessageToHistory(userMessage);
     
     // Scroll to bottom when user sends a message
     setTimeout(() => {
@@ -311,6 +365,9 @@ export default function ChatScreen({ navigation }) {
         content: '',
         timestamp: new Date().toISOString()
       };
+      
+      // Update balance after successful response
+      fetchBalance();
 
       // Clear loading interval and replace typing message with actual response
       clearInterval(loadingInterval);
@@ -444,6 +501,9 @@ export default function ChatScreen({ navigation }) {
         console.error('Empty response detected:', { hasReceivedContent, content: assistantMessage.content });
         throw new Error('Empty response received - please try again');
       }
+      
+      // Save assistant message to database
+      await saveMessageToHistory(assistantMessage);
 
     } catch (error) {
       console.error('Error sending message after retries:', error);
@@ -544,6 +604,7 @@ export default function ChatScreen({ navigation }) {
 
   return (
     <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+      <StatusBar style="dark" backgroundColor="transparent" translucent />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
@@ -552,8 +613,19 @@ export default function ChatScreen({ navigation }) {
         >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>🔮 AstroRoshni</Text>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('BirthForm')} style={styles.nameButton}>
+              <Text style={styles.headerSubtitle}>with 👤 {birthData?.name} ▼</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.creditButton}
+              onPress={() => navigation.navigate('Credits')}
+            >
+              <Text style={styles.creditText}>💳 {credits}</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerButton}
               onPress={() => setShowLanguageModal(true)}
@@ -609,6 +681,20 @@ export default function ChatScreen({ navigation }) {
           </View>
         )}
 
+        {/* Credit cost info */}
+        {!showGreeting && (
+          <View style={styles.creditInfo}>
+            <Text style={styles.creditInfoText}>
+              Each question costs {chatCost} credit{chatCost > 1 ? 's' : ''} • Balance: {credits}
+            </Text>
+            {credits < chatCost && (
+              <TouchableOpacity onPress={() => navigation.navigate('Credits')}>
+                <Text style={styles.lowCreditWarning}>Get more credits</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* Input (only show when not showing greeting) */}
         {!showGreeting && (
           <View style={styles.inputContainer}>
@@ -616,18 +702,18 @@ export default function ChatScreen({ navigation }) {
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder={loading ? "Analyzing your chart..." : "Ask me about your birth chart..."}
+              placeholder={loading ? "Analyzing your chart..." : credits < chatCost ? "Insufficient credits" : "Ask me about your birth chart..."}
               placeholderTextColor={COLORS.gray}
               maxLength={500}
-              editable={!loading}
+              editable={!loading && credits >= chatCost}
             />
             <TouchableOpacity
-              style={[styles.sendButton, (loading || !inputText.trim()) && styles.sendButtonDisabled]}
+              style={[styles.sendButton, (loading || !inputText.trim() || credits < chatCost) && styles.sendButtonDisabled]}
               onPress={() => sendMessage()}
-              disabled={loading || !inputText.trim()}
+              disabled={loading || !inputText.trim() || credits < chatCost}
             >
               <Text style={styles.sendButtonText}>
-                {loading ? '...' : 'Send'}
+                {loading ? '...' : credits < chatCost ? 'No Credits' : 'Send'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -689,15 +775,39 @@ export default function ChatScreen({ navigation }) {
                 <Text style={styles.menuText}>View Chart</Text>
               </TouchableOpacity>
 
+
+
               <TouchableOpacity
                 style={styles.menuOption}
                 onPress={() => {
                   setShowMenu(false);
-                  setShowEventPeriods(true);
+                  setShowDashaBrowser(true);
                 }}
               >
-                <Ionicons name="calendar" size={20} color={COLORS.accent} />
-                <Text style={styles.menuText}>Event Periods</Text>
+                <Ionicons name="time" size={20} color={COLORS.accent} />
+                <Text style={styles.menuText}>Dasha Browser</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  setShowMenu(false);
+                  navigation.navigate('ChatHistory');
+                }}
+              >
+                <Ionicons name="time" size={20} color={COLORS.accent} />
+                <Text style={styles.menuText}>Chat History</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  setShowMenu(false);
+                  navigation.navigate('Credits');
+                }}
+              >
+                <Ionicons name="card" size={20} color={COLORS.accent} />
+                <Text style={styles.menuText}>Credits</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -709,19 +819,10 @@ export default function ChatScreen({ navigation }) {
                 }}
               >
                 <Ionicons name="person" size={20} color={COLORS.accent} />
-                <Text style={styles.menuText}>Birth Details</Text>
+                <Text style={styles.menuText}>Select Native</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  shareChat();
-                }}
-              >
-                <Ionicons name="share" size={20} color={COLORS.accent} />
-                <Text style={styles.menuText}>Share Chat</Text>
-              </TouchableOpacity>
+
 
               <TouchableOpacity
                 style={styles.menuOption}
@@ -735,16 +836,7 @@ export default function ChatScreen({ navigation }) {
                 <Text style={styles.menuText}>Back to Home</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  clearChat();
-                }}
-              >
-                <Ionicons name="trash" size={20} color={COLORS.error} />
-                <Text style={[styles.menuText, { color: COLORS.error }]}>Clear Chat</Text>
-              </TouchableOpacity>
+
 
               <TouchableOpacity
                 style={styles.menuOption}
@@ -791,6 +883,13 @@ export default function ChatScreen({ navigation }) {
             }}
           />
         )}
+
+        {/* Dasha Browser Modal */}
+        <CascadingDashaBrowser 
+          visible={showDashaBrowser} 
+          onClose={() => setShowDashaBrowser(false)}
+          birthData={birthData}
+        />
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
@@ -822,13 +921,44 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  headerTitleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    lineHeight: 20,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.accent,
+    marginTop: 1,
+    marginLeft: 22,
+    opacity: 0.9,
+  },
+  nameButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 4,
   },
   headerButtons: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  creditButton: {
+    marginRight: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+  },
+  creditText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerButton: {
     marginLeft: 12,
@@ -1006,5 +1136,24 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
+  },
+  creditInfo: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  creditInfoText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  lowCreditWarning: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });

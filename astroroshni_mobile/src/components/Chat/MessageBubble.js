@@ -45,7 +45,7 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
       await Clipboard.setString(cleanText);
       Alert.alert('Copied!', 'Message copied to clipboard');
     } catch (error) {
-      console.error('Error copying to clipboard:', error);
+      // Error copying to clipboard
     }
   };
 
@@ -65,7 +65,7 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
         message: shareText,
       });
     } catch (error) {
-      console.error('Error sharing message:', error);
+      // Error sharing message
     }
   };
 
@@ -535,7 +535,7 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
     let listCounter = 0;
     
     // Split by headers and paragraphs - include markdown headers
-    const parts = text.split(/(<h3>.*?<\/h3>|###\s+.+|\n\n+)/).filter(part => part.trim());
+    const parts = text.split(/(<h3>.*?<\/h3>|##\s+.+|###\s+.+|\n\n+)/).filter(part => part.trim());
     
     for (const part of parts) {
       if (part.match(/<h3>(.*?)<\/h3>/)) {
@@ -548,10 +548,10 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
             <Text style={styles.headerText}>{headerText}</Text>
           </View>
         );
-      } else if (part.match(/^###\s+(.+)$/)) {
+      } else if (part.match(/^##\s+(.+)$/m) || part.match(/^###\s+(.+)$/m)) {
         listCounter = 0; // Reset counter for new section
-        // Handle markdown headers
-        const headerText = part.replace(/^###\s+(.+)$/, '$1');
+        // Handle markdown headers (both ## and ###)
+        const headerText = part.replace(/^##\s+(.+)$/m, '$1').replace(/^###\s+(.+)$/m, '$1');
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>

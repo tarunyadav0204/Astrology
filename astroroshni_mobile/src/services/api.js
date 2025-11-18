@@ -17,9 +17,6 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  console.log('API Request:', config.method?.toUpperCase(), config.url);
-  console.log('Full URL:', config.baseURL + config.url);
-  
   return config;
 });
 
@@ -27,8 +24,6 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.log('API Error:', error.response?.status, error.response?.data);
-    
     if (error.response?.status === 401) {
       // Clear invalid token
       AsyncStorage.removeItem('authToken');
@@ -60,11 +55,15 @@ export const chatAPI = {
 
 export const chartAPI = {
   calculateChart: (birthData) => api.post(getEndpoint('/calculate-chart'), birthData),
+  calculateChartOnly: (birthData) => api.post(getEndpoint('/calculate-chart-only'), birthData),
   calculateDivisionalChart: (birthData, division = 9) => 
     api.post(getEndpoint('/calculate-divisional-chart'), { birth_data: birthData, division }),
   calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => 
     api.post(getEndpoint('/calculate-transits'), { birth_data: birthData, transit_date: transitDate }),
   calculateYogi: (birthData) => api.post(getEndpoint('/calculate-yogi'), birthData),
+  calculateCascadingDashas: (birthData, targetDate) => 
+    api.post(getEndpoint('/calculate-cascading-dashas'), { birth_data: birthData, target_date: targetDate }),
+  calculateDasha: (birthData) => api.post(getEndpoint('/calculate-dasha'), birthData),
   getExistingCharts: (search = '') => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
@@ -73,6 +72,14 @@ export const chartAPI = {
   },
   updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),
   deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`),
+};
+
+export const creditAPI = {
+  getBalance: () => api.get(getEndpoint('/credits/balance')),
+  getHistory: () => api.get(getEndpoint('/credits/history')),
+  redeemPromoCode: (code) => api.post(getEndpoint('/credits/redeem'), { code }),
+  spendCredits: (amount, feature, description) => 
+    api.post(getEndpoint('/credits/spend'), { amount, feature, description }),
 };
 
 export default api;

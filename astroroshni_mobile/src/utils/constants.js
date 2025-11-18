@@ -33,15 +33,8 @@ import { Platform } from 'react-native';
 
 // API Configuration matching web version
 const getApiUrl = () => {
-  console.log('Environment check - NODE_ENV:', process.env.NODE_ENV, '__DEV__:', __DEV__);
-  
-  // Use local backend for development
-  if (__DEV__) {
-    return 'http://localhost:8001';
-  }
-  
-  // Use production URL for release builds
-  return 'https://astroroshni.com';
+  // Use localhost for testing
+  return 'http://localhost:8001';
 };
 
 export const API_BASE_URL = getApiUrl();

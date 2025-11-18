@@ -42,6 +42,7 @@ from nakshatra.nakshatra_routes import router as nakshatra_router
 from festivals.routes import router as festivals_router
 from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
+from credits.routes import router as credits_router
 import math
 from datetime import timedelta
 import signal
@@ -170,6 +171,7 @@ app.include_router(nakshatra_router, prefix="/api")
 app.include_router(festivals_router, prefix="/api")
 app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
+app.include_router(credits_router, prefix="/api/credits")
 
 
 # Root endpoint for health check
@@ -1044,6 +1046,11 @@ async def keepalive():
     """Simple endpoint to keep server alive"""
     return {"status": "alive", "timestamp": datetime.now().isoformat()}
 
+@app.post("/api/calculate-chart-only")
+async def calculate_chart_only(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
+    # Calculate chart without saving to database
+    return await _calculate_chart_data(birth_data, node_type)
+
 @app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     # Store birth data in database (update if exists)
@@ -1057,6 +1064,10 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     conn.commit()
     conn.close()
     
+    # Calculate and return chart data
+    return await _calculate_chart_data(birth_data, node_type)
+
+async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
     # Calculate Julian Day with proper timezone handling
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
@@ -1509,8 +1520,8 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
     
 
     
-    # First get the basic chart
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    # First get the basic chart without saving to database
+    chart_data = await _calculate_chart_data(birth_data, 'mean')
     
     def get_divisional_sign(sign, degree_in_sign, division):
         """Calculate divisional sign using proper Vedic formulas"""
@@ -2293,7 +2304,7 @@ async def calculate_sub_dashas(request: dict):
 
 @app.post("/api/calculate-ashtakavarga")
 async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
-    from ashtakavarga import AshtakavargaCalculator
+    from calculators.ashtakavarga import AshtakavargaCalculator
     
     birth_data = BirthData(**request['birth_data'])
     chart_type = request.get('chart_type', 'lagna')
@@ -2323,6 +2334,111 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
         "analysis": analysis,
         "chart_type": chart_type
     }
+
+@app.post("/api/ashtakavarga/transit-analysis")
+async def get_transit_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
+    """Get Ashtakavarga analysis for transit date"""
+    from calculators.ashtakavarga_transit import AshtakavargaTransitCalculator
+    
+    birth_data = BirthData(**request['birth_data'])
+    transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
+    
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
+    
+    transit_av = calculator.calculate_transit_ashtakavarga(transit_date)
+    recommendations = calculator.get_transit_recommendations(transit_date)
+    comparison = calculator.compare_birth_transit_strength(transit_date)
+    
+    return {
+        "transit_date": transit_date,
+        "transit_ashtakavarga": transit_av,
+        "recommendations": recommendations,
+        "birth_transit_comparison": comparison
+    }
+
+@app.post("/api/ashtakavarga/monthly-forecast")
+async def get_monthly_ashtakavarga_forecast(request: dict, current_user: User = Depends(get_current_user)):
+    """Get monthly Ashtakavarga forecast"""
+    from calculators.ashtakavarga_transit import AshtakavargaTransitCalculator
+    
+    birth_data = BirthData(**request['birth_data'])
+    start_date = datetime.strptime(request.get('start_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+    
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
+    
+    forecast = []
+    for i in range(0, 30, 7):
+        check_date = start_date + timedelta(days=i)
+        recommendations = calculator.get_transit_recommendations(check_date.strftime('%Y-%m-%d'))
+        
+        forecast.append({
+            "date": check_date.strftime('%Y-%m-%d'),
+            "week": f"Week {i//7 + 1}",
+            "strength": recommendations['transit_strength'],
+            "key_activities": recommendations['favorable_activities'][:2] if recommendations['favorable_activities'] else []
+        })
+    
+    return {
+        "forecast_period": f"{start_date.strftime('%Y-%m-%d')} to {(start_date + timedelta(days=30)).strftime('%Y-%m-%d')}",
+        "weekly_forecast": forecast
+    }
+
+@app.post("/api/ashtakavarga/predict-events")
+async def predict_ashtakavarga_events(request: dict, current_user: User = Depends(get_current_user)):
+    """Predict events using Ashtakavarga for specific year"""
+    from calculators.ashtakavarga_events import AshtakavargaEventPredictor
+    
+    birth_data = BirthData(**request['birth_data'])
+    year = request.get('year', datetime.now().year)
+    
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    predictor = AshtakavargaEventPredictor(birth_data, chart_data)
+    
+    events = predictor.predict_events_for_year(year)
+    
+    return {
+        "year": year,
+        "events": events,
+        "total_events": len(events)
+    }
+
+@app.post("/api/ashtakavarga/predict-specific-event")
+async def predict_specific_event(request: dict, current_user: User = Depends(get_current_user)):
+    """Predict timing for specific events like marriage, career, etc."""
+    from calculators.ashtakavarga_events import AshtakavargaEventPredictor
+    
+    birth_data = BirthData(**request['birth_data'])
+    event_type = request.get('event_type', 'marriage')
+    start_year = request.get('start_year', datetime.now().year)
+    end_year = request.get('end_year', start_year + 5)
+    
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    predictor = AshtakavargaEventPredictor(birth_data, chart_data)
+    
+    predictions = predictor.predict_specific_event_timing(event_type, start_year, end_year)
+    
+    return {
+        "event_type": event_type,
+        "period": f"{start_year}-{end_year}",
+        "predictions": predictions
+    }
+
+@app.post("/api/ashtakavarga/daily-strength")
+async def get_daily_ashtakavarga_strength(request: dict, current_user: User = Depends(get_current_user)):
+    """Get Ashtakavarga strength for specific date"""
+    from calculators.ashtakavarga_events import AshtakavargaEventPredictor
+    
+    birth_data = BirthData(**request['birth_data'])
+    date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
+    
+    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    predictor = AshtakavargaEventPredictor(birth_data, chart_data)
+    
+    daily_analysis = predictor.get_daily_ashtakavarga_strength(date)
+    
+    return daily_analysis
 
 @app.get("/api/interpretations/planet-nakshatra")
 async def get_planet_nakshatra_interpretation(

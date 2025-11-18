@@ -69,9 +69,15 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
   };
 
   const getHouseNumber = (signIndex) => {
-    if (signIndex === -1) return '';
-    const ascendantSign = 4; // Leo
-    return ((signIndex - ascendantSign + 12) % 12) + 1;
+    if (!chartData.houses || signIndex === -1) return '';
+    
+    // Find which house contains this sign
+    for (let i = 0; i < chartData.houses.length; i++) {
+      if (chartData.houses[i].sign === signIndex) {
+        return i + 1; // Return house number (1-12)
+      }
+    }
+    return '';
   };
 
   return (
@@ -107,8 +113,8 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
                 x={pos.x + 8} 
                 y={pos.y + 18} 
                 fontSize="12" 
-                fill={pos.sign === 4 ? "#e91e63" : "#333"} 
-                fontWeight={pos.sign === 4 ? "900" : "bold"}>
+                fill={houseNumber === 1 ? "#e91e63" : "#333"} 
+                fontWeight={houseNumber === 1 ? "900" : "bold"}>
                 {houseNumber}
               </SvgText>
               

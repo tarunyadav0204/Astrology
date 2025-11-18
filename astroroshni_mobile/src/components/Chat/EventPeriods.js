@@ -8,6 +8,8 @@ import {
   Alert,
   Modal,
   Dimensions,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +28,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    console.log('📅 EventPeriods useEffect:', { visible, selectedYear, birthData: !!birthData });
     if (visible) {
       loadEventPeriods();
     }
@@ -34,8 +35,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   const loadEventPeriods = async () => {
     try {
-      console.log('📅 Loading event periods for year:', selectedYear);
-      console.log('📊 Birth data:', birthData);
       setLoading(true);
       setError(null);
       
@@ -44,25 +43,20 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...birthData, selectedYear })
       });
-
-      console.log('🌐 Event periods response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`Failed to load event periods: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('📊 Event periods data:', data);
       
       const filteredPeriods = (data.periods || []).filter(period => {
         const periodYear = new Date(period.start_date).getFullYear();
         return periodYear === selectedYear;
       }).sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
       
-      console.log('📅 Filtered periods:', filteredPeriods.length);
       setPeriods(filteredPeriods);
     } catch (err) {
-      console.error('❌ Event periods error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -134,7 +128,32 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
     return descriptions[transitPlanet] || 'Important planetary influence';
   };
 
-  const yearOptions = Array.from({ length: 131 }, (_, i) => 1950 + i);
+  const yearOptions = Array.from({ length: 121 }, (_, i) => 1950 + i);
+
+  const showYearPicker = () => {
+    if (Platform.OS === 'ios') {
+      // Create options with current year highlighted
+      const currentIndex = yearOptions.indexOf(selectedYear);
+      const yearLabels = yearOptions.map(year => 
+        year === selectedYear ? `${year} ✓` : year.toString()
+      );
+      
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', ...yearLabels],
+          cancelButtonIndex: 0,
+          title: `Select Year (Current: ${selectedYear})`
+        },
+        (buttonIndex) => {
+          if (buttonIndex > 0) {
+            setSelectedYear(yearOptions[buttonIndex - 1]);
+          }
+        }
+      );
+    } else {
+      Alert.alert('Year Selection', 'Use the arrows to change year');
+    }
+  };
 
   if (loading) {
     return (
@@ -170,8 +189,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
     );
   }
 
-  console.log('📅 EventPeriods render:', { visible, loading, error, periodsCount: periods.length });
-  
   return (
     <Modal visible={visible} animationType="slide">
       <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
@@ -182,23 +199,13 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
               <Ionicons name="arrow-back" size={20} color="white" />
             </TouchableOpacity>
             
-            <View style={styles.yearSelector}>
-              <TouchableOpacity 
-                style={styles.yearBtn} 
-                onPress={() => setSelectedYear(Math.max(2020, selectedYear - 1))}
-              >
-                <Text style={styles.yearBtnText}>‹</Text>
-              </TouchableOpacity>
-              
+            <TouchableOpacity 
+              style={styles.yearSelector}
+              onPress={() => showYearPicker()}
+            >
               <Text style={styles.yearText}>{selectedYear}</Text>
-              
-              <TouchableOpacity 
-                style={styles.yearBtn} 
-                onPress={() => setSelectedYear(Math.min(2030, selectedYear + 1))}
-              >
-                <Text style={styles.yearBtnText}>›</Text>
-              </TouchableOpacity>
-            </View>
+              <Ionicons name="chevron-down" size={16} color="#333" />
+            </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.toggleBtn} 
@@ -359,26 +366,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     height: 35,
     marginHorizontal: 10,
-  },
-  yearBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  yearBtnText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ff6b35',
+    minWidth: 80,
   },
   yearText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#333',
-    marginHorizontal: 15,
-    minWidth: 50,
-    textAlign: 'center',
+    marginRight: 5,
   },
   toggleBtn: {
     backgroundColor: COLORS.secondary,

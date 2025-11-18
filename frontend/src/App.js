@@ -1085,7 +1085,7 @@ function App() {
         {currentView === 'dashboard' && (
           <Dashboard 
             onBack={() => setCurrentView('astroroshnihomepage')} 
-            onViewAllCharts={() => setCurrentView('astroroshnihomepage')}
+            onViewAllCharts={() => setCurrentView('selector')}
             currentView={currentView} 
             setCurrentView={setCurrentView} 
             onLogout={handleLogout}

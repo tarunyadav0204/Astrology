@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -57,9 +57,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
     trimshamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60
   };
 
-  const toggleStyle = () => {
+  const toggleStyle = useCallback(() => {
     setChartStyle(prev => prev === 'north' ? 'south' : 'north');
-  };
+  }, []);
+  
+  const memoizedChartTypes = useMemo(() => chartTypes, []);
+  const memoizedChartTitles = useMemo(() => chartTitles, []);
 
   useEffect(() => {
     loadChartData(currentChartType);
@@ -125,44 +128,50 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
   };
 
   const onSwipeGesture = (event) => {
-    const { translationX, state } = event.nativeEvent;
+    const { translationX, state, velocityX } = event.nativeEvent;
     
     // Update animation during gesture
     if (state === 2) { // ACTIVE state
-      slideAnim.setValue(translationX / width);
+      const normalizedTranslation = Math.max(-1, Math.min(1, translationX / (width * 0.3)));
+      slideAnim.setValue(normalizedTranslation);
     }
     
     // Handle gesture end
-    if (state === 5 && Math.abs(translationX) > 50) { // END state
-      setShowSwipeHint(false);
-      const currentIndex = chartTypes.indexOf(currentChartType);
-      let newIndex;
+    if (state === 5) { // END state
+      const threshold = Math.abs(velocityX) > 500 ? 50 : 100;
+      const shouldSwipe = Math.abs(translationX) > threshold;
       
-      if (translationX > 0) {
-        // Swipe right - previous chart
-        newIndex = currentIndex > 0 ? currentIndex - 1 : chartTypes.length - 1;
+      if (shouldSwipe) {
+        setShowSwipeHint(false);
+        const currentIndex = chartTypes.indexOf(currentChartType);
+        let newIndex;
+        
+        if (translationX > 0) {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : chartTypes.length - 1;
+        } else {
+          newIndex = currentIndex < chartTypes.length - 1 ? currentIndex + 1 : 0;
+        }
+        
+        setCurrentChartType(chartTypes[newIndex]);
+        
+        // Complete the swipe animation
+        Animated.spring(slideAnim, {
+          toValue: translationX > 0 ? 1 : -1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }).start(() => {
+          slideAnim.setValue(0);
+        });
       } else {
-        // Swipe left - next chart
-        newIndex = currentIndex < chartTypes.length - 1 ? currentIndex + 1 : 0;
+        // Snap back
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 150,
+          friction: 10,
+        }).start();
       }
-      
-      setCurrentChartType(chartTypes[newIndex]);
-      
-      // Reset animation
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }).start();
-    } else if (state === 5) {
-      // Snap back if swipe wasn't far enough
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }).start();
     }
   };
   
@@ -177,21 +186,16 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
       newIndex = currentIndex < chartTypes.length - 1 ? currentIndex + 1 : 0;
     }
     
-    // Animate transition
-    Animated.sequence([
-      Animated.timing(slideAnim, {
-        toValue: direction === 'prev' ? 1 : -1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    setCurrentChartType(chartTypes[newIndex]);
     
-    setTimeout(() => setCurrentChartType(chartTypes[newIndex]), 150);
+    // Smooth programmatic transition
+    Animated.timing(slideAnim, {
+      toValue: direction === 'prev' ? 1 : -1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start(() => {
+      slideAnim.setValue(0);
+    });
   };
   
   // Hide swipe hint after 3 seconds
@@ -200,7 +204,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
     return () => clearTimeout(timer);
   }, []);
   
-  const renderChart = (type, data) => {
+  const renderChart = useCallback((type, data) => {
     if (!type || !data) {
       return (
         <View style={styles.loadingContainer}>
@@ -224,7 +228,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
         showDegreeNakshatra={showDegreeNakshatra}
       />
     );
-  };
+  }, [chartStyle, birthData, showDegreeNakshatra]);
 
   return (
     <View style={styles.container}>
@@ -279,57 +283,41 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
           onGestureEvent={onSwipeGesture}
           onHandlerStateChange={onSwipeGesture}
           activeOffsetX={[-10, 10]}
-          failOffsetY={[-50, 50]}
+          failOffsetY={[-20, 20]}
         >
-          <View style={styles.carouselContainer}>
+          <Animated.View style={[
+            styles.carouselContainer,
+            {
+              transform: [{
+                translateX: slideAnim.interpolate({
+                  inputRange: [-1, 0, 1],
+                  outputRange: [width, 0, -width],
+                  extrapolate: 'clamp',
+                })
+              }]
+            }
+          ]}>
             {/* Previous Chart */}
-            <Animated.View style={[
-              styles.chartSlide,
-              {
-                transform: [{
-                  translateX: slideAnim.interpolate({
-                    inputRange: [-1, 0, 1],
-                    outputRange: [0, -width, -width * 2],
-                    extrapolate: 'clamp',
-                  })
-                }]
-              }
-            ]}>
-              {renderChart(prevChartType, chartDataCache[prevChartType])}
-            </Animated.View>
+            <View style={[styles.chartSlide, { left: -width }]}>
+              <View style={styles.chartCard}>
+                {renderChart(prevChartType, chartDataCache[prevChartType])}
+              </View>
+            </View>
             
             {/* Current Chart */}
-            <Animated.View style={[
-              styles.chartSlide,
-              {
-                transform: [{
-                  translateX: slideAnim.interpolate({
-                    inputRange: [-1, 0, 1],
-                    outputRange: [width, 0, -width],
-                    extrapolate: 'clamp',
-                  })
-                }]
-              }
-            ]}>
-              {renderChart(currentChartType, currentChartData)}
-            </Animated.View>
+            <View style={[styles.chartSlide, { left: 0 }]}>
+              <View style={styles.chartCard}>
+                {renderChart(currentChartType, currentChartData)}
+              </View>
+            </View>
             
             {/* Next Chart */}
-            <Animated.View style={[
-              styles.chartSlide,
-              {
-                transform: [{
-                  translateX: slideAnim.interpolate({
-                    inputRange: [-1, 0, 1],
-                    outputRange: [width * 2, width, 0],
-                    extrapolate: 'clamp',
-                  })
-                }]
-              }
-            ]}>
-              {renderChart(nextChartType, chartDataCache[nextChartType])}
-            </Animated.View>
-          </View>
+            <View style={[styles.chartSlide, { left: width }]}>
+              <View style={styles.chartCard}>
+                {renderChart(nextChartType, chartDataCache[nextChartType])}
+              </View>
+            </View>
+          </Animated.View>
         </PanGestureHandler>
         
         {showSwipeHint && (
@@ -337,15 +325,45 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
             styles.swipeHint,
             {
               opacity: slideAnim.interpolate({
-                inputRange: [-1, 0, 1],
-                outputRange: [0.3, 1, 0.3],
-              })
+                inputRange: [-0.5, 0, 0.5],
+                outputRange: [0.5, 1, 0.5],
+                extrapolate: 'clamp',
+              }),
+              transform: [{
+                translateY: slideAnim.interpolate({
+                  inputRange: [-1, 0, 1],
+                  outputRange: [5, 0, 5],
+                  extrapolate: 'clamp',
+                })
+              }]
             }
           ]}>
             <View style={styles.swipeIndicator}>
+              <Animated.View style={[
+                styles.swipeDot,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [-1, 0, 1],
+                      outputRange: [2, 0, -2],
+                      extrapolate: 'clamp',
+                    })
+                  }]
+                }
+              ]} />
               <View style={styles.swipeDot} />
-              <View style={styles.swipeDot} />
-              <View style={styles.swipeDot} />
+              <Animated.View style={[
+                styles.swipeDot,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [-1, 0, 1],
+                      outputRange: [-2, 0, 2],
+                      extrapolate: 'clamp',
+                    })
+                  }]
+                }
+              ]} />
             </View>
             <Text style={styles.swipeHintText}>Swipe left or right</Text>
           </Animated.View>
@@ -446,14 +464,17 @@ const styles = StyleSheet.create({
   carouselContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: '100%',
+    width: width * 3,
   },
   chartSlide: {
     width: width,
-    flex: 1,
     position: 'absolute',
     top: 0,
     bottom: 0,
+  },
+  chartCard: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   swipeHint: {
     position: 'absolute',

@@ -12,6 +12,10 @@ const AdminPanel = ({ user, onLogout }) => {
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [pendingSubscription, setPendingSubscription] = useState(null);
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [creditStats, setCreditStats] = useState({});
+  const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1 });
+  const [creditSettings, setCreditSettings] = useState([]);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -19,6 +23,10 @@ const AdminPanel = ({ user, onLogout }) => {
       fetchSubscriptionPlans();
     } else if (activeTab === 'charts') {
       fetchCharts();
+    } else if (activeTab === 'credits') {
+      fetchPromoCodes();
+      fetchCreditStats();
+      fetchCreditSettings();
     }
   }, [activeTab]);
 
@@ -104,6 +112,119 @@ const AdminPanel = ({ user, onLogout }) => {
     }
   };
 
+  const fetchPromoCodes = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/promo-codes', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setPromoCodes(data.promo_codes || []);
+    } catch (error) {
+      console.error('Error fetching promo codes:', error);
+    }
+  };
+
+  const fetchCreditStats = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/stats', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setCreditStats(data);
+    } catch (error) {
+      console.error('Error fetching credit stats:', error);
+    }
+  };
+
+  const handleCreatePromoCode = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/promo-codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(newPromoCode)
+      });
+      
+      if (response.ok) {
+        setNewPromoCode({ code: '', credits: 100, max_uses: 1 });
+        fetchPromoCodes();
+        fetchCreditStats();
+      }
+    } catch (error) {
+      console.error('Error creating promo code:', error);
+    }
+  };
+
+  const handleBulkPromoCodes = async () => {
+    const prefix = prompt('Enter prefix for bulk codes (e.g., SPECIAL):');
+    const count = parseInt(prompt('How many codes to create?', '10'));
+    const credits = parseInt(prompt('Credits per code:', '50'));
+    
+    if (prefix && count && credits) {
+      try {
+        const response = await fetch('/api/credits/admin/bulk-promo-codes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ prefix, count, credits, max_uses: 1 })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          alert(`Created ${data.codes.length} promo codes`);
+          fetchPromoCodes();
+          fetchCreditStats();
+        }
+      } catch (error) {
+        console.error('Error creating bulk promo codes:', error);
+      }
+    }
+  };
+
+  const fetchCreditSettings = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/settings', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setCreditSettings(data.settings || []);
+    } catch (error) {
+      console.error('Error fetching credit settings:', error);
+    }
+  };
+
+  const handleUpdateSettings = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ settings: creditSettings })
+      });
+      
+      if (response.ok) {
+        alert('Settings updated successfully');
+        fetchCreditSettings();
+      }
+    } catch (error) {
+      console.error('Error updating settings:', error);
+    }
+  };
+
+  const handleSettingChange = (key, value) => {
+    setCreditSettings(prev => 
+      prev.map(setting => 
+        setting.key === key ? { ...setting, value: parseInt(value) } : setting
+      )
+    );
+  };
+
   return (
     <div className="admin-panel">
       <div className="admin-header">
@@ -129,6 +250,12 @@ const AdminPanel = ({ user, onLogout }) => {
           onClick={() => setActiveTab('chat')}
         >
           Chat History
+        </button>
+        <button 
+          className={`tab ${activeTab === 'credits' ? 'active' : ''}`}
+          onClick={() => setActiveTab('credits')}
+        >
+          Credit Management
         </button>
       </div>
 
@@ -314,6 +441,129 @@ const AdminPanel = ({ user, onLogout }) => {
 
         {activeTab === 'chat' && (
           <AdminChatHistory />
+        )}
+
+        {activeTab === 'credits' && (
+          <div className="credits-management">
+            <h2>Credit Management</h2>
+            
+            <div className="credit-settings">
+              <h3>Chat Question Cost</h3>
+              <div className="settings-form">
+                {creditSettings.filter(setting => setting.key === 'chat_question_cost').map(setting => (
+                  <div key={setting.key} className="setting-item">
+                    <label>{setting.description}</label>
+                    <input
+                      type="number"
+                      value={setting.value}
+                      onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                      min="1"
+                    />
+                  </div>
+                ))}
+                <button onClick={handleUpdateSettings} className="update-settings-btn">
+                  Update Cost
+                </button>
+              </div>
+            </div>
+
+            <div className="credit-stats">
+              <h3>Statistics</h3>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <h4>Total Codes</h4>
+                  <p>{creditStats.total_codes || 0}</p>
+                </div>
+                <div className="stat-card">
+                  <h4>Active Codes</h4>
+                  <p>{creditStats.active_codes || 0}</p>
+                </div>
+                <div className="stat-card">
+                  <h4>Used Codes</h4>
+                  <p>{creditStats.used_codes || 0}</p>
+                </div>
+                <div className="stat-card">
+                  <h4>Credits Distributed</h4>
+                  <p>{creditStats.total_credits_distributed || 0}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="promo-code-creation">
+              <h3>Create Promo Code</h3>
+              <div className="create-form">
+                <div className="form-field">
+                  <label>Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., WELCOME123"
+                    value={newPromoCode.code}
+                    onChange={(e) => setNewPromoCode({...newPromoCode, code: e.target.value.toUpperCase()})}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Credits</label>
+                  <input
+                    type="number"
+                    placeholder="100"
+                    value={newPromoCode.credits}
+                    onChange={(e) => setNewPromoCode({...newPromoCode, credits: parseInt(e.target.value)})}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Max Uses Per User</label>
+                  <input
+                    type="number"
+                    placeholder="1"
+                    value={newPromoCode.max_uses}
+                    onChange={(e) => setNewPromoCode({...newPromoCode, max_uses: parseInt(e.target.value)})}
+                  />
+                </div>
+                <div className="form-buttons">
+                  <button onClick={handleCreatePromoCode} className="create-btn">
+                    Create Code
+                  </button>
+                  <button onClick={handleBulkPromoCodes} className="bulk-btn">
+                    Create Bulk Codes
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="promo-codes-list">
+              <h3>Promo Codes</h3>
+              <div className="codes-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Credits</th>
+                      <th>Max Uses Per User</th>
+                      <th>Used Count</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promoCodes.map(code => (
+                      <tr key={code.code}>
+                        <td><strong>{code.code}</strong></td>
+                        <td>{code.credits}</td>
+                        <td>{code.max_uses}</td>
+                        <td>{code.used_count}</td>
+                        <td>
+                          <span className={`status ${code.is_active ? 'active' : 'inactive'}`}>
+                            {code.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>{new Date(code.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

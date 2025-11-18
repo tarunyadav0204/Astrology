@@ -1,5 +1,5 @@
 from calculators.planet_analyzer import PlanetAnalyzer
-from ashtakavarga import AshtakavargaCalculator
+from calculators.ashtakavarga import AshtakavargaCalculator
 
 class TenthHouseAnalyzer:
     def __init__(self, chart_data, birth_details):

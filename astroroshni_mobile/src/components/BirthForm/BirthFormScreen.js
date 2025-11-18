@@ -23,7 +23,7 @@ import { COLORS } from '../../utils/constants';
 
 export default function BirthFormScreen({ navigation }) {
   const addWelcomeMessage = navigation.getParent()?.getState()?.routes?.find(r => r.name === 'Chat')?.params?.addWelcomeMessage;
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState('saved');
   const [formData, setFormData] = useState({
     name: '',
     date: new Date(),
@@ -46,31 +46,16 @@ export default function BirthFormScreen({ navigation }) {
   const [searchTimeout, setSearchTimeout] = useState(null);
 
   useEffect(() => {
-    loadSavedData();
     loadExistingCharts();
   }, []);
 
-  const loadSavedData = async () => {
-    try {
-      const savedData = await storage.getBirthDetails();
-      if (savedData) {
-        setFormData({
-          ...savedData,
-          date: new Date(savedData.date),
-          time: new Date(savedData.time),
-        });
-      }
-    } catch (error) {
-      console.error('Error loading saved data:', error);
-    }
-  };
+
 
   const loadExistingCharts = async (search = '') => {
     try {
       const response = await chartAPI.getExistingCharts(search);
       setExistingCharts(response.data.charts || []);
     } catch (error) {
-      console.error('Failed to load existing charts:', error);
       setExistingCharts([]);
     }
   };
@@ -107,14 +92,12 @@ export default function BirthFormScreen({ navigation }) {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
     if (selectedDate) {
       handleInputChange('date', selectedDate);
     }
   };
 
   const handleTimeChange = (event, selectedTime) => {
-    setShowTimePicker(false);
     if (selectedTime) {
       handleInputChange('time', selectedTime);
     }
@@ -157,16 +140,35 @@ export default function BirthFormScreen({ navigation }) {
         Alert.alert('Success', 'Chart updated successfully!');
         loadExistingCharts(searchQuery);
         setEditingChart(null);
+        setFormData({
+          name: '',
+          date: new Date(),
+          time: new Date(),
+          place: '',
+          latitude: null,
+          longitude: null,
+          timezone: 'Asia/Kolkata',
+          gender: '',
+        });
         setActiveTab('saved');
       } else {
-        // Save birth details locally
-        await storage.setBirthDetails(formData);
-        
-        // Calculate chart
+        // Calculate chart without saving to database
         const [chartData, yogiData] = await Promise.all([
-          chartAPI.calculateChart(birthData),
+          chartAPI.calculateChartOnly(birthData),
           chartAPI.calculateYogi(birthData)
         ]);
+
+        // Save birth details locally with consistent time format
+        await storage.setBirthDetails({
+          ...formData,
+          time: formData.time.toTimeString().split(' ')[0] // Save as HH:MM:SS string
+        });
+        
+        // Store chart data for viewing
+        await storage.setChartData({
+          birthData: birthData,
+          chartData: chartData
+        });
 
         Alert.alert(
           'Success',
@@ -188,26 +190,26 @@ export default function BirthFormScreen({ navigation }) {
 
   const selectExistingChart = async (chart) => {
     try {
-      const birthData = {
+      // Parse time properly
+      let timeDate;
+      if (chart.time.includes(':')) {
+        const [hours, minutes] = chart.time.split(':');
+        timeDate = new Date();
+        timeDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      } else {
+        timeDate = new Date(chart.time);
+      }
+      
+      // Just load the existing chart data without creating new entry
+      await storage.setBirthDetails({
         name: chart.name,
-        date: chart.date,
-        time: chart.time,
+        date: new Date(chart.date),
+        time: timeDate,
+        place: chart.place || '',
         latitude: chart.latitude,
         longitude: chart.longitude,
         timezone: chart.timezone,
-        place: chart.place || '',
         gender: chart.gender || ''
-      };
-      
-      const [chartData, yogiData] = await Promise.all([
-        chartAPI.calculateChart(birthData),
-        chartAPI.calculateYogi(birthData)
-      ]);
-      
-      await storage.setBirthDetails({
-        ...birthData,
-        date: new Date(chart.date),
-        time: chart.time // Keep original time format
       });
 
       // Add welcome message to chat if callback exists
@@ -229,10 +231,30 @@ export default function BirthFormScreen({ navigation }) {
 
   const editChart = (chart) => {
     setEditingChart(chart);
+    
+    // Parse time properly to avoid NaN
+    let timeDate;
+    try {
+      if (chart.time.includes(':')) {
+        const [hours, minutes] = chart.time.split(':');
+        timeDate = new Date();
+        timeDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+      } else {
+        timeDate = new Date(chart.time);
+        if (isNaN(timeDate.getTime())) {
+          timeDate = new Date();
+          timeDate.setHours(12, 0, 0, 0); // Default to noon
+        }
+      }
+    } catch (error) {
+      timeDate = new Date();
+      timeDate.setHours(12, 0, 0, 0); // Default to noon
+    }
+    
     setFormData({
       name: chart.name,
       date: new Date(chart.date),
-      time: chart.time.includes(':') ? new Date(`1970-01-01T${chart.time}`) : new Date(chart.time),
+      time: timeDate,
       place: chart.place || `${chart.latitude}, ${chart.longitude}`,
       latitude: chart.latitude,
       longitude: chart.longitude,
@@ -270,7 +292,7 @@ export default function BirthFormScreen({ navigation }) {
       setSuggestions(places);
       setShowSuggestions(true);
     } catch (error) {
-      console.error('Location search error:', error);
+      // Location search error
     }
   };
 
