@@ -12,7 +12,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import ChatModal from '../Chat/ChatModal';
 import CreditsModal from '../Credits/CreditsModal';
 import PanchangWidget from '../PanchangWidget/HomePanchangWidget';
-import BirthForm from '../BirthForm/BirthForm';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
@@ -33,6 +33,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
   const [showChartModal, setShowChartModal] = useState(false);
+  const [showBirthFormModal, setShowBirthFormModal] = useState(false);
   const [chartRefHighlight, setChartRefHighlight] = useState(null);
   const [matchingData, setMatchingData] = useState({
     boy: { name: '', day: '', month: '', year: '', hours: '', minutes: '', seconds: '', place: '' },
@@ -930,13 +931,22 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
             {/* Column 2 - Chart Widget (20%) */}
             <div className="form-card birth-chart-widget">
-              <BirthForm 
-                onSubmit={() => {
-                  setShowChartModal(true);
-                }} 
-                user={user}
-                onLogout={onLogout}
-              />
+              <div className="birth-chart-content">
+                <h3>📊 Birth Chart</h3>
+                <p>Generate your complete Vedic birth chart</p>
+                <div className="chart-features">
+                  <div className="feature-item">🌟 Lagna Chart</div>
+                  <div className="feature-item">🌙 Navamsa Chart</div>
+                  <div className="feature-item">⏰ Dasha Periods</div>
+                  <div className="feature-item">🎯 Predictions</div>
+                </div>
+                <button 
+                  className="chart-btn"
+                  onClick={() => user ? setShowBirthFormModal(true) : onLogin()}
+                >
+                  Generate Chart
+                </button>
+              </div>
             </div>
 
             {/* Column 3 - Nakshatra Widget (20%) */}
@@ -1555,6 +1565,17 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
         </div>
       )}
+      
+      <BirthFormModal
+        isOpen={showBirthFormModal}
+        onClose={() => setShowBirthFormModal(false)}
+        onSubmit={() => {
+          setShowBirthFormModal(false);
+          setShowChartModal(true);
+        }}
+        title="Birth Chart - Enter Details"
+        description="Please provide your birth information to generate your Vedic birth chart"
+      />
     </div>
   );
 };

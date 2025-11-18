@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
-import BirthForm from '../BirthForm/BirthForm';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import './NativeSelector.css';
 
 const NativeSelector = ({ birthData, onNativeChange }) => {
@@ -31,23 +30,13 @@ const NativeSelector = ({ birthData, onNativeChange }) => {
         </button>
       </div>
 
-      {showForm && createPortal(
-        <div className="form-modal">
-          <div className="form-modal-content">
-            <div className="form-modal-header">
-              <h3>Select Different Native</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowForm(false)}
-              >
-                ×
-              </button>
-            </div>
-            <BirthForm onSubmit={handleFormSubmit} />
-          </div>
-        </div>,
-        document.body
-      )}
+      <BirthFormModal
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        onSubmit={handleFormSubmit}
+        title="Select Different Native"
+        description="Choose a different person's birth details for analysis"
+      />
     </div>
   );
 };
