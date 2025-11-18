@@ -330,12 +330,32 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
   return (
     <TabContainer key="fixed-tabs-v2">
       {/* Tab Navigation */}
-      <TabNavigation>
+      <TabNavigation style={{
+        display: 'flex',
+        background: '#f8f9fa',
+        borderRadius: '0',
+        margin: '0',
+        borderBottom: '2px solid #e5e7eb',
+        padding: '0'
+      }}>
         <TabButton
           type="button"
           onClick={() => setActiveTab('new')}
           active={activeTab === 'new'}
           isFirst={true}
+          style={{
+            flex: '1',
+            padding: '12px 20px',
+            background: activeTab === 'new' ? 'white' : 'transparent',
+            color: activeTab === 'new' ? '#2563eb' : '#6b7280',
+            border: 'none',
+            borderRadius: '0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'new' ? '600' : '500',
+            fontSize: '14px',
+            borderBottom: activeTab === 'new' ? '2px solid #2563eb' : '2px solid transparent',
+            margin: '0'
+          }}
         >
           📝 New Chart
         </TabButton>
@@ -344,6 +364,19 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
           onClick={() => setActiveTab('saved')}
           active={activeTab === 'saved'}
           isLast={true}
+          style={{
+            flex: '1',
+            padding: '12px 20px',
+            background: activeTab === 'saved' ? 'white' : 'transparent',
+            color: activeTab === 'saved' ? '#2563eb' : '#6b7280',
+            border: 'none',
+            borderRadius: '0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'saved' ? '600' : '500',
+            fontSize: '14px',
+            borderBottom: activeTab === 'saved' ? '2px solid #2563eb' : '2px solid transparent',
+            margin: '0'
+          }}
         >
           📊 Saved Charts
         </TabButton>
@@ -353,6 +386,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
       {activeTab === 'new' ? (
         <TabContent>
         <FormContainer style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', zIndex: 3, padding: '20px 32px 40px 32px' }}>
           <h2>
             {prefilledData ? 'Marriage Analysis - Enter Details' : 'Birth Details'}
           </h2>
@@ -456,11 +490,11 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
           )}
           </div>
           </form>
+          </div>
         </FormContainer>
         </TabContent>
       ) : (
         <TabContent style={{ padding: '0 10px' }}>
-          <h3>📊 Saved Charts</h3>
           <SearchInput
             type="text"
             placeholder="Search by name..."

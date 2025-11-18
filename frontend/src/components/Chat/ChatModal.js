@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import BirthForm from '../BirthForm/BirthForm';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import ChatGreeting from './ChatGreeting';
 import EventPeriods from './EventPeriods';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -1326,6 +1327,15 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     </div>
             </div>
         )}
+        
+        {/* Birth Form Modal */}
+        <BirthFormModal
+            isOpen={showBirthForm}
+            onClose={() => setShowBirthForm(false)}
+            onSubmit={handleBirthFormSubmit}
+            title="Chat - Enter Birth Details"
+            description="Please provide your birth information to start chatting with AstroRoshni"
+        />
         
         {/* Credits Modal */}
         <CreditsModal 

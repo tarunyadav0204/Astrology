@@ -4,7 +4,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
 import AIInsightsTab from '../Health/AIInsightsTab';
-import BirthForm from '../BirthForm/BirthForm';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
@@ -14,7 +14,7 @@ import './HealthAnalysisPage.css';
 const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
-  const [showForm, setShowForm] = useState(!chartData || !birthData);
+  const [showModal, setShowModal] = useState(!chartData || !birthData);
   const [activeTab, setActiveTab] = useState('insights');
 
   const handleAdminClick = () => {
@@ -24,7 +24,7 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
   };
 
   const handleFormSubmit = () => {
-    setShowForm(false);
+    setShowModal(false);
   };
 
   const seoData = generatePageSEO('healthAnalysis', { path: '/health-analysis' });
@@ -64,15 +64,7 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
             <p>Get comprehensive insights about your health, vitality, and wellness prospects</p>
           </div>
 
-          {showForm ? (
-            <div className="form-section">
-              <div className="form-card">
-                <h2>Enter Your Birth Details</h2>
-                <p>Please provide your birth information to generate your health analysis report</p>
-                <BirthForm onSubmit={handleFormSubmit} />
-              </div>
-            </div>
-          ) : (
+          {chartData && birthData ? (
             <>
               <NativeSelector 
                 birthData={birthData} 
@@ -104,7 +96,20 @@ const HealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
                 </div>
               </div>
             </>
+          ) : (
+            <div className="no-data-message">
+              <h3>🌿 Health Analysis Report</h3>
+              <p>Your personalized health analysis will appear here once you provide your birth details.</p>
+            </div>
           )}
+          
+          <BirthFormModal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            onSubmit={handleFormSubmit}
+            title="Health Analysis - Enter Birth Details"
+            description="Please provide your birth information to generate your health analysis report"
+          />
         </div>
       </div>
     </div>

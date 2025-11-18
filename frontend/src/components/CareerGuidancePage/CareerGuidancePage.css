@@ -351,3 +351,25 @@
     grid-template-columns: 1fr;
   }
 }
+.no-data-message {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  margin: 20px 0;
+}
+
+.no-data-message h3 {
+  color: #1f2937;
+  margin-bottom: 12px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.no-data-message p {
+  color: #6b7280;
+  font-size: 16px;
+  margin: 0;
+}

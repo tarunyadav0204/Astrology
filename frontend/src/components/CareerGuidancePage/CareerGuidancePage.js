@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import CareerAnalysisTab from '../Career/CareerAnalysisTab';
-import BirthForm from '../BirthForm/BirthForm';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
@@ -13,7 +13,7 @@ import './CareerGuidancePage.css';
 const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
-  const [showForm, setShowForm] = useState(!chartData || !birthData);
+  const [showModal, setShowModal] = useState(!chartData || !birthData);
 
   const handleAdminClick = () => {
     if (onAdminClick) {
@@ -22,7 +22,7 @@ const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
   };
 
   const handleFormSubmit = () => {
-    setShowForm(false);
+    setShowModal(false);
   };
 
   const seoData = generatePageSEO('careerGuidance', { path: '/career-guidance' });
@@ -62,23 +62,30 @@ const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
             <p>Get comprehensive insights about your career prospects, suitable fields, and professional timing</p>
           </div>
 
-          {showForm ? (
-            <div className="form-section">
-              <div className="form-card">
-                <h2>Enter Your Birth Details</h2>
-                <p>Please provide your birth information to generate your career guidance report</p>
-                <BirthForm onSubmit={handleFormSubmit} />
+          <div className="analysis-section">
+            {chartData && birthData ? (
+              <>
+                <NativeSelector 
+                  birthData={birthData} 
+                  onNativeChange={() => window.location.reload()}
+                />
+                <CareerAnalysisTab chartData={chartData} birthDetails={birthData} />
+              </>
+            ) : (
+              <div className="no-data-message">
+                <h3>🚀 Career Guidance Report</h3>
+                <p>Your personalized career analysis will appear here once you provide your birth details.</p>
               </div>
-            </div>
-          ) : (
-            <div className="analysis-section">
-              <NativeSelector 
-                birthData={birthData} 
-                onNativeChange={() => window.location.reload()}
-              />
-              <CareerAnalysisTab chartData={chartData} birthDetails={birthData} />
-            </div>
-          )}
+            )}
+          </div>
+          
+          <BirthFormModal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            onSubmit={handleFormSubmit}
+            title="Career Guidance - Enter Birth Details"
+            description="Please provide your birth information to generate your career guidance report"
+          />
         </div>
       </div>
     </div>

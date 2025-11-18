@@ -1,0 +1,137 @@
+.birth-form-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.birth-form-modal-content {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #ff9ff3 100%);
+  border-radius: 24px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.birth-form-modal-header {
+  padding: 32px 70px 24px 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.birth-form-modal-header h2 {
+  margin: 0 0 12px 0;
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.birth-form-modal-header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  text-align: center;
+  font-weight: 400;
+}
+
+.birth-form-modal-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  font-size: 20px;
+  color: white;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+}
+
+.birth-form-modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.birth-form-modal-body {
+  padding: 0;
+  max-height: calc(90vh - 100px);
+  overflow-y: auto;
+  width: 100%;
+  max-width: 500px;
+}
+
+.birth-form-modal-body * {
+  max-width: 500px !important;
+  box-sizing: border-box;
+}
+
+.birth-form-modal-body > div {
+  max-width: 500px !important;
+  width: 100% !important;
+}
+
+.birth-form-modal-content {
+  width: 500px !important;
+  max-width: 500px !important;
+}
+
+@media (max-width: 768px) {
+  .birth-form-modal-overlay {
+    padding: 10px;
+  }
+  
+  .birth-form-modal-content {
+    max-height: 95vh;
+    border-radius: 20px;
+  }
+  
+  .birth-form-modal-header {
+    padding: 24px 24px 20px;
+  }
+  
+  .birth-form-modal-close {
+    top: 20px;
+    right: 20px;
+  }
+}
