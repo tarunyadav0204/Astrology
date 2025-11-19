@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import NavigationHeader from '../Shared/NavigationHeader';
 import PanchangHeader from './components/PanchangHeader';
@@ -18,6 +18,7 @@ import './PanchangPage.css';
 
 const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
+  const urlLocation = useLocation();
   const [user, setUser] = useState(propUser);
 
   useEffect(() => {
@@ -35,7 +36,11 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
       setUser(propUser);
     }
   }, [propUser]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const urlParams = new URLSearchParams(urlLocation.search);
+    const dateParam = urlParams.get('date');
+    return dateParam ? new Date(dateParam) : new Date();
+  });
   const [location, setLocation] = useState({
     name: 'New Delhi, India',
     latitude: 28.6139,
@@ -265,17 +270,8 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
             calendarSystem={calendarSystem}
             onCalendarSystemChange={handleCalendarSystemChange}
             festivals={festivals}
+            showMonthlyLink={true}
           />
-
-          <div className="page-header">
-            <h1>Today's Panchang</h1>
-            <p>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • {location.name}</p>
-            <div className="panchang-navigation">
-              <a href="/monthly-panchang" className="monthly-panchang-link">
-                📅 View Monthly Panchang Calendar
-              </a>
-            </div>
-          </div>
 
           <div className="panchang-section">
             <div className="section-header">

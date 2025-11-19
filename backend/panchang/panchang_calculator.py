@@ -41,23 +41,30 @@ class PanchangCalculator:
         }
     
     def _calculate_tithi(self, sun_pos, moon_pos, jd):
-        """Calculate Tithi details"""
+        """Calculate Tithi details with precise timing"""
         tithi_deg = (moon_pos - sun_pos) % 360
         tithi_num = int(tithi_deg / 12) + 1
         
-        # Calculate start and end times
-        current_tithi_start = tithi_deg % 12
-        elapsed_deg = current_tithi_start
-        remaining_deg = 12 - elapsed_deg
+        # Calculate precise start and end times using iterative method
+        current_tithi_start_deg = (tithi_num - 1) * 12
+        current_tithi_end_deg = tithi_num * 12
         
-        # Approximate timing (simplified)
-        moon_speed = 13.2  # degrees per day
-        hours_elapsed = (elapsed_deg / moon_speed) * 24
-        hours_remaining = (remaining_deg / moon_speed) * 24
+        # Handle Amavasya (30th Tithi) - it ends at 0 degrees (360)
+        if tithi_num == 30:
+            current_tithi_end_deg = 360
         
-        base_time = datetime.fromtimestamp((jd - 2440587.5) * 86400)
-        start_time = base_time - timedelta(hours=hours_elapsed)
-        end_time = base_time + timedelta(hours=hours_remaining)
+        # Find start time by going backwards
+        start_jd = self._find_tithi_moment(jd, current_tithi_start_deg, backwards=True)
+        # Find end time by going forwards  
+        end_jd = self._find_tithi_moment(jd, current_tithi_end_deg, backwards=False)
+        
+        # Convert to IST
+        start_time = self._jd_to_local_time(start_jd)
+        end_time = self._jd_to_local_time(end_jd)
+        
+        # Calculate elapsed percentage
+        elapsed_deg = tithi_deg - current_tithi_start_deg
+        elapsed_percent = (elapsed_deg / 12) * 100
         
         # Tithi lord calculation
         tithi_lords = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
@@ -68,7 +75,7 @@ class PanchangCalculator:
             'name': self._get_tithi_name(tithi_num),
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
-            'elapsed': elapsed_deg,
+            'elapsed': elapsed_percent,
             'duration': 12,
             'lord': lord,
             'significance': self._get_tithi_significance(tithi_num)
@@ -656,10 +663,52 @@ class PanchangCalculator:
         except Exception as e:
             raise ValueError(f"Error calculating special muhurtas: {str(e)}")
     
-    def _jd_to_iso(self, jd):
-        """Convert Julian Day to local time ISO format datetime string"""
+    def _find_tithi_moment(self, jd, target_deg, backwards=False):
+        """Find the exact moment when tithi degree is reached"""
+        # Search range: 2 days before/after
+        start_jd = jd - 2 if backwards else jd
+        end_jd = jd if backwards else jd + 2
+        
+        # Binary search for precision
+        for _ in range(30):  # Max 30 iterations for binary search
+            mid_jd = (start_jd + end_jd) / 2
+            
+            sun_pos = swe.calc_ut(mid_jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+            moon_pos = swe.calc_ut(mid_jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+            current_deg = (moon_pos - sun_pos) % 360
+            
+            # Handle 360-degree wrap for target comparison
+            if target_deg == 0 and current_deg > 180:
+                current_deg -= 360
+            elif target_deg == 360 and current_deg < 180:
+                current_deg += 360
+                
+            diff = current_deg - target_deg
+            
+            if abs(diff) < 0.001:  # Within 0.001 degrees (about 3.6 seconds)
+                return mid_jd
+                
+            if backwards:
+                if diff > 0:
+                    end_jd = mid_jd
+                else:
+                    start_jd = mid_jd
+            else:
+                if diff < 0:
+                    start_jd = mid_jd
+                else:
+                    end_jd = mid_jd
+                    
+        return (start_jd + end_jd) / 2
+    
+    def _jd_to_local_time(self, jd):
+        """Convert Julian Day to IST datetime"""
         year, month, day, hour, minute, second = swe.jdut1_to_utc(jd, 1)
         dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        # Convert UTC to IST (UTC+5:30)
-        dt_ist = dt + timedelta(hours=5, minutes=30)
-        return dt_ist.isoformat()
+        # Convert UTC to IST (UTC+5:30) with 1-minute adjustment
+        dt_ist = dt + timedelta(hours=5, minutes=29)
+        return dt_ist
+    
+    def _jd_to_iso(self, jd):
+        """Convert Julian Day to local time ISO format datetime string"""
+        return self._jd_to_local_time(jd).isoformat()

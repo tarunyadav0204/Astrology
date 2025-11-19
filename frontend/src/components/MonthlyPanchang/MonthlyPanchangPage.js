@@ -75,7 +75,10 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
   };
 
   const handleDayClick = (dayData) => {
-    setSelectedDayData(dayData);
+    if (dayData) {
+      const dateStr = dayData.date;
+      navigate(`/panchang?date=${dateStr}`);
+    }
   };
 
   const renderCalendar = () => {

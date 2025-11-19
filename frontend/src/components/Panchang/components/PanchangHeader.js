@@ -8,7 +8,8 @@ const PanchangHeader = ({
   onLocationChange,
   calendarSystem,
   onCalendarSystemChange,
-  festivals 
+  festivals,
+  showMonthlyLink = false
 }) => {
   const formatDateForCalendar = (date) => {
     return date.toISOString().split('T')[0];
@@ -32,7 +33,7 @@ const PanchangHeader = ({
   return (
     <div className="panchang-header">
       <div className="header-row">
-        <div className="date-navigation">
+        <div className="date-navigation-container">
           <button className="nav-btn" onClick={() => navigateDate(-1)}>←</button>
           <input 
             type="date" 
@@ -54,14 +55,19 @@ const PanchangHeader = ({
           <span>📍 {location.name}</span>
           <button className="change-location-btn" onClick={onLocationChange}>Change</button>
         </div>
+        {showMonthlyLink && (
+          <a href="/monthly-panchang" className="monthly-panchang-link">
+            📅 View Monthly Panchang Calendar
+          </a>
+        )}
       </div>
       <div className="date-display">
-        {selectedDate.toLocaleDateString('en-US', { 
+        <h1>{selectedDate.toDateString() === new Date().toDateString() ? "Today's" : ""} Panchang - {selectedDate.toLocaleDateString('en-US', { 
           weekday: 'long', 
           year: 'numeric', 
           month: 'long', 
           day: 'numeric' 
-        })}
+        })}</h1>
       </div>
     </div>
   );
