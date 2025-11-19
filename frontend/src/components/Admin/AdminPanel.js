@@ -5,8 +5,16 @@ import AdminChatHistory from './AdminChatHistory';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
-const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
   const navigate = useNavigate();
+  
+  const handleHomeClick = () => {
+    if (onHomeClick) {
+      onHomeClick();
+    } else {
+      navigate('/');
+    }
+  };
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [charts, setCharts] = useState([]);
@@ -237,10 +245,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) 
         onLogout={onLogout || (() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          navigate('/');
+          handleHomeClick();
         })}
-        onLogin={onLogin || (() => navigate('/'))}
+        onLogin={onLogin || (() => handleHomeClick())}
         showLoginButton={showLoginButton}
+        onHomeClick={handleHomeClick}
       />
       <div className="admin-content-wrapper">
 

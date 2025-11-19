@@ -68,7 +68,7 @@ const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
             <>
               <NativeSelector 
                 birthData={birthData} 
-                onNativeChange={() => window.location.reload()}
+                onNativeChange={() => setShowModal(true)}
               />
               <div className="analysis-section">
                 <div className="tab-navigation">

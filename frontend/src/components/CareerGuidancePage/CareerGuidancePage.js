@@ -67,7 +67,7 @@ const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
               <>
                 <NativeSelector 
                   birthData={birthData} 
-                  onNativeChange={() => window.location.reload()}
+                  onNativeChange={() => setShowModal(true)}
                 />
                 <CareerAnalysisTab chartData={chartData} birthDetails={birthData} />
               </>

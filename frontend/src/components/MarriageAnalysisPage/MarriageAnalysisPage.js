@@ -83,7 +83,7 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
               <>
                 <NativeSelector 
                   birthData={birthData} 
-                  onNativeChange={() => window.location.reload()}
+                  onNativeChange={() => setShowModal(true)}
                 />
                 <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />
               </>

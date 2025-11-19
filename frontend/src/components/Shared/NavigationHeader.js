@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCredits } from '../../context/CreditContext';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick }) => {
+const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
 
@@ -53,7 +53,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
       <div className="main-nav">
         <div className="container">
           <div className="logo-section">
-            <button className="logo-text" onClick={() => navigate('/')}>
+            <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
               🔮 AstroRoshni
             </button>
           </div>
@@ -90,7 +90,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
       <nav className="navigation">
         <div className="container">
           <ul className="nav-menu">
-            <li><a href="/#home">Home</a></li>
+            <li><button onClick={onHomeClick || (() => navigate('/'))}>Home</button></li>
             <li className="dropdown">
               <a href="#horoscope" className="dropdown-toggle">Horoscope</a>
               <div className="dropdown-content">

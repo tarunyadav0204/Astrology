@@ -886,9 +886,10 @@ function App() {
           <AdminPanel 
             user={user} 
             onLogout={handleLogout} 
-            onAdminClick={handleAdminClick}
+            onAdminClick={() => setCurrentView('astroroshnihomepage')}
             onLogin={() => setShowLoginModal(true)}
             showLoginButton={false}
+            onHomeClick={() => setCurrentView('astroroshnihomepage')}
           />
         )}
         {currentView === 'selector' && (
