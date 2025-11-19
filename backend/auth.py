@@ -5,7 +5,13 @@ import sqlite3
 import jwt
 
 # JWT Configuration
-SECRET_KEY = "astrology-app-secret-key-2024"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise ValueError("JWT_SECRET environment variable is required")
 ALGORITHM = "HS256"
 security = HTTPBearer()
 

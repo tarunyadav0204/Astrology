@@ -883,7 +883,13 @@ function App() {
           />
         )}
         {currentView === 'admin' && (
-          <AdminPanel user={user} onLogout={handleLogout} />
+          <AdminPanel 
+            user={user} 
+            onLogout={handleLogout} 
+            onAdminClick={handleAdminClick}
+            onLogin={() => setShowLoginModal(true)}
+            showLoginButton={false}
+          />
         )}
         {currentView === 'selector' && (
           <ChartSelector 
