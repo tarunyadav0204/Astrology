@@ -16,8 +16,10 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
 
   useEffect(() => {
     setAspectTimelines({});
-    fetchVedicAspects();
     fetchDashaTimeline();
+    if (birthData) {
+      loadBulkTimelines(currentYear);
+    }
   }, [birthData]);
 
   useEffect(() => {
@@ -32,22 +34,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     return () => clearTimeout(timer);
   }, [currentYear]);
 
-  const fetchVedicAspects = async () => {
-    try {
-      const response = await fetch('/api/vedic-transit-aspects', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ birth_data: birthData })
-      });
-      
-      const data = await response.json();
-      setAspects(data.aspects || []);
-    } catch (error) {
-      console.error('Error fetching Vedic aspects:', error);
-    }
-  };
+
 
   const fetchDashaTimeline = async () => {
     try {
@@ -74,49 +61,39 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
     }
   };
 
-  const loadTimeline = async (aspect, year) => {
+  const loadBulkTimelines = async (year) => {
     try {
-      const response = await fetch('/api/vedic-transit-timeline', {
+      const response = await fetch('/api/vedic-transit-timelines-bulk', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           birth_data: birthData,
-          aspect_type: aspect.aspect_type,
-          planet1: aspect.planet1,
-          planet2: aspect.planet2,
-          start_year: year,
-          year_range: 1,
-          required_transit_house: aspect.required_transit_house,
-          enhancement_type: aspect.enhancement_type
+          year: year,
+          year_range: 1
         })
       });
       
       const data = await response.json();
-      const aspectKey = `${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`;
-      setAspectTimelines(prev => ({
-        ...prev,
-        [aspectKey]: data.timeline || []
-      }));
+      setAspects(data.aspects || []);
+      setAspectTimelines(data.timelines || {});
     } catch (error) {
-      console.error('Error loading timeline:', error);
+      console.error('Error loading bulk timelines:', error);
     }
   };
 
-  const handleYearChange = (year) => {
+  const handleYearChange = async (year) => {
     setCurrentYear(year);
     setAspectTimelines({});
-    aspects.forEach(aspect => {
-      loadTimeline(aspect, year);
-    });
+    await loadBulkTimelines(year);
   };
 
   useEffect(() => {
-    if (aspects.length > 0) {
-      handleYearChange(currentYear);
+    if (birthData) {
+      loadBulkTimelines(currentYear);
     }
-  }, [aspects]);
+  }, [currentYear]);
 
   const formatPeriod = (period) => {
     const start = new Date(period.start_date);

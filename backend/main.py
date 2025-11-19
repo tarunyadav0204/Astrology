@@ -1043,18 +1043,44 @@ async def system_status():
     try:
         import psutil
         import gc
+        import threading
         
-        # Get memory usage
         process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        cpu_percent = process.cpu_percent()
+        
+        # Memory info
+        memory_info = process.memory_info()
+        memory_mb = memory_info.rss / 1024 / 1024
+        memory_percent = process.memory_percent()
+        
+        # CPU info
+        cpu_percent = process.cpu_percent(interval=1)
+        
+        # System info
+        system_memory = psutil.virtual_memory()
+        system_cpu = psutil.cpu_percent(interval=1)
+        
+        # Thread info
+        thread_count = threading.active_count()
+        
+        # Connection info
+        connections = len(process.connections())
         
         # Force garbage collection
         gc.collect()
         
         return {
-            "memory_mb": round(memory_mb, 2),
-            "cpu_percent": cpu_percent,
+            "process": {
+                "memory_mb": round(memory_mb, 2),
+                "memory_percent": round(memory_percent, 2),
+                "cpu_percent": cpu_percent,
+                "threads": thread_count,
+                "connections": connections
+            },
+            "system": {
+                "memory_total_gb": round(system_memory.total / 1024 / 1024 / 1024, 2),
+                "memory_used_percent": system_memory.percent,
+                "cpu_percent": system_cpu
+            },
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -1064,6 +1090,60 @@ async def system_status():
 async def keepalive():
     """Simple endpoint to keep server alive"""
     return {"status": "alive", "timestamp": datetime.now().isoformat()}
+
+@app.get("/api/resource-monitor")
+async def resource_monitor():
+    """Detailed resource monitoring"""
+    try:
+        import psutil
+        import asyncio
+        
+        process = psutil.Process()
+        
+        # Get current event loop info
+        loop = asyncio.get_event_loop()
+        
+        return {
+            "memory_mb": round(process.memory_info().rss / 1024 / 1024, 2),
+            "cpu_percent": process.cpu_percent(),
+            "open_files": len(process.open_files()),
+            "connections": len(process.connections()),
+            "threads": process.num_threads(),
+            "event_loop_running": loop.is_running(),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/health-detailed")
+async def health_detailed():
+    """Detailed health check with resource usage"""
+    try:
+        import psutil
+        process = psutil.Process()
+        
+        # Test database
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+        conn.close()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "users": user_count,
+            "memory_mb": round(process.memory_info().rss / 1024 / 1024, 2),
+            "cpu_percent": process.cpu_percent(),
+            "connections": len(process.connections()),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.post("/api/calculate-chart-only")
 async def calculate_chart_only(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
@@ -2117,10 +2197,21 @@ async def calculate_accurate_dasha(birth_data: BirthData):
 @app.post("/api/calculate-cascading-dashas")
 async def calculate_cascading_dashas(request: dict):
     """Calculate complete cascading dasha hierarchy for a given date"""
-    from shared.dasha_calculator import DashaCalculator
-    
-    birth_data = BirthData(**request['birth_data'])
-    target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+    try:
+        from shared.dasha_calculator import DashaCalculator
+        
+        birth_data = BirthData(**request['birth_data'])
+        target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+    except Exception as e:
+        return {
+            'maha_dashas': [],
+            'antar_dashas': [],
+            'pratyantar_dashas': [],
+            'sookshma_dashas': [],
+            'prana_dashas': [],
+            'current_dashas': {},
+            'error': f'Input validation error: {str(e)}'
+        }
     
     # Convert to dict for calculator
     birth_dict = {
@@ -2244,7 +2335,14 @@ async def calculate_cascading_dashas(request: dict):
 @app.post("/api/calculate-sub-dashas")
 async def calculate_sub_dashas(request: dict):
     """Calculate sub-dashas (Antar, Pratyantar, Sookshma, Prana) for given parent dasha"""
-    from event_prediction.config import DASHA_PERIODS, PLANET_ORDER
+    try:
+        from event_prediction.config import DASHA_PERIODS, PLANET_ORDER
+    except ImportError:
+        DASHA_PERIODS = {
+            'Ketu': 7, 'Venus': 20, 'Sun': 6, 'Moon': 10, 'Mars': 7,
+            'Rahu': 18, 'Jupiter': 16, 'Saturn': 19, 'Mercury': 17
+        }
+        PLANET_ORDER = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury']
     
     birth_data = BirthData(**request['birth_data'])
     parent_dasha = request['parent_dasha']
@@ -3209,15 +3307,18 @@ if __name__ == "__main__":
     logger.info("Starting Astrology API server on port 8001...")
     
     try:
+        # Get port from environment for GCP deployment
+        port = int(os.getenv('PORT', 8001))
+        
         uvicorn.run(
             app, 
             host="0.0.0.0", 
-            port=8001,
-            timeout_keep_alive=120,
-            timeout_graceful_shutdown=30,
-            access_log=True,
-            limit_max_requests=500,
-            limit_concurrency=50
+            port=port,
+            timeout_keep_alive=300,
+            timeout_graceful_shutdown=60,
+            access_log=False,  # Disable for performance in production
+            limit_max_requests=2000,
+            limit_concurrency=500  # Higher for load balancer
         )
     except Exception as e:
         log_shutdown(f"Exception: {str(e)}")

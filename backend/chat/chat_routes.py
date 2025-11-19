@@ -129,8 +129,13 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             if request.selected_period:
                 context_builder.set_selected_period(request.selected_period)
             
-            # Build astrological context with requested period
-            context = context_builder.build_complete_context(birth_data, request.question, requested_period=requested_period)
+            # Build astrological context with requested period (run in thread pool)
+            import asyncio
+            context = await asyncio.get_event_loop().run_in_executor(
+                None, 
+                context_builder.build_complete_context,
+                birth_data, request.question, requested_period
+            )
             
             # Get conversation history
             history = session_manager.get_conversation_history(birth_hash)
@@ -182,12 +187,14 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                     response_text = "Invalid year range requested for transit data. Please try again."
                                 else:
                                     try:
-                                        # Build context with transit data
+                                        # Build context with transit data (run in thread pool)
                                         print(f"🏗️ Building transit context...")
-                                        transit_context = context_builder.build_complete_context(
+                                        transit_context = await asyncio.get_event_loop().run_in_executor(
+                                            None,
+                                            context_builder.build_complete_context,
                                             birth_data, 
                                             request.question, 
-                                            requested_period={'start_year': start_year, 'end_year': end_year}
+                                            {'start_year': start_year, 'end_year': end_year}
                                         )
                                         
                                         print(f"✅ Transit context built successfully")

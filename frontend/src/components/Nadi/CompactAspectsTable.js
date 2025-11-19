@@ -8,9 +8,11 @@ const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick, selectedD
   const [selectedPeriod, setSelectedPeriod] = useState(null);
   const [selectedAspect, setSelectedAspect] = useState(null);
 
-  const loadTimeline = async (aspect, year) => {
+  const loadBulkTimelines = async (year) => {
+    if (!aspects || aspects.length === 0) return;
+    
     try {
-      const response = await fetch('/api/nadi-timeline', {
+      const response = await fetch('/api/nadi-timelines-bulk', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -18,37 +20,28 @@ const CompactAspectsTable = ({ aspects, natalPlanets, onTimelineClick, selectedD
         },
         body: JSON.stringify({
           natal_planets: natalPlanets,
-          aspect_type: aspect.aspect_type,
-          planet1: aspect.planet1,
-          planet2: aspect.planet2,
+          aspects: aspects,
           start_year: year,
           year_range: 1
         })
       });
       
       const data = await response.json();
-      const aspectKey = `${aspect.planet1}-${aspect.planet2}-${aspect.aspect_type}`;
-      setAspectTimelines(prev => ({
-        ...prev,
-        [aspectKey]: data.timeline || []
-      }));
+      setAspectTimelines(data.timelines || {});
     } catch (error) {
-      console.error('Error loading timeline:', error);
+      console.error('Error loading bulk timelines:', error);
     }
   };
 
-  const handleYearChange = (year) => {
+  const handleYearChange = async (year) => {
     setCurrentYear(year);
-    // Load timelines for all aspects for this year
-    aspects?.forEach(aspect => {
-      loadTimeline(aspect, year);
-    });
+    await loadBulkTimelines(year);
   };
 
   // Auto-load timelines for current year on mount
   useEffect(() => {
     if (aspects && aspects.length > 0) {
-      handleYearChange(currentYear);
+      loadBulkTimelines(currentYear);
     }
   }, [aspects]);
 

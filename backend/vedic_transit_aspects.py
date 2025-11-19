@@ -2,16 +2,21 @@ from fastapi import APIRouter, Request, Depends
 from typing import Dict, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-from calculators.real_transit_calculator import RealTransitCalculator
+
+try:
+    from calculators.real_transit_calculator import RealTransitCalculator
+    real_calculator = RealTransitCalculator()
+except ImportError:
+    real_calculator = None
 
 router = APIRouter()
-
-# Use real calculator instead of hardcoded system
-real_calculator = RealTransitCalculator()
 
 # Use the old class for compatibility but with real calculations
 class VedicTransitAspectCalculator:
     def calculate_vedic_aspects(self, birth_data: Dict) -> List[Dict]:
+        if real_calculator is None:
+            return []  # Return empty if calculator not available
+        
         real_aspects = real_calculator.find_real_aspects(birth_data)
         
         # Convert to expected format
@@ -32,6 +37,8 @@ class VedicTransitAspectCalculator:
         return aspects
     
     def calculate_aspect_timeline(self, aspect_data: Dict, start_year: int, year_range: int) -> List[Dict]:
+        if real_calculator is None:
+            return []  # Return empty if calculator not available
         return real_calculator.calculate_aspect_timeline(aspect_data, start_year, year_range)
 
 vedic_calculator = VedicTransitAspectCalculator()
@@ -96,6 +103,35 @@ async def get_vedic_transit_timeline(request: Request):
     return {
         'timeline': timeline,
         'start_year': start_year,
+        'year_range': year_range
+    }
+
+@router.post("/vedic-transit-timelines-bulk")
+async def get_bulk_vedic_transit_timelines(request: Request):
+    """Get timelines for ALL aspects in a single call"""
+    request_data = await request.json()
+    
+    birth_data = request_data['birth_data']
+    year = request_data.get('year', datetime.now().year)
+    year_range = request_data.get('year_range', 1)
+    
+    # Get all aspects first
+    aspects = vedic_calculator.calculate_vedic_aspects(birth_data)
+    
+    # Calculate timelines for ALL aspects in one call
+    all_timelines = {}
+    for aspect in aspects:
+        if aspect.get('aspect_data'):
+            timeline = vedic_calculator.calculate_aspect_timeline(
+                aspect['aspect_data'], year, year_range
+            )
+            aspect_key = f"{aspect['planet1']}-{aspect['planet2']}-{aspect['aspect_type']}"
+            all_timelines[aspect_key] = timeline
+    
+    return {
+        'aspects': aspects,
+        'timelines': all_timelines,
+        'year': year,
         'year_range': year_range
     }
 
