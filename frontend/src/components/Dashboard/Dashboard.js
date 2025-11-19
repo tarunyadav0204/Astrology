@@ -282,8 +282,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
       const response = await fetch('/api/calculate-cascading-dashas', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           birth_data: birthData,

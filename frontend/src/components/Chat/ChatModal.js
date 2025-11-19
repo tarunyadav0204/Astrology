@@ -601,6 +601,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         console.log('DEBUG: Complete text contains nakshatra:', completeText.toLowerCase().includes('nakshatra'));
                                         
                                         assistantMessage.content = completeText.trim();
+                                        assistantMessage.shouldSave = true; // Mark for saving
                                         
                                         // Final update with complete content
                                         setMessages(prev => {
@@ -612,9 +613,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             console.log('DEBUG: Updated message with complete content');
                                             return updated;
                                         });
-                                        
-                                        await saveMessage(currentSessionId, 'assistant', completeText);
-                                        console.log('DEBUG: Saved complete message to backend');
                                     }
                                 } else if (parsed.status === 'complete' && parsed.response) {
                                     console.log('DEBUG: Processing complete response');
@@ -634,6 +632,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     if (responseText.length > 0) {
                                         assistantMessage.content = responseText;
                                         console.log('DEBUG: Set assistant message content');
+                                        
+                                        assistantMessage.shouldSave = true; // Mark for saving
                                         
                                         if (!messageAdded) {
                                             console.log('DEBUG: Adding new message to replace typing indicator');
@@ -672,13 +672,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                                 console.error('UPDATE MESSAGE ERROR:', updateError);
                                             }
                                         }
-                                        
-                                        try {
-                                            await saveMessage(currentSessionId, 'assistant', responseText);
-                                            console.log('DEBUG: Message saved to backend');
-                                        } catch (saveError) {
-                                            console.error('SAVE MESSAGE ERROR:', saveError);
-                                        }
                                     }
                                 } else if (parsed.status === 'complete' && !parsed.response) {
                                     console.log('DEBUG: Processing completion signal for chunked response');
@@ -686,6 +679,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     if (assistantMessage.chunks && assistantMessage.chunks.length > 0) {
                                         const completeText = assistantMessage.chunks.join('');
                                         assistantMessage.content = completeText.trim();
+                                        assistantMessage.shouldSave = true; // Mark for saving
                                         
                                         setMessages(prev => {
                                             return prev.map(msg => 
@@ -737,6 +731,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         }
                                         assistantMessage.content = response;
                                         
+                                        assistantMessage.shouldSave = true; // Mark for saving
+                                        
                                         if (!messageAdded) {
                                             try {
                                                 setMessages(prev => {
@@ -751,12 +747,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                                 console.error('REGEX SET MESSAGE ERROR:', regexSetError);
                                             }
                                         }
-                                        
-                                        try {
-                                            await saveMessage(currentSessionId, 'assistant', response);
-                                        } catch (regexSaveError) {
-                                            console.error('REGEX SAVE ERROR:', regexSaveError);
-                                        }
                                     }
                                 } catch (regexError) {
                                     console.error('REGEX FALLBACK ERROR:', regexError);
@@ -768,6 +758,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             }
             
             console.log('DEBUG: Stream processing completed, messageAdded:', messageAdded);
+            
+            // Save message only once when complete
+            if (assistantMessage.shouldSave && assistantMessage.content.trim()) {
+                try {
+                    await saveMessage(currentSessionId, 'assistant', assistantMessage.content.trim());
+                    console.log('DEBUG: Message saved to backend');
+                } catch (saveError) {
+                    console.error('SAVE MESSAGE ERROR:', saveError);
+                }
+            }
             
             // If no message was added, remove the typing indicator
             if (!messageAdded) {

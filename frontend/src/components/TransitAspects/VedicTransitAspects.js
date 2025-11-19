@@ -37,8 +37,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       const response = await fetch('/api/vedic-transit-aspects', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ birth_data: birthData })
       });
@@ -56,7 +55,6 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Cache-Control': 'no-cache'
         },
         body: JSON.stringify({
@@ -81,8 +79,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       const response = await fetch('/api/vedic-transit-timeline', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           birth_data: birthData,
