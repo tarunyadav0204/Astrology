@@ -140,12 +140,29 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TimeoutMiddleware)
 
+# CORS configuration for multiple domains
+allowed_origins = [
+    "https://astrovishnu.com",
+    "https://www.astrovishnu.com",
+    "https://astroroshni.com",
+    "https://www.astroroshni.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001"
+]
+
+# Add development origins if in development mode
+if os.getenv('ENVIRONMENT', 'development') == 'development':
+    allowed_origins.append("*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Include rule engine router with /api prefix
