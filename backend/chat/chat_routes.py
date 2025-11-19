@@ -340,9 +340,12 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 else:
                     print(f"❌ AI ERROR: {ai_result.get('error')}")
                     
-                    # Convert AI errors to user-friendly messages
+                    # Log AI error details for debugging
                     ai_error = ai_result.get('error', 'AI analysis failed')
-                    user_error = "I'm having trouble processing your question right now. Please try rephrasing it or try again later."
+                    print(f"❌ AI ERROR: {ai_error}")
+                    
+                    # Show generic user-friendly message
+                    user_error = "I'm having trouble processing your question right now. Please try again in a moment."
                     
                     if "timeout" in str(ai_error).lower():
                         user_error = "Your question is taking longer than expected to process. Please try again."
@@ -360,17 +363,17 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 # traceback.print_exc()
                 pass
                 
-                # Convert technical errors to user-friendly messages
-                error_message = "I'm having trouble connecting right now. Please try again in a moment."
+                # Log technical error details for debugging
+                print(f"❌ CHAT ROUTE ERROR: {type(e).__name__}: {str(e)}")
                 
+                # Always show generic user-friendly message
+                error_message = "I'm having trouble processing your question right now. Please try again in a moment."
+                
+                # Only vary the message for clearly user-facing issues
                 if "timeout" in str(e).lower() or "503" in str(e):
                     error_message = "The service is temporarily busy. Please try again in a few moments."
-                elif "connection" in str(e).lower() or "connect" in str(e).lower():
-                    error_message = "I'm having connection issues. Please check your internet and try again."
                 elif "rate limit" in str(e).lower() or "quota" in str(e).lower():
                     error_message = "I'm receiving too many requests right now. Please wait a moment and try again."
-                elif "authentication" in str(e).lower() or "unauthorized" in str(e).lower():
-                    error_message = "There's a temporary service issue. Please try again shortly."
                 
                 yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
                 

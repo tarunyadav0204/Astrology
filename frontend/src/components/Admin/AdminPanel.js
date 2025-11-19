@@ -424,7 +424,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <th>Chart ID</th>
                       <th>Name</th>
                       <th>Gender</th>
-                      <th>Owner</th>
+                      <th>Owner Phone</th>
+                      <th>Owner Name</th>
                       <th>Birth Date</th>
                       <th>Birth Time</th>
                       <th>Location</th>
@@ -439,10 +440,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         <td>{chart.name}</td>
                         <td>{chart.gender || 'Not specified'}</td>
                         <td>{chart.user_phone}</td>
+                        <td>{chart.user_name}</td>
                         <td>{chart.date}</td>
                         <td>{chart.time}</td>
                         <td>{chart.place || `${chart.latitude?.toFixed(2)}, ${chart.longitude?.toFixed(2)}`}</td>
-                        <td>{new Date(chart.created_at).toLocaleDateString()}</td>
+                        <td>{new Date(chart.created_at).toLocaleString()}</td>
                         <td>
                           <button 
                             onClick={() => handleDeleteChart(chart.id)}

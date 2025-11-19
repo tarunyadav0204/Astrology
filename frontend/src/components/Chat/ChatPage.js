@@ -37,6 +37,29 @@ const ChatPage = () => {
         }
     }, [birthData]);
     
+    // Check token validity on component mount
+    useEffect(() => {
+        const checkTokenValidity = async () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const response = await fetch('/api/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.status === 401) {
+                        console.log('🔐 Invalid token detected, clearing auth...');
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        window.location.href = '/login';
+                    }
+                } catch (error) {
+                    console.log('Token validation failed:', error);
+                }
+            }
+        };
+        checkTokenValidity();
+    }, []);
+    
     const addGreetingMessage = () => {
         const place = birthData.place && !birthData.place.includes(',') ? birthData.place : `${birthData.latitude}, ${birthData.longitude}`;
         const greetingMessage = {
@@ -116,6 +139,29 @@ const ChatPage = () => {
                     headers: Object.fromEntries(response.headers.entries()),
                     body: errorText
                 });
+                
+                // If 401 Unauthorized, token is invalid - clear auth and redirect to login
+                if (response.status === 401) {
+                    console.log('🔐 401 error detected - invalid token, clearing auth...');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    
+                    // Show user-friendly message before redirect
+                    setMessages(prev => {
+                        const filtered = prev.filter(msg => !(msg.role === 'assistant' && !msg.content.trim()));
+                        return [...filtered, { 
+                            role: 'assistant', 
+                            content: "Your session has expired. Please log in again to continue.", 
+                            timestamp: new Date().toISOString() 
+                        }];
+                    });
+                    
+                    // Redirect to login after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    return;
+                }
                 
                 // If 402 Payment Required, refresh credit balance
                 if (response.status === 402) {
@@ -222,12 +268,23 @@ const ChatPage = () => {
                 tokenPreview: localStorage.getItem('token') ? localStorage.getItem('token').substring(0, 20) + '...' : 'No token'
             });
             
+            // Show generic user-friendly error messages
+            let errorMessage = "I'm having trouble processing your question right now. Please try again in a moment.";
+            
+            if (error.message.includes('quota') || error.message.includes('rate limit')) {
+                errorMessage = "I'm receiving too many requests right now. Please wait a moment and try again.";
+            } else if (error.message.includes('network') || error.message.includes('connection')) {
+                errorMessage = "Please check your internet connection and try again.";
+            } else if (error.message.includes('timeout')) {
+                errorMessage = "Your request is taking longer than expected. Please try again.";
+            }
+            
             // Remove empty assistant message if it exists
             setMessages(prev => {
                 const filtered = prev.filter(msg => !(msg.role === 'assistant' && !msg.content.trim()));
                 return [...filtered, { 
                     role: 'assistant', 
-                    content: `An error occurred: ${error.message}. Please try again.`, 
+                    content: errorMessage, 
                     timestamp: new Date().toISOString() 
                 }];
             });
