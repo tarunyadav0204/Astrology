@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
+import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
-const AdminPanel = ({ user, onLogout }) => {
+const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [charts, setCharts] = useState([]);
@@ -227,10 +230,19 @@ const AdminPanel = ({ user, onLogout }) => {
 
   return (
     <div className="admin-panel">
-      <div className="admin-header">
-        <h1>Admin Panel</h1>
-        <button onClick={onLogout} className="logout-btn">Logout</button>
-      </div>
+      <NavigationHeader 
+        showZodiacSelector={false}
+        user={user}
+        onAdminClick={onAdminClick}
+        onLogout={onLogout || (() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/');
+        })}
+        onLogin={onLogin || (() => navigate('/'))}
+        showLoginButton={showLoginButton}
+      />
+      <div className="admin-content-wrapper">
 
       <div className="admin-tabs">
         <button 
@@ -556,7 +568,7 @@ const AdminPanel = ({ user, onLogout }) => {
                             {code.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td>{new Date(code.created_at).toLocaleDateString()}</td>
+                        <td>{new Date(code.created_at).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -565,6 +577,7 @@ const AdminPanel = ({ user, onLogout }) => {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

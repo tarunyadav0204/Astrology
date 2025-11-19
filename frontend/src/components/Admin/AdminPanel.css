@@ -1,5 +1,10 @@
 .admin-panel {
-  padding: 20px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
+}
+
+.admin-content-wrapper {
+  padding: 200px 20px 20px 20px;
   max-width: 1200px;
   margin: 0 auto;
 }
