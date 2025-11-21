@@ -405,6 +405,23 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     });
                 }
                 
+                // Get user context
+                let userData = null;
+                try {
+                    const userResponse = await fetch('/api/auth/me', {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    });
+                    if (userResponse.ok) {
+                        userData = await userResponse.json();
+                    }
+                } catch (error) {
+                    console.log('Could not get user data:', error);
+                }
+                
+                const userName = userData?.name || 'User';
+                const nativeName = birthData?.name || 'Native';
+                const relationship = (userName.toLowerCase() === nativeName.toLowerCase()) ? 'self' : 'other';
+                
                 const token = localStorage.getItem('token');
                 const response = await fetch('/api/chat/ask', {
                     method: 'POST',
@@ -417,7 +434,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         question: message, 
                         language, 
                         response_style: responseStyle,
-                        selected_period: options.selected_period 
+                        selected_period: options.selected_period,
+                        user_name: userName,
+                        user_relationship: relationship
                     })
                 });
 

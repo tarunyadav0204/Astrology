@@ -30,6 +30,9 @@ class ChatRequest(BaseModel):
     language: Optional[str] = 'english'
     response_style: Optional[str] = 'detailed'
     selected_period: Optional[Dict] = None
+    # User context
+    user_name: Optional[str] = None
+    user_relationship: Optional[str] = 'self'
 
 class ClearChatRequest(BaseModel):
     name: Optional[str] = None
@@ -134,7 +137,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             context = await asyncio.get_event_loop().run_in_executor(
                 None, 
                 context_builder.build_complete_context,
-                birth_data, request.question, requested_period
+                birth_data, request.question, None, requested_period
             )
             
             # Get conversation history
@@ -153,8 +156,20 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 if not requested_period and context.get('transit_data_availability'):
                     enhanced_question += "\n\nIMPORTANT: For PRECISE event prediction, use the advanced methodology in transit_data_availability. When dasha planets recreate their natal relationships through transits, events manifest with highest probability. For timing questions, you MUST request transit data using the JSON format. Do NOT provide a complete response - only request the transit data."
                 
+                # Extract user context
+                user_context = {
+                    'user_name': request.user_name,
+                    'user_relationship': request.user_relationship or 'self'
+                }
+                
+                print(f"\n=== USER CONTEXT DEBUG ===")
+                print(f"Request user_name: {request.user_name}")
+                print(f"Request user_relationship: {request.user_relationship}")
+                print(f"Final user_context: {user_context}")
+                print(f"Birth data name: {birth_data.get('name')}")
+                
                 gemini_analyzer = GeminiChatAnalyzer()
-                ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style)
+                ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style, user_context)
                 
                 # print(f"AI result success: {ai_result.get('success')}")
                 # print(f"AI result keys: {list(ai_result.keys())}")
@@ -164,6 +179,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     
                     # Check if Gemini requested transit data via JSON and make second call if needed
                     if ai_result.get('has_transit_request', False):
+                        print(f"🔍 TRANSIT REQUEST DETECTED - NOT showing first response to user")
                         
                         # Look for JSON transit request in response
                         json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
@@ -194,6 +210,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                             context_builder.build_complete_context,
                                             birth_data, 
                                             request.question, 
+                                            None,
                                             {'start_year': start_year, 'end_year': end_year}
                                         )
                                         
@@ -205,7 +222,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                         
                                         print(f"🤖 Making second Gemini call...")
                                         second_ai_result = await gemini_analyzer.generate_chat_response(
-                                            enhanced_question, transit_context, history, request.language, request.response_style
+                                            enhanced_question, transit_context, history, request.language, request.response_style, user_context
                                         )
                                         
                                         if second_ai_result['success']:

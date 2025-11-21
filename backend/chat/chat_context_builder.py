@@ -95,6 +95,7 @@ class ChatContextBuilder:
         context = {
             # Basic chart
             "birth_details": {
+                "name": birth_data.get('name'),
                 "date": birth_data.get('date'),
                 "time": birth_data.get('time'),
                 "place": birth_data.get('place', birth_data.get('name', 'Unknown')),

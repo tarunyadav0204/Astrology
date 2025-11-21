@@ -41,7 +41,7 @@ class GeminiChatAnalyzer:
         if not self.model:
             raise ValueError("No available Gemini model found")
     
-    async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed') -> Dict[str, Any]:
+    async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None) -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION"""
         
         # Add current date context and calculate native's age
@@ -78,7 +78,7 @@ class GeminiChatAnalyzer:
             'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.'
         }
         
-        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style)
+        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style, user_context)
         
         print(f"\n=== SENDING TO AI (ASYNC) ===")
         print(f"Question: {user_question}")
@@ -193,6 +193,22 @@ class GeminiChatAnalyzer:
             # Fix formatting issues - ensure proper markdown headers
             cleaned_text = self._fix_response_formatting(cleaned_text)
             
+            # Fix pronoun usage if this is a third-party consultation
+            if user_context and user_context.get('user_relationship') != 'self':
+                native_name = astrological_context.get('birth_details', {}).get('name', 'the native')
+                print(f"\n=== PRONOUN FIX DEBUG ===")
+                print(f"User context: {user_context}")
+                print(f"User relationship: {user_context.get('user_relationship')}")
+                print(f"Native name: {native_name}")
+                print(f"Will fix pronouns: {native_name and native_name != 'the native'}")
+                if native_name and native_name != 'the native':
+                    original_text = cleaned_text[:200]
+                    cleaned_text = self._fix_pronoun_usage(cleaned_text, native_name)
+                    fixed_text = cleaned_text[:200]
+                    print(f"Original: {original_text}")
+                    print(f"Fixed: {fixed_text}")
+                    print(f"Changes made: {original_text != fixed_text}")
+            
             # Ensure response doesn't end abruptly (minimum length check)
             if len(cleaned_text) < 50:
                 print(f"\n=== SUSPICIOUSLY SHORT AI RESPONSE ===")
@@ -303,7 +319,58 @@ class GeminiChatAnalyzer:
         
         return response_text
     
-    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed') -> str:
+    def _fix_pronoun_usage(self, response_text: str, native_name: str) -> str:
+        """Fix pronoun usage for third-party consultations"""
+        import re
+        
+        # Common patterns to fix
+        fixes = [
+            # Chart references
+            (r'\byour chart\b', f"{native_name}'s chart"),
+            (r'\bYour chart\b', f"{native_name}'s chart"),
+            
+            # "You are" patterns
+            (r'\byou are\b', f"{native_name} is"),
+            (r'\bYou are\b', f"{native_name} is"),
+            
+            # Possessive patterns
+            (r'\byour ([a-z]+)\b', f"{native_name}'s \\1"),
+            (r'\bYour ([a-z]+)\b', f"{native_name}'s \\1"),
+            
+            # Action patterns
+            (r'\byou should\b', f"{native_name} should"),
+            (r'\bYou should\b', f"{native_name} should"),
+            (r'\byou have\b', f"{native_name} has"),
+            (r'\bYou have\b', f"{native_name} has"),
+            (r'\byou will\b', f"{native_name} will"),
+            (r'\bYou will\b', f"{native_name} will"),
+            (r'\byou can\b', f"{native_name} can"),
+            (r'\bYou can\b', f"{native_name} can"),
+            (r'\byou may\b', f"{native_name} may"),
+            (r'\bYou may\b', f"{native_name} may"),
+            (r'\byou might\b', f"{native_name} might"),
+            (r'\bYou might\b', f"{native_name} might"),
+            
+            # Prepositional patterns
+            (r'\bfor you\b', f"for {native_name}"),
+            (r'\bFor you\b', f"For {native_name}"),
+            (r'\bto you\b', f"to {native_name}"),
+            (r'\bTo you\b', f"To {native_name}"),
+            (r'\bwith you\b', f"with {native_name}"),
+            (r'\bWith you\b', f"With {native_name}"),
+            
+            # Sentence starters
+            (r'^Your\b', f"{native_name}'s"),
+            (r'^You\b', f"{native_name}")
+        ]
+        
+        # Apply all fixes
+        for pattern, replacement in fixes:
+            response_text = re.sub(pattern, replacement, response_text, flags=re.IGNORECASE)
+        
+        return response_text
+    
+    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed', user_context: Dict = None) -> str:
         """Create comprehensive chat prompt for Gemini"""
         
         history_text = ""
@@ -320,6 +387,57 @@ class GeminiChatAnalyzer:
         # Extract key chart information for emphasis
         ascendant_info = context.get('ascendant_info', {})
         ascendant_summary = f"ASCENDANT: {ascendant_info.get('sign_name', 'Unknown')} at {ascendant_info.get('exact_degree_in_sign', 0):.2f}°"
+        
+        # Build user context instruction
+        user_context_instruction = ""
+        if user_context:
+            user_name = user_context.get('user_name', 'User')
+            native_name = context.get('birth_details', {}).get('name', 'the native')
+            relationship = user_context.get('user_relationship', 'self')
+            
+            if relationship == 'self' or (user_name and native_name and user_name.lower() == native_name.lower()):
+                user_context_instruction = f"""
+USER CONTEXT - SELF CONSULTATION:
+The person asking questions is {native_name} themselves. Use direct personal language:
+- "Your chart shows..."
+- "You have..."
+- "Your personality..."
+- "You should..."
+- "This affects you directly..."
+
+"""
+            else:
+                user_context_instruction = f"""
+🚨 CRITICAL USER CONTEXT - THIRD PARTY CONSULTATION 🚨
+
+The person asking is {user_name} asking about {native_name}'s chart.
+
+⚠️ ABSOLUTE REQUIREMENT: You MUST use "{native_name}" or "they/their" throughout your ENTIRE response.
+⚠️ NEVER use "you/your" when referring to the chart owner.
+
+**MANDATORY OPENING PATTERN:**
+Your Quick Answer MUST start with: "Based on {native_name}'s birth chart..."
+
+**REQUIRED LANGUAGE PATTERNS - USE THESE EXACT FORMATS:**
+✅ "{native_name}'s chart shows..." ❌ "Your chart shows..."
+✅ "{native_name} has..." or "They have..." ❌ "You have..."
+✅ "{native_name}'s personality..." ❌ "Your personality..."
+✅ "{native_name} should..." ❌ "You should..."
+✅ "This affects {native_name}..." ❌ "This affects you..."
+✅ "{native_name}'s career is poised..." ❌ "Your career is poised..."
+✅ "{native_name} is in Saturn Mahadasha..." ❌ "You are in Saturn Mahadasha..."
+✅ "For {native_name}, the period indicates..." ❌ "For you, the period..."
+✅ "{native_name}'s relationships..." ❌ "Your relationships..."
+
+**EXAMPLE CORRECT OPENING:**
+"Quick Answer: Based on {native_name}'s birth chart and current planetary periods, {native_name}'s career is poised for significant growth..."
+
+**ABSOLUTELY FORBIDDEN WORDS when user ≠ native:**
+❌ "your" ❌ "you" ❌ "yourself" 
+
+🔍 QUALITY CHECK: Before sending response, verify EVERY sentence uses "{native_name}" or "they/their" - NO EXCEPTIONS.
+
+"""
         
         # Custom JSON serializer for datetime objects
         def json_serializer(obj):
@@ -381,21 +499,22 @@ You MUST respond in TAMIL (தமிழ்) language. Use Tamil script throughou
         if response_style == 'concise':
             response_format_instruction = """
 RESPONSE FORMAT - CONCISE MODE:
-Provide ONLY a Quick Answer section (2-3 sentences max) with:
-- Direct answer to the question
-- Key astrological factor with classical reference
-- Age-appropriate guidance
+Provide ONLY a Quick Answer section with:
+- Complete summary of your analysis in plain, accessible language
+- Direct answer to the question without technical jargon
+- Key insights that matter most to the person
+- Practical guidance they can understand and act upon
 
 Do NOT include detailed analysis, multiple sections, or extensive explanations.
-Format: <div class="quick-answer-card">**Quick Answer**: [Direct response with key insight and one classical reference]</div>
+Format: <div class="quick-answer-card">**Quick Answer**: [Comprehensive summary in everyday language that covers all major insights]</div>
 
 """
         else:
             response_format_instruction = """
 RESPONSE FORMAT - DETAILED MODE:
-Start with Quick Answer (2-3 sentences) then provide full analysis:
+Start with comprehensive Quick Answer then provide full analysis:
 
-<div class="quick-answer-card">**Quick Answer**: [Direct response with key insight and classical reference]</div>
+<div class="quick-answer-card">**Quick Answer**: [Complete summary of your entire analysis in plain, accessible language. This should cover all major insights, predictions, and guidance without technical terms. Most people will only read this section, so make it comprehensive yet easy to understand.]</div>
 
 ### Key Insights
 [Bullet points with specific predictions]
@@ -422,7 +541,7 @@ End your response with 3-4 relevant follow-up questions in this exact format:
 
 """
         
-        return f"""{language_instruction}{response_format_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
+        return f"""{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
 
 CLASSICAL TEXT REFERENCES - MANDATORY REQUIREMENT:
 You MUST reference classical Vedic texts to support your predictions and analysis. Use these authoritative sources:

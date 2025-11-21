@@ -99,7 +99,7 @@ export default function ChatScreen({ navigation }) {
     }
   }, [birthData]);
 
-  const handleGreetingOptionSelect = (option) => {
+  const handleGreetingOptionSelect = async (option) => {
     console.log('🎯 Greeting option selected:', option);
     if (option.action === 'periods') {
       console.log('📅 Opening Event Periods modal');
@@ -109,10 +109,30 @@ export default function ChatScreen({ navigation }) {
       console.log('💬 Going to chat mode');
       setShowGreeting(false);
       
-      // Add welcome message when entering chat mode
+      // Get user data to differentiate from native
+      let userData = null;
+      try {
+        userData = await storage.getUserData();
+      } catch (error) {
+        console.log('Could not get user data:', error);
+      }
+      
+      const userName = userData?.name || 'User';
+      const nativeName = birthData?.name || 'the native';
+      
+      // Create personalized welcome message
+      let welcomeContent;
+      if (userName.toLowerCase() === nativeName.toLowerCase()) {
+        // User and native are the same person
+        welcomeContent = `🌟 Welcome to your personalized astrological consultation, ${nativeName}!\n\nI'm here to help you understand your birth chart and provide insights about your life path. Feel free to ask me anything about:\n\n• Your personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits affecting you\n• Your strengths and areas for growth\n\nWhat would you like to explore first?`;
+      } else {
+        // User and native are different people
+        welcomeContent = `🌟 Welcome ${userName}! I'm here to help you understand ${nativeName}'s birth chart and provide astrological insights.\n\nFeel free to ask me anything about ${nativeName}'s:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits affecting them\n• Strengths and areas for growth\n\nWhat would you like to explore first about ${nativeName}'s chart?`;
+      }
+      
       const welcomeMessage = {
         id: Date.now().toString(),
-        content: `🌟 Welcome to your personalized astrological consultation, ${birthData?.name}!\n\nI'm here to help you understand your birth chart and provide insights about your life path. Feel free to ask me anything about:\n\n• Your personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits affecting you\n• Your strengths and areas for growth\n\nWhat would you like to explore first?`,
+        content: welcomeContent,
         role: 'assistant',
         timestamp: new Date().toISOString(),
       };
@@ -291,7 +311,26 @@ export default function ChatScreen({ navigation }) {
           fixedBirthData.time = timeDate.toTimeString().slice(0, 5); // Extract HH:MM
         }
         
-        const requestBody = { ...fixedBirthData, question: messageText, language: language || 'english', response_style: 'detailed' };
+        // Get user context
+        let userData = null;
+        try {
+          userData = await storage.getUserData();
+        } catch (error) {
+          console.log('Could not get user data:', error);
+        }
+        
+        const userName = userData?.name || 'User';
+        const nativeName = birthData?.name || 'Native';
+        const relationship = (userName.toLowerCase() === nativeName.toLowerCase()) ? 'self' : 'other';
+        
+        const requestBody = { 
+          ...fixedBirthData, 
+          question: messageText, 
+          language: language || 'english', 
+          response_style: 'detailed',
+          user_name: userName,
+          user_relationship: relationship
+        };
         const fullUrl = `${API_BASE_URL}${getEndpoint('/chat/ask')}`;
         console.log(`🌐 NETWORK REQUEST (attempt ${attempt})`);
         console.log(`📍 Full URL: ${fullUrl}`);
@@ -775,6 +814,18 @@ export default function ChatScreen({ navigation }) {
                 style={styles.menuOption}
                 onPress={() => {
                   setShowMenu(false);
+                  navigation.setOptions({ addWelcomeMessage: setMessages });
+                  navigation.navigate('BirthForm');
+                }}
+              >
+                <Text style={styles.menuIcon}>👤</Text>
+                <Text style={styles.menuText}>Select Native</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  setShowMenu(false);
                   setShowChart(true);
                 }}
               >
@@ -797,17 +848,6 @@ export default function ChatScreen({ navigation }) {
                 style={styles.menuOption}
                 onPress={() => {
                   setShowMenu(false);
-                  navigation.navigate('ChatHistory');
-                }}
-              >
-                <Text style={styles.menuIcon}>💬</Text>
-                <Text style={styles.menuText}>Chat History</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
                   navigation.navigate('Credits');
                 }}
               >
@@ -819,12 +859,11 @@ export default function ChatScreen({ navigation }) {
                 style={styles.menuOption}
                 onPress={() => {
                   setShowMenu(false);
-                  navigation.setOptions({ addWelcomeMessage: setMessages });
-                  navigation.navigate('BirthForm');
+                  navigation.navigate('ChatHistory');
                 }}
               >
-                <Text style={styles.menuIcon}>👤</Text>
-                <Text style={styles.menuText}>Select Native</Text>
+                <Text style={styles.menuIcon}>💬</Text>
+                <Text style={styles.menuText}>Chat History</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
