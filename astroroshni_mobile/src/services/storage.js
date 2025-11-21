@@ -42,6 +42,11 @@ export const storage = {
   // Clear birth details
   clearBirthDetails: () => AsyncStorage.removeItem('birthDetails'),
   
+  // Generic storage methods
+  setItem: (key, value) => AsyncStorage.setItem(key, value),
+  getItem: (key) => AsyncStorage.getItem(key),
+  removeItem: (key) => AsyncStorage.removeItem(key),
+  
   // Clear all data
   clearAll: () => AsyncStorage.clear(),
 };

@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  PanResponder,
 } from 'react-native';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { chartAPI } from '../../services/api';
+import { storage } from '../../services/storage';
 
 import { COLORS } from '../../utils/constants';
 import NorthIndianChart from './NorthIndianChart';
@@ -64,26 +65,138 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
   const memoizedChartTypes = useMemo(() => chartTypes, []);
   const memoizedChartTitles = useMemo(() => chartTitles, []);
 
+  const getChartData = () => {
+    if (currentChartType === 'lagna') {
+      return chartData;
+    }
+    return currentChartData || chartData;
+  };
+
   useEffect(() => {
-    loadChartData(currentChartType);
-    // Preload adjacent charts
+    // For lagna chart, always use passed chartData directly
+    if (currentChartType === 'lagna') {
+      setCurrentChartData(chartData);
+    } else {
+      // Load the specific chart type data
+      loadChartData(currentChartType, true);
+    }
+  }, [currentChartType, chartData]);
+  
+  useEffect(() => {
+    // Update adjacent chart types
     const currentIndex = chartTypes.indexOf(currentChartType);
     const nextIndex = (currentIndex + 1) % chartTypes.length;
     const prevIndex = currentIndex > 0 ? currentIndex - 1 : chartTypes.length - 1;
     
     setNextChartType(chartTypes[nextIndex]);
     setPrevChartType(chartTypes[prevIndex]);
-    
-    // Preload next and previous charts
-    if (!chartDataCache[chartTypes[nextIndex]]) {
-      loadChartData(chartTypes[nextIndex], false);
-    }
-    if (!chartDataCache[chartTypes[prevIndex]]) {
-      loadChartData(chartTypes[prevIndex], false);
-    }
   }, [currentChartType]);
+  
+  const loadCachedCharts = async () => {
+    if (!birthData) return;
+    
+    // For lagna chart, always use passed chartData
+    if (currentChartType === 'lagna') {
+      setCurrentChartData(chartData);
+      return;
+    }
+    
+    try {
+      // Create cache key based on birth data
+      const cacheKey = `charts_${birthData.name}_${birthData.date}_${birthData.time}`;
+      const cachedCharts = await storage.getItem(cacheKey);
+      
+      if (cachedCharts) {
+        const parsedCache = JSON.parse(cachedCharts);
+        setChartDataCache({ lagna: chartData, ...parsedCache });
+      } else {
+        // No cache, load all charts
+        loadAllCharts();
+      }
+    } catch (error) {
+      console.error('Error loading cached charts:', error);
+      loadAllCharts();
+    }
+  };
+  
+  const saveCacheToStorage = async (cache) => {
+    if (!birthData) return;
+    
+    try {
+      const cacheKey = `charts_${birthData.name}_${birthData.date}_${birthData.time}`;
+      const { lagna, ...cacheToSave } = cache; // Don't save lagna as it's always available
+      await storage.setItem(cacheKey, JSON.stringify(cacheToSave));
+    } catch (error) {
+      console.error('Error saving chart cache:', error);
+    }
+  };
+
+  const loadAllCharts = async () => {
+    if (!birthData) return;
+    
+    try {
+      setLoading(true);
+      const formattedData = {
+        ...birthData,
+        date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+        time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        timezone: birthData.timezone || 'Asia/Kolkata'
+      };
+      
+      // Batch fetch all divisional charts
+      const divisionalPromises = Object.entries(chartDivisions).map(async ([type, division]) => {
+        try {
+          const response = await chartAPI.calculateDivisionalChart(formattedData, division);
+          return { type, data: response.data.divisional_chart };
+        } catch (error) {
+          console.error(`Error loading ${type}:`, error);
+          return { type, data: null };
+        }
+      });
+      
+      // Fetch transit chart
+      const transitPromise = (async () => {
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const response = await chartAPI.calculateTransits(formattedData, today);
+          return { type: 'transit', data: response.data };
+        } catch (error) {
+          console.error('Error loading transit:', error);
+          return { type: 'transit', data: null };
+        }
+      })();
+      
+      // Wait for all charts to load
+      const results = await Promise.all([...divisionalPromises, transitPromise]);
+      
+      // Update cache with all results
+      const newCache = { lagna: chartData };
+      results.forEach(({ type, data }) => {
+        if (data) newCache[type] = data;
+      });
+      
+      setChartDataCache(newCache);
+      setCurrentChartData(newCache[currentChartType] || chartData);
+      
+      // Save to persistent storage
+      await saveCacheToStorage(newCache);
+      
+    } catch (error) {
+      console.error('Error loading charts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadChartData = async (type, setCurrent = true) => {
+    // Use cached data if available
+    if (chartDataCache[type]) {
+      if (setCurrent) setCurrentChartData(chartDataCache[type]);
+      return;
+    }
+    
     if (type === 'lagna') {
       const data = chartData;
       setChartDataCache(prev => ({ ...prev, [type]: data }));
@@ -107,7 +220,6 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
       let response;
       let data;
       if (chartDivisions[type]) {
-        // Divisional chart
         response = await chartAPI.calculateDivisionalChart(formattedData, chartDivisions[type]);
         data = response.data.divisional_chart;
       } else if (type === 'transit') {
@@ -127,26 +239,27 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
     }
   };
 
-  const onSwipeGesture = (event) => {
-    const { translationX, state, velocityX } = event.nativeEvent;
-    
-    // Update animation during gesture
-    if (state === 2) { // ACTIVE state
-      const normalizedTranslation = Math.max(-1, Math.min(1, translationX / (width * 0.3)));
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      return Math.abs(gestureState.dx) > 10;
+    },
+    onPanResponderGrant: () => {
+      setShowSwipeHint(false);
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      const normalizedTranslation = Math.max(-1, Math.min(1, gestureState.dx / 100));
       slideAnim.setValue(normalizedTranslation);
-    }
-    
-    // Handle gesture end
-    if (state === 5) { // END state
-      const threshold = Math.abs(velocityX) > 500 ? 50 : 100;
-      const shouldSwipe = Math.abs(translationX) > threshold;
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      const threshold = 50;
+      const shouldSwipe = Math.abs(gestureState.dx) > threshold;
       
       if (shouldSwipe) {
-        setShowSwipeHint(false);
         const currentIndex = chartTypes.indexOf(currentChartType);
         let newIndex;
         
-        if (translationX > 0) {
+        if (gestureState.dx > 0) {
           newIndex = currentIndex > 0 ? currentIndex - 1 : chartTypes.length - 1;
         } else {
           newIndex = currentIndex < chartTypes.length - 1 ? currentIndex + 1 : 0;
@@ -154,26 +267,19 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
         
         setCurrentChartType(chartTypes[newIndex]);
         
-        // Complete the swipe animation
-        Animated.spring(slideAnim, {
-          toValue: translationX > 0 ? 1 : -1,
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 200,
           useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }).start(() => {
-          slideAnim.setValue(0);
-        });
+        }).start();
       } else {
-        // Snap back
         Animated.spring(slideAnim, {
           toValue: 0,
           useNativeDriver: true,
-          tension: 150,
-          friction: 10,
         }).start();
       }
-    }
-  };
+    },
+  });
   
   const navigateChart = (direction) => {
     setShowSwipeHint(false);
@@ -255,11 +361,12 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
             showDegreeNakshatra && styles.controlButtonActive
           ]}
         >
-          <Ionicons 
-            name={showDegreeNakshatra ? 'eye-off' : 'eye'} 
-            size={16} 
-            color={showDegreeNakshatra ? COLORS.white : COLORS.textSecondary} 
-          />
+          <Text style={{
+            fontSize: 16,
+            color: showDegreeNakshatra ? COLORS.white : COLORS.textSecondary
+          }}>
+            {showDegreeNakshatra ? '👁️' : '👁️'}
+          </Text>
           <Text style={[
             styles.controlButtonText,
             showDegreeNakshatra && styles.controlButtonTextActive
@@ -272,53 +379,32 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
           onPress={toggleStyle}
           style={styles.styleToggle}
         >
+          <Text style={styles.styleToggleIcon}>🔄</Text>
           <Text style={styles.styleToggleText}>
             {chartStyle === 'north' ? 'South' : 'North'}
           </Text>
         </TouchableOpacity>
       </View>
       
-      <GestureHandlerRootView style={styles.chartContainer}>
-        <PanGestureHandler 
-          onGestureEvent={onSwipeGesture}
-          onHandlerStateChange={onSwipeGesture}
-          activeOffsetX={[-10, 10]}
-          failOffsetY={[-20, 20]}
-        >
-          <Animated.View style={[
-            styles.carouselContainer,
+      <View style={styles.chartContainer}>
+        <Animated.View 
+          {...panResponder.panHandlers}
+          style={[
+            styles.swipeArea,
             {
               transform: [{
                 translateX: slideAnim.interpolate({
                   inputRange: [-1, 0, 1],
-                  outputRange: [width, 0, -width],
+                  outputRange: [-20, 0, 20],
                   extrapolate: 'clamp',
                 })
               }]
             }
-          ]}>
-            {/* Previous Chart */}
-            <View style={[styles.chartSlide, { left: -width }]}>
-              <View style={styles.chartCard}>
-                {renderChart(prevChartType, chartDataCache[prevChartType])}
-              </View>
-            </View>
-            
-            {/* Current Chart */}
-            <View style={[styles.chartSlide, { left: 0 }]}>
-              <View style={styles.chartCard}>
-                {renderChart(currentChartType, currentChartData)}
-              </View>
-            </View>
-            
-            {/* Next Chart */}
-            <View style={[styles.chartSlide, { left: width }]}>
-              <View style={styles.chartCard}>
-                {renderChart(nextChartType, chartDataCache[nextChartType])}
-              </View>
-            </View>
-          </Animated.View>
-        </PanGestureHandler>
+          ]}
+        >
+          {renderChart(currentChartType, getChartData())}
+        </Animated.View>
+      </View>
         
         {showSwipeHint && (
           <Animated.View style={[
@@ -368,7 +454,6 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
             <Text style={styles.swipeHintText}>Swipe left or right</Text>
           </Animated.View>
         )}
-      </GestureHandlerRootView>
     </View>
   );
 };
@@ -377,8 +462,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.surface,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    paddingVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -443,12 +527,18 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   styleToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: COLORS.accent,
     borderWidth: 1,
     borderColor: COLORS.accent,
+    gap: 6,
+  },
+  styleToggleIcon: {
+    fontSize: 14,
   },
   styleToggleText: {
     color: COLORS.white,
@@ -457,9 +547,17 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     width: '100%',
-    aspectRatio: 1,
+    height: 400,
     position: 'relative',
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  swipeArea: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   carouselContainer: {
     flex: 1,
@@ -467,7 +565,7 @@ const styles = StyleSheet.create({
     width: width * 3,
   },
   chartSlide: {
-    width: width,
+    width: width - 40,
     position: 'absolute',
     top: 0,
     bottom: 0,

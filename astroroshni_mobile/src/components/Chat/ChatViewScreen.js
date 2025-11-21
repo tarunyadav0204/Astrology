@@ -7,9 +7,10 @@ import {
   StyleSheet,
   Alert,
   Share,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MessageBubble from './MessageBubble';
@@ -54,6 +55,7 @@ export default function ChatViewScreen({ route, navigation }) {
 
   return (
     <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -61,7 +63,7 @@ export default function ChatViewScreen({ route, navigation }) {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
+            <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           
           <View style={styles.headerInfo}>
@@ -77,7 +79,7 @@ export default function ChatViewScreen({ route, navigation }) {
             style={styles.shareButton}
             onPress={shareChat}
           >
-            <Ionicons name="share-outline" size={20} color={COLORS.accent} />
+            <Text style={styles.shareIcon}>📎</Text>
           </TouchableOpacity>
         </View>
 
@@ -108,7 +110,7 @@ export default function ChatViewScreen({ route, navigation }) {
             style={styles.continueButton}
             onPress={continueConversation}
           >
-            <Ionicons name="chatbubble-ellipses" size={20} color={COLORS.white} />
+            <Text style={styles.chatIcon}>💬</Text>
             <Text style={styles.continueText}>Continue Conversation</Text>
           </TouchableOpacity>
         </View>
@@ -158,6 +160,19 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: COLORS.lightGray,
+  },
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.accent,
+    fontWeight: 'bold',
+  },
+  shareIcon: {
+    fontSize: 18,
+    color: COLORS.accent,
+  },
+  chatIcon: {
+    fontSize: 18,
+    color: COLORS.white,
   },
   messagesContainer: {
     flex: 1,

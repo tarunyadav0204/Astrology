@@ -178,16 +178,18 @@ class CreditService:
             conn.close()
             return {"success": False, "message": "Promo code has expired"}
         
-        if used_count >= max_uses:
-            conn.close()
-            return {"success": False, "message": "Promo code usage limit reached"}
-        
+        # Check if user has already used this promo code
         cursor.execute("""
             SELECT id FROM promo_code_usage WHERE promo_code_id = ? AND userid = ?
         """, (promo_id, userid))
         if cursor.fetchone():
             conn.close()
             return {"success": False, "message": "You have already used this promo code"}
+        
+        # Check global usage limit
+        if used_count >= max_uses:
+            conn.close()
+            return {"success": False, "message": "Promo code usage limit reached"}
         
         self.add_credits(userid, credits, 'promo_code', code, f"Promo code: {code}")
         

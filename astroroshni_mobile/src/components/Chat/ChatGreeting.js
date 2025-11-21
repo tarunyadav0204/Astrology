@@ -6,8 +6,8 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 
 export default function ChatGreeting({ birthData, onOptionSelect }) {
@@ -69,7 +69,7 @@ export default function ChatGreeting({ birthData, onOptionSelect }) {
                   <Text style={styles.optionTitle}>{option.title}</Text>
                   <Text style={styles.optionDescription}>{option.description}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.accent} />
+                <Text style={styles.chevronIcon}>▶</Text>
               </LinearGradient>
             </TouchableOpacity>
           ))}
@@ -177,6 +177,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 18,
+  },
+  chevronIcon: {
+    fontSize: 16,
+    color: COLORS.accent,
   },
   quickQuestionsContainer: {
     alignItems: 'center',

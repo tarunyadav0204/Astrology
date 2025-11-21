@@ -7,9 +7,10 @@ import {
   StyleSheet,
   Alert,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { storage } from '../../services/storage';
@@ -148,14 +149,14 @@ export default function ChatHistoryScreen({ navigation }) {
             minute: '2-digit'
           })}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={COLORS.gray} />
+        <Text style={styles.chevronIcon}>▶</Text>
       </View>
     </TouchableOpacity>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="chatbubbles-outline" size={64} color={COLORS.gray} />
+      <Text style={styles.emptyIcon}>💬</Text>
       <Text style={styles.emptyTitle}>No Chat History</Text>
       <Text style={styles.emptyText}>
         Start a conversation to see your chat history here
@@ -171,6 +172,7 @@ export default function ChatHistoryScreen({ navigation }) {
 
   return (
     <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -178,7 +180,7 @@ export default function ChatHistoryScreen({ navigation }) {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
+            <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Chat History</Text>
           {Array.isArray(chatSessions) && chatSessions.length > 0 && (
@@ -186,7 +188,7 @@ export default function ChatHistoryScreen({ navigation }) {
               style={styles.clearButton}
               onPress={clearAllHistory}
             >
-              <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+              <Text style={styles.trashIcon}>🗑️</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -247,6 +249,21 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: COLORS.lightGray,
+  },
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.accent,
+    fontWeight: 'bold',
+  },
+  trashIcon: {
+    fontSize: 18,
+  },
+  chevronIcon: {
+    fontSize: 12,
+    color: COLORS.gray,
+  },
+  emptyIcon: {
+    fontSize: 64,
   },
   listContainer: {
     padding: 16,

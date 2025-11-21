@@ -83,6 +83,8 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
   return (
     <View style={styles.container}>
       <Svg viewBox="0 0 340 340" style={styles.svg}>
+        {/* Outer border */}
+        <Rect x="0" y="0" width="340" height="340" fill="none" stroke="#ff6f00" strokeWidth="3"/>
         {/* Grid lines */}
         <Line x1="85" y1="0" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
         <Line x1="170" y1="0" x2="170" y2="85" stroke="#ff8a65" strokeWidth="2"/>
@@ -148,9 +150,7 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
         })}
       </Svg>
       
-      <Text style={styles.instructionText}>
-        South Indian Chart Style
-      </Text>
+
     </View>
   );
 };

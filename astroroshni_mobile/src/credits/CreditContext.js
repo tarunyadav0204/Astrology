@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { creditAPI } from './creditService';
 
 const CreditContext = createContext();
@@ -9,11 +10,30 @@ export const CreditProvider = ({ children }) => {
 
   const fetchBalance = async () => {
     try {
+      // Check if user is authenticated first
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        console.log('⚠️ No auth token, skipping credit fetch');
+        setCredits(0);
+        return;
+      }
+      
       setLoading(true);
+      console.log('🔄 Fetching credits from API...');
       const response = await creditAPI.getBalance();
+      console.log('✅ Credits response:', response.data);
       setCredits(response.data.credits);
     } catch (error) {
-      console.error('Error fetching credits:', error);
+      console.error('❌ Error fetching credits:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
       if (error.response?.status === 401) {
         console.log('User not authenticated for credits');
         setCredits(0);
@@ -54,7 +74,8 @@ export const CreditProvider = ({ children }) => {
       loading,
       fetchBalance,
       redeemCode,
-      spendCredits
+      spendCredits,
+      refreshCredits: fetchBalance // Expose for manual refresh
     }}>
       {children}
     </CreditContext.Provider>

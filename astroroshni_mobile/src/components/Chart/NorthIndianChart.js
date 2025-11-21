@@ -383,9 +383,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
         </View>
       )}
       
-      <Text style={styles.instructionText}>
-        Touch planets to see degree. Touch signs for options.
-      </Text>
+
     </View>
   );
 };

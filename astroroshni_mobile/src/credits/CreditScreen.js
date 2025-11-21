@@ -57,6 +57,15 @@ const CreditScreen = () => {
         .replace(/&gt;/g, '>')
         .replace(/&#39;/g, "'");
       
+      // Provide user-friendly messages for common errors
+      if (errorMessage.toLowerCase().includes('already used') || errorMessage.toLowerCase().includes('already redeemed')) {
+        errorMessage = 'You have already used this promo code. Each code can only be used once per user.';
+      } else if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('not found')) {
+        errorMessage = 'Invalid promo code. Please check the code and try again.';
+      } else if (errorMessage.toLowerCase().includes('expired')) {
+        errorMessage = 'This promo code has expired and is no longer valid.';
+      }
+      
       Alert.alert('Redemption Failed', errorMessage);
     } finally {
       setRedeeming(false);

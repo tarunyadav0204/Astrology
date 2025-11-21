@@ -9,9 +9,10 @@ import {
   Modal,
   SafeAreaView,
   Platform,
+  StatusBar,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +24,28 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const [transitDate, setTransitDate] = useState(new Date());
   const [selectedDashas, setSelectedDashas] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const formatPeriodDuration = (years) => {
+    if (!years) return '';
+    
+    const totalDays = years * 365.25;
+    const totalMonths = years * 12;
+    
+    if (totalDays < 90) { // Less than 3 months
+      return `${Math.round(totalDays)}d`;
+    } else if (totalMonths < 12) { // Less than 1 year
+      return `${Math.round(totalMonths)}m`;
+    } else {
+      const wholeYears = Math.floor(years);
+      const remainingMonths = Math.round((years - wholeYears) * 12);
+      
+      if (remainingMonths === 0) {
+        return `${wholeYears}y`;
+      } else {
+        return `${wholeYears}y ${remainingMonths}m`;
+      }
+    }
+  };
   const scrollRefs = {
     maha: React.useRef(null),
     antar: React.useRef(null),
@@ -212,7 +235,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.compactCalendarButton} onPress={() => setShowDatePicker(true)}>
-          <Ionicons name="calendar" size={18} color={COLORS.white} />
+          <Text style={styles.calendarIcon}>📅</Text>
         </TouchableOpacity>
         
         <View style={styles.navButtonGroup}>
@@ -326,7 +349,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                   <Text style={styles.breadcrumbPlanet}>{item.planet}</Text>
                   {item.details && (
                     <>
-                      <Text style={styles.breadcrumbPeriod}>{item.details.years?.toFixed(1)}y</Text>
+                      <Text style={styles.breadcrumbPeriod}>{formatPeriodDuration(item.details.years)}</Text>
                       <Text style={styles.breadcrumbDates}>
                         {new Date(item.details.start).toLocaleDateString('en-US', {month: 'short', year: '2-digit'})} - {new Date(item.details.end).toLocaleDateString('en-US', {month: 'short', year: '2-digit'})}
                       </Text>
@@ -360,6 +383,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             options.map((dasha, index) => {
               const isSelected = selectedValue === dasha.planet;
               const isCurrent = dasha.current;
+              const currentDate = transitDate;
+              const startDate = new Date(dasha.start);
+              const endDate = new Date(dasha.end);
+              const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
               
               return (
                 <TouchableOpacity
@@ -367,7 +394,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                   style={[
                     styles.optionCard,
                     isSelected && styles.selectedOptionCard,
-                    isCurrent && styles.currentOptionCard
+                    isActuallyCurrent && styles.currentOptionCard
                   ]}
                   onPress={() => {
                     handleDashaSelection(dashaType, dasha.planet);
@@ -376,21 +403,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                   <Text style={[
                     styles.optionPlanet,
                     isSelected && styles.selectedOptionPlanet,
-                    isCurrent && styles.currentOptionPlanet
+                    isActuallyCurrent && styles.currentOptionPlanet
                   ]}>
                     {dasha.planet}
                   </Text>
                   <Text style={[
                     styles.optionPeriod,
                     isSelected && styles.selectedOptionPeriod,
-                    isCurrent && styles.currentOptionPeriod
+                    isActuallyCurrent && styles.currentOptionPeriod
                   ]}>
-                    {dasha.years?.toFixed(1)}y
+                    {formatPeriodDuration(dasha.years)}
                   </Text>
                   <Text style={[
                     styles.optionDates,
                     isSelected && styles.selectedOptionDates,
-                    isCurrent && styles.currentOptionDates
+                    isActuallyCurrent && styles.currentOptionDates
                   ]}>
                     {new Date(dasha.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(dasha.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
                   </Text>
@@ -406,10 +433,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   if (loading) {
     return (
       <Modal visible={visible} animationType="slide">
+        <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.closeIcon}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Cascading Dasha Browser</Text>
             <View style={styles.placeholder} />
@@ -426,10 +454,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   if (error) {
     return (
       <Modal visible={visible} animationType="slide">
+        <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.closeIcon}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Cascading Dasha Browser</Text>
             <View style={styles.placeholder} />
@@ -447,10 +476,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   return (
     <Modal visible={visible} animationType="slide">
+      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+            <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Dashas for {birthData?.name || 'User'}</Text>
           <View style={styles.placeholder} />
@@ -738,6 +768,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  closeIcon: {
+    fontSize: 20,
+    color: COLORS.textPrimary,
+  },
+  calendarIcon: {
+    fontSize: 16,
   },
 });
 

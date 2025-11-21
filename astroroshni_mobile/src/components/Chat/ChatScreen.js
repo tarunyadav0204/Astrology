@@ -12,11 +12,12 @@ import {
   Share,
   Platform,
   KeyboardAvoidingView,
+  BackHandler,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'react-native';
 
 import MessageBubble from './MessageBubble';
 import EventPeriods from './EventPeriods';
@@ -68,6 +69,19 @@ export default function ChatScreen({ navigation }) {
     
     return unsubscribe;
   }, [navigation]);
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!showGreeting) {
+        setShowGreeting(true);
+        setMessages([]);
+        return true; // Prevent default back action
+      }
+      return false; // Allow default back action
+    });
+
+    return () => backHandler.remove();
+  }, [showGreeting]);
 
   const fetchChatCost = async () => {
     try {
@@ -575,7 +589,7 @@ export default function ChatScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             await storage.clearAll();
-            navigation.replace('Login');
+            navigation.navigate('Login');
           },
         },
       ]
@@ -597,7 +611,7 @@ export default function ChatScreen({ navigation }) {
 
   return (
     <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
-      <StatusBar style="dark" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
@@ -623,13 +637,13 @@ export default function ChatScreen({ navigation }) {
               style={styles.headerButton}
               onPress={() => setShowLanguageModal(true)}
             >
-              <Ionicons name="language" size={24} color={COLORS.accent} />
+              <Text style={styles.headerButtonText}>🌐</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerButton}
               onPress={() => setShowMenu(true)}
             >
-              <Ionicons name="menu" size={24} color={COLORS.accent} />
+              <Text style={styles.headerButtonText}>☰</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -764,11 +778,9 @@ export default function ChatScreen({ navigation }) {
                   setShowChart(true);
                 }}
               >
-                <Ionicons name="bar-chart" size={20} color={COLORS.accent} />
+                <Text style={styles.menuIcon}>📊</Text>
                 <Text style={styles.menuText}>View Chart</Text>
               </TouchableOpacity>
-
-
 
               <TouchableOpacity
                 style={styles.menuOption}
@@ -777,7 +789,7 @@ export default function ChatScreen({ navigation }) {
                   setShowDashaBrowser(true);
                 }}
               >
-                <Ionicons name="time" size={20} color={COLORS.accent} />
+                <Text style={styles.menuIcon}>⏰</Text>
                 <Text style={styles.menuText}>Dasha Browser</Text>
               </TouchableOpacity>
 
@@ -788,7 +800,7 @@ export default function ChatScreen({ navigation }) {
                   navigation.navigate('ChatHistory');
                 }}
               >
-                <Ionicons name="time" size={20} color={COLORS.accent} />
+                <Text style={styles.menuIcon}>💬</Text>
                 <Text style={styles.menuText}>Chat History</Text>
               </TouchableOpacity>
 
@@ -799,7 +811,7 @@ export default function ChatScreen({ navigation }) {
                   navigation.navigate('Credits');
                 }}
               >
-                <Ionicons name="card" size={20} color={COLORS.accent} />
+                <Text style={styles.menuIcon}>💳</Text>
                 <Text style={styles.menuText}>Credits</Text>
               </TouchableOpacity>
 
@@ -811,11 +823,9 @@ export default function ChatScreen({ navigation }) {
                   navigation.navigate('BirthForm');
                 }}
               >
-                <Ionicons name="person" size={20} color={COLORS.accent} />
+                <Text style={styles.menuIcon}>👤</Text>
                 <Text style={styles.menuText}>Select Native</Text>
               </TouchableOpacity>
-
-
 
               <TouchableOpacity
                 style={styles.menuOption}
@@ -825,11 +835,9 @@ export default function ChatScreen({ navigation }) {
                   setMessages([]);
                 }}
               >
-                <Ionicons name="home" size={20} color={COLORS.accent} />
+                <Text style={styles.menuIcon}>🏠</Text>
                 <Text style={styles.menuText}>Back to Home</Text>
               </TouchableOpacity>
-
-
 
               <TouchableOpacity
                 style={styles.menuOption}
@@ -838,7 +846,7 @@ export default function ChatScreen({ navigation }) {
                   logout();
                 }}
               >
-                <Ionicons name="log-out" size={20} color={COLORS.error} />
+                <Text style={[styles.menuIcon, { color: COLORS.error }]}>🚪</Text>
                 <Text style={[styles.menuText, { color: COLORS.error }]}>Logout</Text>
               </TouchableOpacity>
 
@@ -960,6 +968,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  headerButtonText: {
+    fontSize: 20,
+    color: COLORS.accent,
   },
   messagesContainer: {
     flex: 1,
@@ -1106,6 +1118,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
+  },
+  menuIcon: {
+    fontSize: 20,
+    color: COLORS.accent,
   },
   menuText: {
     fontSize: 16,

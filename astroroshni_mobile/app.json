@@ -19,6 +19,7 @@
       "bundleIdentifier": "com.astroroshni.mobile",
       "buildNumber": "2",
       "deploymentTarget": "13.4",
+      "newArchEnabled": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
@@ -31,7 +32,8 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#f97316"
       },
-      "package": "com.astroroshni.mobile"
+      "package": "com.astroroshni.mobile",
+      "newArchEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

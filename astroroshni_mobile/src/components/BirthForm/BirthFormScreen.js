@@ -12,10 +12,10 @@ import {
   KeyboardAvoidingView,
   Modal,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { LinearGradient } from 'react-native-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
@@ -203,8 +203,8 @@ export default function BirthFormScreen({ navigation }) {
       // Just load the existing chart data without creating new entry
       await storage.setBirthDetails({
         name: chart.name,
-        date: new Date(chart.date),
-        time: timeDate,
+        date: chart.date, // Keep as string
+        time: chart.time, // Keep as string
         place: chart.place || '',
         latitude: chart.latitude,
         longitude: chart.longitude,
@@ -462,7 +462,7 @@ export default function BirthFormScreen({ navigation }) {
                     onPress={() => setShowDatePicker(true)}
                   >
                     <Text style={styles.dateTimeText}>{formatDate(formData.date)}</Text>
-                    <Ionicons name="calendar" size={16} color={COLORS.accent} />
+                    <Text style={styles.dateTimeIcon}>📅</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -490,24 +490,10 @@ export default function BirthFormScreen({ navigation }) {
                     onPress={() => setShowTimePicker(true)}
                   >
                     <Text style={styles.dateTimeText}>{formatTime(formData.time)}</Text>
-                    <Ionicons name="time" size={16} color={COLORS.accent} />
+                    <Text style={styles.dateTimeIcon}>🕐</Text>
                   </TouchableOpacity>
                 )}
               </View>
-
-              {showSuggestions && suggestions.length > 0 && (
-                <View style={styles.suggestionsList}>
-                  {suggestions.map(suggestion => (
-                    <TouchableOpacity
-                      key={suggestion.id}
-                      style={styles.suggestionItem}
-                      onPress={() => handlePlaceSelect(suggestion)}
-                    >
-                      <Text style={styles.suggestionText}>{suggestion.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Place of Birth</Text>
@@ -517,10 +503,20 @@ export default function BirthFormScreen({ navigation }) {
                   onChangeText={(value) => handleInputChange('place', value)}
                   placeholder="City, State, Country"
                   placeholderTextColor={COLORS.gray}
-                  onBlur={() => {
-                    setTimeout(() => setShowSuggestions(false), 200);
-                  }}
                 />
+                {showSuggestions && suggestions.length > 0 && (
+                  <View style={styles.suggestionsList}>
+                    {suggestions.slice(0, 3).map(suggestion => (
+                      <TouchableOpacity
+                        key={suggestion.id}
+                        style={styles.suggestionItem}
+                        onPress={() => handlePlaceSelect(suggestion)}
+                      >
+                        <Text style={styles.suggestionText} numberOfLines={1}>{suggestion.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
 
 
@@ -603,76 +599,43 @@ export default function BirthFormScreen({ navigation }) {
           </ScrollView>
         )}
 
-        {/* Date Picker Modal */}
+        {/* Date Picker */}
         {showDatePicker && Platform.OS !== 'web' && (
-          <Modal visible={showDatePicker} transparent animationType="slide">
-            <View style={styles.pickerModal}>
-              <View style={styles.pickerContainer}>
-                <DateTimePicker
-                  value={formData.date}
-                  mode="date"
-                  display="spinner"
-                  onChange={handleDateChange}
-                  maximumDate={new Date()}
-                />
-                <TouchableOpacity
-                  style={styles.pickerDone}
-                  onPress={() => setShowDatePicker(false)}
-                >
-                  <Text style={styles.pickerDoneText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+          <DateTimePicker
+            value={formData.date}
+            mode="date"
+            display="default"
+            accentColor={COLORS.accent}
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) {
+                handleInputChange('date', selectedDate);
+              }
+            }}
+            minimumDate={new Date(1900, 0, 1)}
+            maximumDate={new Date()}
+          />
         )}
 
-        {/* Time Picker Modal */}
+        {/* Time Picker */}
         {showTimePicker && Platform.OS !== 'web' && (
-          <Modal visible={showTimePicker} transparent animationType="slide">
-            <View style={styles.pickerModal}>
-              <View style={styles.pickerContainer}>
-                <DateTimePicker
-                  value={formData.time}
-                  mode="time"
-                  display="spinner"
-                  onChange={handleTimeChange}
-                />
-                <TouchableOpacity
-                  style={styles.pickerDone}
-                  onPress={() => setShowTimePicker(false)}
-                >
-                  <Text style={styles.pickerDoneText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+          <DateTimePicker
+            value={formData.time}
+            mode="time"
+            display="default"
+            accentColor={COLORS.accent}
+            onChange={(event, selectedTime) => {
+              setShowTimePicker(false);
+              if (selectedTime) {
+                handleInputChange('time', selectedTime);
+              }
+            }}
+          />
         )}
 
-        {/* Place Suggestions Modal */}
-        <Modal visible={showSuggestions && suggestions.length > 0} transparent animationType="slide">
-          <View style={styles.pickerModal}>
-            <View style={styles.pickerContainer}>
-              <Text style={styles.modalTitle}>Select Place</Text>
-              <ScrollView style={{ maxHeight: 200 }}>
-                {suggestions.map(suggestion => (
-                  <TouchableOpacity
-                    key={suggestion.id}
-                    style={styles.suggestionItem}
-                    onPress={() => handlePlaceSelect(suggestion)}
-                  >
-                    <Text style={styles.suggestionText}>{suggestion.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.pickerDone}
-                onPress={() => setShowSuggestions(false)}
-              >
-                <Text style={styles.pickerDoneText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+
+
+
 
         </KeyboardAvoidingView>
       </View>
@@ -790,6 +753,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
   },
+  dateTimeIcon: {
+    fontSize: 16,
+  },
   genderButtons: {
     flexDirection: 'row',
     gap: 10,
@@ -824,6 +790,18 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 
+  suggestionsList: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderRadius: 8,
+    marginTop: 5,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   suggestionItem: {
     padding: 12,
     borderBottomWidth: 1,
@@ -956,6 +934,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
+  },
+  pickerContent: {
+    height: 200,
+    marginBottom: 20,
   },
   pickerDone: {
     backgroundColor: COLORS.accent,

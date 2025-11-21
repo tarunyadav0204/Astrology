@@ -10,8 +10,8 @@ import {
   Clipboard,
   Share,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 
 export default function MessageBubble({ message, language, onFollowUpClick }) {
@@ -668,13 +668,13 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
               style={styles.actionButton}
               onPress={copyToClipboard}
             >
-              <Ionicons name="copy-outline" size={16} color={COLORS.accent} />
+              <Text style={styles.actionIcon}>📋</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={shareMessage}
             >
-              <Ionicons name="share-outline" size={16} color={COLORS.accent} />
+              <Text style={styles.actionIcon}>↗️</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -884,6 +884,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  actionIcon: {
+    fontSize: 16,
+    color: COLORS.accent,
   },
   timestamp: {
     fontSize: 11,

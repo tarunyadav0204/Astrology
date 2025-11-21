@@ -10,9 +10,11 @@ import {
   Dimensions,
   ActionSheetIOS,
   Platform,
+  StatusBar,
+  PanResponder,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
@@ -25,7 +27,22 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   const [error, setError] = useState(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [viewMode, setViewMode] = useState('cards');
+  const [showYearModal, setShowYearModal] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      return Math.abs(gestureState.dx) > 10;
+    },
+    onPanResponderGrant: () => {},
+    onPanResponderMove: () => {},
+    onPanResponderRelease: (evt, gestureState) => {
+      if (gestureState.dx > 50) {
+        onClose();
+      }
+    },
+  });
 
   useEffect(() => {
     if (visible) {
@@ -132,8 +149,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   const showYearPicker = () => {
     if (Platform.OS === 'ios') {
-      // Create options with current year highlighted
-      const currentIndex = yearOptions.indexOf(selectedYear);
       const yearLabels = yearOptions.map(year => 
         year === selectedYear ? `${year} ✓` : year.toString()
       );
@@ -151,7 +166,16 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
         }
       );
     } else {
-      Alert.alert('Year Selection', 'Use the arrows to change year');
+      setShowYearModal(true);
+    }
+  };
+
+  const changeYear = (direction) => {
+    const currentIndex = yearOptions.indexOf(selectedYear);
+    if (direction === 'prev' && currentIndex > 0) {
+      setSelectedYear(yearOptions[currentIndex - 1]);
+    } else if (direction === 'next' && currentIndex < yearOptions.length - 1) {
+      setSelectedYear(yearOptions[currentIndex + 1]);
     }
   };
 
@@ -161,9 +185,10 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
         <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
           <SafeAreaView style={styles.safeArea}>
             <View style={styles.loadingContainer}>
-              <Text style={styles.loadingSpinner}>🔮</Text>
-              <Text style={styles.loadingText}>Analyzing your chart for significant periods...</Text>
-              <Text style={styles.loadingSubtext}>This may take a moment as we calculate transit activations</Text>
+              <Text style={styles.loadingSpinner}>🎯</Text>
+              <Text style={styles.loadingText}>🔍 Finding All Life Events</Text>
+              <Text style={styles.loadingSubtext}>✨ Calculating probability of occurrence for each event</Text>
+              <Text style={styles.loadingDetails}>📊 Analyzing planetary transits & activations...</Text>
             </View>
           </SafeAreaView>
         </LinearGradient>
@@ -191,20 +216,28 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   return (
     <Modal visible={visible} animationType="slide">
+      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
+          {/* Page Title */}
+          <View style={styles.pageTitle}>
+            <Text style={styles.pageTitleText}>🎯 Event Periods</Text>
+            <Text style={styles.pageSubtitle}>High-probability periods for significant life events</Text>
+            <Text style={styles.tapHint}>💬 Tap any period for detailed analysis</Text>
+          </View>
+
           {/* Simple Header */}
-          <View style={[styles.header, { marginTop: insets.top + 10 }]}>
+          <View style={styles.header}>
             <TouchableOpacity style={styles.backBtn} onPress={onClose}>
-              <Ionicons name="arrow-back" size={20} color="white" />
+              <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.yearSelector}
-              onPress={() => showYearPicker()}
+              onPress={showYearPicker}
             >
               <Text style={styles.yearText}>{selectedYear}</Text>
-              <Ionicons name="chevron-down" size={16} color="#333" />
+              <Text style={styles.chevronDown}>▼</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -218,6 +251,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
           </View>
 
           {/* Content */}
+          <View {...panResponder.panHandlers} style={styles.gestureContainer}>
           {periods.length === 0 ? (
             <View style={styles.noPeriodsContainer}>
               <Text style={styles.noPeriodsText}>No high-significance periods found for {selectedYear}.</Text>
@@ -330,8 +364,46 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
               ))}
             </ScrollView>
           )}
+          </View>
         </SafeAreaView>
       </LinearGradient>
+      
+      {/* Year Selection Modal for Android */}
+      <Modal visible={showYearModal} transparent animationType="fade">
+        <View style={styles.yearModalOverlay}>
+          <View style={styles.yearModalContent}>
+            <Text style={styles.yearModalTitle}>Select Year</Text>
+            <ScrollView style={styles.yearList} showsVerticalScrollIndicator={false}>
+              {yearOptions.map(year => (
+                <TouchableOpacity
+                  key={year}
+                  style={[
+                    styles.yearOption,
+                    year === selectedYear && styles.yearOptionSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedYear(year);
+                    setShowYearModal(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.yearOptionText,
+                    year === selectedYear && styles.yearOptionTextSelected
+                  ]}>
+                    {year} {year === selectedYear ? '✓' : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.yearModalClose}
+              onPress={() => setShowYearModal(false)}
+            >
+              <Text style={styles.yearModalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -342,6 +414,40 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  pageTitle: {
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+  },
+  pageTitleText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    textAlign: 'center',
+    marginBottom: 5,
+    textShadowColor: 'rgba(255, 255, 255, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  pageSubtitle: {
+    fontSize: 14,
+    color: '#2d2d2d',
+    textAlign: 'center',
+    lineHeight: 18,
+    textShadowColor: 'rgba(255, 255, 255, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  tapHint: {
+    fontSize: 12,
+    color: COLORS.accent,
+    textAlign: 'center',
+    marginTop: 5,
+    fontWeight: '600',
+    textShadowColor: 'rgba(255, 255, 255, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   header: {
     flexDirection: 'row',
@@ -360,6 +466,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     minWidth: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    fontSize: 18,
+    color: 'white',
+    fontWeight: 'bold',
+    lineHeight: 18,
+    textAlignVertical: 'center',
+  },
+  chevronDown: {
+    fontSize: 12,
+    color: '#333',
   },
   yearSelector: {
     flexDirection: 'row',
@@ -399,16 +517,33 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   loadingText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
+    textShadowColor: 'rgba(255, 255, 255, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   loadingSubtext: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#2d2d2d',
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 10,
+    textShadowColor: 'rgba(255, 255, 255, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  loadingDetails: {
+    color: '#444',
     fontSize: 14,
     textAlign: 'center',
+    fontStyle: 'italic',
+    textShadowColor: 'rgba(255, 255, 255, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   errorContainer: {
     flex: 1,
@@ -597,5 +732,61 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     lineHeight: 16,
+  },
+  // Year Modal Styles
+  yearModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  yearModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxHeight: '70%',
+  },
+  yearModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.accent,
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  yearList: {
+    maxHeight: 300,
+  },
+  yearOption: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  yearOptionSelected: {
+    backgroundColor: COLORS.accent,
+  },
+  yearOptionText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+  },
+  yearOptionTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  yearModalClose: {
+    backgroundColor: COLORS.lightGray,
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 15,
+  },
+  yearModalCloseText: {
+    fontSize: 16,
+    color: COLORS.accent,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  gestureContainer: {
+    flex: 1,
   },
 });

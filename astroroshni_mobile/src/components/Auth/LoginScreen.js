@@ -12,16 +12,18 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';
+import { useCredits } from '../../credits/CreditContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
+  const { refreshCredits } = useCredits();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -62,7 +64,7 @@ export default function LoginScreen({ navigation }) {
   const checkAuthStatus = async () => {
     const token = await storage.getAuthToken();
     if (token) {
-      navigation.replace('Chat');
+      navigation.navigate('Chat');
     }
   };
 
@@ -80,7 +82,9 @@ export default function LoginScreen({ navigation }) {
         console.log('✅ Login successful:', response.data);
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
-        navigation.replace('Chat');
+        // Refresh credits after successful login
+        await refreshCredits();
+        navigation.navigate('Chat');
       } else {
         // For registration, send OTP using registration endpoint
         setRegistrationData({ name, phone, password });
@@ -134,7 +138,7 @@ export default function LoginScreen({ navigation }) {
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
       
-      navigation.replace('Chat');
+      navigation.navigate('Chat');
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Invalid OTP or registration failed');
     } finally {

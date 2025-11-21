@@ -1,7 +1,8 @@
+import './polyfills';
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
@@ -24,7 +25,7 @@ export default function App() {
     <SafeAreaProvider>
       <CreditProvider>
         <NavigationContainer>
-        <StatusBar style="dark" backgroundColor="#ff6b35" />
+        <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator
           initialRouteName="Welcome"
           screenOptions={{
@@ -35,6 +36,8 @@ export default function App() {
             headerTitleStyle: {
               fontWeight: 'bold',
             },
+            gestureEnabled: true,
+            gestureDirection: 'horizontal',
           }}
         >
           <Stack.Screen 

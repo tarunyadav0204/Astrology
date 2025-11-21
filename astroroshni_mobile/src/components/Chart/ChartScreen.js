@@ -6,19 +6,22 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import ChartWidget from './ChartWidget';
+import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 
 export default function ChartScreen({ visible, onClose }) {
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showDashaBrowser, setShowDashaBrowser] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -30,38 +33,17 @@ export default function ChartScreen({ visible, onClose }) {
     try {
       setLoading(true);
       
-      // First try to get fresh data from database
-      try {
-        const response = await chartAPI.getExistingCharts('');
-        const charts = response.data.charts || [];
-        if (charts.length > 0) {
-          // Use the most recent chart from database
-          const latestChart = charts[0];
-          const freshData = {
-            name: latestChart.name,
-            date: latestChart.date,
-            time: latestChart.time,
-            latitude: latestChart.latitude,
-            longitude: latestChart.longitude,
-            timezone: latestChart.timezone,
-            place: latestChart.place || '',
-            gender: latestChart.gender || ''
-          };
-          setBirthData(freshData);
-          await calculateChart(freshData);
-          return;
-        }
-      } catch (dbError) {
-      }
-      
-      // Fallback to local storage if database fetch fails
+      // Always use current birth data from storage (most up-to-date)
       const data = await storage.getBirthDetails();
-      if (data) {
+      console.log('ChartScreen - Birth data from storage:', data);
+      if (data && data.name) {
         setBirthData(data);
         await calculateChart(data);
+      } else {
+        console.log('ChartScreen - No valid birth data found');
       }
     } catch (error) {
-      // Error loading birth data
+      console.error('ChartScreen - Error loading birth data:', error);
     } finally {
       setLoading(false);
     }
@@ -69,71 +51,46 @@ export default function ChartScreen({ visible, onClose }) {
 
   const calculateChart = async (data) => {
     try {
+      console.log('ChartScreen - Calculating chart for:', data);
       
-      // Ensure proper date/time format
-      let formattedDate = data.date;
-      let formattedTime = data.time;
-      
-      // Fix date format
-      if (typeof data.date === 'string' && data.date.includes('T')) {
-        formattedDate = data.date.split('T')[0];
-      }
-      
-      // Fix time format - extract HH:MM from various formats
-      if (typeof data.time === 'string') {
-        if (data.time.includes('T')) {
-          // Extract time from datetime string like "1970-01-01T09:25:00.000Z"
-          const timePart = data.time.split('T')[1];
-          if (timePart) {
-            formattedTime = timePart.slice(0, 5); // Get HH:MM
-          }
-        } else if (data.time.includes(':')) {
-          // Already in HH:MM format
-          formattedTime = data.time.slice(0, 5);
-        }
-      }
-      
+      // Format data properly for API
       const formattedData = {
         ...data,
-        date: formattedDate,
-        time: formattedTime,
+        date: typeof data.date === 'string' ? data.date.split('T')[0] : data.date,
+        time: typeof data.time === 'string' ? data.time.split('T')[1]?.slice(0, 5) || data.time : data.time,
         latitude: parseFloat(data.latitude),
         longitude: parseFloat(data.longitude),
-        timezone: 'Asia/Kolkata' // Always use proper timezone
+        timezone: data.timezone || 'Asia/Kolkata'
       };
       
-      // Get auth token for authenticated request
-      const token = await storage.getAuthToken();
-      
-      // Clear any cached chart data to ensure fresh calculation
-      await storage.clearChartData();
-      
-      // Always calculate fresh chart data without saving to database
+      console.log('ChartScreen - Formatted data:', formattedData);
       const response = await chartAPI.calculateChartOnly(formattedData);
-      
       const chartResult = response.data;
-      
-      // Store chart data for future use
-      await storage.setChartData({
-        birthData: formattedData,
-        chartData: chartResult
-      });
+      console.log('ChartScreen - Chart calculated successfully');
       
       setChartData(chartResult);
     } catch (error) {
-      // Error calculating chart
+      console.error('ChartScreen - Error calculating chart:', error);
     }
   };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Vedic Charts</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color={COLORS.accent} />
-          </TouchableOpacity>
-        </View>
+        <LinearGradient 
+          colors={['#FF6B35', '#FF8A65', '#FFAB91']} 
+          style={styles.header}
+          start={{x: 0, y: 0}} 
+          end={{x: 1, y: 1}}
+        >
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>✨ Vedic Charts</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -154,6 +111,13 @@ export default function ChartScreen({ visible, onClose }) {
                   {birthData.date} at {birthData.time}
                 </Text>
                 <Text style={styles.chartDetails}>{birthData.place}</Text>
+                
+                <TouchableOpacity 
+                  style={styles.dashaBrowserButton}
+                  onPress={() => setShowDashaBrowser(true)}
+                >
+                  <Text style={styles.dashaBrowserButtonText}>⏰ Dasha Browser</Text>
+                </TouchableOpacity>
               </View>
             )}
           </ScrollView>
@@ -163,6 +127,12 @@ export default function ChartScreen({ visible, onClose }) {
           </View>
         )}
       </LinearGradient>
+      
+      <CascadingDashaBrowser 
+        visible={showDashaBrowser} 
+        onClose={() => setShowDashaBrowser(false)}
+        birthData={birthData}
+      />
     </Modal>
   );
 }
@@ -172,29 +142,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    paddingBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    paddingTop: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: 50,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   closeButton: {
-    padding: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: COLORS.white,
+    fontWeight: 'bold',
   },
   chartContainer: {
     flex: 1,
-    padding: 20,
+    paddingVertical: 20,
   },
   chartInfo: {
     marginTop: 20,
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 10,
     alignItems: 'center',
@@ -218,5 +211,23 @@ const styles = StyleSheet.create({
   loadingText: {
     color: COLORS.textPrimary,
     fontSize: 16,
+  },
+  dashaBrowserButton: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 15,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  dashaBrowserButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
