@@ -23,6 +23,7 @@ from calculators.vargottama_calculator import VargottamaCalculator
 from calculators.neecha_bhanga_calculator import NeechaBhangaCalculator
 from calculators.pancha_mahapurusha_calculator import PanchaMahapurushaCalculator
 from shared.dasha_calculator import DashaCalculator
+from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -183,6 +184,10 @@ class ChatContextBuilder:
         # Always include current dashas
         dasha_calc = DashaCalculator()
         context['current_dashas'] = dasha_calc.calculate_current_dashas(birth_data)
+        
+        # Add Kalchakra dasha
+        kalchakra_calc = KalachakraDashaCalculator()
+        context['kalchakra_dasha'] = kalchakra_calc.calculate_kalchakra_dasha(birth_data)
         
         # Add specific date dashas if requested
         if target_date:

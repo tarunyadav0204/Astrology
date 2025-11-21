@@ -33,18 +33,15 @@ import { Platform } from 'react-native';
 
 // API Configuration matching web version
 const getApiUrl = () => {
-  // Production server
-  return 'https://astroroshni.com';
+  // Development server - use IP for simulator compatibility
+  return 'http://192.168.68.102:8001';
 };
 
 export const API_BASE_URL = getApiUrl();
 
 // Helper function to handle API endpoints for both dev and production
 export const getEndpoint = (path) => {
-  if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('192.168')) {
-    return `/api${path}`; // /api prefix for localhost (matching web version)
-  }
-  return `/api${path}`; // /api prefix for production
+  return `/api${path}`; // Always use /api prefix
 };
 
 export const LANGUAGES = [
