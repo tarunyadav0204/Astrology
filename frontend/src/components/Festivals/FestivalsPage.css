@@ -1,7 +1,8 @@
 .festivals-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
-  padding: 20px;
+  padding: 0 20px 20px 20px;
+  padding-top: 180px; /* Account for fixed header */
 }
 
 .festivals-header {
@@ -13,6 +14,49 @@
   padding: 20px;
   border-radius: 15px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-left: 0;
+  margin-right: 0;
+  position: relative;
+}
+
+.header-left {
+  display: flex;
+  gap: 10px;
+}
+
+.header-btn {
+  background: linear-gradient(135deg, #e91e63 0%, #f06292 100%);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.header-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+}
+
+.header-btn.monthly-btn {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+}
+
+.header-btn.monthly-btn:hover {
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.header-content {
+  text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-right: 200px;
 }
 
 .header-content h1 {
@@ -26,6 +70,11 @@
   margin: 5px 0 0 0;
   color: #666;
   font-size: 1.1rem;
+}
+
+.date-selector {
+  position: absolute;
+  right: 20px;
 }
 
 .date-selector .date-input {
@@ -233,13 +282,118 @@
 }
 
 .search-btn {
-  background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+  background: linear-gradient(135deg, #e91e63 0%, #f06292 100%);
   color: white;
 }
 
 .action-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.search-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.search-modal {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 800px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-content {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 20px;
+}
+
+.search-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.search-header h3 {
+  margin: 0;
+  color: #d84315;
+  font-size: 1.5rem;
+}
+
+.close-search {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #666;
+  padding: 5px;
+}
+
+.search-input-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 12px 15px;
+  border: 2px solid #ff6b35;
+  border-radius: 10px;
+  font-size: 16px;
+  background: white;
+}
+
+.search-submit-btn {
+  background: linear-gradient(135deg, #e91e63 0%, #f06292 100%);
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.search-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-results h4 {
+  color: #d84315;
+  margin-bottom: 20px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.no-results-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+
+.no-results h3 {
+  color: #d84315;
+  margin-bottom: 10px;
 }
 
 @media (max-width: 768px) {
@@ -282,5 +436,9 @@
   .quick-actions {
     gap: 15px;
     padding: 15px;
+  }
+  
+  .search-input-container {
+    flex-direction: column;
   }
 }

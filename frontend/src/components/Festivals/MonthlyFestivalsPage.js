@@ -151,36 +151,37 @@ const MonthlyFestivalsPage = () => {
   return (
     <div className="monthly-festivals-page">
       <NavigationHeader />
-      <div className="calendar-header">
-        <button 
-          className="nav-btn"
-          onClick={() => navigateMonth(-1)}
-        >
-          ‹
-        </button>
-        <h1>
-          {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-        </h1>
-        <button 
-          className="nav-btn"
-          onClick={() => navigateMonth(1)}
-        >
-          ›
-        </button>
-      </div>
-
-      <div className="calendar-stats">
-        <div className="stat-card">
-          <span className="stat-number">{monthlyData.festivals.length}</span>
-          <span className="stat-label">Festivals</span>
+      <div className="unified-header">
+        <div className="header-left">
+          <h1>🎊 Monthly Festivals & Vrats</h1>
+          <p>Sacred observances and celebrations</p>
         </div>
-        <div className="stat-card">
-          <span className="stat-number">{monthlyData.vrats.length}</span>
-          <span className="stat-label">Vrats</span>
+        <div className="header-center">
+          <button 
+            className="nav-btn"
+            onClick={() => navigateMonth(-1)}
+          >
+            ‹
+          </button>
+          <h2>
+            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </h2>
+          <button 
+            className="nav-btn"
+            onClick={() => navigateMonth(1)}
+          >
+            ›
+          </button>
         </div>
-        <div className="stat-card">
-          <span className="stat-number">{monthlyData.festivals.length + monthlyData.vrats.length}</span>
-          <span className="stat-label">Total Events</span>
+        <div className="header-right">
+          <div className="stat-item">
+            <span className="stat-number">{monthlyData.festivals.length}</span>
+            <span className="stat-label">Festivals</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{monthlyData.vrats.length}</span>
+            <span className="stat-label">Vrats</span>
+          </div>
         </div>
       </div>
 

@@ -62,6 +62,33 @@ async def get_festival_categories():
     """Get festival categories"""
     return FESTIVAL_CATEGORIES
 
+@router.get("/search")
+async def search_festivals(q: str):
+    """Search festivals by name, description, or significance"""
+    if not q or len(q.strip()) < 2:
+        return {"festivals": []}
+    
+    search_term = q.lower().strip()
+    matches = []
+    
+    # Search through all festivals
+    for key, festival in HINDU_FESTIVALS.items():
+        # Check name, description, significance, and type
+        searchable_text = (
+            festival.get("name", "").lower() + " " +
+            festival.get("description", "").lower() + " " +
+            festival.get("significance", "").lower() + " " +
+            festival.get("type", "").lower()
+        )
+        
+        if search_term in searchable_text:
+            matches.append({
+                "id": key,
+                **festival
+            })
+    
+    return {"festivals": matches}
+
 @router.get("/search/{festival_name}")
 async def search_festival(festival_name: str):
     """Search for specific festival information"""

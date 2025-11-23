@@ -6,6 +6,10 @@ const FestivalsPage = () => {
   const [todayFestivals, setTodayFestivals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     fetchTodayFestivals();
@@ -14,7 +18,11 @@ const FestivalsPage = () => {
   const fetchTodayFestivals = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/festivals/today`, {
+      const date = new Date(selectedDate);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      const response = await fetch(`/api/festivals/month/${year}/${month}`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -22,7 +30,11 @@ const FestivalsPage = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setTodayFestivals(data.festivals || []);
+        // Filter festivals for the selected date
+        const allFestivals = [...(data.festivals || []), ...(data.vrats || [])];
+        const selectedDateStr = selectedDate;
+        const dayFestivals = allFestivals.filter(f => f.date === selectedDateStr);
+        setTodayFestivals(dayFestivals);
       } else {
         console.error('API response error:', response.status, response.statusText);
         setTodayFestivals([]);
@@ -109,13 +121,53 @@ const FestivalsPage = () => {
     return colors[type] || '#e74c3c';
   };
 
+  const searchFestivals = async () => {
+    if (!searchTerm.trim()) return;
+    
+    try {
+      setSearchLoading(true);
+      const response = await fetch(`/api/festivals/search?q=${encodeURIComponent(searchTerm)}`, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.festivals || []);
+      } else {
+        console.error('Search API error:', response.status);
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching festivals:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   return (
     <div className="festivals-page">
       <NavigationHeader />
       <div className="festivals-header">
+        <div className="header-left">
+          <button 
+            className="header-btn monthly-btn"
+            onClick={() => window.location.href = '/festivals/monthly'}
+          >
+            📅 Monthly Calendar
+          </button>
+          <button 
+            className="header-btn search-btn"
+            onClick={() => setShowSearch(!showSearch)}
+          >
+            🔍 Search Festivals
+          </button>
+        </div>
         <div className="header-content">
-          <h1>🎊 Hindu Festivals & Vrats</h1>
-          <p>Sacred days and spiritual observances</p>
+          <h1>🎊 Today's Festivals</h1>
+          <p>Sacred days and spiritual observances • {formatDate(selectedDate)}</p>
         </div>
         <div className="date-selector">
           <input
@@ -129,10 +181,6 @@ const FestivalsPage = () => {
 
       <div className="festivals-content">
         <div className="today-section">
-          <h2>Today's Observances</h2>
-          <div className="date-display">
-            {formatDate(selectedDate)}
-          </div>
 
           {loading ? (
             <div className="loading">
@@ -145,13 +193,13 @@ const FestivalsPage = () => {
                 <div 
                   key={index} 
                   className="festival-card"
-                  style={{ borderLeftColor: getTypeColor(festival.type) }}
+                  style={{ borderLeftColor: getTypeColor(festival.type || 'festival') }}
                 >
                   <div className="festival-header">
-                    <span className="festival-icon">{getTypeIcon(festival.type)}</span>
+                    <span className="festival-icon">{getTypeIcon(festival)}</span>
                     <div className="festival-title">
                       <h3>{festival.name}</h3>
-                      <span className="festival-type">{festival.type.replace('_', ' ')}</span>
+                      <span className="festival-type">{festival.type?.replace('_', ' ') || 'Festival'}</span>
                     </div>
                   </div>
                   
@@ -164,14 +212,16 @@ const FestivalsPage = () => {
                     <p>{festival.significance}</p>
                   </div>
 
-                  <div className="festival-rituals">
-                    <h4>🕯️ Rituals & Observances</h4>
-                    <ul>
-                      {festival.rituals.map((ritual, idx) => (
-                        <li key={idx}>{ritual}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  {festival.rituals && festival.rituals.length > 0 && (
+                    <div className="festival-rituals">
+                      <h4>🕯️ Rituals & Observances</h4>
+                      <ul>
+                        {festival.rituals.map((ritual, idx) => (
+                          <li key={idx}>{ritual}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -193,11 +243,103 @@ const FestivalsPage = () => {
           </button>
           <button 
             className="action-btn search-btn"
-            onClick={() => {/* Add search functionality */}}
+            onClick={() => setShowSearch(!showSearch)}
           >
             🔍 Search Festivals
           </button>
         </div>
+
+      {showSearch && (
+        <div className="search-modal-overlay">
+          <div className="search-modal">
+            <div className="search-header">
+              <h3>🔍 Search Festivals & Vrats</h3>
+              <button 
+                className="close-search"
+                onClick={() => setShowSearch(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="search-input-container">
+              <input
+                type="text"
+                placeholder="Search by festival name, deity, or type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && searchFestivals()}
+                className="search-input"
+              />
+              <button 
+                className="search-submit-btn"
+                onClick={searchFestivals}
+                disabled={!searchTerm.trim()}
+              >
+                Search
+              </button>
+            </div>
+            
+            <div className="search-content">
+              {searchLoading ? (
+                <div className="loading">
+                  <div className="spinner"></div>
+                  <p>Searching festivals...</p>
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="search-results">
+                  <h4>Search Results ({searchResults.length} found)</h4>
+                  <div className="festivals-grid">
+                    {searchResults.map((festival, index) => (
+                      <div 
+                        key={index} 
+                        className="festival-card"
+                        style={{ borderLeftColor: getTypeColor(festival.type || 'festival') }}
+                      >
+                        <div className="festival-header">
+                          <span className="festival-icon">{getTypeIcon(festival)}</span>
+                          <div className="festival-title">
+                            <h3>{festival.name}</h3>
+                            <span className="festival-type">{festival.type?.replace('_', ' ')}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="festival-description">
+                          <p>{festival.description}</p>
+                        </div>
+
+                        <div className="festival-significance">
+                          <h4>🌟 Significance</h4>
+                          <p>{festival.significance}</p>
+                        </div>
+
+                        {festival.rituals && (
+                          <div className="festival-rituals">
+                            <h4>🕯️ Rituals & Observances</h4>
+                            <ul>
+                              {Array.isArray(festival.rituals) ? 
+                                festival.rituals.map((ritual, idx) => (
+                                  <li key={idx}>{ritual}</li>
+                                )) :
+                                <li>{festival.rituals}</li>
+                              }
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : searchTerm && !searchLoading ? (
+                <div className="no-results">
+                  <div className="no-results-icon">🔍</div>
+                  <h3>No festivals found</h3>
+                  <p>Try searching with different keywords like "Diwali", "Ekadashi", or "Shiva"</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
