@@ -117,7 +117,7 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
         
         try:
             # Send initial status
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Initializing wealth analysis...'})}\\n\\n"
+            yield f"data: {json.dumps({'status': 'processing', 'message': 'Initializing wealth analysis...'})}\n\n"
             
             # Create birth data object
             from types import SimpleNamespace
@@ -145,12 +145,12 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
                 print(f"Debug - Found cached insights: {bool(stored_insights)}")
                 if stored_insights:
                     print(f"Debug - Returning cached data")
-                    yield f"data: {json.dumps({'status': 'complete', 'data': stored_insights, 'cached': True})}\\n\\n"
+                    yield f"data: {json.dumps({'status': 'complete', 'data': stored_insights, 'cached': True})}\n\n"
                     return
             else:
                 print(f"Debug - Skipping cache due to force regenerate")
             
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Calculating birth chart...'})}\\n\\n"
+            yield f"data: {json.dumps({'status': 'processing', 'message': 'Calculating birth chart...'})}\n\n"
             
             # Calculate birth chart and wealth analysis
             chart_calc = ChartCalculator({})
@@ -159,7 +159,7 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
             wealth_calc = WealthCalculator(chart_data, birth_data)
             wealth_analysis = wealth_calc.calculate_overall_wealth()
             
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights...'})}\\n\\n"
+            yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights...'})}\n\n"
             
             # Generate AI insights
             try:
@@ -202,12 +202,12 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
                 max_iterations = 24  # 2 minutes
                 
                 while thread.is_alive() and count < max_iterations:
-                    yield f"data: {json.dumps({'status': 'processing', 'message': 'AI wealth analysis in progress...'})}\\n\\n"
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'AI wealth analysis in progress...'})}\n\n"
                     await asyncio.sleep(5)
                     count += 1
                 
                 if thread.is_alive():
-                    yield f"data: {json.dumps({'status': 'error', 'error': 'AI analysis timed out'})}\\n\\n"
+                    yield f"data: {json.dumps({'status': 'error', 'error': 'AI analysis timed out'})}\n\n"
                     return
                 
                 thread.join(timeout=1)
@@ -221,7 +221,7 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
                 _store_ai_insights(birth_hash, ai_insights)
                 
                 # Send final result
-                yield f"data: {json.dumps({'status': 'complete', 'data': ai_insights, 'cached': False})}\\n\\n"
+                yield f"data: {json.dumps({'status': 'complete', 'data': ai_insights, 'cached': False})}\n\n"
                 
             except Exception as e:
                 error_response = {
@@ -238,10 +238,10 @@ async def get_ai_wealth_insights(request: BirthDetailsRequest):
                     },
                     'error': str(e)
                 }
-                yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\\n\\n"
+                yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
                 
         except Exception as e:
-            yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\\n\\n"
+            yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
     
     return StreamingResponse(
         generate_streaming_response(),

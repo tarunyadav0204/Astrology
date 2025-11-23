@@ -114,7 +114,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
               <div className="dropdown-content">
                 <button onClick={() => user ? navigate('/career-guidance') : onLogin()}>💼 Your Career</button>
                 <button onClick={() => user ? navigate('/marriage-analysis') : onLogin()}>💍 Your Marriage</button>
-                <button onClick={() => user ? onLogin() : onLogin()}>🎓 Your Education</button>
+                <button onClick={() => user ? navigate('/education') : (onLogin && onLogin())}>🎓 Your Education</button>
                 <button onClick={() => user ? navigate('/health-analysis') : onLogin()}>🏥 Your Health</button>
                 <button onClick={() => user ? navigate('/wealth-analysis') : onLogin()}>💰 Your Wealth</button>
               </div>

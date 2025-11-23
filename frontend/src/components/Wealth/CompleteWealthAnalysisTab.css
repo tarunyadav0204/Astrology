@@ -243,9 +243,21 @@
 }
 
 .planets-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 20px;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  gap: 20px !important;
+}
+
+.card-content .planets-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  gap: 20px !important;
+}
+
+.house-wealth-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  gap: 20px !important;
 }
 
 .planet-card {
@@ -837,6 +849,10 @@
   }
   
   .planets-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .house-wealth-grid {
     grid-template-columns: 1fr;
   }
   

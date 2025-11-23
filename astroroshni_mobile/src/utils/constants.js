@@ -33,15 +33,15 @@ import { Platform } from 'react-native';
 
 // API Configuration matching web version
 const getApiUrl = () => {
-  // Development server - use IP for simulator compatibility
-  return 'http://192.168.68.102:8001';
+  // Production server
+  return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();
 
 // Helper function to handle API endpoints for both dev and production
 export const getEndpoint = (path) => {
-  return `/api${path}`; // Always use /api prefix
+  return `/api${path}`; // Always use /api prefix to match web version
 };
 
 export const LANGUAGES = [

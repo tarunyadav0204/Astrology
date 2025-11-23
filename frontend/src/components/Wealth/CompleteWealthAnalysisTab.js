@@ -450,7 +450,7 @@ const CompleteWealthAnalysisTab = ({ chartData, birthDetails }) => {
           
           {expandedSections['house-wealth'] && (
             <div className="card-content">
-              <div className="planets-grid">
+              <div className="house-wealth-grid">
                 {wealthData.house_analysis && Object.entries(wealthData.house_analysis).map(([house, analysis]) => {
                   const houseSymbols = {
                     '1': '🏠', '2': '💰', '4': '🏡', '5': '📈', 
