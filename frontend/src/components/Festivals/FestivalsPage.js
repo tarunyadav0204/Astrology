@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './FestivalsPage.css';
 
-const FestivalsPage = () => {
+const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const [todayFestivals, setTodayFestivals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dateParam = urlParams.get('date');
+    return dateParam || new Date().toISOString().split('T')[0];
+  });
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -34,6 +38,9 @@ const FestivalsPage = () => {
         const allFestivals = [...(data.festivals || []), ...(data.vrats || [])];
         const selectedDateStr = selectedDate;
         const dayFestivals = allFestivals.filter(f => f.date === selectedDateStr);
+        console.log('Selected date:', selectedDateStr);
+        console.log('All festivals:', allFestivals);
+        console.log('Filtered festivals:', dayFestivals);
         setTodayFestivals(dayFestivals);
       } else {
         console.error('API response error:', response.status, response.statusText);
@@ -149,7 +156,13 @@ const FestivalsPage = () => {
 
   return (
     <div className="festivals-page">
-      <NavigationHeader />
+      <NavigationHeader 
+        user={user}
+        onLogout={onLogout}
+        onAdminClick={onAdminClick}
+        onLogin={onLogin}
+        showLoginButton={showLoginButton}
+      />
       <div className="festivals-header">
         <div className="header-left">
           <button 
@@ -191,7 +204,7 @@ const FestivalsPage = () => {
             <div className="festivals-grid">
               {todayFestivals.map((festival, index) => (
                 <div 
-                  key={index} 
+                  key={`${festival.name}-${festival.date}-${index}`} 
                   className="festival-card"
                   style={{ borderLeftColor: getTypeColor(festival.type || 'festival') }}
                 >
@@ -203,14 +216,18 @@ const FestivalsPage = () => {
                     </div>
                   </div>
                   
-                  <div className="festival-description">
-                    <p>{festival.description}</p>
-                  </div>
+                  {festival.description && (
+                    <div className="festival-description">
+                      <p>{festival.description}</p>
+                    </div>
+                  )}
 
-                  <div className="festival-significance">
-                    <h4>🌟 Significance</h4>
-                    <p>{festival.significance}</p>
-                  </div>
+                  {festival.significance && (
+                    <div className="festival-significance">
+                      <h4>🌟 Significance</h4>
+                      <p>{festival.significance}</p>
+                    </div>
+                  )}
 
                   {festival.rituals && festival.rituals.length > 0 && (
                     <div className="festival-rituals">

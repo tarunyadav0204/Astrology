@@ -205,10 +205,20 @@ const MonthlyFestivalsPage = () => {
                 const isCurrentMonth = day.getMonth() === currentDate.getMonth();
                 const isToday = day.toDateString() === new Date().toDateString();
                 
+                const handleDateClick = () => {
+                  const year = day.getFullYear();
+                  const month = String(day.getMonth() + 1).padStart(2, '0');
+                  const dayNum = String(day.getDate()).padStart(2, '0');
+                  const dateStr = `${year}-${month}-${dayNum}`;
+                  window.location.href = `/festivals?date=${dateStr}`;
+                };
+                
                 return (
                   <div 
                     key={index}
                     className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}`}
+                    onClick={handleDateClick}
+                    style={{ cursor: 'pointer' }}
                   >
                     <div className="day-number">
                       {day.getDate()}
@@ -221,7 +231,10 @@ const MonthlyFestivalsPage = () => {
                             key={idx}
                             className="event-dot"
                             title={event.name}
-                            onClick={() => setSelectedEvent(event)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                            }}
                           >
                             <span className="event-icon">{getEventIcon(event)}</span>
                             <span className="event-name">{event.name}</span>

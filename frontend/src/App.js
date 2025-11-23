@@ -857,7 +857,13 @@ function App() {
               onAdminClick={handleAdminClick} 
             />
           } />
-          <Route path="/festivals" element={<FestivalsPage />} />
+          <Route path="/festivals" element={
+            <FestivalsPage 
+              user={user} 
+              onLogout={handleLogout} 
+              onAdminClick={handleAdminClick} 
+            />
+          } />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
 
           <Route path="/astroroshni" element={<AstroRoshniPage />} />

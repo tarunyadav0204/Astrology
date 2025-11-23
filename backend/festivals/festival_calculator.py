@@ -118,42 +118,32 @@ class FestivalCalculator:
             jd = swe.julday(current_date.year, current_date.month, current_date.day)
             lunar_day = self.get_lunar_day(jd)
             
-            # Check for monthly vrats (avoid duplicates)
+            # Check for monthly vrats
             date_str = current_date.strftime("%Y-%m-%d")
-            existing_names = [v["name"].lower() for v in vrats]
             
-            for vrat_id, vrat in MONTHLY_VRATS.items():
-                vrat_name_lower = vrat["name"].lower()
-                # Skip if similar vrat already exists
-                if not any("pradosh" in existing and "pradosh" in vrat_name_lower for existing in existing_names):
-                    if lunar_day == 11 and vrat_id == "ekadashi":
-                        vrats.append({
-                            "name": "Shukla " + vrat["name"],
-                            "date": date_str,
-                            "deity": vrat["deity"],
-                            "benefits": vrat["benefits"]
-                        })
-                    elif lunar_day == 26 and vrat_id == "ekadashi":
-                        vrats.append({
-                            "name": "Krishna " + vrat["name"],
-                            "date": date_str,
-                            "deity": vrat["deity"],
-                            "benefits": vrat["benefits"]
-                        })
-                    elif lunar_day == 13 and vrat_id == "pradosh":
-                        vrats.append({
-                            "name": "Shukla " + vrat["name"],
-                            "date": date_str,
-                            "deity": vrat["deity"],
-                            "benefits": vrat["benefits"]
-                        })
-                    elif lunar_day == 28 and vrat_id == "pradosh":
-                        vrats.append({
-                            "name": "Krishna " + vrat["name"],
-                            "date": date_str,
-                            "deity": vrat["deity"],
-                            "benefits": vrat["benefits"]
-                        })
+            # Shukla Ekadashi (11th day of bright fortnight)
+            if lunar_day == 11:
+                ekadashi_data = HINDU_FESTIVALS.get("shukla_ekadashi", {})
+                vrats.append({
+                    "name": ekadashi_data.get("name", "Shukla Ekadashi"),
+                    "date": date_str,
+                    "type": ekadashi_data.get("type", "vrat"),
+                    "description": ekadashi_data.get("description", "Sacred fast on bright fortnight 11th day"),
+                    "significance": ekadashi_data.get("significance", "Spiritual purification and Vishnu worship"),
+                    "rituals": ekadashi_data.get("rituals", ["fasting", "vishnu worship", "charity"])
+                })
+            
+            # Krishna Ekadashi (26th day or 11th of dark fortnight)
+            elif lunar_day == 26:
+                ekadashi_data = HINDU_FESTIVALS.get("krishna_ekadashi", {})
+                vrats.append({
+                    "name": ekadashi_data.get("name", "Krishna Ekadashi"),
+                    "date": date_str,
+                    "type": ekadashi_data.get("type", "vrat"),
+                    "description": ekadashi_data.get("description", "Sacred fast on dark fortnight 11th day"),
+                    "significance": ekadashi_data.get("significance", "Spiritual purification and Vishnu worship"),
+                    "rituals": ekadashi_data.get("rituals", ["fasting", "vishnu worship", "charity"])
+                })
             
             current_date += timedelta(days=1)
         
