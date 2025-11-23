@@ -16,6 +16,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import JaiminiKalachakraHomeRN from './JaiminiKalachakraHomeRN';
+import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
+
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const [cascadingData, setCascadingData] = useState(null);
@@ -31,7 +34,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dashaType, setDashaType] = useState('vimshottari'); // 'vimshottari', 'kalchakra', or 'jaimini'
   const [showSystemInfo, setShowSystemInfo] = useState(false);
-  const [manushyaRule, setManushyaRule] = useState('always-reverse'); // 'always-reverse' or 'pada-based'
+  const [showKalachakraViz, setShowKalachakraViz] = useState(false);
+  const [kalchakraViewMode, setKalchakraViewMode] = useState('chips'); // 'chips', 'wheel', 'timeline'
+
+  const [jaiminiTab, setJaiminiTab] = useState('home'); // 'home', 'periods', 'analysis'
 
   const formatPeriodDuration = (years) => {
     if (!years) return '';
@@ -75,7 +81,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         fetchJaiminiKalchakraDashas();
       }
     }
-  }, [visible, birthData, transitDate, dashaType, manushyaRule]);
+  }, [visible, birthData, transitDate, dashaType]);
 
   useEffect(() => {
     if (dashaType === 'vimshottari' && cascadingData) {
@@ -94,12 +100,22 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       const scrollRef = scrollRefs[dashaType];
       if (selectedValue && scrollRef?.current) {
         const options = getDashaOptions(dashaType);
-        const selectedIndex = options.findIndex(d => d.planet === selectedValue);
-        if (selectedIndex > 0) {
-          const scrollX = dashaType.includes('kalchakra') ? selectedIndex * 98 : selectedIndex * 78;
+        let selectedIndex = -1;
+        
+        if (dashaType === 'kalchakra_maha') {
+          selectedIndex = options.findIndex(d => d.name === selectedValue);
+        } else if (dashaType === 'kalchakra_antar') {
+          selectedIndex = options.findIndex(d => d.name === selectedValue);
+        } else {
+          selectedIndex = options.findIndex(d => d.planet === selectedValue);
+        }
+        
+        if (selectedIndex >= 0) {
+          const cardWidth = dashaType.includes('kalchakra') ? 98 : 78;
+          const scrollX = Math.max(0, selectedIndex * cardWidth - 50); // Center the selected chip
           setTimeout(() => {
             scrollRef.current?.scrollTo({ x: scrollX, animated: true });
-          }, 100);
+          }, 200);
         }
       }
     });
@@ -107,11 +123,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   // Auto-scroll to current Kalchakra dasha on load
   useEffect(() => {
-    if (dashaType === 'kalchakra' && kalchakraData?.periods && scrollRefs.kalchakra_maha?.current) {
+    if (dashaType === 'kalchakra' && kalchakraData?.mahadashas && scrollRefs.kalchakra_maha?.current) {
       const currentDate = new Date();
-      const currentIndex = kalchakraData.periods.findIndex(period => {
-        const startDate = new Date(period.start_date);
-        const endDate = new Date(period.end_date);
+      const currentIndex = kalchakraData.mahadashas.findIndex(period => {
+        const startDate = new Date(period.start);
+        const endDate = new Date(period.end);
         return currentDate >= startDate && currentDate <= endDate;
       });
       
@@ -289,8 +305,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          birth_data: formattedBirthData,
-          manushya_rule: manushyaRule
+          birth_data: formattedBirthData
         })
       });
       
@@ -299,6 +314,12 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       }
       
       const kalchakraData = await response.json();
+      console.log('=== FRONTEND KALCHAKRA DATA ===');
+      console.log('Keys:', Object.keys(kalchakraData));
+      console.log('Has all_antardashas:', 'all_antardashas' in kalchakraData);
+      console.log('All antardashas count:', kalchakraData.all_antardashas?.length || 0);
+      console.log('Current antardasha:', kalchakraData.current_antardasha);
+      console.log('=== END FRONTEND DEBUG ===');
       setKalchakraData(kalchakraData);
       
       // Fetch system info
@@ -320,8 +341,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     }
   };
   
-  const fetchKalchakraAntardasha = async (mahaPlanet) => {
+  const fetchKalchakraAntardasha = async (mahaSign) => {
     try {
+      console.log('=== FETCHING ANTARDASHA ===');
+      console.log('mahaSign:', mahaSign);
       const token = await AsyncStorage.getItem('authToken');
       
       const formattedBirthData = {
@@ -342,14 +365,18 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         },
         body: JSON.stringify({
           birth_data: formattedBirthData,
-          maha_planet: mahaPlanet,
+          maha_sign: mahaSign,
           target_date: new Date().toISOString().split('T')[0]
         })
       });
       
+      console.log('Antardasha response status:', response.status);
       if (response.ok) {
         const antarData = await response.json();
+        console.log('Antardasha data received:', antarData);
         setKalchakraAntarData(antarData);
+      } else {
+        console.log('Antardasha response not ok:', response.status);
       }
     } catch (err) {
       console.error('Kalchakra antardasha fetch error:', err);
@@ -442,21 +469,44 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   }, [selectedDashas.jaimini_maha, jaiminiData]);
 
   const autoSelectCurrentKalchakraDashas = () => {
-    if (!kalchakraData?.periods) return;
+    if (!kalchakraData?.mahadashas) return;
     
-    // Use the current flag set by backend
-    const currentPeriod = kalchakraData.periods.find(period => period.current === true);
+    // Use current mahadasha from backend response
+    const currentMaha = kalchakraData.current_mahadasha || kalchakraData.mahadashas.find(period => {
+      const startDate = new Date(period.start);
+      const endDate = new Date(period.end);
+      const now = new Date();
+      return now >= startDate && now <= endDate;
+    });
     
-    if (currentPeriod) {
-      setSelectedDashas({ kalchakra_maha: currentPeriod.planet });
-      // Fetch antardasha for current mahadasha
-      fetchKalchakraAntardasha(currentPeriod.planet);
+    if (currentMaha) {
+      const selections = { kalchakra_maha: currentMaha.name };
+      
+      // Auto-select current antardasha if available
+      if (kalchakraData.current_antardasha) {
+        selections.kalchakra_antar = kalchakraData.current_antardasha.name;
+      }
+      
+      setSelectedDashas(selections);
+      
+      // Fetch antardashas for current mahadasha
+      fetchKalchakraAntardasha(currentMaha.name);
     }
   };
   
-  const handleKalchakraMahaSelection = (planet) => {
-    setSelectedDashas({ kalchakra_maha: planet });
-    fetchKalchakraAntardasha(planet);
+  const handleKalchakraMahaSelection = (signName) => {
+    setSelectedDashas({ kalchakra_maha: signName });
+    
+    // Auto-scroll to selected mahadasha
+    setTimeout(() => {
+      if (scrollRefs.kalchakra_maha?.current && kalchakraData?.mahadashas) {
+        const selectedIndex = kalchakraData.mahadashas.findIndex(d => d.name === signName);
+        if (selectedIndex >= 0) {
+          const scrollX = Math.max(0, selectedIndex * 98 - 50);
+          scrollRefs.kalchakra_maha.current.scrollTo({ x: scrollX, animated: true });
+        }
+      }
+    }, 100);
   };
   
   const calculateProgress = (startDate, endDate, currentDate = new Date()) => {
@@ -539,9 +589,16 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const getDashaOptions = (dashaLevel) => {
     if (dashaType === 'kalchakra') {
       if (dashaLevel === 'kalchakra_maha') {
-        return kalchakraData?.periods || [];
+        return kalchakraData?.mahadashas || [];
       } else if (dashaLevel === 'kalchakra_antar') {
-        return kalchakraAntarData?.antar_periods || [];
+        // Filter all_antardashas for the selected mahadasha
+        const selectedMaha = selectedDashas.kalchakra_maha;
+        if (selectedMaha && kalchakraData?.all_antardashas) {
+          return kalchakraData.all_antardashas.filter(antar => 
+            antar.maha_name === selectedMaha
+          );
+        }
+        return [];
       }
       return [];
     }
@@ -568,7 +625,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   const renderDashaTypeSelector = () => (
     <View style={styles.dashaTypeSelector}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
+      <View style={styles.tabScrollView}>
         <TouchableOpacity
           style={[styles.dashaTypeTab, dashaType === 'vimshottari' && styles.activeDashaTypeTab]}
           onPress={() => {
@@ -605,20 +662,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             )}
           </View>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.dashaTypeTab, dashaType === 'jaimini' && styles.activeDashaTypeTab]}
-          onPress={() => {
-            setDashaType('jaimini');
-            setSelectedDashas({});
-            setKalchakraAntarData(null);
-            setJaiminiData(null);
-          }}
-        >
-          <Text style={[styles.dashaTypeTabText, dashaType === 'jaimini' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            Jaimini Kalchakra
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+
+      </View>
     </View>
   );
 
@@ -726,57 +771,49 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const renderKalchakraCurrentStatus = () => {
     if (!kalchakraData) return null;
     
-    const currentMaha = kalchakraData.periods?.find(period => {
-      const startDate = new Date(period.start_date);
-      const endDate = new Date(period.end_date);
+    const currentMaha = kalchakraData.current_mahadasha || kalchakraData.mahadashas?.find(period => {
+      const startDate = new Date(period.start);
+      const endDate = new Date(period.end);
       const now = new Date();
       return now >= startDate && now <= endDate;
     });
     
-    const currentAntar = kalchakraAntarData?.antar_periods?.find(period => period.current);
+    const currentAntar = kalchakraData.current_antardasha;
     
     if (!currentMaha) return null;
     
-    const mahaProgress = calculateProgress(currentMaha.start_date, currentMaha.end_date);
-    const antarProgress = currentAntar ? calculateProgress(currentAntar.start_date, currentAntar.end_date) : 0;
+    const mahaProgress = calculateProgress(currentMaha.start, currentMaha.end);
+    const antarProgress = currentAntar ? calculateProgress(currentAntar.start, currentAntar.end) : 0;
     
     return (
       <View style={styles.currentStatusCard}>
-        <Text style={styles.currentStatusTitle}>Current Kalchakra Periods</Text>
+        <Text style={styles.currentStatusTitle}>Current BPHS Kalchakra</Text>
         
-        <View style={styles.currentPeriodRow}>
-          <View style={styles.currentPeriodInfo}>
-            <Text style={styles.currentPeriodLabel}>Mahadasha</Text>
-            <Text style={styles.currentPeriodPlanet}>{currentMaha.planet}</Text>
-            <Text style={styles.currentPeriodTime}>{getRemainingTime(currentMaha.end_date)}</Text>
+        <View style={styles.compactPeriodRow}>
+          <View style={styles.periodColumn}>
+            <Text style={styles.periodLabel}>Maha</Text>
+            <Text style={styles.periodName}>{currentMaha.name}</Text>
+            <Text style={styles.periodGati}>{currentMaha.gati}</Text>
           </View>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${mahaProgress}%` }]} />
+          
+          {currentAntar && (
+            <View style={styles.periodColumn}>
+              <Text style={styles.periodLabel}>Antar</Text>
+              <Text style={styles.periodName}>{currentAntar.name}</Text>
+              <Text style={styles.periodProgress}>{Math.round(antarProgress)}%</Text>
             </View>
-            <Text style={styles.progressText}>{Math.round(mahaProgress)}%</Text>
+          )}
+          
+          <View style={styles.systemColumn}>
+            <Text style={styles.systemLabel}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
+            <Text style={styles.systemLabel}>Nak {kalchakraData.nakshatra}.{kalchakraData.pada}</Text>
+            <Text style={styles.systemLabel}>{kalchakraData.deha}→{kalchakraData.jeeva}</Text>
           </View>
         </View>
         
-        {currentAntar && (
-          <View style={styles.currentPeriodRow}>
-            <View style={styles.currentPeriodInfo}>
-              <Text style={styles.currentPeriodLabel}>Antardasha</Text>
-              <Text style={styles.currentPeriodPlanet}>{currentAntar.planet}</Text>
-              <Text style={styles.currentPeriodTime}>{getRemainingTime(currentAntar.end_date)}</Text>
-            </View>
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, styles.antarProgressFill, { width: `${antarProgress}%` }]} />
-              </View>
-              <Text style={styles.progressText}>{Math.round(antarProgress)}%</Text>
-            </View>
-          </View>
-        )}
-        
-        <View style={styles.systemInfoRow}>
-          <Text style={styles.systemInfoText}>120-year cycle • {kalchakraData.sequence_direction} sequence</Text>
-          <Text style={styles.systemInfoText}>Moon: {kalchakraData.moon_nakshatra} Pada {kalchakraData.moon_pada} ({kalchakraData.nakshatra_deity})</Text>
+        <View style={styles.compactProgressBar}>
+          <View style={[styles.compactProgressFill, { width: `${mahaProgress}%` }]} />
+          <Text style={styles.compactProgressText}>{Math.round(mahaProgress)}% • {getRemainingTime(currentMaha.end)}</Text>
         </View>
       </View>
     );
@@ -854,39 +891,188 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     );
   };
 
-  const renderManushyaRuleSelector = () => (
-    <View style={styles.manushyaRuleSelector}>
-      <Text style={styles.manushyaRuleLabel}>Manushya Nakshatra Rule:</Text>
-      <View style={styles.manushyaRuleOptions}>
-        <TouchableOpacity
-          style={[styles.manushyaRuleOption, manushyaRule === 'always-reverse' && styles.activeManushyaRule]}
-          onPress={() => {
-            setManushyaRule('always-reverse');
-            setKalchakraData(null);
-            setKalchakraAntarData(null);
-          }}
-        >
-          <Text style={[styles.manushyaRuleText, manushyaRule === 'always-reverse' && styles.activeManushyaRuleText]}>
-            BPHS Authentic
-          </Text>
-          <Text style={[styles.manushyaRuleSubtext, manushyaRule === 'always-reverse' && styles.activeManushyaRuleSubtext]}>All Manushya: Backward</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.manushyaRuleOption, manushyaRule === 'pada-based' && styles.activeManushyaRule]}
-          onPress={() => {
-            setManushyaRule('pada-based');
-            setKalchakraData(null);
-            setKalchakraAntarData(null);
-          }}
-        >
-          <Text style={[styles.manushyaRuleText, manushyaRule === 'pada-based' && styles.activeManushyaRuleText]}>
-            Modern Variant
-          </Text>
-          <Text style={[styles.manushyaRuleSubtext, manushyaRule === 'pada-based' && styles.activeManushyaRuleSubtext]}>Pada 1-2: Forward, 3-4: Backward</Text>
-        </TouchableOpacity>
+
+
+  const renderJaiminiTabs = () => {
+    return (
+      <>
+        <View style={styles.jaiminiTabSelector}>
+          <TouchableOpacity
+            style={[styles.jaiminiTab, jaiminiTab === 'home' && styles.activeJaiminiTab]}
+            onPress={() => setJaiminiTab('home')}
+          >
+            <Text style={[styles.jaiminiTabText, jaiminiTab === 'home' && styles.activeJaiminiTabText]}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.jaiminiTab, jaiminiTab === 'periods' && styles.activeJaiminiTab]}
+            onPress={() => setJaiminiTab('periods')}
+          >
+            <Text style={[styles.jaiminiTabText, jaiminiTab === 'periods' && styles.activeJaiminiTabText]}>Periods</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.jaiminiTab, jaiminiTab === 'analysis' && styles.activeJaiminiTab]}
+            onPress={() => setJaiminiTab('analysis')}
+          >
+            <Text style={[styles.jaiminiTabText, jaiminiTab === 'analysis' && styles.activeJaiminiTabText]}>Analysis</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {jaiminiTab === 'home' && (
+          <JaiminiKalachakraHomeRN birthData={birthData} />
+        )}
+        
+        {jaiminiTab === 'periods' && renderJaiminiPeriodsList()}
+        
+        {jaiminiTab === 'analysis' && renderJaiminiAnalysis()}
+      </>
+    );
+  };
+
+  const renderJaiminiPeriodsList = () => {
+    return renderJaiminiKalchakraDashaList();
+  };
+
+  const renderJaiminiAnalysis = () => {
+    if (!jaiminiData?.cards) {
+      return (
+        <View style={styles.selectorContainer}>
+          <Text style={styles.selectorLabel}>Analysis</Text>
+          <View style={[styles.optionCard, styles.disabledOption]}>
+            <Text style={styles.disabledOptionText}>No analysis data available</Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.predictionCardsSection}>
+        <ScrollView style={styles.cardsContainer} showsVerticalScrollIndicator={false}>
+          {/* Status Card */}
+          {jaiminiData.cards.status_card && (
+            <View style={styles.statusCard}>
+              <Text style={styles.cardTitle}>Current Status</Text>
+              <View style={styles.statusRow}>
+                <Text style={styles.statusSign}>{jaiminiData.cards.status_card.sign_name}</Text>
+                <Text style={styles.statusScore}>{jaiminiData.cards.status_card.strength_score}/100</Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${jaiminiData.cards.status_card.progress_percent}%` }]} />
+                </View>
+                <Text style={styles.progressText}>{jaiminiData.cards.status_card.progress_percent}%</Text>
+              </View>
+              <Text style={styles.timeRemaining}>{jaiminiData.cards.status_card.time_remaining}</Text>
+              <Text style={styles.chakraInfo}>Chakra {jaiminiData.cards.status_card.chakra} • {jaiminiData.cards.status_card.direction}</Text>
+            </View>
+          )}
+          
+          {/* Focus Card */}
+          {jaiminiData.cards.focus_card && (
+            <View style={styles.focusCard}>
+              <Text style={styles.cardTitle}>🎯 Life Focus</Text>
+              <Text style={styles.focusTheme}>{jaiminiData.cards.focus_card.theme}</Text>
+              <Text style={styles.energyStyle}>⚡ {jaiminiData.cards.focus_card.energy_style}</Text>
+              <Text style={styles.keyAreas}>🏠 {jaiminiData.cards.focus_card.key_areas}</Text>
+              <View style={styles.keywordsContainer}>
+                {jaiminiData.cards.focus_card.keywords.map((keyword, index) => (
+                  <View key={index} style={styles.keywordTag}>
+                    <Text style={styles.keywordText}>{keyword}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+          
+          {/* Timeline Card */}
+          {jaiminiData.cards.timeline_card && (
+            <View style={styles.timelineCard}>
+              <Text style={styles.cardTitle}>📅 Timeline</Text>
+              <View style={styles.currentPeriodInfo}>
+                <Text style={styles.currentPeriodName}>{jaiminiData.cards.timeline_card.current_period.name}</Text>
+                <Text style={styles.currentPeriodDates}>
+                  {new Date(jaiminiData.cards.timeline_card.current_period.start).toLocaleDateString()} - 
+                  {new Date(jaiminiData.cards.timeline_card.current_period.end).toLocaleDateString()}
+                </Text>
+              </View>
+              {jaiminiData.cards.timeline_card.next_events.length > 0 && (
+                <View style={styles.nextEventsContainer}>
+                  <Text style={styles.nextEventsTitle}>Upcoming Events:</Text>
+                  {jaiminiData.cards.timeline_card.next_events.map((event, index) => (
+                    <Text key={index} style={styles.nextEventText}>• {event.name} ({new Date(event.date).toLocaleDateString()})</Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+          
+          {/* Predictions Card */}
+          {jaiminiData.cards.predictions_card && (
+            <View style={styles.predictionsCard}>
+              <Text style={styles.cardTitle}>🔮 Predictions</Text>
+              {jaiminiData.cards.predictions_card.next_6_months.length > 0 && (
+                <View style={styles.predictionSection}>
+                  <Text style={styles.predictionSectionTitle}>Next 6 months:</Text>
+                  {jaiminiData.cards.predictions_card.next_6_months.map((event, index) => (
+                    <Text key={index} style={styles.predictionText}>• {event}</Text>
+                  ))}
+                </View>
+              )}
+              {jaiminiData.cards.predictions_card.next_2_years.length > 0 && (
+                <View style={styles.predictionSection}>
+                  <Text style={styles.predictionSectionTitle}>Next 2 years:</Text>
+                  {jaiminiData.cards.predictions_card.next_2_years.map((theme, index) => (
+                    <Text key={index} style={styles.predictionText}>• {theme}</Text>
+                  ))}
+                </View>
+              )}
+              {jaiminiData.cards.predictions_card.jump_effects.length > 0 && (
+                <View style={styles.predictionSection}>
+                  <Text style={styles.predictionSectionTitle}>Jump Effects:</Text>
+                  {jaiminiData.cards.predictions_card.jump_effects.map((effect, index) => (
+                    <Text key={index} style={styles.predictionText}>⚡ {effect}</Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+          
+          {/* Strength Card */}
+          {jaiminiData.cards.strength_card && (
+            <View style={styles.strengthCard}>
+              <Text style={styles.cardTitle}>💪 Strength Comparison</Text>
+              <View style={styles.strengthComparison}>
+                <View style={styles.strengthItem}>
+                  <Text style={styles.strengthLabel}>Current</Text>
+                  <View style={styles.strengthBar}>
+                    <View style={[styles.strengthFill, { width: `${jaiminiData.cards.strength_card.current_strength}%` }]} />
+                  </View>
+                  <Text style={styles.strengthValue}>{jaiminiData.cards.strength_card.current_strength}/100</Text>
+                </View>
+                <View style={styles.strengthItem}>
+                  <Text style={styles.strengthLabel}>Next ({jaiminiData.cards.strength_card.next_sign_name})</Text>
+                  <View style={styles.strengthBar}>
+                    <View style={[styles.strengthFill, { width: `${jaiminiData.cards.strength_card.next_strength}%` }]} />
+                  </View>
+                  <Text style={styles.strengthValue}>{jaiminiData.cards.strength_card.next_strength}/100</Text>
+                </View>
+              </View>
+              <View style={[styles.guidanceContainer, {
+                backgroundColor: jaiminiData.cards.strength_card.comparison === 'significant_increase' ? '#e8f5e8' :
+                               jaiminiData.cards.strength_card.comparison === 'significant_decrease' ? '#ffebee' : '#fff3e0'
+              }]}>
+                <Text style={[styles.guidanceText, {
+                  color: jaiminiData.cards.strength_card.comparison === 'significant_increase' ? '#2e7d32' :
+                         jaiminiData.cards.strength_card.comparison === 'significant_decrease' ? '#c62828' : '#ef6c00'
+                }]}>
+                  💡 {jaiminiData.cards.strength_card.guidance}
+                </Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderJaiminiKalchakraDashaList = () => {
     if (!jaiminiData) {
@@ -1012,6 +1198,17 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                   onPress={() => {
                     setSelectedDashas({ jaimini_maha: period.id || period.sign });
                     fetchJaiminiAntardasha(period.sign);
+                    
+                    // Auto-scroll to selected jaimini mahadasha
+                    setTimeout(() => {
+                      if (scrollRefs.jaimini_maha?.current && jaiminiData?.periods) {
+                        const selectedIndex = jaiminiData.periods.findIndex(p => (p.id || p.sign) === (period.id || period.sign));
+                        if (selectedIndex >= 0) {
+                          const scrollX = Math.max(0, selectedIndex * 120 - 60);
+                          scrollRefs.jaimini_maha.current.scrollTo({ x: scrollX, animated: true });
+                        }
+                      }
+                    }, 100);
                   }}
                 >
                   <Text style={[
@@ -1071,6 +1268,17 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     ]}
                     onPress={() => {
                       setSelectedDashas(prev => ({ ...prev, jaimini_antar: period.sign }));
+                      
+                      // Auto-scroll to selected jaimini antardasha
+                      setTimeout(() => {
+                        if (scrollRefs.jaimini_maha?.current && jaiminiAntarData?.antar_periods) {
+                          const selectedIndex = jaiminiAntarData.antar_periods.findIndex(p => p.sign === period.sign);
+                          if (selectedIndex >= 0) {
+                            const scrollX = Math.max(0, selectedIndex * 78 - 50);
+                            scrollRefs.jaimini_maha.current.scrollTo({ x: scrollX, animated: true });
+                          }
+                        }
+                      }, 100);
                     }}
                   >
                     <Text style={[
@@ -1106,137 +1314,506 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           </View>
         )}
         
-        {/* Prediction Cards - Show at the end */}
-        {jaiminiData.cards && (
-          <View style={styles.predictionCardsSection}>
-            <Text style={styles.predictionSectionTitle}>📊 Jaimini Predictions</Text>
-            <ScrollView style={styles.cardsContainer} showsVerticalScrollIndicator={false}>
-              {/* Status Card */}
-              {jaiminiData.cards.status_card && (
-                <View style={styles.statusCard}>
-                  <Text style={styles.cardTitle}>Current Status</Text>
-                  <View style={styles.statusRow}>
-                    <Text style={styles.statusSign}>{jaiminiData.cards.status_card.sign_name}</Text>
-                    <Text style={styles.statusScore}>{jaiminiData.cards.status_card.strength_score}/100</Text>
-                  </View>
-                  <View style={styles.progressBarContainer}>
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${jaiminiData.cards.status_card.progress_percent}%` }]} />
-                    </View>
-                    <Text style={styles.progressText}>{jaiminiData.cards.status_card.progress_percent}%</Text>
-                  </View>
-                  <Text style={styles.timeRemaining}>{jaiminiData.cards.status_card.time_remaining}</Text>
-                  <Text style={styles.chakraInfo}>Chakra {jaiminiData.cards.status_card.chakra} • {jaiminiData.cards.status_card.direction}</Text>
-                </View>
-              )}
-              
-              {/* Focus Card */}
-              {jaiminiData.cards.focus_card && (
-                <View style={styles.focusCard}>
-                  <Text style={styles.cardTitle}>🎯 Life Focus</Text>
-                  <Text style={styles.focusTheme}>{jaiminiData.cards.focus_card.theme}</Text>
-                  <Text style={styles.energyStyle}>⚡ {jaiminiData.cards.focus_card.energy_style}</Text>
-                  <Text style={styles.keyAreas}>🏠 {jaiminiData.cards.focus_card.key_areas}</Text>
-                  <View style={styles.keywordsContainer}>
-                    {jaiminiData.cards.focus_card.keywords.map((keyword, index) => (
-                      <View key={index} style={styles.keywordTag}>
-                        <Text style={styles.keywordText}>{keyword}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-              
-              {/* Timeline Card */}
-              {jaiminiData.cards.timeline_card && (
-                <View style={styles.timelineCard}>
-                  <Text style={styles.cardTitle}>📅 Timeline</Text>
-                  <View style={styles.currentPeriodInfo}>
-                    <Text style={styles.currentPeriodName}>{jaiminiData.cards.timeline_card.current_period.name}</Text>
-                    <Text style={styles.currentPeriodDates}>
-                      {new Date(jaiminiData.cards.timeline_card.current_period.start).toLocaleDateString()} - 
-                      {new Date(jaiminiData.cards.timeline_card.current_period.end).toLocaleDateString()}
-                    </Text>
-                  </View>
-                  {jaiminiData.cards.timeline_card.next_events.length > 0 && (
-                    <View style={styles.nextEventsContainer}>
-                      <Text style={styles.nextEventsTitle}>Upcoming Events:</Text>
-                      {jaiminiData.cards.timeline_card.next_events.map((event, index) => (
-                        <Text key={index} style={styles.nextEventText}>• {event.name} ({new Date(event.date).toLocaleDateString()})</Text>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              )}
-              
-              {/* Predictions Card */}
-              {jaiminiData.cards.predictions_card && (
-                <View style={styles.predictionsCard}>
-                  <Text style={styles.cardTitle}>🔮 Predictions</Text>
-                  {jaiminiData.cards.predictions_card.next_6_months.length > 0 && (
-                    <View style={styles.predictionSection}>
-                      <Text style={styles.predictionSectionTitle}>Next 6 months:</Text>
-                      {jaiminiData.cards.predictions_card.next_6_months.map((event, index) => (
-                        <Text key={index} style={styles.predictionText}>• {event}</Text>
-                      ))}
-                    </View>
-                  )}
-                  {jaiminiData.cards.predictions_card.next_2_years.length > 0 && (
-                    <View style={styles.predictionSection}>
-                      <Text style={styles.predictionSectionTitle}>Next 2 years:</Text>
-                      {jaiminiData.cards.predictions_card.next_2_years.map((theme, index) => (
-                        <Text key={index} style={styles.predictionText}>• {theme}</Text>
-                      ))}
-                    </View>
-                  )}
-                  {jaiminiData.cards.predictions_card.jump_effects.length > 0 && (
-                    <View style={styles.predictionSection}>
-                      <Text style={styles.predictionSectionTitle}>Jump Effects:</Text>
-                      {jaiminiData.cards.predictions_card.jump_effects.map((effect, index) => (
-                        <Text key={index} style={styles.predictionText}>⚡ {effect}</Text>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              )}
-              
-              {/* Strength Card */}
-              {jaiminiData.cards.strength_card && (
-                <View style={styles.strengthCard}>
-                  <Text style={styles.cardTitle}>💪 Strength Comparison</Text>
-                  <View style={styles.strengthComparison}>
-                    <View style={styles.strengthItem}>
-                      <Text style={styles.strengthLabel}>Current</Text>
-                      <View style={styles.strengthBar}>
-                        <View style={[styles.strengthFill, { width: `${jaiminiData.cards.strength_card.current_strength}%` }]} />
-                      </View>
-                      <Text style={styles.strengthValue}>{jaiminiData.cards.strength_card.current_strength}/100</Text>
-                    </View>
-                    <View style={styles.strengthItem}>
-                      <Text style={styles.strengthLabel}>Next ({jaiminiData.cards.strength_card.next_sign_name})</Text>
-                      <View style={styles.strengthBar}>
-                        <View style={[styles.strengthFill, { width: `${jaiminiData.cards.strength_card.next_strength}%` }]} />
-                      </View>
-                      <Text style={styles.strengthValue}>{jaiminiData.cards.strength_card.next_strength}/100</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.guidanceContainer, {
-                    backgroundColor: jaiminiData.cards.strength_card.comparison === 'significant_increase' ? '#e8f5e8' :
-                                   jaiminiData.cards.strength_card.comparison === 'significant_decrease' ? '#ffebee' : '#fff3e0'
-                  }]}>
-                    <Text style={[styles.guidanceText, {
-                      color: jaiminiData.cards.strength_card.comparison === 'significant_increase' ? '#2e7d32' :
-                             jaiminiData.cards.strength_card.comparison === 'significant_decrease' ? '#c62828' : '#ef6c00'
-                    }]}>
-                      💡 {jaiminiData.cards.strength_card.guidance}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
+
       </>
+    );
+  };
+
+  const renderKalchakraViewToggle = () => (
+    <View style={styles.kalchakraViewToggle}>
+      <TouchableOpacity
+        style={[styles.viewToggleBtn, kalchakraViewMode === 'chips' && styles.activeViewToggle]}
+        onPress={() => setKalchakraViewMode('chips')}
+      >
+        <Text style={[styles.viewToggleText, kalchakraViewMode === 'chips' && styles.activeViewToggleText]}>Periods</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.viewToggleBtn, kalchakraViewMode === 'wheel' && styles.activeViewToggle]}
+        onPress={() => setKalchakraViewMode('wheel')}
+      >
+        <Text style={[styles.viewToggleText, kalchakraViewMode === 'wheel' && styles.activeViewToggleText]}>🎯 Wheel</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.viewToggleBtn, kalchakraViewMode === 'timeline' && styles.activeViewToggle]}
+        onPress={() => setKalchakraViewMode('timeline')}
+      >
+        <Text style={[styles.viewToggleText, kalchakraViewMode === 'timeline' && styles.activeViewToggleText]}>📊 Timeline</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderKalchakraWheel = () => {
+    if (!kalchakraData) {
+      return (
+        <View style={styles.wheelContainer}>
+          <Text style={styles.wheelTitle}>Loading wheel data...</Text>
+        </View>
+      );
+    }
+
+    const signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    const size = 380;
+    const center = size / 2;
+    const outerRadius = 140;
+    const innerRadius = 100;
+    
+    const getSignNumber = (signName) => {
+      return signs.indexOf(signName) + 1;
+    };
+    
+    const sequenceSigns = kalchakraData.wheel_data?.sequence_signs || kalchakraData.sequence_numbers || [];
+    const currentSign = kalchakraData.wheel_data?.current_sign || kalchakraData.current_mahadasha?.sign;
+    const dehaSign = kalchakraData.deha ? getSignNumber(kalchakraData.deha) : (sequenceSigns[0] || null);
+    const jeevaSign = kalchakraData.jeeva ? getSignNumber(kalchakraData.jeeva) : (sequenceSigns[sequenceSigns.length - 1] || null);
+    const mahadashas = kalchakraData.mahadashas || [];
+    
+    // Calculate current age
+    const birthDate = new Date(birthData.date);
+    const currentAge = Math.floor((new Date() - birthDate) / (365.25 * 24 * 60 * 60 * 1000));
+    
+    console.log('Birth date:', birthData.date, 'Current age:', currentAge);
+    console.log('Deha:', kalchakraData.deha, '-> sign number:', dehaSign);
+    console.log('Jeeva:', kalchakraData.jeeva, '-> sign number:', jeevaSign);
+    console.log('Mahadashas array:', mahadashas.map((m, i) => ({ index: i, name: m.name, years: m.years, sign: m.sign })));
+    
+    // Calculate cumulative ages for debugging
+    let cumulativeAge = 0;
+    mahadashas.forEach((maha, index) => {
+      console.log(`${index + 1}. ${maha.name}: ${cumulativeAge} - ${cumulativeAge + Math.round(maha.years)} (${Math.round(maha.years)}y)`);
+      cumulativeAge += Math.round(maha.years);
+    });
+    
+    const getGatiForSign = (signNumber) => {
+      const maha = mahadashas.find(m => m.sign === signNumber);
+      return maha?.gati || 'Normal';
+    };
+    
+    const getGatiColor = (gati) => {
+      if (gati.includes('Manduka')) return '#ffe0b2';
+      if (gati.includes('Simhavalokana')) return '#ffcc80';
+      if (gati.includes('Markata')) return '#ffab91';
+      if (gati === 'Start') return '#c8e6c9';
+      return '#e1bee7';
+    };
+    
+    const createArcPath = (startAngle, endAngle, radius) => {
+      const start = {
+        x: center + Math.cos(startAngle) * radius,
+        y: center + Math.sin(startAngle) * radius
+      };
+      const end = {
+        x: center + Math.cos(endAngle) * radius,
+        y: center + Math.sin(endAngle) * radius
+      };
+      const largeArcFlag = endAngle - startAngle <= Math.PI ? "0" : "1";
+      return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+    };
+
+    return (
+      <View style={styles.wheelContainer}>
+        <View style={styles.wheelHeader}>
+          <Text style={styles.wheelTitle}>Kalachakra Wheel</Text>
+          <Text style={styles.wheelSubtitle}>{kalchakraData.deha} → {kalchakraData.jeeva} ({kalchakraData.direction})</Text>
+        </View>
+        
+        <Svg width={size} height={size} style={styles.svgWheel}>
+          <Defs>
+            <LinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor="#e1bee7" stopOpacity="0.8" />
+              <Stop offset="100%" stopColor="#9c27b0" stopOpacity="0.3" />
+            </LinearGradient>
+            <LinearGradient id="activeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor="#9c27b0" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#673ab7" stopOpacity="0.8" />
+            </LinearGradient>
+            <LinearGradient id="centerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor="#9c27b0" stopOpacity="1" />
+              <Stop offset="50%" stopColor="#673ab7" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#4a148c" stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          
+          {/* Outer ring */}
+          <Circle cx={center} cy={center} r={outerRadius} fill="none" stroke="#e1bee7" strokeWidth="2" />
+          <Circle cx={center} cy={center} r={innerRadius} fill="none" stroke="#e1bee7" strokeWidth="2" />
+          
+          {/* Sign segments */}
+          {signs.map((sign, index) => {
+            const signNumber = index + 1;
+            const startAngle = ((index * 30) - 90) * (Math.PI / 180);
+            const endAngle = (((index + 1) * 30) - 90) * (Math.PI / 180);
+            
+            const mahaForSign = mahadashas.find(m => m.sign === signNumber);
+            const isInSequence = !!mahaForSign;
+            const isCurrent = currentSign === signNumber;
+            const isDeha = dehaSign === signNumber;
+            const isJeeva = jeevaSign === signNumber;
+            const gati = getGatiForSign(signNumber);
+            const hasSpecialGati = gati !== 'Normal' && gati !== 'Start';
+            
+            const segmentColor = isCurrent ? '#9c27b0' : 
+                               isDeha ? '#ffcdd2' :
+                               isJeeva ? '#c8e6c9' :
+                               hasSpecialGati ? getGatiColor(gati) :
+                               isInSequence ? '#e1bee7' : '#f5f5f5';
+            
+            // Create segment path
+            const outerStart = {
+              x: center + Math.cos(startAngle) * outerRadius,
+              y: center + Math.sin(startAngle) * outerRadius
+            };
+            const outerEnd = {
+              x: center + Math.cos(endAngle) * outerRadius,
+              y: center + Math.sin(endAngle) * outerRadius
+            };
+            const innerStart = {
+              x: center + Math.cos(startAngle) * innerRadius,
+              y: center + Math.sin(startAngle) * innerRadius
+            };
+            const innerEnd = {
+              x: center + Math.cos(endAngle) * innerRadius,
+              y: center + Math.sin(endAngle) * innerRadius
+            };
+            
+            const segmentPath = `
+              M ${outerStart.x} ${outerStart.y}
+              A ${outerRadius} ${outerRadius} 0 0 1 ${outerEnd.x} ${outerEnd.y}
+              L ${innerEnd.x} ${innerEnd.y}
+              A ${innerRadius} ${innerRadius} 0 0 0 ${innerStart.x} ${innerStart.y}
+              Z
+            `;
+            
+            return (
+              <G key={sign}>
+                <Path
+                  d={segmentPath}
+                  fill={segmentColor}
+                  stroke="white"
+                  strokeWidth="1"
+                  opacity={isInSequence || isDeha || isJeeva ? 1 : 0.2}
+                />
+                
+                {/* Sign text */}
+                <SvgText
+                  x={center + Math.cos((startAngle + endAngle) / 2) * ((outerRadius + innerRadius) / 2)}
+                  y={center + Math.sin((startAngle + endAngle) / 2) * ((outerRadius + innerRadius) / 2) - 8}
+                  fontSize="11"
+                  fontWeight="600"
+                  fill={isCurrent ? 'white' : '#333'}
+                  textAnchor="middle"
+                  alignmentBaseline="middle"
+                >
+                  {sign.slice(0, 3)}
+                </SvgText>
+                
+                {/* Years inside ring below sign name */}
+                {isInSequence && (
+                  <SvgText
+                    x={center + Math.cos((startAngle + endAngle) / 2) * ((outerRadius + innerRadius) / 2)}
+                    y={center + Math.sin((startAngle + endAngle) / 2) * ((outerRadius + innerRadius) / 2) + 8}
+                    fontSize="9"
+                    fontWeight="600"
+                    fill={isCurrent ? 'white' : '#666'}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    {(() => {
+                      const maha = mahadashas.find(m => m.name === sign);
+                      return maha ? `${Math.round(maha.years)}y` : '';
+                    })()} 
+                  </SvgText>
+                )}
+                
+
+                
+
+                
+                {/* Sequence number */}
+                {isInSequence && (
+                  <Circle
+                    cx={center + Math.cos((startAngle + endAngle) / 2) * (innerRadius - 15)}
+                    cy={center + Math.sin((startAngle + endAngle) / 2) * (innerRadius - 15)}
+                    r="10"
+                    fill="#9c27b0"
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                )}
+                {isInSequence && (
+                  <SvgText
+                    x={center + Math.cos((startAngle + endAngle) / 2) * (innerRadius - 15)}
+                    y={center + Math.sin((startAngle + endAngle) / 2) * (innerRadius - 15)}
+                    fontSize="10"
+                    fontWeight="700"
+                    fill="white"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    {(() => {
+                      const maha = mahadashas.find(m => m.sign === signNumber);
+                      const sequenceIndex = mahadashas.findIndex(m => m.sign === signNumber);
+                      return sequenceIndex >= 0 ? sequenceIndex + 1 : '';
+                    })()} 
+                  </SvgText>
+                )}
+                
+                {/* Gati indicator outside circle */}
+                {hasSpecialGati && (
+                  <SvgText
+                    x={center + Math.cos((startAngle + endAngle) / 2) * (outerRadius + 18)}
+                    y={center + Math.sin((startAngle + endAngle) / 2) * (outerRadius + 18)}
+                    fontSize="12"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    {gati.includes('Manduka') ? '🐸' : 
+                     gati.includes('Simhavalokana') ? '🦁' : 
+                     gati.includes('Markata') ? '🐒' : '⚡'}
+                  </SvgText>
+                )}
+                
+                {/* Red S for Deha (starting sign) outside circle */}
+                {isDeha && (
+                  <SvgText
+                    x={center + Math.cos((startAngle + endAngle) / 2) * (outerRadius + 18)}
+                    y={center + Math.sin((startAngle + endAngle) / 2) * (outerRadius + 18)}
+                    fontSize="12"
+                    fontWeight="700"
+                    fill="#d32f2f"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    S
+                  </SvgText>
+                )}
+                
+                {/* Arrow for current period outside circle */}
+                {isCurrent && (
+                  <SvgText
+                    x={center + Math.cos((startAngle + endAngle) / 2) * (outerRadius + 18)}
+                    y={center + Math.sin((startAngle + endAngle) / 2) * (outerRadius + 18)}
+                    fontSize="10"
+                    fill="#ff6f00"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    ▶
+                  </SvgText>
+                )}
+              </G>
+            );
+          })}
+          
+          {/* Sequence connection lines */}
+          {mahadashas.map((maha, index) => {
+            if (index === mahadashas.length - 1) return null; // Skip last one
+            const currentSignIndex = signs.findIndex(s => s === maha.name) || 0;
+            const nextMaha = mahadashas[index + 1];
+            const nextSignIndex = signs.findIndex(s => s === nextMaha.name) || 0;
+            
+            const currentAngle = ((currentSignIndex * 30) + 15 - 90) * (Math.PI / 180);
+            const nextAngle = ((nextSignIndex * 30) + 15 - 90) * (Math.PI / 180);
+            
+            const currentPos = {
+              x: center + Math.cos(currentAngle) * (innerRadius - 25),
+              y: center + Math.sin(currentAngle) * (innerRadius - 25)
+            };
+            const nextPos = {
+              x: center + Math.cos(nextAngle) * (innerRadius - 25),
+              y: center + Math.sin(nextAngle) * (innerRadius - 25)
+            };
+            
+            return (
+              <Path
+                key={`connection-${index}`}
+                d={`M ${currentPos.x} ${currentPos.y} L ${nextPos.x} ${nextPos.y}`}
+                stroke="#9c27b0"
+                strokeWidth="2"
+                strokeDasharray="3,3"
+                opacity="0.6"
+              />
+            );
+          })}
+          
+
+          
+          {/* Current date line */}
+          {(() => {
+            const currentMaha = mahadashas.find(m => {
+              const startDate = new Date(m.start);
+              const endDate = new Date(m.end);
+              const now = new Date();
+              return now >= startDate && now <= endDate;
+            });
+            
+            if (currentMaha) {
+              const currentSignIndex = signs.findIndex(s => s === currentMaha.name);
+              const startDate = new Date(currentMaha.start);
+              const endDate = new Date(currentMaha.end);
+              const now = new Date();
+              const progress = (now - startDate) / (endDate - startDate);
+              
+              const signStartAngle = ((currentSignIndex * 30) - 90) * (Math.PI / 180);
+              const signEndAngle = (((currentSignIndex + 1) * 30) - 90) * (Math.PI / 180);
+              const currentAngle = signStartAngle + (signEndAngle - signStartAngle) * progress;
+              
+              const innerPoint = {
+                x: center + Math.cos(currentAngle) * innerRadius,
+                y: center + Math.sin(currentAngle) * innerRadius
+              };
+              const outerPoint = {
+                x: center + Math.cos(currentAngle) * outerRadius,
+                y: center + Math.sin(currentAngle) * outerRadius
+              };
+              
+              return (
+                <Path
+                  d={`M ${innerPoint.x} ${innerPoint.y} L ${outerPoint.x} ${outerPoint.y}`}
+                  stroke="#ff6f00"
+                  strokeWidth="3"
+                  opacity="0.8"
+                />
+              );
+            }
+            return null;
+          })()}
+          
+
+          
+          {/* Center circle */}
+          <Circle cx={center} cy={center} r="45" fill="url(#centerGradient)" stroke="white" strokeWidth="3" />
+          <SvgText
+            x={center}
+            y={center - 8}
+            fontSize="14"
+            fontWeight="700"
+            fill="white"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {kalchakraData.cycle_len}y
+          </SvgText>
+          <SvgText
+            x={center}
+            y={center + 8}
+            fontSize="10"
+            fill="white"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {kalchakraData.direction}
+          </SvgText>
+          
+
+        </Svg>
+        
+        {/* Legend */}
+        <View style={styles.wheelLegend}>
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#9c27b0' }]} />
+              <Text style={styles.legendText}>Current</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#ffcdd2' }]} />
+              <Text style={styles.legendText}>Deha</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#c8e6c9' }]} />
+              <Text style={styles.legendText}>Jeeva</Text>
+            </View>
+          </View>
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#e1bee7' }]} />
+              <Text style={styles.legendText}>Sequence</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#ffe0b2' }]} />
+              <Text style={styles.legendText}>Gati</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderKalchakraTimeline = () => {
+    if (!kalchakraData) {
+      return (
+        <View style={styles.timelineContainer}>
+          <Text style={styles.timelineTitle}>Loading timeline data...</Text>
+        </View>
+      );
+    }
+
+    const mahadashas = kalchakraData.mahadashas || [];
+    const currentDate = new Date();
+
+    return (
+      <View style={styles.timelineContainer}>
+        <View style={styles.timelineHeader}>
+          <Text style={styles.timelineTitle}>Kalchakra Timeline</Text>
+          <View style={styles.dehaJeevaInfo}>
+            <Text style={styles.dehaJeevaText}>🎯 {kalchakraData.deha} → {kalchakraData.jeeva}</Text>
+            <Text style={styles.cycleInfo}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.timelineTable}>
+          <View style={styles.tableHeader}>
+            <Text style={styles.headerCell}>Sign</Text>
+            <Text style={styles.headerCell}>Gati</Text>
+            <Text style={styles.headerCell}>Duration</Text>
+            <Text style={styles.headerCell}>Period</Text>
+          </View>
+          
+          {mahadashas.map((maha, index) => {
+            const startDate = new Date(maha.start);
+            const endDate = new Date(maha.end);
+            const isCurrent = currentDate >= startDate && currentDate <= endDate;
+            const isDeha = maha.name === kalchakraData.deha;
+            const isJeeva = maha.name === kalchakraData.jeeva;
+            
+            return (
+              <View key={index} style={[
+                styles.tableRow,
+                isCurrent && styles.currentRow,
+                isDeha && styles.dehaRow,
+                isJeeva && styles.jeevaRow
+              ]}>
+                <View style={styles.signCell}>
+                  <Text style={[styles.signText, isCurrent && styles.currentText]}>
+                    {maha.name}
+                  </Text>
+                  {isDeha && <Text style={styles.specialLabel}>DEHA</Text>}
+                  {isJeeva && <Text style={styles.specialLabel}>JEEVA</Text>}
+                </View>
+                <View style={styles.gatiCell}>
+                  <Text style={[styles.gatiText, isCurrent && styles.currentText]}>
+                    {maha.gati?.includes('Manduka') ? '🐸' :
+                     maha.gati?.includes('Simhavalokana') ? '🦁' :
+                     maha.gati?.includes('Markata') ? '🐒' : '⚡'}
+                  </Text>
+                  <Text style={[styles.gatiName, isCurrent && styles.currentText]}>
+                    {maha.gati?.replace(' Gati', '') || 'Normal'}
+                  </Text>
+                </View>
+                <Text style={[styles.durationCell, isCurrent && styles.currentText]}>
+                  {formatPeriodDuration(maha.years)}
+                </Text>
+                <Text style={[styles.periodCell, isCurrent && styles.currentText]}>
+                  {startDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'})} - {endDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'})}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+        
+        {mahadashas.length === 0 && (
+          <Text style={styles.timelineEmpty}>No timeline data available</Text>
+        )}
+      </View>
     );
   };
 
@@ -1246,134 +1823,156 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     
     return (
       <>
-        <View style={styles.selectorContainer}>
-          <Text style={styles.selectorLabel}>Kalchakra Mahadasha (BPHS Authentic)</Text>
-          <ScrollView 
-            ref={scrollRefs.kalchakra_maha}
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            style={styles.optionsScroll}
-          >
-            {mahaOptions.length === 0 ? (
-              <View style={[styles.optionCard, styles.disabledOption]}>
-                <Text style={styles.disabledOptionText}>No periods available</Text>
-              </View>
-            ) : (
-              mahaOptions.map((period, index) => {
-                const isSelected = selectedDashas.kalchakra_maha === period.planet;
-                const currentDate = new Date();
-                const startDate = new Date(period.start_date);
-                const endDate = new Date(period.end_date);
-                const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
-                const progress = calculateProgress(period.start_date, period.end_date);
-                
-                return (
-                  <TouchableOpacity
-                    key={`${period.planet}-${index}`}
-                    style={[
-                      styles.kalchakraCard,
-                      isSelected && styles.selectedKalchakraCard,
-                      isActuallyCurrent && styles.currentKalchakraCard
-                    ]}
-                    onPress={() => handleKalchakraMahaSelection(period.planet)}
-                  >
-                    <Text style={[
-                      styles.kalchakraPlanet,
-                      isSelected && styles.selectedKalchakraPlanet,
-                      isActuallyCurrent && styles.currentKalchakraPlanet
-                    ]}>
-                      {period.planet}
-                    </Text>
-                    <Text style={[
-                      styles.kalchakraPeriod,
-                      isSelected && styles.selectedKalchakraPeriod,
-                      isActuallyCurrent && styles.currentKalchakraPeriod
-                    ]}>
-                      {formatPeriodDuration(period.duration_years)}
-                    </Text>
-                    <Text style={[
-                      styles.kalchakraSequence,
-                      isSelected && styles.selectedKalchakraSequence,
-                      isActuallyCurrent && styles.currentKalchakraSequence
-                    ]}>
-                      {period.sequence_direction === 'forward' ? '→' : '←'} C{period.cycle_number || 1}
-                    </Text>
-                    <Text style={[
-                      styles.kalchakraDates,
-                      isSelected && styles.selectedKalchakraDates,
-                      isActuallyCurrent && styles.currentKalchakraDates
-                    ]}>
-                      {new Date(period.start_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(period.end_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
-                    </Text>
-                    {isActuallyCurrent && (
-                      <View style={styles.kalchakraProgressBar}>
-                        <View style={[styles.kalchakraProgressFill, { width: `${progress}%` }]} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
+        {renderKalchakraViewToggle()}
         
-        {selectedDashas.kalchakra_maha && antarOptions.length > 0 && (
-          <View style={styles.selectorContainer}>
-            <Text style={styles.selectorLabel}>Kalchakra Antardasha ({selectedDashas.kalchakra_maha})</Text>
-            <ScrollView 
-              ref={scrollRefs.kalchakra_antar}
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              style={styles.optionsScroll}
-            >
-              {antarOptions.map((period, index) => {
-                const isSelected = selectedDashas.kalchakra_antar === period.planet;
-                const isActuallyCurrent = period.current;
-                const progress = calculateProgress(period.start_date, period.end_date);
-                
-                return (
-                  <TouchableOpacity
-                    key={`antar-${period.planet}-${index}`}
-                    style={[
-                      styles.kalchakraAntarCard,
-                      isSelected && styles.selectedKalchakraAntarCard,
-                      isActuallyCurrent && styles.currentKalchakraAntarCard
-                    ]}
-                    onPress={() => {
-                      setSelectedDashas(prev => ({ ...prev, kalchakra_antar: period.planet }));
-                    }}
-                  >
-                    <Text style={[
-                      styles.kalchakraAntarPlanet,
-                      isSelected && styles.selectedKalchakraAntarPlanet,
-                      isActuallyCurrent && styles.currentKalchakraAntarPlanet
-                    ]}>
-                      {period.planet}
-                    </Text>
-                    <Text style={[
-                      styles.kalchakraAntarPeriod,
-                      isSelected && styles.selectedKalchakraAntarPeriod,
-                      isActuallyCurrent && styles.currentKalchakraAntarPeriod
-                    ]}>
-                      {formatPeriodDuration(period.years)}
-                    </Text>
-                    <Text style={[
-                      styles.kalchakraAntarDates,
-                      isSelected && styles.selectedKalchakraAntarDates,
-                      isActuallyCurrent && styles.currentKalchakraAntarDates
-                    ]}>
-                      {new Date(period.start_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(period.end_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
-                    </Text>
-                    {isActuallyCurrent && (
-                      <View style={styles.kalchakraAntarProgressBar}>
-                        <View style={[styles.kalchakraAntarProgressFill, { width: `${progress}%` }]} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+        {kalchakraViewMode === 'wheel' && renderKalchakraWheel()}
+        {kalchakraViewMode === 'timeline' && renderKalchakraTimeline()}
+        
+
+        
+        {kalchakraViewMode === 'chips' && (
+          <>
+            <View style={styles.selectorContainer}>
+              <Text style={styles.selectorLabel}>BPHS Kalchakra Mahadasha (Sign-Based)</Text>
+              <ScrollView 
+                ref={scrollRefs.kalchakra_maha}
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.optionsScroll}
+              >
+                {mahaOptions.length === 0 ? (
+                  <View style={[styles.optionCard, styles.disabledOption]}>
+                    <Text style={styles.disabledOptionText}>No periods available</Text>
+                  </View>
+                ) : (
+                  mahaOptions.map((period, index) => {
+                    const isSelected = selectedDashas.kalchakra_maha === period.name;
+                    const currentDate = new Date();
+                    const startDate = new Date(period.start);
+                    const endDate = new Date(period.end);
+                    const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
+                    const progress = calculateProgress(period.start, period.end);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={`${period.name}-${index}`}
+                        style={[
+                          styles.kalchakraCard,
+                          isSelected && styles.selectedKalchakraCard,
+                          isActuallyCurrent && styles.currentKalchakraCard
+                        ]}
+                        onPress={() => handleKalchakraMahaSelection(period.name)}
+                      >
+                        <Text style={[
+                          styles.kalchakraPlanet,
+                          isSelected && styles.selectedKalchakraPlanet,
+                          isActuallyCurrent && styles.currentKalchakraPlanet
+                        ]}>
+                          {period.name}
+                        </Text>
+                        <Text style={[
+                          styles.kalchakraPeriod,
+                          isSelected && styles.selectedKalchakraPeriod,
+                          isActuallyCurrent && styles.currentKalchakraPeriod
+                        ]}>
+                          {formatPeriodDuration(period.years)}
+                        </Text>
+                        <Text style={[
+                          styles.kalchakraSequence,
+                          isSelected && styles.selectedKalchakraSequence,
+                          isActuallyCurrent && styles.currentKalchakraSequence
+                        ]}>
+                          {period.gati}
+                        </Text>
+                        <Text style={[
+                          styles.kalchakraDates,
+                          isSelected && styles.selectedKalchakraDates,
+                          isActuallyCurrent && styles.currentKalchakraDates
+                        ]}>
+                          {new Date(period.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(period.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
+                        </Text>
+                        {isActuallyCurrent && (
+                          <View style={styles.kalchakraProgressBar}>
+                            <View style={[styles.kalchakraProgressFill, { width: `${progress}%` }]} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </View>
+            
+            {selectedDashas.kalchakra_maha && antarOptions.length > 0 && (
+              <View style={styles.selectorContainer}>
+                <Text style={styles.selectorLabel}>BPHS Kalchakra Antardasha ({selectedDashas.kalchakra_maha})</Text>
+                <ScrollView 
+                  ref={scrollRefs.kalchakra_antar}
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  style={styles.optionsScroll}
+                >
+                  {antarOptions.map((period, index) => {
+                    const isSelected = selectedDashas.kalchakra_antar === period.name;
+                    const isActuallyCurrent = period.current;
+                    const progress = calculateProgress(period.start, period.end);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={`antar-${period.name}-${index}`}
+                        style={[
+                          styles.kalchakraAntarCard,
+                          isSelected && styles.selectedKalchakraAntarCard,
+                          isActuallyCurrent && styles.currentKalchakraAntarCard
+                        ]}
+                        onPress={() => {
+                          setSelectedDashas(prev => ({ ...prev, kalchakra_antar: period.name }));
+                          
+                          // Auto-scroll to selected antardasha
+                          setTimeout(() => {
+                            if (scrollRefs.kalchakra_antar?.current && antarOptions) {
+                              const selectedIndex = antarOptions.findIndex(d => d.name === period.name);
+                              if (selectedIndex >= 0) {
+                                const scrollX = Math.max(0, selectedIndex * 78 - 50);
+                                scrollRefs.kalchakra_antar.current.scrollTo({ x: scrollX, animated: true });
+                              }
+                            }
+                          }, 100);
+                        }}
+                      >
+                        <Text style={[
+                          styles.kalchakraAntarPlanet,
+                          isSelected && styles.selectedKalchakraAntarPlanet,
+                          isActuallyCurrent && styles.currentKalchakraAntarPlanet
+                        ]}>
+                          {period.name}
+                        </Text>
+                        <Text style={[
+                          styles.kalchakraAntarPeriod,
+                          isSelected && styles.selectedKalchakraAntarPeriod,
+                          isActuallyCurrent && styles.currentKalchakraAntarPeriod
+                        ]}>
+                          {formatPeriodDuration(period.years)}
+                        </Text>
+                        <Text style={[
+                          styles.kalchakraAntarDates,
+                          isSelected && styles.selectedKalchakraAntarDates,
+                          isActuallyCurrent && styles.currentKalchakraAntarDates
+                        ]}>
+                          {new Date(period.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(period.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
+                        </Text>
+                        {isActuallyCurrent && (
+                          <View style={styles.kalchakraAntarProgressBar}>
+                            <View style={[styles.kalchakraAntarProgressFill, { width: `${progress}%` }]} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </>
         )}
       </>
     );
@@ -1554,12 +2153,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               </>
             ) : dashaType === 'kalchakra' ? (
               <>
-                {renderManushyaRuleSelector()}
                 {renderKalchakraDashaList()}
               </>
             ) : (
               <>
-                {renderJaiminiKalchakraDashaList()}
+                {renderJaiminiTabs()}
               </>
             )}
           </View>
@@ -1857,14 +2455,15 @@ const styles = StyleSheet.create({
   },
   tabScrollView: {
     flexDirection: 'row',
+    flex: 1,
   },
   dashaTypeTab: {
+    flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginRight: 4,
-    minWidth: 100,
   },
   tabContent: {
     flexDirection: 'row',
@@ -1913,8 +2512,292 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontWeight: '600',
   },
+  kalchakraViewToggle: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 12,
+  },
+  viewToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeViewToggle: {
+    backgroundColor: '#9c27b0',
+  },
+  viewToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  activeViewToggleText: {
+    color: COLORS.white,
+  },
+  wheelContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  wheelHeader: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  wheelTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9c27b0',
+  },
+  wheelSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  svgWheel: {
+    alignSelf: 'center',
+    marginVertical: 4,
+  },
+  wheelLegend: {
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  legendEmoji: {
+    fontSize: 12,
+  },
+  timelineContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  timelineHeader: {
+    marginBottom: 16,
+  },
+  timelineTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9c27b0',
+    marginBottom: 8,
+  },
+  dehaJeevaInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dehaJeevaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#673ab7',
+  },
+  cycleInfo: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+  timelineTable: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f3e5f5',
+    paddingVertical: 8,
+  },
+  headerCell: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9c27b0',
+    textAlign: 'center',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  currentRow: {
+    backgroundColor: '#e8f5e8',
+  },
+  dehaRow: {
+    backgroundColor: '#ffebee',
+  },
+  jeevaRow: {
+    backgroundColor: '#e3f2fd',
+  },
+  signCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  signText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  specialLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#9c27b0',
+    marginTop: 2,
+  },
+  gatiCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  gatiText: {
+    fontSize: 14,
+  },
+  gatiName: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  durationCell: {
+    flex: 1,
+    fontSize: 11,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  periodCell: {
+    flex: 1,
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  currentText: {
+    color: '#2e7d32',
+    fontWeight: '700',
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  timelineGati: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#673ab7',
+  },
+  timelineTransition: {
+    fontSize: 12,
+    color: COLORS.textPrimary,
+  },
+  debugContainer: {
+    backgroundColor: '#ffebee',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#d32f2f',
+  },
+  timelineEmpty: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 20,
+  },
+
+  gatiLegend: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  gatiLegendTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  gatiLegendRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  gatiLegendItem: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+  },
+  sequenceFlow: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  sequenceTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  sequenceChain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  sequenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sequenceSign: {
+    backgroundColor: '#e1bee7',
+    borderRadius: 6,
+    padding: 6,
+    alignItems: 'center',
+    minWidth: 40,
+    borderWidth: 1,
+    borderColor: '#9c27b0',
+  },
+  sequenceSignSpecial: {
+    backgroundColor: '#ffcc02',
+    borderColor: '#ff6f00',
+  },
+  sequenceSignText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#9c27b0',
+  },
+  sequenceGatiText: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sequenceArrow: {
+    fontSize: 16,
+    color: '#9c27b0',
+    marginHorizontal: 4,
+  },
   infoButton: {
-    marginLeft: 4,
     padding: 2,
   },
   infoIcon: {
@@ -1923,77 +2806,82 @@ const styles = StyleSheet.create({
   },
   currentStatusCard: {
     backgroundColor: '#f3e5f5',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#9c27b0',
   },
   currentStatusTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#9c27b0',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
   },
-  currentPeriodRow: {
+  compactPeriodRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
-  currentPeriodInfo: {
+  periodColumn: {
+    alignItems: 'center',
     flex: 1,
   },
-  currentPeriodLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
+  systemColumn: {
+    alignItems: 'flex-end',
+    flex: 1,
   },
-  currentPeriodPlanet: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#9c27b0',
-  },
-  currentPeriodTime: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  progressContainer: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  progressBar: {
-    width: 50,
-    height: 6,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 3,
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#9c27b0',
-    borderRadius: 3,
-  },
-  antarProgressFill: {
-    backgroundColor: '#673ab7',
-  },
-  progressText: {
+  periodLabel: {
     fontSize: 10,
     color: COLORS.textSecondary,
     fontWeight: '600',
   },
-  systemInfoRow: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e1bee7',
+  periodName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#9c27b0',
+    marginTop: 2,
   },
-  systemInfoText: {
-    fontSize: 11,
+  periodGati: {
+    fontSize: 9,
     color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+  periodProgress: {
+    fontSize: 9,
+    color: '#673ab7',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  systemLabel: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
+    textAlign: 'right',
+    marginBottom: 1,
+  },
+  compactProgressBar: {
+    position: 'relative',
+    height: 16,
+    backgroundColor: '#e1bee7',
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  compactProgressFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    height: '100%',
+    backgroundColor: '#9c27b0',
+    borderRadius: 8,
+  },
+  compactProgressText: {
+    fontSize: 10,
+    color: COLORS.white,
+    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 2,
+    zIndex: 1,
   },
   kalchakraCard: {
     backgroundColor: '#f3e5f5',
@@ -2196,57 +3084,7 @@ const styles = StyleSheet.create({
     color: '#9c27b0',
     marginBottom: 8,
   },
-  manushyaRuleSelector: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e1bee7',
-  },
-  manushyaRuleLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9c27b0',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  manushyaRuleOptions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  manushyaRuleOption: {
-    flex: 1,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 8,
-    padding: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  activeManushyaRule: {
-    backgroundColor: '#9c27b0',
-    borderColor: '#9c27b0',
-  },
-  manushyaRuleText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-  activeManushyaRuleText: {
-    color: COLORS.white,
-  },
-  manushyaRuleSubtext: {
-    fontSize: 9,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: 2,
-    lineHeight: 11,
-  },
-  activeManushyaRuleSubtext: {
-    color: 'rgba(255,255,255,0.8)',
-  },
+
   jaiminiInfoCard: {
     backgroundColor: '#e8f5e8',
     borderRadius: 12,
@@ -2294,12 +3132,12 @@ const styles = StyleSheet.create({
   jumpTitle: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#ff9800',
+    color: '#e65100',
     marginBottom: 4,
   },
   jumpText: {
     fontSize: 10,
-    color: '#ff9800',
+    color: '#bf360c',
     marginBottom: 2,
   },
   predictionInfo: {
@@ -2722,6 +3560,31 @@ const styles = StyleSheet.create({
     borderColor: '#2e7d32',
   },
   selectedJaiminiText: {
+    color: COLORS.white,
+  },
+  jaiminiTabSelector: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 12,
+  },
+  jaiminiTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeJaiminiTab: {
+    backgroundColor: '#4caf50',
+  },
+  jaiminiTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  activeJaiminiTabText: {
     color: COLORS.white,
   },
 });

@@ -3343,8 +3343,8 @@ async def calculate_kalchakra_dasha(request: dict):
         import swisseph as swe
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         
-        # Initialize calculator with manushya rule and compute
-        calculator = BPHSKalachakraCalculator(manushya_rule=manushya_rule)
+        # Initialize calculator and compute
+        calculator = BPHSKalachakraCalculator()
         kalchakra_data = calculator.calculate_kalchakra_dasha(birth_dict)
         
         if 'error' in kalchakra_data:
@@ -3354,9 +3354,9 @@ async def calculate_kalchakra_dasha(request: dict):
         maha_dashas = []
         for maha in kalchakra_data.get('mahadashas', []):
             maha_dashas.append({
-                'planet': maha['planet'],
-                'start': maha.get('start_iso', maha.get('start_date', '')),
-                'end': maha.get('end_iso', maha.get('end_date', '')),
+                'planet': maha.get('name', maha.get('planet', 'Unknown')),
+                'start': maha.get('start', maha.get('start_iso', maha.get('start_date', ''))),
+                'end': maha.get('end', maha.get('end_iso', maha.get('end_date', ''))),
                 'years': maha['years']
             })
         
@@ -3365,7 +3365,7 @@ async def calculate_kalchakra_dasha(request: dict):
         current_date = datetime.now(timezone.utc)
         
         periods = []
-        for i, maha in enumerate(maha_dashas):
+        for i, maha in enumerate(kalchakra_data.get('mahadashas', [])):
             # Check if this is the current period
             try:
                 start_date = datetime.fromisoformat(maha['start'].replace('Z', '+00:00'))
@@ -3375,32 +3375,30 @@ async def calculate_kalchakra_dasha(request: dict):
                 is_current = False
             
             periods.append({
-                'planet': maha['planet'],
+                'name': maha.get('name', 'Unknown'),
+                'sign': maha.get('sign', 1),
                 'start_date': maha['start'],
                 'end_date': maha['end'],
                 'duration_years': maha['years'],
-                'cycle_number': 1,
-                'sequence_direction': 'forward' if kalchakra_data.get('direction_forward', True) else 'backward',
+                'gati': maha.get('gati', 'Normal'),
                 'current': is_current
             })
         
-        # Get deity classification for display
-        nakshatra_num = kalchakra_data.get('nakshatra', 1)
-        deity = calculator.NAKSHATRA_DEITIES.get(nakshatra_num, 'Deva')
+        # No need for deity classification in sign-based system
         
         return {
-            "system": kalchakra_data.get('system', 'Kalchakra (BPHS)'),
-            "periods": periods,
-            "current_dashas": {
-                "mahadasha": kalchakra_data.get('current_mahadasha', {}),
-                "antardasha": kalchakra_data.get('current_antardasha', {})
-            },
-            "moon_nakshatra": kalchakra_data.get('nakshatra', 'Ashwini'),
-            "moon_pada": kalchakra_data.get('pada', 1),
-            "nakshatra_deity": deity,
-            "starting_planet": kalchakra_data.get('starting_planet', 'Sun'),
-            "sequence_direction": kalchakra_data.get('sequence_direction', 'Forward'),
-            "cycle_length": kalchakra_data.get('cycle_length_years', 120)
+            "system": kalchakra_data.get('system', 'Kalchakra (BPHS Authentic)'),
+            "mahadashas": kalchakra_data.get('mahadashas', []),
+            "current_mahadasha": kalchakra_data.get('current_mahadasha', {}),
+            "current_antardasha": kalchakra_data.get('current_antardasha', {}),
+            "all_antardashas": kalchakra_data.get('all_antardashas', []),
+            "nakshatra": kalchakra_data.get('nakshatra', 1),
+            "pada": kalchakra_data.get('pada', 1),
+            "direction": kalchakra_data.get('direction', 'Savya'),
+            "cycle_len": kalchakra_data.get('cycle_len', 100),
+            "deha": kalchakra_data.get('deha', 'Aries'),
+            "jeeva": kalchakra_data.get('jeeva', 'Pisces'),
+            "sequence": kalchakra_data.get('sequence_names', [])
         }
         
     except ImportError as e:
@@ -3410,6 +3408,53 @@ async def calculate_kalchakra_dasha(request: dict):
         print(f"Kalchakra calculation error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         return {"system": "Kalchakra", "error": f"Calculation failed: {str(e)}"}
+
+@app.post("/api/jaimini-antardashas")
+async def get_jaimini_antardashas(request: dict):
+    """Get all antardashas for a mahadasha"""
+    try:
+        from calculators.jaimini_kalachakra_calculator import JaiminiKalachakraCalculator
+        from calculators.chart_calculator import ChartCalculator
+        
+        # Get chart data from session or calculate
+        birth_data = BirthData(**request.get('birth_data', {}))
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(birth_data)
+        
+        calculator = JaiminiKalachakraCalculator(chart_data)
+        antardashas = calculator.get_all_antardashas_for_maha(
+            request['maha_sign'],
+            request['maha_start_jd'],
+            request['maha_end_jd']
+        )
+        
+        return {"antardashas": antardashas}
+        
+    except Exception as e:
+        return {"error": f"Antardasha calculation failed: {str(e)}"}
+
+@app.post("/api/jaimini-antar-details")
+async def get_jaimini_antar_details(request: dict):
+    """Get detailed information for an antardasha"""
+    try:
+        from calculators.jaimini_kalachakra_calculator import JaiminiKalachakraCalculator
+        from calculators.chart_calculator import ChartCalculator
+        
+        # Get chart data from session or calculate
+        birth_data = BirthData(**request.get('birth_data', {}))
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(birth_data)
+        
+        calculator = JaiminiKalachakraCalculator(chart_data)
+        details = calculator.get_antardasha_details(
+            request['maha_sign'],
+            request['antar_sign']
+        )
+        
+        return details
+        
+    except Exception as e:
+        return {"error": f"Antar details calculation failed: {str(e)}"}
 
 @app.post("/api/calculate-jaimini-kalchakra-dasha")
 async def calculate_jaimini_kalchakra_dasha(request: dict):
@@ -3499,6 +3544,7 @@ async def calculate_jaimini_kalchakra_dasha(request: dict):
                 'duration_years': maha['years'],
                 'chakra': maha['chakra'],
                 'direction': maha['direction'],
+                'cycle': maha.get('cycle', 1),
                 'current': is_current
             }
             periods.append(period_data)
@@ -3526,6 +3572,7 @@ async def calculate_jaimini_kalchakra_dasha(request: dict):
             "chakra2_direction": jaimini_data.get('chakra2_direction', 'Backward'),
             "chakra1_signs": jaimini_data.get('chakra1_signs', []),
             "chakra2_signs": jaimini_data.get('chakra2_signs', []),
+            "skipped_rashis": jaimini_data.get('skipped_rashis', []),
             "reversals": jaimini_data.get('reversals', []),
             "jumps": jaimini_data.get('jumps', []),
             "total_cycle_years": jaimini_data.get('total_cycle_years', 100),
@@ -3758,9 +3805,8 @@ async def calculate_jaimini_kalchakra_antardasha(request: dict):
         # Calculate proportional antardashas based on sign durations
         maha_total_days = selected_maha['end_jd'] - selected_maha['start_jd']
         
-        # Get sign durations from navamsa calculation
-        navamsa_chart = calculator.divisional_calc.calculate_divisional_chart(9)
-        sign_durations = calculator._calculate_sign_durations(navamsa_chart)
+        # Use classical fixed durations instead of navamsa calculation
+        sign_durations = calculator.CLASSICAL_YEARS
         
         # Calculate total duration for antardashas in this sequence
         total_duration = sum(sign_durations.get(sign_num, 1.0) for sign_num in antar_sequence)
@@ -3800,12 +3846,12 @@ async def calculate_jaimini_kalchakra_antardasha(request: dict):
 
 @app.post("/api/calculate-kalchakra-antardasha")
 async def calculate_kalchakra_antardasha(request: dict):
-    """Calculate Kalchakra antardasha periods for selected mahadasha"""
+    """Calculate BPHS Kalchakra antardasha periods for selected mahadasha"""
     try:
         from calculators.bphs_kalachakra_calculator import BPHSKalachakraCalculator
         
         birth_data = BirthData(**request['birth_data'])
-        maha_planet = request['maha_planet']
+        maha_sign = request.get('maha_sign', request.get('maha_planet'))  # Support both keys
         target_date = request.get('target_date')
         
         # Convert timezone to offset if needed
@@ -3844,34 +3890,37 @@ async def calculate_kalchakra_antardasha(request: dict):
         if 'error' in kalchakra_data:
             return kalchakra_data
         
-        # Find the selected mahadasha
+        # Find the selected mahadasha by sign name
         selected_maha = None
         for maha in kalchakra_data.get('mahadashas', []):
-            if maha['planet'] == maha_planet:
+            if maha['name'] == maha_sign:
                 selected_maha = maha
                 break
         
         if not selected_maha:
             return {'error': 'Selected mahadasha not found'}
         
-        # Calculate antardasha periods for this mahadasha
-        sequence = calculator._sequence_from(
-            kalchakra_data.get('starting_planet', 'Sun'),
-            kalchakra_data.get('direction_forward', True)
-        )
+        # Calculate antardasha periods for this mahadasha using sign sequence
+        sequence = kalchakra_data.get('sequence', [])
         
-        # Get antardasha sequence starting from maha lord
-        start_idx = sequence.index(maha_planet)
-        antar_sequence = [sequence[(start_idx + i) % 9] for i in range(9)]
+        # Get antardasha sequence starting from maha sign
+        maha_sign_num = selected_maha['sign']
+        try:
+            start_idx = sequence.index(maha_sign_num)
+        except ValueError:
+            start_idx = 0
+        
+        antar_sequence = [sequence[(start_idx + i) % len(sequence)] for i in range(len(sequence))]
         
         maha_total_days = selected_maha['end_jd'] - selected_maha['start_jd']
-        cycle_years = sum(calculator.KALCHAKRA_YEARS.values())  # 120
+        cycle_years = kalchakra_data.get('cycle_len', 100)
         
         antar_periods = []
         cursor_jd = selected_maha['start_jd']
         
-        for planet in antar_sequence:
-            antar_proportion = calculator.KALCHAKRA_YEARS[planet] / cycle_years
+        for sign_num in antar_sequence:
+            sign_name = calculator.SIGN_NAMES[sign_num]
+            antar_proportion = calculator.SIGN_YEARS[sign_num] / cycle_years
             antar_days = maha_total_days * antar_proportion
             end_jd = cursor_jd + antar_days
             
@@ -3886,9 +3935,10 @@ async def calculate_kalchakra_antardasha(request: dict):
                 is_current = cursor_jd <= current_jd < end_jd
             
             antar_periods.append({
-                'planet': planet,
-                'start_date': calculator._jd_to_iso_utc(cursor_jd),
-                'end_date': calculator._jd_to_iso_utc(end_jd - 1/86400.0),
+                'name': sign_name,
+                'sign': sign_num,
+                'start': calculator._jd_to_iso_utc(cursor_jd),
+                'end': calculator._jd_to_iso_utc(end_jd - 1/86400.0),
                 'start_jd': cursor_jd,
                 'end_jd': end_jd,
                 'years': round(antar_days / 365.2425, 4),
@@ -3898,14 +3948,150 @@ async def calculate_kalchakra_antardasha(request: dict):
             cursor_jd = end_jd
         
         return {
-            'system': 'Kalchakra Antardasha',
-            'maha_planet': maha_planet,
+            'system': 'BPHS Kalchakra Antardasha',
+            'maha_sign': maha_sign,
             'antar_periods': antar_periods,
             'sequence': antar_sequence
         }
         
     except Exception as e:
         return {'error': f'Antardasha calculation error: {str(e)}'}
+
+@app.post("/api/calculate-jaimini-kalchakra-antardasha")
+async def calculate_jaimini_kalchakra_antardasha_frontend(request: dict):
+    """Frontend-compatible endpoint for Jaimini Kalchakra antardasha periods"""
+    try:
+        from calculators.jaimini_kalachakra_calculator import JaiminiKalachakraCalculator
+        from calculators.chart_calculator import ChartCalculator
+        from datetime import datetime, timezone
+        
+        birth_data = BirthData(**request['birth_data'])
+        maha_sign = request['maha_sign']
+        
+        # Convert timezone to offset
+        timezone_offset = birth_data.timezone
+        if isinstance(timezone_offset, str):
+            if timezone_offset.startswith('UTC'):
+                tz_str = timezone_offset[3:]
+                if tz_str and ':' in tz_str:
+                    sign = 1 if tz_str[0] == '+' else -1
+                    parts = tz_str[1:].split(':')
+                    timezone_offset = sign * (float(parts[0]) + float(parts[1])/60)
+                else:
+                    timezone_offset = 5.5
+            else:
+                timezone_offset = 5.5
+        
+        # Calculate birth chart
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(birth_data)
+        
+        # Initialize calculator
+        calculator = JaiminiKalachakraCalculator(chart_data)
+        
+        birth_dict = {
+            'date': birth_data.date,
+            'time': birth_data.time,
+            'timezone_offset': timezone_offset
+        }
+        
+        # Get full Jaimini data
+        jaimini_data = calculator.calculate_jaimini_kalachakra_dasha(birth_dict)
+        
+        if 'error' in jaimini_data:
+            return jaimini_data
+        
+        # Find the selected mahadasha
+        selected_maha = None
+        for maha in jaimini_data.get('mahadashas', []):
+            if maha['sign_name'] == maha_sign:
+                selected_maha = maha
+                break
+        
+        if not selected_maha:
+            return {"error": "Selected mahadasha not found"}
+        
+        # Calculate antardashas for this mahadasha
+        full_sequence = []
+        for maha in jaimini_data.get('mahadashas', []):
+            full_sequence.append(maha['sign'])
+        
+        # Generate antardasha sequence starting from selected sign
+        maha_sign_num = selected_maha['sign']
+        try:
+            start_idx = full_sequence.index(maha_sign_num)
+        except ValueError:
+            start_idx = 0
+        
+        antar_sequence = []
+        for i in range(len(full_sequence)):
+            antar_sequence.append(full_sequence[(start_idx + i) % len(full_sequence)])
+        
+        # Calculate proportional antardashas based on sign durations
+        maha_total_days = selected_maha['end_jd'] - selected_maha['start_jd']
+        
+        # Use classical fixed durations
+        sign_durations = calculator.CLASSICAL_YEARS
+        
+        # Calculate total duration for antardashas in this sequence
+        total_duration = sum(sign_durations.get(sign_num, 1.0) for sign_num in antar_sequence)
+        
+        antar_periods = []
+        cursor_jd = selected_maha['start_jd']
+        current_jd = calculator._current_jd(datetime.utcnow().replace(tzinfo=timezone.utc))
+        
+        for sign_num in antar_sequence:
+            # Use proportional duration based on sign strength
+            sign_duration = sign_durations.get(sign_num, 1.0)
+            proportion = sign_duration / total_duration if total_duration > 0 else 1.0 / len(antar_sequence)
+            days = maha_total_days * proportion
+            
+            # Check if current
+            is_current = cursor_jd <= current_jd < cursor_jd + days
+            
+            antar_periods.append({
+                'sign': calculator.SIGN_NAMES[sign_num],
+                'start_date': calculator._jd_to_iso_utc(cursor_jd),
+                'end_date': calculator._jd_to_iso_utc(cursor_jd + days - 1/86400.0),
+                'years': round(days / 365.2425, 2),
+                'current': is_current
+            })
+            cursor_jd += days
+        
+        return {
+            "antar_periods": antar_periods
+        }
+        
+    except Exception as e:
+        import traceback
+        print(f"Jaimini antardasha calculation error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return {"error": f"Calculation failed: {str(e)}"}
+
+@app.post("/api/jaimini-rashi-skip-reasons")
+async def get_jaimini_rashi_skip_reasons(request: dict):
+    """Get detailed reasons why a rashi is skipped in Jaimini Kalchakra"""
+    try:
+        from calculators.jaimini_rashi_strength import JaiminiRashiStrength
+        from calculators.chart_calculator import ChartCalculator
+        
+        # Get chart data
+        birth_data = BirthData(**request.get('birth_data', {}))
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(birth_data)
+        
+        # Get rashi index (0-11)
+        rashi_index = request['rashi_index']
+        threshold = request.get('threshold', 25.0)
+        
+        # Calculate skip reasons
+        strength_calc = JaiminiRashiStrength(chart_data)
+        skip_reasons = strength_calc.get_skip_reasons(rashi_index, threshold)
+        
+        return skip_reasons
+        
+    except Exception as e:
+        return {"error": f"Skip reasons calculation failed: {str(e)}"}
 
 @app.get("/api/kalchakra-dasha-info")
 async def get_kalchakra_dasha_info():
@@ -3919,6 +4105,83 @@ async def get_kalchakra_dasha_info():
         return {
             "system_name": "Kalchakra Dasha",
             "error": "Calculator not available"
+        }
+
+@app.post("/api/calculate-lifetime-gatis")
+async def calculate_lifetime_gatis(request: dict):
+    """Calculate all Gati periods in user's lifetime for BPHS Kalchakra"""
+    try:
+        from calculators.bphs_kalachakra_calculator import BPHSKalachakraCalculator
+        
+        birth_data = BirthData(**request['birth_data'])
+        
+        # Convert timezone to offset if needed
+        timezone_offset = birth_data.timezone
+        if isinstance(timezone_offset, str):
+            if timezone_offset.startswith('UTC'):
+                tz_str = timezone_offset[3:]
+                if tz_str and ':' in tz_str:
+                    sign = 1 if tz_str[0] == '+' else -1
+                    parts = tz_str[1:].split(':')
+                    timezone_offset = sign * (float(parts[0]) + float(parts[1])/60)
+                else:
+                    timezone_offset = 5.5
+            else:
+                timezone_offset = 5.5
+        
+        birth_dict = {
+            'date': birth_data.date,
+            'time': birth_data.time,
+            'timezone_offset': timezone_offset
+        }
+        
+        calculator = BPHSKalachakraCalculator()
+        gati_analysis = calculator.get_lifetime_gatis(birth_dict)
+        
+        if 'error' in gati_analysis:
+            return gati_analysis
+        
+        # Add Gati meanings for interpretation
+        gati_meanings = calculator.get_gati_meanings()
+        
+        return {
+            "gati_analysis": gati_analysis,
+            "gati_meanings": gati_meanings,
+            "birth_info": {
+                "name": birth_data.name,
+                "date": birth_data.date
+            }
+        }
+        
+    except ImportError:
+        return {"error": "BPHS Kalchakra calculator not available"}
+    except Exception as e:
+        return {"error": f"Gati analysis failed: {str(e)}"}
+
+@app.get("/api/gati-meanings")
+async def get_gati_meanings():
+    """Get Gati interpretations and meanings"""
+    try:
+        from calculators.bphs_kalachakra_calculator import BPHSKalachakraCalculator
+        calculator = BPHSKalachakraCalculator()
+        return calculator.get_gati_meanings()
+    except ImportError:
+        return {
+            "Manduka": {
+                "name": "Manduka (Frog)",
+                "description": "Sudden jumps and unexpected changes",
+                "themes": ["Rapid progress", "Unexpected opportunities", "Quick transformations"]
+            },
+            "Simhavalokana": {
+                "name": "Simhavalokana (Lion)", 
+                "description": "Powerful, focused transformation",
+                "themes": ["Leadership emergence", "Major life changes", "Authoritative periods"]
+            },
+            "Markata": {
+                "name": "Markata (Monkey)",
+                "description": "Restless energy and multiple directions", 
+                "themes": ["Versatility", "Multiple interests", "Adaptability"]
+            }
         }
 
 if __name__ == "__main__":
