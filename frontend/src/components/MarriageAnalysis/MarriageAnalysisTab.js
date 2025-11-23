@@ -76,9 +76,6 @@ const MarriageAnalysisTab = ({ chartData, birthDetails }) => {
 
   return (
     <div className="marriage-analysis-container">
-      <div className="analysis-header">
-        <h2>💍 Marriage Analysis</h2>
-      </div>
       <SingleChartAnalysis analysis={analysis} chartData={chartData} birthDetails={birthDetails} />
     </div>
   );
