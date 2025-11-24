@@ -4,6 +4,8 @@ import TechnicalAnalysisTab from './TechnicalAnalysisTab';
 import AIQuestionsTab from './AIQuestionsTab';
 import './EducationAnalysisPage.css';
 
+// Added promo code edit and delete functionality with custom confirmation modal
+
 const EducationAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const [activeTab, setActiveTab] = useState('technical');
   const [analysisData, setAnalysisData] = useState(null);
