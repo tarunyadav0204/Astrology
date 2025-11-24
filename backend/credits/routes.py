@@ -19,6 +19,11 @@ class CreatePromoCodeRequest(BaseModel):
     max_uses: int = 1
     expires_at: Optional[str] = None
 
+class UpdatePromoCodeRequest(BaseModel):
+    credits: int
+    max_uses: int
+    is_active: bool
+
 @router.get("/balance")
 async def get_credit_balance(current_user: User = Depends(get_current_user)):
     balance = credit_service.get_user_credits(current_user.userid)
@@ -114,6 +119,71 @@ async def get_promo_codes(current_user: User = Depends(get_current_user)):
     
     conn.close()
     return {"promo_codes": codes}
+
+@router.put("/admin/promo-codes/{code}")
+async def update_promo_code(code: str, request: UpdatePromoCodeRequest, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        UPDATE promo_codes 
+        SET credits = ?, max_uses = ?, is_active = ?
+        WHERE code = ?
+    """, (request.credits, request.max_uses, request.is_active, code.upper()))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Promo code not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Promo code updated successfully"}
+
+@router.delete("/admin/promo-codes/{code}")
+async def delete_promo_code(code: str, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM promo_codes WHERE code = ?", (code.upper(),))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Promo code not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Promo code deleted successfully"}
+
+@router.post("/admin/delete-promo-code")
+async def delete_promo_code_post(request: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    code = request.get("code")
+    if not code:
+        raise HTTPException(status_code=400, detail="Promo code is required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM promo_codes WHERE code = ?", (code.upper(),))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Promo code not found")
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Promo code deleted successfully"}
 
 @router.post("/admin/add-credits")
 async def admin_add_credits(request: dict, current_user: User = Depends(get_current_user)):

@@ -27,6 +27,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [creditStats, setCreditStats] = useState({});
   const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1 });
   const [creditSettings, setCreditSettings] = useState([]);
+  const [editingPromoCode, setEditingPromoCode] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -234,6 +237,82 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         setting.key === key ? { ...setting, value: parseInt(value) } : setting
       )
     );
+  };
+
+  const handleUpdatePromoCode = async (code, updates) => {
+    if (!updates.credits || updates.credits < 1 || !updates.max_uses || updates.max_uses < 1) {
+      alert('Credits and max uses must be positive numbers');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/credits/admin/promo-codes/${code}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(updates)
+      });
+      
+      if (response.ok) {
+        fetchPromoCodes();
+        fetchCreditStats();
+        setEditingPromoCode(null);
+        setEditFormData({});
+      } else {
+        const errorData = await response.json();
+        alert(errorData.detail || 'Failed to update promo code');
+      }
+    } catch (error) {
+      console.error('Error updating promo code:', error);
+      alert('Error updating promo code');
+    }
+  };
+
+  const startEditingPromoCode = (code) => {
+    setEditingPromoCode(code.code);
+    setEditFormData({
+      credits: code.credits,
+      max_uses: code.max_uses,
+      is_active: code.is_active
+    });
+  };
+
+  const handleDeletePromoCode = (code) => {
+    setDeleteConfirmation(code);
+  };
+
+  const confirmDelete = async () => {
+    const code = deleteConfirmation;
+    setDeleteConfirmation(null);
+    
+    try {
+      const response = await fetch('/api/credits/admin/delete-promo-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ code: code })
+      });
+      
+      if (response.ok) {
+        fetchPromoCodes();
+        fetchCreditStats();
+        alert('Promo code deleted successfully');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.detail || 'Failed to delete promo code');
+      }
+    } catch (error) {
+      console.error('Error deleting promo code:', error);
+      alert('Error deleting promo code: ' + error.message);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation(null);
   };
 
   return (
@@ -565,21 +644,90 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       <th>Used Count</th>
                       <th>Status</th>
                       <th>Created</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {promoCodes.map(code => (
                       <tr key={code.code}>
                         <td><strong>{code.code}</strong></td>
-                        <td>{code.credits}</td>
-                        <td>{code.max_uses}</td>
+                        <td>
+                          {editingPromoCode === code.code ? (
+                            <input
+                              type="number"
+                              value={editFormData.credits || code.credits}
+                              onChange={(e) => setEditFormData({...editFormData, credits: parseInt(e.target.value)})}
+                              style={{ width: '80px' }}
+                            />
+                          ) : (
+                            code.credits
+                          )}
+                        </td>
+                        <td>
+                          {editingPromoCode === code.code ? (
+                            <input
+                              type="number"
+                              value={editFormData.max_uses || code.max_uses}
+                              onChange={(e) => setEditFormData({...editFormData, max_uses: parseInt(e.target.value)})}
+                              style={{ width: '60px' }}
+                            />
+                          ) : (
+                            code.max_uses
+                          )}
+                        </td>
                         <td>{code.used_count}</td>
                         <td>
-                          <span className={`status ${code.is_active ? 'active' : 'inactive'}`}>
-                            {code.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                          {editingPromoCode === code.code ? (
+                            <select
+                              value={editFormData.is_active !== undefined ? (editFormData.is_active ? '1' : '0') : (code.is_active ? '1' : '0')}
+                              onChange={(e) => setEditFormData({...editFormData, is_active: e.target.value === '1'})}
+                            >
+                              <option value="1">Active</option>
+                              <option value="0">Inactive</option>
+                            </select>
+                          ) : (
+                            <span className={`status ${code.is_active ? 'active' : 'inactive'}`}>
+                              {code.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          )}
                         </td>
                         <td>{new Date(code.created_at).toLocaleString()}</td>
+                        <td>
+                          {editingPromoCode === code.code ? (
+                            <div>
+                              <button 
+                                onClick={() => handleUpdatePromoCode(code.code, editFormData)}
+                                className="save-btn"
+                              >
+                                Save
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setEditingPromoCode(null);
+                                  setEditFormData({});
+                                }}
+                                className="cancel-btn"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <button 
+                                onClick={() => startEditingPromoCode(code)}
+                                className="edit-btn"
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                onClick={() => handleDeletePromoCode(code.code)}
+                                className="delete-btn"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -590,6 +738,61 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
       </div>
       </div>
+      
+      {deleteConfirmation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            textAlign: 'center',
+            minWidth: '300px'
+          }}>
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to delete promo code <strong>{deleteConfirmation}</strong>?</p>
+            <div style={{ marginTop: '20px' }}>
+              <button 
+                onClick={confirmDelete}
+                style={{
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  marginRight: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                Delete
+              </button>
+              <button 
+                onClick={cancelDelete}
+                style={{
+                  backgroundColor: '#ccc',
+                  color: 'black',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

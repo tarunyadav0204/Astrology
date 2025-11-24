@@ -37,6 +37,7 @@ import MonthlyPanchangPage from './components/MonthlyPanchang/MonthlyPanchangPag
 import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
+import EducationAnalysisPage from './components/EducationAnalysis/EducationAnalysisPage';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
@@ -865,6 +866,13 @@ function App() {
             />
           } />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
+          <Route path="/education" element={
+            <EducationAnalysisPage 
+              user={user} 
+              onLogout={handleLogout} 
+              onAdminClick={handleAdminClick} 
+            />
+          } />
 
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={

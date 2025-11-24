@@ -269,7 +269,8 @@ class YogaCalculator(BaseCalculator):
             'viparita_raja_yogas': self.calculate_viparita_raja_yogas(),
             'dharma_karma_yogas': self.calculate_dharma_karma_yogas(),
             'career_specific_yogas': self.calculate_career_specific_yogas(),
-            'health_yogas': self.calculate_health_yogas()
+            'health_yogas': self.calculate_health_yogas(),
+            'education_yogas': self.calculate_education_yogas()
         }
     
     def calculate_career_specific_yogas(self):
@@ -527,6 +528,104 @@ class YogaCalculator(BaseCalculator):
         
         return yogas
     
+    def calculate_education_yogas(self):
+        """Calculate education-specific yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Saraswati Yoga - Mercury, Jupiter, Venus in conjunction/mutual aspect
+        if all(p in planets for p in ['Mercury', 'Jupiter', 'Venus']):
+            mercury_house = planets['Mercury'].get('house', 1)
+            jupiter_house = planets['Jupiter'].get('house', 1)
+            venus_house = planets['Venus'].get('house', 1)
+            
+            # Check for conjunction (same house)
+            if mercury_house == jupiter_house == venus_house:
+                yogas.append({
+                    'name': 'Saraswati Yoga',
+                    'planets': ['Mercury', 'Jupiter', 'Venus'],
+                    'houses': [mercury_house],
+                    'strength': 'High',
+                    'description': 'Mercury, Jupiter, Venus conjunction - excellent learning ability and academic success'
+                })
+            # Check for mutual aspects
+            elif self._planets_in_mutual_aspect(['Mercury', 'Jupiter', 'Venus'], planets):
+                yogas.append({
+                    'name': 'Saraswati Yoga (Aspect)',
+                    'planets': ['Mercury', 'Jupiter', 'Venus'],
+                    'houses': [mercury_house, jupiter_house, venus_house],
+                    'strength': 'Medium',
+                    'description': 'Mercury, Jupiter, Venus in mutual aspect - good learning ability'
+                })
+        
+        # Budh-Aditya Yoga - Sun-Mercury conjunction
+        if 'Sun' in planets and 'Mercury' in planets:
+            sun_house = planets['Sun'].get('house', 1)
+            mercury_house = planets['Mercury'].get('house', 1)
+            
+            if sun_house == mercury_house:
+                yogas.append({
+                    'name': 'Budh-Aditya Yoga',
+                    'planets': ['Sun', 'Mercury'],
+                    'houses': [sun_house],
+                    'strength': 'High',
+                    'description': 'Sun-Mercury conjunction - sharp intelligence and analytical abilities'
+                })
+        
+        # Guru-Mangal Yoga - Jupiter-Mars conjunction/aspect
+        if 'Jupiter' in planets and 'Mars' in planets:
+            jupiter_house = planets['Jupiter'].get('house', 1)
+            mars_house = planets['Mars'].get('house', 1)
+            
+            if jupiter_house == mars_house or self._are_planets_connected(planets['Jupiter'], planets['Mars']):
+                yogas.append({
+                    'name': 'Guru-Mangal Yoga',
+                    'planets': ['Jupiter', 'Mars'],
+                    'houses': [jupiter_house, mars_house],
+                    'strength': 'Medium',
+                    'description': 'Jupiter-Mars connection - technical and scientific education aptitude'
+                })
+        
+        # Education Lord Yoga - 4th, 5th, 9th lords connected
+        fourth_lord = self._get_house_lord(4)
+        fifth_lord = self._get_house_lord(5)
+        ninth_lord = self._get_house_lord(9)
+        
+        if fourth_lord and fifth_lord and ninth_lord:
+            connected_lords = []
+            if fourth_lord in planets and fifth_lord in planets:
+                if self._are_planets_connected(planets[fourth_lord], planets[fifth_lord]):
+                    connected_lords.extend([fourth_lord, fifth_lord])
+            
+            if fifth_lord in planets and ninth_lord in planets:
+                if self._are_planets_connected(planets[fifth_lord], planets[ninth_lord]):
+                    if ninth_lord not in connected_lords:
+                        connected_lords.append(ninth_lord)
+            
+            if len(connected_lords) >= 2:
+                yogas.append({
+                    'name': 'Education Lord Yoga',
+                    'planets': connected_lords,
+                    'strength': 'High',
+                    'description': f'Education house lords {" and ".join(connected_lords)} connected - strong educational foundation'
+                })
+        
+        return yogas
+    
+    def _planets_in_mutual_aspect(self, planet_names, planets):
+        """Check if planets are in mutual aspect"""
+        houses = [planets[p].get('house', 1) for p in planet_names if p in planets]
+        if len(houses) < 2:
+            return False
+        
+        # Check if any two planets aspect each other
+        for i in range(len(houses)):
+            for j in range(i + 1, len(houses)):
+                house_diff = abs(houses[i] - houses[j])
+                if house_diff in [3, 6, 9] or (houses[i] + houses[j]) == 13:
+                    return True
+        return False
+    
     def _are_planets_connected(self, planet1_data, planet2_data):
         """Check if two planets are connected by conjunction or aspect"""
         house1 = planet1_data.get('house', 1)
@@ -548,4 +647,29 @@ class YogaCalculator(BaseCalculator):
         if house_number <= len(houses):
             house_sign = houses[house_number - 1].get('sign', 0)
             return self.SIGN_LORDS.get(house_sign)
-        return None
+
+    
+    def get_education_yogas_only(self):
+        """Get only education-related yogas from all yogas"""
+        all_yogas = self.calculate_all_yogas()
+        education_yogas = []
+        
+        # Add specific education yogas
+        education_yogas.extend(all_yogas.get('education_yogas', []))
+        
+        # Add relevant yogas from other categories
+        for yoga in all_yogas.get('gaja_kesari_yogas', []):
+            education_yogas.append(yoga)
+        
+        # Filter other yogas for education relevance
+        education_keywords = ['saraswati', 'budh', 'mercury', 'jupiter', 'guru', 'education', 'learning', 'gaja', 'kesari']
+        
+        for category_yogas in all_yogas.values():
+            if isinstance(category_yogas, list):
+                for yoga in category_yogas:
+                    yoga_name = yoga.get('name', '').lower()
+                    if any(keyword in yoga_name for keyword in education_keywords):
+                        if yoga not in education_yogas:
+                            education_yogas.append(yoga)
+        
+        return education_yogas
