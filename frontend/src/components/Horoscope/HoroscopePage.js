@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import { API_BASE_URL } from '../../config';
@@ -6,8 +7,15 @@ import { generatePageSEO } from '../../config/seo.config';
 import './HoroscopePage.css';
 
 const HoroscopePage = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState('daily');
-  const [selectedZodiac, setSelectedZodiac] = useState('aries');
+  const location = useLocation();
+  
+  // Get URL parameters
+  const urlParams = new URLSearchParams(location.search);
+  const periodParam = urlParams.get('period') || 'daily';
+  const signParam = urlParams.get('sign') || 'aries';
+  
+  const [selectedPeriod, setSelectedPeriod] = useState(periodParam);
+  const [selectedZodiac, setSelectedZodiac] = useState(signParam);
   const [horoscopeData, setHoroscopeData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +40,20 @@ const HoroscopePage = () => {
     { key: 'monthly', label: 'Monthly', icon: '🗓️' },
     { key: 'yearly', label: 'Yearly', icon: '📆' }
   ];
+
+  // Update state when URL parameters change
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const periodParam = urlParams.get('period');
+    const signParam = urlParams.get('sign');
+    
+    if (periodParam && periodParam !== selectedPeriod) {
+      setSelectedPeriod(periodParam);
+    }
+    if (signParam && signParam !== selectedZodiac) {
+      setSelectedZodiac(signParam);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     fetchHoroscope();

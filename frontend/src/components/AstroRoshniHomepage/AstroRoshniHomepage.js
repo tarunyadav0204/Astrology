@@ -991,9 +991,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="horoscope-content">
               <div className="horoscope-tabs">
                 <button className={`tab ${selectedPeriod === 'daily' ? 'active' : ''}`} onClick={() => setSelectedPeriod('daily')}>Daily</button>
-                <button className={`tab ${selectedPeriod === 'weekly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('weekly')}>Weekly</button>
-                <button className={`tab ${selectedPeriod === 'monthly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('monthly')}>Monthly</button>
-                <button className={`tab ${selectedPeriod === 'yearly' ? 'active' : ''}`} onClick={() => setSelectedPeriod('yearly')}>Yearly</button>
+                <button className={`tab ${selectedPeriod === 'weekly' ? 'active' : ''}`} onClick={() => { setSelectedPeriod('weekly'); navigate(`/horoscope?period=weekly&sign=${selectedZodiac}`); }}>Weekly</button>
+                <button className={`tab ${selectedPeriod === 'monthly' ? 'active' : ''}`} onClick={() => { setSelectedPeriod('monthly'); navigate(`/horoscope?period=monthly&sign=${selectedZodiac}`); }}>Monthly</button>
+                <button className={`tab ${selectedPeriod === 'yearly' ? 'active' : ''}`} onClick={() => { setSelectedPeriod('yearly'); navigate(`/horoscope?period=yearly&sign=${selectedZodiac}`); }}>Yearly</button>
               </div>
               
               <div className="zodiac-grid">
@@ -1042,6 +1042,23 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                         <span><strong>Lucky Color:</strong> {getCurrentHoroscope().lucky_color}</span>
                         <span><strong>Rating:</strong> {'⭐'.repeat(getCurrentHoroscope().rating || 0)}</span>
                       </div>
+                      <button 
+                        className="view-full-btn"
+                        onClick={() => navigate(`/horoscope?period=${selectedPeriod}&sign=${selectedZodiac}`)}
+                        style={{
+                          marginTop: '15px',
+                          padding: '10px 20px',
+                          background: 'linear-gradient(135deg, #e91e63, #f06292)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '25px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        View Full {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Horoscope →
+                      </button>
                     </div>
                   </div>
                 )}

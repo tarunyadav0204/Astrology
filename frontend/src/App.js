@@ -365,6 +365,7 @@ function App() {
               )
             } />
             <Route path="/horoscope/:period" element={<HoroscopePage />} />
+            <Route path="/horoscope" element={<HoroscopePage />} />
             <Route path="/marriage-analysis" element={
               <>
                 <AstroRoshniHomepage 
@@ -805,6 +806,7 @@ function App() {
           <CreditProvider>
             <Routes>
           <Route path="/horoscope/:period" element={<HoroscopePage />} />
+          <Route path="/horoscope" element={<HoroscopePage />} />
           <Route path="/marriage-analysis" element={
             <MarriageAnalysisPage 
               user={user} 

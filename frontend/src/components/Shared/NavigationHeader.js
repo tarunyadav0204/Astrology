@@ -95,16 +95,16 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
               <a href="#horoscope" className="dropdown-toggle">Horoscope</a>
               <div className="dropdown-content">
                 <button onClick={() => {
-                  navigate('/horoscope/daily');
+                  navigate('/horoscope?period=daily');
                 }}>📅 Daily Horoscope</button>
                 <button onClick={() => {
-                  navigate('/horoscope/weekly');
+                  navigate('/horoscope?period=weekly');
                 }}>📊 Weekly Horoscope</button>
                 <button onClick={() => {
-                  navigate('/horoscope/monthly');
+                  navigate('/horoscope?period=monthly');
                 }}>🗓️ Monthly Horoscope</button>
                 <button onClick={() => {
-                  navigate('/horoscope/yearly');
+                  navigate('/horoscope?period=yearly');
                 }}>📆 Yearly Horoscope</button>
               </div>
             </li>

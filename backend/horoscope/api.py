@@ -1,17 +1,20 @@
 from datetime import datetime
 from typing import Dict
 from .generators.western_generator import WesternHoroscopeGenerator
+from .generators.accurate_generator import AccurateHoroscopeGenerator
 
 class HoroscopeAPI:
     def __init__(self):
         self.western_generator = WesternHoroscopeGenerator()
+        self.accurate_generator = AccurateHoroscopeGenerator()
     
     def get_daily_horoscope(self, zodiac_sign: str, date: datetime = None) -> Dict:
         if not date:
             date = datetime.now()
             
-        horoscope = self.western_generator.generate_comprehensive_horoscope(
-            zodiac_sign, 'daily', date
+        # Use accurate generator for real astronomical data
+        horoscope = self.accurate_generator.generate_accurate_horoscope(
+            zodiac_sign.capitalize(), date, 'daily'
         )
         
         return {
@@ -25,8 +28,9 @@ class HoroscopeAPI:
         if not date:
             date = datetime.now()
             
-        horoscope = self.western_generator.generate_comprehensive_horoscope(
-            zodiac_sign, 'weekly', date
+        # Use accurate generator for real astronomical data
+        horoscope = self.accurate_generator.generate_accurate_horoscope(
+            zodiac_sign.capitalize(), date, 'weekly'
         )
         
         return {
@@ -40,8 +44,9 @@ class HoroscopeAPI:
         if not date:
             date = datetime.now()
             
-        horoscope = self.western_generator.generate_comprehensive_horoscope(
-            zodiac_sign, 'monthly', date
+        # Use accurate generator for real astronomical data
+        horoscope = self.accurate_generator.generate_accurate_horoscope(
+            zodiac_sign.capitalize(), date, 'monthly'
         )
         
         return {
@@ -55,8 +60,9 @@ class HoroscopeAPI:
         if not date:
             date = datetime.now()
             
-        horoscope = self.western_generator.generate_comprehensive_horoscope(
-            zodiac_sign, 'yearly', date
+        # Use accurate generator for real astronomical data
+        horoscope = self.accurate_generator.generate_accurate_horoscope(
+            zodiac_sign.capitalize(), date, 'yearly'
         )
         
         return {
