@@ -251,6 +251,80 @@
   background: linear-gradient(135deg, #17a2b8 0%, #6610f2 100%);
 }
 
+/* Enhanced wealth analysis styles */
+.enhancement-indicator {
+  margin-bottom: 15px;
+}
+
+.enhancement-badge {
+  background: linear-gradient(135deg, #6610f2 0%, #e83e8c 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.enhanced-wealth-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+.enhanced-wealth-content h1,
+.enhanced-wealth-content h2,
+.enhanced-wealth-content h3,
+.enhanced-wealth-content h4 {
+  color: #333;
+  margin-top: 25px;
+  margin-bottom: 15px;
+}
+
+.enhanced-wealth-content h1 {
+  font-size: 1.8rem;
+  border-bottom: 2px solid #6c757d;
+  padding-bottom: 10px;
+}
+
+.enhanced-wealth-content h2 {
+  font-size: 1.5rem;
+  color: #6c757d;
+}
+
+.enhanced-wealth-content h3 {
+  font-size: 1.3rem;
+  color: #495057;
+}
+
+.enhanced-wealth-content p {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.enhanced-wealth-content ul,
+.enhanced-wealth-content ol {
+  margin-bottom: 15px;
+  padding-left: 25px;
+}
+
+.enhanced-wealth-content li {
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.enhanced-wealth-content strong {
+  color: #495057;
+  font-weight: 600;
+}
+
+.enhanced-wealth-content em {
+  color: #6c757d;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .ai-insights-tab {
     padding: 15px;
@@ -266,6 +340,387 @@
   }
   
   .card-content {
+    padding: 15px;
+  }
+  
+  .enhanced-wealth-content {
+    padding: 20px;
+  }
+  
+  .enhanced-wealth-content h1 {
+    font-size: 1.5rem;
+  }
+  
+  .enhanced-wealth-content h2 {
+    font-size: 1.3rem;
+  }
+}
+
+/* Structured Q&A Styles */
+.structured-qa {
+  max-width: 100%;
+}
+
+.wealth-summary {
+  background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+  color: #334155;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 25px;
+  text-align: center;
+  border: 1px solid #E2E8F0;
+}
+
+.wealth-summary h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.3em;
+}
+
+.wealth-summary p {
+  margin: 0;
+  font-size: 1.1em;
+  line-height: 1.6;
+}
+
+.questions-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.qa-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid #E2E8F0;
+  border: 1px solid #F1F5F9;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qa-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.question-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.question-number {
+  background: linear-gradient(135deg, #E2E8F0, #CBD5E1);
+  color: #475569;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9em;
+  flex-shrink: 0;
+  border: 1px solid #CBD5E1;
+}
+
+.question-header h5 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.1em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.answer-content {
+  margin-left: 45px;
+}
+
+.main-answer {
+  color: #34495e;
+  line-height: 1.7;
+  margin-bottom: 15px;
+  font-size: 1em;
+}
+
+.key-points {
+  background: #ECFDF5;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 15px 0;
+  border-left: 3px solid #D1FAE5;
+  border: 1px solid #D1FAE5;
+}
+
+.key-points h6 {
+  margin: 0 0 10px 0;
+  color: #059669;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.key-points ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.key-points li {
+  margin-bottom: 6px;
+  color: #2c3e50;
+  line-height: 1.5;
+}
+
+.astrological-basis {
+  background: #FFFBEB;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 15px;
+  border-left: 3px solid #FEF3C7;
+  border: 1px solid #FEF3C7;
+}
+
+.astrological-basis h6 {
+  margin: 0 0 8px 0;
+  color: #D97706;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.basis-text {
+  margin: 0;
+  color: #92400e;
+  font-style: italic;
+  line-height: 1.5;
+  font-size: 0.95em;
+}
+
+/* Raw content fallback */
+.raw-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+/* Mobile responsive for Q&A */
+@media (max-width: 768px) {
+  .qa-card {
+    padding: 15px;
+  }
+  
+  .question-header {
+    gap: 10px;
+  }
+  
+  .answer-content {
+    margin-left: 40px;
+  }
+  
+  .question-number {
+    width: 25px;
+    height: 25px;
+    font-size: 0.8em;
+  }
+  
+  .wealth-summary {
+    padding: 15px;
+  }
+  
+  .key-points,
+  .astrological-basis {
+    padding: 12px;
+  }
+}
+/* Accordion Styles */
+.questions-accordion {
+  width: 100%;
+  max-width: 100%;
+}
+
+.accordion-panel {
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.accordion-panel:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #E2E8F0;
+}
+
+.accordion-header:hover {
+  background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%);
+}
+
+.accordion-header.open {
+  background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%);
+}
+
+.question-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.question-number {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1em;
+  flex-shrink: 0;
+}
+
+.question-text {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.accordion-icon {
+  font-size: 1.5em;
+  font-weight: bold;
+  transition: transform 0.3s ease;
+}
+
+.accordion-header.open .accordion-icon {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  padding: 25px;
+  background: #fafafa;
+}
+
+.answer-section,
+.key-points-section,
+.astrological-section {
+  margin-bottom: 25px;
+}
+
+.answer-section:last-child,
+.key-points-section:last-child,
+.astrological-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  color: #475569;
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #E2E8F0;
+  display: inline-block;
+}
+
+.answer-text {
+  background: #FEFEFE;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #E2E8F0;
+  border: 1px solid #F1F5F9;
+  line-height: 1.7;
+  color: #475569;
+  white-space: pre-line;
+}
+
+.answer-text strong {
+  color: #2980b9;
+  font-weight: 600;
+}
+
+.answer-text em {
+  color: #8e44ad;
+  font-style: italic;
+}
+
+.key-points-list {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #27ae60;
+  margin: 0;
+  padding-left: 40px;
+}
+
+.key-points-list li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+  color: #2c3e50;
+}
+
+.key-points-list li strong {
+  color: #27ae60;
+}
+
+.astrological-text {
+  background: #fff3cd;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #f39c12;
+  line-height: 1.6;
+  color: #8b4513;
+  white-space: pre-line;
+}
+
+.astrological-text strong {
+  color: #d68910;
+  font-weight: 600;
+}
+
+.astrological-text em {
+  color: #a0522d;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .accordion-header {
+    padding: 15px;
+  }
+  
+  .question-info {
+    gap: 10px;
+  }
+  
+  .question-number {
+    width: 30px;
+    height: 30px;
+    font-size: 0.9em;
+  }
+  
+  .question-text {
+    font-size: 1em;
+  }
+  
+  .accordion-content {
+    padding: 20px;
+  }
+  
+  .answer-text,
+  .key-points-list,
+  .astrological-text {
     padding: 15px;
   }
 }

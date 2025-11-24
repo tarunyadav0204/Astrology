@@ -4,6 +4,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import CompleteWealthAnalysisTab from '../Wealth/CompleteWealthAnalysisTab';
 import AIInsightsTab from '../Wealth/AIInsightsTab';
+import AstrologicalContextTab from '../Wealth/AstrologicalContextTab';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
@@ -84,6 +85,14 @@ const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
                   >
                     Detailed Technical Analysis
                   </button>
+                  {user?.role === 'admin' && (
+                    <button 
+                      className={`tab-btn ${activeTab === 'context' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('context')}
+                    >
+                      Astrological Context
+                    </button>
+                  )}
                 </div>
                 
                 <div className="tab-content">
@@ -92,6 +101,9 @@ const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
                   )}
                   {activeTab === 'detailed' && (
                     <CompleteWealthAnalysisTab chartData={chartData} birthDetails={birthData} />
+                  )}
+                  {activeTab === 'context' && user?.role === 'admin' && (
+                    <AstrologicalContextTab birthDetails={birthData} user={user} />
                   )}
                 </div>
               </div>
