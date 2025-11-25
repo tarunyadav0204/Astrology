@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCredits } from '../../context/CreditContext';
+import CreditsModal from '../Credits/CreditsModal';
 import './AIInsightsTab.css';
 
 // Format text with proper line breaks and bold formatting
@@ -82,6 +83,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [dots, setDots] = useState('');
   const [showCreditWarning, setShowCreditWarning] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   
   const steps = [
     '💰 Analyzing wealth houses',
@@ -169,6 +171,15 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
       clearTimeout(timeoutSignal);
       
       if (!response.ok) {
+        // Handle 402 Payment Required specifically
+        if (response.status === 402) {
+          const errorData = await response.json();
+          const errorMessage = errorData.detail || 'Insufficient credits';
+          setError(errorMessage);
+          setShowCreditWarning(true);
+          setLoading(false);
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -255,14 +266,37 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
 
   // Show credit warning if insufficient credits
   if (showCreditWarning) {
+    // Parse error message to extract credit amounts
+    const creditMatch = error?.match(/You need (\d+) credits but have (\d+)/i);
+    const neededCredits = creditMatch ? creditMatch[1] : wealthCost;
+    const currentCredits = creditMatch ? creditMatch[2] : credits;
+    
     return (
       <div className="ai-insights-tab">
         <div className="credit-warning">
           <h3>💳 Insufficient Credits</h3>
-          <p>You need <strong>{wealthCost} credits</strong> for wealth analysis but have <strong>{credits} credits</strong>.</p>
+          <p>You need <strong>{neededCredits} credits</strong> for wealth analysis but have <strong>{currentCredits} credits</strong>.</p>
           <p>Please purchase more credits or redeem a promo code to continue.</p>
-          <button onClick={() => window.location.href = '/profile'}>Manage Credits</button>
+          <div className="credit-actions">
+            <button onClick={() => setShowCreditsModal(true)}>Add Credits</button>
+            <button onClick={() => setShowCreditWarning(false)} className="secondary-btn">Cancel</button>
+          </div>
         </div>
+        
+        {/* Credits Modal */}
+        <CreditsModal 
+          isOpen={showCreditsModal} 
+          onClose={() => {
+            setShowCreditsModal(false);
+            // Refresh credits after modal closes
+            setTimeout(() => {
+              if (credits >= wealthCost) {
+                setShowCreditWarning(false);
+                loadAIInsights();
+              }
+            }, 500);
+          }} 
+        />
       </div>
     );
   }
@@ -289,7 +323,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     );
   }
 
-  if (error) {
+  if (error && !showCreditWarning) {
     return (
       <div className="ai-insights-tab">
         <div className="error-state">
@@ -340,10 +374,12 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     );
   }
 
-  // If we have enhanced wealth analysis, render structured Q&A format
+  // If we have enhanced wealth analysis, render structured format
   if (wealthAnalysis) {
-    // Check if it's structured format (object) or raw text
     const isStructured = typeof wealthAnalysis === 'object' && wealthAnalysis.questions;
+    const parsedStructure = wealthAnalysis.parsed_structure;
+    const jsonResponse = wealthAnalysis.json_response;
+    const rawResponse = wealthAnalysis.raw_response;
     
     return (
       <div className="ai-insights-tab">
@@ -364,24 +400,119 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
         )}
 
         <div className="enhanced-wealth-content">
-          {isStructured ? (
-            <div className="structured-qa">
-              {wealthAnalysis.summary && (
-                <div className="wealth-summary">
-                  <h4>📊 Quick Summary</h4>
-                  <p>{wealthAnalysis.summary}</p>
+          {/* JSON Response Format */}
+          {jsonResponse && (
+            <>
+              {/* Quick Answer Section */}
+              {jsonResponse.quick_answer && (
+                <div className="quick-answer-section">
+                  <h3>✨ Quick Answer</h3>
+                  <div className="quick-answer-card">
+                    <div dangerouslySetInnerHTML={{__html: jsonResponse.quick_answer}} />
+                  </div>
                 </div>
               )}
               
-              <div className="questions-accordion">
-                {wealthAnalysis.questions?.map((qa, index) => (
-                  <AccordionPanel key={index} qa={qa} index={index} />
-                ))}
-              </div>
-            </div>
-          ) : (
+              {/* Detailed Analysis Accordion */}
+              {jsonResponse.detailed_analysis && jsonResponse.detailed_analysis.length > 0 && (
+                <div className="detailed-analysis-section">
+                  <h3>📊 Detailed Analysis</h3>
+                  <div className="questions-accordion">
+                    {jsonResponse.detailed_analysis.map((qa, index) => (
+                      <AccordionPanel key={index} qa={qa} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Final Thoughts Section */}
+              {jsonResponse.final_thoughts && (
+                <div className="final-thoughts-section">
+                  <h3>💭 Final Thoughts</h3>
+                  <div className="final-thoughts-card">
+                    <div dangerouslySetInnerHTML={{__html: jsonResponse.final_thoughts}} />
+                  </div>
+                </div>
+              )}
+              
+              {/* Follow-up Questions */}
+              {jsonResponse.follow_up_questions && jsonResponse.follow_up_questions.length > 0 && (
+                <div className="follow-up-section">
+                  <h3>🤔 Follow-up Questions</h3>
+                  <div className="follow-up-chips">
+                    {jsonResponse.follow_up_questions.map((question, index) => (
+                      <button key={index} className="follow-up-chip">
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* Fallback to old parsed structure format */}
+          {!jsonResponse && parsedStructure && (
+            <>
+              {/* Quick Answer Section */}
+              {parsedStructure?.quick_answer && (
+                <div className="quick-answer-section">
+                  <h3>✨ Quick Answer</h3>
+                  <div className="quick-answer-card">
+                    <div dangerouslySetInnerHTML={{__html: formatText(parsedStructure.quick_answer)}} />
+                  </div>
+                </div>
+              )}
+              
+              {/* Detailed Analysis Accordion */}
+              {isStructured && (
+                <div className="detailed-analysis-section">
+                  <h3>📊 Detailed Analysis</h3>
+                  <div className="questions-accordion">
+                    {wealthAnalysis.questions?.map((qa, index) => (
+                      <AccordionPanel key={index} qa={qa} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Final Thoughts Section */}
+              {parsedStructure?.final_thoughts && (
+                <div className="final-thoughts-section">
+                  <h3>💭 Final Thoughts</h3>
+                  <div className="final-thoughts-card">
+                    <div dangerouslySetInnerHTML={{__html: formatText(parsedStructure.final_thoughts)}} />
+                  </div>
+                </div>
+              )}
+              
+              {/* Follow-up Questions */}
+              {parsedStructure?.follow_up_questions?.length > 0 && (
+                <div className="follow-up-section">
+                  <h3>🤔 Follow-up Questions</h3>
+                  <div className="follow-up-chips">
+                    {parsedStructure.follow_up_questions.map((question, index) => (
+                      <button key={index} className="follow-up-chip">
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* Fallback for raw response */}
+          {!jsonResponse && !parsedStructure && rawResponse && (
             <div className="raw-content">
-              <div dangerouslySetInnerHTML={{__html: typeof wealthAnalysis === 'string' ? wealthAnalysis : JSON.stringify(wealthAnalysis)}}></div>
+              <div dangerouslySetInnerHTML={{__html: rawResponse}} />
+            </div>
+          )}
+          
+          {/* Final fallback */}
+          {!jsonResponse && !parsedStructure && !rawResponse && (
+            <div className="raw-content">
+              <div dangerouslySetInnerHTML={{__html: typeof wealthAnalysis === 'string' ? wealthAnalysis : JSON.stringify(wealthAnalysis)}} />
             </div>
           )}
         </div>

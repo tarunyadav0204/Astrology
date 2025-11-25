@@ -25,6 +25,13 @@
   font-size: 1.1em;
 }
 
+.credit-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
 .credit-warning button {
   background: #ffc107;
   color: #212529;
@@ -33,13 +40,21 @@
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 15px;
   transition: all 0.3s ease;
 }
 
 .credit-warning button:hover {
   background: #e0a800;
   transform: translateY(-2px);
+}
+
+.credit-warning .secondary-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.credit-warning .secondary-btn:hover {
+  background: #5a6268;
 }
 
 .loading-state {
@@ -770,5 +785,171 @@
   .key-points-list,
   .astrological-text {
     padding: 15px;
+  }
+}
+
+/* New Structured Response Styles */
+.quick-answer-section {
+  margin-bottom: 30px;
+}
+
+.quick-answer-section h3 {
+  color: #2c3e50;
+  font-size: 1.5em;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quick-answer-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  line-height: 1.7;
+  font-size: 1.1em;
+}
+
+.key-insights-section {
+  margin-bottom: 30px;
+}
+
+.key-insights-section h3 {
+  color: #2c3e50;
+  font-size: 1.5em;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.insight-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #3498db;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.insight-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.insight-card h4 {
+  color: #2980b9;
+  font-size: 1.2em;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.insight-card p {
+  color: #34495e;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.detailed-analysis-section {
+  margin-bottom: 30px;
+}
+
+.detailed-analysis-section h3 {
+  color: #2c3e50;
+  font-size: 1.5em;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.final-thoughts-section {
+  margin-bottom: 30px;
+}
+
+.final-thoughts-section h3 {
+  color: #2c3e50;
+  font-size: 1.5em;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.final-thoughts-card {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(240, 147, 251, 0.3);
+  line-height: 1.7;
+  font-size: 1.1em;
+}
+
+.follow-up-section {
+  margin-bottom: 30px;
+}
+
+.follow-up-section h3 {
+  color: #2c3e50;
+  font-size: 1.5em;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.follow-up-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.follow-up-chip {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+  color: #2c3e50;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-size: 0.95em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(132, 250, 176, 0.3);
+}
+
+.follow-up-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(132, 250, 176, 0.4);
+  background: linear-gradient(135deg, #8fd3f4 0%, #84fab0 100%);
+}
+
+/* Mobile responsive for new sections */
+@media (max-width: 768px) {
+  .quick-answer-card,
+  .final-thoughts-card {
+    padding: 20px;
+    font-size: 1em;
+  }
+  
+  .insights-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .follow-up-chips {
+    justify-content: center;
+  }
+  
+  .follow-up-chip {
+    padding: 10px 16px;
+    font-size: 0.9em;
   }
 }

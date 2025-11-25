@@ -71,105 +71,103 @@ def _store_ai_insights(birth_hash, insights_data):
     conn.commit()
     conn.close()
 
-def parse_gemini_astrology_response(raw_text):
-    """
-    Parses the raw text response from Gemini into a structured dictionary
-    suitable for UI rendering.
-    """
-    import re
-    import html
-    
-    # Debug: Print the complete response format
-    print("\n" + "="*100)
-    print("COMPLETE GEMINI RESPONSE - FULL TEXT:")
-    print("="*100)
-    print(raw_text)
-    print("="*100)
-    print(f"Total length: {len(raw_text)} characters")
-    print("="*100 + "\n")
-    
-    parsed_data = {
-        "quick_answer": None,
-        "key_insights": [],
-        "detailed_analysis": [],
-        "final_thoughts": None,
-        "follow_up_questions": []
-    }
-
-    # Extract Quick Answer from div structure
-    quick_answer_match = re.search(r'&lt;div class=&quot;quick-answer-card&quot;&gt;(.*?)&lt;/div&gt;', raw_text, re.DOTALL)
-    if quick_answer_match:
-        quick_content = quick_answer_match.group(1)
-        # Decode HTML entities
-        quick_content = html.unescape(quick_content)
-        # Convert ** to <strong> tags
-        quick_content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', quick_content)
-        parsed_data["quick_answer"] = quick_content.strip()
-        print(f"✅ EXTRACTED QUICK ANSWER: {parsed_data['quick_answer'][:100]}...")
-        
-        # Also add to detailed_analysis for frontend display
-        parsed_data["detailed_analysis"].append({
-            "title": "Wealth Analysis Summary",
-            "content": quick_content.strip()
-        })
-    
-    # If no quick answer found, add fallback content
-    if not parsed_data["quick_answer"]:
-        parsed_data["quick_answer"] = "Analysis in progress..."
-        parsed_data["detailed_analysis"].append({
-            "title": "Complete Analysis",
-            "content": raw_text[:1000] + "..." if len(raw_text) > 1000 else raw_text
-        })
-
-    return parsed_data
-
 def _parse_ai_response(response_text):
-    """Parse JSON response from Gemini"""
-    
-    # Log the response for debugging
-    print("\n" + "="*100)
-    print("GEMINI JSON RESPONSE:")
-    print("="*100)
-    print(response_text)
-    print("="*100 + "\n")
-    
+    """Parse AI response into structured Q&A format"""
     import re
-    import html
     
-    # Extract JSON from markdown code blocks
-    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
-    if json_match:
-        json_text = json_match.group(1)
-        # Decode HTML entities
-        json_text = html.unescape(json_text)
-        print(f"✅ Extracted and decoded JSON: {json_text[:100]}...")
+    questions = [
+        "What is my overall wealth potential according to my birth chart?",
+        "Will I be wealthy or face financial struggles in life?",
+        "Should I do business or job for better financial success?",
+        "What are my best sources of income and earning methods?",
+        "Can I do stock trading and speculation successfully?",
+        "When will I see significant financial growth in my life?",
+        "At what age will I achieve financial stability?",
+        "What types of investments and financial strategies suit me best?",
+        "Should I invest in property, stocks, or other assets?"
+    ]
+    
+    formatted_questions = []
+    
+    # Try multiple splitting patterns
+    patterns = [r'\*\*\d+\.', r'\d+\.\s*\*\*', r'###\s*\d+\.', r'^\d+\.', r'\n\d+\.']
+    sections = []
+    
+    for pattern in patterns:
+        test_sections = re.split(pattern, response_text, flags=re.MULTILINE)
+        if len(test_sections) > len(sections):
+            sections = test_sections
+    
+    # If no numbered sections found, try to find questions in text
+    if len(sections) <= 1:
+        for i, question in enumerate(questions):
+            # Find the question in text (case insensitive)
+            question_pattern = re.escape(question.lower())
+            match = re.search(question_pattern, response_text.lower())
+            if match:
+                start_pos = match.end()
+                # Find next question or end of text
+                next_question_pos = len(response_text)
+                for j, next_q in enumerate(questions[i+1:], i+1):
+                    next_match = re.search(re.escape(next_q.lower()), response_text.lower()[start_pos:])
+                    if next_match:
+                        next_question_pos = start_pos + next_match.start()
+                        break
+                
+                section_text = response_text[start_pos:next_question_pos].strip()
+                if section_text and len(section_text) > 20:
+                    # Take first few sentences as answer
+                    sentences = section_text.split('.')
+                    answer = '. '.join(sentences[:4]).strip()
+                    if answer and not answer.endswith('.'):
+                        answer += '.'
+                    
+                    formatted_questions.append({
+                        "question": questions[i],
+                        "answer": answer,
+                        "key_points": [],
+                        "astrological_basis": "Based on comprehensive chart analysis"
+                    })
     else:
-        json_text = response_text
+        # Process numbered sections
+        for i, section in enumerate(sections[1:]):
+            if i < len(questions):
+                # Clean the section
+                answer = section.strip()
+                # Remove the question text if it appears at the start
+                for q in questions:
+                    if answer.lower().startswith(q.lower()):
+                        answer = answer[len(q):].strip()
+                        break
+                
+                # Take first few sentences as answer
+                sentences = answer.split('.')
+                answer = '. '.join(sentences[:4]).strip()
+                if answer and not answer.endswith('.'):
+                    answer += '.'
+                
+                if answer:
+                    formatted_questions.append({
+                        "question": questions[i],
+                        "answer": answer,
+                        "key_points": [],
+                        "astrological_basis": "Based on comprehensive chart analysis"
+                    })
     
-    try:
-        json_response = json.loads(json_text)
-        print(f"✅ Successfully parsed JSON response")
-        
-        return {
-            "summary": "Comprehensive wealth analysis based on Vedic astrology principles.",
-            "json_response": json_response,
-            "wealth_analysis": {
-                "json_response": json_response,
-                "summary": "Comprehensive wealth analysis based on Vedic astrology principles."
-            }
-        }
-    except json.JSONDecodeError as e:
-        print(f"❌ Failed to parse JSON: {e}")
-        return {
-            "summary": "Comprehensive wealth analysis based on Vedic astrology principles.",
-            "raw_response": response_text,
-            "wealth_analysis": {
-                "raw_response": response_text,
-                "summary": "Comprehensive wealth analysis based on Vedic astrology principles."
-            }
-        }
-
-
+    # Ensure we have all 9 questions - add placeholders if missing
+    for i, question in enumerate(questions):
+        if i >= len(formatted_questions) or formatted_questions[i]['question'] != question:
+            formatted_questions.insert(i, {
+                "question": question,
+                "answer": "Analysis in progress. Please regenerate for complete insights.",
+                "key_points": [],
+                "astrological_basis": "Based on comprehensive chart analysis"
+            })
+    
+    return {
+        "summary": "Comprehensive wealth analysis based on Vedic astrology principles.",
+        "questions": formatted_questions[:9]  # Ensure exactly 9 questions
+    }
 
 @router.post("/ai-insights-enhanced")
 async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
@@ -266,77 +264,23 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights with enhanced context...'})}\n\n"
             
-            # Create comprehensive wealth question with strict JSON format requirement
+            # Create comprehensive wealth question
             wealth_question = """
-As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided.
+As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided. Answer each question separately with detailed analysis.
 
-CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. No other text, no explanations, no markdown. Just pure JSON.
+Questions to answer with detailed astrological analysis:
 
-STRICT MANDATORY FORMAT - Validate your JSON before responding:
+**1. What is my overall wealth potential according to my birth chart?**
+**2. Will I be wealthy or face financial struggles in life?**
+**3. Should I do business or job for better financial success?**
+**4. What are my best sources of income and earning methods?**
+**5. Can I do stock trading and speculation successfully?**
+**6. When will I see significant financial growth in my life?**
+**7. At what age will I achieve financial stability?**
+**8. What types of investments and financial strategies suit me best?**
+**9. Should I invest in property, stocks, or other assets?**
 
-{
-  "quick_answer": "Brief summary with <strong>bold text</strong> and <br> for line breaks",
-  "detailed_analysis": [
-    {
-      "question": "What is my overall wealth potential according to my birth chart?",
-      "answer": "Detailed answer with <strong>bold</strong>, <br> for line breaks, and <p> for paragraphs"
-    },
-    {
-      "question": "Will I be wealthy or face financial struggles in life?", 
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "Should I do business or job for better financial success?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "What are my best sources of income and earning methods?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "Can I do stock trading and speculation successfully?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "When will I see significant financial growth in my life?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "At what age will I achieve financial stability?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "What types of investments and financial strategies suit me best?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "Should I invest in property, stocks, or other assets?",
-      "answer": "Detailed answer with HTML markup"
-    }
-  ],
-  "final_thoughts": "Summary with <strong>bold</strong> and <br> line breaks",
-  "follow_up_questions": [
-    "📅 When will this happen?",
-    "🔮 What remedies can help?",
-    "💼 How to maximize success?",
-    "🌟 What should I focus on?"
-  ]
-}
-
-MANDATORY RULES:
-1. Response must start with { and end with }
-2. All strings must be properly escaped
-3. No markdown code blocks (```)
-4. No additional text outside JSON
-5. Validate JSON syntax before responding
-
-HTML markup for content formatting:
-- <strong>text</strong> for bold
-- <br> for line breaks  
-- <p>text</p> for paragraphs
-- <em>text</em> for emphasis
-
-Provide detailed astrological analysis using the birth chart data and planetary periods.
+Use the comprehensive birth chart data, current planetary periods, and all astrological context provided to give detailed, accurate predictions.
 """
             
             # Use chat analyzer (async)
