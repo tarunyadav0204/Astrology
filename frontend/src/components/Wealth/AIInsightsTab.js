@@ -137,7 +137,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     const timeoutId = setTimeout(() => {
       setError('Analysis timed out. Please try again.');
       setLoading(false);
-    }, 120000); // 2 minutes timeout
+    }, 300000); // 5 minutes timeout
     
     try {
       const requestBody = {
@@ -153,7 +153,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
       console.log('Request body:', requestBody);
       
       const controller = new AbortController();
-      const timeoutSignal = setTimeout(() => controller.abort(), 120000);
+      const timeoutSignal = setTimeout(() => controller.abort(), 300000);
       
       const token = localStorage.getItem('token');
       const response = await fetch('/api/wealth/ai-insights-enhanced', {
@@ -181,7 +181,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
           reader.cancel();
           throw new Error('Stream timeout - no response received');
         }
-      }, 90000); // 1.5 minutes for stream
+      }, 240000); // 4 minutes for stream
       
       while (true) {
         const { done, value } = await reader.read();
