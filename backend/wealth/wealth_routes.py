@@ -252,16 +252,25 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             
             # Use chat context builder (async)
             try:
-                print(f"🏗️ Building context for birth data: {birth_data['date']} {birth_data['time']}")
+                print(f"🏗️ STARTING CONTEXT BUILD for: {birth_data['date']} {birth_data['time']}")
+                print(f"   Birth data keys: {list(birth_data.keys())}")
+                
                 context_builder = ChatContextBuilder()
+                print(f"🏗️ ChatContextBuilder instance created")
+                
+                print(f"🏗️ Calling build_complete_context in executor...")
                 full_context = await asyncio.get_event_loop().run_in_executor(
                     None, context_builder.build_complete_context, birth_data
                 )
-                print(f"✅ Context built successfully")
+                print(f"✅ CONTEXT BUILD COMPLETED")
+                print(f"   Context type: {type(full_context)}")
+                print(f"   Context length: {len(str(full_context))} chars")
+                
             except Exception as e:
-                print(f"❌ Context building failed: {e}")
+                print(f"❌ CONTEXT BUILD FAILED: {type(e).__name__}: {e}")
                 import traceback
-                traceback.print_exc()
+                full_traceback = traceback.format_exc()
+                print(f"Context build traceback:\n{full_traceback}")
                 raise
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights with enhanced context...'})}\n\n"
@@ -429,30 +438,53 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     print(f"📄 PARSING RESPONSE:")
                     print(f"   Length: {len(ai_response_text)} chars")
                     print(f"   First 200 chars: {ai_response_text[:200]}...")
-                    print(f"   Last 200 chars: ...{ai_response_text[-200:]}")
                     
-                    parsed_response = json.loads(ai_response_text)
+                    # Extract JSON from markdown code blocks
+                    import re
+                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
+                    if json_match:
+                        json_text = json_match.group(1)
+                        print(f"✅ EXTRACTED JSON FROM MARKDOWN")
+                    else:
+                        json_text = ai_response_text
+                        print(f"⚠️ NO MARKDOWN WRAPPER FOUND, using raw response")
+                    
+                    parsed_response = json.loads(json_text)
                     print(f"✅ JSON PARSED SUCCESSFULLY")
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                     
                     # Deduct credits for successful analysis
-                    credit_service.deduct_credits(current_user.userid, wealth_cost, 'wealth_analysis')
-                    print(f"💳 Credits deducted successfully")
+                    success = credit_service.spend_credits(current_user.userid, wealth_cost, 'wealth_analysis', f"Wealth analysis for {request.birth_date}")
+                    if success:
+                        print(f"💳 Credits deducted successfully")
+                    else:
+                        print(f"❌ Credit deduction failed")
                     
                     # Store in cache
                     _store_ai_insights(birth_hash, parsed_response)
                     print(f"💾 Response cached successfully")
                     
-                    # Send complete response
-                    final_response = {'status': 'complete', 'data': parsed_response, 'cached': False}
+                    # Send complete response in expected format
+                    enhanced_insights = {
+                        'wealth_analysis': {
+                            'json_response': parsed_response,
+                            'summary': 'Comprehensive wealth analysis based on Vedic astrology principles.'
+                        },
+                        'enhanced_context': True,
+                        'questions_covered': len(parsed_response.get('detailed_analysis', [])),
+                        'context_type': 'chat_context_builder',
+                        'generated_at': datetime.now().isoformat()
+                    }
+                    
+                    final_response = {'status': 'complete', 'data': enhanced_insights, 'cached': False}
                     response_json = json.dumps(final_response)
                     print(f"🚀 SENDING FINAL RESPONSE: {len(response_json)} chars")
                     yield f"data: {response_json}\n\n"
                         
                 except json.JSONDecodeError as e:
                     print(f"❌ JSON PARSING FAILED: {e}")
-                    print(f"   Raw response (first 1000 chars): {ai_response_text[:1000]}...")
+                    print(f"   Extracted JSON (first 1000 chars): {json_text[:1000] if 'json_text' in locals() else 'N/A'}...")
                     yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
             else:
                 error_response = {
