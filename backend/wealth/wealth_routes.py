@@ -483,44 +483,47 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     print(f"   Length: {len(ai_response_text)} chars")
                     print(f"   First 200 chars: {ai_response_text[:200]}...")
                     
-                    # Decode HTML entities with manual replacements
+                    # Extract JSON from markdown code blocks first
                     import html
                     import re
-                    decoded_text = ai_response_text
                     
-                    # Multiple rounds of HTML decoding
-                    for _ in range(5):
-                        new_decoded = html.unescape(decoded_text)
-                        if new_decoded == decoded_text:
-                            break
-                        decoded_text = new_decoded
-                    
-                    # Manual replacements for stubborn entities
-                    decoded_text = decoded_text.replace('&quot;', '"')
-                    decoded_text = decoded_text.replace('&amp;', '&')
-                    decoded_text = decoded_text.replace('&lt;', '<')
-                    decoded_text = decoded_text.replace('&gt;', '>')
-                    decoded_text = decoded_text.replace('&#39;', "'")
-                    decoded_text = decoded_text.replace('&apos;', "'")
-                    
-                    # Extract JSON from markdown code blocks
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', decoded_text, re.DOTALL)
+                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
                     if json_match:
                         json_text = json_match.group(1)
                         print(f"✅ EXTRACTED JSON FROM MARKDOWN")
                     else:
-                        # Try to find JSON object in decoded text
-                        json_match = re.search(r'({.*})', decoded_text, re.DOTALL)
+                        # Try to find JSON object in raw text
+                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
                         if json_match:
                             json_text = json_match.group(1)
-                            print(f"✅ EXTRACTED JSON FROM DECODED TEXT")
+                            print(f"✅ EXTRACTED JSON FROM RAW TEXT")
                         else:
-                            json_text = decoded_text
-                            print(f"⚠️ NO JSON FOUND, using decoded response")
+                            json_text = ai_response_text
+                            print(f"⚠️ NO JSON FOUND, using raw response")
+                    
+                    # Now decode HTML entities in the extracted JSON
+                    decoded_json = json_text
+                    
+                    # Multiple rounds of HTML decoding
+                    for _ in range(5):
+                        new_decoded = html.unescape(decoded_json)
+                        if new_decoded == decoded_json:
+                            break
+                        decoded_json = new_decoded
+                    
+                    # Manual replacements for stubborn entities
+                    decoded_json = decoded_json.replace('&quot;', '"')
+                    decoded_json = decoded_json.replace('&amp;', '&')
+                    decoded_json = decoded_json.replace('&lt;', '<')
+                    decoded_json = decoded_json.replace('&gt;', '>')
+                    decoded_json = decoded_json.replace('&#39;', "'")
+                    decoded_json = decoded_json.replace('&apos;', "'")
                     
                     # Additional cleanup for common JSON issues
-                    json_text = json_text.replace('\\"', '"')  # Fix escaped quotes
-                    json_text = json_text.replace('\\\\\\"', '"')  # Fix double-escaped quotes
+                    decoded_json = decoded_json.replace('\\"', '"')  # Fix escaped quotes
+                    decoded_json = decoded_json.replace('\\\\\\"', '"')  # Fix double-escaped quotes
+                    
+                    json_text = decoded_json
                     
                     parsed_response = json.loads(json_text)
                     print(f"✅ JSON PARSED SUCCESSFULLY")
