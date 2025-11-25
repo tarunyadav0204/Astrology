@@ -13,6 +13,7 @@ export const useCredits = () => {
 export const CreditProvider = ({ children }) => {
     const [credits, setCredits] = useState(0);
     const [chatCost, setChatCost] = useState(1);
+    const [wealthCost, setWealthCost] = useState(5);
     const [loading, setLoading] = useState(true);
 
     const fetchBalance = async () => {
@@ -52,7 +53,7 @@ export const CreditProvider = ({ children }) => {
         }
     };
 
-    const fetchChatCost = async () => {
+    const fetchCosts = async () => {
         try {
             const response = await fetch('/api/credits/settings/chat-cost');
             if (response.ok) {
@@ -62,12 +63,22 @@ export const CreditProvider = ({ children }) => {
         } catch (error) {
             console.error('Error fetching chat cost:', error);
         }
+        
+        try {
+            const response = await fetch('/api/credits/settings/wealth-cost');
+            if (response.ok) {
+                const data = await response.json();
+                setWealthCost(data.cost || 5);
+            }
+        } catch (error) {
+            console.error('Error fetching wealth cost:', error);
+        }
     };
 
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
-            await Promise.all([fetchBalance(), fetchChatCost()]);
+            await Promise.all([fetchBalance(), fetchCosts()]);
             setLoading(false);
         };
         loadData();
@@ -100,6 +111,7 @@ export const CreditProvider = ({ children }) => {
         <CreditContext.Provider value={{
             credits,
             chatCost,
+            wealthCost,
             loading,
             fetchBalance,
             spendCredits

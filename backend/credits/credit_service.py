@@ -83,12 +83,19 @@ class CreditService:
             )
         ''')
         
-        # Insert default credit cost for chat questions only
+        # Insert default credit costs
         cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'chat_question_cost'")
         if cursor.fetchone()[0] == 0:
             cursor.execute('''
                 INSERT INTO credit_settings (setting_key, setting_value, description)
                 VALUES ('chat_question_cost', 1, 'Credits per chat question')
+            ''')
+        
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'wealth_analysis_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('wealth_analysis_cost', 5, 'Credits per wealth analysis')
             ''')
         
         conn.commit()
@@ -235,13 +242,13 @@ class CreditService:
         return success
     
     def get_all_credit_settings(self) -> List[Dict]:
-        """Get all credit settings (only chat question cost)"""
+        """Get all credit settings"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT setting_key, setting_value, description 
             FROM credit_settings 
-            WHERE setting_key = 'chat_question_cost'
+            WHERE setting_key IN ('chat_question_cost', 'wealth_analysis_cost')
         """)
         
         settings = []

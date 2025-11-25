@@ -8,6 +8,7 @@ import AstrologicalContextTab from '../Wealth/AstrologicalContextTab';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useCredits } from '../../context/CreditContext';
 import { ZODIAC_SIGNS } from '../../config/career.config';
 import { generatePageSEO } from '../../config/seo.config';
 import './WealthAnalysisPage.css';
@@ -15,6 +16,7 @@ import './WealthAnalysisPage.css';
 const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
   const { chartData, birthData } = useAstrology();
+  const { wealthCost } = useCredits();
   const [showModal, setShowModal] = useState(!chartData || !birthData);
   const [activeTab, setActiveTab] = useState('insights');
 
@@ -63,6 +65,24 @@ const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
             </button>
             <h1>💰 Wealth Analysis Report</h1>
             <p>Get comprehensive insights about your financial prospects, income sources, and wealth-building potential</p>
+            <div className="analysis-info">
+              <div className="info-card">
+                <h3>🎯 360° Detailed Analysis</h3>
+                <p>Our advanced wealth analysis provides a comprehensive 360-degree view of your financial future using:</p>
+                <ul>
+                  <li>✨ 9 Essential wealth questions with detailed answers</li>
+                  <li>🪐 Complete planetary analysis from birth chart</li>
+                  <li>🏛️ Dhana yogas and prosperity indicators</li>
+                  <li>📊 Investment guidance and timing predictions</li>
+                  <li>💼 Business vs job recommendations</li>
+                  <li>📈 Stock trading and speculation analysis</li>
+                </ul>
+                <div className="cost-info">
+                  <span className="cost-label">Analysis Cost:</span>
+                  <span className="cost-amount">{wealthCost} credits</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {chartData && birthData ? (
@@ -77,7 +97,7 @@ const WealthAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
                     className={`tab-btn ${activeTab === 'insights' ? 'active' : ''}`}
                     onClick={() => setActiveTab('insights')}
                   >
-                    Personalized Wealth Insights
+                    Wealth Insights ({wealthCost} credits)
                   </button>
                   <button 
                     className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 import sys
@@ -7,6 +7,8 @@ import hashlib
 import json
 import sqlite3
 from datetime import datetime
+from auth import get_current_user, User
+from credits.credit_service import CreditService
 
 # Add the parent directory to the path to import calculators
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +28,7 @@ class BirthDetailsRequest(BaseModel):
     user_role: Optional[str] = None
 
 router = APIRouter(prefix="/wealth", tags=["wealth"])
+credit_service = CreditService()
 
 def _create_birth_hash(birth_data):
     """Create unique hash for birth data"""
@@ -394,8 +397,25 @@ from fastapi.responses import StreamingResponse
 import asyncio
 
 @router.post("/ai-insights-enhanced")
-async def get_enhanced_wealth_insights(request: BirthDetailsRequest):
-    """Enhanced wealth insights using chat context builder with 9 key questions"""
+async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
+    """Enhanced wealth insights using chat context builder with 9 key questions - requires credits"""
+    
+    # Check credit cost and user balance
+    wealth_cost = credit_service.get_credit_setting('wealth_analysis_cost')
+    user_balance = credit_service.get_user_credits(current_user.userid)
+    
+    print(f"💳 WEALTH CREDIT CHECK:")
+    print(f"   User ID: {current_user.userid}")
+    print(f"   Wealth cost: {wealth_cost} credits")
+    print(f"   User balance: {user_balance} credits")
+    
+    if user_balance < wealth_cost:
+        print(f"❌ INSUFFICIENT CREDITS: Need {wealth_cost}, have {user_balance}")
+        raise HTTPException(
+            status_code=402, 
+            detail=f"Insufficient credits. You need {wealth_cost} credits but have {user_balance}."
+        )
+    
     print(f"Enhanced wealth insights request received: {request.birth_date} {request.birth_time}")
     
     async def generate_streaming_response():
@@ -582,20 +602,42 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
                     for i, q in enumerate(formatted_response['questions'][:2]):
                         print(f"Q{i+1}: {q['question'][:50]}... -> {q['answer'][:100]}...")
                 
-                # Store in wealth database with enhanced flag
-                enhanced_insights = {
-                    'wealth_analysis': formatted_response,
-                    'enhanced_context': True,
-                    'questions_covered': len(formatted_response.get('questions', [])) if isinstance(formatted_response, dict) else 0,
-                    'context_type': 'chat_context_builder',
-                    'generated_at': datetime.now().isoformat()
-                }
-                
-                await asyncio.get_event_loop().run_in_executor(
-                    None, _store_ai_insights, birth_hash, enhanced_insights
+                # Deduct credits for successful analysis
+                print(f"💰 DEDUCTING CREDITS: {wealth_cost} credits for user {current_user.userid}")
+                success = credit_service.spend_credits(
+                    current_user.userid, 
+                    wealth_cost, 
+                    'wealth_analysis', 
+                    f"Wealth analysis for {request.birth_date}"
                 )
                 
-                yield f"data: {json.dumps({'status': 'complete', 'data': enhanced_insights, 'cached': False})}\n\n"
+                if not success:
+                    print(f"❌ CREDIT DEDUCTION FAILED for user {current_user.userid}")
+                    error_response = {
+                        'wealth_analysis': 'Credit deduction failed. Please try again.',
+                        'enhanced_context': False,
+                        'error': 'Credit deduction failed'
+                    }
+                    yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
+                else:
+                    print(f"✅ CREDITS DEDUCTED SUCCESSFULLY")
+                    new_balance = credit_service.get_user_credits(current_user.userid)
+                    print(f"   New balance: {new_balance} credits")
+                    
+                    # Store in wealth database with enhanced flag
+                    enhanced_insights = {
+                        'wealth_analysis': formatted_response,
+                        'enhanced_context': True,
+                        'questions_covered': len(formatted_response.get('questions', [])) if isinstance(formatted_response, dict) else 0,
+                        'context_type': 'chat_context_builder',
+                        'generated_at': datetime.now().isoformat()
+                    }
+                    
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, _store_ai_insights, birth_hash, enhanced_insights
+                    )
+                    
+                    yield f"data: {json.dumps({'status': 'complete', 'data': enhanced_insights, 'cached': False})}\n\n"
             else:
                 error_response = {
                     'wealth_analysis': 'AI analysis failed. Please try again.',

@@ -151,3 +151,81 @@
   font-size: 16px;
   margin: 0;
 }
+
+.analysis-info {
+  margin: 30px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.info-card {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  max-width: 600px;
+  width: 100%;
+  border: 1px solid #e9ecef;
+}
+
+.info-card h3 {
+  color: #495057;
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.info-card p {
+  color: #6c757d;
+  margin-bottom: 15px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.info-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+
+.info-card li {
+  padding: 8px 0;
+  color: #495057;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.cost-info {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.cost-label {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-right: 10px;
+}
+
+.cost-amount {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .info-card {
+    padding: 20px;
+    margin: 0 10px;
+  }
+  
+  .info-card h3 {
+    font-size: 1.2rem;
+  }
+  
+  .info-card li {
+    font-size: 14px;
+  }
+}

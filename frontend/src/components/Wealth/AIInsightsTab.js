@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useCredits } from '../../context/CreditContext';
 import './AIInsightsTab.css';
 
 // Format text with proper line breaks and bold formatting
@@ -74,11 +75,13 @@ const AccordionPanel = ({ qa, index }) => {
 };
 
 const AIInsightsTab = ({ chartData, birthDetails }) => {
+  const { credits, wealthCost, loading: creditsLoading } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [dots, setDots] = useState('');
+  const [showCreditWarning, setShowCreditWarning] = useState(false);
   
   const steps = [
     '💰 Analyzing wealth houses',
@@ -116,6 +119,13 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   const loadAIInsights = async (forceRegenerate = false) => {
     if (!birthDetails) return;
     
+    // Check credits before making request
+    if (credits < wealthCost) {
+      setShowCreditWarning(true);
+      setLoading(false);
+      return;
+    }
+    
     console.log('loadAIInsights called with forceRegenerate:', forceRegenerate);
     
     setLoading(true);
@@ -145,10 +155,12 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
       const controller = new AbortController();
       const timeoutSignal = setTimeout(() => controller.abort(), 120000);
       
+      const token = localStorage.getItem('token');
       const response = await fetch('/api/wealth/ai-insights-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal
@@ -222,14 +234,16 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   };
 
   useEffect(() => {
-    loadAIInsights();
+    if (!creditsLoading) {
+      loadAIInsights();
+    }
     
     // Cleanup function to handle component unmounting
     return () => {
       setLoading(false);
       setError(null);
     };
-  }, [birthDetails]);
+  }, [birthDetails, creditsLoading]);
   
   // Add cleanup on component unmount
   useEffect(() => {
@@ -239,7 +253,21 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     };
   }, []);
 
-  if (loading) {
+  // Show credit warning if insufficient credits
+  if (showCreditWarning) {
+    return (
+      <div className="ai-insights-tab">
+        <div className="credit-warning">
+          <h3>💳 Insufficient Credits</h3>
+          <p>You need <strong>{wealthCost} credits</strong> for wealth analysis but have <strong>{credits} credits</strong>.</p>
+          <p>Please purchase more credits or redeem a promo code to continue.</p>
+          <button onClick={() => window.location.href = '/profile'}>Manage Credits</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || creditsLoading) {
     return (
       <div className="ai-insights-tab">
         <div className="loading-state">
@@ -319,26 +347,21 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     
     return (
       <div className="ai-insights-tab">
-        <div className="ai-header">
-          <h3>💰 Enhanced Wealth Analysis</h3>
-          <p>Comprehensive 9-question analysis using advanced astrological context</p>
-          {aiInsights.cached && (
-            <div className="cache-indicator">
-              <span className="cache-badge">💾 Previously Generated</span>
-            </div>
-          )}
-
-          <button 
-            className="regenerate-btn" 
-            onClick={() => {
-              console.log('Regenerate button clicked');
-              loadAIInsights(true);
-            }}
-            title="Generate fresh analysis"
-          >
-            🔄 Regenerate Analysis
-          </button>
-        </div>
+        <button 
+          className="regenerate-btn corner-btn" 
+          onClick={() => {
+            console.log('Regenerate button clicked');
+            loadAIInsights(true);
+          }}
+          title="Generate fresh analysis"
+        >
+          Regenerate
+        </button>
+        {aiInsights.cached && (
+          <div className="cache-indicator">
+            <span className="cache-badge">💾 Previously Generated</span>
+          </div>
+        )}
 
         <div className="enhanced-wealth-content">
           {isStructured ? (

@@ -550,9 +550,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <h2>Credit Management</h2>
             
             <div className="credit-settings">
-              <h3>Chat Question Cost</h3>
+              <h3>Feature Costs</h3>
               <div className="settings-form">
-                {creditSettings.filter(setting => setting.key === 'chat_question_cost').map(setting => (
+                {creditSettings.map(setting => (
                   <div key={setting.key} className="setting-item">
                     <label>{setting.description}</label>
                     <input
@@ -564,7 +564,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   </div>
                 ))}
                 <button onClick={handleUpdateSettings} className="update-settings-btn">
-                  Update Cost
+                  Update Costs
                 </button>
               </div>
             </div>
