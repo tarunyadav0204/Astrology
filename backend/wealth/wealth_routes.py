@@ -383,6 +383,15 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     ai_result = await gemini_analyzer.generate_chat_response(
                         wealth_question, context_dict, [], 'english', 'detailed'
                     )
+                    print(f"📝 GEMINI API RESPONSE RECEIVED:")
+                    print(f"   Success: {ai_result.get('success') if ai_result else 'None'}")
+                    print(f"   Response type: {type(ai_result)}")
+                    print(f"   Response keys: {list(ai_result.keys()) if ai_result and isinstance(ai_result, dict) else 'Not a dict'}")
+                    if ai_result and ai_result.get('response'):
+                        print(f"   Response length: {len(str(ai_result['response']))} chars")
+                        print(f"   Response preview: {str(ai_result['response'])[:200]}...")
+                    else:
+                        print(f"   No response content found")
                     print(f"📨 Received response from Gemini API: success={ai_result.get('success')}")
                     break  # Success, exit retry loop
                     
