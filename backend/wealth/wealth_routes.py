@@ -307,6 +307,22 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             wealth_question = """
 As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided.
 
+SPECIAL FOCUS ON WEALTH INDICATORS:
+- InduLagna (Wealth Ascendant): Analyze the InduLagna position, sign, house placement, and aspects for wealth potential
+- 2nd House (Wealth): Primary wealth house analysis with lord placement and aspects
+- 11th House (Gains): Income and gains analysis with planetary influences
+- 9th House (Fortune): Luck and fortune factors affecting wealth accumulation
+- Jupiter (Karaka for Wealth): Natural significator analysis for financial wisdom
+- Venus (Luxury): Material comforts and luxury potential
+- Dhana Yogas: Classical wealth combinations from BPHS and other texts
+- Dasha Periods: Current and upcoming periods affecting financial growth
+
+MANDATORY INDU LAGNA ANALYSIS:
+In the Wealth Analysis section, specifically analyze the Indu Lagna provided in the special_lagnas data.
+Assess the financial magnitude based on the planets occupying or aspecting the Indu Lagna sign.
+Cross-reference this with the 2nd and 11th house strength to determine if the wealth is 'Stable' (2nd/11th) or 'Sudden/Speculative' (Indu Lagna).
+Mention the Indu Lagna explicitly in your final verdict on financial volume.
+
 CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. No other text, no explanations, no markdown. Just pure JSON.
 
 STRICT MANDATORY FORMAT - Validate your JSON before responding:
@@ -467,15 +483,44 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     print(f"   Length: {len(ai_response_text)} chars")
                     print(f"   First 200 chars: {ai_response_text[:200]}...")
                     
-                    # Extract JSON from markdown code blocks
+                    # Decode HTML entities with manual replacements
+                    import html
                     import re
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
+                    decoded_text = ai_response_text
+                    
+                    # Multiple rounds of HTML decoding
+                    for _ in range(5):
+                        new_decoded = html.unescape(decoded_text)
+                        if new_decoded == decoded_text:
+                            break
+                        decoded_text = new_decoded
+                    
+                    # Manual replacements for stubborn entities
+                    decoded_text = decoded_text.replace('&quot;', '"')
+                    decoded_text = decoded_text.replace('&amp;', '&')
+                    decoded_text = decoded_text.replace('&lt;', '<')
+                    decoded_text = decoded_text.replace('&gt;', '>')
+                    decoded_text = decoded_text.replace('&#39;', "'")
+                    decoded_text = decoded_text.replace('&apos;', "'")
+                    
+                    # Extract JSON from markdown code blocks
+                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', decoded_text, re.DOTALL)
                     if json_match:
                         json_text = json_match.group(1)
                         print(f"✅ EXTRACTED JSON FROM MARKDOWN")
                     else:
-                        json_text = ai_response_text
-                        print(f"⚠️ NO MARKDOWN WRAPPER FOUND, using raw response")
+                        # Try to find JSON object in decoded text
+                        json_match = re.search(r'({.*})', decoded_text, re.DOTALL)
+                        if json_match:
+                            json_text = json_match.group(1)
+                            print(f"✅ EXTRACTED JSON FROM DECODED TEXT")
+                        else:
+                            json_text = decoded_text
+                            print(f"⚠️ NO JSON FOUND, using decoded response")
+                    
+                    # Additional cleanup for common JSON issues
+                    json_text = json_text.replace('\\"', '"')  # Fix escaped quotes
+                    json_text = json_text.replace('\\\\\\"', '"')  # Fix double-escaped quotes
                     
                     parsed_response = json.loads(json_text)
                     print(f"✅ JSON PARSED SUCCESSFULLY")

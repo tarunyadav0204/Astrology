@@ -22,6 +22,7 @@ from calculators.planetary_war_calculator import PlanetaryWarCalculator
 from calculators.vargottama_calculator import VargottamaCalculator
 from calculators.neecha_bhanga_calculator import NeechaBhangaCalculator
 from calculators.pancha_mahapurusha_calculator import PanchaMahapurushaCalculator
+from calculators.indu_lagna_calculator import InduLagnaCalculator
 from shared.dasha_calculator import DashaCalculator
 from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
 
@@ -76,6 +77,7 @@ class ChatContextBuilder:
         vargottama_calc = VargottamaCalculator(chart_data, {})
         neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, {})
         pancha_mahapurusha_calc = PanchaMahapurushaCalculator(chart_data)
+        indu_lagna_calc = InduLagnaCalculator(chart_data)
         
         # Extract and validate ascendant information
         ascendant_degree = chart_data.get('ascendant', 0)
@@ -162,11 +164,14 @@ class ChatContextBuilder:
                 "vargottama_positions": vargottama_calc.get_vargottama_summary(),
                 "neecha_bhanga": neecha_bhanga_calc.get_neecha_bhanga_summary(),
                 "pancha_mahapurusha": pancha_mahapurusha_calc.get_pancha_mahapurusha_summary()
-            }
+            },
+            
+            # Add InduLagna analysis to context
+            **indu_lagna_calc.get_indu_lagna_analysis()
         })
         
-        # Add planetary analysis for all planets
-        planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
+        # Add planetary analysis for all planets including InduLagna
+        planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'InduLagna']
         for planet in planets:
             try:
                 context["planetary_analysis"][planet] = planet_analyzer.analyze_planet(planet)

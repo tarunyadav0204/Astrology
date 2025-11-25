@@ -115,6 +115,15 @@ class ChartCalculator(BaseCalculator):
                 'house': house_num
             }
         
+        # Add InduLagna
+        from .indu_lagna_calculator import InduLagnaCalculator
+        indu_calc = InduLagnaCalculator({
+            'ascendant': ascendant_sidereal,
+            'planets': planets
+        })
+        indu_data = indu_calc.get_indu_lagna_data()
+        planets['InduLagna'] = indu_data
+        
         # Calculate house positions for all planets
         for planet_name in planets:
             if 'house' not in planets[planet_name]:

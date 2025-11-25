@@ -298,8 +298,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
     // Check combustion first
     if (isCombusted(planet)) return 'combusted';
     
-    // Only main planets have exaltation/debilitation - exclude Rahu, Ketu, Gulika, Mandi
-    if (['Rahu', 'Ketu', 'Gulika', 'Mandi'].includes(planet.name)) {
+    // Only main planets have exaltation/debilitation - exclude Rahu, Ketu, Gulika, Mandi, InduLagna
+    if (['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna'].includes(planet.name)) {
       return 'normal';
     }
     
@@ -350,6 +350,9 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
   };
 
   const getPlanetColor = (planet) => {
+    // InduLagna has special purple color
+    if (planet.name === 'InduLagna') return '#9c27b0';
+    
     const highlight = getPlanetHighlight(planet.name);
     if (highlight) return highlight;
     
@@ -407,23 +410,39 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
     if (!chartData.planets) return [];
     
     const rashiForThisHouse = getRashiForHouse(houseIndex);
+    const planetsInHouse = [];
     
-    return Object.entries(chartData.planets)
+    // Add regular planets (exclude InduLagna as it's handled separately)
+    Object.entries(chartData.planets)
       .filter(([name, data]) => {
-        return data.sign === rashiForThisHouse;
+        return data.sign === rashiForThisHouse && name !== 'InduLagna';
       })
-      .map(([name, data]) => {
+      .forEach(([name, data]) => {
         const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
         const planetIndex = planetNames.indexOf(name);
-        return {
+        planetsInHouse.push({
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude),
           shortNakshatra: getShortNakshatra(data.longitude),
           formattedDegree: formatDegree(data.degree || 0)
-        };
+        });
       });
+    
+    // Add InduLagna if it's in this house
+    if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === rashiForThisHouse) {
+      planetsInHouse.push({
+        symbol: 'IL',
+        name: 'InduLagna',
+        degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
+        nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
+        shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
+        formattedDegree: formatDegree(chartData.planets.InduLagna.degree || 0)
+      });
+    }
+    
+    return planetsInHouse;
   };
 
   return (

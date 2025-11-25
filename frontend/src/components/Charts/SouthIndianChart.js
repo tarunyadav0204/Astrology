@@ -102,7 +102,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
   const getPlanetStatus = (planet) => {
     if (isCombusted(planet)) return 'combusted';
     
-    if (['Rahu', 'Ketu', 'Gulika', 'Mandi'].includes(planet.name)) {
+    if (['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna'].includes(planet.name)) {
       return 'normal';
     }
     
@@ -152,6 +152,9 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
   };
 
   const getPlanetColor = (planet) => {
+    // InduLagna has special purple color
+    if (planet.name === 'InduLagna') return '#9c27b0';
+    
     const highlight = getPlanetHighlight(planet.name);
     if (highlight) return highlight;
     
@@ -341,20 +344,37 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
   const getPlanetsInSign = (signIndex) => {
     if (!chartData.planets || signIndex === -1) return [];
     
-    return Object.entries(chartData.planets)
-      .filter(([name, data]) => data.sign === signIndex)
-      .map(([name, data]) => {
+    const planetsInSign = [];
+    
+    // Add regular planets (exclude InduLagna as it's handled separately)
+    Object.entries(chartData.planets)
+      .filter(([name, data]) => data.sign === signIndex && name !== 'InduLagna')
+      .forEach(([name, data]) => {
         const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
         const planetIndex = planetNames.indexOf(name);
-        return {
+        planetsInSign.push({
           symbol: planets[planetIndex] || name.substring(0, 2),
           name: name,
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude),
           shortNakshatra: getShortNakshatra(data.longitude),
           formattedDegree: formatDegree(data.degree || 0)
-        };
+        });
       });
+    
+    // Add InduLagna if it's in this sign
+    if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === signIndex) {
+      planetsInSign.push({
+        symbol: 'IL',
+        name: 'InduLagna',
+        degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
+        nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
+        shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
+        formattedDegree: formatDegree(chartData.planets.InduLagna.degree || 0)
+      });
+    }
+    
+    return planetsInSign;
   };
 
   const getHouseNumber = (signIndex) => {

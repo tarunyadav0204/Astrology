@@ -1323,6 +1323,15 @@ async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
         'house': mandi_house
     }
     
+    # Add InduLagna
+    from calculators.indu_lagna_calculator import InduLagnaCalculator
+    indu_calc = InduLagnaCalculator({
+        'ascendant': ascendant_sidereal,
+        'planets': planets
+    })
+    indu_data = indu_calc.get_indu_lagna_data()
+    planets['InduLagna'] = indu_data
+    
     # Calculate house positions for all planets using Whole Sign system
     # In Whole Sign houses, each house is exactly 30 degrees starting from ascendant sign
     for planet_name in planets:
