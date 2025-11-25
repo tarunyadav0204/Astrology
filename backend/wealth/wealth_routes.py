@@ -511,13 +511,14 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                             break
                         decoded_json = new_decoded
                     
-                    # Manual replacements for stubborn entities
-                    decoded_json = decoded_json.replace('&quot;', '"')
-                    decoded_json = decoded_json.replace('&amp;', '&')
-                    decoded_json = decoded_json.replace('&lt;', '<')
-                    decoded_json = decoded_json.replace('&gt;', '>')
-                    decoded_json = decoded_json.replace('&#39;', "'")
-                    decoded_json = decoded_json.replace('&apos;', "'")
+                    # Manual replacements for stubborn entities (multiple passes)
+                    for _ in range(3):
+                        decoded_json = decoded_json.replace('&quot;', '"')
+                        decoded_json = decoded_json.replace('&amp;', '&')
+                        decoded_json = decoded_json.replace('&lt;', '<')
+                        decoded_json = decoded_json.replace('&gt;', '>')
+                        decoded_json = decoded_json.replace('&#39;', "'")
+                        decoded_json = decoded_json.replace('&apos;', "'")
                     
                     # Additional cleanup for common JSON issues
                     decoded_json = decoded_json.replace('\\"', '"')  # Fix escaped quotes
@@ -525,7 +526,29 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     
                     json_text = decoded_json
                     
-                    parsed_response = json.loads(json_text)
+                    # Debug: Print first 500 chars of cleaned JSON
+                    print(f"🔍 CLEANED JSON (first 500 chars): {json_text[:500]}...")
+                    
+                    try:
+                        parsed_response = json.loads(json_text)
+                    except json.JSONDecodeError as json_error:
+                        print(f"⚠️ JSON parsing failed, trying fallback parsing...")
+                        # Fallback: Try to parse with more aggressive cleaning
+                        fallback_json = json_text
+                        # Remove any remaining HTML-like content in strings
+                        fallback_json = re.sub(r'&[a-zA-Z0-9#]+;', '', fallback_json)
+                        try:
+                            parsed_response = json.loads(fallback_json)
+                            print(f"✅ FALLBACK JSON PARSING SUCCEEDED")
+                        except:
+                            # Last resort: create a basic response structure
+                            print(f"❌ All JSON parsing failed, creating fallback response")
+                            parsed_response = {
+                                "quick_answer": "Wealth analysis completed but response formatting failed. Please try again.",
+                                "detailed_analysis": [],
+                                "final_thoughts": "Please regenerate the analysis.",
+                                "follow_up_questions": []
+                            }
                     print(f"✅ JSON PARSED SUCCESSFULLY")
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
