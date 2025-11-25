@@ -157,14 +157,14 @@ class GeminiChatAnalyzer:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = loop.run_in_executor(executor, _sync_generate_content)
                 try:
-                    # 90 second timeout for Gemini API (longer for transit requests)
-                    response = await asyncio.wait_for(future, timeout=90.0)
+                    # 600 second timeout for Gemini API (10 minutes for large wealth analysis prompts)
+                    response = await asyncio.wait_for(future, timeout=600.0)
                 except asyncio.TimeoutError:
                     print(f"\n=== AI TIMEOUT ===")
                     return {
                         'success': False,
                         'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
-                        'error': 'AI request timeout (90s)'
+                        'error': 'AI request timeout (600s)'
                     }
             
             # Validate response
