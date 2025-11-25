@@ -71,330 +71,105 @@ def _store_ai_insights(birth_hash, insights_data):
     conn.commit()
     conn.close()
 
-def _clean_html_tags(text):
-    """Remove HTML tags and decode HTML entities while preserving content structure"""
+def parse_gemini_astrology_response(raw_text):
+    """
+    Parses the raw text response from Gemini into a structured dictionary
+    suitable for UI rendering.
+    """
     import re
     import html
     
-    if not text:
-        return text
+    # Debug: Print the complete response format
+    print("\n" + "="*100)
+    print("COMPLETE GEMINI RESPONSE - FULL TEXT:")
+    print("="*100)
+    print(raw_text)
+    print("="*100)
+    print(f"Total length: {len(raw_text)} characters")
+    print("="*100 + "\n")
     
-    # Decode HTML entities first
-    text = html.unescape(text)
-    
-    # Remove HTML tags but preserve line breaks
-    text = re.sub(r'<br[^>]*>', '\n', text)
-    text = re.sub(r'<p[^>]*>', '\n', text)
-    text = re.sub(r'</p>', '\n', text)
-    text = re.sub(r'<[^>]+>', '', text)
-    
-    # Remove JSON artifacts more carefully
-    text = re.sub(r'"\s*,\s*"[^"]*"\s*:', '', text)  # Remove JSON field names
-    text = re.sub(r'"\s*}\s*,\s*{\s*"', ' ', text)  # Remove JSON separators
-    
-    # Remove JSON structure but preserve content
-    text = re.sub(r'^[{\["\s]*', '', text)  # Remove leading JSON chars
-    text = re.sub(r'[}\]"\s]*$', '', text)  # Remove trailing JSON chars
-    text = re.sub(r'[{}\[\]]+', ' ', text)  # Remove remaining brackets
-    
-    # Clean up quotes more selectively
-    text = re.sub(r'"([^"]{0,10})":', r'\1:', text)  # Remove quotes around short keys
-    text = re.sub(r'""', '', text)  # Remove empty quotes
-    
-    # Preserve paragraph structure
-    text = re.sub(r'\n\s*\n', '\n\n', text)  # Normalize paragraph breaks
-    text = re.sub(r'[ \t]+', ' ', text)  # Clean horizontal whitespace
-    text = text.strip()
-    
-    return text
-
-def _format_ai_response(raw_response):
-    """Format AI response into structured Q&A format"""
-    try:
-        # Clean HTML tags first
-        cleaned_response = _clean_html_tags(raw_response)
-        
-        # Try to parse as JSON first
-        if cleaned_response.strip().startswith('{'):
-            return json.loads(cleaned_response)
-        
-        # If not JSON, parse the text response
-        return _parse_text_response(cleaned_response)
-    except:
-        # Fallback to text parsing
-        return _parse_text_response(_clean_html_tags(raw_response))
-
-def _parse_text_response(text):
-    """Parse unstructured text into Q&A format"""
-    import re
-    
-    # Clean HTML first
-    text = _clean_html_tags(text)
-    
-    questions = [
-        "What is my overall wealth potential according to my birth chart?",
-        "Will I be wealthy or face financial struggles in life?", 
-        "Should I do business or job for better financial success?",
-        "What are my best sources of income and earning methods?",
-        "Can I do stock trading and speculation successfully?",
-        "When will I see significant financial growth in my life?",
-        "At what age will I achieve financial stability?",
-        "What types of investments and financial strategies suit me best?",
-        "Should I invest in property, stocks, or other assets?"
-    ]
-    
-    # Extract summary from Quick Answer
-    summary = ""
-    if "Quick Answer" in text:
-        start = text.find("Quick Answer")
-        # Look for the end of the summary - either double newline or start of first question
-        end_markers = ["\n\n", "**1.", "1.", "### 1."]
-        end = len(text)  # Default to end of text
-        
-        for marker in end_markers:
-            marker_pos = text.find(marker, start + 50)  # Skip immediate area after "Quick Answer"
-            if marker_pos != -1 and marker_pos < end:
-                end = marker_pos
-        
-        summary = text[start:end].replace("**Quick Answer**:", "").replace("Quick Answer:", "").strip()
-        # Remove any leading asterisks or colons
-        summary = summary.lstrip("*: ")
-    
-    formatted_questions = []
-    
-    # Split text by numbered questions (1., 2., etc.) - try multiple patterns
-    sections = []
-    patterns = [r'\*\*\d+\.', r'\d+\.\s*\*\*', r'###\s*\d+\.', r'^\d+\.', r'\n\d+\.']
-    
-    for pattern in patterns:
-        test_sections = re.split(pattern, text, flags=re.MULTILINE)
-        if len(test_sections) > len(sections):
-            sections = test_sections
-    
-    # If no numbered sections found, try to extract from the full text
-    if len(sections) <= 1:
-        # Look for question patterns and extract content after each
-        for i, question in enumerate(questions):
-            # Find the question in text (case insensitive)
-            question_pattern = re.escape(question.lower())
-            match = re.search(question_pattern, text.lower())
-            if match:
-                start_pos = match.end()
-                # Find next question or end of text
-                next_question_pos = len(text)
-                for j, next_q in enumerate(questions[i+1:], i+1):
-                    next_match = re.search(re.escape(next_q.lower()), text.lower()[start_pos:])
-                    if next_match:
-                        next_question_pos = start_pos + next_match.start()
-                        break
-                
-                section_text = text[start_pos:next_question_pos].strip()
-                if section_text and len(section_text) > 50:
-                    # Clean and format the section
-                    paragraphs = [p.strip() for p in section_text.split('\n') if p.strip()]
-                    answer = ' '.join(paragraphs[:3])  # Take first few paragraphs
-                    
-                    formatted_questions.append({
-                        "question": questions[i],
-                        "answer": answer,
-                        "key_points": _extract_key_points(section_text),
-                        "astrological_basis": _extract_astrological_basis(section_text)
-                    })
-    else:
-        # Process numbered sections
-        for i, section in enumerate(sections[1:]):
-            if i < len(questions):
-                # Clean the section
-                section = section.strip()
-                
-                # Remove question text from section start
-                question_text = questions[i]
-                if section.lower().startswith(question_text.lower()):
-                    section = section[len(question_text):].strip()
-                
-                # Extract answer - take more content to avoid truncation
-                paragraphs = [p.strip() for p in section.split('\n\n') if p.strip()]
-                
-                answer = ""
-                # Combine multiple paragraphs for a complete answer
-                valid_paragraphs = []
-                for para in paragraphs:
-                    if (len(para) > 20 and 
-                        not para.startswith("Key") and 
-                        not para.startswith("Astrological") and
-                        not any(q.lower() in para.lower() for q in questions)):
-                        valid_paragraphs.append(para)
-                        if len(valid_paragraphs) >= 2:  # Take up to 2 paragraphs
-                            break
-                
-                answer = ' '.join(valid_paragraphs) if valid_paragraphs else section[:500]
-                
-                # Extract key points and astrological basis from the section
-                full_section = ' '.join(paragraphs)
-                key_points = _extract_key_points(full_section)
-                astrological_basis = _extract_astrological_basis(full_section)
-                
-                if answer:
-                    formatted_questions.append({
-                        "question": questions[i],
-                        "answer": answer,
-                        "key_points": key_points,
-                        "astrological_basis": astrological_basis
-                    })
-    
-    # Fallback: if no numbered sections found, try to extract from content
-    if not formatted_questions:
-        # Look for question patterns in text
-        for i, question in enumerate(questions):
-            # Find content related to each question
-            question_keywords = {
-                0: ["wealth potential", "overall wealth"],
-                1: ["wealthy", "financial struggles", "prosperity"],
-                2: ["business", "job", "employment"],
-                3: ["income sources", "earning methods"],
-                4: ["stock trading", "speculation"],
-                5: ["financial growth", "growth timing"],
-                6: ["financial stability", "stability age"],
-                7: ["investment strategies", "financial strategies"],
-                8: ["property", "assets", "investment types"]
-            }
-            
-            if i in question_keywords:
-                # Find relevant paragraphs
-                paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
-                best_match = ""
-                
-                for para in paragraphs:
-                    if any(keyword.lower() in para.lower() for keyword in question_keywords[i]):
-                        if len(para) > best_match:
-                            best_match = para
-                
-                if best_match:
-                    formatted_questions.append({
-                        "question": question,
-                        "answer": best_match,
-                        "key_points": _extract_key_points(best_match),
-                        "astrological_basis": _extract_astrological_basis(best_match)
-                    })
-    
-    return {
-        "summary": summary or "Comprehensive wealth analysis based on Vedic astrology principles.",
-        "questions": formatted_questions
+    parsed_data = {
+        "quick_answer": None,
+        "key_insights": [],
+        "detailed_analysis": [],
+        "final_thoughts": None,
+        "follow_up_questions": []
     }
 
-def _extract_key_points(text):
-    """Extract key points from text"""
-    import re
-    text = _clean_html_tags(text)
+    # Extract Quick Answer from div structure
+    quick_answer_match = re.search(r'&lt;div class=&quot;quick-answer-card&quot;&gt;(.*?)&lt;/div&gt;', raw_text, re.DOTALL)
+    if quick_answer_match:
+        quick_content = quick_answer_match.group(1)
+        # Decode HTML entities
+        quick_content = html.unescape(quick_content)
+        # Convert ** to <strong> tags
+        quick_content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', quick_content)
+        parsed_data["quick_answer"] = quick_content.strip()
+        print(f"✅ EXTRACTED QUICK ANSWER: {parsed_data['quick_answer'][:100]}...")
+        
+        # Also add to detailed_analysis for frontend display
+        parsed_data["detailed_analysis"].append({
+            "title": "Wealth Analysis Summary",
+            "content": quick_content.strip()
+        })
     
-    # Remove JSON artifacts and question text
-    text = re.sub(r'key_points.*?:', '', text)
-    text = re.sub(r'astrological_basis.*', '', text)
-    
-    # Remove question patterns
-    questions_to_remove = [
-        "What is my overall wealth potential",
-        "Will I be wealthy or face", 
-        "Should I do business or job",
-        "What are my best sources",
-        "Can I do stock trading",
-        "When will I see significant",
-        "At what age will I achieve",
-        "What types of investments",
-        "Should I invest in property"
-    ]
-    
-    for q in questions_to_remove:
-        text = re.sub(rf'{re.escape(q)}[^.]*\?', '', text, flags=re.IGNORECASE)
-    
-    points = []
-    sentences = text.split('.')
-    for sentence in sentences[:3]:
-        sentence = sentence.strip()
-        if (sentence and len(sentence) > 20 and 
-            not any(x in sentence.lower() for x in ['question', 'answer', 'key_points', 'according to my birth chart'])):
-            points.append(sentence)
-    return points
+    # If no quick answer found, add fallback content
+    if not parsed_data["quick_answer"]:
+        parsed_data["quick_answer"] = "Analysis in progress..."
+        parsed_data["detailed_analysis"].append({
+            "title": "Complete Analysis",
+            "content": raw_text[:1000] + "..." if len(raw_text) > 1000 else raw_text
+        })
 
-def _extract_astrological_basis(text):
-    """Extract astrological reasoning from text"""
-    import re
-    text = _clean_html_tags(text)
-    
-    # Remove JSON field names and question text
-    text = re.sub(r'astrological_basis.*?:', '', text)
-    
-    # Remove question patterns
-    questions_to_remove = [
-        "What is my overall wealth potential",
-        "Will I be wealthy or face", 
-        "Should I do business or job",
-        "What are my best sources",
-        "Can I do stock trading",
-        "When will I see significant",
-        "At what age will I achieve",
-        "What types of investments",
-        "Should I invest in property"
-    ]
-    
-    for q in questions_to_remove:
-        text = re.sub(rf'{re.escape(q)}[^.]*\?', '', text, flags=re.IGNORECASE)
-    
-    # Look for planetary mentions, house references, etc.
-    astrological_terms = ['Jupiter', 'Saturn', 'Mars', 'Venus', 'Mercury', 'Sun', 'Moon', 'house', 'lord', 'yoga', 'dasha', 'BPHS', 'Brihat', 'Parashara', 'Lagna', 'exalted']
-    basis_parts = []
-    
-    sentences = text.split('.')
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if (sentence and any(term in sentence for term in astrological_terms) and 
-            len(sentence) > 25 and
-            not any(q.lower() in sentence.lower() for q in questions_to_remove)):
-            # Clean up the sentence
-            sentence = re.sub(r'^[^A-Za-z]*', '', sentence)  # Remove leading non-letters
-            if sentence and not sentence.lower().startswith('according to my birth chart'):
-                basis_parts.append(sentence)
-            if len(basis_parts) >= 2:
-                break
-    
-    return '. '.join(basis_parts) if basis_parts else "Based on planetary positions and house analysis."
+    return parsed_data
 
-@router.post("/overall-assessment")
-async def get_overall_wealth_assessment(request: BirthDetailsRequest):
-    """Get complete wealth assessment without AI insights"""
+def _parse_ai_response(response_text):
+    """Parse JSON response from Gemini"""
+    
+    # Log the response for debugging
+    print("\n" + "="*100)
+    print("GEMINI JSON RESPONSE:")
+    print("="*100)
+    print(response_text)
+    print("="*100 + "\n")
+    
+    import re
+    import html
+    
+    # Extract JSON from markdown code blocks
+    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
+    if json_match:
+        json_text = json_match.group(1)
+        # Decode HTML entities
+        json_text = html.unescape(json_text)
+        print(f"✅ Extracted and decoded JSON: {json_text[:100]}...")
+    else:
+        json_text = response_text
+    
     try:
-        # Create birth data object
-        from types import SimpleNamespace
-        birth_data = SimpleNamespace(
-            date=request.birth_date,
-            time=request.birth_time,
-            place=request.birth_place,
-            latitude=request.latitude,
-            longitude=request.longitude,
-            timezone=request.timezone
-        )
-        
-        # Calculate birth chart
-        chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(birth_data)
-        
-        # Calculate wealth analysis
-        wealth_calc = WealthCalculator(chart_data, birth_data)
-        wealth_analysis = wealth_calc.calculate_overall_wealth()
+        json_response = json.loads(json_text)
+        print(f"✅ Successfully parsed JSON response")
         
         return {
-            "status": "success",
-            "data": wealth_analysis
+            "summary": "Comprehensive wealth analysis based on Vedic astrology principles.",
+            "json_response": json_response,
+            "wealth_analysis": {
+                "json_response": json_response,
+                "summary": "Comprehensive wealth analysis based on Vedic astrology principles."
+            }
         }
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"Wealth calculation error: {error_details}")
-        raise HTTPException(status_code=500, detail=f"Wealth calculation error: {str(e)}\n{error_details}")
+    except json.JSONDecodeError as e:
+        print(f"❌ Failed to parse JSON: {e}")
+        return {
+            "summary": "Comprehensive wealth analysis based on Vedic astrology principles.",
+            "raw_response": response_text,
+            "wealth_analysis": {
+                "raw_response": response_text,
+                "summary": "Comprehensive wealth analysis based on Vedic astrology principles."
+            }
+        }
 
-from fastapi.responses import StreamingResponse
-import asyncio
+
 
 @router.post("/ai-insights-enhanced")
 async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
@@ -417,6 +192,9 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
         )
     
     print(f"Enhanced wealth insights request received: {request.birth_date} {request.birth_time}")
+    
+    from fastapi.responses import StreamingResponse
+    import asyncio
     
     async def generate_streaming_response():
         import json
@@ -486,79 +264,82 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
                 traceback.print_exc()
                 raise
             
-            # Debug context
-            print(f"=== CONTEXT DEBUG ===")
-            print(f"Context type: {type(full_context)}")
-            if isinstance(full_context, str):
-                print(f"Context length: {len(full_context)} chars")
-            else:
-                print(f"Context is not string, converting...")
-                # Convert to string if needed
-                full_context = str(full_context) if full_context else "No context available"
-            
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights with enhanced context...'})}\n\n"
             
-            # Create comprehensive wealth question with formatting instructions
+            # Create comprehensive wealth question with strict JSON format requirement
             wealth_question = """
-As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided. Answer each question separately with detailed analysis.
+As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided.
 
-IMPORTANT INSTRUCTIONS:
-- Use ALL the astrological data provided including birth chart, divisional charts (D1, D9, D10, D12), current dashas, nakshatras, yogas, and planetary strengths
-- Apply BOTH Parashari and Jaimini astrology principles for comprehensive analysis
-- Analyze Chara Karakas (Atmakaraka, Amatyakaraka, Bhratrukaraka, Matrukaraka, Putrakaraka, Gnatikaraka, Darakaraka) and their significance for wealth
-- Use Jaimini aspects, Argala (planetary influences), and Arudha Padas for deeper insights
-- Answer each question individually with unique, specific content
-- Include references to classical texts (BPHS, Phaladeepika, Jaimini Sutras, Hora Sara, etc.)
-- Analyze current dasha periods (both Vimshottari and Chara Dasha) and their impact on wealth
-- Consider planetary aspects, conjunctions, and house lordships from both systems
-- Examine divisional charts for career (D10) and wealth indicators
-- Include nakshatra analysis for relevant planets and Chara Karakas
+CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. No other text, no explanations, no markdown. Just pure JSON.
 
-Questions to answer with detailed astrological analysis:
+STRICT MANDATORY FORMAT - Validate your JSON before responding:
 
-**1. What is my overall wealth potential according to my birth chart?**
-Analyze: 2nd house (accumulated wealth), 11th house (gains), Jupiter (natural significator), Venus (luxury), Dhana yogas, Lagna lord strength, and overall chart promise.
+{
+  "quick_answer": "Brief summary with <strong>bold text</strong> and <br> for line breaks",
+  "detailed_analysis": [
+    {
+      "question": "What is my overall wealth potential according to my birth chart?",
+      "answer": "Detailed answer with <strong>bold</strong>, <br> for line breaks, and <p> for paragraphs"
+    },
+    {
+      "question": "Will I be wealthy or face financial struggles in life?", 
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "Should I do business or job for better financial success?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "What are my best sources of income and earning methods?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "Can I do stock trading and speculation successfully?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "When will I see significant financial growth in my life?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "At what age will I achieve financial stability?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "What types of investments and financial strategies suit me best?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "Should I invest in property, stocks, or other assets?",
+      "answer": "Detailed answer with HTML markup"
+    }
+  ],
+  "final_thoughts": "Summary with <strong>bold</strong> and <br> line breaks",
+  "follow_up_questions": [
+    "📅 When will this happen?",
+    "🔮 What remedies can help?",
+    "💼 How to maximize success?",
+    "🌟 What should I focus on?"
+  ]
+}
 
-**2. Will I be wealthy or face financial struggles in life?**
-Examine: Malefic influences on wealth houses, 6th/8th/12th house connections, debilitated planets affecting wealth, dasha periods, and long-term financial trajectory.
+MANDATORY RULES:
+1. Response must start with { and end with }
+2. All strings must be properly escaped
+3. No markdown code blocks (```)
+4. No additional text outside JSON
+5. Validate JSON syntax before responding
 
-**3. Should I do business or job for better financial success?**
-Compare: 10th house (career) vs 7th house (partnerships/business), relevant divisional charts (D10), planetary strengths for entrepreneurship vs employment, dasha support.
+HTML markup for content formatting:
+- <strong>text</strong> for bold
+- <br> for line breaks  
+- <p>text</p> for paragraphs
+- <em>text</em> for emphasis
 
-**4. What are my best sources of income and earning methods?**
-Analyze: 10th lord placement, planets in 10th house, Atmakaraka (soul's desire), Amatyakaraka (career significator), strongest planets, relevant nakshatras, Arudha Lagna, and specific career indicators from D10 chart using both Parashari and Jaimini methods.
-
-**5. Can I do stock trading and speculation successfully?**
-Examine: 5th house (speculation), 8th house (sudden gains/losses), Mercury (trading), Mars (risk-taking), relevant yogas, and current dasha support for speculation.
-
-**6. When will I see significant financial growth in my life?**
-Analyze: Current Mahadasha and Antardasha periods, upcoming beneficial periods, Jupiter transits, Saturn returns, and specific timing using dasha analysis.
-
-**7. At what age will I achieve financial stability?**
-Calculate: Based on current age, dasha progression, planetary maturity periods, and when beneficial combinations will manifest fully.
-
-**8. What types of investments and financial strategies suit me best?**
-Recommend: Based on planetary strengths, risk tolerance from chart, long-term vs short-term indicators, and suitable investment vehicles per astrological indications.
-
-**9. Should I invest in property, stocks, or other assets?**
-Compare: 4th house (property), 5th house (speculation), 8th house (investments), Mars (real estate), Mercury (trading), and current planetary periods.
-
-For each answer, provide:
-- Specific planetary positions and degrees
-- House lordships and their significance from both Parashari and Jaimini perspectives
-- Chara Karaka analysis (especially Atmakaraka, Amatyakaraka for wealth and career)
-- Jaimini aspects and Argala influences on wealth houses
-- Arudha Pada analysis for material prosperity
-- Relevant yogas and combinations from both systems
-- Divisional chart analysis where applicable
-- Current dasha impact (Vimshottari and Chara Dasha)
-- Classical text references (BPHS, Jaimini Sutras, etc.)
-- Practical recommendations based on integrated analysis
-
-Use the comprehensive birth chart data, current planetary periods, and all astrological context provided to give detailed, accurate predictions.
+Provide detailed astrological analysis using the birth chart data and planetary periods.
 """
             
-            # Use chat analyzer (async) - no modifications to chat system
+            # Use chat analyzer (async)
             try:
                 print(f"🤖 Initializing Gemini analyzer...")
                 gemini_analyzer = GeminiChatAnalyzer()
@@ -569,14 +350,8 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
                 traceback.print_exc()
                 raise
             
-            # Debug the question being sent
-            print(f"=== QUESTION DEBUG ===")
-            print(f"Question length: {len(wealth_question)} chars")
-            print(f"Question preview: {wealth_question[:200]}...")
-            
             # Prepare context as dictionary for GeminiChatAnalyzer
             if isinstance(full_context, str):
-                # If context is string, wrap it in a dictionary
                 context_dict = {
                     'astrological_data': full_context,
                     'birth_details': {
@@ -587,7 +362,6 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
                     }
                 }
             else:
-                # If context is already a dictionary, use it directly
                 context_dict = full_context if full_context else {
                     'astrological_data': 'No astrological context available',
                     'birth_details': {
@@ -609,327 +383,107 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
                     ai_result = await gemini_analyzer.generate_chat_response(
                         wealth_question, context_dict, [], 'english', 'detailed'
                     )
-                    print(f"📨 Received response from Gemini API: success={ai_result.get('success')}")
-                    break  # Success, exit retry loop
+                    print(f"📝 GEMINI API RESPONSE RECEIVED:")
+                    print(f"   Success: {ai_result.get('success') if ai_result else 'None'}")
                     
-                except Exception as api_error:
-                    error_msg = str(api_error)
-                    print(f"⚠️ API attempt {attempt + 1} failed: {error_msg}")
+                    if ai_result and ai_result.get('success'):
+                        # HTML decode the response to fix encoded characters
+                        import html
+                        raw_response = ai_result.get('response', '')
+                        decoded_response = html.unescape(raw_response)
+                        ai_result['response'] = decoded_response
+                        print(f"   Response decoded from HTML entities")
                     
-                    # Check if it's a timeout/deadline error
-                    if ("timeout" in error_msg.lower() or 
-                        "deadline" in error_msg.lower() or 
-                        "504" in error_msg or
-                        "DeadlineExceeded" in error_msg):
-                        
-                        if attempt < max_retries - 1:  # Not the last attempt
-                            wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
-                            print(f"⏳ Timeout detected, retrying in {wait_time} seconds...")
-                            yield f"data: {json.dumps({'status': 'processing', 'message': f'API timeout, retrying in {wait_time}s... (attempt {attempt + 2}/{max_retries})'})}
+                    break
+                except Exception as e:
+                    print(f"❌ Attempt {attempt + 1} failed: {e}")
+                    if attempt == max_retries - 1:
+                        raise
+                    print(f"⏳ Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+            
+            if not ai_result or not ai_result.get('success'):
+                error_msg = ai_result.get('error', 'Unknown error') if ai_result else 'No response from AI'
+                print(f"❌ AI analysis failed: {error_msg}")
+                yield f"data: {json.dumps({'status': 'error', 'message': f'AI analysis failed: {error_msg}'})}
 
 "
-                            await asyncio.sleep(wait_time)
-                            continue
-                        else:
-                            print(f"❌ All retry attempts exhausted for timeout")
-                            ai_result = {'success': False, 'error': f'API timeout after {max_retries} attempts'}
-                            break
-                    else:
-                        # Non-timeout error, don't retry
-                        print(f"❌ Non-timeout error, not retrying: {error_msg}")
-                        ai_result = {'success': False, 'error': error_msg}
-                        break
+                return
             
-            if ai_result and ai_result.get('success'):
-                # Debug logging
-                print(f"=== RECEIVED FROM AI (ASYNC) ===")
-                print(f"Original length: {len(ai_result['response'])} chars")
-                cleaned_preview = _clean_html_tags(ai_result['response'])
-                print(f"Cleaned length: {len(cleaned_preview)} chars")
-                print(f"Response preview: {ai_result['response'][:200]}...")
-                print(f"Response ends with: {repr(ai_result['response'][-100:])}")
-                
-                # Parse and format AI response
-                formatted_response = _format_ai_response(ai_result['response'])
-                print(f"Formatted response type: {type(formatted_response)}")
-                print(f"Questions found: {len(formatted_response.get('questions', [])) if isinstance(formatted_response, dict) else 0}")
-                
-                # Debug the cleaned text
-                cleaned_text = _clean_html_tags(ai_result['response'])
-                print(f"Cleaned text preview: {cleaned_text[:500]}...")
-                print(f"Contains '**1.'? {('**1.' in cleaned_text)}")
-                print(f"Contains '1.'? {('1.' in cleaned_text)}")
-                print(f"Contains '### 1.'? {('### 1.' in cleaned_text)}")
-                
-                # Show first few questions if found
-                if isinstance(formatted_response, dict) and formatted_response.get('questions'):
-                    for i, q in enumerate(formatted_response['questions'][:2]):
-                        print(f"Q{i+1}: {q['question'][:50]}... -> {q['answer'][:100]}...")
-                
-                # Deduct credits for successful analysis
-                print(f"💰 DEDUCTING CREDITS: {wealth_cost} credits for user {current_user.userid}")
-                success = credit_service.spend_credits(
-                    current_user.userid, 
-                    wealth_cost, 
-                    'wealth_analysis', 
-                    f"Wealth analysis for {request.birth_date}"
-                )
-                
-                if not success:
-                    print(f"❌ CREDIT DEDUCTION FAILED for user {current_user.userid}")
-                    error_response = {
-                        'wealth_analysis': 'Credit deduction failed. Please try again.',
-                        'enhanced_context': False,
-                        'error': 'Credit deduction failed'
-                    }
-                    yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
-                else:
-                    print(f"✅ CREDITS DEDUCTED SUCCESSFULLY")
-                    new_balance = credit_service.get_user_credits(current_user.userid)
-                    print(f"   New balance: {new_balance} credits")
-                    
-                    # Store in wealth database with enhanced flag
-                    enhanced_insights = {
-                        'wealth_analysis': formatted_response,
-                        'enhanced_context': True,
-                        'questions_covered': len(formatted_response.get('questions', [])) if isinstance(formatted_response, dict) else 0,
-                        'context_type': 'chat_context_builder',
-                        'generated_at': datetime.now().isoformat()
-                    }
-                    
-                    await asyncio.get_event_loop().run_in_executor(
-                        None, _store_ai_insights, birth_hash, enhanced_insights
-                    )
-                    
-                    yield f"data: {json.dumps({'status': 'complete', 'data': enhanced_insights, 'cached': False})}\n\n"
-            else:
-                error_response = {
-                    'wealth_analysis': 'AI analysis failed. Please try again.',
-                    'enhanced_context': False,
-                    'error': ai_result.get('error', 'Unknown error')
-                }
-                yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
-                
-        except Exception as e:
-            print(f"❌ ENHANCED WEALTH ANALYSIS ERROR: {type(e).__name__}: {str(e)}")
-            import traceback
-            full_traceback = traceback.format_exc()
-            print(f"Full traceback:\n{full_traceback}")
+            print(f"✅ AI analysis completed successfully")
             
-            # Log specific error details
-            if "gemini" in str(e).lower() or "api" in str(e).lower():
-                print(f"🔑 Possible Gemini API issue - check API key and quota")
-            elif "context" in str(e).lower():
-                print(f"📊 Context building issue - check chart calculation")
-            elif "credit" in str(e).lower():
-                print(f"💳 Credit system issue")
-            else:
-                print(f"🔍 Unknown error type - investigate further")
-            
-            error_response = {
-                'wealth_analysis': f'Analysis error: {str(e)}. Please try again.',
-                'enhanced_context': False,
-                'error': str(e),
-                'error_type': type(e).__name__
-            }
-            yield f"data: {json.dumps({'status': 'error', 'error': str(e), 'error_type': type(e).__name__})}\n\n"
-    
-    return StreamingResponse(
-        generate_streaming_response(),
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
-
-@router.post("/astrological-context")
-async def get_astrological_context(request: BirthDetailsRequest):
-    """Get the complete astrological context that's sent to AI - Admin only"""
-    # Check admin access
-    if request.user_role != 'admin':
-        raise HTTPException(status_code=403, detail="Admin access required")
-    try:
-        # Import chat components
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from chat.chat_context_builder import ChatContextBuilder
-        
-        # Prepare birth data in chat format
-        birth_data = {
-            'name': request.birth_place,
-            'date': request.birth_date,
-            'time': request.birth_time,
-            'place': request.birth_place,
-            'latitude': request.latitude or 28.6139,
-            'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30'
-        }
-        
-        # Build complete context
-        context_builder = ChatContextBuilder()
-        full_context = await asyncio.get_event_loop().run_in_executor(
-            None, context_builder.build_complete_context, birth_data
-        )
-        
-        return {
-            "status": "success",
-            "context": full_context,
-            "birth_details": birth_data,
-            "context_length": len(str(full_context))
-        }
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"Context fetch error: {error_details}")
-        raise HTTPException(status_code=500, detail=f"Context fetch error: {str(e)}")
-
-@router.post("/ai-insights")
-async def get_ai_wealth_insights(request: BirthDetailsRequest):
-    """Get AI-powered wealth insights with streaming keep-alive"""
-    print(f"AI wealth insights request received: {request.birth_date} {request.birth_time}")
-    print(f"Debug - Full request: {request}")
-    print(f"Debug - Request force_regenerate: {request.force_regenerate}")
-    print(f"Debug - Request dict: {request.__dict__}")
-    
-    async def generate_streaming_response():
-        import json
-        
-        try:
-            # Send initial status
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Initializing wealth analysis...'})}\n\n"
-            
-            # Create birth data object
-            from types import SimpleNamespace
-            birth_data = SimpleNamespace(
-                date=request.birth_date,
-                time=request.birth_time,
-                place=request.birth_place,
-                latitude=request.latitude,
-                longitude=request.longitude,
-                timezone=request.timezone
-            )
-            
-            # Create unique hash for this birth data
-            birth_hash = _create_birth_hash(birth_data)
-            
-            # Initialize database table
-            _init_ai_insights_table()
-            
-            # Check if we have stored insights (unless force regenerate)
-            force_regen = request.force_regenerate
-            print(f"Debug - Force regenerate: {force_regen}")
-            print(f"Debug - Force regenerate type: {type(force_regen)}")
-            if force_regen is not True:
-                stored_insights = _get_stored_ai_insights(birth_hash)
-                print(f"Debug - Found cached insights: {bool(stored_insights)}")
-                if stored_insights:
-                    print(f"Debug - Returning cached data")
-                    yield f"data: {json.dumps({'status': 'complete', 'data': stored_insights, 'cached': True})}\n\n"
-                    return
-            else:
-                print(f"Debug - Skipping cache due to force regenerate")
-            
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Calculating birth chart...'})}\n\n"
-            
-            # Calculate birth chart and wealth analysis
-            chart_calc = ChartCalculator({})
-            chart_data = chart_calc.calculate_chart(birth_data)
-            
-            wealth_calc = WealthCalculator(chart_data, birth_data)
-            wealth_analysis = wealth_calc.calculate_overall_wealth()
-            
-            yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights...'})}\n\n"
-            
-            # Generate AI insights
+            # Parse the AI response
             try:
-                print("Initializing Gemini wealth analyzer...")
-                gemini_analyzer = GeminiWealthAnalyzer()
-                print("Gemini wealth analyzer initialized successfully")
+                ai_response_text = ai_result.get('response', '')
+                print(f"📄 Raw AI response length: {len(ai_response_text)}")
+                print(f"📄 First 500 chars: {ai_response_text[:500]}...")
                 
-                # Run AI generation with periodic updates
-                import threading
-                import time
-                result = {}
-                exception = {}
+                # Parse JSON response
+                parsed_response = json.loads(ai_response_text)
+                print(f"✅ JSON parsed successfully")
+                print(f"📊 Response keys: {list(parsed_response.keys())}")
                 
-                def ai_worker():
-                    try:
-                        print("Starting Gemini AI wealth generation...")
-                        # Pass birth data to Gemini analyzer
-                        wealth_analysis_with_birth = wealth_analysis.copy()
-                        wealth_analysis_with_birth.update({
-                            'name': birth_data.place,
-                            'date': birth_data.date,
-                            'time': birth_data.time,
-                            'latitude': birth_data.latitude,
-                            'longitude': birth_data.longitude,
-                            'timezone': birth_data.timezone
-                        })
-                        
-                        # Generate AI insights
-                        result['data'] = gemini_analyzer.generate_wealth_insights(wealth_analysis_with_birth, chart_data)
-                        print("AI wealth generation completed")
-                    except Exception as e:
-                        print(f"AI worker error: {e}")
-                        exception['error'] = e
+                # Validate required structure
+                if not all(key in parsed_response for key in ['quick_answer', 'detailed_analysis', 'final_thoughts']):
+                    print(f"❌ Missing required keys in response")
+                    raise ValueError("Response missing required structure")
                 
-                thread = threading.Thread(target=ai_worker)
-                thread.start()
+                if not isinstance(parsed_response.get('detailed_analysis'), list):
+                    print(f"❌ detailed_analysis is not a list")
+                    raise ValueError("detailed_analysis must be a list")
                 
-                # Send keep-alive messages with timeout
-                count = 0
-                max_iterations = 24  # 2 minutes
+                if len(parsed_response.get('detailed_analysis', [])) != 9:
+                    print(f"❌ Expected 9 questions, got {len(parsed_response.get('detailed_analysis', []))}")
+                    # Don't fail, just log the issue
                 
-                while thread.is_alive() and count < max_iterations:
-                    yield f"data: {json.dumps({'status': 'processing', 'message': 'AI wealth analysis in progress...'})}\n\n"
-                    await asyncio.sleep(5)
-                    count += 1
+                print(f"✅ Response structure validated")
                 
-                if thread.is_alive():
-                    yield f"data: {json.dumps({'status': 'error', 'error': 'AI analysis timed out'})}\n\n"
-                    return
-                
-                thread.join(timeout=1)
-                
-                if 'error' in exception:
-                    raise exception['error']
-                
-                ai_insights = result['data']
-                
-                # Store insights in database
-                _store_ai_insights(birth_hash, ai_insights)
-                
-                # Send final result
-                yield f"data: {json.dumps({'status': 'complete', 'data': ai_insights, 'cached': False})}\n\n"
-                
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON parsing failed: {e}")
+                print(f"📄 Problematic response: {ai_response_text[:1000]}...")
+                yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}
+
+"
+                return
             except Exception as e:
-                error_response = {
-                    'success': False,
-                    'insights': {
-                        'wealth_overview': '',
-                        'income_analysis': '',
-                        'investment_guidance': [],
-                        'business_prospects': [],
-                        'financial_challenges': [],
-                        'prosperity_indicators': '',
-                        'wealth_timeline': [],
-                        'career_money': []
-                    },
-                    'error': str(e)
-                }
-                yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
-                
+                print(f"❌ Response validation failed: {e}")
+                yield f"data: {json.dumps({'status': 'error', 'message': f'Response validation failed: {str(e)}'})}
+
+"
+                return
+            
+            # Deduct credits after successful analysis
+            try:
+                credit_service.deduct_credits(current_user.userid, wealth_cost, 'wealth_analysis')
+                print(f"💳 Deducted {wealth_cost} credits from user {current_user.userid}")
+            except Exception as e:
+                print(f"❌ Credit deduction failed: {e}")
+                # Continue anyway since analysis was successful
+            
+            # Store in cache
+            try:
+                _store_ai_insights(birth_hash, parsed_response)
+                print(f"💾 Insights cached successfully")
+            except Exception as e:
+                print(f"❌ Failed to cache insights: {e}")
+                # Continue anyway
+            
+            # Return final result
+            yield f"data: {json.dumps({'status': 'complete', 'data': parsed_response, 'cached': False})}
+
+"
+            
         except Exception as e:
-            yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+            print(f"❌ CRITICAL ERROR in wealth analysis: {e}")
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'status': 'error', 'message': f'Analysis failed: {str(e)}'})}
+
+"
     
     return StreamingResponse(
         generate_streaming_response(),
         media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"  # Disable nginx buffering
-        }
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )

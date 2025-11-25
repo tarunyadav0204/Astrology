@@ -385,14 +385,15 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     )
                     print(f"📝 GEMINI API RESPONSE RECEIVED:")
                     print(f"   Success: {ai_result.get('success') if ai_result else 'None'}")
-                    print(f"   Response type: {type(ai_result)}")
-                    print(f"   Response keys: {list(ai_result.keys()) if ai_result and isinstance(ai_result, dict) else 'Not a dict'}")
-                    if ai_result and ai_result.get('response'):
-                        print(f"   Response length: {len(str(ai_result['response']))} chars")
-                        print(f"   Response preview: {str(ai_result['response'])[:200]}...")
-                    else:
-                        print(f"   No response content found")
-                    print(f"📨 Received response from Gemini API: success={ai_result.get('success')}")
+                    
+                    if ai_result and ai_result.get('success'):
+                        # HTML decode the response to fix encoded characters
+                        import html
+                        raw_response = ai_result.get('response', '')
+                        decoded_response = html.unescape(raw_response)
+                        ai_result['response'] = decoded_response
+                        print(f"   Response decoded from HTML entities")
+                    
                     break  # Success, exit retry loop
                     
                 except Exception as api_error:
@@ -422,43 +423,37 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                         break
             
             if ai_result and ai_result.get('success'):
-                # Parse AI response into Q&A format
-                formatted_response = _parse_ai_response(ai_result['response'])
-                
-                # Deduct credits for successful analysis
-                print(f"💰 DEDUCTING CREDITS: {wealth_cost} credits for user {current_user.userid}")
-                success = credit_service.spend_credits(
-                    current_user.userid, 
-                    wealth_cost, 
-                    'wealth_analysis', 
-                    f"Wealth analysis for {request.birth_date}"
-                )
-                
-                if not success:
-                    print(f"❌ CREDIT DEDUCTION FAILED for user {current_user.userid}")
-                    error_response = {
-                        'wealth_analysis': 'Credit deduction failed. Please try again.',
-                        'enhanced_context': False,
-                        'error': 'Credit deduction failed'
-                    }
-                    yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
-                else:
-                    print(f"✅ CREDITS DEDUCTED SUCCESSFULLY")
+                # Parse AI response
+                try:
+                    ai_response_text = ai_result.get('response', '')
+                    print(f"📄 PARSING RESPONSE:")
+                    print(f"   Length: {len(ai_response_text)} chars")
+                    print(f"   First 200 chars: {ai_response_text[:200]}...")
+                    print(f"   Last 200 chars: ...{ai_response_text[-200:]}")
                     
-                    # Store in wealth database with enhanced flag
-                    enhanced_insights = {
-                        'wealth_analysis': formatted_response,
-                        'enhanced_context': True,
-                        'questions_covered': len(formatted_response.get('questions', [])),
-                        'context_type': 'chat_context_builder',
-                        'generated_at': datetime.now().isoformat()
-                    }
+                    parsed_response = json.loads(ai_response_text)
+                    print(f"✅ JSON PARSED SUCCESSFULLY")
+                    print(f"   Keys: {list(parsed_response.keys())}")
+                    print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                     
-                    await asyncio.get_event_loop().run_in_executor(
-                        None, _store_ai_insights, birth_hash, enhanced_insights
-                    )
+                    # Deduct credits for successful analysis
+                    credit_service.deduct_credits(current_user.userid, wealth_cost, 'wealth_analysis')
+                    print(f"💳 Credits deducted successfully")
                     
-                    yield f"data: {json.dumps({'status': 'complete', 'data': enhanced_insights, 'cached': False})}\n\n"
+                    # Store in cache
+                    _store_ai_insights(birth_hash, parsed_response)
+                    print(f"💾 Response cached successfully")
+                    
+                    # Send complete response
+                    final_response = {'status': 'complete', 'data': parsed_response, 'cached': False}
+                    response_json = json.dumps(final_response)
+                    print(f"🚀 SENDING FINAL RESPONSE: {len(response_json)} chars")
+                    yield f"data: {response_json}\n\n"
+                        
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON PARSING FAILED: {e}")
+                    print(f"   Raw response (first 1000 chars): {ai_response_text[:1000]}...")
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
             else:
                 error_response = {
                     'wealth_analysis': 'AI analysis failed. Please try again.',
