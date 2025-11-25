@@ -422,10 +422,24 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
         import json
         
         try:
+            print(f"🔄 Starting wealth analysis for user {current_user.userid}")
+            
             # Import chat components (no modifications to chat system)
             sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            from chat.chat_context_builder import ChatContextBuilder
-            from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+            
+            try:
+                from chat.chat_context_builder import ChatContextBuilder
+                print(f"✅ ChatContextBuilder imported successfully")
+            except Exception as e:
+                print(f"❌ Failed to import ChatContextBuilder: {e}")
+                raise
+                
+            try:
+                from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+                print(f"✅ GeminiChatAnalyzer imported successfully")
+            except Exception as e:
+                print(f"❌ Failed to import GeminiChatAnalyzer: {e}")
+                raise
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Initializing enhanced wealth analysis...'})}\n\n"
             
@@ -459,22 +473,26 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Building comprehensive astrological context...'})}\n\n"
             
             # Use chat context builder (async)
-            context_builder = ChatContextBuilder()
-            full_context = await asyncio.get_event_loop().run_in_executor(
-                None, context_builder.build_complete_context, birth_data
-            )
+            try:
+                print(f"🏗️ Building context for birth data: {birth_data['date']} {birth_data['time']}")
+                context_builder = ChatContextBuilder()
+                full_context = await asyncio.get_event_loop().run_in_executor(
+                    None, context_builder.build_complete_context, birth_data
+                )
+                print(f"✅ Context built successfully")
+            except Exception as e:
+                print(f"❌ Context building failed: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
             
             # Debug context
             print(f"=== CONTEXT DEBUG ===")
             print(f"Context type: {type(full_context)}")
             if isinstance(full_context, str):
                 print(f"Context length: {len(full_context)} chars")
-                print(f"Context preview: {full_context[:300]}...")
-                print(f"Contains 'Jupiter'? {('Jupiter' in full_context)}")
-                print(f"Contains 'dasha'? {('dasha' in full_context)}")
-                print(f"Contains 'house'? {('house' in full_context)}")
             else:
-                print(f"Context value: {full_context}")
+                print(f"Context is not string, converting...")
                 # Convert to string if needed
                 full_context = str(full_context) if full_context else "No context available"
             
@@ -541,7 +559,15 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
 """
             
             # Use chat analyzer (async) - no modifications to chat system
-            gemini_analyzer = GeminiChatAnalyzer()
+            try:
+                print(f"🤖 Initializing Gemini analyzer...")
+                gemini_analyzer = GeminiChatAnalyzer()
+                print(f"✅ Gemini analyzer initialized")
+            except Exception as e:
+                print(f"❌ Failed to initialize Gemini analyzer: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
             
             # Debug the question being sent
             print(f"=== QUESTION DEBUG ===")
@@ -572,9 +598,17 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
                     }
                 }
             
-            ai_result = await gemini_analyzer.generate_chat_response(
-                wealth_question, context_dict, [], 'english', 'detailed'
-            )
+            try:
+                print(f"🚀 Sending request to Gemini API...")
+                ai_result = await gemini_analyzer.generate_chat_response(
+                    wealth_question, context_dict, [], 'english', 'detailed'
+                )
+                print(f"📨 Received response from Gemini API: success={ai_result.get('success')}")
+            except Exception as e:
+                print(f"❌ Gemini API call failed: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
             
             if ai_result['success']:
                 # Debug logging
@@ -647,16 +681,28 @@ Use the comprehensive birth chart data, current planetary periods, and all astro
                 yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
                 
         except Exception as e:
-            print(f"Enhanced wealth analysis error: {e}")
+            print(f"❌ ENHANCED WEALTH ANALYSIS ERROR: {type(e).__name__}: {str(e)}")
             import traceback
-            traceback.print_exc()
+            full_traceback = traceback.format_exc()
+            print(f"Full traceback:\n{full_traceback}")
+            
+            # Log specific error details
+            if "gemini" in str(e).lower() or "api" in str(e).lower():
+                print(f"🔑 Possible Gemini API issue - check API key and quota")
+            elif "context" in str(e).lower():
+                print(f"📊 Context building issue - check chart calculation")
+            elif "credit" in str(e).lower():
+                print(f"💳 Credit system issue")
+            else:
+                print(f"🔍 Unknown error type - investigate further")
             
             error_response = {
                 'wealth_analysis': f'Analysis error: {str(e)}. Please try again.',
                 'enhanced_context': False,
-                'error': str(e)
+                'error': str(e),
+                'error_type': type(e).__name__
             }
-            yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'status': 'error', 'error': str(e), 'error_type': type(e).__name__})}\n\n"
     
     return StreamingResponse(
         generate_streaming_response(),
