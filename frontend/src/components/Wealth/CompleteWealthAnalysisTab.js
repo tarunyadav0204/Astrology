@@ -17,10 +17,12 @@ const CompleteWealthAnalysisTab = ({ chartData, birthDetails }) => {
       setError(null);
       
       try {
+        const token = localStorage.getItem('token');
         const response = await fetch('/api/wealth/overall-assessment', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             birth_date: birthDetails.date,
@@ -33,6 +35,9 @@ const CompleteWealthAnalysisTab = ({ chartData, birthDetails }) => {
         });
         
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication required. Please log in again.');
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         

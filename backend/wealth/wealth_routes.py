@@ -15,7 +15,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from calculators.chart_calculator import ChartCalculator
 from calculators.wealth_calculator import WealthCalculator
-from ai.gemini_wealth_analyzer import GeminiWealthAnalyzer
 
 class BirthDetailsRequest(BaseModel):
     birth_date: str  # YYYY-MM-DD
@@ -170,6 +169,35 @@ def _parse_ai_response(response_text):
         }
 
 
+
+@router.post("/overall-assessment")
+async def get_overall_wealth_assessment(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
+    """Complete wealth assessment with technical analysis"""
+    try:
+        # Prepare birth data
+        from types import SimpleNamespace
+        birth_data = SimpleNamespace(
+            date=request.birth_date,
+            time=request.birth_time,
+            place=request.birth_place,
+            latitude=request.latitude or 28.6139,
+            longitude=request.longitude or 77.2090,
+            timezone=request.timezone or 'UTC+5:30'
+        )
+        
+        # Calculate chart
+        calculator = ChartCalculator({})
+        chart_data = calculator.calculate_chart(birth_data)
+        
+        # Calculate wealth analysis
+        wealth_calculator = WealthCalculator(chart_data, birth_data)
+        wealth_data = wealth_calculator.calculate_overall_wealth()
+        
+        return {"success": True, "data": wealth_data}
+        
+    except Exception as e:
+        print(f"❌ Wealth assessment error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/ai-insights-enhanced")
 async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
@@ -517,3 +545,40 @@ Provide detailed astrological analysis using the birth chart data and planetary 
             "X-Accel-Buffering": "no"
         }
     )
+
+@router.post("/astrological-context")
+async def get_astrological_context(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
+    """Get complete astrological context for admin users"""
+    try:
+        # Check if user is admin
+        if current_user.role != 'admin':
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Import chat context builder
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from chat.chat_context_builder import ChatContextBuilder
+        
+        # Prepare birth data
+        birth_data = {
+            'name': request.birth_place,
+            'date': request.birth_date,
+            'time': request.birth_time,
+            'place': request.birth_place,
+            'latitude': request.latitude or 28.6139,
+            'longitude': request.longitude or 77.2090,
+            'timezone': request.timezone or 'UTC+5:30'
+        }
+        
+        # Build complete context
+        context_builder = ChatContextBuilder()
+        full_context = context_builder.build_complete_context(birth_data)
+        
+        return {
+            "success": True,
+            "context": full_context,
+            "context_length": len(str(full_context))
+        }
+        
+    except Exception as e:
+        print(f"❌ Context error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

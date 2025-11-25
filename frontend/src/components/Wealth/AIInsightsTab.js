@@ -78,12 +78,13 @@ const AccordionPanel = ({ qa, index }) => {
 const AIInsightsTab = ({ chartData, birthDetails }) => {
   const { credits, wealthCost, loading: creditsLoading } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [dots, setDots] = useState('');
   const [showCreditWarning, setShowCreditWarning] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   
   const steps = [
     '💰 Analyzing wealth houses',
@@ -124,7 +125,6 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     // Check credits before making request
     if (credits < wealthCost) {
       setShowCreditWarning(true);
-      setLoading(false);
       return;
     }
     
@@ -244,17 +244,10 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     }
   };
 
-  useEffect(() => {
-    if (!creditsLoading) {
-      loadAIInsights();
-    }
-    
-    // Cleanup function to handle component unmounting
-    return () => {
-      setLoading(false);
-      setError(null);
-    };
-  }, [birthDetails, creditsLoading]);
+  const startAnalysis = () => {
+    setHasStarted(true);
+    loadAIInsights();
+  };
   
   // Add cleanup on component unmount
   useEffect(() => {
@@ -264,7 +257,71 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     };
   }, []);
 
-  // Show credit warning if insufficient credits
+  // Show initial confirmation screen if analysis hasn't started
+  if (!hasStarted && !aiInsights) {
+    return (
+      <div className="ai-insights-tab">
+        <div className="analysis-confirmation">
+          <div className="confirmation-header">
+            <h3>💰 AI Wealth Analysis</h3>
+            <p>Get comprehensive insights about your financial prospects and wealth-building potential</p>
+          </div>
+          
+          <div className="analysis-preview">
+            <h4>📊 What You'll Get:</h4>
+            <ul className="preview-list">
+              <li>✨ 9 Essential wealth questions with detailed answers</li>
+              <li>🪐 Complete planetary analysis from your birth chart</li>
+              <li>🏛️ Dhana yogas and prosperity indicators</li>
+              <li>📊 Investment guidance and timing predictions</li>
+              <li>💼 Business vs job recommendations</li>
+              <li>📈 Stock trading and speculation analysis</li>
+            </ul>
+          </div>
+          
+          <div className="cost-section">
+            <div className="cost-info">
+              <span className="cost-label">Analysis Cost:</span>
+              <span className="cost-amount">{wealthCost} credits</span>
+            </div>
+            <div className="balance-info">
+              <span className="balance-label">Your Balance:</span>
+              <span className={`balance-amount ${credits >= wealthCost ? 'sufficient' : 'insufficient'}`}>
+                {credits} credits
+              </span>
+            </div>
+          </div>
+          
+          {credits >= wealthCost ? (
+            <div className="action-section">
+              <button className="start-analysis-btn" onClick={startAnalysis}>
+                🚀 Start Analysis ({wealthCost} credits)
+              </button>
+              <p className="analysis-note">
+                ⏱️ Analysis takes 1-2 minutes • 🎯 Personalized to your birth chart
+              </p>
+            </div>
+          ) : (
+            <div className="insufficient-credits">
+              <p className="credit-warning-text">
+                You need <strong>{wealthCost} credits</strong> but have <strong>{credits} credits</strong>
+              </p>
+              <button className="add-credits-btn" onClick={() => setShowCreditsModal(true)}>
+                💳 Add Credits
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <CreditsModal 
+          isOpen={showCreditsModal} 
+          onClose={() => setShowCreditsModal(false)} 
+        />
+      </div>
+    );
+  }
+  
+  // Show credit warning if insufficient credits during analysis
   if (showCreditWarning) {
     // Parse error message to extract credit amounts
     const creditMatch = error?.match(/You need (\d+) credits but have (\d+)/i);
@@ -315,7 +372,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
             ))}
           </div>
           <p className="loading-message">
-            ✨ This comprehensive analysis takes 30-60 seconds to ensure accuracy.<br/>
+            ✨ This comprehensive analysis takes 1-2 minutes to ensure accuracy.<br/>
             🎯 We're creating insights tailored specifically to your birth chart.
           </p>
         </div>
@@ -329,7 +386,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
         <div className="error-state">
           <h3>⚠️ Analysis Error</h3>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Retry Analysis</button>
+          <button onClick={() => loadAIInsights(true)}>Retry Analysis</button>
         </div>
       </div>
     );

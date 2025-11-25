@@ -13,10 +13,12 @@ const AstrologicalContextTab = ({ birthDetails, user }) => {
     setError(null);
     
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch('/api/wealth/astrological-context', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           birth_date: birthDetails.date,
@@ -30,6 +32,9 @@ const AstrologicalContextTab = ({ birthDetails, user }) => {
       });
       
       if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('Admin access required');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
