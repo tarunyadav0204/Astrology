@@ -179,14 +179,27 @@
   background: #5a6268;
 }
 
+.ai-insights-tab {
+  position: relative;
+}
+
 .corner-btn {
-  position: fixed;
-  top: 180px;
-  right: 20px;
+  position: absolute;
+  top: 15px;
+  right: 15px;
   padding: 6px 12px;
   font-size: 12px;
   border-radius: 4px;
-  z-index: 1000;
+  background: #6c757d;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  z-index: 10;
+}
+
+.corner-btn:hover {
+  background: #5a6268;
 }
 
 .insights-grid {
@@ -997,52 +1010,55 @@
 }
 
 .cost-section {
-  background: #e3f2fd;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 30px;
-  border: 1px solid #bbdefb;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 25px;
+  border: 1px solid #e9ecef;
+  text-align: center;
 }
 
 .cost-info, .balance-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+  display: inline-block;
+  margin: 0 15px;
+  font-size: 0.95em;
 }
 
-.balance-info:last-child {
-  margin-bottom: 0;
+.cost-label {
+  font-weight: 500;
+  color: white;
+  margin-right: 8px;
 }
 
-.cost-label, .balance-label {
-  font-weight: 600;
-  color: #495057;
+.balance-label {
+  font-weight: 500;
+  color: #6c757d;
+  margin-right: 8px;
 }
 
 .cost-amount {
   background: #495057;
   color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
+  padding: 3px 10px;
+  border-radius: 12px;
   font-weight: 600;
   font-size: 0.9em;
 }
 
 .balance-amount {
-  padding: 4px 12px;
-  border-radius: 20px;
+  padding: 3px 10px;
+  border-radius: 12px;
   font-weight: 600;
   font-size: 0.9em;
 }
 
 .balance-amount.sufficient {
-  background: #4caf50;
+  background: #28a745;
   color: white;
 }
 
 .balance-amount.insufficient {
-  background: #f44336;
+  background: #dc3545;
   color: white;
 }
 
@@ -1107,6 +1123,26 @@
   box-shadow: 0 6px 18px rgba(255, 193, 7, 0.4);
 }
 
+.cancel-btn {
+  background: #6c757d !important;
+  color: white !important;
+  border: none !important;
+  padding: 15px 30px !important;
+  border-radius: 25px !important;
+  font-size: 1.1em !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3) !important;
+}
+
+.cancel-btn:hover {
+  background: #5a6268;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
 /* Mobile responsive for confirmation */
 @media (max-width: 768px) {
   .analysis-confirmation {
@@ -1131,6 +1167,13 @@
   .start-analysis-btn {
     width: 100%;
     padding: 12px 20px;
+  }
+  
+  .cancel-btn {
+    width: 100%;
+    padding: 12px 20px;
+    margin-left: 0;
+    margin-top: 10px;
   }
 }
 

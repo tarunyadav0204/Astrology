@@ -268,13 +268,25 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             # Initialize database table
             _init_ai_insights_table()
             
-            # Check cache
+            # Check cache first
             force_regen = request.force_regenerate
-            if force_regen is not True:
-                stored_insights = _get_stored_ai_insights(birth_hash)
-                if stored_insights and stored_insights.get('enhanced_context'):
-                    yield f"data: {json.dumps({'status': 'complete', 'data': stored_insights, 'cached': True})}\n\n"
-                    return
+            stored_insights = _get_stored_ai_insights(birth_hash)
+            
+            if stored_insights and not force_regen:
+                print(f"💾 Found cached insights, returning cached response")
+                # Format cached response properly
+                cached_response = {
+                    'wealth_analysis': {
+                        'json_response': stored_insights,
+                        'summary': 'Comprehensive wealth analysis based on Vedic astrology principles.'
+                    },
+                    'enhanced_context': True,
+                    'questions_covered': len(stored_insights.get('detailed_analysis', [])),
+                    'context_type': 'chat_context_builder',
+                    'generated_at': datetime.now().isoformat()
+                }
+                yield f"data: {json.dumps({'status': 'complete', 'data': cached_response, 'cached': True})}\n\n"
+                return
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Building comprehensive astrological context...'})}\n\n"
             
@@ -306,6 +318,8 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             # Create comprehensive wealth question with strict JSON format requirement
             wealth_question = """
 As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided.
+
+IMPORTANT: Be completely honest and realistic in your analysis. Do not give false hope or exaggerated promises. If the chart shows challenges or limitations, mention them clearly. Provide balanced insights that include both positive potential and realistic challenges.
 
 SPECIAL FOCUS ON WEALTH INDICATORS:
 - InduLagna (Wealth Ascendant): Analyze the InduLagna position, sign, house placement, and aspects for wealth potential
@@ -531,6 +545,7 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     
                     try:
                         parsed_response = json.loads(json_text)
+                        print(f"✅ JSON PARSED SUCCESSFULLY")
                     except json.JSONDecodeError as json_error:
                         print(f"⚠️ JSON parsing failed, trying fallback parsing...")
                         # Fallback: Try to parse with more aggressive cleaning
@@ -549,7 +564,7 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                                 "final_thoughts": "Please regenerate the analysis.",
                                 "follow_up_questions": []
                             }
-                    print(f"✅ JSON PARSED SUCCESSFULLY")
+                    
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                     
@@ -560,7 +575,7 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     else:
                         print(f"❌ Credit deduction failed")
                     
-                    # Store in cache
+                    # Store in cache (always store, even fallback responses)
                     _store_ai_insights(birth_hash, parsed_response)
                     print(f"💾 Response cached successfully")
                     
@@ -616,6 +631,46 @@ Provide detailed astrological analysis using the birth chart data and planetary 
             "X-Accel-Buffering": "no"
         }
     )
+
+@router.post("/check-cache")
+async def check_cached_insights(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):
+    """Check if cached insights exist without generating new ones"""
+    try:
+        # Create birth data object
+        from types import SimpleNamespace
+        birth_data = SimpleNamespace(
+            date=request.birth_date,
+            time=request.birth_time,
+            place=request.birth_place,
+            latitude=request.latitude or 28.6139,
+            longitude=request.longitude or 77.2090,
+            timezone=request.timezone or 'UTC+5:30'
+        )
+        
+        birth_hash = _create_birth_hash(birth_data)
+        _init_ai_insights_table()
+        
+        stored_insights = _get_stored_ai_insights(birth_hash)
+        
+        if stored_insights:
+            # Format cached response properly
+            cached_response = {
+                'wealth_analysis': {
+                    'json_response': stored_insights,
+                    'summary': 'Comprehensive wealth analysis based on Vedic astrology principles.'
+                },
+                'enhanced_context': True,
+                'questions_covered': len(stored_insights.get('detailed_analysis', [])),
+                'context_type': 'chat_context_builder',
+                'generated_at': datetime.now().isoformat()
+            }
+            return {"success": True, "data": cached_response, "cached": True}
+        else:
+            return {"success": False, "message": "No cached data found"}
+            
+    except Exception as e:
+        print(f"❌ Cache check error: {e}")
+        return {"success": False, "message": str(e)}
 
 @router.post("/astrological-context")
 async def get_astrological_context(request: BirthDetailsRequest, current_user: User = Depends(get_current_user)):

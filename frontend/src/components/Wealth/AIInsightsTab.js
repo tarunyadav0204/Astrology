@@ -85,6 +85,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   const [showCreditWarning, setShowCreditWarning] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   
   const steps = [
     '💰 Analyzing wealth houses',
@@ -123,10 +124,13 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     if (!birthDetails) return;
     
     // Check credits before making request
+    console.log('Credit check:', { credits, wealthCost, hasCredits: credits >= wealthCost });
     if (credits < wealthCost) {
+      console.log('Insufficient credits, showing warning');
       setShowCreditWarning(true);
       return;
     }
+    console.log('Credits sufficient, proceeding with analysis');
     
     console.log('loadAIInsights called with forceRegenerate:', forceRegenerate);
     
@@ -221,6 +225,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
                   clearTimeout(streamTimeout);
                   clearTimeout(timeoutId);
                   setAiInsights(data.data);
+                  setHasStarted(true); // Mark as started when we have insights
                   setLoading(false);
                   return;
                 } else if (data.status === 'error') {
@@ -249,6 +254,51 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     loadAIInsights();
   };
   
+
+  
+  // Check for cached data on mount
+  useEffect(() => {
+    const checkCachedData = async () => {
+      if (!birthDetails) return;
+      
+      try {
+        const requestBody = {
+          birth_date: birthDetails.date,
+          birth_time: birthDetails.time,
+          birth_place: birthDetails.place,
+          latitude: birthDetails.latitude,
+          longitude: birthDetails.longitude,
+          timezone: birthDetails.timezone
+        };
+        
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/wealth/check-cache', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.cached) {
+            setAiInsights(result.data);
+            setHasStarted(true);
+            console.log('Loaded cached wealth analysis');
+          } else {
+            console.log('No cached analysis found');
+          }
+        }
+      } catch (error) {
+        console.log('Cache check failed:', error.message);
+      }
+    };
+    
+    checkCachedData();
+  }, [birthDetails]);
+  
   // Add cleanup on component unmount
   useEffect(() => {
     return () => {
@@ -257,6 +307,66 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     };
   }, []);
 
+  // Show regenerate confirmation screen
+  if (showRegenerateConfirm) {
+    return (
+      <div className="ai-insights-tab">
+        <div className="analysis-confirmation">
+          <div className="confirmation-header">
+            <h3>🔄 Regenerate Wealth Analysis</h3>
+            <p>Generate a fresh analysis with updated insights</p>
+          </div>
+          
+          <div className="cost-section">
+            <div className="cost-info">
+              <span className="cost-label">Analysis Cost:</span>
+              <span className="cost-amount">{wealthCost} credits</span>
+            </div>
+            <div className="balance-info">
+              <span className="balance-label">Your Balance:</span>
+              <span className={`balance-amount ${credits >= wealthCost ? 'sufficient' : 'insufficient'}`}>
+                {credits} credits
+              </span>
+            </div>
+          </div>
+          
+          {credits >= wealthCost ? (
+            <div className="action-section">
+              <button className="start-analysis-btn" onClick={() => {
+                setShowRegenerateConfirm(false);
+                loadAIInsights(true);
+              }}>
+                🔄 Regenerate Analysis ({wealthCost} credits)
+              </button>
+              <button className="cancel-btn" onClick={() => setShowRegenerateConfirm(false)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="insufficient-credits">
+              <p className="credit-warning-text">
+                You need <strong>{wealthCost} credits</strong> but have <strong>{credits} credits</strong>
+              </p>
+              <div className="action-section">
+                <button className="add-credits-btn" onClick={() => setShowCreditsModal(true)}>
+                  💳 Add Credits
+                </button>
+                <button className="cancel-btn" onClick={() => setShowRegenerateConfirm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <CreditsModal 
+          isOpen={showCreditsModal} 
+          onClose={() => setShowCreditsModal(false)} 
+        />
+      </div>
+    );
+  }
+  
   // Show initial confirmation screen if analysis hasn't started
   if (!hasStarted && !aiInsights) {
     return (
@@ -444,7 +554,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
           className="regenerate-btn corner-btn" 
           onClick={() => {
             console.log('Regenerate button clicked');
-            loadAIInsights(true);
+            setShowRegenerateConfirm(true);
           }}
           title="Generate fresh analysis"
         >
