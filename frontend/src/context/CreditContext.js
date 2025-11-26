@@ -14,6 +14,7 @@ export const CreditProvider = ({ children }) => {
     const [credits, setCredits] = useState(0);
     const [chatCost, setChatCost] = useState(1);
     const [wealthCost, setWealthCost] = useState(5);
+    const [marriageCost, setMarriageCost] = useState(3);
     const [loading, setLoading] = useState(true);
 
     const fetchBalance = async () => {
@@ -73,6 +74,16 @@ export const CreditProvider = ({ children }) => {
         } catch (error) {
             console.error('Error fetching wealth cost:', error);
         }
+        
+        try {
+            const response = await fetch('/api/credits/settings/marriage-cost');
+            if (response.ok) {
+                const data = await response.json();
+                setMarriageCost(data.cost || 3);
+            }
+        } catch (error) {
+            console.error('Error fetching marriage cost:', error);
+        }
     };
 
     useEffect(() => {
@@ -112,6 +123,7 @@ export const CreditProvider = ({ children }) => {
             credits,
             chatCost,
             wealthCost,
+            marriageCost,
             loading,
             fetchBalance,
             spendCredits

@@ -240,6 +240,11 @@ async def get_wealth_cost():
     cost = credit_service.get_credit_setting('wealth_analysis_cost')
     return {"cost": cost}
 
+@router.get("/settings/marriage-cost")
+async def get_marriage_cost():
+    cost = credit_service.get_credit_setting('marriage_analysis_cost')
+    return {"cost": cost}
+
 @router.post("/admin/bulk-promo-codes")
 async def create_bulk_promo_codes(request: dict, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':

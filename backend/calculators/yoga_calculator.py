@@ -1,4 +1,5 @@
 from .base_calculator import BaseCalculator
+from .aspect_calculator import AspectCalculator
 
 class YogaCalculator(BaseCalculator):
     """Calculate various Vedic yogas and combinations"""
@@ -10,68 +11,57 @@ class YogaCalculator(BaseCalculator):
             0: 'Mars', 1: 'Venus', 2: 'Mercury', 3: 'Moon', 4: 'Sun', 5: 'Mercury',
             6: 'Venus', 7: 'Mars', 8: 'Jupiter', 9: 'Saturn', 10: 'Saturn', 11: 'Jupiter'
         }
+        
+        # Initialize aspect calculator
+        self.aspect_calc = AspectCalculator(chart_data)
     
     def calculate_raj_yogas(self):
         """Calculate Raj Yogas (royal combinations)"""
         planets = self.chart_data.get('planets', {})
         raj_yogas = []
         
-        # Only consider actual planets, not calculated points
-        valid_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-        
-        # Get valid planet data only
-        valid_planet_data = {name: data for name, data in planets.items() if name in valid_planets}
-        
-        # Debug logging
-        print(f"DEBUG: Valid planets in chart: {list(valid_planet_data.keys())}")
-        for name, data in valid_planet_data.items():
-            print(f"DEBUG: {name} - House: {data.get('house', 'MISSING')}, Sign: {data.get('sign', 'MISSING')}")
-        
-        # Check if all planets are in same house (indicates data issue)
-        houses = [data.get('house', 1) for data in valid_planet_data.values()]
-        unique_houses = set(houses)
-        print(f"DEBUG: Houses occupied: {unique_houses}")
-        
-        if len(unique_houses) == 1 and len(houses) > 1:
-            print(f"DEBUG: All planets in same house {list(unique_houses)[0]} - data corruption detected")
-            return []
-        
-        # Kendra-Trikona Raj Yoga requires planets in different houses
+        # Kendra-Trikona Raj Yoga: Lords of Kendra and Trikona houses connected
         kendra_houses = [1, 4, 7, 10]
         trikona_houses = [1, 5, 9]
         processed_pairs = set()
         
-        for planet1_name, planet1_data in valid_planet_data.items():
-            house1 = planet1_data.get('house', 1)
-            
-            for planet2_name, planet2_data in valid_planet_data.items():
-                if planet1_name == planet2_name:
+        for kendra_house in kendra_houses:
+            kendra_lord = self._get_house_lord(kendra_house)
+            if not kendra_lord or kendra_lord not in planets:
+                continue
+                
+            for trikona_house in trikona_houses:
+                if kendra_house == trikona_house:  # Skip same house
+                    continue
+                    
+                trikona_lord = self._get_house_lord(trikona_house)
+                if not trikona_lord or trikona_lord not in planets:
+                    continue
+                
+                if kendra_lord == trikona_lord:  # Same planet can't form yoga with itself
                     continue
                 
                 # Prevent duplicate pairs
-                pair = tuple(sorted([planet1_name, planet2_name]))
+                pair = tuple(sorted([kendra_lord, trikona_lord]))
                 if pair in processed_pairs:
                     continue
                 processed_pairs.add(pair)
-                    
-                house2 = planet2_data.get('house', 1)
                 
-                # Skip if same house (conjunction doesn't form Kendra-Trikona)
-                if house1 == house2:
-                    continue
+                # Check if lords are connected
+                kendra_lord_data = planets[kendra_lord].copy()
+                kendra_lord_data['name'] = kendra_lord
+                trikona_lord_data = planets[trikona_lord].copy()
+                trikona_lord_data['name'] = trikona_lord
                 
-                # Check Kendra-Trikona combination
-                if ((house1 in kendra_houses and house2 in trikona_houses) or 
-                    (house1 in trikona_houses and house2 in kendra_houses)):
+                if self._are_planets_connected(kendra_lord_data, trikona_lord_data):
                     raj_yogas.append({
                         'name': 'Kendra-Trikona Raj Yoga',
-                        'planets': [planet1_name, planet2_name],
-                        'houses': [house1, house2],
+                        'planets': [kendra_lord, trikona_lord],
+                        'houses': [planets[kendra_lord].get('house', 1), planets[trikona_lord].get('house', 1)],
                         'strength': 'High',
-                        'description': f'{planet1_name} and {planet2_name} form Raj Yoga'
+                        'description': f'{kendra_house}th lord {kendra_lord} and {trikona_house}th lord {trikona_lord} connected'
                     })
         
-        print(f"DEBUG: Found {len(raj_yogas)} Raj Yogas")
         return raj_yogas
     
     def calculate_dhana_yogas(self):
@@ -106,11 +96,11 @@ class YogaCalculator(BaseCalculator):
         mahapurusha_yogas = []
         
         yoga_definitions = {
-            'Mars': {'name': 'Ruchaka Yoga', 'houses': [1, 4, 7, 10], 'signs': [0, 7]},
-            'Mercury': {'name': 'Bhadra Yoga', 'houses': [1, 4, 7, 10], 'signs': [2, 5]},
-            'Jupiter': {'name': 'Hamsa Yoga', 'houses': [1, 4, 7, 10], 'signs': [8, 11]},
-            'Venus': {'name': 'Malavya Yoga', 'houses': [1, 4, 7, 10], 'signs': [1, 6]},
-            'Saturn': {'name': 'Sasha Yoga', 'houses': [1, 4, 7, 10], 'signs': [9, 10]}
+            'Mars': {'name': 'Ruchaka Yoga', 'houses': [1, 4, 7, 10], 'signs': [0, 7, 9]},  # Aries, Scorpio, Capricorn(exalt)
+            'Mercury': {'name': 'Bhadra Yoga', 'houses': [1, 4, 7, 10], 'signs': [2, 5]},  # Gemini, Virgo(own+exalt)
+            'Jupiter': {'name': 'Hamsa Yoga', 'houses': [1, 4, 7, 10], 'signs': [8, 11, 3]},  # Sagittarius, Pisces, Cancer(exalt)
+            'Venus': {'name': 'Malavya Yoga', 'houses': [1, 4, 7, 10], 'signs': [1, 6, 11]},  # Taurus, Libra, Pisces(exalt)
+            'Saturn': {'name': 'Sasha Yoga', 'houses': [1, 4, 7, 10], 'signs': [9, 10, 6]}  # Capricorn, Aquarius, Libra(exalt)
         }
         
         for planet_name, yoga_data in yoga_definitions.items():
@@ -270,7 +260,8 @@ class YogaCalculator(BaseCalculator):
             'dharma_karma_yogas': self.calculate_dharma_karma_yogas(),
             'career_specific_yogas': self.calculate_career_specific_yogas(),
             'health_yogas': self.calculate_health_yogas(),
-            'education_yogas': self.calculate_education_yogas()
+            'education_yogas': self.calculate_education_yogas(),
+            'marriage_yogas': self.calculate_marriage_yogas()
         }
     
     def calculate_career_specific_yogas(self):
@@ -627,16 +618,24 @@ class YogaCalculator(BaseCalculator):
         return False
     
     def _are_planets_connected(self, planet1_data, planet2_data):
-        """Check if two planets are connected by conjunction or aspect"""
+        """Check if two planets are connected by conjunction or aspect using AspectCalculator"""
         house1 = planet1_data.get('house', 1)
         house2 = planet2_data.get('house', 1)
+        planet1_name = planet1_data.get('name', '')
+        planet2_name = planet2_data.get('name', '')
         
-        # Conjunction (same house)
+        # 1. Conjunction (same house)
         if house1 == house2:
             return True
         
-        # 7th house aspect (opposition)
-        if abs(house1 - house2) == 6 or (house1 + house2) == 13:
+        # 2. Use AspectCalculator to check if planet1 aspects house2
+        aspecting_planets_house2 = self.aspect_calc.get_aspecting_planets(house2)
+        if planet1_name in aspecting_planets_house2:
+            return True
+        
+        # 3. Use AspectCalculator to check if planet2 aspects house1
+        aspecting_planets_house1 = self.aspect_calc.get_aspecting_planets(house1)
+        if planet2_name in aspecting_planets_house1:
             return True
         
         return False
@@ -648,6 +647,27 @@ class YogaCalculator(BaseCalculator):
             house_sign = houses[house_number - 1].get('sign', 0)
             return self.SIGN_LORDS.get(house_sign)
 
+    
+    def get_marriage_yogas_only(self):
+        """Get only marriage-related yogas from all yogas"""
+        all_yogas = self.calculate_all_yogas()
+        marriage_yogas = []
+        
+        # Add specific marriage yogas
+        marriage_yogas.extend(all_yogas.get('marriage_yogas', []))
+        
+        # Filter other yogas for marriage relevance
+        marriage_keywords = ['kalatra', 'marriage', 'spouse', 'venus', 'shukra', 'seventh', 'saptama', 'mangal', 'guru']
+        
+        for category_yogas in all_yogas.values():
+            if isinstance(category_yogas, list):
+                for yoga in category_yogas:
+                    yoga_name = yoga.get('name', '').lower()
+                    if any(keyword in yoga_name for keyword in marriage_keywords):
+                        if yoga not in marriage_yogas:
+                            marriage_yogas.append(yoga)
+        
+        return marriage_yogas
     
     def get_education_yogas_only(self):
         """Get only education-related yogas from all yogas"""
@@ -673,3 +693,154 @@ class YogaCalculator(BaseCalculator):
                             education_yogas.append(yoga)
         
         return education_yogas
+    
+    def calculate_marriage_yogas(self):
+        """Calculate marriage-specific yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Mangal Dosha (Kuja Dosha)
+        yogas.extend(self._calculate_mangal_dosha())
+        
+        # Kalatra Yogas (marriage combinations)
+        yogas.extend(self._calculate_kalatra_yogas())
+        
+        # Venus-Jupiter marriage yogas
+        yogas.extend(self._calculate_venus_jupiter_yogas())
+        
+        # 7th house marriage yogas
+        yogas.extend(self._calculate_seventh_house_yogas())
+        
+        return yogas
+    
+    def _calculate_mangal_dosha(self):
+        """Calculate Mangal Dosha (Mars affliction in marriage houses)"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        if 'Mars' not in planets:
+            return yogas
+        
+        mars_house = planets['Mars'].get('house', 1)
+        mangal_dosha_houses = [1, 2, 4, 7, 8, 12]
+        
+        if mars_house in mangal_dosha_houses:
+            severity = 'High' if mars_house in [1, 7, 8] else 'Medium'
+            yogas.append({
+                'name': 'Mangal Dosha',
+                'planet': 'Mars',
+                'house': mars_house,
+                'strength': severity,
+                'type': 'affliction',
+                'description': f'Mars in {mars_house}th house - marriage delays and conflicts'
+            })
+        
+        return yogas
+    
+    def _calculate_kalatra_yogas(self):
+        """Calculate Kalatra (marriage) yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # 7th lord in Kendra
+        seventh_lord = self._get_house_lord(7)
+        if seventh_lord and seventh_lord in planets:
+            seventh_lord_house = planets[seventh_lord].get('house', 1)
+            if seventh_lord_house in [1, 4, 7, 10]:
+                yogas.append({
+                    'name': 'Kalatra Yoga',
+                    'planet': seventh_lord,
+                    'house': seventh_lord_house,
+                    'strength': 'High',
+                    'type': 'beneficial',
+                    'description': f'7th lord {seventh_lord} in Kendra - strong marriage'
+                })
+        
+        # Venus in 7th house
+        if 'Venus' in planets:
+            venus_house = planets['Venus'].get('house', 1)
+            if venus_house == 7:
+                yogas.append({
+                    'name': 'Shukra Kalatra Yoga',
+                    'planet': 'Venus',
+                    'house': 7,
+                    'strength': 'High',
+                    'type': 'beneficial',
+                    'description': 'Venus in 7th house - beautiful spouse, happy marriage'
+                })
+        
+        return yogas
+    
+    def _calculate_venus_jupiter_yogas(self):
+        """Calculate Venus-Jupiter marriage combinations"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        if 'Venus' not in planets or 'Jupiter' not in planets:
+            return yogas
+        
+        venus_house = planets['Venus'].get('house', 1)
+        jupiter_house = planets['Jupiter'].get('house', 1)
+        
+        # Venus-Jupiter conjunction
+        if venus_house == jupiter_house:
+            yogas.append({
+                'name': 'Guru-Shukra Yoga',
+                'planets': ['Venus', 'Jupiter'],
+                'houses': [venus_house],
+                'strength': 'High',
+                'type': 'beneficial',
+                'description': 'Venus-Jupiter conjunction - harmonious marriage, spiritual spouse'
+            })
+        
+        # Venus-Jupiter mutual aspect
+        elif self._are_planets_connected(planets['Venus'], planets['Jupiter']):
+            yogas.append({
+                'name': 'Guru-Shukra Drishti Yoga',
+                'planets': ['Venus', 'Jupiter'],
+                'houses': [venus_house, jupiter_house],
+                'strength': 'Medium',
+                'type': 'beneficial',
+                'description': 'Venus-Jupiter aspect - balanced marriage, good values'
+            })
+        
+        return yogas
+    
+    def _calculate_seventh_house_yogas(self):
+        """Calculate 7th house specific marriage yogas"""
+        yogas = []
+        planets = self.chart_data.get('planets', {})
+        
+        # Benefics in 7th house
+        benefics_in_seventh = []
+        for planet in ['Jupiter', 'Venus', 'Mercury']:
+            if planet in planets and planets[planet].get('house', 1) == 7:
+                benefics_in_seventh.append(planet)
+        
+        if benefics_in_seventh:
+            yogas.append({
+                'name': 'Saptama Shubha Yoga',
+                'planets': benefics_in_seventh,
+                'houses': [7],
+                'strength': 'High',
+                'type': 'beneficial',
+                'description': f'Benefic planets {", ".join(benefics_in_seventh)} in 7th house - good marriage'
+            })
+        
+        # Malefics in 7th house
+        malefics_in_seventh = []
+        for planet in ['Mars', 'Saturn', 'Rahu', 'Ketu']:
+            if planet in planets and planets[planet].get('house', 1) == 7:
+                malefics_in_seventh.append(planet)
+        
+        if malefics_in_seventh:
+            yogas.append({
+                'name': 'Saptama Krura Yoga',
+                'planets': malefics_in_seventh,
+                'houses': [7],
+                'strength': 'High',
+                'type': 'affliction',
+                'description': f'Malefic planets {", ".join(malefics_in_seventh)} in 7th house - marriage challenges'
+            })
+        
+        return yogas

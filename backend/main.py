@@ -44,6 +44,7 @@ from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
 from credits.routes import router as credits_router
 from education.routes import router as education_router
+from marriage.marriage_routes import router as marriage_router
 import math
 from datetime import timedelta
 import signal
@@ -191,6 +192,7 @@ app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(education_router, prefix="/api")
+app.include_router(marriage_router, prefix="/api")
 
 
 # Root endpoint for health check

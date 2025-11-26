@@ -3,6 +3,7 @@ import './MarriageAnalysisTab.css';
 import { apiService } from '../../services/apiService';
 import SpousePersonalityAnalysis from './SpousePersonalityAnalysis';
 import CompatibilityAnalysis from './CompatibilityAnalysis';
+import AIInsightsTab from './AIInsightsTab';
 import { 
   getHouseLordship, getFriendship, ownSigns, exaltationSigns, debilitationSigns,
   houseLords, getPlanetStatus, getPlanetDignity, getStatusColor, getNakshatraLord,
@@ -82,7 +83,7 @@ const MarriageAnalysisTab = ({ chartData, birthDetails }) => {
 };
 
 const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
-  const [activeTab, setActiveTab] = useState('marriage');
+  const [activeTab, setActiveTab] = useState('ai-insights');
   const overallScore = analysis.overall_score || {};
   const seventhHouse = analysis.seventh_house_analysis || {};
   const karakas = analysis.karaka_analysis || {};
@@ -469,6 +470,12 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
     <div className="single-chart-analysis">
       {/* Tab Navigation */}
       <div className="marriage-tabs">
+        <button 
+          className={`tab-btn ${activeTab === 'ai-insights' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ai-insights')}
+        >
+          360° Analysis
+        </button>
         <button 
           className={`tab-btn ${activeTab === 'marriage' ? 'active' : ''}`}
           onClick={() => setActiveTab('marriage')}
@@ -2976,6 +2983,12 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
       {activeTab === 'compatibility' && (
         <div className="compatibility-tab-content" style={{ marginTop: '20px' }}>
           <CompatibilityAnalysis />
+        </div>
+      )}
+
+      {activeTab === 'ai-insights' && (
+        <div className="ai-insights-tab-content" style={{ marginTop: '20px' }}>
+          <AIInsightsTab chartData={chartData} birthDetails={birthDetails} />
         </div>
       )}
 

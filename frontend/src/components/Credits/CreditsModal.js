@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCredits } from '../../context/CreditContext';
 
 const CreditsModal = ({ isOpen, onClose }) => {
-    const { credits, fetchBalance, chatCost } = useCredits();
+    const { credits, fetchBalance, chatCost, wealthCost, marriageCost } = useCredits();
     const [promoCode, setPromoCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
@@ -155,9 +155,17 @@ const CreditsModal = ({ isOpen, onClose }) => {
                     borderLeft: '4px solid #ff6b35'
                 }}>
                     <h4 style={{ color: '#333', margin: '0 0 10px 0', fontSize: '16px' }}>💰 Credit Costs</h4>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ color: '#333', fontWeight: '500' }}>Chat Question</span>
                         <span style={{ color: '#ff6b35', fontWeight: 'bold' }}>{chatCost} credit{chatCost > 1 ? 's' : ''}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ color: '#333', fontWeight: '500' }}>Marriage Analysis</span>
+                        <span style={{ color: '#ff6b35', fontWeight: 'bold' }}>{marriageCost} credit{marriageCost > 1 ? 's' : ''}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#333', fontWeight: '500' }}>Wealth Analysis</span>
+                        <span style={{ color: '#ff6b35', fontWeight: 'bold' }}>{wealthCost} credit{wealthCost > 1 ? 's' : ''}</span>
                     </div>
                 </div>
             </div>
