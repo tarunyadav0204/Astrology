@@ -26,6 +26,7 @@ from calculators.indu_lagna_calculator import InduLagnaCalculator
 from shared.dasha_calculator import DashaCalculator
 from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
+from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -300,9 +301,46 @@ class ChatContextBuilder:
         dasha_calc = DashaCalculator()
         context['current_dashas'] = dasha_calc.calculate_current_dashas(birth_data)
         
+        # Add Maraka analysis for relatives (both Mahadasha and Antardasha)
+        birth_hash = self._create_birth_hash(birth_data)
+        chart_data = self.static_cache[birth_hash]['d1_chart']
+        asc_sign = int(chart_data['ascendant'] / 30)
+        
+        relatives = {
+            "Mother": (asc_sign + 3) % 12,        # 4th
+            "Father": (asc_sign + 8) % 12,        # 9th
+            "Spouse": (asc_sign + 6) % 12,        # 7th
+            "First_Child": self._get_child_lagna(asc_sign, 1, method='bhavat_bhavam'),
+            "Second_Child": self._get_child_lagna(asc_sign, 2, method='bhavat_bhavam'),
+            "Third_Child": self._get_child_lagna(asc_sign, 3, method='bhavat_bhavam')
+        }
+        
+        # Get BOTH Dasha Lords
+        md_planet = context['current_dashas'].get('mahadasha', {}).get('planet')
+        ad_planet = context['current_dashas'].get('antardasha', {}).get('planet')
+        
+        # Analyze Maraka Status for BOTH
+        context['current_dashas']['maraka_analysis'] = {}
+        
+        if md_planet:
+            context['current_dashas']['maraka_analysis']['mahadasha_lord'] = {}
+            for rel_name, rel_lagna in relatives.items():
+                status = self._check_relative_maraka(md_planet, rel_lagna, chart_data)
+                context['current_dashas']['maraka_analysis']['mahadasha_lord'][rel_name] = status
+
+        if ad_planet:
+            context['current_dashas']['maraka_analysis']['antardasha_lord'] = {}
+            for rel_name, rel_lagna in relatives.items():
+                status = self._check_relative_maraka(ad_planet, rel_lagna, chart_data)
+                context['current_dashas']['maraka_analysis']['antardasha_lord'][rel_name] = status
+        
         # Add Kalchakra dasha
         kalchakra_calc = KalachakraDashaCalculator()
         context['kalchakra_dasha'] = kalchakra_calc.calculate_kalchakra_dasha(birth_data)
+        
+        # Add Shoola Dasha (Jaimini longevity system)
+        shoola_calc = ShoolaDashaCalculator(chart_data)
+        context['shoola_dasha'] = shoola_calc.calculate_shoola_dasha(birth_data)
         
         # Add specific date dashas if requested
         if target_date:
@@ -334,6 +372,11 @@ class ChatContextBuilder:
                     "5. Synthesize with dasha context for timing and intensity",
                     "6. Predict SPECIFIC life events, not general philosophical statements"
                 ],
+                "critical_transit_rules": {
+                    "exit_rule": "CRITICAL TRANSIT RULE: If a Dasha Lord flagged as a 'Maraka' transits the 12th House (House of Exit) relative to the person, interpret this as 'Departure', 'Final Release', or 'End of Life Cycle', not just financial loss. This is often the trigger for death.",
+                    "dasha_chhidra_rule": "TIMING RULE: If a malefic Antardasha (e.g., Mars-Rahu) is ending within 1-2 months, prioritize this 'Dasha Transition Period' as the most likely time for a critical event, even if later transits look stronger. The end of a malefic period is a classic trigger.",
+                    "trigger_planet_rule": "TRIGGER RULE: In a Maraka period, the event often manifests when the Sun or Mars transits the 12th, 8th, or 1st house. Check the monthly transit data for these specific triggers."
+                },
                 "example_analysis": "Mars (lord 5th,10th, natal 2nd) transits 6th aspecting natal Sun (9th house, lord 1st): Houses involved = 1st,2nd,5th,6th,9th,10th = self,wealth,children,health,father,career. Possible events: health issues affecting father, career conflicts requiring courage, children's education expenses, property disputes, work-related stress affecting family finances.",
                 "quick_answer_requirements": {
                     "must_include": "4-6 SPECIFIC life events with exact dates from transit periods - predict MORE events by combining house meanings",
@@ -904,3 +947,73 @@ class ChatContextBuilder:
                     planet_data['sign_name'] = sign_names[sign_index]
         
         return chart_copy
+    
+    def _get_child_lagna(self, ascendant_sign: int, child_number: int, method: str = 'bhavat_bhavam') -> int:
+        """
+        Calculates the Derived Lagna (Sign Index 0-11) for the Nth child.
+        
+        Args:
+            ascendant_sign (int): Native's Lagna (0=Aries, 1=Taurus...)
+            child_number (int): 1 for 1st child, 2 for 2nd, etc.
+            method (str): 
+                'sibling' = 5th, 7th, 9th (Standard Parashara - 3rd from previous)
+                'bhavat_bhavam' = 5th, 9th, 1st (Deep Reflection - 5th from previous)
+        
+        Returns:
+            int: The sign index (0-11) for that child's Lagna.
+        """
+        if child_number < 1: return ascendant_sign
+        
+        # 1. Start at the 5th House (Index + 4)
+        # This is the universal house for the 1st Child
+        child_lagna = (ascendant_sign + 4) % 12
+        
+        # 2. If looking for 2nd, 3rd, etc., apply the jump
+        if child_number > 1:
+            if method == 'sibling':
+                # Jump 3 houses (Index + 2) for each subsequent child
+                # 1st=5th, 2nd=7th, 3rd=9th...
+                jump = 2
+            else:
+                # 'bhavat_bhavam' (The one that worked for the death prediction)
+                # Jump 5 houses (Index + 4) for each subsequent child
+                # 1st=5th, 2nd=9th, 3rd=1st...
+                jump = 4
+                
+            # Apply jumps
+            total_jump = jump * (child_number - 1)
+            child_lagna = (child_lagna + total_jump) % 12
+            
+        return child_lagna
+    
+    def _check_relative_maraka(self, planet_name: str, relative_lagna_sign: int, chart_data: Dict) -> str:
+        """
+        Checks if a planet is a Maraka (Killer) for a relative's Lagna.
+        """
+        if planet_name not in chart_data['planets']: return "Neutral"
+        
+        # 1. Calculate Maraka Houses (2nd and 7th from Relative)
+        maraka_house_2 = (relative_lagna_sign + 1) % 12  # 2nd Sign
+        maraka_house_7 = (relative_lagna_sign + 6) % 12  # 7th Sign
+        
+        # 2. Get Lordships of the Planet
+        sign_lords = {0: 'Mars', 1: 'Venus', 2: 'Mercury', 3: 'Moon', 4: 'Sun', 
+                      5: 'Mercury', 6: 'Venus', 7: 'Mars', 8: 'Jupiter', 9: 'Saturn', 
+                      10: 'Saturn', 11: 'Jupiter'}
+        
+        is_maraka_lord = False
+        if sign_lords[maraka_house_2] == planet_name: is_maraka_lord = True
+        if sign_lords[maraka_house_7] == planet_name: is_maraka_lord = True
+        
+        # 3. Check Placement (Is it sitting in 2nd or 7th?)
+        p_sign = chart_data['planets'][planet_name]['sign']
+        is_in_maraka_house = (p_sign == maraka_house_2) or (p_sign == maraka_house_7)
+        
+        if is_maraka_lord and is_in_maraka_house:
+            return "Double Maraka (Critical Danger)"
+        elif is_maraka_lord:
+            return "Maraka Lord (Health Threat)"
+        elif is_in_maraka_house:
+            return "Placed in Maraka House (Stress)"
+            
+        return "Safe"

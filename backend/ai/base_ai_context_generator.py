@@ -16,6 +16,7 @@ from calculators.planetary_war_calculator import PlanetaryWarCalculator
 from calculators.vargottama_calculator import VargottamaCalculator
 from calculators.neecha_bhanga_calculator import NeechaBhangaCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
+from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from shared.dasha_calculator import DashaCalculator
 
 class BaseAIContextGenerator:
@@ -303,6 +304,10 @@ class BaseAIContextGenerator:
         # House lordship mapping
         birth_hash = self._create_birth_hash(birth_data)
         chart_data = self.static_cache[birth_hash]['d1_chart']
+        
+        # Shoola Dasha (Jaimini longevity system)
+        shoola_calc = ShoolaDashaCalculator(chart_data)
+        context['shoola_dasha'] = shoola_calc.calculate_shoola_dasha(birth_data)
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
         context['house_lordships'] = self._get_house_lordships(ascendant_sign)
         
@@ -322,6 +327,23 @@ class BaseAIContextGenerator:
                     planet_name = dasha.get('planet')
                     if planet_name:
                         dasha['rel_pos'] = self._calculate_dasha_relationships(planet_name, chart_data)
+            
+            # Add Maraka analysis for relatives
+            asc_sign = int(chart_data['ascendant'] / 30)
+            relatives = {
+                "Mother": (asc_sign + 3) % 12,  # 4th
+                "Father": (asc_sign + 8) % 12,  # 9th
+                "First_Child": (asc_sign + 4) % 12,  # 5th
+                "Second_Child": (asc_sign + 8) % 12,  # 9th (Standard for 2nd child)
+                "Spouse": (asc_sign + 6) % 12   # 7th
+            }
+            
+            md_planet = context['current_dashas'].get('mahadasha', {}).get('planet')
+            if md_planet:
+                context['current_dashas']['maraka_analysis'] = {}
+                for rel_name, rel_lagna in relatives.items():
+                    status = self._check_relative_maraka(md_planet, rel_lagna, chart_data)
+                    context['current_dashas']['maraka_analysis'][f"for_{rel_name}"] = status
         
         return context
     
@@ -454,7 +476,8 @@ class BaseAIContextGenerator:
             'synthesis_required': len(synthesis_notes) > 0,
             'conflicting_indications': synthesis_notes,
             'instruction': 'When analyzing life areas, cross-reference both Parashara (house lords) and Jaimini (chara karakas) methods. If they conflict, mention both perspectives and synthesize for balanced prediction.',
-            'dusthana_analysis_rule': 'CRITICAL: If a planet rules a Dusthana (6th, 8th, 12th) and transits that same house, interpret it as an intensification of that house\'s themes (e.g., health issues, transformation, expenses) rather than just "benefic protection", even if the planet is natural benefic like Jupiter.'
+            'dusthana_analysis_rule': 'CRITICAL: If a planet rules a Dusthana (6th, 8th, 12th) and transits that same house, interpret it as an intensification of that house\'s themes (e.g., health issues, transformation, expenses) rather than just "benefic protection", even if the planet is natural benefic like Jupiter.',
+            'ashtakavarga_rule': 'When discussing house strength, explicitly mention the Ashtakavarga Bindu count (e.g., "With only 20 points in the 2nd house...").'
         }
     
     def _calculate_dasha_relationships(self, planet_name: str, chart_data: Dict) -> Dict:
@@ -498,3 +521,35 @@ class BaseAIContextGenerator:
             relationships[f"from_{pillar_name}"] = f"{relative_house} ({effect})"
 
         return relationships
+    
+    def _check_relative_maraka(self, planet_name: str, relative_lagna_sign: int, chart_data: Dict) -> str:
+        """
+        Checks if a planet is a Maraka (Killer) for a relative's Lagna.
+        """
+        if planet_name not in chart_data['planets']: return "Neutral"
+        
+        # 1. Calculate Maraka Houses (2nd and 7th from Relative)
+        maraka_house_2 = (relative_lagna_sign + 1) % 12  # 2nd Sign
+        maraka_house_7 = (relative_lagna_sign + 6) % 12  # 7th Sign
+        
+        # 2. Get Lordships of the Planet
+        sign_lords = {0: 'Mars', 1: 'Venus', 2: 'Mercury', 3: 'Moon', 4: 'Sun', 
+                      5: 'Mercury', 6: 'Venus', 7: 'Mars', 8: 'Jupiter', 9: 'Saturn', 
+                      10: 'Saturn', 11: 'Jupiter'}
+        
+        is_maraka_lord = False
+        if sign_lords[maraka_house_2] == planet_name: is_maraka_lord = True
+        if sign_lords[maraka_house_7] == planet_name: is_maraka_lord = True
+        
+        # 3. Check Placement (Is it sitting in 2nd or 7th?)
+        p_sign = chart_data['planets'][planet_name]['sign']
+        is_in_maraka_house = (p_sign == maraka_house_2) or (p_sign == maraka_house_7)
+        
+        if is_maraka_lord and is_in_maraka_house:
+            return "Double Maraka (Critical Danger)"
+        elif is_maraka_lord:
+            return "Maraka Lord (Health Threat)"
+        elif is_in_maraka_house:
+            return "Placed in Maraka House (Stress)"
+            
+        return "Safe"

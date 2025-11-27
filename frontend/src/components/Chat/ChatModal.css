@@ -65,6 +65,12 @@
     position: relative;
 }
 
+.mobile-menu {
+    position: absolute;
+    right: 80px;
+    top: 20px;
+}
+
 .chat-modal-header h2 {
     color: white;
     margin: 0;
@@ -754,21 +760,20 @@
     }
     
     .desktop-buttons button {
-        background: rgba(0, 0, 0, 0.7);
-        border: 1px solid rgba(0, 0, 0, 0.8);
-        color: white;
+        background: white;
+        border: none;
+        color: black;
         padding: 6px 12px;
         border-radius: 6px;
         font-size: 12px;
         cursor: pointer;
         white-space: nowrap;
         transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     .desktop-buttons button:hover {
-        background: rgba(0, 0, 0, 0.9);
+        background: rgba(255, 255, 255, 0.9);
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
@@ -778,20 +783,19 @@
     }
     
     .mobile-menu-btn {
-        background: rgba(0, 0, 0, 0.7);
-        border: 1px solid rgba(0, 0, 0, 0.8);
-        color: white;
+        background: white;
+        border: none;
+        color: black;
         padding: 6px 8px;
         border-radius: 6px;
         font-size: 16px;
         cursor: pointer;
-        backdrop-filter: blur(10px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         transition: all 0.3s ease;
     }
     
     .mobile-menu-btn:hover {
-        background: rgba(0, 0, 0, 0.9);
+        background: rgba(255, 255, 255, 0.9);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
 }
@@ -825,6 +829,18 @@
         padding-right: 0;
     }
     
+    .chat-modal-header h2::after {
+        content: 'AstroRoshni';
+    }
+    
+    .chat-modal-header h2 {
+        font-size: 0;
+    }
+    
+    .chat-modal-header h2::after {
+        font-size: 16px;
+    }
+    
     .desktop-buttons {
         display: none !important;
     }
@@ -834,20 +850,19 @@
     }
     
     .mobile-menu-btn {
-        background: rgba(0, 0, 0, 0.7);
-        border: 1px solid rgba(0, 0, 0, 0.8);
-        color: white;
+        background: white;
+        border: none;
+        color: black;
         padding: 6px 8px;
         border-radius: 6px;
         font-size: 16px;
         cursor: pointer;
-        backdrop-filter: blur(10px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         transition: all 0.3s ease;
     }
     
     .mobile-menu-btn:hover {
-        background: rgba(0, 0, 0, 0.9);
+        background: rgba(255, 255, 255, 0.9);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     

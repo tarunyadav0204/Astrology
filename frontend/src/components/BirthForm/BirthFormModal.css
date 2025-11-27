@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -20,16 +20,16 @@
 }
 
 .birth-form-modal-content {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #ff9ff3 100%);
+  background: white;
   border-radius: 24px;
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
-  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #e2e8f0;
 }
 
 @keyframes slideUp {
@@ -44,38 +44,36 @@
 }
 
 .birth-form-modal-header {
-  padding: 32px 70px 24px 32px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 24px 70px 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
   position: relative;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: #f8fafc;
 }
 
 .birth-form-modal-header h2 {
-  margin: 0 0 12px 0;
-  color: white;
+  margin: 0 0 8px 0;
+  color: #1e1b4b;
   font-size: 24px;
   font-weight: 700;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   text-align: center;
 }
 
 .birth-form-modal-header p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 16px;
+  color: #64748b;
+  font-size: 14px;
   text-align: center;
   font-weight: 400;
 }
 
 .birth-form-modal-close {
   position: absolute;
-  top: 24px;
-  right: 24px;
-  background: rgba(255, 255, 255, 0.2);
+  top: 20px;
+  right: 20px;
+  background: #f1f5f9;
   border: none;
   font-size: 20px;
-  color: white;
+  color: #64748b;
   cursor: pointer;
   width: 36px;
   height: 36px;
@@ -83,20 +81,20 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .birth-form-modal-close:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1) rotate(90deg);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  background: #e2e8f0;
+  color: #1e293b;
+  transform: scale(1.1);
 }
 
 .birth-form-modal-body {
   padding: 0;
-  max-height: calc(90vh - 100px);
-  overflow-y: auto;
+  max-height: 90vh;
+  overflow-y: visible;
   width: 100%;
   max-width: 500px;
 }
@@ -127,11 +125,11 @@
   }
   
   .birth-form-modal-header {
-    padding: 24px 24px 20px;
+    padding: 20px 20px 16px;
   }
   
   .birth-form-modal-close {
-    top: 20px;
-    right: 20px;
+    top: 16px;
+    right: 16px;
   }
 }

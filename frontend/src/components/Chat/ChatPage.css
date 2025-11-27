@@ -13,6 +13,30 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.chat-header > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.credits-display .credits-short {
+    display: none;
+}
+
+.credits-display .credits-full {
+    display: inline;
+}
+
+@media (max-width: 768px) {
+    .chat-header > div:first-child > div:last-child {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
 .chat-header h1 {
     color: white;
     margin: 0 0 10px 0;
@@ -398,6 +422,14 @@
 }
 
 @media (max-width: 768px) {
+    .credits-display .credits-full {
+        display: none;
+    }
+    
+    .credits-display .credits-short {
+        display: inline;
+    }
+    
     .message-content {
         max-width: 85%;
     }

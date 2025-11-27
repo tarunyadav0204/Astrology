@@ -165,7 +165,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
   );
 };
 
-const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLogout, user }) => {
+const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurrentView, onLogout, user }) => {
   const { birthData, chartData, setBirthData, setChartData } = useAstrology();
   const [layouts, setLayouts] = useState(DASHBOARD_CONFIG.defaultLayout);
   const [transitDate, setTransitDate] = useState(new Date());
@@ -328,7 +328,7 @@ const Dashboard = ({ onBack, onViewAllCharts, currentView, setCurrentView, onLog
         currentChart={birthData}
         onSelectChart={selectExistingChart}
         onViewAllCharts={onViewAllCharts}
-        onNewChart={onBack}
+        onNewChart={onNewChart || onBack}
         onLogout={onLogout}
         user={user}
         showTransitControls={window.innerWidth > 768}

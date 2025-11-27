@@ -7,7 +7,7 @@ import { FORM_FIELDS, VALIDATION_MESSAGES } from '../../config/form.config';
 import { APP_CONFIG } from '../../config/app.config';
 import { FormContainer, FormField, Input, Select, Label, Button, AutocompleteContainer, SuggestionList, SuggestionItem, SearchInput, ChartsList, ChartItem, TabContainer, TabNavigation, TabButton, TabContent } from './BirthForm.styles';
 
-const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
+const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose }) => {
   const { birthData, setBirthData, setChartData, setLoading, setError } = useAstrology();
   
   const [formData, setFormData] = useState({
@@ -329,33 +329,71 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
 
   return (
     <TabContainer key="fixed-tabs-v2">
-      {/* Tab Navigation */}
-      <TabNavigation style={{
-        display: 'flex',
-        background: '#f8f9fa',
-        borderRadius: '0',
-        margin: '0',
-        borderBottom: '2px solid #e5e7eb',
-        padding: '0'
-      }}>
+      {onClose && (
+        <div style={{
+          padding: '24px 70px 20px 24px',
+          borderBottom: '1px solid #e2e8f0',
+          background: '#f8fafc',
+          position: 'relative',
+          borderRadius: '24px 24px 0 0'
+        }}>
+          <h2 style={{
+            margin: '0 0 8px 0',
+            color: '#1e1b4b',
+            fontSize: '24px',
+            fontWeight: '700',
+            textAlign: 'center'
+          }}>
+            {activeTab === 'new' ? 'Enter Birth Details' : 'Select Saved Chart'}
+          </h2>
+          <p style={{
+            margin: 0,
+            color: '#64748b',
+            fontSize: '14px',
+            textAlign: 'center',
+            fontWeight: '400'
+          }}>
+            {activeTab === 'new' ? 'Please provide birth information to generate chart' : 'Choose from your previously saved birth charts'}
+          </p>
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: '#f1f5f9',
+              border: 'none',
+              fontSize: '20px',
+              color: '#64748b',
+              cursor: 'pointer',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = '#e2e8f0';
+              e.target.style.color = '#1e293b';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = '#f1f5f9';
+              e.target.style.color = '#64748b';
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <TabNavigation>
         <TabButton
           type="button"
           onClick={() => setActiveTab('new')}
           active={activeTab === 'new'}
           isFirst={true}
-          style={{
-            flex: '1',
-            padding: '12px 20px',
-            background: activeTab === 'new' ? 'white' : 'transparent',
-            color: activeTab === 'new' ? '#2563eb' : '#6b7280',
-            border: 'none',
-            borderRadius: '0',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'new' ? '600' : '500',
-            fontSize: '14px',
-            borderBottom: activeTab === 'new' ? '2px solid #2563eb' : '2px solid transparent',
-            margin: '0'
-          }}
         >
           📝 New Chart
         </TabButton>
@@ -364,19 +402,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
           onClick={() => setActiveTab('saved')}
           active={activeTab === 'saved'}
           isLast={true}
-          style={{
-            flex: '1',
-            padding: '12px 20px',
-            background: activeTab === 'saved' ? 'white' : 'transparent',
-            color: activeTab === 'saved' ? '#2563eb' : '#6b7280',
-            border: 'none',
-            borderRadius: '0',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'saved' ? '600' : '500',
-            fontSize: '14px',
-            borderBottom: activeTab === 'saved' ? '2px solid #2563eb' : '2px solid transparent',
-            margin: '0'
-          }}
         >
           📊 Saved Charts
         </TabButton>
@@ -384,9 +409,9 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
 
       {/* Tab Content */}
       {activeTab === 'new' ? (
-        <TabContent>
-        <FormContainer style={{ flex: 1, overflow: 'hidden' }}>
-          <div style={{ position: 'relative', zIndex: 3, padding: '20px 32px 40px 32px' }}>
+        <TabContent style={{ height: 'fit-content', overflow: 'visible' }}>
+        <FormContainer style={{ flex: 1, overflow: 'visible', height: 'fit-content' }}>
+          <div style={{ position: 'relative', zIndex: 3, padding: '0px 24px 16px 24px' }}>
           <h2>
             {prefilledData ? 'Marriage Analysis - Enter Details' : 'Birth Details'}
           </h2>
@@ -494,15 +519,15 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
         </FormContainer>
         </TabContent>
       ) : (
-        <TabContent style={{ padding: '0 10px' }}>
+        <div style={{ padding: '10px', height: '600px', overflow: 'auto' }}>
           <SearchInput
             type="text"
             placeholder="Search by name..."
             value={searchQuery}
             onChange={handleSearchChange}
-
+            style={{ marginBottom: '10px' }}
           />
-          <ChartsList>
+          <ChartsList style={{ height: '520px', overflow: 'auto' }}>
             {existingCharts.map(chart => (
               <ChartItem key={chart.id}>
                 <div onClick={() => selectExistingChart(chart)} style={{ flex: 1, cursor: 'pointer' }}>
@@ -532,7 +557,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData }) => {
               </div>
             )}
           </ChartsList>
-        </TabContent>
+        </div>
       )}
     </TabContainer>
   );

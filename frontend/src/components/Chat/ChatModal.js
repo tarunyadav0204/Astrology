@@ -1000,17 +1000,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         <div className="chat-modal-overlay" onClick={onClose}>
             <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
-                        <h2 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : '- Your Personal Astrologer'}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', marginRight: '100px' }}>
+                        <h2 style={{ margin: 0, flex: 1 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : '- Your Personal Astrologer'}</h2>
                         <div style={{
                             background: 'rgba(255,255,255,0.2)',
                             padding: '4px 12px',
                             borderRadius: '15px',
                             fontSize: '12px',
                             color: 'white',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap'
                         }}>
-                            💳 {credits} credits | {chatCost} per question
+                            💳 {credits} credits
                         </div>
                     </div>
                     

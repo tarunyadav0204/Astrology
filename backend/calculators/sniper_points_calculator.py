@@ -22,9 +22,17 @@ class SniperPointsCalculator(BaseCalculator):
     def calculate_kharesh_point(self) -> Dict[str, Any]:
         """Calculate 22nd Drekkana (Kharesh) - 8th sign from D3 ascendant"""
         try:
-            d3_asc_long = self.d3_chart.get('ascendant', 0)
-            d3_asc_sign = int(d3_asc_long / 30)
+            # Handle different D3 chart structures
+            d3_asc_long = None
+            if 'ascendant' in self.d3_chart:
+                d3_asc_long = self.d3_chart['ascendant']
+            elif 'divisional_chart' in self.d3_chart and 'ascendant' in self.d3_chart['divisional_chart']:
+                d3_asc_long = self.d3_chart['divisional_chart']['ascendant']
             
+            if d3_asc_long is None:
+                return {'error': 'Kharesh calculation failed: D3 ascendant not found'}
+            
+            d3_asc_sign = int(d3_asc_long / 30)
             drekkana_22_sign_idx = (d3_asc_sign + 7) % 12
             kharesh_lord = self.sign_lords[drekkana_22_sign_idx]
             
@@ -44,7 +52,17 @@ class SniperPointsCalculator(BaseCalculator):
     def calculate_64th_navamsa(self) -> Dict[str, Any]:
         """Calculate 64th Navamsa - 4th sign from Moon in D9 chart"""
         try:
-            moon_d9 = self.d9_chart['planets'].get('Moon', {})
+            # Handle different D9 chart structures
+            d9_planets = None
+            if 'planets' in self.d9_chart:
+                d9_planets = self.d9_chart['planets']
+            elif 'divisional_chart' in self.d9_chart and 'planets' in self.d9_chart['divisional_chart']:
+                d9_planets = self.d9_chart['divisional_chart']['planets']
+            
+            if not d9_planets or 'Moon' not in d9_planets:
+                return {'error': '64th Navamsa calculation failed: Moon not found in D9 chart'}
+            
+            moon_d9 = d9_planets['Moon']
             moon_d9_sign = moon_d9.get('sign')
             
             if moon_d9_sign is None:

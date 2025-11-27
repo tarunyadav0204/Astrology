@@ -337,37 +337,40 @@ const ChatPage = () => {
     return (
         <div className="chat-page">
             <div className="chat-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
                         <h1 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : 'Consultation'}</h1>
                         <div style={{ fontSize: '10px', color: '#999' }}>Admin: {isAdmin ? 'Yes' : 'No'}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <button 
                             onClick={() => setShowContextModal(true)}
                             style={{
-                                background: 'red',
-                                padding: '8px 16px',
+                                background: 'white',
+                                padding: '8px 12px',
                                 borderRadius: '20px',
-                                fontSize: '12px',
+                                fontSize: '11px',
                                 fontWeight: 'bold',
-                                color: 'white',
+                                color: 'black',
                                 border: '2px solid black',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
                             }}
                         >
-                            📄 CONTEXT BUTTON {isAdmin ? '(Admin)' : '(Debug)'}
+                            📄 MENU
                         </button>
-                        <div style={{
+                        <div className="credits-display" style={{
                             background: 'rgba(255,107,53,0.1)',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
+                            padding: '6px 10px',
+                            borderRadius: '15px',
+                            fontSize: '11px',
                             fontWeight: 'bold',
                             color: '#ff6b35',
-                            border: '1px solid rgba(255,107,53,0.3)'
+                            border: '1px solid rgba(255,107,53,0.3)',
+                            whiteSpace: 'nowrap'
                         }}>
-                            💳 {credits} credits | {chatCost} per question
+                            <span className="credits-full">💳 {credits} | {chatCost} per question</span>
+                            <span className="credits-short">💳 {credits} Credits</span>
                         </div>
                     </div>
                 </div>

@@ -6,6 +6,7 @@ import AnalyticsTracker from './components/Analytics/AnalyticsTracker';
 import 'react-toastify/dist/ReactToastify.css';
 import './styles/mobile-fixes.css';
 import BirthForm from './components/BirthForm/BirthForm';
+import BirthFormModal from './components/BirthForm/BirthFormModal';
 import Dashboard from './components/Dashboard/Dashboard';
 import PredictionsPage from './components/PredictionsPage/PredictionsPage';
 import LandingPage from './components/LandingPage/LandingPage';
@@ -38,6 +39,8 @@ import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import EducationAnalysisPage from './components/EducationAnalysis/EducationAnalysisPage';
+import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
+import ChatModal from './components/Chat/ChatModal';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
@@ -51,6 +54,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authView, setAuthView] = useState('login');
+  const [showChatModal, setShowChatModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -792,6 +796,8 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
+              <FloatingChatButton onOpenChat={() => setShowChatModal(true)} />
+              <ChatModal isOpen={showChatModal} onClose={() => setShowChatModal(false)} />
             </CreditProvider>
           </AstrologyProvider>
         </Router>
@@ -919,20 +925,19 @@ function App() {
           />
         )}
         {currentView === 'form' && (
-          <div>
-            <UnifiedHeader
-              onViewAllCharts={() => setCurrentView('selector')}
-              onNewChart={() => setCurrentView('form')}
-              onLogout={handleLogout}
-              user={user}
-            />
-            <BirthForm onSubmit={() => setCurrentView('dashboard')} onLogout={handleLogout} />
-          </div>
+          <BirthFormModal
+            isOpen={true}
+            onClose={() => setCurrentView('dashboard')}
+            onSubmit={() => setCurrentView('dashboard')}
+            title="Enter Birth Details"
+            description="Please provide your birth information to generate your chart"
+          />
         )}
         {currentView === 'dashboard' && (
           <Dashboard 
             onBack={() => setCurrentView('astroroshnihomepage')} 
             onViewAllCharts={() => setCurrentView('selector')}
+            onNewChart={() => setCurrentView('form')}
             currentView={currentView} 
             setCurrentView={setCurrentView} 
             onLogout={handleLogout}
@@ -957,6 +962,8 @@ function App() {
             </div>
           } />
             </Routes>
+            {currentView !== 'dashboard' && <FloatingChatButton onOpenChat={() => setShowChatModal(true)} />}
+            <ChatModal isOpen={showChatModal} onClose={() => setShowChatModal(false)} />
           </CreditProvider>
         </AstrologyProvider>
       </Router>
