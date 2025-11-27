@@ -64,13 +64,14 @@ class PanchaMahapurushaCalculator:
     
     def _check_yoga_formation(self, yoga_name, planet, yoga_info):
         """Check if specific Pancha Mahapurusha Yoga is formed"""
-        planet_position = self.chart_data.get(planet, 0)
-        planet_sign = int(planet_position / 30)
+        # Get planet data from correct structure
+        planets = self.chart_data.get('planets', {})
+        if planet not in planets:
+            return self._get_no_yoga_result(yoga_name, planet, yoga_info)
         
-        # Calculate house position from ascendant
-        ascendant_position = self.chart_data.get('ascendant', 0)
-        ascendant_sign = int(ascendant_position / 30)
-        planet_house = (planet_sign - ascendant_sign) % 12
+        planet_data = planets[planet]
+        planet_sign = planet_data.get('sign', 0)
+        planet_house = planet_data.get('house', 1) - 1  # Convert to 0-based
         
         # Check if planet is in Kendra (houses 1, 4, 7, 10)
         kendra_houses = [0, 3, 6, 9]  # 0-indexed (1st, 4th, 7th, 10th)
@@ -91,7 +92,8 @@ class PanchaMahapurushaCalculator:
         is_formed = is_in_kendra and is_in_valid_sign
         
         # Calculate yoga strength
-        yoga_strength = self._calculate_yoga_strength(planet, planet_position, sign_type, planet_house)
+        planet_longitude = planet_data.get('longitude', 0)
+        yoga_strength = self._calculate_yoga_strength(planet, planet_longitude, sign_type, planet_house)
         
         return {
             'yoga_name': yoga_name,
@@ -159,7 +161,9 @@ class PanchaMahapurushaCalculator:
         # This would require nakshatra calculation - placeholder for now
         
         # Check if planet is not combust (too close to Sun)
-        sun_position = self.chart_data.get('Sun', 0)
+        planets = self.chart_data.get('planets', {})
+        sun_data = planets.get('Sun', {})
+        sun_position = sun_data.get('longitude', 0)
         distance_from_sun = abs(planet_position - sun_position)
         if distance_from_sun > 180:
             distance_from_sun = 360 - distance_from_sun
@@ -245,3 +249,20 @@ class PanchaMahapurushaCalculator:
             }
         
         return None
+    
+    def _get_no_yoga_result(self, yoga_name, planet, yoga_info):
+        """Return result when yoga is not formed due to missing planet data"""
+        return {
+            'yoga_name': yoga_name,
+            'planet': planet,
+            'is_formed': False,
+            'planet_sign': 'Unknown',
+            'planet_house': 0,
+            'sign_type': None,
+            'is_in_kendra': False,
+            'is_in_valid_sign': False,
+            'yoga_strength': 'Not Formed',
+            'conditions': yoga_info['conditions'],
+            'effects': yoga_info['effects'],
+            'detailed_analysis': f"{yoga_name} Yoga is not formed. {planet} data not available."
+        }

@@ -23,7 +23,12 @@ class VargottamaCalculator:
     
     def _analyze_planet_vargottama(self, planet):
         """Analyze Vargottama status for a specific planet"""
-        d1_position = self.chart_data.get(planet, 0)
+        planets_data = self.chart_data.get('planets', {})
+        
+        if planet not in planets_data:
+            return {'is_vargottama': False, 'vargottama_charts': [], 'total_charts': 0, 'strength_level': 'None'}
+            
+        d1_position = planets_data[planet].get('longitude', 0)
         d1_sign = int(d1_position / 30)
         
         vargottama_charts = ['D1']  # D1 is always included

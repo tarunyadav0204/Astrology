@@ -6,15 +6,16 @@ class ChartCalculator(BaseCalculator):
     
     def calculate_chart(self, birth_data, node_type='mean'):
         """Calculate birth chart with planetary positions and houses"""
+        # CRITICAL: Set Ayanamsa to Lahiri
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        
         # Calculate Julian Day with proper timezone handling
         time_parts = birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
         
-        # Auto-detect IST for Indian coordinates, otherwise parse timezone
-        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-            tz_offset = 5.5
-        else:
-            tz_offset = 0
+        # Parse timezone from birth_data or fallback to coordinate-based detection
+        tz_offset = 0
+        if hasattr(birth_data, 'timezone') and birth_data.timezone:
             if birth_data.timezone.startswith('UTC'):
                 tz_str = birth_data.timezone[3:]
                 if tz_str:
@@ -24,6 +25,10 @@ class ChartCalculator(BaseCalculator):
                         tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
                     else:
                         tz_offset = float(tz_str)
+        else:
+            # Fallback: Auto-detect IST for Indian subcontinent
+            if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+                tz_offset = 5.5
         
         # Convert local time to UTC
         utc_hour = hour - tz_offset
@@ -53,7 +58,11 @@ class ChartCalculator(BaseCalculator):
             if planet == 12:  # Ketu
                 longitude = (longitude + 180) % 360
             
-            is_retrograde = speed < 0 if planet <= 6 else False
+            # Calculate retrograde status
+            is_retrograde = speed < 0
+            # Force True for Mean Nodes (standard in Vedic astrology)
+            if planet in [11, 12] and node_type == 'mean':
+                is_retrograde = True
             
             planets[planet_names[i]] = {
                 'longitude': longitude,
@@ -62,7 +71,7 @@ class ChartCalculator(BaseCalculator):
                 'retrograde': is_retrograde
             }
 
-        # Calculate ascendant and houses
+        # Calculate ascendant and houses  
         houses_data = swe.houses(jd, birth_data.latitude, birth_data.longitude, b'P')
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
@@ -80,40 +89,8 @@ class ChartCalculator(BaseCalculator):
                 'sign': house_sign
             })
         
-        # Calculate Gulika and Mandi
-        weekday = int((jd + 1.5) % 7)
-        gulika_portions = [10.5, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0]
-        mandi_portions = [7.5, 15.0, 22.5, 6.0, 13.5, 21.0, 4.5]
-        
-        gulika_longitude = ((gulika_portions[weekday] * 15) - ayanamsa) % 360
-        mandi_longitude = ((mandi_portions[weekday] * 15) - ayanamsa) % 360
-        
-        if gulika_longitude < 0:
-            gulika_longitude += 360
-        if mandi_longitude < 0:
-            mandi_longitude += 360
-        
-        # Add Gulika and Mandi
-        for name, longitude in [('Gulika', gulika_longitude), ('Mandi', mandi_longitude)]:
-            house_num = 1
-            for house_idx in range(12):
-                house_start = houses[house_idx]['longitude']
-                house_end = (house_start + 30) % 360
-                if house_start <= house_end:
-                    if house_start <= longitude < house_end:
-                        house_num = house_idx + 1
-                        break
-                else:
-                    if longitude >= house_start or longitude < house_end:
-                        house_num = house_idx + 1
-                        break
-            
-            planets[name] = {
-                'longitude': longitude,
-                'sign': int(longitude / 30),
-                'degree': longitude % 30,
-                'house': house_num
-            }
+        # Calculate Gulika and Mandi using accurate sunrise/sunset
+        self._calculate_upagrahas(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa)
         
         # Add InduLagna
         from .indu_lagna_calculator import InduLagnaCalculator
@@ -126,15 +103,164 @@ class ChartCalculator(BaseCalculator):
         
         # Calculate house positions for all planets
         for planet_name in planets:
-            if 'house' not in planets[planet_name]:
+            if 'house' not in planets[planet_name] or planets[planet_name]['house'] == 1:
                 planet_longitude = planets[planet_name]['longitude']
                 planet_sign = int(planet_longitude / 30)
                 house_number = ((planet_sign - ascendant_sign) % 12) + 1
                 planets[planet_name]['house'] = house_number
         
+        # Calculate Bhav Chalit using professional house system
+        bhav_chalit = self._calculate_bhav_chalit_professional(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa)
+        
         return {
             "planets": planets,
             "houses": houses,
             "ayanamsa": ayanamsa,
-            "ascendant": ascendant_sidereal
+            "ascendant": ascendant_sidereal,
+            "bhav_chalit": bhav_chalit
         }
+    
+    def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa):
+        """Calculate Bhav Chalit using Placidus house system (professional KP/Sripati method)"""
+        try:
+            # Use Placidus house system (P) for accurate unequal houses
+            cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
+            
+            # Convert tropical cusps to sidereal - ensure we have 12 cusps
+            sidereal_cusps = [(cusp - ayanamsa) % 360 for cusp in cusps[1:13]]  # Take exactly 12 cusps
+            
+            # Ensure we have exactly 12 cusps
+            if len(sidereal_cusps) < 12:
+                # Fallback to equal houses if cusps are incomplete
+                asc_sidereal = (ascmc[0] - ayanamsa) % 360
+                sidereal_cusps = [(asc_sidereal + i * 30) % 360 for i in range(12)]
+            
+            bhav_planets = {}
+            
+            for planet_name, planet_data in planets.items():
+                planet_longitude = planet_data['longitude']
+                
+                # Find which house this longitude falls into
+                planet_house = 1
+                for i in range(12):
+                    start = sidereal_cusps[i]
+                    end = sidereal_cusps[(i + 1) % 12]
+                    
+                    # Handle 360° crossover (Pisces to Aries)
+                    if end < start:
+                        if planet_longitude >= start or planet_longitude < end:
+                            planet_house = i + 1
+                            break
+                    else:
+                        if start <= planet_longitude < end:
+                            planet_house = i + 1
+                            break
+                
+                bhav_planets[planet_name] = {
+                    'longitude': planet_longitude,
+                    'sign': planet_data['sign'],
+                    'degree': planet_data['degree'],
+                    'house': planet_house,
+                    'retrograde': planet_data.get('retrograde', False)
+                }
+            
+            return {
+                'planets': bhav_planets,
+                'cusps': sidereal_cusps,
+                'ascendant': (ascmc[0] - ayanamsa) % 360
+            }
+        except Exception as e:
+            # Fallback to whole sign houses if Bhav Chalit fails
+            asc_sidereal = (ayanamsa) % 360
+            bhav_planets = {}
+            for planet_name, planet_data in planets.items():
+                bhav_planets[planet_name] = planet_data.copy()
+            
+            return {
+                'planets': bhav_planets,
+                'cusps': [(i * 30) for i in range(12)],
+                'ascendant': asc_sidereal
+            }
+    
+    def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa):
+        """Calculate Gulika and Mandi based on actual sunrise/sunset (Dinamaan)"""
+        try:
+            # Get sunrise and sunset for the day (single call)
+            sun_transit = swe.rise_trans(jd, swe.SUN, '', swe.FLG_SWIEPH, lon, lat, 0)
+            
+            sunrise_jd = sun_transit[1][0]  # Index 1 is Rise
+            sunset_jd = sun_transit[2][0]   # Index 2 is Set
+            
+            # Check if birth is day or night
+            is_day_birth = sunrise_jd <= jd < sunset_jd
+            
+            # Calculate day/night duration
+            day_duration = sunset_jd - sunrise_jd
+            night_duration = (sunrise_jd + 1.0) - sunset_jd
+            
+            current_duration = day_duration if is_day_birth else night_duration
+            part_length = current_duration / 8
+            
+            # Weekday mapping for Saturn's segment
+            weekday = int((jd + 1.5) % 7)
+            gulika_indices_day = {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0}
+            gulika_indices_night = {0: 2, 1: 1, 2: 0, 3: 6, 4: 5, 5: 4, 6: 3}
+            
+            if is_day_birth:
+                segment_index = gulika_indices_day[weekday]
+                start_time_jd = sunrise_jd + (segment_index * part_length)
+            else:
+                segment_index = gulika_indices_night[weekday]
+                start_time_jd = sunset_jd + (segment_index * part_length)
+            
+            # Calculate Gulika longitude at Saturn's segment start
+            houses_gulika = swe.houses(start_time_jd, lat, lon, b'P')
+            gulika_long = (houses_gulika[1][0] - ayanamsa) % 360
+            
+            # Mandi at middle of Saturn's segment
+            mandi_time_jd = start_time_jd + (part_length / 2)
+            houses_mandi = swe.houses(mandi_time_jd, lat, lon, b'P')
+            mandi_long = (houses_mandi[1][0] - ayanamsa) % 360
+            
+        except Exception:
+            # Fallback to approximate calculation if sunrise/sunset fails
+            weekday = int((jd + 1.5) % 7)
+            gulika_portions = [10.5, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0]
+            mandi_portions = [7.5, 15.0, 22.5, 6.0, 13.5, 21.0, 4.5]
+            
+            gulika_long = ((gulika_portions[weekday] * 15) - ayanamsa) % 360
+            mandi_long = ((mandi_portions[weekday] * 15) - ayanamsa) % 360
+            
+            if gulika_long < 0:
+                gulika_long += 360
+            if mandi_long < 0:
+                mandi_long += 360
+        
+        # Add to planets dict
+        for name, longitude in [('Gulika', gulika_long), ('Mandi', mandi_long)]:
+            planets[name] = {
+                'longitude': longitude,
+                'sign': int(longitude / 30),
+                'degree': longitude % 30,
+                'house': 1  # Will be calculated later
+            }
+    
+    def get_baladi_avastha(self, planet_name: str, degree: float, sign: int) -> str:
+        """Calculate Planetary Age (State of Maturity)"""
+        if planet_name in ['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna']:
+            return "N/A"
+            
+        is_odd_sign = (sign + 1) % 2 != 0
+        
+        if 0 <= degree < 6:
+            return "Bal (Infant - 25% Strength)" if is_odd_sign else "Mrit (Dead - 0% Strength)"
+        elif 6 <= degree < 12:
+            return "Kumar (Teen - 50% Strength)" if is_odd_sign else "Vriddha (Old - Minimal Strength)"
+        elif 12 <= degree < 18:
+            return "Yuva (Youth - 100% Strength)"
+        elif 18 <= degree < 24:
+            return "Vriddha (Old - Minimal Strength)" if is_odd_sign else "Kumar (Teen - 50% Strength)"
+        elif 24 <= degree < 30:
+            return "Mrit (Dead - 0% Strength)" if is_odd_sign else "Bal (Infant - 25% Strength)"
+        
+        return "Unknown"

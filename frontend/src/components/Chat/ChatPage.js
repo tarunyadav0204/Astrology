@@ -6,6 +6,8 @@ import BirthForm from '../BirthForm/BirthForm';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
+import ContextModal from './ContextModal';
+import { authService } from '../../services/authService';
 import './ChatPage.css';
 
 // Enable detailed logging for debugging
@@ -20,6 +22,9 @@ const ChatPage = () => {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showCreditsModal, setShowCreditsModal] = useState(false);
+    const [showContextModal, setShowContextModal] = useState(false);
+    const [contextData, setContextData] = useState(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -37,10 +42,11 @@ const ChatPage = () => {
         }
     }, [birthData]);
     
-    // Check token validity on component mount
+    // Check token validity and user role on component mount
     useEffect(() => {
         const checkTokenValidity = async () => {
             const token = localStorage.getItem('token');
+            console.log('🔍 Checking token and admin status...');
             if (token) {
                 try {
                     const response = await fetch('/api/me', {
@@ -51,10 +57,18 @@ const ChatPage = () => {
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
                         window.location.href = '/login';
+                    } else if (response.ok) {
+                        const userData = await response.json();
+                        console.log('👤 User data:', userData);
+                        console.log('🔑 User role:', userData.role);
+                        console.log('👑 Is admin?', userData.role === 'admin');
+                        setIsAdmin(userData.role === 'admin');
                     }
                 } catch (error) {
                     console.log('Token validation failed:', error);
                 }
+            } else {
+                console.log('❌ No token found');
             }
         };
         checkTokenValidity();
@@ -117,13 +131,18 @@ const ChatPage = () => {
             console.log('Token exists:', !!token);
             console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
             
+            const requestBody = { ...birthData, question: message };
+            if (isAdmin) {
+                requestBody.include_context = true;
+            }
+            
             const response = await fetch('/api/chat/ask', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     ...(token && { 'Authorization': `Bearer ${token}` })
                 },
-                body: JSON.stringify({ ...birthData, question: message })
+                body: JSON.stringify(requestBody)
             });
 
             console.log('Response status:', response.status, response.statusText);
@@ -218,6 +237,9 @@ const ChatPage = () => {
                                     if (parsed.status === 'complete' && parsed.response) {
                                         assistantMessage.content = parsed.response;
                                         hasReceivedContent = true;
+                                        if (isAdmin && parsed.context) {
+                                            setContextData(parsed.context);
+                                        }
                                         setMessages(prev => {
                                             const newMessages = [...prev];
                                             newMessages[newMessages.length - 1] = { ...assistantMessage };
@@ -316,17 +338,37 @@ const ChatPage = () => {
         <div className="chat-page">
             <div className="chat-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <h1 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : 'Consultation'}</h1>
-                    <div style={{
-                        background: 'rgba(255,107,53,0.1)',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        color: '#ff6b35',
-                        border: '1px solid rgba(255,107,53,0.3)'
-                    }}>
-                        💳 {credits} credits | {chatCost} per question
+                    <div>
+                        <h1 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : 'Consultation'}</h1>
+                        <div style={{ fontSize: '10px', color: '#999' }}>Admin: {isAdmin ? 'Yes' : 'No'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button 
+                            onClick={() => setShowContextModal(true)}
+                            style={{
+                                background: 'red',
+                                padding: '8px 16px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                border: '2px solid black',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            📄 CONTEXT BUTTON {isAdmin ? '(Admin)' : '(Debug)'}
+                        </button>
+                        <div style={{
+                            background: 'rgba(255,107,53,0.1)',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            color: '#ff6b35',
+                            border: '1px solid rgba(255,107,53,0.3)'
+                        }}>
+                            💳 {credits} credits | {chatCost} per question
+                        </div>
                     </div>
                 </div>
                 <p>Ask me anything about your birth chart and life guidance</p>
@@ -345,6 +387,13 @@ const ChatPage = () => {
             <CreditsModal 
                 isOpen={showCreditsModal} 
                 onClose={() => setShowCreditsModal(false)} 
+            />
+            
+            {/* Context Modal for Admin */}
+            <ContextModal 
+                isOpen={showContextModal}
+                onClose={() => setShowContextModal(false)}
+                contextData={contextData}
             />
         </div>
     );

@@ -25,9 +25,19 @@ from calculators.pancha_mahapurusha_calculator import PanchaMahapurushaCalculato
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from shared.dasha_calculator import DashaCalculator
 from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
+from calculators.sniper_points_calculator import SniperPointsCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
+    
+    # Class-level constants
+    NAKSHATRA_NAMES = [
+        'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu',
+        'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta',
+        'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha',
+        'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
+        'Uttara Bhadrapada', 'Revati'
+    ]
     
     def __init__(self):
         self.static_cache = {}  # Cache static chart data
@@ -71,6 +81,15 @@ class ChatContextBuilder:
         friendship_calc = FriendshipCalculator()
         yoga_calc = YogaCalculator(birth_obj, chart_data)
         argala_calc = ArgalaCalculator(chart_data)
+        
+        # Initialize Ashtakavarga calculator
+        from calculators.ashtakavarga import AshtakavargaCalculator
+        ashtakavarga_calc = AshtakavargaCalculator(birth_data, chart_data)
+        
+        # Initialize Panchang calculator
+        from calculators.panchang_calculator import PanchangCalculator
+        panchang_calc = PanchangCalculator()
+        panchang_calc.birth_data = birth_data
         
         # Advanced calculators
         planetary_war_calc = PlanetaryWarCalculator(chart_data)
@@ -117,7 +136,10 @@ class ChatContextBuilder:
                 "formatted": f"{ascendant_sign_name} {ascendant_degree % 30:.2f}°"
             },
             
-            "d1_chart": chart_data,
+            "d1_chart": self._add_sign_names_to_chart_copy(chart_data),
+            
+            # Bhav Chalit chart
+            "bhav_chalit_chart": chart_data.get('bhav_chalit', {})
         }
         
         # Calculate divisional charts
@@ -166,20 +188,108 @@ class ChatContextBuilder:
                 "pancha_mahapurusha": pancha_mahapurusha_calc.get_pancha_mahapurusha_summary()
             },
             
+            # Ashtakavarga Analysis
+            "ashtakavarga": {
+                "d1_rashi": {
+                    "sarvashtakavarga": ashtakavarga_calc.calculate_sarvashtakavarga(),
+                    "bhinnashtakavarga": {
+                        planet: ashtakavarga_calc.calculate_individual_ashtakavarga(planet)
+                        for planet in ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+                    },
+                    "lagna_analysis": ashtakavarga_calc.get_ashtakavarga_analysis('lagna')
+                },
+                "d9_navamsa": self._calculate_d9_ashtakavarga(d9_chart, birth_data)
+            },
+            
+            # Birth Panchang
+            "birth_panchang": panchang_calc.calculate_birth_panchang(birth_data),
+            
             # Add InduLagna analysis to context
-            **indu_lagna_calc.get_indu_lagna_analysis()
+            **indu_lagna_calc.get_indu_lagna_analysis(),
+            
+            # Sniper Points (Critical for sudden events/health crises)
+            "sniper_points": SniperPointsCalculator(
+                chart_data,
+                divisional_calc.calculate_divisional_chart(3),
+                divisional_calc.calculate_divisional_chart(9)
+            ).get_all_sniper_points()
         })
         
-        # Add planetary analysis for all planets including InduLagna
+        # Add minimal planetary analysis (raw data only, no text bloat)
         planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'InduLagna']
         for planet in planets:
             try:
-                context["planetary_analysis"][planet] = planet_analyzer.analyze_planet(planet)
+                full_analysis = planet_analyzer.analyze_planet(planet)
+                context["planetary_analysis"][planet] = self._filter_planetary_analysis(full_analysis, chart_calc)
             except Exception as e:
                 # print(f"Error analyzing {planet}: {e}")
                 continue
         
         return context
+    
+    def _filter_planetary_analysis(self, full_analysis: Dict, chart_calc: ChartCalculator) -> Dict:
+        """Filter planetary analysis to keep only raw data, remove text bloat and friendship matrix redundancy"""
+        return {
+            'basic_info': {
+                'planet': full_analysis['basic_info']['planet'],
+                'sign': full_analysis['basic_info']['sign'],
+                'house': full_analysis['basic_info']['house'],
+                'degree': full_analysis['basic_info']['degree'],
+                'longitude': full_analysis['basic_info']['longitude'],
+                'nakshatra': full_analysis['basic_info']['nakshatra'],
+                'nakshatra_pada': self._get_nakshatra_pada(full_analysis['basic_info']['longitude']),
+                'avastha': chart_calc.get_baladi_avastha(
+                    full_analysis['basic_info']['planet'],
+                    full_analysis['basic_info']['degree'],
+                    full_analysis['basic_info']['sign']
+                )
+            },
+            'dignity_analysis': {
+                'dignity': full_analysis['dignity_analysis']['dignity'],
+                'functional_nature': full_analysis['dignity_analysis']['functional_nature'],
+                'strength_multiplier': full_analysis['dignity_analysis']['strength_multiplier']
+            },
+            'strength_analysis': {
+                'shadbala_rupas': full_analysis['strength_analysis']['shadbala_rupas'],
+                'shadbala_points': full_analysis['strength_analysis']['shadbala_points'],
+                'shadbala_grade': full_analysis['strength_analysis']['shadbala_grade']
+            },
+            'house_position_analysis': {
+                'house_number': full_analysis['house_position_analysis']['house_number'],
+                'house_types': full_analysis['house_position_analysis']['house_types']
+            },
+            'conjunctions': {
+                'has_conjunctions': full_analysis['conjunctions']['has_conjunctions'],
+                'conjunction_count': full_analysis['conjunctions']['conjunction_count'],
+                'conjunctions': [{
+                    'planet': c['planet'],
+                    'type': c['type'],
+                    'orb': c['orb']
+                } for c in full_analysis['conjunctions']['conjunctions']]
+            },
+            'combustion_status': {
+                'is_combust': full_analysis['combustion_status']['is_combust'],
+                'is_cazimi': full_analysis['combustion_status']['is_cazimi'],
+                'status': full_analysis['combustion_status']['status']
+            },
+            'retrograde_analysis': {
+                'is_retrograde': full_analysis['retrograde_analysis']['is_retrograde']
+            },
+            'aspects_received': {
+                'has_aspects': full_analysis['aspects_received']['has_aspects'],
+                'aspect_count': full_analysis['aspects_received']['aspect_count'],
+                'aspects': [{
+                    'aspecting_planet': a['aspecting_planet'],
+                    'aspect_type': a['aspect_type'],
+                    'effect_score': a.get('effect_score', 0)
+                } for a in full_analysis['aspects_received']['aspects']]
+            },
+            'overall_assessment': {
+                'overall_strength_score': full_analysis['overall_assessment']['overall_strength_score'],
+                'classical_grade': full_analysis['overall_assessment']['classical_grade']
+            }
+            # Removed friendship_analysis - massive redundancy eliminated
+        }
     
     def _build_dynamic_context(self, birth_data: Dict, user_question: str, target_date: Optional[datetime], requested_period: Optional[Dict] = None) -> Dict[str, Any]:
         """Build dynamic context based on question and date"""
@@ -204,21 +314,7 @@ class ChatContextBuilder:
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
         context['house_lordships'] = self._get_house_lordships(ascendant_sign)
         
-        # Add comprehensive house significations with ALL possible meanings
-        context['house_significations'] = {
-            1: "Self, personality, health, appearance, vitality, general well-being, head, brain, identity, first impressions, leadership, independence, new beginnings, personal initiatives",
-            2: "Wealth, family, speech, values, food, accumulated resources, face, right eye, savings, possessions, family traditions, oral communication, eating habits, financial security, material assets", 
-            3: "Siblings, courage, communication, short travels, hands, efforts, neighbors, writing, media, local transport, hobbies, skills, manual dexterity, correspondence, nearby places, small journeys",
-            4: "Home, mother, education, property, vehicles, happiness, chest, heart, domestic life, real estate, academic learning, emotional security, homeland, comfort, private life, inner peace",
-            5: "Children, creativity, intelligence, romance, speculation, stomach, past life karma, entertainment, sports, gambling, artistic expression, love affairs, pregnancy, mental abilities, fun activities",
-            6: "Health issues, enemies, service, daily work, debts, diseases, obstacles, employment, routine tasks, medical treatment, litigation, competition, pets, subordinates, work environment, health maintenance",
-            7: "Marriage, partnerships, business, spouse, public relations, lower abdomen, contracts, legal matters, open enemies, cooperation, negotiations, public image, business partnerships, marital harmony",
-            8: "Transformation, occult, longevity, inheritance, accidents, hidden things, research, surgery, insurance, taxes, spouse's money, mysteries, psychology, death and rebirth, joint resources, investigations",
-            9: "Fortune, dharma, higher learning, father, spirituality, long travels, thighs, philosophy, religion, foreign countries, publishing, teaching, law, ethics, pilgrimage, wisdom, higher education, mentors",
-            10: "Career, reputation, authority, public image, government, knees, profession, status, recognition, achievements, boss, public service, political power, social standing, professional success, fame",
-            11: "Gains, friends, aspirations, elder siblings, income, fulfillment of desires, social networks, hopes, large organizations, profits, achievements of goals, community involvement, group activities",
-            12: "Losses, spirituality, foreign lands, expenses, isolation, feet, moksha, hospitals, prisons, meditation, charity, hidden enemies, subconscious mind, sleep, dreams, liberation, sacrifice, foreign settlement"
-        }
+
         
         # Add transit data availability info with enhanced methodology
         current_year = datetime.now().year
@@ -234,8 +330,9 @@ class ChatContextBuilder:
                     "1. Identify ALL houses involved: transit house + natal house + lordship houses of both planets",
                     "2. Combine ALL house significations to determine possible life areas affected", 
                     "3. Consider planetary natures (benefic/malefic) to determine positive/negative outcomes",
-                    "4. Synthesize with dasha context for timing and intensity",
-                    "5. Predict SPECIFIC life events, not general philosophical statements"
+                    "4. CRITICAL: If a planet rules a Dusthana (6th, 8th, 12th) and transits that same house, interpret it as an intensification of that house's themes (e.g., health issues, transformation, expenses) rather than just 'benefic protection', even if the planet is natural benefic like Jupiter",
+                    "5. Synthesize with dasha context for timing and intensity",
+                    "6. Predict SPECIFIC life events, not general philosophical statements"
                 ],
                 "example_analysis": "Mars (lord 5th,10th, natal 2nd) transits 6th aspecting natal Sun (9th house, lord 1st): Houses involved = 1st,2nd,5th,6th,9th,10th = self,wealth,children,health,father,career. Possible events: health issues affecting father, career conflicts requiring courage, children's education expenses, property disputes, work-related stress affecting family finances.",
                 "quick_answer_requirements": {
@@ -662,6 +759,54 @@ class ChatContextBuilder:
 
         return periods[:20]  # Return top 20 periods
     
+    def _get_nakshatra_pada(self, longitude):
+        """Calculate Nakshatra Pada from longitude with high precision"""
+        # Normalize longitude (handle 360.0 or >360 cases)
+        longitude = longitude % 360
+        
+        # Exact division: 360 degrees / 27 nakshatras
+        nakshatra_span = 360 / 27
+        
+        # Calculate position (0-based index)
+        absolute_position = longitude / nakshatra_span
+        
+        # Get nakshatra index (0 to 26)
+        nakshatra_index = int(absolute_position)
+        
+        # Calculate pada (1 to 4)
+        fractional_part = absolute_position - nakshatra_index
+        pada = int(fractional_part * 4) + 1
+        
+        # Safety check for index bounds
+        if nakshatra_index >= 27:
+            nakshatra_index = 26
+            
+        return {
+            'nakshatra': self.NAKSHATRA_NAMES[nakshatra_index],
+            'nakshatra_id': nakshatra_index + 1,
+            'pada': pada,
+            'formatted': f"{self.NAKSHATRA_NAMES[nakshatra_index]} ({pada})"
+        }
+    
+    def _calculate_d9_ashtakavarga(self, d9_chart, birth_data):
+        """Calculate Ashtakavarga for D9 Navamsa chart"""
+        try:
+            from calculators.ashtakavarga import AshtakavargaCalculator
+            # Access the correct nested structure
+            d9_chart_data = d9_chart.get('divisional_chart', d9_chart)
+            d9_ashtakavarga_calc = AshtakavargaCalculator(birth_data, d9_chart_data)
+            
+            return {
+                "sarvashtakavarga": d9_ashtakavarga_calc.calculate_sarvashtakavarga(),
+                "bhinnashtakavarga": {
+                    planet: d9_ashtakavarga_calc.calculate_individual_ashtakavarga(planet)
+                    for planet in ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+                },
+                "navamsa_analysis": d9_ashtakavarga_calc.get_ashtakavarga_analysis('navamsa')
+            }
+        except Exception as e:
+            return {"error": f"D9 Ashtakavarga calculation failed: {e}"}
+    
     def _get_house_lordships(self, ascendant_sign: int) -> Dict:
         """Get house lordships based on ascendant sign"""
         # Sign lordships (0=Aries, 1=Taurus, etc.)
@@ -735,3 +880,27 @@ class ChatContextBuilder:
                     life_areas.append(area)
         
         return life_areas[:4]  # Return top 4 most relevant areas
+    
+    def _add_sign_names_to_chart_copy(self, chart_data: Dict) -> Dict:
+        """Create copy of chart data with sign names to prevent Gemini 0-based vs 1-based indexing confusion"""
+        import copy
+        chart_copy = copy.deepcopy(chart_data)
+        
+        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        
+        # Add sign names to all planets in d1_chart
+        if 'planets' in chart_copy:
+            for planet_name, planet_data in chart_copy['planets'].items():
+                if 'sign' in planet_data:
+                    sign_index = planet_data['sign']
+                    planet_data['sign_name'] = sign_names[sign_index]
+        
+        # Add sign names to bhav_chalit chart
+        if 'bhav_chalit' in chart_copy and 'planets' in chart_copy['bhav_chalit']:
+            for planet_name, planet_data in chart_copy['bhav_chalit']['planets'].items():
+                if 'sign' in planet_data:
+                    sign_index = planet_data['sign']
+                    planet_data['sign_name'] = sign_names[sign_index]
+        
+        return chart_copy

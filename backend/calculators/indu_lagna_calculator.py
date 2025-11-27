@@ -129,10 +129,16 @@ class InduLagnaCalculator(BaseCalculator):
         return occupying
     
     def _get_aspecting_planets(self, sign_number):
-        """Get planets aspecting the given sign"""
+        """Get planets aspecting the given sign (only physical planets can cast aspects)"""
         aspecting = []
+        # Only physical planets can cast aspects in Parashari astrology
+        physical_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
+        
         if 'planets' in self.chart_data:
             for planet, data in self.chart_data['planets'].items():
+                if planet not in physical_planets:
+                    continue  # Skip Upagrahas like Gulika
+                    
                 planet_sign = data['sign'] + 1  # Convert to 1-based
                 
                 # Check for aspects (7th, 4th/8th for Mars, 5th/9th for Jupiter, etc.)

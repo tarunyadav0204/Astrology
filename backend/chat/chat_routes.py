@@ -30,6 +30,7 @@ class ChatRequest(BaseModel):
     language: Optional[str] = 'english'
     response_style: Optional[str] = 'detailed'
     selected_period: Optional[Dict] = None
+    include_context: Optional[bool] = False
     # User context
     user_name: Optional[str] = None
     user_relationship: Optional[str] = 'self'
@@ -134,11 +135,31 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             
             # Build astrological context with requested period (run in thread pool)
             import asyncio
-            context = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                context_builder.build_complete_context,
-                birth_data, request.question, None, requested_period
-            )
+            try:
+                context = await asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    context_builder.build_complete_context,
+                    birth_data, request.question, None, requested_period
+                )
+            except Exception as context_error:
+                print(f"❌ CONTEXT BUILDING ERROR: {context_error}")
+                import traceback
+                traceback.print_exc()
+                yield f"data: {json.dumps({'status': 'error', 'error': f'Chart calculation failed: {str(context_error)}'})}\n\n"
+                return
+            
+            # Send context data immediately for admin users
+            if request.include_context and current_user.role == 'admin':
+                try:
+                    # Send full context as string for admin viewing
+                    context_json = json.dumps({'status': 'context', 'context': str(context)}, ensure_ascii=True)
+                    yield f"data: {context_json}\n\n"
+
+                except Exception as ctx_error:
+
+                    # Fallback with error info
+                    fallback_json = json.dumps({'status': 'context', 'context': f'Context serialization failed: {str(ctx_error)}'}, ensure_ascii=True)
+                    yield f"data: {fallback_json}\n\n"
             
             # Get conversation history
             history = session_manager.get_conversation_history(birth_hash)
@@ -307,6 +328,8 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                             'response': clean_response
                         }
                         
+                        # Context already sent earlier for admin users
+                        
                         # Smart chunking that preserves markdown structure
                         max_chunk_size = 3500
                         
@@ -323,11 +346,13 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                     'total_chunks': len(chunks),
                                     'response': chunk
                                 }
+                                # Context already sent earlier for admin users
                                 chunk_json = json.dumps(chunk_data, ensure_ascii=True, separators=(',', ':'))
                                 yield f"data: {chunk_json}\n\n"
                             
                             # Send completion signal
                             complete_data = {'status': 'complete'}
+                            # Context already sent earlier for admin users
                             complete_json = json.dumps(complete_data, ensure_ascii=True)
                             yield f"data: {complete_json}\n\n"
                         else:

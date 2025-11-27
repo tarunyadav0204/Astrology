@@ -183,10 +183,22 @@
   position: relative;
 }
 
-.corner-btn {
+/* AI Header Actions */
+.ai-header-actions {
   position: absolute;
   top: 15px;
   right: 15px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.ai-header-actions > * {
+  margin: 0;
+  vertical-align: baseline;
+}
+
+.corner-btn {
   padding: 6px 12px;
   font-size: 12px;
   border-radius: 4px;
@@ -195,11 +207,23 @@
   border: none;
   cursor: pointer;
   transition: background 0.3s ease;
-  z-index: 10;
+  vertical-align: top;
 }
 
 .corner-btn:hover {
   background: #5a6268;
+}
+
+.pdf-download-btn {
+  background: #ff9800;
+}
+
+.pdf-download-btn:hover {
+  background: #f57c00;
+}
+
+.pdf-download-link {
+  text-decoration: none;
 }
 
 .insights-grid {

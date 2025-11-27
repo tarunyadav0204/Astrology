@@ -80,18 +80,18 @@ class MarriageAIContextGenerator(BaseAIContextGenerator):
         planets = chart_data.get('planets', {})
         
         marriage_houses = {
-            "7th_house": self._analyze_house(7, chart_data, "Primary marriage house"),
-            "2nd_house": self._analyze_house(2, chart_data, "Family life, marital assets"),
-            "4th_house": self._analyze_house(4, chart_data, "Domestic happiness"),
-            "5th_house": self._analyze_house(5, chart_data, "Romance, children"),
-            "8th_house": self._analyze_house(8, chart_data, "Marital longevity, spouse's family"),
-            "11th_house": self._analyze_house(11, chart_data, "Gains from marriage"),
-            "12th_house": self._analyze_house(12, chart_data, "Bed pleasures, foreign spouse")
+            "7th_house": self._analyze_house(7, chart_data),
+            "2nd_house": self._analyze_house(2, chart_data),
+            "4th_house": self._analyze_house(4, chart_data),
+            "5th_house": self._analyze_house(5, chart_data),
+            "8th_house": self._analyze_house(8, chart_data),
+            "11th_house": self._analyze_house(11, chart_data),
+            "12th_house": self._analyze_house(12, chart_data)
         }
         
         return marriage_houses
     
-    def _analyze_house(self, house_num: int, chart_data: Dict, significance: str) -> Dict[str, Any]:
+    def _analyze_house(self, house_num: int, chart_data: Dict) -> Dict[str, Any]:
         """Analyze a specific house for marriage"""
         planets = chart_data.get('planets', {})
         houses = chart_data.get('houses', [])
@@ -119,7 +119,6 @@ class MarriageAIContextGenerator(BaseAIContextGenerator):
             }
         
         return {
-            'significance': significance,
             'sign': house_sign,
             'lord': house_lord,
             'lord_position': lord_position,
@@ -132,7 +131,7 @@ class MarriageAIContextGenerator(BaseAIContextGenerator):
         planets = chart_data.get('planets', {})
         
         # 7th house analysis
-        seventh_house = self._analyze_house(7, chart_data, "Spouse characteristics")
+        seventh_house = self._analyze_house(7, chart_data)
         
         # Venus analysis (natural karaka for marriage)
         venus_analysis = {}

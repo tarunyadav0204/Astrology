@@ -9,6 +9,7 @@ import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
 import { showToast } from '../../utils/toast';
 import CreditsModal from '../Credits/CreditsModal';
+import ContextModal from './ContextModal';
 
 import './ChatModal.css';
 
@@ -27,6 +28,28 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [copySuccess, setCopySuccess] = useState(false);
     const [chatMode, setChatMode] = useState('greeting'); // 'greeting', 'question', 'periods'
     const [eventPeriods, setEventPeriods] = useState([]);
+    
+    // Check admin status
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const response = await fetch('/api/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const userData = await response.json();
+                        console.log('👤 Admin check - User data:', userData);
+                        setIsAdmin(userData.role === 'admin');
+                    }
+                } catch (error) {
+                    console.log('Admin check failed:', error);
+                }
+            }
+        };
+        checkAdminStatus();
+    }, []);
     
     const getNextLanguage = (current) => {
         const languages = ['english', 'hindi', 'telugu', 'gujarati', 'tamil'];
@@ -408,7 +431,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 // Get user context
                 let userData = null;
                 try {
-                    const userResponse = await fetch('/api/auth/me', {
+                    const userResponse = await fetch('/api/me', {
                         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                     });
                     if (userResponse.ok) {
@@ -423,21 +446,27 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 const relationship = (userName.toLowerCase() === nativeName.toLowerCase()) ? 'self' : 'other';
                 
                 const token = localStorage.getItem('token');
+                const requestBody = { 
+                    ...birthData, 
+                    question: message, 
+                    language, 
+                    response_style: responseStyle,
+                    selected_period: options.selected_period,
+                    user_name: userName,
+                    user_relationship: relationship
+                };
+                
+                if (isAdmin) {
+                    requestBody.include_context = true;
+                }
+                
                 const response = await fetch('/api/chat/ask', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
                         ...(token && { 'Authorization': `Bearer ${token}` })
                     },
-                    body: JSON.stringify({ 
-                        ...birthData, 
-                        question: message, 
-                        language, 
-                        response_style: responseStyle,
-                        selected_period: options.selected_period,
-                        user_name: userName,
-                        user_relationship: relationship
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 console.log('Chat response status:', response.status);
@@ -558,6 +587,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         if (data && data.length > 0) {
                             try {
                                 console.log('DEBUG: Attempting to parse JSON data');
+                                console.log('DEBUG: Raw data contains "context":', data.includes('"context"'));
                                 // Decode HTML entities in the raw data
                                 const decodeHtmlEntities = (text) => {
                                     const textarea = document.createElement('textarea');
@@ -578,8 +608,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     console.log('DEBUG: JSON parsed after HTML decode, status:', parsed.status);
                                 }
                                 
-                                if (parsed.status === 'chunk') {
+                                if (parsed.status === 'context') {
+                                    if (isAdmin && parsed.context) {
+                                        setContextData(parsed.context);
+                                    }
+                                } else if (parsed.status === 'chunk') {
                                     console.log('DEBUG: Processing chunk response', parsed.chunk_index, 'of', parsed.total_chunks);
+                                    console.log('DEBUG: Chunk keys:', Object.keys(parsed));
+                                    
+                                    // Check if this is the last chunk and log for debugging
+                                    if (parsed.chunk_index === parsed.total_chunks - 1) {
+                                        console.log('DEBUG: Last chunk received, full chunk data:', JSON.stringify(parsed, null, 2));
+                                    }
                                     // Accumulate chunks
                                     if (!assistantMessage.chunks) {
                                         assistantMessage.chunks = new Array(parsed.total_chunks);
@@ -635,6 +675,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     }
                                 } else if (parsed.status === 'complete' && parsed.response) {
                                     console.log('DEBUG: Processing complete response');
+                                    console.log('DEBUG: Parsed keys:', Object.keys(parsed));
+                                    console.log('DEBUG: isAdmin:', isAdmin);
+                                    console.log('DEBUG: parsed.context exists:', !!parsed.context);
+                                    console.log('DEBUG: Full complete response:', JSON.stringify(parsed, null, 2));
+                                    
+                                    // Capture context data for admin
+                                    if (isAdmin && parsed.context) {
+                                        console.log('DEBUG: Setting context data:', parsed.context);
+                                        setContextData(parsed.context);
+                                    } else {
+                                        console.log('DEBUG: Not setting context - isAdmin:', isAdmin, 'hasContext:', !!parsed.context);
+                                    }
                                     // Decode HTML entities in the response content
                                     let responseText = parsed.response;
                                     
@@ -694,6 +746,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                     }
                                 } else if (parsed.status === 'complete' && !parsed.response) {
                                     console.log('DEBUG: Processing completion signal for chunked response');
+                                    console.log('DEBUG: Completion signal keys:', Object.keys(parsed));
+                                    console.log('DEBUG: Full completion signal:', JSON.stringify(parsed, null, 2));
+                                    
+                                    // Capture context data for admin from completion signal
+                                    if (isAdmin && parsed.context) {
+                                        console.log('DEBUG: Setting context data from completion signal:', parsed.context);
+                                        setContextData(parsed.context);
+                                    } else {
+                                        console.log('DEBUG: No context in completion - isAdmin:', isAdmin, 'hasContext:', !!parsed.context);
+                                        console.log('DEBUG: Full parsed object:', JSON.stringify(parsed, null, 2));
+                                    }
+                                    
                                     // Ensure final message state is correct
                                     if (assistantMessage.chunks && assistantMessage.chunks.length > 0) {
                                         const completeText = assistantMessage.chunks.join('');
@@ -890,6 +954,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [followUpQuestion, setFollowUpQuestion] = useState('');
     const [chartRefHighlight, setChartRefHighlight] = useState(null);
     const [showCreditsModal, setShowCreditsModal] = useState(false);
+    const [showContextModal, setShowContextModal] = useState(false);
+    const [contextData, setContextData] = useState(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     
     const handleFollowUpClick = (question) => {
         setFollowUpQuestion(question);
@@ -972,6 +1039,21 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         <button onClick={() => setShowBirthForm(true)}>
                             👤 Change Person
                         </button>
+                        {isAdmin && (
+                            <button 
+                                onClick={() => {
+                                    console.log('Context button clicked, contextData:', contextData);
+                                    setShowContextModal(true);
+                                }}
+                                style={{
+                                    background: contextData ? 'red' : 'orange',
+                                    color: 'white',
+                                    border: '2px solid black'
+                                }}
+                            >
+                                📄 Context {contextData ? '(Has Data)' : '(No Data)'}
+                            </button>
+                        )}
                     </div>
                     
                     {/* Mobile menu */}
@@ -1360,6 +1442,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         <CreditsModal 
             isOpen={showCreditsModal} 
             onClose={() => setShowCreditsModal(false)} 
+        />
+        
+        {/* Context Modal */}
+        <ContextModal 
+            isOpen={showContextModal}
+            onClose={() => setShowContextModal(false)}
+            contextData={contextData}
         />
         </>
     );

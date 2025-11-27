@@ -269,16 +269,21 @@ class AshtakavargaCalculator:
             'recommendations': recommendations
         }
     
-    def _analyze_navamsa_ashtakavarga(self):
-        """Analyze for Navamsa chart context"""
+    def _analyze_navamsa_ashtakavarga(self, d9_chart_data=None):
+        """Analyze using Navamsa positions against Rashi SAV strength"""
         sarva = self.calculate_sarvashtakavarga()
         bindus = sarva['sarvashtakavarga']
         sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
         
-        # Focus on 7th house (marriage) and Venus/Jupiter positions
-        venus_sign = self.planets['Venus']['sign']
-        jupiter_sign = self.planets['Jupiter']['sign']
+        # Get D9 positions if available, otherwise use D1 as fallback
+        if d9_chart_data and 'planets' in d9_chart_data:
+            venus_sign = d9_chart_data['planets']['Venus']['sign']
+            jupiter_sign = d9_chart_data['planets']['Jupiter']['sign']
+        else:
+            # Fallback to D1 positions with note
+            venus_sign = self.planets['Venus']['sign']
+            jupiter_sign = self.planets['Jupiter']['sign']
         
         recommendations = []
         if bindus[venus_sign] >= 28:

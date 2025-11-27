@@ -7,11 +7,23 @@
   min-height: 400px;
 }
 
-/* Corner Regenerate Button */
-.corner-btn {
+/* AI Header Actions */
+.ai-header-actions {
   position: absolute;
   top: 15px;
   right: 15px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.ai-header-actions > * {
+  margin: 0;
+  vertical-align: baseline;
+}
+
+/* Corner Buttons */
+.corner-btn {
   background: linear-gradient(135deg, #e91e63, #ad1457);
   color: white;
   border: none;
@@ -21,8 +33,23 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  z-index: 10;
   box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+  vertical-align: top;
+}
+
+.pdf-download-btn {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+  vertical-align: top;
+}
+
+.pdf-download-btn:hover {
+  background: linear-gradient(135deg, #f57c00, #ef6c00);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+}
+
+.pdf-download-link {
+  text-decoration: none;
 }
 
 .corner-btn:hover {

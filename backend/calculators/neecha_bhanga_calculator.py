@@ -53,13 +53,19 @@ class NeechaBhangaCalculator:
         """Calculate Neecha Bhanga for all debilitated planets"""
         results = {}
         
+        # Access planets from correct data structure
+        planets_data = self.chart_data.get('planets', {})
+        
         for planet in self.debilitation_signs.keys():
-            planet_position = self.chart_data.get(planet, 0)
-            planet_sign = int(planet_position / 30)
+            if planet not in planets_data:
+                continue
+                
+            planet_longitude = planets_data[planet].get('longitude', 0)
+            planet_sign = int(planet_longitude / 30)
             
             # Check if planet is debilitated
             if planet_sign == self.debilitation_signs[planet]:
-                neecha_bhanga_result = self._check_neecha_bhanga_conditions(planet, planet_position)
+                neecha_bhanga_result = self._check_neecha_bhanga_conditions(planet, planet_longitude)
                 results[planet] = neecha_bhanga_result
         
         return results
@@ -138,11 +144,17 @@ class NeechaBhangaCalculator:
     
     def _check_kendra_position(self, planet):
         """Check if planet is in Kendra (1,4,7,10) from Lagna or Moon"""
-        planet_pos = self.chart_data.get(planet, 0)
+        planets_data = self.chart_data.get('planets', {})
+        
+        if planet not in planets_data:
+            return False
+            
+        planet_pos = planets_data[planet].get('longitude', 0)
         planet_house = int(planet_pos / 30)
         
         lagna_house = int(self.chart_data.get('ascendant', 0) / 30)
-        moon_house = int(self.chart_data.get('Moon', 0) / 30)
+        moon_pos = planets_data.get('Moon', {}).get('longitude', 0)
+        moon_house = int(moon_pos / 30)
         
         # Kendra houses from Lagna
         lagna_kendras = [(lagna_house + i) % 12 for i in [0, 3, 6, 9]]
@@ -154,8 +166,13 @@ class NeechaBhangaCalculator:
     
     def _check_aspect_by_lord(self, planet, lord):
         """Check if debilitated planet is aspected by its lord"""
-        planet_pos = self.chart_data.get(planet, 0)
-        lord_pos = self.chart_data.get(lord, 0)
+        planets_data = self.chart_data.get('planets', {})
+        
+        if planet not in planets_data or lord not in planets_data:
+            return False
+            
+        planet_pos = planets_data[planet].get('longitude', 0)
+        lord_pos = planets_data[lord].get('longitude', 0)
         
         if not lord_pos:
             return False
@@ -216,14 +233,19 @@ class NeechaBhangaCalculator:
     
     def _check_exalted_conjunction(self, planet):
         """Check if debilitated planet is conjunct with any exalted planet"""
-        planet_pos = self.chart_data.get(planet, 0)
+        planets_data = self.chart_data.get('planets', {})
+        
+        if planet not in planets_data:
+            return None
+            
+        planet_pos = planets_data[planet].get('longitude', 0)
         planet_sign = int(planet_pos / 30)
         
         for other_planet, exalt_sign in self.exaltation_signs.items():
-            if other_planet == planet:
+            if other_planet == planet or other_planet not in planets_data:
                 continue
             
-            other_pos = self.chart_data.get(other_planet, 0)
+            other_pos = planets_data[other_planet].get('longitude', 0)
             other_sign = int(other_pos / 30)
             
             # Check if other planet is exalted and in same sign

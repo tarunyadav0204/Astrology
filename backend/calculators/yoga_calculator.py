@@ -12,6 +12,9 @@ class YogaCalculator(BaseCalculator):
             6: 'Venus', 7: 'Mars', 8: 'Jupiter', 9: 'Saturn', 10: 'Saturn', 11: 'Jupiter'
         }
         
+        # Initialize ascendant sign for dosha calculations
+        self.ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data else 0
+        
         # Initialize aspect calculator
         self.aspect_calc = AspectCalculator(chart_data)
     
@@ -261,7 +264,8 @@ class YogaCalculator(BaseCalculator):
             'career_specific_yogas': self.calculate_career_specific_yogas(),
             'health_yogas': self.calculate_health_yogas(),
             'education_yogas': self.calculate_education_yogas(),
-            'marriage_yogas': self.calculate_marriage_yogas()
+            'marriage_yogas': self.calculate_marriage_yogas(),
+            'major_doshas': self.calculate_major_doshas()
         }
     
     def calculate_career_specific_yogas(self):
@@ -604,16 +608,25 @@ class YogaCalculator(BaseCalculator):
         return yogas
     
     def _planets_in_mutual_aspect(self, planet_names, planets):
-        """Check if planets are in mutual aspect"""
-        houses = [planets[p].get('house', 1) for p in planet_names if p in planets]
-        if len(houses) < 2:
+        """Check if planets are in mutual aspect using AspectCalculator"""
+        if len(planet_names) < 2:
             return False
         
-        # Check if any two planets aspect each other
-        for i in range(len(houses)):
-            for j in range(i + 1, len(houses)):
-                house_diff = abs(houses[i] - houses[j])
-                if house_diff in [3, 6, 9] or (houses[i] + houses[j]) == 13:
+        # Check if any two planets aspect each other using proper aspect calculation
+        for i in range(len(planet_names)):
+            for j in range(i + 1, len(planet_names)):
+                planet1 = planet_names[i]
+                planet2 = planet_names[j]
+                
+                if planet1 not in planets or planet2 not in planets:
+                    continue
+                
+                planet1_data = planets[planet1].copy()
+                planet1_data['name'] = planet1
+                planet2_data = planets[planet2].copy()
+                planet2_data['name'] = planet2
+                
+                if self._are_planets_connected(planet1_data, planet2_data):
                     return True
         return False
     
@@ -844,3 +857,113 @@ class YogaCalculator(BaseCalculator):
             })
         
         return yogas
+    
+    def calculate_major_doshas(self):
+        """Calculate major negative yogas (Doshas)"""
+        return {
+            "mangal_dosha": self._check_mangal_dosha(),
+            "kaal_sarp_dosha": self._check_kaal_sarp(),
+            "pitra_dosha": self._check_pitra_dosha()
+        }
+    
+    def _check_mangal_dosha(self):
+        """Mars in 1, 2, 4, 7, 8, 12 from Lagna or Moon"""
+        planets = self.chart_data.get('planets', {})
+        if 'Mars' not in planets or 'Moon' not in planets:
+            return {"present": False, "note": "Missing planetary data"}
+        
+        mars_sign = planets['Mars']['sign']
+        moon_sign = planets['Moon']['sign']
+        
+        dosha_houses = [1, 2, 4, 7, 8, 12]
+        
+        # Check from Lagna
+        mars_house_lagna = ((mars_sign - self.ascendant_sign) % 12) + 1
+        is_manglik_lagna = mars_house_lagna in dosha_houses
+        
+        # Check from Moon
+        mars_house_moon = ((mars_sign - moon_sign) % 12) + 1
+        is_manglik_moon = mars_house_moon in dosha_houses
+        
+        return {
+            "present": is_manglik_lagna or is_manglik_moon,
+            "type": "High" if (is_manglik_lagna and is_manglik_moon) else "Low",
+            "from_lagna": is_manglik_lagna,
+            "from_moon": is_manglik_moon,
+            "mars_house_lagna": mars_house_lagna,
+            "mars_house_moon": mars_house_moon
+        }
+    
+    def _check_kaal_sarp(self):
+        """All planets hemmed between Rahu and Ketu"""
+        planets = self.chart_data.get('planets', {})
+        if 'Rahu' not in planets or 'Ketu' not in planets:
+            return {"present": False, "note": "Missing node data"}
+        
+        rahu_long = planets['Rahu']['longitude']
+        ketu_long = planets['Ketu']['longitude']
+        
+        # Get other planets
+        others = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        planet_longitudes = []
+        
+        for p in others:
+            if p in planets:
+                planet_longitudes.append(planets[p]['longitude'])
+        
+        if len(planet_longitudes) < 7:
+            return {"present": False, "note": "Incomplete planetary data"}
+        
+        # Simple check: all planets in one hemisphere
+        # Calculate arc between Rahu and Ketu
+        if rahu_long < ketu_long:
+            arc1_start, arc1_end = rahu_long, ketu_long
+        else:
+            arc1_start, arc1_end = ketu_long, rahu_long
+        
+        planets_in_arc = 0
+        for p_long in planet_longitudes:
+            if arc1_start <= p_long <= arc1_end:
+                planets_in_arc += 1
+        
+        # KSY if all 7 planets are in one arc (simplified)
+        ksy_present = planets_in_arc == 7 or planets_in_arc == 0
+        
+        return {
+            "present": ksy_present,
+            "planets_in_rahu_ketu_arc": planets_in_arc,
+            "note": "Simplified calculation - all planets in one hemisphere"
+        }
+    
+    def _check_pitra_dosha(self):
+        """Sun or Moon afflicted by Nodes or Saturn in 9th"""
+        planets = self.chart_data.get('planets', {})
+        
+        # Check 9th house occupants
+        ninth_house_planets = []
+        for planet, data in planets.items():
+            if data.get('house') == 9:
+                ninth_house_planets.append(planet)
+        
+        # Check Sun/Moon conjunctions with malefics
+        sun_afflicted = False
+        moon_afflicted = False
+        
+        if 'Sun' in planets and 'Saturn' in planets:
+            if planets['Sun'].get('house') == planets['Saturn'].get('house'):
+                sun_afflicted = True
+        
+        if 'Moon' in planets and 'Rahu' in planets:
+            if planets['Moon'].get('house') == planets['Rahu'].get('house'):
+                moon_afflicted = True
+        
+        pitra_present = ('Rahu' in ninth_house_planets or 'Ketu' in ninth_house_planets or 
+                        'Saturn' in ninth_house_planets or sun_afflicted or moon_afflicted)
+        
+        return {
+            "present": pitra_present,
+            "ninth_house_malefics": [p for p in ninth_house_planets if p in ['Rahu', 'Ketu', 'Saturn']],
+            "sun_afflicted": sun_afflicted,
+            "moon_afflicted": moon_afflicted,
+            "note": "Requires detailed conjunction analysis for complete assessment"
+        }

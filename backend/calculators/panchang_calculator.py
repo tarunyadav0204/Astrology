@@ -5,7 +5,8 @@ class PanchangCalculator(BaseCalculator):
     """Extract panchang calculation logic from main.py"""
     
     def __init__(self):
-        super().__init__()
+        # PanchangCalculator doesn't need chart_data in constructor
+        pass
         self.TITHI_NAMES = [
             'Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami', 'Shashthi', 'Saptami', 'Ashtami',
             'Navami', 'Dashami', 'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Purnima/Amavasya'
@@ -89,4 +90,7 @@ class PanchangCalculator(BaseCalculator):
     
     def calculate_birth_panchang(self, birth_data):
         """Calculate panchang for birth date"""
-        return self.calculate_panchang(birth_data.date)
+        if isinstance(birth_data, dict):
+            return self.calculate_panchang(birth_data['date'])
+        else:
+            return self.calculate_panchang(birth_data.date)

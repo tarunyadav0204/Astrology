@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { MarriageReportPDF } from '../PDF/MarriageReportPDF';
 import './AIInsightsTab.css';
 
 // Format text with proper line breaks and bold formatting
@@ -492,16 +494,37 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   
   return (
     <div className="ai-insights-tab">
-      <button 
-        className="regenerate-btn corner-btn" 
-        onClick={() => {
-          console.log('Regenerate button clicked');
-          setShowRegenerateConfirm(true);
-        }}
-        title="Generate fresh analysis"
-      >
-        Regenerate
-      </button>
+      <div className="ai-header-actions">
+        <button 
+          className="regenerate-btn corner-btn" 
+          onClick={() => {
+            console.log('Regenerate button clicked');
+            setShowRegenerateConfirm(true);
+          }}
+          title="Generate fresh analysis"
+        >
+          Regenerate
+        </button>
+        
+        {jsonResponse && (
+          <PDFDownloadLink
+            document={<MarriageReportPDF data={aiInsights} userName={birthDetails?.name} />}
+            fileName={`Marriage_Analysis_${birthDetails?.name || 'Report'}.pdf`}
+            className="pdf-download-link"
+          >
+            {({ loading }) => (
+              <button 
+                className="pdf-download-btn corner-btn"
+                disabled={loading}
+                title="Download PDF Report"
+              >
+                {loading ? '📄 Preparing...' : '📄 Download PDF'}
+              </button>
+            )}
+          </PDFDownloadLink>
+        )}
+      </div>
+      
       {aiInsights.cached && (
         <div className="cache-indicator">
           <span className="cache-badge">💾 Previously Generated</span>
@@ -517,7 +540,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
               <div className="quick-answer-section">
                 <h3>✨ Quick Answer</h3>
                 <div className="quick-answer-card">
-                  <div dangerouslySetInnerHTML={{__html: jsonResponse.quick_answer}} />
+                  <div dangerouslySetInnerHTML={{__html: parseMarkdown(jsonResponse.quick_answer)}} />
                 </div>
               </div>
             )}
