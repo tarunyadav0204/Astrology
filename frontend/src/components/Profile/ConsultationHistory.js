@@ -92,11 +92,6 @@ const ConsultationHistory = ({ user }) => {
 
   return (
     <div className="consultation-history">
-      <div className="history-header">
-        <h2>📋 Past Consultations</h2>
-        <p>Your astrology consultation history</p>
-      </div>
-
       {sessions.length === 0 ? (
         <div className="no-history">
           <div className="no-history-icon">💬</div>

@@ -1,0 +1,158 @@
+.credit-ledger {
+  margin-top: 0;
+}
+
+.ledger-header {
+  margin-bottom: 20px;
+}
+
+.ledger-header h2 {
+  margin: 0 0 5px 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.ledger-header p {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #e91e63;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.no-transactions {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f9f9f9;
+  border-radius: 10px;
+}
+
+.no-transactions-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.no-transactions h3 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.no-transactions p {
+  margin: 0;
+  color: #666;
+}
+
+.transactions-table {
+  overflow-x: auto;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.transactions-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.transactions-table thead {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.transactions-table th {
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: white;
+  border: none;
+  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.transactions-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.transactions-table tr:hover {
+  background: #f9f9f9;
+}
+
+.date-cell {
+  color: #666;
+  font-size: 14px;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.type-badge.earned {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.type-badge.spent {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.feature-cell {
+  color: #333;
+  font-weight: 500;
+}
+
+.amount-cell {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.amount-cell.earned {
+  color: #2e7d32;
+}
+
+.amount-cell.spent {
+  color: #c62828;
+}
+
+.balance-cell {
+  color: #333;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .transactions-table {
+    font-size: 13px;
+  }
+  
+  .transactions-table th,
+  .transactions-table td {
+    padding: 8px 6px;
+  }
+  
+  .ledger-header h2 {
+    font-size: 20px;
+  }
+}

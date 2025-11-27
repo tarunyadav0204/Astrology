@@ -2,6 +2,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   padding: 20px;
+  padding-top: 200px;
 }
 
 .profile-header {
@@ -65,8 +66,43 @@
 .profile-content {
   background: white;
   border-radius: 15px;
-  padding: 20px;
+  padding: 0;
   box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.profile-tabs {
+  display: flex;
+  border-bottom: 2px solid #f0f0f0;
+  background: #f8f9fa;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 15px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  background: #fff;
+  color: #e91e63;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #e91e63;
+  border-bottom: 3px solid #e91e63;
+  margin-bottom: -2px;
+}
+
+.tab-content {
+  padding: 20px;
 }
 
 @media (max-width: 768px) {
