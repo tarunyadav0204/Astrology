@@ -32,16 +32,30 @@ class FriendshipCalculator(BaseCalculator):
     
     def calculate_friendship(self, birth_data):
         """Calculate planetary friendship matrix"""
+        # Handle both dict and object input
+        if isinstance(birth_data, dict):
+            time_str = birth_data.get('time', '12:00')
+            date_str = birth_data.get('date', '2000-01-01')
+            latitude = birth_data.get('latitude', 0.0)
+            longitude = birth_data.get('longitude', 0.0)
+            timezone = birth_data.get('timezone', 'UTC+05:30')
+        else:
+            time_str = birth_data.time
+            date_str = birth_data.date
+            latitude = birth_data.latitude
+            longitude = birth_data.longitude
+            timezone = birth_data.timezone
+        
         # Calculate planetary positions
-        time_parts = birth_data.time.split(':')
+        time_parts = time_str.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
         
-        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+        if 6.0 <= latitude <= 37.0 and 68.0 <= longitude <= 97.0:
             tz_offset = 5.5
         else:
             tz_offset = 0
-            if birth_data.timezone.startswith('UTC'):
-                tz_str = birth_data.timezone[3:]
+            if timezone.startswith('UTC'):
+                tz_str = timezone[3:]
                 if tz_str and ':' in tz_str:
                     sign = 1 if tz_str[0] == '+' else -1
                     parts = tz_str[1:].split(':')
@@ -49,9 +63,9 @@ class FriendshipCalculator(BaseCalculator):
         
         utc_hour = hour - tz_offset
         jd = swe.julday(
-            int(birth_data.date.split('-')[0]),
-            int(birth_data.date.split('-')[1]),
-            int(birth_data.date.split('-')[2]),
+            int(date_str.split('-')[0]),
+            int(date_str.split('-')[1]),
+            int(date_str.split('-')[2]),
             utc_hour
         )
         

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import NavigationHeader from '../Shared/NavigationHeader';
 import NativeSelector from '../Shared/NativeSelector';
 import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
-import AIInsightsTab from '../Health/AIInsightsTab';
+import AIInsightsTab from '../HealthAnalysis/AIInsightsTab';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { useAstrology } from '../../context/AstrologyContext';

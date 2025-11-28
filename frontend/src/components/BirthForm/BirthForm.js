@@ -143,7 +143,11 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       
       setChartData(enhancedChartData);
       toast.success('Chart loaded successfully!');
-      onSubmit();
+      
+      // Close modal directly without triggering onSubmit callback
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       toast.error('Failed to load chart');
     }

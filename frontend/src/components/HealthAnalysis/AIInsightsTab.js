@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
 import jsPDF from 'jspdf';
+import './AIInsightsTab.css';
 
 const formatText = (text) => {
   if (!text) return '';
@@ -63,8 +64,8 @@ const AccordionPanel = ({ qa, index }) => {
   );
 };
 
-const AIQuestionsTab = ({ chartData, birthDetails }) => {
-  const { credits, educationCost, loading: creditsLoading } = useCredits();
+const AIInsightsTab = ({ chartData, birthDetails }) => {
+  const { credits, healthCost, loading: creditsLoading } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -76,13 +77,18 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   
   const steps = [
-    '🎓 Analyzing education houses',
+    '🏥 Analyzing health houses',
     '🪐 Examining planetary positions',
-    '📚 Calculating learning indicators',
-    '🧠 Assessing intellectual capacity',
-    '📈 Generating education timing'
+    '💪 Calculating vitality indicators',
+    '🧠 Assessing mental health',
+    '📈 Generating health timing'
   ];
   
+  const parseMarkdown = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  };
+
   useEffect(() => {
     let stepInterval, dotsInterval;
     
@@ -108,7 +114,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
       
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/education/get-analysis', {
+        const response = await fetch('/api/health/get-analysis', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -142,7 +148,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
   const loadAIInsights = async (forceRegenerate = false) => {
     if (!birthDetails) return;
     
-    if (credits < educationCost) {
+    if (credits < healthCost) {
       setShowCreditWarning(true);
       return;
     }
@@ -175,7 +181,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
       const timeoutSignal = setTimeout(() => controller.abort(), 300000);
       
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/education/ai-analyze', {
+      const response = await fetch('/api/health/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,19 +281,22 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
     const maxWidth = pageWidth - 2 * margin;
     let yPosition = 30;
     
+    // Colors matching the screen theme
     const colors = {
-      primary: [44, 62, 80],
-      accent: [76, 175, 80],
-      light: [248, 249, 250],
-      text: [74, 85, 104],
-      border: [226, 232, 240]
+      primary: [44, 62, 80],     // #2c3e50
+      accent: [76, 175, 80],     // #4caf50
+      light: [248, 249, 250],    // #f8f9fa
+      text: [74, 85, 104],       // #4a5568
+      border: [226, 232, 240]    // #e2e8f0
     };
     
+    // Helper function to add colored background
     const addBackground = (x, y, width, height, color) => {
       doc.setFillColor(...color);
       doc.rect(x, y, width, height, 'F');
     };
     
+    // Helper function to add text with styling
     const addText = (text, fontSize = 12, isBold = false, color = colors.text, bgColor = null) => {
       doc.setFontSize(fontSize);
       doc.setFont('helvetica', isBold ? 'bold' : 'normal');
@@ -296,8 +305,10 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
       const lines = doc.splitTextToSize(text, maxWidth - 10);
       const lineHeight = fontSize * 0.6;
       
+      // Add background if specified (only for headers)
       if (bgColor) {
         const totalHeight = lines.length * lineHeight + 10;
+        // Only add background if the entire header fits on current page
         if (yPosition + totalHeight <= pageHeight - 30) {
           addBackground(margin - 5, yPosition - 5, maxWidth + 10, totalHeight, bgColor);
         } else {
@@ -307,7 +318,9 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
         }
       }
       
+      // Add lines one by one, creating new pages as needed
       for (let i = 0; i < lines.length; i++) {
+        // Check if current line fits on page
         if (yPosition + lineHeight > pageHeight - 30) {
           doc.addPage();
           yPosition = 30;
@@ -317,9 +330,10 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
         yPosition += lineHeight + 2;
       }
       
-      yPosition += 5;
+      yPosition += 5; // Add some spacing after the text block
     };
     
+    // Helper function to add section divider
     const addDivider = () => {
       doc.setDrawColor(...colors.border);
       doc.setLineWidth(0.5);
@@ -327,28 +341,34 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
       yPosition += 10;
     };
     
+    // Helper function to clean HTML tags and decode entities
     const cleanText = (html) => {
       if (!html) return '';
       return html
+        // Remove HTML tags but preserve content
         .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '$1')
         .replace(/<em[^>]*>(.*?)<\/em>/gi, '$1')
         .replace(/<[^>]*>/g, '')
+        // Decode HTML entities
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&#39;/g, "'")
         .replace(/&quot;/g, '"')
+        // Remove markdown formatting
         .replace(/\*\*(.*?)\*\*/g, '$1')
         .replace(/\*(.*?)\*/g, '$1')
+        // Remove unwanted special characters and symbols
         .replace(/[ØÜÝÞß]/g, '')
         .replace(/[=<>]/g, '')
+        // Clean up multiple spaces and line breaks
         .replace(/\s+/g, ' ')
         .replace(/\n\s*\n/g, '\n')
         .trim();
     };
     
-    // Header
+    // AstroRoshni Header
     addBackground(0, 0, pageWidth, 80, colors.primary);
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(28);
@@ -356,7 +376,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
     doc.text('AstroRoshni', margin, 25);
     
     doc.setFontSize(18);
-    doc.text('Education Analysis Report', margin, 45);
+    doc.text('Health Analysis Report', margin, 45);
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
@@ -365,32 +385,37 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
     
     yPosition = 90;
     
-    // Disclaimer
-    addText('IMPORTANT DISCLAIMER: This astrological education analysis is provided for educational and entertainment purposes only. It is not intended as academic or career advice. The information contained herein should not be used as a substitute for professional educational counseling. Always consult with qualified educational professionals for any academic concerns or before making any decisions related to your education or career.', 9, false, [150, 150, 150]);
+    // Top Disclaimer
+    addText('IMPORTANT DISCLAIMER: This astrological health analysis is provided for educational and entertainment purposes only. It is not intended as medical advice, diagnosis, or treatment. The information contained herein should not be used as a substitute for professional medical care. Always consult with qualified healthcare professionals for any health concerns or before making any decisions related to your health or treatment.', 9, false, [150, 150, 150]);
     
     yPosition += 10;
     
-    const educationAnalysis = aiInsights.education_analysis;
-    const jsonResponse = educationAnalysis?.json_response;
+    const healthAnalysis = aiInsights.health_analysis;
+    const jsonResponse = healthAnalysis?.json_response;
     
     if (jsonResponse) {
+      // Quick Answer Section
       if (jsonResponse.quick_answer) {
-        addText('Quick Education Overview', 18, true, colors.primary, colors.light);
+        addText('Quick Health Overview', 18, true, colors.primary, colors.light);
         yPosition += 5;
         addText(cleanText(jsonResponse.quick_answer), 11, false, colors.text);
         addDivider();
       }
       
+      // Detailed Analysis Section
       if (jsonResponse.detailed_analysis && jsonResponse.detailed_analysis.length > 0) {
         addText('Detailed Analysis', 18, true, colors.primary, colors.light);
         yPosition += 5;
         
         jsonResponse.detailed_analysis.forEach((qa, index) => {
+          // Question with number badge
           addText(`${index + 1}. ${cleanText(qa.question)}`, 14, true, colors.primary);
           
+          // Answer
           addText('Answer:', 12, true, colors.accent);
           addText(cleanText(qa.answer), 11, false, colors.text);
           
+          // Key Points
           if (qa.key_points && qa.key_points.length > 0) {
             addText('Key Points:', 12, true, colors.accent);
             qa.key_points.forEach(point => {
@@ -398,6 +423,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
             });
           }
           
+          // Astrological Basis
           if (qa.astrological_basis) {
             addText('Astrological Basis:', 12, true, colors.accent);
             addText(cleanText(qa.astrological_basis), 11, false, colors.text);
@@ -415,6 +441,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
         addDivider();
       }
       
+      // Final Thoughts Section
       if (jsonResponse.final_thoughts) {
         addText('Final Thoughts', 18, true, colors.primary, colors.light);
         yPosition += 5;
@@ -422,64 +449,69 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
       }
     }
     
-    // Footer
+    // Footer on all pages
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       
+      // Footer background
       addBackground(0, pageHeight - 40, pageWidth, 40, colors.light);
       
+      // AstroRoshni footer
       doc.setFontSize(10);
       doc.setTextColor(...colors.primary);
       doc.setFont('helvetica', 'bold');
       doc.text('AstroRoshni - Vedic Astrology Insights', margin, pageHeight - 30);
       
+      // Page number
       doc.setFontSize(10);
       doc.setTextColor(...colors.text);
       doc.setFont('helvetica', 'normal');
       doc.text(`Page ${i} of ${pageCount}`, pageWidth - 40, pageHeight - 30);
       
+      // Legal Disclaimer
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
-      const disclaimerText = 'LEGAL DISCLAIMER: This report is for educational and entertainment purposes only. Not intended as academic advice. ' +
-                            'Consult qualified educational professionals for academic concerns. AstroRoshni assumes no responsibility for decisions made based on this content.';
+      const disclaimerText = 'LEGAL DISCLAIMER: This report is for educational and entertainment purposes only. Not intended as medical advice. ' +
+                            'Consult qualified healthcare professionals for medical concerns. AstroRoshni assumes no responsibility for decisions made based on this content.';
       const disclaimerLines = doc.splitTextToSize(disclaimerText, pageWidth - 2 * margin);
       doc.text(disclaimerLines, margin, pageHeight - 20);
     }
     
-    const fileName = `Education_Analysis_${birthDetails?.name || 'Report'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    // Download the PDF
+    const fileName = `Health_Analysis_${birthDetails?.name || 'Report'}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   };
 
   if (showRegenerateConfirm) {
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="analysis-confirmation">
           <div className="confirmation-header">
-            <h3>🔄 Regenerate Education Analysis</h3>
+            <h3>🔄 Regenerate Health Analysis</h3>
             <p>Generate a fresh analysis with updated insights</p>
           </div>
           
           <div className="cost-section">
             <div className="cost-info">
               <span className="cost-label">Analysis Cost:</span>
-              <span className="cost-amount">{educationCost} credits</span>
+              <span className="cost-amount">{healthCost} credits</span>
             </div>
             <div className="balance-info">
               <span className="balance-label">Your Balance:</span>
-              <span className={`balance-amount ${credits >= educationCost ? 'sufficient' : 'insufficient'}`}>
+              <span className={`balance-amount ${credits >= healthCost ? 'sufficient' : 'insufficient'}`}>
                 {credits} credits
               </span>
             </div>
           </div>
           
-          {credits >= educationCost ? (
+          {credits >= healthCost ? (
             <div className="action-section">
               <button className="start-analysis-btn" onClick={() => {
                 setShowRegenerateConfirm(false);
                 loadAIInsights(true);
               }}>
-                🔄 Regenerate Analysis ({educationCost} credits)
+                🔄 Regenerate Analysis ({healthCost} credits)
               </button>
               <button className="cancel-btn" onClick={() => setShowRegenerateConfirm(false)}>
                 Cancel
@@ -488,7 +520,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
           ) : (
             <div className="insufficient-credits">
               <p className="credit-warning-text">
-                You need <strong>{educationCost} credits</strong> but have <strong>{credits} credits</strong>
+                You need <strong>{healthCost} credits</strong> but have <strong>{credits} credits</strong>
               </p>
               <div className="action-section">
                 <button className="add-credits-btn" onClick={() => setShowCreditsModal(true)}>
@@ -512,42 +544,42 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
   
   if (!hasStarted && !aiInsights) {
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="analysis-confirmation">
           <div className="confirmation-header">
-            <h3>🎓 AI Education Analysis 360°</h3>
-            <p>Get comprehensive insights about your education, learning potential, and academic success from your birth chart</p>
+            <h3>🏥 AI Health Analysis 360°</h3>
+            <p>Get comprehensive insights about your health, vitality, and wellness from your birth chart</p>
           </div>
           
           <div className="analysis-preview">
             <h4>📊 What You'll Get:</h4>
             <ul className="preview-list">
-              <li>✨ 7 Essential education questions with detailed answers</li>
-              <li>🪐 Complete planetary analysis for learning indicators</li>
-              <li>📚 Subject recommendations and academic strengths</li>
-              <li>🧠 Intelligence and memory assessment</li>
-              <li>📅 Education timing and favorable periods</li>
-              <li>🔮 Study methods and learning environment guidance</li>
+              <li>✨ 7 Essential health questions with detailed answers</li>
+              <li>🪐 Complete planetary analysis for health indicators</li>
+              <li>💪 Vitality and immunity assessment</li>
+              <li>🧠 Mental health and emotional wellness</li>
+              <li>📅 Health timing and vulnerable periods</li>
+              <li>🔮 Preventive measures and wellness recommendations</li>
             </ul>
           </div>
           
           <div className="cost-section">
             <div className="cost-info">
               <span className="cost-label">Analysis Cost:</span>
-              <span className="cost-amount">{educationCost} credits</span>
+              <span className="cost-amount">{healthCost} credits</span>
             </div>
             <div className="balance-info">
               <span className="balance-label">Your Balance:</span>
-              <span className={`balance-amount ${credits >= educationCost ? 'sufficient' : 'insufficient'}`}>
+              <span className={`balance-amount ${credits >= healthCost ? 'sufficient' : 'insufficient'}`}>
                 {credits} credits
               </span>
             </div>
           </div>
           
-          {credits >= educationCost ? (
+          {credits >= healthCost ? (
             <div className="action-section">
               <button className="start-analysis-btn" onClick={startAnalysis}>
-                🚀 Start Analysis ({educationCost} credits)
+                🚀 Start Analysis ({healthCost} credits)
               </button>
               <p className="analysis-note">
                 ⏱️ Analysis takes 1-2 minutes • 🎯 Personalized to your birth chart
@@ -556,7 +588,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
           ) : (
             <div className="insufficient-credits">
               <p className="credit-warning-text">
-                You need <strong>{educationCost} credits</strong> but have <strong>{credits} credits</strong>
+                You need <strong>{healthCost} credits</strong> but have <strong>{credits} credits</strong>
               </p>
               <button className="add-credits-btn" onClick={() => setShowCreditsModal(true)}>
                 💳 Add Credits
@@ -575,14 +607,14 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
   
   if (showCreditWarning) {
     const creditMatch = error?.match(/You need (\d+) credits but have (\d+)/i);
-    const neededCredits = creditMatch ? creditMatch[1] : educationCost;
+    const neededCredits = creditMatch ? creditMatch[1] : healthCost;
     const currentCredits = creditMatch ? creditMatch[2] : credits;
     
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="credit-warning">
           <h3>💳 Insufficient Credits</h3>
-          <p>You need <strong>{neededCredits} credits</strong> for education analysis but have <strong>{currentCredits} credits</strong>.</p>
+          <p>You need <strong>{neededCredits} credits</strong> for health analysis but have <strong>{currentCredits} credits</strong>.</p>
           <p>Please purchase more credits or redeem a promo code to continue.</p>
           <div className="credit-actions">
             <button onClick={() => setShowCreditsModal(true)}>Add Credits</button>
@@ -595,7 +627,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
           onClose={() => {
             setShowCreditsModal(false);
             setTimeout(() => {
-              if (credits >= educationCost) {
+              if (credits >= healthCost) {
                 setShowCreditWarning(false);
                 loadAIInsights();
               }
@@ -608,10 +640,10 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
 
   if (loading || creditsLoading) {
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="loading-state">
           <div className="ai-spinner"></div>
-          <h3>💎 Generating Your Personalized Education Insights</h3>
+          <h3>💎 Generating Your Personalized Health Insights</h3>
           <div className="loading-steps">
             {steps.map((step, index) => (
               <div key={index} className={`step ${index <= currentStep ? 'active' : ''}`}>
@@ -630,7 +662,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
 
   if (error && !showCreditWarning) {
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="error-state">
           <h3>⚠️ Analysis Error</h3>
           <p>{error}</p>
@@ -642,41 +674,41 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
 
   if (!aiInsights) {
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="error-state">
-          <h3>🎓 Analysis Failed</h3>
-          <p>Could not generate education insights. Please try again.</p>
+          <h3>🏥 Analysis Failed</h3>
+          <p>Could not generate health insights. Please try again.</p>
           <button onClick={() => loadAIInsights(true)}>🔄 Regenerate Analysis</button>
         </div>
       </div>
     );
   }
 
-  const educationAnalysis = aiInsights.education_analysis;
+  const healthAnalysis = aiInsights.health_analysis;
   
-  const hasContent = educationAnalysis && (
-    educationAnalysis.json_response || 
-    educationAnalysis.raw_response ||
-    educationAnalysis.summary
+  const hasContent = healthAnalysis && (
+    healthAnalysis.json_response || 
+    healthAnalysis.raw_response ||
+    healthAnalysis.summary
   );
   
   if (!hasContent) {
     return (
-      <div className="ai-insights-tab education-theme">
+      <div className="ai-insights-tab health-theme">
         <div className="error-state">
-          <h3>🎓 Analysis Failed</h3>
-          <p>Could not generate education insights. Please try again.</p>
+          <h3>🏥 Analysis Failed</h3>
+          <p>Could not generate health insights. Please try again.</p>
           <button onClick={() => loadAIInsights(true)}>🔄 Regenerate Analysis</button>
         </div>
       </div>
     );
   }
 
-  const jsonResponse = educationAnalysis.json_response;
-  const rawResponse = educationAnalysis.raw_response;
+  const jsonResponse = healthAnalysis.json_response;
+  const rawResponse = healthAnalysis.raw_response;
   
   return (
-    <div className="ai-insights-tab education-theme">
+    <div className="ai-insights-tab health-theme">
       <div className="ai-header-actions">
         <button 
           className="regenerate-btn corner-btn" 
@@ -701,7 +733,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
         </div>
       )}
 
-      <div className="enhanced-education-content">
+      <div className="enhanced-health-content">
         {jsonResponse && (
           <>
             {jsonResponse.quick_answer && (
@@ -756,19 +788,19 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
         
         {!jsonResponse && !rawResponse && (
           <div className="raw-content">
-            <div dangerouslySetInnerHTML={{__html: typeof educationAnalysis === 'string' ? educationAnalysis : JSON.stringify(educationAnalysis)}} />
+            <div dangerouslySetInnerHTML={{__html: typeof healthAnalysis === 'string' ? healthAnalysis : JSON.stringify(healthAnalysis)}} />
           </div>
         )}
       </div>
 
       <div className="ai-footer">
         <p className="ai-disclaimer">
-          <strong>Disclaimer:</strong> Education insights are for educational purposes only and not academic advice. 
-          Always consult qualified educational professionals for academic concerns.
+          <strong>Disclaimer:</strong> Health insights are for educational purposes only and not medical advice. 
+          Always consult qualified healthcare professionals for health concerns.
         </p>
       </div>
     </div>
   );
 };
 
-export default AIQuestionsTab;
+export default AIInsightsTab;

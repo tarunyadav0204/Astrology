@@ -17,15 +17,17 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
       setError(null);
       
       try {
+        const token = localStorage.getItem('token');
         const response = await fetch('/api/health/overall-assessment', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
           },
           body: JSON.stringify({
-            birth_date: birthDetails.date || '1990-01-01',
-            birth_time: birthDetails.time || '12:00',
-            birth_place: birthDetails.place || 'New Delhi',
+            date: birthDetails.date || '1990-01-01',
+            time: birthDetails.time || '12:00',
+            place: birthDetails.place || 'New Delhi',
             latitude: birthDetails.latitude || 28.6139,
             longitude: birthDetails.longitude || 77.2090,
             timezone: birthDetails.timezone || 'UTC+5:30'
@@ -40,7 +42,7 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
         setHealthData(result.data);
       } catch (error) {
         console.error('Error loading health analysis:', error);
-        setError(error.message || 'Failed to load health analysis');
+        setError(error.message || 'Failed to load technical health analysis');
       } finally {
         setLoading(false);
       }
@@ -79,9 +81,29 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
     return (
       <div className="complete-health-analysis">
         <div className="error-state">
-          <h3>⚠️ Analysis Error</h3>
+          <h3>📊 Technical Analysis</h3>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Retry Analysis</button>
+          <button 
+            onClick={() => {
+              // Switch to the first tab (Personalized Health Insights)
+              const tabButtons = document.querySelectorAll('.tab-button');
+              if (tabButtons[0]) {
+                tabButtons[0].click();
+              }
+            }}
+            style={{
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginTop: '10px'
+            }}
+          >
+            Generate Analysis
+          </button>
         </div>
       </div>
     );
@@ -100,8 +122,8 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
   return (
     <div className="complete-health-analysis">
       <div className="analysis-header">
-        <h3>🏥 Complete Health Analysis</h3>
-        <p>Comprehensive Vedic health analysis with detailed calculations</p>
+        <h3 style={{color: 'white'}}>🏥 Complete Health Analysis</h3>
+        <p style={{color: 'white'}}>Comprehensive Vedic health analysis with detailed calculations</p>
       </div>
 
       <div className="analysis-sections">

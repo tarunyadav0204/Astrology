@@ -245,6 +245,16 @@ async def get_marriage_cost():
     cost = credit_service.get_credit_setting('marriage_analysis_cost')
     return {"cost": cost}
 
+@router.get("/settings/health-cost")
+async def get_health_cost():
+    cost = credit_service.get_credit_setting('health_analysis_cost')
+    return {"cost": cost}
+
+@router.get("/settings/education-cost")
+async def get_education_cost():
+    cost = credit_service.get_credit_setting('education_analysis_cost')
+    return {"cost": cost}
+
 @router.post("/admin/bulk-promo-codes")
 async def create_bulk_promo_codes(request: dict, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':

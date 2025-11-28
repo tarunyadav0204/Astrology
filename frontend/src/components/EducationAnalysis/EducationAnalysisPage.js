@@ -1,25 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from '../Shared/NavigationHeader';
+import NativeSelector from '../Shared/NativeSelector';
 import TechnicalAnalysisTab from './TechnicalAnalysisTab';
 import AIQuestionsTab from './AIQuestionsTab';
+import { useAstrology } from '../../context/AstrologyContext';
 import './EducationAnalysisPage.css';
 
 // Added promo code edit and delete functionality with custom confirmation modal
 
 const EducationAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
-  const [activeTab, setActiveTab] = useState('technical');
+  const { birthData } = useAstrology();
+  const [activeTab, setActiveTab] = useState('ai');
   const [analysisData, setAnalysisData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [birthDetails, setBirthDetails] = useState(null);
 
   useEffect(() => {
     console.log('EducationAnalysisPage useEffect triggered, user:', user);
+    
+    // Use birth data from context if available, otherwise try localStorage
+    if (birthData) {
+      setBirthDetails(birthData);
+    } else {
+      const savedBirthData = localStorage.getItem('currentBirthData') || 
+                            localStorage.getItem('birthData') ||
+                            localStorage.getItem('userBirthData');
+      
+      if (savedBirthData) {
+        try {
+          const parsedBirthData = JSON.parse(savedBirthData);
+          setBirthDetails(parsedBirthData);
+        } catch (error) {
+          console.error('Error parsing birth data:', error);
+        }
+      }
+    }
+    
     if (user) {
       console.log('User exists, calling fetchEducationAnalysis');
       fetchEducationAnalysis();
     } else {
       console.log('No user found, skipping API call');
     }
-  }, [user]);
+  }, [user, birthData]);
 
   const fetchEducationAnalysis = async () => {
     try {
@@ -123,18 +146,23 @@ const EducationAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogi
         
         {user && (
           <>
+            <NativeSelector 
+              birthData={birthDetails} 
+              onNativeChange={() => window.location.reload()}
+            />
+            <div className="analysis-section">
             <div className="tab-navigation">
-              <button 
-                className={`tab-btn ${activeTab === 'technical' ? 'active' : ''}`}
-                onClick={() => setActiveTab('technical')}
-              >
-                📊 Technical Analysis
-              </button>
               <button 
                 className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
                 onClick={() => setActiveTab('ai')}
               >
-                🤖 AI Q&A
+                Personalized Education Analysis
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'technical' ? 'active' : ''}`}
+                onClick={() => setActiveTab('technical')}
+              >
+                Detailed Technical Analysis
               </button>
             </div>
 
@@ -146,21 +174,22 @@ const EducationAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogi
                 </div>
               ) : (
                 <>
+                  {activeTab === 'ai' && (
+                    <AIQuestionsTab 
+                      chartData={null}
+                      birthDetails={birthDetails}
+                    />
+                  )}
                   {activeTab === 'technical' && (
                     <TechnicalAnalysisTab 
                       analysisData={analysisData}
                       onRefresh={fetchEducationAnalysis}
                     />
                   )}
-                  {activeTab === 'ai' && (
-                    <AIQuestionsTab 
-                      analysisData={analysisData}
-                      user={user}
-                    />
-                  )}
                 </>
               )}
             </div>
+          </div>
           </>
         )}
       </div>

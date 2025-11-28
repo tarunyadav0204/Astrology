@@ -536,12 +536,13 @@ class YogaCalculator(BaseCalculator):
             
             # Check for conjunction (same house)
             if mercury_house == jupiter_house == venus_house:
+                house_significance = self._get_saraswati_house_significance(mercury_house)
                 yogas.append({
                     'name': 'Saraswati Yoga',
                     'planets': ['Mercury', 'Jupiter', 'Venus'],
                     'houses': [mercury_house],
                     'strength': 'High',
-                    'description': 'Mercury, Jupiter, Venus conjunction - excellent learning ability and academic success'
+                    'description': f'Mercury, Jupiter, Venus conjunction in {mercury_house}th house - {house_significance}'
                 })
             # Check for mutual aspects
             elif self._planets_in_mutual_aspect(['Mercury', 'Jupiter', 'Venus'], planets):
@@ -559,12 +560,14 @@ class YogaCalculator(BaseCalculator):
             mercury_house = planets['Mercury'].get('house', 1)
             
             if sun_house == mercury_house:
+                house_significance = self._get_budh_aditya_house_significance(sun_house)
+                strength = 'High' if sun_house in [1, 4, 5, 9, 10] else 'Medium'
                 yogas.append({
                     'name': 'Budh-Aditya Yoga',
                     'planets': ['Sun', 'Mercury'],
                     'houses': [sun_house],
-                    'strength': 'High',
-                    'description': 'Sun-Mercury conjunction - sharp intelligence and analytical abilities'
+                    'strength': strength,
+                    'description': f'Sun-Mercury conjunction in {sun_house}th house - {house_significance}'
                 })
         
         # Guru-Mangal Yoga - Jupiter-Mars conjunction/aspect
@@ -606,6 +609,42 @@ class YogaCalculator(BaseCalculator):
                 })
         
         return yogas
+    
+    def _get_saraswati_house_significance(self, house: int) -> str:
+        """Get house-specific significance for Saraswati Yoga"""
+        significances = {
+            1: "exceptional learning ability and academic leadership",
+            2: "wealth through education and eloquent speech", 
+            3: "creative writing and communication skills",
+            4: "strong foundation in traditional learning",
+            5: "brilliant intelligence and academic excellence",
+            6: "victory in competitive exams and debates",
+            7: "success in collaborative learning and partnerships",
+            8: "deep research abilities and occult knowledge",
+            9: "higher education success and teaching abilities",
+            10: "career success through education and reputation",
+            11: "gains and recognition through academic achievements",
+            12: "foreign education and spiritual learning"
+        }
+        return significances.get(house, "general learning enhancement")
+    
+    def _get_budh_aditya_house_significance(self, house: int) -> str:
+        """Get house-specific significance for Budh-Aditya Yoga"""
+        significances = {
+            1: "sharp analytical mind and leadership in academics",
+            2: "intelligent speech and financial acumen",
+            3: "excellent communication and writing skills", 
+            4: "strong logical foundation and practical learning",
+            5: "brilliant intelligence and academic success",
+            6: "analytical problem-solving in competitive fields",
+            7: "diplomatic intelligence and partnership success",
+            8: "research excellence but challenges in formal education",
+            9: "philosophical intelligence and higher learning",
+            10: "career success through intellectual abilities",
+            11: "networking skills and gains through intelligence",
+            12: "intuitive intelligence but may face educational obstacles"
+        }
+        return significances.get(house, "enhanced intellectual abilities")
     
     def _planets_in_mutual_aspect(self, planet_names, planets):
         """Check if planets are in mutual aspect using AspectCalculator"""
