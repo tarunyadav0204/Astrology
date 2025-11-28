@@ -121,7 +121,8 @@ CRITICAL DATA UTILIZATION INSTRUCTIONS:
 4. **Education Yogas**: Check 'education_yogas' (Saraswati, Budh-Aditya). Mention them by name if present.
 5. **Timing**: Cross-reference 'current_dashas' with 'education_timing'. Identify periods favorable for **Exams** or **Admissions**.
 
-STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
+CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
+Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
 {
   "quick_answer": "Summary of academic potential, best fields of study, and current educational phase.",
   "detailed_analysis": [
@@ -157,10 +158,12 @@ STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
   ]
 }
 
-CRITICAL JSON SAFETY RULES:
-1. Escape ALL double quotes inside strings.
-2. No line breaks inside JSON strings - use <br> tags.
-3. DISCLAIMER: Always mention this is astrological guidance, not career counseling.
+CRITICAL: Your entire response must be valid JSON starting with { and ending with }.
+Do NOT include any text before or after the JSON object.
+Do NOT use HTML div tags or HTML formatting.
+Use <br> for line breaks within JSON strings.
+Escape quotes properly: \"text\"
+DISCLAIMER: Always mention this is astrological guidance, not career counseling.
 """
             
             # Generate AI response
@@ -222,15 +225,24 @@ CRITICAL JSON SAFETY RULES:
                             parsing_successful = True
                             print(f"✅ JSON PARSED AFTER CLEANUP")
                         except json.JSONDecodeError as cleanup_error:
-                            print(f"❌ JSON parsing failed: {cleanup_error}")
-                            # Don't deduct credits for parsing failures
-                            yield f"data: {json.dumps({'status': 'error', 'message': 'AI response formatting error. Please try again.'})}\n\n"
-                            return
+                            print(f"❌ JSON parsing failed completely. Treating as HTML response.")
+                            print(f"📄 Raw response length: {len(ai_response_text)}")
+                            print(f"📄 Raw response preview: {ai_response_text[:500]}...")
+                            # If JSON parsing fails completely, treat as HTML response
+                            parsed_response = {
+                                "raw_response": ai_response_text,
+                                "quick_answer": "Analysis completed successfully.",
+                                "detailed_analysis": [],
+                                "final_thoughts": "Analysis provided in detailed format.",
+                                "follow_up_questions": []
+                            }
+                            parsing_successful = True  # HTML response is still valid
                     
                     # Build complete response
                     education_insights = {
                         'education_analysis': {
-                            'json_response': parsed_response,
+                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
+                            'raw_response': parsed_response.get('raw_response'),
                             'summary': 'Advanced Vedic education analysis with house and planetary calculations.'
                         },
                         'enhanced_context': True,

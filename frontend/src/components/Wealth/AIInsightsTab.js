@@ -9,17 +9,34 @@ import './AIInsightsTab.css';
 const formatText = (text) => {
   if (!text) return '';
   
+  // Decode HTML entities first
+  let formatted = text.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  
+  // Handle markdown headers (### -> h3)
+  formatted = formatted.replace(/^### (.*$)/gm, '<h3 style="color: #ff9800; margin: 1rem 0 0.5rem 0;">$1</h3>');
+  
   // Handle bold text (**text**)
-  let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #ff9800; font-weight: bold;">$1</strong>');
   
-  // Handle single asterisks (*text*)
-  formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // Handle italic text (*text*)
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em style="color: #ff9800; font-style: italic;">$1</em>');
   
-  // Add line breaks after periods followed by capital letters (new sentences)
-  formatted = formatted.replace(/\. ([A-Z])/g, '.\n$1');
+  // Handle bullet points (• text)
+  formatted = formatted.replace(/^• (.*$)/gm, '<li style="margin: 0.25rem 0;">$1</li>');
   
-  // Add line breaks before "According to" and similar phrases
-  formatted = formatted.replace(/(According to|As per|The|This)/g, '\n$1');
+  // Wrap consecutive list items in ul tags
+  formatted = formatted.replace(/(<li.*?<\/li>\s*)+/gs, '<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">$&</ul>');
+  
+  // Handle line breaks - convert double line breaks to paragraphs
+  formatted = formatted.replace(/\n\n+/g, '</p><p>');
+  
+  // Wrap in paragraph tags if not already wrapped
+  if (!formatted.startsWith('<h3>') && !formatted.startsWith('<ul>')) {
+    formatted = '<p>' + formatted + '</p>';
+  }
+  
+  // Clean up empty paragraphs
+  formatted = formatted.replace(/<p><\/p>/g, '');
   
   return formatted;
 };
@@ -100,7 +117,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
   // Function to parse markdown-style bold text
   const parseMarkdown = (text) => {
     if (!text || typeof text !== 'string') return text;
-    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    return formatText(text);
   };
 
   useEffect(() => {
@@ -697,7 +714,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
           {/* Fallback for raw response */}
           {!jsonResponse && !parsedStructure && rawResponse && (
             <div className="raw-content">
-              <div dangerouslySetInnerHTML={{__html: rawResponse}} />
+              <div dangerouslySetInnerHTML={{__html: formatText(rawResponse)}} />
             </div>
           )}
           

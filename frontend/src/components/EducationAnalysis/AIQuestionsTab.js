@@ -5,9 +5,36 @@ import jsPDF from 'jspdf';
 
 const formatText = (text) => {
   if (!text) return '';
+  
+  // Decode HTML entities first
   let formatted = text.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #4caf50; font-weight: bold;">$1</strong>');
-  formatted = formatted.replace(/\*(.*?)\*/g, '<em style="color: #4caf50; font-style: italic;">$1</em>');
+  
+  // Handle markdown headers (### -> h3)
+  formatted = formatted.replace(/^### (.*$)/gm, '<h3 style="color: #2196f3; margin: 1rem 0 0.5rem 0;">$1</h3>');
+  
+  // Handle bold text (**text**)
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #2196f3; font-weight: bold;">$1</strong>');
+  
+  // Handle italic text (*text*)
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em style="color: #2196f3; font-style: italic;">$1</em>');
+  
+  // Handle bullet points (• text)
+  formatted = formatted.replace(/^• (.*$)/gm, '<li style="margin: 0.25rem 0;">$1</li>');
+  
+  // Wrap consecutive list items in ul tags
+  formatted = formatted.replace(/(<li.*?<\/li>\s*)+/gs, '<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">$&</ul>');
+  
+  // Handle line breaks - convert double line breaks to paragraphs
+  formatted = formatted.replace(/\n\n+/g, '</p><p>');
+  
+  // Wrap in paragraph tags if not already wrapped
+  if (!formatted.startsWith('<h3>') && !formatted.startsWith('<ul>')) {
+    formatted = '<p>' + formatted + '</p>';
+  }
+  
+  // Clean up empty paragraphs
+  formatted = formatted.replace(/<p><\/p>/g, '');
+  
   return formatted;
 };
 
@@ -752,7 +779,7 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
         
         {!jsonResponse && rawResponse && (
           <div className="raw-content">
-            <div dangerouslySetInnerHTML={{__html: rawResponse}} />
+            <div dangerouslySetInnerHTML={{__html: formatText(rawResponse)}} />
           </div>
         )}
         

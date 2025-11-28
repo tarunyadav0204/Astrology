@@ -105,8 +105,8 @@ Ignore any astrological activations that occur before Age 22 for "Marriage Timin
 If a strong period appears at age 18-21, interpret it as a "Relationship Learning Phase" or "Serious Relationship", NOT a wedding.
 Prioritize windows between Age 24-32 for the "Primary Window".
 
-STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
-Respond ONLY with a valid JSON object.
+CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
+Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
 
 {
   "quick_answer": "A summary of the 7th house strength. E.g., 'Your chart shows a relationship dynamic driven by intellect (Mercury). The years <strong>2026-2027</strong> mark a significant relationship milestone.'",
@@ -145,10 +145,11 @@ Respond ONLY with a valid JSON object.
   ]
 }
 
-CRITICAL JSON SAFETY RULES:
-1. Escape ALL double quotes inside strings: \\\"text\\\"
-2. No line breaks inside JSON strings - use <br> tags instead
-3. Validate JSON structure before responding
+CRITICAL: Your entire response must be valid JSON starting with { and ending with }.
+Do NOT include any text before or after the JSON object.
+Do NOT use HTML div tags or HTML formatting.
+Use <br> for line breaks within JSON strings.
+Escape quotes properly: \"text\"
 """
             
             # Generate AI response
@@ -223,10 +224,16 @@ CRITICAL JSON SAFETY RULES:
                             print(f"✅ JSON PARSED AFTER CLEANUP")
                             
                         except json.JSONDecodeError:
-                            print(f"❌ JSON parsing failed completely.")
-                            # Don't deduct credits for parsing failures
-                            yield f"data: {json.dumps({'status': 'error', 'message': 'AI response formatting error. Please try again.'})}\n\n"
-                            return
+                            print(f"❌ JSON parsing failed completely. Treating as HTML response.")
+                            # If JSON parsing fails completely, treat as HTML response
+                            parsed_response = {
+                                "raw_response": ai_response_text,
+                                "quick_answer": "Analysis completed successfully.",
+                                "detailed_analysis": [],
+                                "final_thoughts": "Analysis provided in detailed format.",
+                                "follow_up_questions": []
+                            }
+                            parsing_successful = True  # HTML response is still valid
                     
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
@@ -234,7 +241,8 @@ CRITICAL JSON SAFETY RULES:
                     # Build complete response
                     marriage_insights = {
                         'marriage_analysis': {
-                            'json_response': parsed_response,
+                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
+                            'raw_response': parsed_response.get('raw_response'),
                             'summary': 'Comprehensive marriage analysis based on Vedic astrology principles.'
                         },
                         'enhanced_context': True,

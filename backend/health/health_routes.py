@@ -81,7 +81,8 @@ CRITICAL DATA UTILIZATION INSTRUCTIONS:
 4. **Functional Nature**: Differentiate between 'Natural Malefics' and 'Functional Malefics' using the 'functional_nature' data.
 5. **Body Parts Analysis**: Use 'body_parts_analysis' to correlate House (Location) with Sign (Nature of ailment).
 
-STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
+CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
+Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
 {
   "quick_answer": "Summary of constitution (Prakriti) and primary health risks based on Ascendant and strongest planet.",
   "detailed_analysis": [
@@ -125,10 +126,12 @@ STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
   ]
 }
 
-CRITICAL JSON SAFETY RULES:
-1. Escape ALL double quotes inside strings
-2. No line breaks inside JSON strings - use <br> tags
-3. DISCLAIMER: Always mention this is astrological guidance, not medical advice
+CRITICAL: Your entire response must be valid JSON starting with { and ending with }.
+Do NOT include any text before or after the JSON object.
+Do NOT use HTML div tags or HTML formatting.
+Use <br> for line breaks within JSON strings.
+Escape quotes properly: \"text\"
+DISCLAIMER: Always mention this is astrological guidance, not medical advice
 """
             
             # Generate AI response
