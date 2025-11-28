@@ -64,7 +64,7 @@ const AccordionPanel = ({ qa, index }) => {
 };
 
 const AIQuestionsTab = ({ chartData, birthDetails }) => {
-  const { credits, educationCost, loading: creditsLoading } = useCredits();
+  const { credits, educationCost, loading: creditsLoading, fetchBalance } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -238,6 +238,8 @@ const AIQuestionsTab = ({ chartData, birthDetails }) => {
                   setAiInsights(data.data);
                   setHasStarted(true);
                   setLoading(false);
+                  // Refresh credits after successful analysis
+                  fetchBalance();
                   return;
                 } else if (data.status === 'error') {
                   hasReceivedFinalMessage = true;

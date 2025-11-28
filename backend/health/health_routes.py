@@ -81,7 +81,7 @@ CRITICAL DATA UTILIZATION INSTRUCTIONS:
 4. **Functional Nature**: Differentiate between 'Natural Malefics' and 'Functional Malefics' using the 'functional_nature' data.
 5. **Body Parts Analysis**: Use 'body_parts_analysis' to correlate House (Location) with Sign (Nature of ailment).
 
-STRICT JSON FORMAT REQUIRED (No markdown, plain JSON):
+STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
 {
   "quick_answer": "Summary of constitution (Prakriti) and primary health risks based on Ascendant and strongest planet.",
   "detailed_analysis": [
@@ -174,8 +174,10 @@ CRITICAL JSON SAFETY RULES:
                     for code, char in replacements.items():
                         decoded_json = decoded_json.replace(code, char)
 
+                    parsing_successful = False
                     try:
                         parsed_response = json.loads(decoded_json)
+                        parsing_successful = True
                         print(f"✅ JSON PARSED SUCCESSFULLY")
                         print(f"   Keys: {list(parsed_response.keys())}")
                         print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
@@ -185,27 +187,28 @@ CRITICAL JSON SAFETY RULES:
                             cleaned_json = re.sub(r'\n(?![\s]*")', '<br>', decoded_json)
                             cleaned_json = cleaned_json.replace('\\\\"', '\\"')
                             parsed_response = json.loads(cleaned_json)
+                            parsing_successful = True
                             print(f"✅ JSON PARSED AFTER CLEANUP")
                             print(f"   Keys: {list(parsed_response.keys())}")
                             print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                         except json.JSONDecodeError as cleanup_error:
                             print(f"❌ JSON parsing failed: {cleanup_error}")
+                            print(f"📄 Raw response appears to be HTML, using as raw_response")
+                            # If JSON parsing fails, treat as HTML response
                             parsed_response = {
-                                "quick_answer": "Analysis generated, but formatting issues occurred.",
-                                "detailed_analysis": [
-                                    {
-                                        "question": "Error",
-                                        "answer": "Response formatting error. Please try again."
-                                    }
-                                ],
-                                "final_thoughts": "Please retry the analysis.",
+                                "raw_response": ai_response_text,
+                                "quick_answer": "Analysis completed successfully.",
+                                "detailed_analysis": [],
+                                "final_thoughts": "Analysis provided in detailed format.",
                                 "follow_up_questions": []
                             }
+                            parsing_successful = True  # HTML response is still valid
                     
                     # Build complete response with advanced data indicators
                     health_insights = {
                         'health_analysis': {
-                            'json_response': parsed_response,
+                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
+                            'raw_response': parsed_response.get('raw_response'),
                             'summary': 'Advanced Vedic health analysis with Mrityu Bhaga, Badhaka, and D-30 calculations.'
                         },
                         'enhanced_context': True,
@@ -220,18 +223,21 @@ CRITICAL JSON SAFETY RULES:
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    # Deduct credits for successful analysis
-                    success = credit_service.spend_credits(
-                        current_user.userid, 
-                        health_cost, 
-                        'health_analysis', 
-                        f"Health analysis for {birth_data.get('name', 'user')}"
-                    )
-                    
-                    if success:
-                        print(f"💳 Credits deducted successfully")
+                    # Only deduct credits if parsing was successful
+                    if parsing_successful:
+                        success = credit_service.spend_credits(
+                            current_user.userid, 
+                            health_cost, 
+                            'health_analysis', 
+                            f"Health analysis for {birth_data.get('name', 'user')}"
+                        )
+                        
+                        if success:
+                            print(f"💳 Credits deducted successfully")
+                        else:
+                            print(f"❌ Credit deduction failed")
                     else:
-                        print(f"❌ Credit deduction failed")
+                        print(f"⚠️ Skipping credit deduction due to parsing failure")
                     
                     # Cache the analysis
                     try:

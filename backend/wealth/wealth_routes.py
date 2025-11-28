@@ -337,7 +337,7 @@ Assess the financial magnitude based on the planets occupying or aspecting the I
 Cross-reference this with the 2nd and 11th house strength to determine if the wealth is 'Stable' (2nd/11th) or 'Sudden/Speculative' (Indu Lagna).
 Mention the Indu Lagna explicitly in your final verdict on financial volume.
 
-CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. No other text, no explanations, no markdown. Just pure JSON.
+CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. Use markdown formatting for emphasis within JSON strings.
 
 STRICT MANDATORY FORMAT - Validate your JSON before responding:
 
@@ -543,8 +543,10 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                     # Debug: Print first 500 chars of cleaned JSON
                     print(f"🔍 CLEANED JSON (first 500 chars): {json_text[:500]}...")
                     
+                    parsing_successful = False
                     try:
                         parsed_response = json.loads(json_text)
+                        parsing_successful = True
                         print(f"✅ JSON PARSED SUCCESSFULLY")
                     except json.JSONDecodeError as json_error:
                         print(f"⚠️ JSON parsing failed, trying fallback parsing...")
@@ -554,26 +556,26 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                         fallback_json = re.sub(r'&[a-zA-Z0-9#]+;', '', fallback_json)
                         try:
                             parsed_response = json.loads(fallback_json)
+                            parsing_successful = True
                             print(f"✅ FALLBACK JSON PARSING SUCCEEDED")
                         except:
-                            # Last resort: create a basic response structure
-                            print(f"❌ All JSON parsing failed, creating fallback response")
-                            parsed_response = {
-                                "quick_answer": "Wealth analysis completed but response formatting failed. Please try again.",
-                                "detailed_analysis": [],
-                                "final_thoughts": "Please regenerate the analysis.",
-                                "follow_up_questions": []
-                            }
+                            # Don't deduct credits for parsing failures
+                            print(f"❌ All JSON parsing failed, not deducting credits")
+                            yield f"data: {json.dumps({'status': 'error', 'message': 'AI response formatting error. Please try again.'})}\n\n"
+                            return
                     
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                     
-                    # Deduct credits for successful analysis
-                    success = credit_service.spend_credits(current_user.userid, wealth_cost, 'wealth_analysis', f"Wealth analysis for {request.birth_date}")
-                    if success:
-                        print(f"💳 Credits deducted successfully")
+                    # Only deduct credits if parsing was successful
+                    if parsing_successful:
+                        success = credit_service.spend_credits(current_user.userid, wealth_cost, 'wealth_analysis', f"Wealth analysis for {request.birth_date}")
+                        if success:
+                            print(f"💳 Credits deducted successfully")
+                        else:
+                            print(f"❌ Credit deduction failed")
                     else:
-                        print(f"❌ Credit deduction failed")
+                        print(f"⚠️ Skipping credit deduction due to parsing failure")
                     
                     # Store in cache (always store, even fallback responses)
                     _store_ai_insights(birth_hash, parsed_response)

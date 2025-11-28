@@ -121,19 +121,19 @@ CRITICAL DATA UTILIZATION INSTRUCTIONS:
 4. **Education Yogas**: Check 'education_yogas' (Saraswati, Budh-Aditya). Mention them by name if present.
 5. **Timing**: Cross-reference 'current_dashas' with 'education_timing'. Identify periods favorable for **Exams** or **Admissions**.
 
-STRICT JSON FORMAT REQUIRED (No markdown, plain JSON):
+STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
 {
   "quick_answer": "Summary of academic potential, best fields of study, and current educational phase.",
   "detailed_analysis": [
     {
       "question": "What is my natural learning potential and intelligence level?",
-      "answer": "Analyze 5th House, Mercury, and **Jupiter**. Mention their 'Intelligence Type' (Analytical vs. Wisdom).",
+      "answer": "Analyze 5th House, Mercury, and **Jupiter**. Mention their Intelligence Type (Analytical vs. Wisdom).",
       "key_points": ["Strengths", "Weaknesses"],
-      "astrological_basis": "e.g., 'Mercury in Virgo creates strong analytical logic...'"
+      "astrological_basis": "e.g., Mercury in Virgo creates strong analytical logic..."
     },
     {
       "question": "Which subjects or career paths suit me best?",
-      "answer": "Based on **Technical Aptitude** and **Subject Analysis**. Be specific (e.g., 'Computer Science' vs 'Civil Engineering' vs 'Literature')."
+      "answer": "Based on **Technical Aptitude** and **Subject Analysis**. Be specific (e.g., Computer Science vs Civil Engineering vs Literature)."
     },
     {
       "question": "Will I have success in higher education (Masters/PhD)?",
@@ -141,7 +141,7 @@ STRICT JSON FORMAT REQUIRED (No markdown, plain JSON):
     },
     {
       "question": "What is the best way for me to study?",
-      "answer": "Use 'learning_capacity' data. Suggest study hacks based on their Mercury/Moon sign (e.g., 'Take breaks' vs 'Deep focus')."
+      "answer": "Use learning_capacity data. Suggest study hacks based on their Mercury/Moon sign (e.g., Take breaks vs Deep focus)."
     },
     {
       "question": "Are there any obstacles or breaks in education?",
@@ -206,8 +206,10 @@ CRITICAL JSON SAFETY RULES:
                     for code, char in replacements.items():
                         decoded_json = decoded_json.replace(code, char)
 
+                    parsing_successful = False
                     try:
                         parsed_response = json.loads(decoded_json)
+                        parsing_successful = True
                         print(f"✅ JSON PARSED SUCCESSFULLY")
                         print(f"   Keys: {list(parsed_response.keys())}")
                         print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
@@ -217,20 +219,13 @@ CRITICAL JSON SAFETY RULES:
                             cleaned_json = re.sub(r'\n(?![\s]*")', '<br>', decoded_json)
                             cleaned_json = cleaned_json.replace('\\\\"', '\\"')
                             parsed_response = json.loads(cleaned_json)
+                            parsing_successful = True
                             print(f"✅ JSON PARSED AFTER CLEANUP")
                         except json.JSONDecodeError as cleanup_error:
                             print(f"❌ JSON parsing failed: {cleanup_error}")
-                            parsed_response = {
-                                "quick_answer": "Analysis generated, but formatting issues occurred.",
-                                "detailed_analysis": [
-                                    {
-                                        "question": "Error",
-                                        "answer": "Response formatting error. Please try again."
-                                    }
-                                ],
-                                "final_thoughts": "Please retry the analysis.",
-                                "follow_up_questions": []
-                            }
+                            # Don't deduct credits for parsing failures
+                            yield f"data: {json.dumps({'status': 'error', 'message': 'AI response formatting error. Please try again.'})}\n\n"
+                            return
                     
                     # Build complete response
                     education_insights = {
@@ -244,18 +239,21 @@ CRITICAL JSON SAFETY RULES:
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    # Deduct credits for successful analysis
-                    success = credit_service.spend_credits(
-                        current_user.userid, 
-                        education_cost, 
-                        'education_analysis', 
-                        f"Education analysis for {birth_data.get('name', 'user')}"
-                    )
-                    
-                    if success:
-                        print(f"💳 Credits deducted successfully")
+                    # Only deduct credits if parsing was successful
+                    if parsing_successful:
+                        success = credit_service.spend_credits(
+                            current_user.userid, 
+                            education_cost, 
+                            'education_analysis', 
+                            f"Education analysis for {birth_data.get('name', 'user')}"
+                        )
+                        
+                        if success:
+                            print(f"💳 Credits deducted successfully")
+                        else:
+                            print(f"❌ Credit deduction failed")
                     else:
-                        print(f"❌ Credit deduction failed")
+                        print(f"⚠️ Skipping credit deduction due to parsing failure")
                     
                     # Cache the analysis
                     try:

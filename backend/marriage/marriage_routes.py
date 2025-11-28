@@ -105,8 +105,8 @@ Ignore any astrological activations that occur before Age 22 for "Marriage Timin
 If a strong period appears at age 18-21, interpret it as a "Relationship Learning Phase" or "Serious Relationship", NOT a wedding.
 Prioritize windows between Age 24-32 for the "Primary Window".
 
-STRICT JSON FORMAT REQUIRED:
-Respond ONLY with a valid JSON object. No markdown blocks.
+STRICT JSON FORMAT REQUIRED (Use markdown formatting for emphasis):
+Respond ONLY with a valid JSON object.
 
 {
   "quick_answer": "A summary of the 7th house strength. E.g., 'Your chart shows a relationship dynamic driven by intellect (Mercury). The years <strong>2026-2027</strong> mark a significant relationship milestone.'",
@@ -200,9 +200,11 @@ CRITICAL JSON SAFETY RULES:
                         decoded_json = decoded_json.replace(code, char)
 
                     # 3. PARSE JSON
+                    parsing_successful = False
                     try:
                         # Attempt 1: Parse the clean string
                         parsed_response = json.loads(decoded_json)
+                        parsing_successful = True
                         print(f"✅ JSON PARSED SUCCESSFULLY")
 
                     except json.JSONDecodeError:
@@ -217,23 +219,14 @@ CRITICAL JSON SAFETY RULES:
                             cleaned_json = cleaned_json.replace('\\\\"', '\\"')
                             
                             parsed_response = json.loads(cleaned_json)
+                            parsing_successful = True
                             print(f"✅ JSON PARSED AFTER CLEANUP")
                             
                         except json.JSONDecodeError:
                             print(f"❌ JSON parsing failed completely.")
-                            # FALLBACK RESPONSE
-                            # This ensures the frontend doesn't crash even if AI fails
-                            parsed_response = {
-                                "quick_answer": "Analysis generated, but formatting issues occurred.",
-                                "detailed_analysis": [
-                                    {
-                                        "question": "Error",
-                                        "answer": "We received the astrological data, but the AI response was not in the correct format. Please try again (credits have not been deducted if logic allows)."
-                                    }
-                                ],
-                                "final_thoughts": "Please retry the analysis.",
-                                "follow_up_questions": []
-                            }
+                            # Don't deduct credits for parsing failures
+                            yield f"data: {json.dumps({'status': 'error', 'message': 'AI response formatting error. Please try again.'})}\n\n"
+                            return
                     
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
@@ -250,18 +243,21 @@ CRITICAL JSON SAFETY RULES:
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    # Deduct credits for successful analysis
-                    success = credit_service.spend_credits(
-                        current_user.userid, 
-                        marriage_cost, 
-                        'marriage_analysis', 
-                        f"Marriage analysis for {birth_data.get('name', 'user')}"
-                    )
-                    
-                    if success:
-                        print(f"💳 Credits deducted successfully")
+                    # Only deduct credits if parsing was successful
+                    if parsing_successful:
+                        success = credit_service.spend_credits(
+                            current_user.userid, 
+                            marriage_cost, 
+                            'marriage_analysis', 
+                            f"Marriage analysis for {birth_data.get('name', 'user')}"
+                        )
+                        
+                        if success:
+                            print(f"💳 Credits deducted successfully")
+                        else:
+                            print(f"❌ Credit deduction failed")
                     else:
-                        print(f"❌ Credit deduction failed")
+                        print(f"⚠️ Skipping credit deduction due to parsing failure")
                     
                     # Cache the analysis
                     try:

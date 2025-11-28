@@ -78,7 +78,7 @@ const AccordionPanel = ({ qa, index }) => {
 };
 
 const AIInsightsTab = ({ chartData, birthDetails }) => {
-  const { credits, wealthCost, loading: creditsLoading } = useCredits();
+  const { credits, wealthCost, loading: creditsLoading, fetchBalance } = useCredits();
   const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -229,6 +229,8 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
                   setAiInsights(data.data);
                   setHasStarted(true); // Mark as started when we have insights
                   setLoading(false);
+                  // Refresh credits after successful analysis
+                  fetchBalance();
                   return;
                 } else if (data.status === 'error') {
                   hasReceivedFinalMessage = true;
