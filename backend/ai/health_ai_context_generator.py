@@ -90,7 +90,8 @@ class HealthAIContextGenerator(BaseAIContextGenerator):
             # Health analysis instructions
             "health_analysis_instructions": {
                 "critical_note": "Focus on prevention and wellness, not diagnosis. Provide age-appropriate health guidance.",
-                "disclaimer": "This is astrological guidance only, not medical advice. Always consult qualified healthcare professionals."
+                "disclaimer": "This is astrological guidance only, not medical advice. Always consult qualified healthcare professionals.",
+                "system_instruction": self.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
             }
         }
         

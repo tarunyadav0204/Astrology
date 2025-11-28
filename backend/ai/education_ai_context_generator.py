@@ -83,7 +83,8 @@ class EducationAIContextGenerator(BaseAIContextGenerator):
             # Education analysis instructions
             "education_analysis_instructions": {
                 "critical_note": "Focus on learning potential, suitable subjects, and optimal study methods.",
-                "disclaimer": "This is astrological guidance for educational planning, not academic counseling."
+                "disclaimer": "This is astrological guidance for educational planning, not academic counseling.",
+                "system_instruction": self.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
             }
         }
         

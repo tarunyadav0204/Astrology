@@ -541,7 +541,13 @@ End your response with 3-4 relevant follow-up questions in this exact format:
 
 """
         
-        return f"""{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
+        # Import the system instruction from ChatContextBuilder
+        from chat.chat_context_builder import ChatContextBuilder
+        system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
+        
+        return f"""{system_instruction}
+
+{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
 
 CLASSICAL TEXT REFERENCES - MANDATORY REQUIREMENT:
 You MUST reference classical Vedic texts to support your predictions and analysis. Use these authoritative sources:

@@ -69,7 +69,8 @@ class MarriageAIContextGenerator(BaseAIContextGenerator):
             # Marriage analysis instructions
             "marriage_analysis_instructions": {
                 "critical_note": "Use the 'future_marriage_transits' data provided. It contains pre-calculated activation years where Double Transit Theory supports marriage. Match these years with Dasha periods for precise timing.",
-                "double_transit_theory": "Marriage requires BOTH Jupiter and Saturn to influence 7th house/lord simultaneously. Years marked as 'Double Transit Active' are most favorable."
+                "double_transit_theory": "Marriage requires BOTH Jupiter and Saturn to influence 7th house/lord simultaneously. Years marked as 'Double Transit Active' are most favorable.",
+                "system_instruction": self.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
             }
         }
         
