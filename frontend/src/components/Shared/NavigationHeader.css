@@ -192,6 +192,8 @@
 
 .main-nav {
   padding: 15px 0;
+  position: relative;
+  z-index: 1001;
 }
 
 .main-nav .container {
@@ -201,11 +203,41 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
 }
 
 .logo-section {
   position: relative;
   z-index: 200;
+  flex-shrink: 0;
+}
+
+.main-nav .search-bar-container {
+  flex: 0 1 300px;
+  max-width: 300px;
+  z-index: 10000;
+}
+
+.main-nav .search-input {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 30px 6px 28px;
+  font-size: 13px;
+}
+
+.main-nav .search-input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+}
+
+.main-nav .search-icon {
+  font-size: 14px;
+  left: 8px;
+}
+
+.main-nav .clear-btn {
+  font-size: 18px;
+  right: 8px;
 }
 
 .logo-text {
@@ -266,7 +298,7 @@
   backdrop-filter: blur(10px);
   padding: 15px 0;
   position: relative;
-  z-index: 100;
+  z-index: 50;
   overflow: visible;
 }
 
@@ -461,6 +493,10 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+  }
+  
+  .main-nav .search-bar-container {
+    display: none;
   }
   
   .language-section {

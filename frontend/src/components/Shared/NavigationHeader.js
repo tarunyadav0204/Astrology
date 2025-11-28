@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCredits } from '../../context/CreditContext';
+import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
 const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick }) => {
@@ -57,11 +58,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
               🔮 AstroRoshni
             </button>
           </div>
-          <div className="language-section">
-            <button className="lang-btn">हिन्दी</button>
-            <button className="lang-btn">தமிழ்</button>
-            <button className="lang-btn">తెలుగు</button>
-          </div>
+          <SearchBar user={user} onLogin={onLogin} />
           <div className="mobile-auth">
             {user ? (
               <div className="user-menu">

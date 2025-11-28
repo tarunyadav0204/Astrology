@@ -12,12 +12,14 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import ChatModal from '../Chat/ChatModal';
 import CreditsModal from '../Credits/CreditsModal';
 import PanchangWidget from '../PanchangWidget/HomePanchangWidget';
+
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
 import { showToast } from '../../utils/toast';
 import './AstroRoshniHomepage.css';
+import './search-section.css';
 
 const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, setCurrentView }) => {
   const navigate = useNavigate();
@@ -677,6 +679,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         showLoginButton={showLoginButton}
         onCreditsClick={() => setShowCreditsModal(true)}
       />
+
+
 
       {/* Your Life Categories */}
       <section className="life-categories">

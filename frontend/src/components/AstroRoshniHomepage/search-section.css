@@ -1,0 +1,17 @@
+.search-section {
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
+  position: relative;
+  z-index: 100;
+}
+
+.search-section .container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .search-section {
+    padding: 30px 15px;
+  }
+}

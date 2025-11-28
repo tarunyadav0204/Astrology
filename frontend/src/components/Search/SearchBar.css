@@ -1,0 +1,131 @@
+.search-bar-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  z-index: 99999999;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 30px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  padding: 12px 20px;
+  transition: all 0.3s;
+}
+
+.search-input-wrapper:focus-within {
+  box-shadow: 0 6px 20px rgba(233, 30, 99, 0.2);
+  transform: translateY(-2px);
+}
+
+.search-icon {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #333;
+  background: transparent;
+}
+
+.search-input::placeholder {
+  color: #999;
+}
+
+.clear-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  padding: 0 5px;
+  transition: color 0.2s;
+}
+
+.clear-btn:hover {
+  color: #e91e63;
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 99999999;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  transform: translateX(5px);
+}
+
+.result-icon {
+  font-size: 20px;
+  margin-right: 12px;
+}
+
+.result-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+}
+
+.result-arrow {
+  font-size: 18px;
+  color: #e91e63;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.search-result-item:hover .result-arrow {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .search-bar-container {
+    max-width: 100%;
+  }
+  
+  .search-input-wrapper {
+    padding: 10px 15px;
+  }
+  
+  .search-input {
+    font-size: 14px;
+  }
+  
+  .search-results {
+    max-height: 300px;
+  }
+  
+  .search-result-item {
+    padding: 12px 15px;
+  }
+}
