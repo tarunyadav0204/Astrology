@@ -238,6 +238,18 @@ CRITICAL JSON SAFETY RULES:
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                     
+                    # Build complete response
+                    marriage_insights = {
+                        'marriage_analysis': {
+                            'json_response': parsed_response,
+                            'summary': 'Comprehensive marriage analysis based on Vedic astrology principles.'
+                        },
+                        'enhanced_context': True,
+                        'questions_covered': len(parsed_response.get('detailed_analysis', [])),
+                        'context_type': 'marriage_ai_context_generator',
+                        'generated_at': datetime.now().isoformat()
+                    }
+                    
                     # Deduct credits for successful analysis
                     success = credit_service.spend_credits(
                         current_user.userid, 
@@ -251,17 +263,40 @@ CRITICAL JSON SAFETY RULES:
                     else:
                         print(f"❌ Credit deduction failed")
                     
-                    # Send complete response in expected format
-                    marriage_insights = {
-                        'marriage_analysis': {
-                            'json_response': parsed_response,
-                            'summary': 'Comprehensive marriage analysis based on Vedic astrology principles.'
-                        },
-                        'enhanced_context': True,
-                        'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'marriage_ai_context_generator',
-                        'generated_at': datetime.now().isoformat()
-                    }
+                    # Cache the analysis
+                    try:
+                        import sqlite3
+                        import hashlib
+                        
+                        # Create birth hash
+                        birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
+                        
+                        conn = sqlite3.connect('astrology.db')
+                        cursor = conn.cursor()
+                        
+                        # Create table if not exists
+                        cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS ai_marriage_insights (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                birth_hash TEXT UNIQUE,
+                                insights_data TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        """)
+                        
+                        # Insert or replace analysis
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO ai_marriage_insights 
+                            (birth_hash, insights_data, updated_at)
+                            VALUES (?, ?, CURRENT_TIMESTAMP)
+                        """, (birth_hash, json.dumps(marriage_insights)))
+                        
+                        conn.commit()
+                        conn.close()
+                        print(f"💾 Analysis cached successfully")
+                    except Exception as cache_error:
+                        print(f"⚠️ Failed to cache analysis: {cache_error}")
                     
                     final_response = {'status': 'complete', 'data': marriage_insights, 'cached': False}
                     response_json = json.dumps(final_response)
@@ -303,6 +338,38 @@ CRITICAL JSON SAFETY RULES:
             "X-Accel-Buffering": "no"
         }
     )
+
+@router.post("/get-analysis")
+async def get_previous_analysis(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
+    """Get previously generated marriage analysis if exists"""
+    import sqlite3
+    import hashlib
+    
+    try:
+        # Create birth hash
+        birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
+        
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        # Query for existing analysis
+        cursor.execute("""
+            SELECT insights_data FROM ai_marriage_insights WHERE birth_hash = ?
+        """, (birth_hash,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            analysis_data = json.loads(result[0])
+            analysis_data['cached'] = True
+            return {"analysis": analysis_data}
+        
+        return {"analysis": None}
+        
+    except Exception as e:
+        print(f"Error fetching previous analysis: {e}")
+        return {"analysis": None}
 
 @router.get("/test")
 async def test_marriage_routes():

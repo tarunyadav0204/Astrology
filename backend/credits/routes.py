@@ -270,3 +270,37 @@ async def get_credit_stats(current_user: User = Depends(get_current_user)):
     
     stats = promo_manager.get_usage_stats()
     return stats
+
+@router.get("/admin/users")
+async def get_all_users_with_credits(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT u.userid, u.name, u.phone, COALESCE(uc.credits, 0) as credits
+        FROM users u
+        LEFT JOIN user_credits uc ON u.userid = uc.userid
+        ORDER BY u.name
+    """)
+    
+    users = []
+    for row in cursor.fetchall():
+        users.append({
+            "userid": row[0],
+            "name": row[1],
+            "phone": row[2],
+            "credits": row[3]
+        })
+    
+    conn.close()
+    return {"users": users}
+
+@router.get("/admin/user-history/{userid}")
+async def get_user_transaction_history(userid: int, current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    transactions = credit_service.get_transaction_history(userid)
+    return {"transactions": transactions}

@@ -122,6 +122,44 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     };
   }, [loading]);
 
+  // Fetch previous analysis on mount
+  useEffect(() => {
+    const fetchPreviousAnalysis = async () => {
+      if (!birthDetails) return;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/marriage/get-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          },
+          body: JSON.stringify({
+            name: birthDetails.name || birthDetails.place,
+            date: birthDetails.date,
+            time: birthDetails.time,
+            place: birthDetails.place,
+            latitude: birthDetails.latitude,
+            longitude: birthDetails.longitude
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.analysis) {
+            setAiInsights(data.analysis);
+            setHasStarted(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching previous analysis:', error);
+      }
+    };
+    
+    fetchPreviousAnalysis();
+  }, [birthDetails]);
+
   const loadAIInsights = async (forceRegenerate = false) => {
     if (!birthDetails) return;
     

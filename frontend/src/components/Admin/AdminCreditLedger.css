@@ -1,0 +1,210 @@
+.admin-credit-ledger {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 250px);
+}
+
+.users-panel {
+  width: 300px;
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow-y: auto;
+}
+
+.users-panel h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #333;
+}
+
+.user-item:hover {
+  background: #f9f9f9;
+  border-color: #f97316;
+}
+
+.user-item.active {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  border-color: #f97316;
+}
+
+.user-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: inherit;
+}
+
+.user-phone {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+  color: inherit;
+}
+
+.user-credits {
+  font-size: 14px;
+  font-weight: 500;
+  color: inherit;
+}
+
+.ledger-panel {
+  flex: 1;
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow-y: auto;
+}
+
+.no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  font-size: 16px;
+}
+
+.ledger-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.ledger-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.current-balance {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.loading, .no-transactions {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.transactions-table {
+  overflow-x: auto;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.transactions-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.transactions-table thead {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.transactions-table th {
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: white;
+  border: none;
+  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.transactions-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.transactions-table tr:hover {
+  background: #f9f9f9;
+}
+
+.date-cell {
+  color: #666;
+  font-size: 14px;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.type-badge.earned {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.type-badge.spent {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.feature-cell {
+  color: #333;
+  font-weight: 500;
+}
+
+.amount-cell {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.amount-cell.earned {
+  color: #2e7d32;
+}
+
+.amount-cell.spent {
+  color: #c62828;
+}
+
+.balance-cell {
+  color: #333;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .admin-credit-ledger {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .users-panel {
+    width: 100%;
+    max-height: 300px;
+  }
+  
+  .ledger-panel {
+    min-height: 400px;
+  }
+}

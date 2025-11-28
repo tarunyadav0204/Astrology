@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
+import AdminCreditLedger from './AdminCreditLedger';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
@@ -357,6 +358,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Credit Management
         </button>
+        <button 
+          className={`tab ${activeTab === 'ledger' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ledger')}
+        >
+          Credit Ledger
+        </button>
       </div>
 
       <div className="admin-content">
@@ -543,6 +550,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'chat' && (
           <AdminChatHistory />
+        )}
+
+        {activeTab === 'ledger' && (
+          <AdminCreditLedger />
         )}
 
         {activeTab === 'credits' && (
