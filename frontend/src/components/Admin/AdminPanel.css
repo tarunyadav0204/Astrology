@@ -405,6 +405,10 @@ select {
     padding: 10px;
   }
   
+  .admin-content-wrapper {
+    padding-top: 180px;
+  }
+  
   .admin-header {
     flex-direction: column;
     gap: 15px;

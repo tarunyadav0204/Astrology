@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   padding: 20px;
-  padding-top: 200px;
+  padding-top: 220px;
 }
 
 .profile-header {
@@ -114,5 +114,11 @@
   
   .profile-page {
     padding: 10px;
+    padding-top: 180px;
+  }
+  
+  .tab-btn {
+    font-size: 13px;
+    padding: 12px 10px;
   }
 }

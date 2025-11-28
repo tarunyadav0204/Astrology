@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
@@ -7,6 +7,7 @@ import './NavigationHeader.css';
 const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
 
 
@@ -59,6 +60,9 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             </button>
           </div>
           <SearchBar user={user} onLogin={onLogin} />
+          <button className="mobile-search-btn" onClick={() => setShowMobileSearch(true)}>
+            🔍
+          </button>
           <div className="mobile-auth">
             {user ? (
               <div className="user-menu">
@@ -71,9 +75,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
                   👤 {user.name || user.phone}
                 </button>
                 {user.role === 'admin' && (
-                  <button className="admin-btn" onClick={onAdminClick}>
-                    ⚙️ Admin
-                  </button>
+                  <button className="admin-btn mobile-admin" onClick={onAdminClick}></button>
                 )}
                 <button className="auth-btn" onClick={onLogout}>Logout</button>
               </div>
@@ -138,6 +140,18 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
                 <div className="zodiac-name">{sign.displayName}</div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+      
+      {showMobileSearch && (
+        <div className="mobile-search-modal" onClick={() => setShowMobileSearch(false)}>
+          <div className="mobile-search-content" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-search-header">
+              <h3>Search</h3>
+              <button className="close-search-btn" onClick={() => setShowMobileSearch(false)}>×</button>
+            </div>
+            <SearchBar user={user} onLogin={onLogin} />
           </div>
         </div>
       )}

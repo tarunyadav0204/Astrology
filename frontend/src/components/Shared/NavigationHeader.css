@@ -499,6 +499,15 @@
     display: none;
   }
   
+  .mobile-search-btn {
+    display: flex !important;
+    flex-shrink: 0;
+  }
+  
+  .main-nav .container {
+    gap: 8px;
+  }
+  
   .language-section {
     display: none;
   }
@@ -512,11 +521,35 @@
     background: transparent;
     border: 2px solid #fff;
     color: #fff;
-    padding: 6px 12px;
+    padding: 5px 10px;
     border-radius: 20px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: bold;
+  }
+  
+  .mobile-auth .mobile-admin {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  .mobile-auth .mobile-admin::after {
+    content: 'A';
+  }
+  
+  .mobile-auth .profile-btn {
+    padding: 6px 10px;
+    font-size: 11px;
   }
   
   .nav-menu {
@@ -588,4 +621,69 @@
   color: rgba(0, 0, 0, 0.8) !important;
   font-weight: 600;
   text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+}
+
+.mobile-search-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.mobile-search-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.mobile-search-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+}
+
+.mobile-search-content {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-search-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.mobile-search-header h3 {
+  margin: 0;
+  color: #e91e63;
+  font-size: 20px;
+}
+
+.close-search-btn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
 }
