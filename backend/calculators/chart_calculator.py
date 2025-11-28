@@ -4,34 +4,51 @@ from .base_calculator import BaseCalculator
 class ChartCalculator(BaseCalculator):
     """Extract chart calculation logic from main.py"""
     
+    def __init__(self, *args, **kwargs):
+        """Initialize with Lahiri Ayanamsa as default"""
+        super().__init__(*args, **kwargs)
+        # CRITICAL: Always ensure Lahiri Ayanamsa is set
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    
     def calculate_chart(self, birth_data, node_type='mean'):
         """Calculate birth chart with planetary positions and houses"""
-        # CRITICAL: Set Ayanamsa to Lahiri
+        # CRITICAL: Ensure Ayanamsa is set to Lahiri (safety check)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         
         # Calculate Julian Day with proper timezone handling
         time_parts = birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
+        print(f"DEBUG: Birth data - Date: {birth_data.date}, Time: {birth_data.time}, Timezone: {getattr(birth_data, 'timezone', 'None')}")
         
-        # Parse timezone from birth_data or fallback to coordinate-based detection
+        # Parse timezone offset with proper global handling
         tz_offset = 0
         if hasattr(birth_data, 'timezone') and birth_data.timezone:
             if birth_data.timezone.startswith('UTC'):
-                tz_str = birth_data.timezone[3:]
+                tz_str = birth_data.timezone[3:]  # Remove 'UTC'
                 if tz_str:
                     if ':' in tz_str:
+                        # Handle UTC+5:30 format
                         sign = 1 if tz_str[0] == '+' else -1
                         parts = tz_str[1:].split(':')
                         tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
                     else:
+                        # Handle UTC+5 format
                         tz_offset = float(tz_str)
-        else:
-            # Fallback: Auto-detect IST for Indian subcontinent
-            if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+        
+        # Override with geographic timezone for specific regions if timezone seems incorrect
+        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+            # Indian coordinates - verify IST
+            if abs(tz_offset - 5.5) > 0.1:  # If not IST, override
+                print(f"DEBUG: Indian coordinates with incorrect timezone {birth_data.timezone} (offset: {tz_offset}), overriding to IST")
                 tz_offset = 5.5
+            else:
+                print(f"DEBUG: Indian coordinates with correct IST timezone: {tz_offset}")
+        else:
+            print(f"DEBUG: Non-Indian coordinates, using timezone: {getattr(birth_data, 'timezone', 'None')} -> offset: {tz_offset}")
         
         # Convert local time to UTC
         utc_hour = hour - tz_offset
+        print(f"DEBUG: Local time: {hour}, UTC time: {utc_hour}, Timezone offset: {tz_offset}, Coordinates: ({birth_data.latitude}, {birth_data.longitude})")
         
         jd = swe.julday(
             int(birth_data.date.split('-')[0]),
@@ -77,6 +94,10 @@ class ChartCalculator(BaseCalculator):
         
         ascendant_tropical = houses_data[1][0]
         ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
+        print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}, Final TZ Offset: {tz_offset}")
+        asc_sign_num = int(ascendant_sidereal / 30)
+        asc_sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][asc_sign_num]
+        print(f"DEBUG: ASC Sign: {asc_sign_num} ({asc_sign_name})")
         
         # Whole Sign houses based on sidereal ascendant
         ascendant_sign = int(ascendant_sidereal / 30)
@@ -122,6 +143,8 @@ class ChartCalculator(BaseCalculator):
     
     def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Bhav Chalit using Placidus house system (professional KP/Sripati method)"""
+        # Ensure Lahiri Ayanamsa for house calculations
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
         try:
             # Use Placidus house system (P) for accurate unequal houses
             cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
@@ -184,6 +207,8 @@ class ChartCalculator(BaseCalculator):
     
     def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Gulika and Mandi based on actual sunrise/sunset (Dinamaan)"""
+        # Ensure Lahiri Ayanamsa for upagraha calculations
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
         try:
             # Get sunrise and sunset for the day (single call)
             sun_transit = swe.rise_trans(jd, swe.SUN, '', swe.FLG_SWIEPH, lon, lat, 0)

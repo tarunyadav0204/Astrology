@@ -120,7 +120,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 'place': request.place,
                 'latitude': request.latitude or 28.6139,
                 'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+5:30',
+                'timezone': request.timezone,
                 'gender': request.gender
             }
             

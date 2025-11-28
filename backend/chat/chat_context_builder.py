@@ -108,7 +108,7 @@ class ChatContextBuilder:
         
         # Validate ascendant calculation
         try:
-            from chart_validator import validate_ascendant_calculation
+            from utils.chart_validator import validate_ascendant_calculation
             validation = validate_ascendant_calculation(birth_data, ascendant_degree)
             ascendant_validation_note = f"Validation: {'PASSED' if validation['is_valid'] else 'FAILED'} - Difference: {validation['difference_degrees']:.4f}°"
         except Exception as e:

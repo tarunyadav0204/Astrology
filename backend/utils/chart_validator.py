@@ -2,6 +2,9 @@ def validate_ascendant_calculation(birth_data, calculated_ascendant):
     """Validate ascendant calculation"""
     import swisseph as swe
     
+    # CRITICAL: Set Lahiri Ayanamsa before any calculation
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    
     date_parts = birth_data['date'].split('-')
     time_parts = birth_data['time'].split(':')
     
@@ -10,10 +13,32 @@ def validate_ascendant_calculation(birth_data, calculated_ascendant):
     day = int(date_parts[2])
     hour = float(time_parts[0]) + float(time_parts[1])/60
     
-    if 6.0 <= birth_data['latitude'] <= 37.0 and 68.0 <= birth_data['longitude'] <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
+    # Use same timezone logic as main chart calculator
+    tz_offset = 0
+    if 'timezone' in birth_data and birth_data['timezone']:
+        tz_str = str(birth_data['timezone']).strip()
+        
+        # Remove UTC/GMT prefix if present
+        if tz_str.upper().startswith('UTC'):
+            tz_str = tz_str[3:]
+        elif tz_str.upper().startswith('GMT'):
+            tz_str = tz_str[3:]
+            
+        tz_str = tz_str.strip()
+        
+        if tz_str:
+            try:
+                if ':' in tz_str:
+                    # Fix: Default to positive unless explicitly negative
+                    sign = -1 if tz_str.startswith('-') else 1
+                    clean_str = tz_str.lstrip('+-')
+                    parts = clean_str.split(':')
+                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+                else:
+                    tz_offset = float(tz_str)
+            except (ValueError, IndexError):
+                print(f"Warning: Could not parse timezone '{tz_str}'. Defaulting to UTC.")
+                tz_offset = 0
     
     utc_hour = hour - tz_offset
     jd = swe.julday(year, month, day, utc_hour)
