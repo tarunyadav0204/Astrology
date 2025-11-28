@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useCredits } from '../../context/CreditContext';
 
-const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {}, onOpenCreditsModal }) => {
-    const { credits, chatCost, loading: creditsLoading } = useCredits();
+const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {}, onOpenCreditsModal, onShowEnhancedPopup }) => {
+    const { credits, chatCost, premiumChatCost, loading: creditsLoading } = useCredits();
     const [message, setMessage] = useState('');
+    const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
     
     useEffect(() => {
         if (followUpQuestion) {
@@ -12,10 +13,12 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
         }
     }, [followUpQuestion, onFollowUpUsed]);
 
+    const currentCost = isPremiumAnalysis ? premiumChatCost : chatCost;
+    
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (message.trim() && !isLoading && credits >= chatCost) {
-            onSendMessage(message.trim());
+        if (message.trim() && !isLoading && credits >= currentCost) {
+            onSendMessage(message.trim(), { premium_analysis: isPremiumAnalysis });
             setMessage('');
         }
     };
@@ -44,34 +47,78 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
                     ))}
                 </div>
             )}
-            {!creditsLoading && credits < chatCost && (
+            {!creditsLoading && credits < currentCost && (
                 <div className="credit-warning">
-                    <span>Insufficient credits ({credits}/{chatCost} required)</span>
+                    <span>Insufficient credits ({credits}/{currentCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : 'Standard Analysis'})</span>
                     <button onClick={onOpenCreditsModal} className="get-credits-btn">
                         Get Credits
                     </button>
                 </div>
             )}
+            <div className="premium-toggle-container" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                marginBottom: '10px',
+                padding: '8px 12px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                fontSize: '14px'
+            }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                    <input
+                        type="checkbox"
+                        checked={isPremiumAnalysis}
+                        onChange={(e) => setIsPremiumAnalysis(e.target.checked)}
+                        style={{ transform: 'scale(1.2)' }}
+                    />
+                    <span>🚀 Premium Deep Analysis</span>
+                </label>
+                <span style={{ 
+                    background: isPremiumAnalysis ? 'linear-gradient(45deg, #ff6b35, #ffd700)' : '#666',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    boxShadow: isPremiumAnalysis ? '0 2px 8px rgba(255, 107, 53, 0.3)' : 'none'
+                }}>
+                    {isPremiumAnalysis ? premiumChatCost : chatCost} credits
+                </span>
+                {isPremiumAnalysis && (
+                    <span 
+                        className="enhanced-analysis-badge"
+                        onClick={() => onShowEnhancedPopup && onShowEnhancedPopup()}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        ✨ Enhanced Analysis
+                    </span>
+                )}
+            </div>
             <form onSubmit={handleSubmit} className="chat-input-form">
                 <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder={isLoading ? "Analyzing your chart..." : credits < chatCost ? "Insufficient credits" : "Ask me about your birth chart..."}
-                    disabled={isLoading || credits < chatCost}
+                    placeholder={isLoading ? "Analyzing your chart..." : credits < currentCost ? "Insufficient credits" : "Ask me about your birth chart..."}
+                    disabled={isLoading || credits < currentCost}
                     className="chat-input"
                 />
                 <button 
                     type="submit" 
-                    disabled={!message.trim() || isLoading || credits < chatCost}
+                    disabled={!message.trim() || isLoading || credits < currentCost}
                     className="send-button"
+                    style={{
+                        background: isPremiumAnalysis ? 'linear-gradient(45deg, #ff6b35, #ffd700)' : undefined,
+                        boxShadow: isPremiumAnalysis ? '0 2px 12px rgba(255, 107, 53, 0.4)' : undefined
+                    }}
                 >
-                    {isLoading ? '...' : credits < chatCost ? 'No Credits' : 'Send'}
+                    {isLoading ? '...' : credits < currentCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : 'Send'}
                 </button>
             </form>
             {!creditsLoading && (
                 <div className="credit-info">
-                    Credits: {credits} | Cost per question: {chatCost}
+                    Credits: {credits} | {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : `Standard: ${chatCost}`} credits per question
                 </div>
             )}
         </div>

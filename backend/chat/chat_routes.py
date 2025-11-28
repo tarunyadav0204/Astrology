@@ -31,6 +31,7 @@ class ChatRequest(BaseModel):
     response_style: Optional[str] = 'detailed'
     selected_period: Optional[Dict] = None
     include_context: Optional[bool] = False
+    premium_analysis: Optional[bool] = False
     # User context
     user_name: Optional[str] = None
     user_relationship: Optional[str] = 'self'
@@ -85,20 +86,25 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     """Ask astrological question with streaming response - requires credits"""
     
     # Check credit cost and user balance
-    chat_cost = credit_service.get_credit_setting('chat_question_cost')
+    if request.premium_analysis:
+        chat_cost = credit_service.get_credit_setting('premium_chat_cost')
+    else:
+        chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
     
     print(f"💳 CREDIT CHECK DEBUG:")
     print(f"   User ID: {current_user.userid}")
+    print(f"   Premium Analysis: {request.premium_analysis}")
     print(f"   Chat cost: {chat_cost} credits")
     print(f"   User balance: {user_balance} credits")
     print(f"   Has sufficient credits: {user_balance >= chat_cost}")
     
     if user_balance < chat_cost:
+        analysis_type = "Premium Deep Analysis" if request.premium_analysis else "Standard Analysis"
         print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
         raise HTTPException(
             status_code=402, 
-            detail=f"Insufficient credits. You need {chat_cost} credits but have {user_balance}."
+            detail=f"Insufficient credits for {analysis_type}. You need {chat_cost} credits but have {user_balance}."
         )
     """Ask astrological question with streaming response"""
     
@@ -190,7 +196,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 print(f"Birth data name: {birth_data.get('name')}")
                 
                 gemini_analyzer = GeminiChatAnalyzer()
-                ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style, user_context)
+                ai_result = await gemini_analyzer.generate_chat_response(enhanced_question, context, history, request.language, request.response_style, user_context, request.premium_analysis)
                 
                 # print(f"AI result success: {ai_result.get('success')}")
                 # print(f"AI result keys: {list(ai_result.keys())}")
@@ -243,7 +249,7 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                         
                                         print(f"🤖 Making second Gemini call...")
                                         second_ai_result = await gemini_analyzer.generate_chat_response(
-                                            enhanced_question, transit_context, history, request.language, request.response_style, user_context
+                                            enhanced_question, transit_context, history, request.language, request.response_style, user_context, request.premium_analysis
                                         )
                                         
                                         if second_ai_result['success']:
@@ -282,11 +288,12 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     
                     if should_deduct:
                         print(f"💰 DEDUCTING CREDITS: {chat_cost} credits for user {current_user.userid}")
+                        analysis_type = "Premium Deep Analysis" if request.premium_analysis else "Standard Chat"
                         success = credit_service.spend_credits(
                             current_user.userid, 
                             chat_cost, 
                             'chat_question', 
-                            f"Chat question: {request.question[:50]}..."
+                            f"{analysis_type}: {request.question[:50]}..."
                         )
                         
                         if not success:

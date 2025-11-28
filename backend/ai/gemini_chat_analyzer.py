@@ -28,20 +28,39 @@ class GeminiChatAnalyzer:
         
         genai.configure(api_key=api_key)
         
-        model_names = ['models/gemini-2.5-flash', 'models/gemini-2.0-flash', 'models/gemini-flash-latest']
+        # Standard models (try in order of preference)
+        model_names = [
+            'models/gemini-2.5-flash',
+            'models/gemini-2.0-flash-exp',
+            'models/gemini-2.0-flash',
+            'models/gemini-1.5-flash',
+            'models/gemini-flash-latest'
+        ]
         self.model = None
+        self.premium_model = None
         
+        # Initialize standard model
         for model_name in model_names:
             try:
                 self.model = genai.GenerativeModel(model_name)
+                print(f"✅ Initialized standard model: {model_name}")
                 break
             except Exception as e:
+                print(f"⚠️ Model {model_name} not available: {e}")
                 continue
+        
+        # Initialize premium model (Gemini 3 Pro Preview)
+        try:
+            self.premium_model = genai.GenerativeModel('models/gemini-3-pro-preview')
+            print(f"✅ Initialized premium model: gemini-3-pro-preview")
+        except Exception as e:
+            print(f"⚠️ Premium model not available, using standard: {e}")
+            self.premium_model = self.model
         
         if not self.model:
             raise ValueError("No available Gemini model found")
     
-    async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None) -> Dict[str, Any]:
+    async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False) -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION"""
         
         # Add current date context and calculate native's age
@@ -107,11 +126,16 @@ class GeminiChatAnalyzer:
             
             def _sync_generate_content():
                 try:
+                    # Select model based on premium analysis flag
+                    selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
+                    model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
+                    
                     print(f"\n=== CALLING GEMINI API ===")
-                    print(f"Model: {self.model._model_name if hasattr(self.model, '_model_name') else 'Unknown'}")
+                    print(f"Analysis Type: {model_type}")
+                    print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
                     print(f"Prompt length: {len(prompt)} characters")
                     
-                    response = self.model.generate_content(prompt)
+                    response = selected_model.generate_content(prompt)
                     
                     print(f"\n=== GEMINI API RESPONSE ===")
                     print(f"Response type: {type(response)}")

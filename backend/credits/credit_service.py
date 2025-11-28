@@ -119,6 +119,13 @@ class CreditService:
                 VALUES ('education_analysis_cost', 3, 'Credits per education analysis')
             ''')
         
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'premium_chat_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('premium_chat_cost', 10, 'Credits per premium deep analysis chat')
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -266,7 +273,7 @@ class CreditService:
         cursor.execute("""
             SELECT setting_key, setting_value, description 
             FROM credit_settings 
-            WHERE setting_key IN ('chat_question_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost')
+            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost')
             ORDER BY setting_key
         """)
         

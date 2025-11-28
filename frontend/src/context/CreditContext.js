@@ -13,6 +13,7 @@ export const useCredits = () => {
 export const CreditProvider = ({ children }) => {
     const [credits, setCredits] = useState(0);
     const [chatCost, setChatCost] = useState(1);
+    const [premiumChatCost, setPremiumChatCost] = useState(10);
     const [wealthCost, setWealthCost] = useState(5);
     const [marriageCost, setMarriageCost] = useState(3);
     const [healthCost, setHealthCost] = useState(3);
@@ -106,6 +107,16 @@ export const CreditProvider = ({ children }) => {
         } catch (error) {
             console.error('Error fetching education cost:', error);
         }
+        
+        try {
+            const response = await fetch('/api/credits/settings/premium-chat-cost');
+            if (response.ok) {
+                const data = await response.json();
+                setPremiumChatCost(data.cost || 10);
+            }
+        } catch (error) {
+            console.error('Error fetching premium chat cost:', error);
+        }
     };
 
     useEffect(() => {
@@ -144,6 +155,7 @@ export const CreditProvider = ({ children }) => {
         <CreditContext.Provider value={{
             credits,
             chatCost,
+            premiumChatCost,
             wealthCost,
             marriageCost,
             healthCost,

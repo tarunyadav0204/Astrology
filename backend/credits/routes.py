@@ -255,6 +255,11 @@ async def get_education_cost():
     cost = credit_service.get_credit_setting('education_analysis_cost')
     return {"cost": cost}
 
+@router.get("/settings/premium-chat-cost")
+async def get_premium_chat_cost():
+    cost = credit_service.get_credit_setting('premium_chat_cost')
+    return {"cost": cost}
+
 @router.post("/admin/bulk-promo-codes")
 async def create_bulk_promo_codes(request: dict, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':

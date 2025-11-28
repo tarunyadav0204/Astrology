@@ -28,6 +28,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [copySuccess, setCopySuccess] = useState(false);
     const [chatMode, setChatMode] = useState('greeting'); // 'greeting', 'question', 'periods'
     const [eventPeriods, setEventPeriods] = useState([]);
+    const [isPremiumMode, setIsPremiumMode] = useState(false);
     
     // Check admin status
     useEffect(() => {
@@ -452,6 +453,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     language, 
                     response_style: responseStyle,
                     selected_period: options.selected_period,
+                    premium_analysis: options.premium_analysis || false,
                     user_name: userName,
                     user_relationship: relationship
                 };
@@ -957,6 +959,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [showContextModal, setShowContextModal] = useState(false);
     const [contextData, setContextData] = useState(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
     
     const handleFollowUpClick = (question) => {
         setFollowUpQuestion(question);
@@ -998,7 +1001,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     return (
         <>
         <div className="chat-modal-overlay" onClick={onClose}>
-            <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
+            <div className={`chat-modal ${isPremiumMode ? 'premium-theme' : ''}`} onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', marginRight: '100px' }}>
                         <h2 style={{ margin: 0, flex: 1 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : '- Your Personal Astrologer'}</h2>
@@ -1197,6 +1200,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         followUpQuestion={followUpQuestion}
                                         onFollowUpUsed={() => setFollowUpQuestion('')}
                                         onOpenCreditsModal={() => setShowCreditsModal(true)}
+                                        onPremiumModeChange={setIsPremiumMode}
+                                        onShowEnhancedPopup={() => setShowEnhancedPopup(true)}
                                     />
                                 </>
                             )}
@@ -1451,6 +1456,78 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             onClose={() => setShowContextModal(false)}
             contextData={contextData}
         />
+        
+        {/* Enhanced Analysis Popup */}
+        {showEnhancedPopup && (
+            <div className="enhanced-popup-overlay" onClick={() => setShowEnhancedPopup(false)}>
+                <div className="enhanced-popup" onClick={(e) => e.stopPropagation()}>
+                    <button className="popup-close" onClick={() => setShowEnhancedPopup(false)}>×</button>
+                    <div className="popup-header">
+                        <span className="popup-icon">✨</span>
+                        <h3>Enhanced Deep Analysis</h3>
+                    </div>
+                    <div className="popup-content">
+                        <p className="popup-intro">This advanced analysis uses more sophisticated astrological calculations and deeper interpretation techniques to provide you with comprehensive insights.</p>
+                        
+                        <div className="benefit-list">
+                            <div className="benefit-item">
+                                <span className="benefit-icon">🔮</span>
+                                <div>
+                                    <strong>Multi-Layered Chart Analysis</strong>
+                                    <p>Examines Lagna, Navamsa, and divisional charts with intricate planetary relationships and house lordships</p>
+                                </div>
+                            </div>
+                            
+                            <div className="benefit-item">
+                                <span className="benefit-icon">🌟</span>
+                                <div>
+                                    <strong>Advanced Dasha Interpretation</strong>
+                                    <p>Analyzes Mahadasha, Antardasha, and Pratyantardasha periods with precise event timing predictions</p>
+                                </div>
+                            </div>
+                            
+                            <div className="benefit-item">
+                                <span className="benefit-icon">🎯</span>
+                                <div>
+                                    <strong>Yoga & Dosha Detection</strong>
+                                    <p>Identifies powerful yogas like Raja, Dhana, Gaja Kesari and doshas affecting your life trajectory</p>
+                                </div>
+                            </div>
+                            
+                            <div className="benefit-item">
+                                <span className="benefit-icon">🌙</span>
+                                <div>
+                                    <strong>Nakshatra Deep Dive</strong>
+                                    <p>Reveals hidden personality traits, karmic patterns, and life purpose through nakshatra analysis</p>
+                                </div>
+                            </div>
+                            
+                            <div className="benefit-item">
+                                <span className="benefit-icon">⚡</span>
+                                <div>
+                                    <strong>Transit Correlation</strong>
+                                    <p>Maps current planetary transits against your birth chart for accurate timing of events</p>
+                                </div>
+                            </div>
+                            
+                            <div className="benefit-item">
+                                <span className="benefit-icon">🏆</span>
+                                <div>
+                                    <strong>Remedial Recommendations</strong>
+                                    <p>Provides personalized gemstone, mantra, and ritual suggestions based on planetary strengths</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="popup-footer">
+                            <button className="popup-btn" onClick={() => setShowEnhancedPopup(false)}>
+                                Got it!
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
         </>
     );
 };
