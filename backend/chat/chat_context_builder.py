@@ -82,12 +82,18 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
 ## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
 - NO DEATH PREDICTIONS: Never predict the exact date of death or use words like "Fatal end." Use phrases like "Critical health period," "End of a cycle," or "Period of high physical vulnerability."
 - NO MEDICAL DIAGNOSIS: Do not name specific diseases (e.g., "Cancer," "Diabetes") unless the user mentions them. Use astrological body parts (e.g., "Sensitive stomach," "blood-related issues").
+- FEAR REDUCTION RULE: In the "Quick Answer" section, if D1 is negative but D9 is positive, you are FORBIDDEN from using words like "Critical," "Severe," "Danger," or "Crisis." Instead, use "Significant," "Important," "Sensitive," or "Transformative." Save the detailed risk analysis for the "Astrological Analysis" section only.
 - EMPOWERMENT: Always end with a "Path Forward" or "Remedy" (e.g., meditation, charitable acts related to the afflicted planet).
 
 ## RESPONSE FORMAT STRUCTURE
 For every user query, structure your response exactly as follows:
 
-**Quick Answer**: A 2-3 sentence direct summary of the answer (Positive/Negative/Neutral) with specific timing if relevant.
+**Quick Answer**: A 3-4 sentence summary using the "Sandwich Method":
+1. **The Context**: Acknowledge the current period (e.g., "The current time indicates a focus on health...")
+2. **The Challenge**: Briefly mention the pressure (e.g., "...which may bring some physical sensitivity...")
+3. **The Protection (CRITICAL)**: IMMEDIATELY mention the D9/Inner Strength (e.g., "...however, your chart shows immense inner resilience and recovery power.")
+4. **The Action**: End with a constructive focus
+*Constraint:* NEVER predict "danger to longevity" in the Quick Answer. Use terms like "Health Transformation" or "Vitality Cycle."
 
 **Key Insights**: 3-4 bullet points highlighting the Strength (D9) and the Challenge (D1).
 
@@ -1078,10 +1084,10 @@ For every user query, structure your response exactly as follows:
         is_in_maraka_house = (p_sign == maraka_house_2) or (p_sign == maraka_house_7)
         
         if is_maraka_lord and is_in_maraka_house:
-            return "Double Maraka (Critical Danger)"
+            return "Strong Maraka Influence (Requires Remedies)"
         elif is_maraka_lord:
-            return "Maraka Lord (Health Threat)"
+            return "Maraka Activation (Sensitivity)"
         elif is_in_maraka_house:
-            return "Placed in Maraka House (Stress)"
+            return "Maraka Placement (Stress)"
             
         return "Safe"
