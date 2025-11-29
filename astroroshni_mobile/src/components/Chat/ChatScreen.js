@@ -13,6 +13,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   BackHandler,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -33,6 +34,29 @@ import { useCredits } from '../../credits/CreditContext';
 export default function ChatScreen({ navigation }) {
   const { credits, fetchBalance } = useCredits();
   const [chatCost, setChatCost] = useState(1);
+  const [premiumChatCost, setPremiumChatCost] = useState(3);
+  const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
+  const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isPremiumAnalysis) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [isPremiumAnalysis]);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -88,6 +112,10 @@ export default function ChatScreen({ navigation }) {
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/chat-cost')}`);
       const data = await response.json();
       setChatCost(data.cost || 1);
+      
+      const premiumResponse = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/premium-chat-cost')}`);
+      const premiumData = await premiumResponse.json();
+      setPremiumChatCost(premiumData.cost || 3);
     } catch (error) {
       console.error('Error fetching chat cost:', error);
     }
@@ -328,6 +356,7 @@ export default function ChatScreen({ navigation }) {
           question: messageText, 
           language: language || 'english', 
           response_style: 'detailed',
+          premium_analysis: isPremiumAnalysis,
           user_name: userName,
           user_relationship: relationship
         };
@@ -649,7 +678,7 @@ export default function ChatScreen({ navigation }) {
   );
 
   return (
-    <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+    <View style={[styles.container, { backgroundColor: COLORS.gradientStart }]}>
       <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView 
@@ -727,13 +756,48 @@ export default function ChatScreen({ navigation }) {
           </View>
         )}
 
+        {/* Premium Toggle */}
+        {!showGreeting && (
+          <View style={styles.premiumToggleContainer}>
+            <TouchableOpacity 
+              style={styles.premiumToggle}
+              onPress={() => setIsPremiumAnalysis(!isPremiumAnalysis)}
+            >
+              <View style={[styles.checkbox, isPremiumAnalysis && styles.checkboxChecked]}>
+                {isPremiumAnalysis && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.premiumLabel}>🚀 Premium</Text>
+            </TouchableOpacity>
+            {isPremiumAnalysis && (
+              <Animated.View
+                style={[
+                  styles.enhancedBadge,
+                  {
+                    opacity: glowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    }),
+                  },
+                ]}
+              >
+                <TouchableOpacity onPress={() => setShowEnhancedPopup(true)}>
+                  <Text style={styles.enhancedBadgeText}>✨ Enhanced</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+            <View style={styles.costBadge}>
+              <Text style={styles.costText}>{isPremiumAnalysis ? premiumChatCost : chatCost} credits</Text>
+            </View>
+          </View>
+        )}
+
         {/* Credit cost info */}
         {!showGreeting && (
           <View style={styles.creditInfo}>
             <Text style={styles.creditInfoText}>
-              Each question costs {chatCost} credit{chatCost > 1 ? 's' : ''} • Balance: {credits}
+              Balance: {credits} credits • {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : `Standard: ${chatCost}`} per question
             </Text>
-            {credits < chatCost && (
+            {credits < (isPremiumAnalysis ? premiumChatCost : chatCost) && (
               <TouchableOpacity onPress={() => navigation.navigate('Credits')}>
                 <Text style={styles.lowCreditWarning}>Get more credits</Text>
               </TouchableOpacity>
@@ -754,12 +818,16 @@ export default function ChatScreen({ navigation }) {
               editable={!loading && credits >= chatCost}
             />
             <TouchableOpacity
-              style={[styles.sendButton, (loading || !inputText.trim() || credits < chatCost) && styles.sendButtonDisabled]}
+              style={[
+                styles.sendButton, 
+                isPremiumAnalysis && styles.sendButtonPremium,
+                (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)) && styles.sendButtonDisabled
+              ]}
               onPress={() => sendMessage()}
-              disabled={loading || !inputText.trim() || credits < chatCost}
+              disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)}
             >
               <Text style={styles.sendButtonText}>
-                {loading ? '...' : credits < chatCost ? 'No Credits' : 'Send'}
+                {loading ? '...' : credits < (isPremiumAnalysis ? premiumChatCost : chatCost) ? 'No Credits' : isPremiumAnalysis ? '🚀 Send' : 'Send'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -930,9 +998,97 @@ export default function ChatScreen({ navigation }) {
           onClose={() => setShowDashaBrowser(false)}
           birthData={birthData}
         />
+
+        {/* Enhanced Analysis Popup */}
+        <Modal
+          visible={showEnhancedPopup}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEnhancedPopup(false)}
+        >
+          <View style={styles.enhancedPopupOverlay}>
+            <View style={styles.enhancedPopup}>
+              <TouchableOpacity 
+                style={styles.popupClose}
+                onPress={() => setShowEnhancedPopup(false)}
+              >
+                <Text style={styles.popupCloseText}>×</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.popupHeader}>
+                <Text style={styles.popupIcon}>✨</Text>
+                <Text style={styles.popupTitle}>Enhanced Deep Analysis</Text>
+              </View>
+              
+              <ScrollView 
+                style={styles.popupContent}
+                contentContainerStyle={styles.popupContentContainer}
+              >
+                <Text style={styles.popupIntro}>
+                  This advanced analysis uses more sophisticated astrological calculations and deeper interpretation techniques to provide you with comprehensive insights.
+                </Text>
+                
+                <View style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>🔮</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>Multi-Layered Chart Analysis</Text>
+                    <Text style={styles.benefitDesc}>Examines Lagna, Navamsa, and divisional charts with intricate planetary relationships and house lordships</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>🌟</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>Advanced Dasha Interpretation</Text>
+                    <Text style={styles.benefitDesc}>Analyzes Mahadasha, Antardasha, and Pratyantardasha periods with precise event timing predictions</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>🎯</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>Yoga & Dosha Detection</Text>
+                    <Text style={styles.benefitDesc}>Identifies powerful yogas like Raja, Dhana, Gaja Kesari and doshas affecting your life trajectory</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>🌙</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>Nakshatra Deep Dive</Text>
+                    <Text style={styles.benefitDesc}>Reveals hidden personality traits, karmic patterns, and life purpose through nakshatra analysis</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>⚡</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>Transit Correlation</Text>
+                    <Text style={styles.benefitDesc}>Maps current planetary transits against your birth chart for accurate timing of events</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>🏆</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>Remedial Recommendations</Text>
+                    <Text style={styles.benefitDesc}>Provides personalized gemstone, mantra, and ritual suggestions based on planetary strengths</Text>
+                  </View>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.popupButton}
+                  onPress={() => setShowEnhancedPopup(false)}
+                >
+                  <Text style={styles.popupButtonText}>Got it!</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -1203,5 +1359,175 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  premiumToggleContainer: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  premiumToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.accent,
+  },
+  checkmark: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  premiumLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginLeft: 8,
+  },
+  costBadge: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  costText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  enhancedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#4a90e2',
+    marginLeft: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  enhancedBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  sendButtonPremium: {
+    backgroundColor: '#ff6b35',
+  },
+  enhancedPopupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  enhancedPopup: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: '90%',
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  popupClose: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  popupCloseText: {
+    fontSize: 24,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  popupHeader: {
+    backgroundColor: '#ff6b35',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    alignItems: 'center',
+  },
+  popupIcon: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  popupTitle: {
+    color: COLORS.white,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  popupContent: {
+    maxHeight: '70%',
+  },
+  popupContentContainer: {
+    padding: 20,
+    paddingBottom: 30,
+  },
+  popupIntro: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    padding: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b35',
+  },
+  benefitIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  benefitText: {
+    flex: 1,
+  },
+  benefitTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  benefitDesc: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  popupButton: {
+    backgroundColor: '#ff6b35',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  popupButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

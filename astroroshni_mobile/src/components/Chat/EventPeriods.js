@@ -182,7 +182,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   if (loading) {
     return (
       <Modal visible={visible} animationType="slide">
-        <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+        <View style={[styles.container, { backgroundColor: COLORS.gradientStart }]}>
           <SafeAreaView style={styles.safeArea}>
             <View style={styles.loadingContainer}>
               <Text style={styles.loadingSpinner}>🎯</Text>
@@ -191,7 +191,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
               <Text style={styles.loadingDetails}>📊 Analyzing planetary transits & activations...</Text>
             </View>
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       </Modal>
     );
   }
@@ -199,7 +199,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   if (error) {
     return (
       <Modal visible={visible} animationType="slide">
-        <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+        <View style={[styles.container, { backgroundColor: COLORS.gradientStart }]}>
           <SafeAreaView style={styles.safeArea}>
             <View style={styles.errorContainer}>
               <Text style={styles.errorTitle}>Unable to Load Event Periods</Text>
@@ -209,7 +209,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
               </TouchableOpacity>
             </View>
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       </Modal>
     );
   }
@@ -217,7 +217,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   return (
     <Modal visible={visible} animationType="slide">
       <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
-      <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.container}>
+      <View style={[styles.container, { backgroundColor: COLORS.gradientStart }]}>
         <SafeAreaView style={styles.safeArea}>
           {/* Page Title */}
           <View style={styles.pageTitle}>
@@ -366,7 +366,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
           )}
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
       
       {/* Year Selection Modal for Android */}
       <Modal visible={showYearModal} transparent animationType="fade">
