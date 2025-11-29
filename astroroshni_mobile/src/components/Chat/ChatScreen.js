@@ -68,6 +68,7 @@ export default function ChatScreen({ navigation }) {
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
   const [birthData, setBirthData] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
   const scrollViewRef = useRef(null);
 
   const suggestions = [
@@ -228,15 +229,27 @@ export default function ChatScreen({ navigation }) {
     }
   };
 
-  const saveMessageToHistory = async (message) => {
+  const createSession = async () => {
     try {
-      if (!birthData) return;
+      const response = await chatAPI.createSession();
+      const newSessionId = response.data.session_id;
+      setSessionId(newSessionId);
+      return newSessionId;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      return null;
+    }
+  };
+
+  const saveMessageToHistory = async (message, currentSessionId) => {
+    try {
+      if (!currentSessionId) return;
       
-      await chatAPI.saveMessage(birthData, {
-        role: message.role,
-        content: message.content,
-        timestamp: message.timestamp
-      });
+      await chatAPI.saveMessage(
+        currentSessionId,
+        message.role,
+        message.content
+      );
     } catch (error) {
       console.warn('Error saving message to history:', error);
     }
@@ -253,6 +266,13 @@ export default function ChatScreen({ navigation }) {
     // Hide greeting when sending first message
     setShowGreeting(false);
 
+    // Create session if first message
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = await createSession();
+      if (!currentSessionId) return;
+    }
+
     const userMessage = {
       id: Date.now().toString(),
       content: messageText,
@@ -265,7 +285,7 @@ export default function ChatScreen({ navigation }) {
     setLoading(true);
     
     // Save user message to database
-    await saveMessageToHistory(userMessage);
+    await saveMessageToHistory(userMessage, currentSessionId);
     
     // Scroll to bottom when user sends a message
     setTimeout(() => {
@@ -578,7 +598,7 @@ export default function ChatScreen({ navigation }) {
       }
       
       // Save assistant message to database
-      await saveMessageToHistory(assistantMessage);
+      await saveMessageToHistory(assistantMessage, currentSessionId);
 
     } catch (error) {
       console.error('Error sending message after retries:', error);

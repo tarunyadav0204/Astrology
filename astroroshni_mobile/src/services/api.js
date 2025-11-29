@@ -49,8 +49,8 @@ export const chatAPI = {
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
   clearHistory: () => api.delete(getEndpoint('/chat/history')),
   createSession: () => api.post(getEndpoint('/chat/session')),
-  saveMessage: (birthData, message) => 
-    api.post(getEndpoint('/chat/save-message'), { ...birthData, message }),
+  saveMessage: (sessionId, sender, content) => 
+    api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
 };
 
 export const chartAPI = {
