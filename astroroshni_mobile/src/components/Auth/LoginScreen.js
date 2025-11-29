@@ -12,9 +12,9 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';

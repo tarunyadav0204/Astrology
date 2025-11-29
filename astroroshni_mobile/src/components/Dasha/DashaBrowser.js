@@ -8,7 +8,7 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
 

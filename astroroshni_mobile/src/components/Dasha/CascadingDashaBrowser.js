@@ -12,7 +12,7 @@ import {
   StatusBar,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';

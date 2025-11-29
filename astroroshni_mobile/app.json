@@ -33,8 +33,7 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "newArchEnabled": false,
-      "jsEngine": "jsc"
+      "newArchEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

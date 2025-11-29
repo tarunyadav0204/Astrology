@@ -15,8 +15,8 @@ import {
   BackHandler,
   Animated,
 } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 

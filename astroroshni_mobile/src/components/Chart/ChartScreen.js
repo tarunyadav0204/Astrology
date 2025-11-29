@@ -8,8 +8,8 @@ import {
   ScrollView,
   StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';

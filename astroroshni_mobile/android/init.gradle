@@ -1,7 +1,0 @@
-allprojects {
-    gradle.projectsEvaluated {
-        tasks.withType(Exec) {
-            environment 'PATH', "/usr/local/bin:${System.getenv('PATH')}"
-        }
-    }
-}

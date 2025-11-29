@@ -10,8 +10,8 @@ import {
   Clipboard,
   Share,
 } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 
 export default function MessageBubble({ message, language, onFollowUpClick }) {

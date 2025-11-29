@@ -12,10 +12,10 @@ import {
   KeyboardAvoidingView,
   Modal,
 } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
+import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';

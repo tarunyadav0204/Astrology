@@ -13,8 +13,8 @@ import {
   StatusBar,
   PanResponder,
 } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
