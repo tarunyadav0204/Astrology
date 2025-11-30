@@ -19,10 +19,17 @@ import DateNavigator from '../Common/DateNavigator';
 
 const { width } = Dimensions.get('window');
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaultStyle = 'north' }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division }, ref) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
+  
+  // Update chart type when prop changes
+  useEffect(() => {
+    if (chartType && chartType !== currentChartType) {
+      setCurrentChartType(chartType);
+    }
+  }, [chartType]);
   const [currentChartData, setCurrentChartData] = useState(chartData);
   const [loading, setLoading] = useState(false);
   const [slideAnim] = useState(new Animated.Value(0));
@@ -71,18 +78,27 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     if (currentChartType === 'lagna') {
       return chartData;
     }
-    return currentChartData || chartData;
+    if (currentChartType === 'transit') {
+      return currentChartData || chartData;
+    }
+    // For divisional charts, use the cached data or return base chart
+    return chartDataCache[currentChartType] || chartData;
   };
 
   useEffect(() => {
     // For lagna chart, always use passed chartData directly
     if (currentChartType === 'lagna') {
       setCurrentChartData(chartData);
+    } else if (currentChartType === 'transit') {
+      loadChartData(currentChartType, true);
+    } else if (division) {
+      // Load divisional chart using the division prop
+      loadDivisionalChart(division);
     } else {
       // Load the specific chart type data
       loadChartData(currentChartType, true);
     }
-  }, [currentChartType, chartData]);
+  }, [currentChartType, chartData, division]);
   
   useEffect(() => {
     // Update adjacent chart types
@@ -192,6 +208,34 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     }
   };
 
+  const loadDivisionalChart = async (divisionNumber) => {
+    if (!birthData || !divisionNumber || loading) return;
+    
+    try {
+      setLoading(true);
+      const formattedData = {
+        ...birthData,
+        date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+        time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        timezone: birthData.timezone || 'Asia/Kolkata'
+      };
+      
+      const response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
+      const data = response.data.divisional_chart;
+      
+      if (data) {
+        setChartDataCache(prev => ({ ...prev, [currentChartType]: data }));
+        setCurrentChartData(data);
+      }
+    } catch (error) {
+      console.error(`Error loading divisional chart D${divisionNumber}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadChartData = async (type, setCurrent = true, customDate = null) => {
     // Use cached data if available (but not for transit with custom date)
     if (chartDataCache[type] && !(type === 'transit' && customDate)) {
@@ -206,7 +250,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       return;
     }
     
-    if (!birthData) return;
+    if (!birthData || loading) return;
     
     try {
       if (setCurrent) setLoading(true);
@@ -243,10 +287,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   };
 
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > 10;
-    },
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: () => false,
     onPanResponderGrant: () => {
       setShowSwipeHint(false);
     },
@@ -358,6 +400,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         chartType={type}
         birthData={birthData}
         showDegreeNakshatra={showDegreeNakshatra}
+        cosmicTheme={cosmicTheme}
       />
     ) : (
       <SouthIndianChart 
@@ -365,65 +408,94 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         chartType={type}
         birthData={birthData}
         showDegreeNakshatra={showDegreeNakshatra}
+        cosmicTheme={cosmicTheme}
       />
     );
   }, [chartStyle, birthData, showDegreeNakshatra]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{chartTitles[currentChartType] || title}</Text>
-        <View style={styles.chartIndicators}>
-          {chartTypes.map((type, index) => (
-            <View
-              key={type}
-              style={[
-                styles.indicator,
-                currentChartType === type && styles.indicatorActive
-              ]}
-            />
-          ))}
+    <View style={[styles.container, cosmicTheme && styles.cosmicContainer]}>
+      {!hideHeader && (
+        <View style={styles.header}>
+          <Text style={styles.title}>{chartTitles[currentChartType] || title}</Text>
+          <View style={styles.chartIndicators}>
+            {chartTypes.map((type, index) => (
+              <View
+                key={type}
+                style={[
+                  styles.indicator,
+                  currentChartType === type && styles.indicatorActive
+                ]}
+              />
+            ))}
+          </View>
         </View>
-      </View>
-      
-      <View style={styles.controls}>
-        <TouchableOpacity
-          onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
-          style={[
-            styles.controlButton,
-            showDegreeNakshatra && styles.controlButtonActive
-          ]}
-        >
-          <Text style={{
-            fontSize: 16,
-            color: showDegreeNakshatra ? COLORS.white : COLORS.textSecondary
-          }}>
-            {showDegreeNakshatra ? '👁️' : '👁️'}
-          </Text>
-          <Text style={[
-            styles.controlButtonText,
-            showDegreeNakshatra && styles.controlButtonTextActive
-          ]}>
-            Details
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          onPress={toggleStyle}
-          style={styles.styleToggle}
-        >
-          <Text style={styles.styleToggleIcon}>🔄</Text>
-          <Text style={styles.styleToggleText}>
-            {chartStyle === 'north' ? 'South' : 'North'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-      {currentChartType === 'transit' && (
-        <DateNavigator date={transitDate} onDateChange={handleTransitDateChange} />
       )}
       
-      <View style={styles.chartContainer}>
+      {!cosmicTheme && (
+        <View style={styles.controls}>
+          <TouchableOpacity
+            onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
+            style={[
+              styles.controlButton,
+              showDegreeNakshatra && styles.controlButtonActive
+            ]}
+          >
+            <Text style={{
+              fontSize: 16,
+              color: showDegreeNakshatra ? COLORS.white : COLORS.textSecondary
+            }}>
+              {showDegreeNakshatra ? '👁️' : '👁️'}
+            </Text>
+            <Text style={[
+              styles.controlButtonText,
+              showDegreeNakshatra && styles.controlButtonTextActive
+            ]}>
+              Details
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={toggleStyle}
+            style={styles.styleToggle}
+          >
+            <Text style={styles.styleToggleIcon}>🔄</Text>
+            <Text style={styles.styleToggleText}>
+              {chartStyle === 'north' ? 'South' : 'North'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {currentChartType === 'transit' && (
+        <DateNavigator 
+          date={transitDate} 
+          onDateChange={handleTransitDateChange}
+          cosmicTheme={cosmicTheme}
+        />
+      )}
+      
+      <View style={[styles.chartContainer, cosmicTheme && styles.cosmicChartContainer, currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit]}>
+        {cosmicTheme && (
+          <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
+            <TouchableOpacity
+              onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
+              style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
+            >
+              <Text style={styles.floatingButtonIcon}>👁️</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={toggleStyle}
+              style={styles.floatingButton}
+            >
+              <Text style={[styles.floatingButtonIcon, styles.floatingButtonText]}>
+                {chartStyle === 'north' ? 'S' : 'N'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
         <Animated.View 
           {...panResponder.panHandlers}
           style={[
@@ -442,6 +514,29 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
           {renderChart(currentChartType, getChartData())}
         </Animated.View>
       </View>
+      
+      {cosmicTheme && (
+        <View style={styles.quickActions}>
+          <TouchableOpacity 
+            style={styles.quickActionButton}
+            onPress={() => {
+              setCurrentChartType('transit');
+              if (onNavigateToTransit) onNavigateToTransit();
+            }}
+          >
+            <Text style={styles.quickActionIcon}>🪐</Text>
+            <Text style={styles.quickActionText}>Transits</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionButton}
+            onPress={onOpenDasha}
+          >
+            <Text style={styles.quickActionIcon}>⏰</Text>
+            <Text style={styles.quickActionText}>Dasha</Text>
+          </TouchableOpacity>
+        </View>
+      )}
         
         {showSwipeHint && (
           <Animated.View style={[
@@ -505,6 +600,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+  },
+  cosmicContainer: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingVertical: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   header: {
     alignItems: 'center',
@@ -590,6 +695,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 10,
   },
+  cosmicChartContainer: {
+    height: 400,
+    padding: 10,
+  },
   swipeArea: {
     flex: 1,
     width: '100%',
@@ -651,6 +760,68 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: COLORS.textSecondary,
+  },
+  floatingControls: {
+    position: 'absolute',
+    top: -30,
+    right: 10,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 10,
+  },
+  floatingControlsTransit: {
+    top: -30,
+  },
+  chartContainerTransit: {
+    marginTop: 20,
+  },
+  floatingButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  floatingButtonActive: {
+    backgroundColor: 'rgba(255, 107, 53, 0.8)',
+    borderColor: 'rgba(255, 107, 53, 1)',
+  },
+  floatingButtonIcon: {
+    fontSize: 16,
+  },
+  floatingButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 20,
+    marginTop: 16,
+  },
+  quickActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    gap: 8,
+  },
+  quickActionIcon: {
+    fontSize: 16,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });
 

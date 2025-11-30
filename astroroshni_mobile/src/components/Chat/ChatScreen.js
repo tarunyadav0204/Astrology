@@ -37,7 +37,9 @@ export default function ChatScreen({ navigation }) {
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
+  const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const badgeFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isPremiumAnalysis) {
@@ -55,6 +57,27 @@ export default function ChatScreen({ navigation }) {
           }),
         ])
       ).start();
+      
+      // Show badge
+      setShowPremiumBadge(true);
+      Animated.timing(badgeFadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
+      // Hide after 3 seconds
+      const timer = setTimeout(() => {
+        Animated.timing(badgeFadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setShowPremiumBadge(false));
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setShowPremiumBadge(false);
     }
   }, [isPremiumAnalysis]);
   const [messages, setMessages] = useState([]);
@@ -63,6 +86,7 @@ export default function ChatScreen({ navigation }) {
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const drawerAnim = useRef(new Animated.Value(300)).current;
   const [showChart, setShowChart] = useState(false);
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -698,42 +722,68 @@ export default function ChatScreen({ navigation }) {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: COLORS.gradientStart }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
+      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradientBg}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          keyboardVerticalOffset={0}
         >
         {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('BirthForm')} style={styles.nameButton}>
-              <Text style={styles.headerSubtitle}>with 👤 {birthData?.name} ▼</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={styles.creditButton}
-              onPress={() => navigation.navigate('Credits')}
-            >
-              <Text style={styles.creditText}>💳 {credits}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => setShowLanguageModal(true)}
-            >
-              <Text style={styles.headerButtonText}>🌐</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => setShowMenu(true)}
-            >
-              <Text style={styles.headerButtonText}>☰</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.headerContainer}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+            style={styles.header}
+          >
+            <View style={styles.headerLeft}>
+              <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
+                <LinearGradient
+                  colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.15)']}
+                  style={styles.nameChipGradient}
+                >
+                  <Text style={styles.nameChipIcon}>👤</Text>
+                  <Text style={styles.nameChipText}>{birthData?.name?.slice(0, 6)}{birthData?.name?.length > 6 ? '...' : ''}</Text>
+                  <Text style={styles.nameChipArrow}>▼</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity
+                style={styles.creditButton}
+                onPress={() => navigation.navigate('Credits')}
+              >
+                <LinearGradient
+                  colors={['#ff6b35', '#ff8c5a']}
+                  style={styles.creditGradient}
+                >
+                  <Text style={styles.creditText}>💳 {credits}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => setShowLanguageModal(true)}
+              >
+                <Text style={styles.headerButtonText}>🌐</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => {
+                  setShowMenu(true);
+                  Animated.spring(drawerAnim, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    tension: 65,
+                    friction: 11,
+                  }).start();
+                }}
+              >
+                <Ionicons name="menu" size={20} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
         </View>
 
         {/* Content */}
@@ -756,99 +806,169 @@ export default function ChatScreen({ navigation }) {
         )}
 
         {/* Suggestions (only show when not loading and not showing greeting) */}
-        {!loading && !showGreeting && (
+        {!loading && !showGreeting && messages.length > 0 && (
           <View style={styles.suggestionsContainer}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggestionsContent}
             >
-              {suggestions.map((item, index) => (
+              {suggestions.slice(0, 3).map((item, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={styles.suggestionButton}
+                  style={styles.suggestionChip}
                   onPress={() => setInputText(item)}
                 >
-                  <Text style={styles.suggestionText}>{item}</Text>
+                  <LinearGradient
+                    colors={['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']}
+                    style={styles.suggestionChipGradient}
+                  >
+                    <Text style={styles.suggestionChipText}>{item}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         )}
 
-        {/* Premium Toggle */}
-        {!showGreeting && (
-          <View style={styles.premiumToggleContainer}>
-            <TouchableOpacity 
-              style={styles.premiumToggle}
-              onPress={() => setIsPremiumAnalysis(!isPremiumAnalysis)}
-            >
-              <View style={[styles.checkbox, isPremiumAnalysis && styles.checkboxChecked]}>
-                {isPremiumAnalysis && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text style={styles.premiumLabel}>🚀 Premium</Text>
-            </TouchableOpacity>
-            {isPremiumAnalysis && (
-              <Animated.View
-                style={[
-                  styles.enhancedBadge,
-                  {
-                    opacity: glowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1],
-                    }),
-                  },
-                ]}
+        {/* Floating Premium Badge - Auto-hides after 3s */}
+        {!showGreeting && showPremiumBadge && (
+          <Animated.View
+            style={[
+              styles.floatingPremiumBadge,
+              { opacity: badgeFadeAnim },
+            ]}
+          >
+            <TouchableOpacity onPress={() => setShowEnhancedPopup(true)} style={styles.floatingBadgeContent}>
+              <LinearGradient
+                colors={['#ff6b35', '#ff8c5a']}
+                style={styles.floatingBadgeGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
-                <TouchableOpacity onPress={() => setShowEnhancedPopup(true)}>
-                  <Text style={styles.enhancedBadgeText}>✨ Enhanced</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-            <View style={styles.costBadge}>
-              <Text style={styles.costText}>{isPremiumAnalysis ? premiumChatCost : chatCost} credits</Text>
-            </View>
-          </View>
+                <Text style={styles.floatingBadgeText}>✨ Premium • {premiumChatCost} credits</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
-        {/* Credit cost info */}
+        {/* Unified Input Bar */}
         {!showGreeting && (
-          <View style={styles.creditInfo}>
-            <Text style={styles.creditInfoText}>
-              Balance: {credits} credits • {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : `Standard: ${chatCost}`} per question
-            </Text>
+          <View style={styles.unifiedInputContainer}>
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+              style={styles.inputBarGradient}
+            >
+              <TextInput
+                style={styles.modernTextInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={loading ? "Analyzing..." : credits < chatCost ? "Insufficient credits" : "Ask me anything..."}
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                maxLength={500}
+                editable={!loading && credits >= chatCost}
+                multiline
+              />
+              
+              <TouchableOpacity
+                style={styles.premiumToggleButton}
+                onPress={() => setIsPremiumAnalysis(!isPremiumAnalysis)}
+              >
+                <Animated.View
+                  style={[
+                    styles.premiumToggleIcon,
+                    isPremiumAnalysis && {
+                      transform: [{
+                        scale: glowAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.15],
+                        }),
+                      }],
+                    },
+                  ]}
+                >
+                  {isPremiumAnalysis ? (
+                    <LinearGradient
+                      colors={['#ffd700', '#ff6b35']}
+                      style={styles.premiumIconGradient}
+                    >
+                      <Text style={styles.premiumIconText}>⚡</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.premiumIconInactive}>
+                      <Text style={styles.premiumIconTextInactive}>⚡</Text>
+                    </View>
+                  )}
+                </Animated.View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modernSendButton,
+                  (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)) && styles.modernSendButtonDisabled
+                ]}
+                onPress={() => sendMessage()}
+                disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)}
+              >
+                <LinearGradient
+                  colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
+                  style={styles.modernSendGradient}
+                >
+                  {loading ? (
+                    <Text style={styles.modernSendText}>⏳</Text>
+                  ) : credits < (isPremiumAnalysis ? premiumChatCost : chatCost) ? (
+                    <Text style={styles.modernSendText}>💳</Text>
+                  ) : (
+                    <Ionicons name="send" size={20} color={COLORS.white} />
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+            
             {credits < (isPremiumAnalysis ? premiumChatCost : chatCost) && (
-              <TouchableOpacity onPress={() => navigation.navigate('Credits')}>
-                <Text style={styles.lowCreditWarning}>Get more credits</Text>
+              <TouchableOpacity 
+                style={styles.lowCreditBanner}
+                onPress={() => navigation.navigate('Credits')}
+              >
+                <Text style={styles.lowCreditText}>💳 Get more credits to continue</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {/* Input (only show when not showing greeting) */}
+        {/* Quick Actions Bar */}
         {!showGreeting && (
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={loading ? "Analyzing your chart..." : credits < chatCost ? "Insufficient credits" : "Ask me about your birth chart..."}
-              placeholderTextColor={COLORS.gray}
-              maxLength={500}
-              editable={!loading && credits >= chatCost}
-            />
-            <TouchableOpacity
-              style={[
-                styles.sendButton, 
-                isPremiumAnalysis && styles.sendButtonPremium,
-                (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)) && styles.sendButtonDisabled
-              ]}
-              onPress={() => sendMessage()}
-              disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)}
+          <View style={styles.quickActionsBar}>
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => setShowChart(true)}
             >
-              <Text style={styles.sendButtonText}>
-                {loading ? '...' : credits < (isPremiumAnalysis ? premiumChatCost : chatCost) ? 'No Credits' : isPremiumAnalysis ? '🚀 Send' : 'Send'}
-              </Text>
+              <Ionicons name="pie-chart-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
+              <Text style={styles.quickActionText}>Chart</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => setShowDashaBrowser(true)}
+            >
+              <Ionicons name="time-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
+              <Text style={styles.quickActionText}>Dasha</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => setShowEventPeriods(true)}
+            >
+              <Ionicons name="calendar-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
+              <Text style={styles.quickActionText}>Events</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => navigation.navigate('ChatHistory')}
+            >
+              <Ionicons name="chatbubbles-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
+              <Text style={styles.quickActionText}>History</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -887,104 +1007,334 @@ export default function ChatScreen({ navigation }) {
           </View>
         </Modal>
 
-        {/* Menu Modal */}
+        {/* Menu Drawer */}
         <Modal
           visible={showMenu}
           transparent
-          animationType="slide"
-          onRequestClose={() => setShowMenu(false)}
+          animationType="fade"
+          onRequestClose={() => {
+            Animated.timing(drawerAnim, {
+              toValue: 300,
+              duration: 250,
+              useNativeDriver: true,
+            }).start(() => setShowMenu(false));
+          }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Menu</Text>
-              
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  navigation.setOptions({ addWelcomeMessage: setMessages });
-                  navigation.navigate('BirthForm');
-                }}
+          <TouchableOpacity 
+            style={styles.drawerOverlay} 
+            activeOpacity={1}
+            onPress={() => {
+              Animated.timing(drawerAnim, {
+                toValue: 300,
+                duration: 250,
+                useNativeDriver: true,
+              }).start(() => setShowMenu(false));
+            }}
+          >
+            <Animated.View 
+              style={[styles.drawerContent, {
+                transform: [{ translateX: drawerAnim }]
+              }]}
+              onStartShouldSetResponder={() => true}
+            >
+              <LinearGradient
+                colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+                style={styles.drawerGradient}
               >
-                <Text style={styles.menuIcon}>👤</Text>
-                <Text style={styles.menuText}>Select Native</Text>
-              </TouchableOpacity>
+                <View style={styles.drawerHeader}>
+                  <View style={styles.cosmicOrbSmall}>
+                    <LinearGradient
+                      colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                      style={styles.orbGradientSmall}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Text style={styles.orbIconSmall}>🔮</Text>
+                    </LinearGradient>
+                  </View>
+                  <Text style={styles.drawerTitle}>Cosmic Menu</Text>
+                  <Text style={styles.drawerSubtitle}>Navigate Your Journey</Text>
+                </View>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  setShowChart(true);
-                }}
-              >
-                <Text style={styles.menuIcon}>📊</Text>
-                <Text style={styles.menuText}>View Chart</Text>
-              </TouchableOpacity>
+                <ScrollView 
+                  style={styles.menuScrollView}
+                  contentContainerStyle={styles.menuScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('Profile');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>✨</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>My Profile</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  setShowDashaBrowser(true);
-                }}
-              >
-                <Text style={styles.menuIcon}>⏰</Text>
-                <Text style={styles.menuText}>Dasha Browser</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('SelectNative');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>👤</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Select Native</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  navigation.navigate('Credits');
-                }}
-              >
-                <Text style={styles.menuIcon}>💳</Text>
-                <Text style={styles.menuText}>Credits</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('BirthForm');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>➕</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>New Native</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  navigation.navigate('ChatHistory');
-                }}
-              >
-                <Text style={styles.menuIcon}>💬</Text>
-                <Text style={styles.menuText}>Chat History</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        setShowChart(true);
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>📊</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>View Chart</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  setShowGreeting(true);
-                  setMessages([]);
-                }}
-              >
-                <Text style={styles.menuIcon}>🏠</Text>
-                <Text style={styles.menuText}>Back to Home</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        setShowDashaBrowser(true);
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>⏰</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Dasha Browser</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowMenu(false);
-                  logout();
-                }}
-              >
-                <Text style={[styles.menuIcon, { color: COLORS.error }]}>🚪</Text>
-                <Text style={[styles.menuText, { color: COLORS.error }]}>Logout</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('Credits');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>💳</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Credits</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowMenu(false)}
-              >
-                <Text style={styles.modalCloseText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('ChatHistory');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>💬</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Chat History</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        setShowGreeting(true);
+                        setMessages([]);
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🏠</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Back to Home</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.menuOption, styles.menuOptionLast]}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        logout();
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff3b30', '#ff6b60']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🚪</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: '#ff6b60' }]}>Logout</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 107, 96, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </ScrollView>
+              </LinearGradient>
+            </Animated.View>
+          </TouchableOpacity>
         </Modal>
 
         {/* Chart Modal */}
@@ -1036,20 +1386,44 @@ export default function ChatScreen({ navigation }) {
               </TouchableOpacity>
               
               <View style={styles.popupHeader}>
-                <Text style={styles.popupIcon}>✨</Text>
-                <Text style={styles.popupTitle}>Enhanced Deep Analysis</Text>
+                <LinearGradient
+                  colors={['#ff6b35', '#ff8c5a', '#ffd700']}
+                  style={styles.popupHeaderGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.popupHeaderContent}>
+                  <View style={styles.popupIconContainer}>
+                    <LinearGradient
+                      colors={['#ffd700', '#ffed4e']}
+                      style={styles.popupIconGradient}
+                    >
+                      <Text style={styles.popupIcon}>✨</Text>
+                    </LinearGradient>
+                  </View>
+                  <Text style={styles.popupTitle}>Enhanced Deep Analysis</Text>
+                  <Text style={styles.popupSubtitle}>Unlock Advanced Cosmic Insights</Text>
+                </View>
               </View>
               
               <ScrollView 
                 style={styles.popupContent}
                 contentContainerStyle={styles.popupContentContainer}
+                showsVerticalScrollIndicator={false}
               >
                 <Text style={styles.popupIntro}>
-                  This advanced analysis uses more sophisticated astrological calculations and deeper interpretation techniques to provide you with comprehensive insights.
+                  Experience the most sophisticated astrological analysis with advanced calculations and deeper interpretation techniques for comprehensive cosmic insights.
                 </Text>
                 
                 <View style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>🔮</Text>
+                  <View style={styles.benefitIconContainer}>
+                    <LinearGradient
+                      colors={['#ff6b35', '#ff8c5a']}
+                      style={styles.benefitIconGradient}
+                    >
+                      <Text style={styles.benefitIcon}>🔮</Text>
+                    </LinearGradient>
+                  </View>
                   <View style={styles.benefitText}>
                     <Text style={styles.benefitTitle}>Multi-Layered Chart Analysis</Text>
                     <Text style={styles.benefitDesc}>Examines Lagna, Navamsa, and divisional charts with intricate planetary relationships and house lordships</Text>
@@ -1057,7 +1431,14 @@ export default function ChatScreen({ navigation }) {
                 </View>
                 
                 <View style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>🌟</Text>
+                  <View style={styles.benefitIconContainer}>
+                    <LinearGradient
+                      colors={['#4CAF50', '#66BB6A']}
+                      style={styles.benefitIconGradient}
+                    >
+                      <Text style={styles.benefitIcon}>🌟</Text>
+                    </LinearGradient>
+                  </View>
                   <View style={styles.benefitText}>
                     <Text style={styles.benefitTitle}>Advanced Dasha Interpretation</Text>
                     <Text style={styles.benefitDesc}>Analyzes Mahadasha, Antardasha, and Pratyantardasha periods with precise event timing predictions</Text>
@@ -1065,7 +1446,14 @@ export default function ChatScreen({ navigation }) {
                 </View>
                 
                 <View style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>🎯</Text>
+                  <View style={styles.benefitIconContainer}>
+                    <LinearGradient
+                      colors={['#2196F3', '#42A5F5']}
+                      style={styles.benefitIconGradient}
+                    >
+                      <Text style={styles.benefitIcon}>🎯</Text>
+                    </LinearGradient>
+                  </View>
                   <View style={styles.benefitText}>
                     <Text style={styles.benefitTitle}>Yoga & Dosha Detection</Text>
                     <Text style={styles.benefitDesc}>Identifies powerful yogas like Raja, Dhana, Gaja Kesari and doshas affecting your life trajectory</Text>
@@ -1073,7 +1461,14 @@ export default function ChatScreen({ navigation }) {
                 </View>
                 
                 <View style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>🌙</Text>
+                  <View style={styles.benefitIconContainer}>
+                    <LinearGradient
+                      colors={['#9C27B0', '#BA68C8']}
+                      style={styles.benefitIconGradient}
+                    >
+                      <Text style={styles.benefitIcon}>🌙</Text>
+                    </LinearGradient>
+                  </View>
                   <View style={styles.benefitText}>
                     <Text style={styles.benefitTitle}>Nakshatra Deep Dive</Text>
                     <Text style={styles.benefitDesc}>Reveals hidden personality traits, karmic patterns, and life purpose through nakshatra analysis</Text>
@@ -1081,7 +1476,14 @@ export default function ChatScreen({ navigation }) {
                 </View>
                 
                 <View style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>⚡</Text>
+                  <View style={styles.benefitIconContainer}>
+                    <LinearGradient
+                      colors={['#FF9800', '#FFB74D']}
+                      style={styles.benefitIconGradient}
+                    >
+                      <Text style={styles.benefitIcon}>⚡</Text>
+                    </LinearGradient>
+                  </View>
                   <View style={styles.benefitText}>
                     <Text style={styles.benefitTitle}>Transit Correlation</Text>
                     <Text style={styles.benefitDesc}>Maps current planetary transits against your birth chart for accurate timing of events</Text>
@@ -1089,7 +1491,14 @@ export default function ChatScreen({ navigation }) {
                 </View>
                 
                 <View style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>🏆</Text>
+                  <View style={styles.benefitIconContainer}>
+                    <LinearGradient
+                      colors={['#795548', '#A1887F']}
+                      style={styles.benefitIconGradient}
+                    >
+                      <Text style={styles.benefitIcon}>🏆</Text>
+                    </LinearGradient>
+                  </View>
                   <View style={styles.benefitText}>
                     <Text style={styles.benefitTitle}>Remedial Recommendations</Text>
                     <Text style={styles.benefitDesc}>Provides personalized gemstone, mantra, and ritual suggestions based on planetary strengths</Text>
@@ -1100,7 +1509,12 @@ export default function ChatScreen({ navigation }) {
                   style={styles.popupButton}
                   onPress={() => setShowEnhancedPopup(false)}
                 >
-                  <Text style={styles.popupButtonText}>Got it!</Text>
+                  <LinearGradient
+                    colors={['#ff6b35', '#ff8c5a']}
+                    style={styles.popupButtonGradient}
+                  >
+                    <Text style={styles.popupButtonText}>Got it!</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -1108,6 +1522,7 @@ export default function ChatScreen({ navigation }) {
         </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      </LinearGradient>
     </View>
   );
 }
@@ -1116,11 +1531,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gradientBg: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
   },
   keyboardAvoidingView: {
     flex: 1,
+  },
+  headerContainer: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   header: {
     flexDirection: 'row',
@@ -1128,65 +1551,100 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  headerTitleContainer: {
+  headerLeft: {
     flex: 1,
-    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   headerTitle: {
     fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  nameChip: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  nameChipGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  nameChipIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  nameChipText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: COLORS.textPrimary,
-    lineHeight: 20,
+    color: COLORS.white,
+    marginRight: 4,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.accent,
-    marginTop: 1,
-    marginLeft: 22,
-    opacity: 0.9,
-  },
-  nameButton: {
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    borderRadius: 4,
+  nameChipArrow: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
   creditButton: {
-    marginRight: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  creditGradient: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   creditText: {
     color: COLORS.white,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   headerButton: {
-    marginLeft: 12,
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.lightGray,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerButtonText: {
-    fontSize: 20,
-    color: COLORS.accent,
+    fontSize: 18,
   },
   messagesContainer: {
     flex: 1,
@@ -1198,84 +1656,174 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   suggestionsContainer: {
-    backgroundColor: COLORS.surface,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   suggestionsContent: {
+    paddingHorizontal: 4,
+  },
+  suggestionChip: {
+    marginRight: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  suggestionChipGradient: {
     paddingHorizontal: 16,
-  },
-  suggestionButton: {
-    backgroundColor: COLORS.surface,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: COLORS.accent,
-    borderRadius: 25,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    marginRight: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderRadius: 20,
   },
-  suggestionText: {
-    color: COLORS.accent,
+  suggestionChipText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  floatingPremiumBadge: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+  },
+  floatingBadgeContent: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  floatingBadgeGradient: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  floatingBadgeText: {
+    color: COLORS.white,
     fontSize: 13,
+    fontWeight: '700',
+  },
+  unifiedInputContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  inputBarGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modernTextInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    maxHeight: 100,
+  },
+  premiumToggleButton: {
+    marginHorizontal: 4,
+  },
+  premiumToggleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumIconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    shadowColor: '#ffd700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  premiumIconText: {
+    fontSize: 24,
+  },
+  premiumIconInactive: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  premiumIconTextInactive: {
+    fontSize: 24,
+    opacity: 0.7,
+  },
+  modernSendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  modernSendButtonDisabled: {
+    opacity: 0.5,
+  },
+  modernSendGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernSendText: {
+    fontSize: 20,
+  },
+  lowCreditBanner: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+  },
+  lowCreditText: {
+    color: COLORS.white,
+    fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
   },
-  inputContainer: {
+  quickActionsBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 16,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: 25,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    marginRight: 12,
-    fontSize: 16,
-    minHeight: 50,
-    maxHeight: 120,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    color: COLORS.textPrimary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sendButton: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 25,
+    justifyContent: 'space-around',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    justifyContent: 'center',
+    paddingTop: 8,
+    paddingBottom: 0,
+  },
+  quickActionButton: {
     alignItems: 'center',
-    minHeight: 50,
-    minWidth: 50,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    justifyContent: 'center',
+    gap: 4,
+    opacity: 0.8,
   },
-  sendButtonDisabled: {
-    opacity: 0.6,
-    backgroundColor: COLORS.gray,
-  },
-  sendButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
+  quickActionText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -1296,6 +1844,79 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
+  },
+  drawerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    flexDirection: 'row',
+  },
+  drawerContent: {
+    width: 300,
+    height: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 15,
+  },
+  drawerGradient: {
+    flex: 1,
+    paddingTop: 60,
+  },
+  drawerHeader: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cosmicOrbSmall: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginBottom: 16,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  orbGradientSmall: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  orbIconSmall: {
+    fontSize: 36,
+  },
+  drawerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  drawerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  menuScrollView: {
+    flex: 1,
+    maxHeight: '80%',
+  },
+  menuScrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+    flexGrow: 1,
   },
   modalTitle: {
     fontSize: 22,
@@ -1322,27 +1943,45 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   menuOption: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  menuOptionLast: {
+    marginTop: 8,
+  },
+  menuGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: COLORS.lightGray,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  menuIcon: {
-    fontSize: 20,
-    color: COLORS.accent,
+  menuIconContainer: {
+    marginRight: 14,
+  },
+  menuIconGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  menuEmoji: {
+    fontSize: 22,
   },
   menuText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.black,
-    marginLeft: 12,
+    color: COLORS.white,
   },
   modalCloseButton: {
     backgroundColor: COLORS.accent,
@@ -1361,193 +2000,189 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  creditInfo: {
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  creditInfoText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  lowCreditWarning: {
-    fontSize: 12,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  premiumToggleContainer: {
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  premiumToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: COLORS.accent,
-  },
-  checkmark: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  premiumLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginLeft: 8,
-  },
-  costBadge: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  costText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  enhancedBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#4a90e2',
-    marginLeft: 8,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  enhancedBadgeText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  sendButtonPremium: {
-    backgroundColor: '#ff6b35',
-  },
+
   enhancedPopupOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   enhancedPopup: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    width: '90%',
-    maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    borderRadius: 24,
+    width: '100%',
+    maxHeight: '90%',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.15,
+    shadowRadius: 30,
+    elevation: 15,
+    overflow: 'hidden',
   },
   popupClose: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    top: 20,
+    right: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   popupCloseText: {
-    fontSize: 24,
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 20,
+    color: '#666',
+    fontWeight: '600',
   },
   popupHeader: {
-    backgroundColor: '#ff6b35',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
     alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  popupHeaderGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  popupHeaderContent: {
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  popupIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  popupIconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   popupIcon: {
-    fontSize: 48,
-    marginBottom: 10,
+    fontSize: 40,
   },
   popupTitle: {
     color: COLORS.white,
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  popupSubtitle: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   popupContent: {
-    maxHeight: '70%',
+    maxHeight: '65%',
   },
   popupContentContainer: {
-    padding: 20,
-    paddingBottom: 30,
+    padding: 24,
+    paddingBottom: 32,
   },
   popupIntro: {
-    fontSize: 15,
-    color: '#555',
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
+    marginBottom: 24,
+    lineHeight: 24,
+    fontWeight: '400',
   },
   benefitItem: {
     flexDirection: 'row',
-    marginBottom: 15,
-    padding: 12,
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ff6b35',
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#fafafa',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  benefitIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  benefitIconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   benefitIcon: {
-    fontSize: 24,
-    marginRight: 12,
+    fontSize: 20,
   },
   benefitText: {
     flex: 1,
+    justifyContent: 'center',
   },
   benefitTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#333',
     marginBottom: 4,
   },
   benefitDesc: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 20,
+    fontWeight: '400',
   },
   popupButton: {
-    backgroundColor: '#ff6b35',
-    paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: 24,
+    marginBottom: 8,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  popupButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    width: '100%',
+    alignItems: 'center',
   },
   popupButtonText: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
 });

@@ -42,6 +42,31 @@ export const storage = {
   // Clear birth details
   clearBirthDetails: () => AsyncStorage.removeItem('birthDetails'),
   
+  // Birth profiles (multiple natives)
+  setBirthProfiles: (profiles) => AsyncStorage.setItem('birthProfiles', JSON.stringify(profiles)),
+  getBirthProfiles: async () => {
+    const data = await AsyncStorage.getItem('birthProfiles');
+    return data ? JSON.parse(data) : [];
+  },
+  addBirthProfile: async (profile) => {
+    const profiles = await storage.getBirthProfiles();
+    const updatedProfiles = profiles.filter(p => p.name !== profile.name);
+    updatedProfiles.push(profile);
+    await storage.setBirthProfiles(updatedProfiles);
+  },
+  removeBirthProfile: async (profileName) => {
+    const profiles = await storage.getBirthProfiles();
+    const updatedProfiles = profiles.filter(p => p.name !== profileName);
+    await storage.setBirthProfiles(updatedProfiles);
+  },
+  
+  // Favorites
+  setFavorites: (favorites) => AsyncStorage.setItem('favorites', JSON.stringify(favorites)),
+  getFavorites: async () => {
+    const data = await AsyncStorage.getItem('favorites');
+    return data ? JSON.parse(data) : [];
+  },
+  
   // Generic storage methods
   setItem: (key, value) => AsyncStorage.setItem(key, value),
   getItem: (key) => AsyncStorage.getItem(key),

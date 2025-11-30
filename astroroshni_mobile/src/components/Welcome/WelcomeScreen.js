@@ -7,16 +7,19 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 
 const { width, height } = Dimensions.get('window');
 
-const StarParticle = ({ delay = 0 }) => {
+const FloatingElement = ({ delay = 0, symbol, size = 20, duration = 8000 }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const animate = () => {
@@ -24,18 +27,23 @@ const StarParticle = ({ delay = 0 }) => {
         Animated.delay(delay),
         Animated.parallel([
           Animated.timing(opacity, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scale, {
-            toValue: 1,
+            toValue: 0.6,
             duration: 2000,
             useNativeDriver: true,
           }),
           Animated.timing(translateY, {
-            toValue: -50,
-            duration: 8000,
+            toValue: -height,
+            duration: duration,
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateX, {
+            toValue: (Math.random() - 0.5) * 100,
+            duration: duration,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotate, {
+            toValue: 360,
+            duration: duration,
             useNativeDriver: true,
           }),
         ]),
@@ -47,7 +55,8 @@ const StarParticle = ({ delay = 0 }) => {
       ]).start(() => {
         opacity.setValue(0);
         translateY.setValue(0);
-        scale.setValue(0);
+        translateX.setValue(0);
+        rotate.setValue(0);
         animate();
       });
     };
@@ -57,15 +66,120 @@ const StarParticle = ({ delay = 0 }) => {
   return (
     <Animated.View
       style={[
-        styles.star,
+        styles.floatingElement,
         {
           opacity,
-          transform: [{ translateY }, { scale }],
+          transform: [
+            { translateY },
+            { translateX },
+            { rotate: rotate.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] }) }
+          ],
           left: Math.random() * width,
-          top: height * 0.8 + Math.random() * 100,
+          top: height + Math.random() * 100,
         },
       ]}
-    />
+    >
+      <Text style={[styles.floatingSymbol, { fontSize: size }]}>{symbol}</Text>
+    </Animated.View>
+  );
+};
+
+const TrustBadge = ({ icon, title, description, delay = 0 }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.trustBadge,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
+      <View style={styles.trustIconContainer}>
+        <LinearGradient
+          colors={['#ff6b35', '#ff8c5a']}
+          style={styles.trustIconGradient}
+        >
+          <Ionicons name={icon} size={24} color="white" />
+        </LinearGradient>
+      </View>
+      <Text style={styles.trustTitle}>{title}</Text>
+      <Text style={styles.trustDescription}>{description}</Text>
+    </Animated.View>
+  );
+};
+
+const FeatureCard = ({ icon, title, description, delay = 0 }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.featureCard,
+        {
+          opacity: fadeAnim,
+          transform: [{ scale: scaleAnim }]
+        }
+      ]}
+    >
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
+        style={styles.featureGradient}
+      >
+        <View style={styles.featureIconContainer}>
+          <LinearGradient
+            colors={['#ff6b35', '#ffd700']}
+            style={styles.featureIconGradient}
+          >
+            <Text style={styles.featureIcon}>{icon}</Text>
+          </LinearGradient>
+        </View>
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDescription}>{description}</Text>
+      </LinearGradient>
+    </Animated.View>
   );
 };
 
@@ -76,6 +190,23 @@ const WelcomeScreen = ({ navigation }) => {
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
   const buttonOpacity = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  
+  const cosmicElements = ['✨', '🌟', '⭐', '🌙', '☀️', '🪐', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+  
+  const trustBadges = [
+    { icon: 'shield-checkmark', title: 'Bank-Level Security', description: 'End-to-end encryption' },
+    { icon: 'target', title: 'NASA-Grade Precision', description: 'Swiss Ephemeris calculations' },
+    { icon: 'people', title: '10,000+ Happy Users', description: 'Trusted worldwide' },
+    { icon: 'ribbon', title: 'Vedic Certified', description: 'Traditional authenticity' },
+  ];
+  
+  const features = [
+    { icon: '📊', title: 'Live Birth Charts', description: 'North & South Indian styles with real-time calculations' },
+    { icon: '🧠', title: 'Deepest Analysis Available', description: 'Unmatched astrological depth that no other app provides' },
+    { icon: '⏰', title: 'Real-Time Transits', description: 'Current planetary positions affecting you now' },
+    { icon: '💬', title: 'Chat with Cosmos', description: 'Ask anything, get instant astrological guidance' },
+  ];
 
   useEffect(() => {
     // Logo entrance animation
@@ -145,70 +276,197 @@ const WelcomeScreen = ({ navigation }) => {
         end={{ x: 1, y: 1 }}
       />
 
-      {/* Star Particles */}
-      {Array.from({ length: 20 }).map((_, i) => (
-        <StarParticle key={i} delay={i * 200} />
+      {/* Floating Cosmic Elements */}
+      {cosmicElements.map((symbol, i) => (
+        <FloatingElement 
+          key={i} 
+          symbol={symbol} 
+          delay={i * 300} 
+          size={16 + Math.random() * 8}
+          duration={6000 + Math.random() * 4000}
+        />
       ))}
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
+      <Animated.ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
           <Animated.View
             style={[
               styles.logoContainer,
               {
                 transform: [
                   { scale: Animated.multiply(logoScale, pulseAnim) },
-                  { rotate: rotation },
+                  {
+                    translateY: scrollY.interpolate({
+                      inputRange: [0, 200],
+                      outputRange: [0, -50],
+                      extrapolate: 'clamp',
+                    })
+                  }
                 ],
               },
             ]}
           >
-            <LinearGradient
-              colors={['#FFD700', '#FFA500', '#FF6B35']}
-              style={styles.mandala}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.mandalaSymbol}>🕉️</Text>
-            </LinearGradient>
+            <View style={styles.logoWrapper}>
+              {/* Rotating cosmic ring */}
+              <Animated.View
+                style={[
+                  styles.cosmicRing,
+                  {
+                    transform: [{ rotate: rotation }]
+                  }
+                ]}
+              >
+                <View style={styles.ringDot} />
+                <View style={[styles.ringDot, styles.ringDot2]} />
+                <View style={[styles.ringDot, styles.ringDot3]} />
+                <View style={[styles.ringDot, styles.ringDot4]} />
+              </Animated.View>
+              
+              {/* Sacred Om symbol - stationary */}
+              <LinearGradient
+                colors={['#FFD700', '#FFA500', '#FF6B35']}
+                style={styles.mandala}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.mandalaSymbol}>🕉️</Text>
+              </LinearGradient>
+            </View>
           </Animated.View>
 
           <Animated.Text style={[styles.appTitle, { opacity: titleOpacity }]}>
             AstroRoshni
           </Animated.Text>
+          
+          <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
+            <Text style={styles.tagline}>Your Personal Cosmic Guide</Text>
+            <Text style={styles.subtitle}>
+              Ancient Wisdom • Modern Precision • Trusted by Thousands
+            </Text>
+          </Animated.View>
         </View>
 
-        {/* Tagline */}
-        <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
-          <Text style={styles.tagline}>Unlock Your Cosmic Destiny</Text>
-          <Text style={styles.subtitle}>
-            Discover the ancient wisdom of Vedic astrology
-          </Text>
-        </Animated.View>
+        {/* Trust & Security Section */}
+        <View style={styles.trustSection}>
+          <Text style={styles.sectionTitle}>Why Trust AstroRoshni?</Text>
+          <View style={styles.trustGrid}>
+            {trustBadges.map((badge, index) => (
+              <TrustBadge
+                key={index}
+                icon={badge.icon}
+                title={badge.title}
+                description={badge.description}
+                delay={index * 200}
+              />
+            ))}
+          </View>
+        </View>
 
-        {/* Get Started Button */}
-        <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.8}>
-            <LinearGradient
-              colors={['#FF6B35', '#F7931E', '#FFD700']}
-              style={styles.getStartedButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.buttonText}>Begin Your Journey</Text>
-              <Text style={styles.buttonIcon}>✨</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+        {/* Features Section */}
+        <View style={styles.featuresSection}>
+          <Text style={styles.sectionTitle}>Unlock Cosmic Insights</Text>
+          <View style={styles.featuresGrid}>
+            {features.map((feature, index) => (
+              <FeatureCard
+                key={index}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                delay={index * 150}
+              />
+            ))}
+          </View>
+        </View>
 
-      {/* Bottom Glow */}
-      <LinearGradient
-        colors={['transparent', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.2)']}
-        style={styles.bottomGlow}
-      />
+        {/* Security Section */}
+        <View style={styles.securitySection}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
+            style={styles.securityCard}
+          >
+            <View style={styles.securityHeader}>
+              <View style={styles.securityIconContainer}>
+                <LinearGradient
+                  colors={['#4CAF50', '#66BB6A']}
+                  style={styles.securityIconGradient}
+                >
+                  <Ionicons name="shield-checkmark" size={32} color="white" />
+                </LinearGradient>
+              </View>
+              <Text style={styles.securityTitle}>Your Privacy is Sacred</Text>
+            </View>
+            
+            <View style={styles.securityFeatures}>
+              <View style={styles.securityFeature}>
+                <Ionicons name="lock-closed" size={16} color="#4CAF50" />
+                <Text style={styles.securityFeatureText}>256-bit Military Encryption</Text>
+              </View>
+              <View style={styles.securityFeature}>
+                <Ionicons name="eye-off" size={16} color="#4CAF50" />
+                <Text style={styles.securityFeatureText}>Zero Data Sharing Policy</Text>
+              </View>
+              <View style={styles.securityFeature}>
+                <Ionicons name="phone-portrait" size={16} color="#4CAF50" />
+                <Text style={styles.securityFeatureText}>Local Device Processing</Text>
+              </View>
+              <View style={styles.securityFeature}>
+                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                <Text style={styles.securityFeatureText}>GDPR Compliant</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Social Proof */}
+        <View style={styles.socialProofSection}>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>10,000+</Text>
+              <Text style={styles.statLabel}>Happy Users</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>4.8★</Text>
+              <Text style={styles.statLabel}>App Rating</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>99.9%</Text>
+              <Text style={styles.statLabel}>Accuracy</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* CTA Section */}
+        <View style={styles.ctaSection}>
+          <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.8}>
+              <LinearGradient
+                colors={['#FF6B35', '#F7931E', '#FFD700']}
+                style={styles.getStartedButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.buttonText} numberOfLines={1}>Begin Your Cosmic Journey</Text>
+                <Text style={styles.buttonIcon}>✨</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <View style={styles.ctaSubtext}>
+              <Text style={styles.ctaSubtextMain}>Trusted by 10,000+ Users</Text>
+              <Text style={styles.ctaSubtextSub}>Free to Start • No Hidden Fees</Text>
+            </View>
+          </Animated.View>
+        </View>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -225,69 +483,111 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
   },
-  star: {
+  floatingElement: {
     position: 'absolute',
-    width: 2,
-    height: 2,
-    backgroundColor: '#FFD700',
-    borderRadius: 1,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 2,
   },
-  content: {
+  floatingSymbol: {
+    color: 'rgba(255, 215, 0, 0.6)',
+    textShadowColor: 'rgba(255, 215, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
+  },
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  heroSection: {
     alignItems: 'center',
     paddingHorizontal: 40,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 60,
+    paddingTop: 80,
+    paddingBottom: 60,
   },
   logoContainer: {
     marginBottom: 30,
   },
+  logoWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cosmicRing: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+    borderStyle: 'dashed',
+  },
+  ringDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFD700',
+    top: -4,
+    left: 86,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  ringDot2: {
+    top: 86,
+    left: 176,
+    backgroundColor: '#FFA500',
+  },
+  ringDot3: {
+    top: 176,
+    left: 86,
+    backgroundColor: '#FF6B35',
+  },
+  ringDot4: {
+    top: 86,
+    left: -4,
+    backgroundColor: '#FFD700',
+  },
   mandala: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+    elevation: 15,
   },
   mandalaSymbol: {
-    fontSize: 60,
+    fontSize: 70,
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 4,
   },
   appTitle: {
-    fontSize: 36,
-    fontWeight: '300',
+    fontSize: 42,
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 3,
+    letterSpacing: 2,
     textAlign: 'center',
     textShadowColor: 'rgba(255, 215, 0, 0.5)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+    textShadowRadius: 15,
+    marginBottom: 20,
   },
   taglineContainer: {
     alignItems: 'center',
-    marginBottom: 80,
   },
   tagline: {
-    fontSize: 20,
+    fontSize: 22,
     color: '#FFD700',
     textAlign: 'center',
-    marginBottom: 10,
-    fontWeight: '500',
+    marginBottom: 12,
+    fontWeight: '600',
     letterSpacing: 1,
   },
   subtitle: {
@@ -295,42 +595,232 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     lineHeight: 24,
-    fontStyle: 'italic',
+    fontWeight: '400',
+  },
+  sectionTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 30,
+    textShadowColor: 'rgba(255, 215, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  trustSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  trustGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  trustBadge: {
+    width: (width - 60) / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  trustIconContainer: {
+    marginBottom: 12,
+  },
+  trustIconGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trustTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  trustDescription: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  featuresSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  featureCard: {
+    width: (width - 60) / 2,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  featureGradient: {
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 200,
+    justifyContent: 'space-between',
+  },
+  featureIconContainer: {
+    marginBottom: 16,
+  },
+  featureIconGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featureIcon: {
+    fontSize: 28,
+  },
+  featureTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  featureDescription: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  securitySection: {
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  securityCard: {
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  securityHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  securityIconContainer: {
+    marginBottom: 16,
+  },
+  securityIconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  securityTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+    textAlign: 'center',
+  },
+  securityFeatures: {
+    gap: 16,
+  },
+  securityFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  securityFeatureText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  socialProofSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFD700',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  ctaSection: {
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+    alignItems: 'center',
   },
   buttonContainer: {
     width: '100%',
     alignItems: 'center',
   },
   getStartedButton: {
-    paddingHorizontal: 40,
-    paddingVertical: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 18,
     borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 12,
+    marginBottom: 20,
+    minWidth: 280,
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     marginRight: 8,
     letterSpacing: 0.5,
   },
   buttonIcon: {
-    fontSize: 18,
+    fontSize: 20,
   },
-  bottomGlow: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    pointerEvents: 'none',
+  ctaSubtext: {
+    alignItems: 'center',
+  },
+  ctaSubtextMain: {
+    fontSize: 16,
+    color: '#FFD700',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  ctaSubtextSub: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '400',
   },
 });
 

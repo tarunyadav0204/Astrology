@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,22 +8,22 @@ import {
   ScrollView,
   Alert,
   Platform,
-  FlatList,
   KeyboardAvoidingView,
-  Modal,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { COLORS } from '../../utils/constants';
 
+const { width } = Dimensions.get('window');
+
 export default function BirthFormScreen({ navigation }) {
-  const addWelcomeMessage = navigation.getParent()?.getState()?.routes?.find(r => r.name === 'Chat')?.params?.addWelcomeMessage;
-  const [activeTab, setActiveTab] = useState('saved');
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
     date: new Date(),
@@ -38,262 +38,143 @@ export default function BirthFormScreen({ navigation }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [existingCharts, setExistingCharts] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [editingChart, setEditingChart] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const confettiAnims = useRef([...Array(20)].map(() => ({
+    x: new Animated.Value(0),
+    y: new Animated.Value(0),
+    rotate: new Animated.Value(0),
+    opacity: new Animated.Value(0),
+  }))).current;
 
   useEffect(() => {
-    loadExistingCharts();
-  }, []);
+    animateStepTransition();
+  }, [step]);
 
+  const animateStepTransition = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    scaleAnim.setValue(0.9);
+    
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(progressAnim, {
+        toValue: step / 5,
+        duration: 400,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
 
+  const shakeAnimation = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
 
-  const loadExistingCharts = async (search = '') => {
-    try {
-      const response = await chartAPI.getExistingCharts(search);
-      setExistingCharts(response.data.charts || []);
-    } catch (error) {
-      setExistingCharts([]);
-    }
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    confettiAnims.forEach((anim, index) => {
+      const startX = Math.random() * width;
+      const endX = startX + (Math.random() - 0.5) * 200;
+      const endY = 800;
+      
+      Animated.parallel([
+        Animated.timing(anim.x, {
+          toValue: endX,
+          duration: 2000 + Math.random() * 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim.y, {
+          toValue: endY,
+          duration: 2000 + Math.random() * 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim.rotate, {
+          toValue: Math.random() * 720,
+          duration: 2000 + Math.random() * 1000,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(anim.opacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.delay(1500),
+          Animated.timing(anim.opacity, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+      
+      anim.x.setValue(startX);
+      anim.y.setValue(-50);
+      anim.rotate.setValue(0);
+      anim.opacity.setValue(0);
+    });
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
     
     if (field === 'place') {
-      // Clear coordinates when manually typing
-      setFormData(prev => ({ 
-        ...prev, 
-        [field]: value,
-        latitude: null,
-        longitude: null
-      }));
-      
-      // Debounced search
+      setFormData(prev => ({ ...prev, [field]: value, latitude: null, longitude: null }));
       if (searchTimeout) clearTimeout(searchTimeout);
-      
       const timeout = setTimeout(() => {
-        if (value.length >= 3) {
-          searchPlaces(value);
-        } else {
-          setSuggestions([]);
-          setShowSuggestions(false);
-        }
+        if (value.length >= 3) searchPlaces(value);
+        else { setSuggestions([]); setShowSuggestions(false); }
       }, 300);
-      
       setSearchTimeout(timeout);
     }
-  };
-
-  const handleDateChange = (event, selectedDate) => {
-    if (selectedDate) {
-      handleInputChange('date', selectedDate);
-    }
-  };
-
-  const handleTimeChange = (event, selectedTime) => {
-    if (selectedTime) {
-      handleInputChange('time', selectedTime);
-    }
-  };
-
-  const validateForm = () => {
-    if (!formData.name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
-      return false;
-    }
-    if (!formData.place.trim()) {
-      Alert.alert('Error', 'Please enter birth place');
-      return false;
-    }
-    if (!formData.gender) {
-      Alert.alert('Error', 'Please select gender');
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setLoading(true);
-    try {
-      const birthData = {
-        name: formData.name,
-        date: formData.date.toISOString().split('T')[0],
-        time: formData.time.toTimeString().split(' ')[0],
-        place: formData.place,
-        latitude: formData.latitude || 0,
-        longitude: formData.longitude || 0,
-        timezone: formData.timezone,
-        gender: formData.gender,
-      };
-
-      if (editingChart) {
-        await chartAPI.updateChart(editingChart.id, birthData);
-        Alert.alert('Success', 'Chart updated successfully!');
-        loadExistingCharts(searchQuery);
-        setEditingChart(null);
-        setFormData({
-          name: '',
-          date: new Date(),
-          time: new Date(),
-          place: '',
-          latitude: null,
-          longitude: null,
-          timezone: 'Asia/Kolkata',
-          gender: '',
-        });
-        setActiveTab('saved');
-      } else {
-        // Calculate chart without saving to database
-        const [chartData, yogiData] = await Promise.all([
-          chartAPI.calculateChartOnly(birthData),
-          chartAPI.calculateYogi(birthData)
-        ]);
-
-        // Save birth details locally with consistent time format
-        await storage.setBirthDetails({
-          ...formData,
-          time: formData.time.toTimeString().split(' ')[0] // Save as HH:MM:SS string
-        });
-        
-        // Store chart data for viewing
-        await storage.setChartData({
-          birthData: birthData,
-          chartData: chartData
-        });
-
-        Alert.alert(
-          'Success',
-          'Birth chart calculated successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('Chat'),
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to process birth details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectExistingChart = async (chart) => {
-    try {
-      // Parse time properly
-      let timeDate;
-      if (chart.time.includes(':')) {
-        const [hours, minutes] = chart.time.split(':');
-        timeDate = new Date();
-        timeDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-      } else {
-        timeDate = new Date(chart.time);
-      }
-      
-      // Just load the existing chart data without creating new entry
-      await storage.setBirthDetails({
-        name: chart.name,
-        date: chart.date, // Keep as string
-        time: chart.time, // Keep as string
-        place: chart.place || '',
-        latitude: chart.latitude,
-        longitude: chart.longitude,
-        timezone: chart.timezone,
-        gender: chart.gender || ''
-      });
-
-      // Add welcome message to chat if callback exists
-      if (addWelcomeMessage) {
-        const welcomeMessage = {
-          id: Date.now(),
-          text: `Welcome ${chart.name}! 🌟 Your birth chart has been loaded. I'm here to help you understand your astrological insights. What would you like to know about your chart?`,
-          isUser: false,
-          timestamp: new Date().toISOString()
-        };
-        
-        addWelcomeMessage(prev => [...prev, welcomeMessage]);
-      }
-      navigation.navigate('Chat');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load chart');
-    }
-  };
-
-  const editChart = (chart) => {
-    setEditingChart(chart);
-    
-    // Parse time properly to avoid NaN
-    let timeDate;
-    try {
-      if (chart.time.includes(':')) {
-        const [hours, minutes] = chart.time.split(':');
-        timeDate = new Date();
-        timeDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
-      } else {
-        timeDate = new Date(chart.time);
-        if (isNaN(timeDate.getTime())) {
-          timeDate = new Date();
-          timeDate.setHours(12, 0, 0, 0); // Default to noon
-        }
-      }
-    } catch (error) {
-      timeDate = new Date();
-      timeDate.setHours(12, 0, 0, 0); // Default to noon
-    }
-    
-    setFormData({
-      name: chart.name,
-      date: new Date(chart.date),
-      time: timeDate,
-      place: chart.place || `${chart.latitude}, ${chart.longitude}`,
-      latitude: chart.latitude,
-      longitude: chart.longitude,
-      timezone: chart.timezone,
-      gender: chart.gender || ''
-    });
-    setActiveTab('new');
   };
 
   const searchPlaces = async (query) => {
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'AstrologyApp/1.0'
-          }
-        }
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+        { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
       );
-      
-      if (!response.ok) {
-        throw new Error('Location search failed');
-      }
-      
       const data = await response.json();
-      
       const places = data.map(item => ({
         id: item.place_id,
         name: item.display_name,
         latitude: parseFloat(item.lat),
         longitude: parseFloat(item.lon),
-        timezone: 'Asia/Kolkata' // Default timezone
+        timezone: 'Asia/Kolkata'
       }));
-      
       setSuggestions(places);
       setShowSuggestions(true);
-    } catch (error) {
-      // Location search error
-    }
+    } catch (error) {}
   };
 
   const handlePlaceSelect = (place) => {
@@ -308,647 +189,552 @@ export default function BirthFormScreen({ navigation }) {
     setSuggestions([]);
   };
 
-  const deleteChart = async (chartId) => {
-    Alert.alert(
-      'Delete Chart',
-      'Are you sure you want to delete this chart?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await chartAPI.deleteChart(chartId);
-              Alert.alert('Success', 'Chart deleted successfully!');
-              loadExistingCharts(searchQuery);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete chart');
-            }
-          },
-        },
-      ]
-    );
+  const validateStep = () => {
+    if (step === 1 && !formData.name.trim()) {
+      shakeAnimation();
+      return false;
+    }
+    if (step === 2 && !formData.gender) {
+      shakeAnimation();
+      return false;
+    }
+    if (step === 5 && !formData.place.trim()) {
+      shakeAnimation();
+      return false;
+    }
+    return true;
   };
 
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+  const nextStep = () => {
+    if (validateStep()) {
+      if (step < 5) setStep(step + 1);
+      else handleSubmit();
+    }
   };
 
-  const formatTime = (time) => {
-    return time.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+  const prevStep = () => {
+    if (step > 1) setStep(step - 1);
   };
 
-  const renderChartItem = ({ item }) => (
-    <View style={styles.chartItem}>
-      <TouchableOpacity
-        style={styles.chartInfo}
-        onPress={() => selectExistingChart(item)}
-      >
-        <Text style={styles.chartName}>{item.name}</Text>
-        <Text style={styles.chartDetails}>
-          {item.date} at {item.time}
-        </Text>
-        <Text style={styles.chartCreated}>
-          Created: {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-      </TouchableOpacity>
-      <View style={styles.chartActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => editChart(item)}
-        >
-          <Text style={styles.actionButtonText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => deleteChart(item.id)}
-        >
-          <Text style={styles.actionButtonText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const birthData = {
+        name: formData.name,
+        date: formData.date.toISOString().split('T')[0],
+        time: formData.time.toTimeString().split(' ')[0],
+        place: formData.place,
+        latitude: formData.latitude || 0,
+        longitude: formData.longitude || 0,
+        timezone: formData.timezone,
+        gender: formData.gender,
+      };
+
+      const [chartData, yogiData] = await Promise.all([
+        chartAPI.calculateChartOnly(birthData),
+        chartAPI.calculateYogi(birthData)
+      ]);
+
+      const profileData = {
+        ...formData,
+        time: formData.time.toTimeString().split(' ')[0]
+      };
+      
+      await storage.setBirthDetails(profileData);
+      await storage.addBirthProfile(profileData);
+      
+      await storage.setChartData({
+        birthData: birthData,
+        chartData: chartData
+      });
+
+      triggerConfetti();
+      setTimeout(() => {
+        Alert.alert('Success', 'Birth chart calculated successfully!', [
+          { text: 'OK', onPress: () => navigation.navigate('Chat') }
+        ]);
+      }, 1000);
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to process birth details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStepIcon = () => {
+    const icons = ['👤', '⚧️', '📅', '🕐', '📍'];
+    return icons[step - 1];
+  };
+
+  const getStepTitle = () => {
+    const titles = ['What\'s your name?', 'Select your gender', 'When were you born?', 'What time were you born?', 'Where were you born?'];
+    return titles[step - 1];
+  };
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
-    <LinearGradient 
-      colors={[COLORS.gradientStart, COLORS.gradientEnd]} 
-      style={styles.container}
-    >
-      <View style={styles.safeArea}>
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoid}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-        {/* Tab Navigation */}
-        <View style={styles.tabNavigation}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'new' && styles.activeTab]}
-            onPress={() => setActiveTab('new')}
-          >
-            <Text style={[styles.tabText, activeTab === 'new' && styles.activeTabText]}>
-              📝 New Chart
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'saved' && styles.activeTab]}
-            onPress={() => setActiveTab('saved')}
-          >
-            <Text style={[styles.tabText, activeTab === 'saved' && styles.activeTabText]}>
-              📊 Saved Charts
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === 'new' ? (
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.formContainer}>
-              <Text style={styles.title}>Birth Details</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.name}
-                  onChangeText={(value) => handleInputChange('name', value)}
-                  placeholder="Full name"
-                  placeholderTextColor={COLORS.gray}
-                />
+    <View style={styles.container}>
+      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
+        <SafeAreaView style={styles.safeArea}>
+          <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              </TouchableOpacity>
+              <View style={styles.headerTitleContainer}>
+                <Ionicons name="person" size={20} color="#ff6b35" />
+                <Text style={styles.headerTitle}>Birth Details</Text>
               </View>
+              <View style={styles.placeholder} />
+            </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Gender</Text>
-                <View style={styles.genderButtons}>
-                  <TouchableOpacity
-                    style={[styles.genderButton, formData.gender === 'Male' && styles.genderButtonSelected]}
-                    onPress={() => handleInputChange('gender', 'Male')}
-                  >
-                    <Text style={[styles.genderButtonText, formData.gender === 'Male' && styles.genderButtonTextSelected]}>Male</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.genderButton, formData.gender === 'Female' && styles.genderButtonSelected]}
-                    onPress={() => handleInputChange('gender', 'Female')}
-                  >
-                    <Text style={[styles.genderButtonText, formData.gender === 'Female' && styles.genderButtonTextSelected]}>Female</Text>
-                  </TouchableOpacity>
+            {/* Progress Bar */}
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <Animated.View style={[styles.progressFill, { width: progressWidth }]}>
+                  <LinearGradient colors={['#ff6b35', '#ffd700']} style={styles.progressGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+                </Animated.View>
+              </View>
+              <Text style={styles.progressText}>Step {step} of 5</Text>
+            </View>
+
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }, { translateX: shakeAnim }] }]}>
+                
+                {/* Step Icon */}
+                <View style={styles.iconContainer}>
+                  <LinearGradient colors={['#ff6b35', '#ffd700', '#ff6b35']} style={styles.iconGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <Text style={styles.stepIcon}>{getStepIcon()}</Text>
+                  </LinearGradient>
                 </View>
-              </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date of Birth</Text>
-                {Platform.OS === 'web' ? (
-                  <TextInput
-                    style={styles.input}
-                    value={formData.date.toISOString().split('T')[0]}
-                    onChangeText={(value) => {
-                      if (value) {
-                        handleInputChange('date', new Date(value));
-                      }
-                    }}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={COLORS.gray}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    style={styles.dateTimeButton}
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <Text style={styles.dateTimeText}>{formatDate(formData.date)}</Text>
-                    <Text style={styles.dateTimeIcon}>📅</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                {/* Step Title */}
+                <Text style={styles.stepTitle}>{getStepTitle()}</Text>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Time of Birth</Text>
-                {Platform.OS === 'web' ? (
-                  <TextInput
-                    style={styles.input}
-                    value={formData.time.toTimeString().slice(0, 5)}
-                    onChangeText={(value) => {
-                      if (value && value.includes(':')) {
-                        const [hours, minutes] = value.split(':');
-                        const newTime = new Date();
-                        newTime.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
-                        handleInputChange('time', newTime);
-                      }
-                    }}
-                    placeholder="HH:MM"
-                    placeholderTextColor={COLORS.gray}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    style={styles.dateTimeButton}
-                    onPress={() => setShowTimePicker(true)}
-                  >
-                    <Text style={styles.dateTimeText}>{formatTime(formData.time)}</Text>
-                    <Text style={styles.dateTimeIcon}>🕐</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Place of Birth</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.place}
-                  onChangeText={(value) => handleInputChange('place', value)}
-                  placeholder="City, State, Country"
-                  placeholderTextColor={COLORS.gray}
-                />
-                {showSuggestions && suggestions.length > 0 && (
-                  <View style={styles.suggestionsList}>
-                    {suggestions.slice(0, 3).map(suggestion => (
-                      <TouchableOpacity
-                        key={suggestion.id}
-                        style={styles.suggestionItem}
-                        onPress={() => handlePlaceSelect(suggestion)}
-                      >
-                        <Text style={styles.suggestionText} numberOfLines={1}>{suggestion.name}</Text>
-                      </TouchableOpacity>
-                    ))}
+                {/* Step Content */}
+                {step === 1 && (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={formData.name}
+                      onChangeText={(value) => handleInputChange('name', value)}
+                      placeholder="Enter your full name"
+                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      autoFocus
+                    />
                   </View>
                 )}
-              </View>
 
-
-
-              <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                <Text style={styles.submitButtonText}>
-                  {loading ? 'Processing...' : (editingChart ? 'Update Chart' : 'Calculate Birth Chart')}
-                </Text>
-              </TouchableOpacity>
-
-              {editingChart && (
-                <TouchableOpacity
-                  style={[styles.submitButton, styles.cancelButton]}
-                  onPress={() => {
-                    setEditingChart(null);
-                    setActiveTab('saved');
-                  }}
-                >
-                  <Text style={styles.submitButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </ScrollView>
-        ) : (
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.savedChartsContainer}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by name..."
-                placeholderTextColor={COLORS.gray}
-                value={searchQuery}
-                onChangeText={(text) => {
-                  setSearchQuery(text);
-                  loadExistingCharts(text);
-                }}
-              />
-              {existingCharts.length > 0 ? (
-                existingCharts.map((item) => (
-                  <View key={item.id.toString()} style={styles.chartItem}>
+                {step === 2 && (
+                  <View style={styles.genderContainer}>
                     <TouchableOpacity
-                      style={styles.chartInfo}
-                      onPress={() => selectExistingChart(item)}
+                      style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected]}
+                      onPress={() => handleInputChange('gender', 'Male')}
                     >
-                      <Text style={styles.chartName}>{item.name}</Text>
-                      <Text style={styles.chartDetails}>
-                        {item.date} at {item.time}
-                      </Text>
-                      <Text style={styles.chartCreated}>
-                        Created: {new Date(item.created_at).toLocaleDateString()}
-                      </Text>
+                      <LinearGradient
+                        colors={formData.gender === 'Male' ? ['#ff6b35', '#ff8c5a'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                        style={styles.genderGradient}
+                      >
+                        <Text style={styles.genderIcon}>♂️</Text>
+                        <Text style={styles.genderText}>Male</Text>
+                      </LinearGradient>
                     </TouchableOpacity>
-                    <View style={styles.chartActions}>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.editButton]}
-                        onPress={() => editChart(item)}
+                    <TouchableOpacity
+                      style={[styles.genderCard, formData.gender === 'Female' && styles.genderCardSelected]}
+                      onPress={() => handleInputChange('gender', 'Female')}
+                    >
+                      <LinearGradient
+                        colors={formData.gender === 'Female' ? ['#ff6b35', '#ff8c5a'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                        style={styles.genderGradient}
                       >
-                        <Text style={styles.actionButtonText}>Edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.deleteButton]}
-                        onPress={() => deleteChart(item.id)}
-                      >
-                        <Text style={styles.actionButtonText}>Delete</Text>
-                      </TouchableOpacity>
+                        <Text style={styles.genderIcon}>♀️</Text>
+                        <Text style={styles.genderText}>Female</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {step === 3 && (
+                  <View style={styles.dateTimeContainer}>
+                    <TouchableOpacity style={styles.dateTimeCard} onPress={() => setShowDatePicker(true)}>
+                      <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']} style={styles.dateTimeGradient}>
+                        <Text style={styles.dateTimeIcon}>📅</Text>
+                        <Text style={styles.dateTimeValue}>
+                          {formData.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    <View style={styles.zodiacWheel}>
+                      <Text style={styles.zodiacText}>♈♉♊♋♌♍</Text>
+                      <Text style={styles.zodiacText}>♎♏♐♑♒♓</Text>
                     </View>
                   </View>
-                ))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>
-                    {searchQuery ? 'No charts found' : 'No saved charts'}
-                  </Text>
-                </View>
+                )}
+
+                {step === 4 && (
+                  <View style={styles.dateTimeContainer}>
+                    <TouchableOpacity style={styles.dateTimeCard} onPress={() => setShowTimePicker(true)}>
+                      <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']} style={styles.dateTimeGradient}>
+                        <Text style={styles.dateTimeIcon}>🕐</Text>
+                        <Text style={styles.dateTimeValue}>
+                          {formData.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {step === 5 && (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={formData.place}
+                      onChangeText={(value) => handleInputChange('place', value)}
+                      placeholder="City, State, Country"
+                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    />
+                    {showSuggestions && suggestions.length > 0 && (
+                      <View style={styles.suggestionsList}>
+                        {suggestions.slice(0, 3).map(suggestion => (
+                          <TouchableOpacity
+                            key={suggestion.id}
+                            style={styles.suggestionItem}
+                            onPress={() => handlePlaceSelect(suggestion)}
+                          >
+                            <Text style={styles.suggestionText} numberOfLines={1}>📍 {suggestion.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+              </Animated.View>
+            </ScrollView>
+
+            {/* Navigation Buttons */}
+            <View style={styles.navigationContainer}>
+              {step > 1 && (
+                <TouchableOpacity style={styles.navButton} onPress={prevStep}>
+                  <LinearGradient colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']} style={styles.navGradient}>
+                    <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+                    <Text style={styles.navText}>Back</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               )}
+              <TouchableOpacity style={[styles.navButton, styles.navButtonPrimary, step === 1 && styles.navButtonFull]} onPress={nextStep} disabled={loading}>
+                <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.navGradient}>
+                  <Text style={styles.navTextPrimary}>{loading ? 'Processing...' : step === 5 ? 'Complete' : 'Next'}</Text>
+                  {step < 5 && <Ionicons name="arrow-forward" size={20} color={COLORS.white} />}
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
-        )}
 
-        {/* Date Picker */}
-        {showDatePicker && Platform.OS !== 'web' && (
-          <DateTimePicker
-            value={formData.date}
-            mode="date"
-            display="default"
-            accentColor={COLORS.accent}
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) {
-                handleInputChange('date', selectedDate);
-              }
-            }}
-            minimumDate={new Date(1900, 0, 1)}
-            maximumDate={new Date()}
-          />
-        )}
+            {/* Date Picker */}
+            {showDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.date}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) handleInputChange('date', selectedDate);
+                }}
+                maximumDate={new Date()}
+              />
+            )}
 
-        {/* Time Picker */}
-        {showTimePicker && Platform.OS !== 'web' && (
-          <DateTimePicker
-            value={formData.time}
-            mode="time"
-            display="default"
-            accentColor={COLORS.accent}
-            onChange={(event, selectedTime) => {
-              setShowTimePicker(false);
-              if (selectedTime) {
-                handleInputChange('time', selectedTime);
-              }
-            }}
-          />
-        )}
+            {/* Time Picker */}
+            {showTimePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.time}
+                mode="time"
+                display="default"
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(false);
+                  if (selectedTime) handleInputChange('time', selectedTime);
+                }}
+              />
+            )}
 
+            {/* Confetti */}
+            {showConfetti && confettiAnims.map((anim, index) => (
+              <Animated.View
+                key={index}
+                style={[
+                  styles.confetti,
+                  {
+                    transform: [
+                      { translateX: anim.x },
+                      { translateY: anim.y },
+                      { rotate: anim.rotate.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] }) }
+                    ],
+                    opacity: anim.opacity,
+                  },
+                ]}
+              >
+                <Text style={styles.confettiText}>{['🎉', '✨', '⭐', '🌟', '💫'][index % 5]}</Text>
+              </Animated.View>
+            ))}
 
-
-
-
-        </KeyboardAvoidingView>
-      </View>
-    </LinearGradient>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    height: Platform.OS === 'web' ? '100vh' : undefined,
-  },
-  safeArea: {
-    flex: 1,
-    height: Platform.OS === 'web' ? '100%' : undefined,
-    paddingTop: 0,
-  },
-  keyboardAvoid: {
-    flex: 1,
-    height: Platform.OS === 'web' ? '100%' : undefined,
-    paddingTop: 0,
-  },
-  tabNavigation: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    margin: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  activeTab: {
-    backgroundColor: COLORS.accent,
-  },
-  tabText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: COLORS.white,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  formContainer: {
-    padding: 20,
-    backgroundColor: COLORS.surface,
-    margin: 15,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dateTimeButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    borderRadius: 8,
-    padding: 12,
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  safeArea: { flex: 1 },
+  keyboardAvoid: { flex: 1 },
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  dateTimeText: {
-    fontSize: 16,
-    color: COLORS.textPrimary,
-  },
-  dateTimeIcon: {
-    fontSize: 16,
-  },
-  genderButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  genderButton: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    borderRadius: 8,
-    padding: 12,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  genderButtonSelected: {
-    backgroundColor: COLORS.accent,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  genderButtonText: {
-    fontSize: 16,
-    color: COLORS.textPrimary,
-  },
-  genderButtonTextSelected: {
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: COLORS.white,
   },
-
-  suggestionsList: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    borderRadius: 8,
-    marginTop: 5,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  placeholder: { width: 40 },
+  progressContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
-  suggestionItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 107, 53, 0.2)',
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
   },
-  suggestionText: {
-    fontSize: 14,
-    color: COLORS.textPrimary,
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
   },
-  submitButton: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 8,
-    padding: 15,
+  progressGradient: {
+    flex: 1,
+  },
+  progressText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  scrollView: { flex: 1 },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  stepContainer: {
     alignItems: 'center',
-    marginTop: 15,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 24,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  stepIcon: {
+    fontSize: 48,
+  },
+  stepTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 40,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  inputContainer: {
+    width: '100%',
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 16,
+    padding: 18,
+    fontSize: 18,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  genderContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+  },
+  genderCard: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
+  genderCardSelected: {
+    shadowColor: '#ff6b35',
+    shadowOpacity: 0.6,
   },
-  cancelButton: {
-    backgroundColor: COLORS.gray,
-    marginTop: 10,
-  },
-  submitButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  savedChartsContainer: {
-    padding: 20,
-  },
-
-  searchInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 15,
-    color: COLORS.textPrimary,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-
-  chartItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
+  genderGradient: {
+    padding: 24,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+  genderIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  genderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  dateTimeContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  dateTimeCard: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 24,
+  },
+  dateTimeGradient: {
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+  dateTimeIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  dateTimeValue: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  zodiacWheel: {
+    alignItems: 'center',
+  },
+  zodiacText: {
+    fontSize: 32,
+    color: 'rgba(255, 255, 255, 0.4)',
+    letterSpacing: 8,
+    marginVertical: 4,
+  },
+  suggestionsList: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    marginTop: 12,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
-    shadowColor: COLORS.accent,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  suggestionItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: COLORS.white,
+  },
+  navigationContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  navButton: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
-  chartInfo: {
+  navButtonFull: {
     flex: 1,
   },
-  chartName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 5,
+  navButtonPrimary: {
+    shadowColor: '#ff6b35',
+    shadowOpacity: 0.6,
   },
-  chartDetails: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 3,
-  },
-  chartCreated: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  chartActions: {
+  navGradient: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  editButton: {
-    backgroundColor: COLORS.accent,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.error,
-  },
-  actionButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    padding: 16,
+    gap: 8,
   },
-  emptyText: {
-    color: COLORS.textSecondary,
+  navText: {
     fontSize: 16,
-  },
-  pickerModal: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  pickerContent: {
-    height: 200,
-    marginBottom: 20,
-  },
-  pickerDone: {
-    backgroundColor: COLORS.accent,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  pickerDoneText: {
+    fontWeight: '600',
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+  },
+  navTextPrimary: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  confetti: {
+    position: 'absolute',
+    top: 0,
+  },
+  confettiText: {
+    fontSize: 24,
   },
 });

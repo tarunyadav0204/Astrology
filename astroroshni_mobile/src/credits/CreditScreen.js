@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,62 @@ import {
   Alert,
   FlatList,
   RefreshControl,
+  ScrollView,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../utils/constants';
 import { useCredits } from './CreditContext';
 import { creditAPI } from './creditService';
 
-const CreditScreen = () => {
+const { width } = Dimensions.get('window');
+
+const CreditScreen = ({ navigation }) => {
   const { credits, loading, redeemCode, fetchBalance } = useCredits();
   const [promoCode, setPromoCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     fetchHistory();
+    
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Pulse animation for credit balance
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
   const fetchHistory = async () => {
@@ -78,72 +120,175 @@ const CreditScreen = () => {
     setRefreshing(false);
   };
 
+
   const renderTransaction = ({ item }) => (
     <View style={styles.transactionItem}>
-      <View style={styles.transactionHeader}>
-        <Text style={[
-          styles.transactionType,
-          { color: item.type === 'earned' ? COLORS.success : COLORS.error }
-        ]}>
-          {item.type === 'earned' ? '+' : '-'}{Math.abs(item.amount)} credits
-        </Text>
-        <Text style={styles.transactionDate}>
-          {new Date(item.date).toLocaleDateString()}
-        </Text>
+      <View style={styles.transactionIcon}>
+        <Ionicons 
+          name={item.type === 'earned' ? 'add-circle' : 'remove-circle'} 
+          size={20} 
+          color={item.type === 'earned' ? '#4CAF50' : '#ff6b35'} 
+        />
       </View>
-      <Text style={styles.transactionDescription}>
-        {item.description || item.source}
-      </Text>
-      <Text style={styles.transactionBalance}>
-        Balance: {item.balance_after} credits
-      </Text>
+      <View style={styles.transactionDetails}>
+        <View style={styles.transactionHeader}>
+          <Text style={styles.transactionDescription}>
+            {item.description || item.source}
+          </Text>
+          <Text style={[
+            styles.transactionAmount,
+            { color: item.type === 'earned' ? '#4CAF50' : '#ff6b35' }
+          ]}>
+            {item.type === 'earned' ? '+' : '-'}{Math.abs(item.amount)}
+          </Text>
+        </View>
+        <View style={styles.transactionFooter}>
+          <Text style={styles.transactionDate}>
+            {new Date(item.date).toLocaleDateString()}
+          </Text>
+          <Text style={styles.transactionBalance}>
+            Balance: {item.balance_after}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Credits</Text>
-        <View style={styles.balanceContainer}>
-          <Text style={styles.balanceLabel}>Current Balance</Text>
-          <Text style={styles.balanceAmount}>{credits} credits</Text>
-        </View>
-      </View>
-
-      <View style={styles.redeemSection}>
-        <Text style={styles.sectionTitle}>Redeem Promo Code</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter promo code"
-            value={promoCode}
-            onChangeText={setPromoCode}
-            autoCapitalize="characters"
-          />
-          <TouchableOpacity
-            style={[styles.redeemButton, redeeming && styles.buttonDisabled]}
-            onPress={handleRedeemCode}
-            disabled={redeeming}
+      <LinearGradient
+        colors={['#fafafa', '#f5f5f5']}
+        style={styles.backgroundGradient}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          {/* Header */}
+          <Animated.View 
+            style={[
+              styles.header,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
           >
-            <Text style={styles.buttonText}>
-              {redeeming ? 'Redeeming...' : 'Redeem'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            
+            <View style={styles.headerContent}>
+              <View style={styles.cosmicOrb}>
+                <LinearGradient
+                  colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                  style={styles.orbGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name="diamond" size={32} color="white" />
+                </LinearGradient>
+              </View>
+              
+              <Text style={styles.headerTitle}>Cosmic Credits</Text>
+              <Text style={styles.headerSubtitle}>Fuel your astrological journey</Text>
+            </View>
+          </Animated.View>
 
-      <View style={styles.historySection}>
-        <Text style={styles.sectionTitle}>Transaction History</Text>
-        <FlatList
-          data={history}
-          renderItem={renderTransaction}
-          keyExtractor={(item, index) => index.toString()}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+          {/* Current Balance */}
+          <Animated.View 
+            style={[
+              styles.balanceCard,
+              {
+                opacity: fadeAnim,
+                transform: [{ scale: pulseAnim }]
+              }
+            ]}
+          >
+            <LinearGradient
+              colors={['#ffffff', '#f8f9fa']}
+              style={styles.balanceGradient}
+            >
+              <View style={styles.balanceContent}>
+                <Text style={styles.balanceLabel}>Your Balance</Text>
+                <Text style={styles.balanceAmount}>{credits}</Text>
+                <Text style={styles.balanceCreditsText}>Credits</Text>
+              </View>
+              
+              <View style={styles.balanceDecoration}>
+                <View style={styles.decorationCircle} />
+                <View style={[styles.decorationCircle, styles.decorationCircle2]} />
+                <View style={[styles.decorationCircle, styles.decorationCircle3]} />
+              </View>
+            </LinearGradient>
+          </Animated.View>
+
+          <ScrollView 
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh}
+                tintColor="#ff6b35"
+              />
+            }
+          >
+            {/* Promo Code Section */}
+            <View style={styles.promoSection}>
+              <Text style={styles.sectionTitle}>Have a Promo Code?</Text>
+              <View style={styles.promoCard}>
+                <View style={styles.promoInputContainer}>
+                  <Ionicons name="ticket" size={20} color="#ff6b35" style={styles.promoIcon} />
+                  <TextInput
+                    style={styles.promoInput}
+                    placeholder="Enter promo code"
+                    placeholderTextColor="#999"
+                    value={promoCode}
+                    onChangeText={setPromoCode}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[styles.redeemButton, redeeming && styles.buttonDisabled]}
+                  onPress={handleRedeemCode}
+                  disabled={redeeming}
+                >
+                  <LinearGradient
+                    colors={redeeming ? ['#ccc', '#999'] : ['#ff6b35', '#ff8c5a']}
+                    style={styles.redeemGradient}
+                  >
+                    <Text style={styles.redeemText}>
+                      {redeeming ? 'Redeeming...' : 'Redeem'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Transaction History */}
+            <View style={styles.historySection}>
+              <Text style={styles.sectionTitle}>Transaction History</Text>
+              {history.length > 0 ? (
+                <View style={styles.historyCard}>
+                  {history.map((item, index) => (
+                    <View key={index}>
+                      {renderTransaction({ item })}
+                      {index < history.length - 1 && <View style={styles.transactionDivider} />}
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="receipt-outline" size={48} color="#ccc" />
+                  <Text style={styles.emptyStateText}>No transactions yet</Text>
+                  <Text style={styles.emptyStateSubtext}>Your credit history will appear here</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
     </View>
   );
 };
@@ -151,76 +296,225 @@ const CreditScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    padding: 16,
+  },
+  backgroundGradient: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
   },
   header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 16,
-  },
-  balanceContainer: {
-    backgroundColor: COLORS.surface,
-    padding: 20,
-    borderRadius: 12,
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  cosmicOrb: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  orbGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  balanceCard: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  balanceGradient: {
+    padding: 24,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  balanceContent: {
+    alignItems: 'center',
+    zIndex: 2,
   },
   balanceLabel: {
     fontSize: 16,
-    color: COLORS.textSecondary,
+    color: '#666',
     marginBottom: 8,
+    fontWeight: '500',
   },
   balanceAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#ff6b35',
+    marginBottom: 4,
   },
-  redeemSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
+  balanceCreditsText: {
     fontSize: 18,
+    color: '#999',
     fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 12,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    gap: 12,
+  balanceDecoration: {
+    position: 'absolute',
+    right: -20,
+    top: -20,
+    zIndex: 1,
   },
-  input: {
+  decorationCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+    position: 'absolute',
+  },
+  decorationCircle2: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 107, 53, 0.08)',
+    top: 20,
+    right: 20,
+  },
+  decorationCircle3: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 107, 53, 0.12)',
+    top: 40,
+    right: 40,
+  },
+  scrollView: {
     flex: 1,
-    backgroundColor: COLORS.surface,
-    padding: 12,
-    borderRadius: 8,
+  },
+
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
     fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+
+  promoSection: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  promoCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  promoInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  promoIcon: {
+    marginRight: 12,
+  },
+  promoInput: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#333',
   },
   redeemButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  redeemGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  redeemText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  buttonText: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
   historySection: {
-    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  historyCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   transactionItem: {
-    backgroundColor: COLORS.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
+  },
+  transactionIcon: {
+    marginRight: 16,
+  },
+  transactionDetails: {
+    flex: 1,
   },
   transactionHeader: {
     flexDirection: 'row',
@@ -228,22 +522,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  transactionType: {
+  transactionDescription: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#333',
+    flex: 1,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  transactionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   transactionDate: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  transactionDescription: {
     fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
+    color: '#666',
   },
   transactionBalance: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+    fontSize: 14,
+    color: '#999',
+  },
+  transactionDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 16,
+  },
+  emptyState: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });
 

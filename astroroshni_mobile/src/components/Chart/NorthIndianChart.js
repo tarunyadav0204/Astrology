@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 
-const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) => {
+const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false }) => {
   
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, houseNumber: null, signName: null });
@@ -192,23 +192,48 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
       <Svg viewBox="0 0 400 400" style={styles.svg}>
         <Defs>
           <LinearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="rgba(255, 255, 255, 0.9)" />
-            <Stop offset="50%" stopColor="rgba(248, 250, 252, 0.95)" />
-            <Stop offset="100%" stopColor="rgba(241, 245, 249, 0.9)" />
+            {cosmicTheme ? [
+                <Stop key="0" offset="0%" stopColor="rgba(255, 255, 255, 0.15)" />,
+                <Stop key="50" offset="50%" stopColor="rgba(255, 255, 255, 0.08)" />,
+                <Stop key="100" offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
+              ] : [
+                <Stop key="0" offset="0%" stopColor="rgba(255, 255, 255, 0.9)" />,
+                <Stop key="50" offset="50%" stopColor="rgba(248, 250, 252, 0.95)" />,
+                <Stop key="100" offset="100%" stopColor="rgba(241, 245, 249, 0.9)" />
+              ]}
           </LinearGradient>
         </Defs>
 
         {/* Outer square border */}
         <Rect x="5" y="5" width="390" height="390" 
-              fill="url(#chartGradient)" stroke="#e91e63" strokeWidth="3"/>
+              fill="transparent" 
+              stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#e91e63"} 
+              strokeWidth={cosmicTheme ? "2" : "3"}
+              rx={cosmicTheme ? "16" : "0"}
+              ry={cosmicTheme ? "16" : "0"}/>
+        
+        {cosmicTheme && (
+          <Rect x="5" y="5" width="390" height="390" 
+                fill="none" 
+                stroke="rgba(255, 255, 255, 0.3)" 
+                strokeWidth="1"
+                rx="16"
+                ry="16"/>
+        )}
         
         {/* Inner diamond border */}
         <Polygon points="200,5 395,200 200,395 5,200" 
-                 fill="none" stroke="#ff6f00" strokeWidth="3"/>
+                 fill="none" 
+                 stroke={cosmicTheme ? "rgba(255, 215, 0, 0.8)" : "#ff6f00"} 
+                 strokeWidth={cosmicTheme ? "2" : "3"}/>
         
         {/* Diagonal lines creating 12 houses */}
-        <Line x1="5" y1="5" x2="395" y2="395" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="395" y1="5" x2="5" y2="395" stroke="#ff8a65" strokeWidth="2"/>
+        <Line x1="10" y1="10" x2="390" y2="390" 
+              stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
+              strokeWidth="2"/>
+        <Line x1="390" y1="10" x2="10" y2="390" 
+              stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
+              strokeWidth="2"/>
 
         {/* Houses */}
         {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
@@ -241,7 +266,9 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                    houseNumber === 12 ? houseData.center.y + 20 :
                    houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
                 fontSize="18" 
-                fill={rashiIndex === chartData.houses[0].sign ? "#e91e63" : "#333"} 
+                fill={cosmicTheme ? 
+                  (rashiIndex === chartData.houses[0].sign ? "#ff6b35" : "rgba(255, 255, 255, 0.9)") :
+                  (rashiIndex === chartData.houses[0].sign ? "#e91e63" : "#333")} 
                 fontWeight={rashiIndex === chartData.houses[0].sign ? "900" : "bold"}
                 onPress={() => handleRashiPress(houseNumber, rashiIndex)}>
                 {rashiIndex + 1}
@@ -370,7 +397,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                       x={planetX} 
                       y={planetY - 8} 
                       fontSize={totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14"} 
-                      fill={getPlanetColor(planet)}
+                      fill={cosmicTheme ? "rgba(255, 255, 255, 0.95)" : getPlanetColor(planet)}
                       fontWeight="900"
                       textAnchor="middle"
                       onPress={() => handlePlanetPress(planet)}>
@@ -381,7 +408,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
                         x={planetX} 
                         y={planetY + 8} 
                         fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
-                        fill="#666"
+                        fill={cosmicTheme ? "rgba(255, 255, 255, 0.7)" : "#666"}
                         fontWeight="500"
                         textAnchor="middle"
                         onPress={() => handlePlanetPress(planet)}>
@@ -411,7 +438,6 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
     width: '100%',
     aspectRatio: 1,
   },

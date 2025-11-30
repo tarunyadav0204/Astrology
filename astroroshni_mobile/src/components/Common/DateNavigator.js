@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '../../utils/constants';
 
-const DateNavigator = ({ date, onDateChange }) => {
+const DateNavigator = ({ date, onDateChange, cosmicTheme = false }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const adjustDate = (days) => {
@@ -14,36 +14,127 @@ const DateNavigator = ({ date, onDateChange }) => {
 
   return (
     <View style={styles.dateNav}>
-      <View style={styles.compactNavRow}>
+      <View style={[
+        styles.compactNavRow,
+        cosmicTheme ? {
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.3)',
+        } : {
+          backgroundColor: COLORS.surface,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        }
+      ]}>
         <View style={styles.navButtonGroup}>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(-30)}>
-            <Text style={styles.compactNavText}>-1M</Text>
+          <TouchableOpacity style={[
+            styles.compactNavButton,
+            cosmicTheme ? {
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            } : {
+              backgroundColor: COLORS.lightGray,
+            }
+          ]} onPress={() => adjustDate(-30)}>
+            <Text style={[
+              styles.compactNavText,
+              { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
+            ]}>-1M</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(-7)}>
-            <Text style={styles.compactNavText}>-1W</Text>
+          <TouchableOpacity style={[
+            styles.compactNavButton,
+            cosmicTheme ? {
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            } : {
+              backgroundColor: COLORS.lightGray,
+            }
+          ]} onPress={() => adjustDate(-7)}>
+            <Text style={[
+              styles.compactNavText,
+              { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
+            ]}>-1W</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(-1)}>
-            <Text style={styles.compactNavText}>-1D</Text>
+          <TouchableOpacity style={[
+            styles.compactNavButton,
+            cosmicTheme ? {
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            } : {
+              backgroundColor: COLORS.lightGray,
+            }
+          ]} onPress={() => adjustDate(-1)}>
+            <Text style={[
+              styles.compactNavText,
+              { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
+            ]}>-1D</Text>
           </TouchableOpacity>
         </View>
         
-        <TouchableOpacity style={styles.compactDateButton} onPress={() => onDateChange(new Date())}>
-          <Text style={styles.compactDateText}>{date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</Text>
+        <TouchableOpacity style={[
+          styles.compactDateButton,
+          cosmicTheme ? {
+            backgroundColor: 'rgba(255, 107, 53, 0.8)',
+          } : {
+            backgroundColor: COLORS.accent,
+          }
+        ]} onPress={() => onDateChange(new Date())}>
+          <Text style={[
+            styles.compactDateText,
+            { color: COLORS.white }
+          ]}>{date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.compactCalendarButton} onPress={() => setShowDatePicker(true)}>
+        <TouchableOpacity style={[
+          styles.compactCalendarButton,
+          cosmicTheme ? {
+            backgroundColor: 'rgba(255, 107, 53, 0.8)',
+          } : {
+            backgroundColor: COLORS.accent,
+          }
+        ]} onPress={() => setShowDatePicker(true)}>
           <Text style={styles.calendarIcon}>📅</Text>
         </TouchableOpacity>
         
         <View style={styles.navButtonGroup}>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(1)}>
-            <Text style={styles.compactNavText}>+1D</Text>
+          <TouchableOpacity style={[
+            styles.compactNavButton,
+            cosmicTheme ? {
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            } : {
+              backgroundColor: COLORS.lightGray,
+            }
+          ]} onPress={() => adjustDate(1)}>
+            <Text style={[
+              styles.compactNavText,
+              { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
+            ]}>+1D</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(7)}>
-            <Text style={styles.compactNavText}>+1W</Text>
+          <TouchableOpacity style={[
+            styles.compactNavButton,
+            cosmicTheme ? {
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            } : {
+              backgroundColor: COLORS.lightGray,
+            }
+          ]} onPress={() => adjustDate(7)}>
+            <Text style={[
+              styles.compactNavText,
+              { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
+            ]}>+1W</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(30)}>
-            <Text style={styles.compactNavText}>+1M</Text>
+          <TouchableOpacity style={[
+            styles.compactNavButton,
+            cosmicTheme ? {
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            } : {
+              backgroundColor: COLORS.lightGray,
+            }
+          ]} onPress={() => adjustDate(30)}>
+            <Text style={[
+              styles.compactNavText,
+              { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
+            ]}>+1M</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -89,14 +180,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   navButtonGroup: {
     flexDirection: 'row',
@@ -105,12 +190,10 @@ const styles = StyleSheet.create({
   compactNavButton: {
     paddingHorizontal: 6,
     paddingVertical: 4,
-    backgroundColor: COLORS.lightGray,
     borderRadius: 6,
     minWidth: 28,
   },
   compactNavText: {
-    color: COLORS.accent,
     fontSize: 9,
     fontWeight: '600',
     textAlign: 'center',
@@ -118,7 +201,6 @@ const styles = StyleSheet.create({
   compactDateButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: COLORS.accent,
     borderRadius: 8,
     minWidth: 80,
     height: 32,
@@ -127,12 +209,10 @@ const styles = StyleSheet.create({
   compactDateText: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
   },
   compactCalendarButton: {
     padding: 8,
-    backgroundColor: COLORS.accent,
     borderRadius: 8,
     height: 32,
     width: 32,

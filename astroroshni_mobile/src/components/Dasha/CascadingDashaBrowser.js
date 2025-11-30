@@ -831,7 +831,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   const renderJaiminiTabs = () => {
     return (
-      <>
+      <React.Fragment>
         <View style={styles.jaiminiTabSelector}>
           <TouchableOpacity
             style={[styles.jaiminiTab, jaiminiTab === 'home' && styles.activeJaiminiTab]}
@@ -860,7 +860,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         {jaiminiTab === 'periods' && renderJaiminiPeriodsList()}
         
         {jaiminiTab === 'analysis' && renderJaiminiAnalysis()}
-      </>
+      </React.Fragment>
     );
   };
 
@@ -1045,7 +1045,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     }
 
     return (
-      <>
+      <React.Fragment>
         <View style={styles.jaiminiInfoCard}>
           <Text style={styles.jaiminiInfoTitle}>Jaimini Kalchakra System</Text>
           <Text style={styles.jaiminiInfoText}>Janma Rashi: {jaiminiData.janma_rashi}</Text>
@@ -1251,7 +1251,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         )}
         
 
-      </>
+      </React.Fragment>
     );
   };
 
@@ -1758,7 +1758,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const antarOptions = getDashaOptions('kalchakra_antar');
     
     return (
-      <>
+      <React.Fragment>
         {renderKalchakraViewToggle()}
         
         {kalchakraViewMode === 'wheel' && renderKalchakraWheel()}
@@ -1767,7 +1767,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
         
         {kalchakraViewMode === 'chips' && (
-          <>
+          <React.Fragment>
             <View style={styles.selectorContainer}>
               <Text style={styles.selectorLabel}>BPHS Kalchakra Mahadasha (Sign-Based)</Text>
               <ScrollView 
@@ -1908,9 +1908,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                 </ScrollView>
               </View>
             )}
-          </>
+          </React.Fragment>
         )}
-      </>
+      </React.Fragment>
     );
   };
   
@@ -2080,21 +2080,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           
           <View style={styles.selectorsContainer}>
             {dashaType === 'vimshottari' ? (
-              <>
+              <React.Fragment>
                 {renderDashaSelector('maha', 'Maha Dasha')}
                 {renderDashaSelector('antar', 'Antar Dasha')}
                 {renderDashaSelector('pratyantar', 'Pratyantar Dasha')}
                 {renderDashaSelector('sookshma', 'Sookshma Dasha')}
                 {renderDashaSelector('prana', 'Prana Dasha')}
-              </>
+              </React.Fragment>
             ) : dashaType === 'kalchakra' ? (
-              <>
+              <React.Fragment>
                 {renderKalchakraDashaList()}
-              </>
+              </React.Fragment>
             ) : (
-              <>
+              <React.Fragment>
                 {renderJaiminiTabs()}
-              </>
+              </React.Fragment>
             )}
           </View>
         </ScrollView>

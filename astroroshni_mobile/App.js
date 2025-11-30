@@ -10,7 +10,9 @@ import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
 import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
+import SelectNativeScreen from './src/components/Native/SelectNativeScreen';
 import CreditScreen from './src/credits/CreditScreen';
+import ProfileScreen from './src/components/Profile/ProfileScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 
 const Stack = createStackNavigator();
@@ -57,7 +59,12 @@ export default function App() {
           <Stack.Screen 
             name="BirthForm" 
             component={BirthFormScreen}
-            options={{ title: '👤 Birth Details' }}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="SelectNative" 
+            component={SelectNativeScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen 
             name="ChatHistory" 
@@ -72,7 +79,12 @@ export default function App() {
           <Stack.Screen 
             name="Credits" 
             component={CreditScreen}
-            options={{ title: '💳 Credits' }}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="Profile" 
+            component={ProfileScreen}
+            options={{ headerShown: false }}
           />
         </Stack.Navigator>
         </NavigationContainer>
