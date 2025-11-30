@@ -252,6 +252,8 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         longitude: null,
         timezone: ''
       }));
+      // Clear place error when typing to search
+      setErrors(prev => ({ ...prev, place: '' }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -282,8 +284,9 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       if (error) newErrors[field] = error;
     });
 
-    if (!formData.latitude || !formData.longitude) {
-      newErrors.place = 'Please select a place from suggestions';
+    // Strict validation: coordinates must exist
+    if (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) {
+      newErrors.place = 'You must select a place from the suggestions list to get accurate coordinates';
     }
 
     setErrors(newErrors);
@@ -292,10 +295,30 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('Form submission attempt:', formData);
+    
+    // ABSOLUTE BLOCK: Multiple validation layers
+    const hasValidCoordinates = formData.latitude && 
+                               formData.longitude && 
+                               formData.latitude !== null && 
+                               formData.longitude !== null &&
+                               typeof formData.latitude === 'number' && 
+                               typeof formData.longitude === 'number' &&
+                               !isNaN(formData.latitude) &&
+                               !isNaN(formData.longitude);
+    
+    if (!hasValidCoordinates) {
+      console.log('BLOCKED: No valid coordinates');
+      toast.error('🚫 BLOCKED: You must select a location from the dropdown suggestions!');
+      setErrors(prev => ({ ...prev, place: 'REQUIRED: Must select from suggestions' }));
+      return false;
+    }
     
     if (!validateForm()) {
       toast.error('Please fix the errors in the form');
-      return;
+      return false;
     }
 
     setLoading(true);
@@ -307,6 +330,11 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         loadExistingCharts(searchQuery);
         cancelEdit();
       } else {
+        // FINAL CHECK: Absolutely prevent API call without coordinates
+        if (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) {
+          throw new Error('Coordinates missing - select from suggestions required');
+        }
+        
         const [chartData, yogiData] = await Promise.all([
           apiService.calculateChart(formData),
           apiService.calculateYogi(formData)
@@ -424,7 +452,16 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
               ✓ Form pre-filled from homepage. Please verify and complete the details.
             </div>
           )}
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => {
+            // Additional form-level validation
+            if (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) {
+              e.preventDefault();
+              e.stopPropagation();
+              toast.error('🚫 Form blocked: Select location from suggestions!');
+              return false;
+            }
+            handleSubmit(e);
+          }}>
         <FormField>
           <Label>{FORM_FIELDS.name.label}</Label>
           <Input
@@ -478,18 +515,21 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         </FormField>
 
         <FormField>
-          <Label>{FORM_FIELDS.place.label}</Label>
+          <Label>{FORM_FIELDS.place.label} *</Label>
           <AutocompleteContainer>
             <Input
               type="text"
               name="place"
               value={formData.place}
               onChange={handleInputChange}
-              placeholder={FORM_FIELDS.place.placeholder}
+              placeholder="Type to search and select from suggestions..."
               error={errors.place}
               autoComplete="off"
               onBlur={() => {
                 setTimeout(() => setShowSuggestions(false), 200);
+              }}
+              style={{
+                borderColor: formData.latitude && formData.longitude ? '#4caf50' : (errors.place ? '#f44336' : '#ddd')
               }}
             />
             {showSuggestions && suggestions.length > 0 && (
@@ -504,12 +544,29 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
                 ))}
               </SuggestionList>
             )}
+            {formData.place && (!formData.latitude || formData.latitude === null) && (
+              <div style={{ color: '#f44336', fontSize: '12px', marginTop: '4px', fontWeight: '500' }}>
+                ⚠️ You must select from suggestions - manual entry will not work
+              </div>
+            )}
+            {formData.latitude && formData.longitude && (
+              <div style={{ color: '#4caf50', fontSize: '12px', marginTop: '4px' }}>
+                ✓ Location confirmed: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+              </div>
+            )}
           </AutocompleteContainer>
           {errors.place && <span className="error">{errors.place}</span>}
         </FormField>
 
         <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-          <Button type="submit">
+          <Button 
+            type="submit"
+            disabled={!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null}
+            style={{
+              opacity: (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) ? 0.5 : 1,
+              cursor: (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) ? 'not-allowed' : 'pointer'
+            }}
+          >
             {editingChart ? 'Update Chart' : prefilledData ? 'Generate Marriage Analysis' : 'Calculate Birth Chart'}
           </Button>
           {editingChart && (

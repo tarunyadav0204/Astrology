@@ -64,7 +64,21 @@ export default function LoginScreen({ navigation }) {
   const checkAuthStatus = async () => {
     const token = await storage.getAuthToken();
     if (token) {
-      navigation.navigate('Chat');
+      // Check if user has existing birth details/charts
+      try {
+        const { chartAPI } = require('../../services/api');
+        const response = await chartAPI.getExistingCharts();
+        const hasCharts = response.data.charts && response.data.charts.length > 0;
+        
+        if (hasCharts) {
+          navigation.navigate('SelectNative');
+        } else {
+          navigation.navigate('BirthForm');
+        }
+      } catch (error) {
+        // If API fails, go to birth form
+        navigation.navigate('BirthForm');
+      }
     }
   };
 
@@ -84,7 +98,22 @@ export default function LoginScreen({ navigation }) {
         await storage.setUserData(response.data.user);
         // Refresh credits after successful login
         await refreshCredits();
-        navigation.navigate('Chat');
+        
+        // Check if user has existing charts
+        try {
+          const { chartAPI } = require('../../services/api');
+          const chartResponse = await chartAPI.getExistingCharts();
+          const hasCharts = chartResponse.data.charts && chartResponse.data.charts.length > 0;
+          
+          if (hasCharts) {
+            navigation.navigate('SelectNative');
+          } else {
+            navigation.navigate('BirthForm');
+          }
+        } catch (error) {
+          // If API fails, go to birth form
+          navigation.navigate('BirthForm');
+        }
       } else {
         // For registration, send OTP using registration endpoint
         setRegistrationData({ name, phone, password });
@@ -138,7 +167,8 @@ export default function LoginScreen({ navigation }) {
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
       
-      navigation.navigate('Chat');
+      // After registration, always go to birth form to add first profile
+      navigation.navigate('BirthForm');
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Invalid OTP or registration failed');
     } finally {

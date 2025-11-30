@@ -77,6 +77,7 @@ export default function ChatGreeting({ birthData, onOptionSelect }) {
   }, []);
   
   const place = birthData?.place || `${birthData?.latitude}, ${birthData?.longitude}`;
+  const time = birthData?.time || 'Unknown time';
 
   const options = [
     {
@@ -140,6 +141,9 @@ export default function ChatGreeting({ birthData, onOptionSelect }) {
           <View style={styles.birthInfoCard}>
             <Text style={styles.birthInfoText}>
               📅 {new Date(birthData?.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </Text>
+            <Text style={styles.birthInfoText}>
+              🕐 {time}
             </Text>
             <Text style={styles.birthInfoText}>
               📍 {place}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,20 +6,149 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  Alert,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
+import { chartAPI } from '../../services/api';
+
+const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDelete, getZodiacSign }) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [isRevealed, setIsRevealed] = useState(false);
+
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 50;
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      if (gestureState.dx < 0) {
+        translateX.setValue(Math.max(gestureState.dx, -120));
+      }
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      if (gestureState.dx < -60) {
+        Animated.spring(translateX, {
+          toValue: -120,
+          useNativeDriver: true,
+        }).start();
+        setIsRevealed(true);
+      } else {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+        setIsRevealed(false);
+      }
+    },
+  });
+
+  const closeSwipe = () => {
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+    setIsRevealed(false);
+  };
+
+  return (
+    <View style={styles.profileWrapper}>
+      {isRevealed && (
+        <View style={styles.swipeActions}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.editButton]}
+            onPress={() => { closeSwipe(); onEdit(profile); }}
+          >
+            <Ionicons name="pencil" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => { closeSwipe(); onDelete(profile); }}
+          >
+            <Ionicons name="trash" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
+      )}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[styles.profileCard, { transform: [{ translateX }] }]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.cardTouchable,
+            selectedProfile === profile.name && styles.selectedCard
+          ]}
+          onPress={() => {
+            if (isRevealed) {
+              closeSwipe();
+            } else {
+              onSelect(profile);
+            }
+          }}
+        >
+          <LinearGradient
+            colors={
+              selectedProfile === profile.name
+                ? ['rgba(255, 107, 53, 0.3)', 'rgba(255, 107, 53, 0.1)']
+                : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+            }
+            style={styles.cardGradient}
+          >
+            <View style={styles.profileInfo}>
+              <View style={styles.profileLeft}>
+                <View style={styles.zodiacIcon}>
+                  <Text style={styles.zodiacText}>{getZodiacSign(profile.date)}</Text>
+                </View>
+                <View style={styles.profileDetails}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.profileName}>{profile.name}</Text>
+                    {profile.isSelf && (
+                      <View style={styles.selfBadge}>
+                        <Text style={styles.selfBadgeText}>You</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.profileDate}>
+                    {new Date(profile.date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })} • {profile.time}
+                  </Text>
+                  {profile.place && (
+                    <Text style={styles.profilePlace}>📍 {profile.place}</Text>
+                  )}
+                </View>
+              </View>
+              <View style={styles.profileRight}>
+                {selectedProfile === profile.name ? (
+                  <Ionicons name="checkmark-circle" size={24} color="#ff6b35" />
+                ) : (
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                )}
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+};
 
 export default function SelectNativeScreen({ navigation }) {
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
 
-  useEffect(() => {
-    loadProfiles();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfiles();
+    }, [])
+  );
 
   const loadProfiles = async () => {
     try {
@@ -59,6 +188,7 @@ export default function SelectNativeScreen({ navigation }) {
           latitude: chart.latitude,
           longitude: chart.longitude,
           timezone: chart.timezone,
+          gender: chart.gender,
           isSelf: userData && chart.name === userData.name
         });
       });
@@ -85,10 +215,39 @@ export default function SelectNativeScreen({ navigation }) {
     try {
       await storage.setBirthDetails(profile);
       setSelectedProfile(profile.name);
-      navigation.goBack();
+      navigation.navigate('Chat');
     } catch (error) {
       console.error('Error selecting profile:', error);
     }
+  };
+
+  const handleEdit = (profile) => {
+    navigation.navigate('BirthForm', { editProfile: profile });
+  };
+
+  const handleDelete = (profile) => {
+    Alert.alert(
+      'Delete Profile',
+      `Are you sure you want to delete ${profile.name}'s profile?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (profile.id && profile.id !== 'self') {
+                await chartAPI.deleteChart(profile.id);
+              }
+              await storage.removeBirthProfile(profile.name);
+              loadProfiles();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete profile');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const getZodiacSign = (date) => {
@@ -119,7 +278,7 @@ export default function SelectNativeScreen({ navigation }) {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <TouchableOpacity onPress={() => navigation.navigate('Chat')} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Select Native</Text>
@@ -137,60 +296,18 @@ export default function SelectNativeScreen({ navigation }) {
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.subtitle}>Choose a profile for astrological analysis</Text>
+            <Text style={styles.instructionText}>👈 Swipe left for options</Text>
 
             {profiles.map((profile) => (
-              <TouchableOpacity
+              <SwipeableProfileCard
                 key={profile.id}
-                style={[
-                  styles.profileCard,
-                  selectedProfile === profile.name && styles.selectedCard
-                ]}
-                onPress={() => selectProfile(profile)}
-              >
-                <LinearGradient
-                  colors={
-                    selectedProfile === profile.name
-                      ? ['rgba(255, 107, 53, 0.3)', 'rgba(255, 107, 53, 0.1)']
-                      : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-                  }
-                  style={styles.cardGradient}
-                >
-                  <View style={styles.profileInfo}>
-                    <View style={styles.profileLeft}>
-                      <View style={styles.zodiacIcon}>
-                        <Text style={styles.zodiacText}>{getZodiacSign(profile.date)}</Text>
-                      </View>
-                      <View style={styles.profileDetails}>
-                        <View style={styles.nameRow}>
-                          <Text style={styles.profileName}>{profile.name}</Text>
-                          {profile.isSelf && (
-                            <View style={styles.selfBadge}>
-                              <Text style={styles.selfBadgeText}>You</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.profileDate}>
-                          {new Date(profile.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </Text>
-                        {profile.place && (
-                          <Text style={styles.profilePlace}>📍 {profile.place}</Text>
-                        )}
-                      </View>
-                    </View>
-                    <View style={styles.profileRight}>
-                      {selectedProfile === profile.name ? (
-                        <Ionicons name="checkmark-circle" size={24} color="#ff6b35" />
-                      ) : (
-                        <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
-                      )}
-                    </View>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                profile={profile}
+                selectedProfile={selectedProfile}
+                onSelect={selectProfile}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                getZodiacSign={getZodiacSign}
+              />
             ))}
 
             {profiles.length === 0 && (
@@ -256,12 +373,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
+    marginBottom: 8,
+  },
+  instructionText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
     marginBottom: 24,
+    fontStyle: 'italic',
+  },
+  profileWrapper: {
+    position: 'relative',
+    marginBottom: 16,
   },
   profileCard: {
-    marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  cardTouchable: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  swipeActions: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: -1,
+  },
+  actionButton: {
+    width: 60,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editButton: {
+    backgroundColor: '#4CAF50',
+  },
+  deleteButton: {
+    backgroundColor: '#f44336',
   },
   selectedCard: {
     shadowColor: '#ff6b35',

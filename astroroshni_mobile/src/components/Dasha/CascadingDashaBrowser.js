@@ -164,7 +164,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       setError(null);
       
       const targetDate = transitDate.toISOString().split('T')[0];
-      const token = await AsyncStorage.getItem('authToken');
       
       const formattedBirthData = {
         name: birthData.name,
@@ -176,26 +175,37 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         location: birthData.place || 'Unknown'
       };
       
-      const response = await fetch(`${API_BASE_URL}/api/calculate-cascading-dashas`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          birth_data: formattedBirthData,
-          target_date: targetDate
-        })
-      });
+      console.log('=== VIMSHOTTARI DASHA REQUEST ===');
+      console.log('Original birthData:', birthData);
+      console.log('Formatted birth data:', formattedBirthData);
+      console.log('Target date:', targetDate);
+      console.log('Request payload:', { birth_data: formattedBirthData, target_date: targetDate });
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
+      
+      console.log('Vimshottari response status:', response.status);
+      console.log('Vimshottari response data keys:', Object.keys(response.data));
+      
+      if (response.data.error) {
+        console.log('VIMSHOTTARI BACKEND ERROR:', response.data.error);
+        console.log('VIMSHOTTARI SYSTEM INFO:', response.data.system);
+        setError(`Vimshottari calculation failed: ${response.data.error}`);
+        return;
       }
       
-      const cascadingData = await response.json();
-      setCascadingData(cascadingData);
+      // Check if we have maha_dashas in the response
+      const mahadashas = response.data.maha_dashas || [];
+      if (mahadashas.length === 0) {
+        console.log('WARNING: No Vimshottari maha_dashas received');
+        setError('Vimshottari calculation returned no dasha periods.');
+        return;
+      }
+      
+      console.log('Vimshottari maha dashas count:', mahadashas.length);
+      setCascadingData(response.data);
     } catch (err) {
       console.error('Cascading fetch error:', err);
+      console.error('Error details:', err.response?.data);
       setError('Failed to load cascading dasha data');
     } finally {
       setLoading(false);
@@ -270,6 +280,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       }
       
       const jaiminiData = await response.json();
+      
+      if (jaiminiData.error) {
+        console.log('JAIMINI BACKEND ERROR:', jaiminiData.error);
+        console.log('JAIMINI SYSTEM INFO:', jaiminiData.system);
+        setError(`Jaimini calculation failed: ${jaiminiData.error}`);
+        return;
+      }
+      
+      // Check if we have valid data structure
+      if (!jaiminiData.periods || jaiminiData.periods.length === 0) {
+        console.log('WARNING: No Jaimini periods data received');
+        setError('Jaimini calculation returned no dasha periods. This may be due to a backend calculation error.');
+        return;
+      }
+      
       setJaiminiData(jaiminiData);
       
     } catch (err) {
@@ -319,7 +344,23 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       console.log('Has all_antardashas:', 'all_antardashas' in kalchakraData);
       console.log('All antardashas count:', kalchakraData.all_antardashas?.length || 0);
       console.log('Current antardasha:', kalchakraData.current_antardasha);
+      
+      if (kalchakraData.error) {
+        console.log('BACKEND ERROR:', kalchakraData.error);
+        console.log('SYSTEM INFO:', kalchakraData.system);
+        setError(`Kalchakra calculation failed: ${kalchakraData.error}`);
+        return;
+      }
+      
       console.log('=== END FRONTEND DEBUG ===');
+      
+      // Check if we have valid data structure
+      if (!kalchakraData.mahadashas || kalchakraData.mahadashas.length === 0) {
+        console.log('WARNING: No mahadashas data received');
+        setError('Kalchakra calculation returned no dasha periods. This may be due to a backend calculation error.');
+        return;
+      }
+      
       setKalchakraData(kalchakraData);
       
       // Fetch system info

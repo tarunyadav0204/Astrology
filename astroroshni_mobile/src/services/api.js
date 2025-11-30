@@ -64,6 +64,8 @@ export const chartAPI = {
   calculateCascadingDashas: (birthData, targetDate) => 
     api.post(getEndpoint('/calculate-cascading-dashas'), { birth_data: birthData, target_date: targetDate }),
   calculateDasha: (birthData) => api.post(getEndpoint('/calculate-dasha'), birthData),
+
+
   getExistingCharts: (search = '') => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);

@@ -87,6 +87,7 @@ export default function ChatScreen({ navigation }) {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const drawerAnim = useRef(new Animated.Value(300)).current;
+  const menuScrollViewRef = useRef(null);
   const [showChart, setShowChart] = useState(false);
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -777,7 +778,12 @@ export default function ChatScreen({ navigation }) {
                     useNativeDriver: true,
                     tension: 65,
                     friction: 11,
-                  }).start();
+                  }).start(() => {
+                    // Reset scroll position when menu opens
+                    setTimeout(() => {
+                      menuScrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                    }, 100);
+                  });
                 }}
               >
                 <Ionicons name="menu" size={20} color={COLORS.white} />
@@ -1057,9 +1063,11 @@ export default function ChatScreen({ navigation }) {
                 </View>
 
                 <ScrollView 
+                  ref={menuScrollViewRef}
                   style={styles.menuScrollView}
                   contentContainerStyle={styles.menuScrollContent}
                   showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled={true}
                 >
                   <TouchableOpacity
                     style={styles.menuOption}
@@ -1271,36 +1279,7 @@ export default function ChatScreen({ navigation }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.menuOption}
-                    onPress={() => {
-                      Animated.timing(drawerAnim, {
-                        toValue: 300,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => {
-                        setShowMenu(false);
-                        setShowGreeting(true);
-                        setMessages([]);
-                      });
-                    }}
-                  >
-                    <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
-                    >
-                      <View style={styles.menuIconContainer}>
-                        <LinearGradient
-                          colors={['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
-                        >
-                          <Text style={styles.menuEmoji}>🏠</Text>
-                        </LinearGradient>
-                      </View>
-                      <Text style={styles.menuText}>Back to Home</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
-                    </LinearGradient>
-                  </TouchableOpacity>
+
 
                   <TouchableOpacity
                     style={[styles.menuOption, styles.menuOptionLast]}
@@ -1862,11 +1841,11 @@ const styles = StyleSheet.create({
   },
   drawerGradient: {
     flex: 1,
-    paddingTop: 60,
   },
   drawerHeader: {
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingTop: 60,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
@@ -1910,13 +1889,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   menuScrollView: {
-    flex: 1,
-    maxHeight: '80%',
+    height: 450,
   },
   menuScrollContent: {
     padding: 20,
-    paddingBottom: 40,
-    flexGrow: 1,
   },
   modalTitle: {
     fontSize: 22,

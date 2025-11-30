@@ -22,17 +22,18 @@ import { COLORS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
-export default function BirthFormScreen({ navigation }) {
+export default function BirthFormScreen({ navigation, route }) {
+  const editProfile = route?.params?.editProfile;
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    name: '',
-    date: new Date(),
-    time: new Date(),
-    place: '',
-    latitude: null,
-    longitude: null,
-    timezone: 'Asia/Kolkata',
-    gender: '',
+    name: editProfile?.name || '',
+    date: editProfile?.date ? new Date(editProfile.date) : new Date(),
+    time: editProfile?.time ? new Date(`2000-01-01T${editProfile.time}`) : new Date(),
+    place: editProfile?.place || '',
+    latitude: editProfile?.latitude || null,
+    longitude: editProfile?.longitude || null,
+    timezone: editProfile?.timezone || 'Asia/Kolkata',
+    gender: editProfile?.gender?.trim() || '',
   });
   
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -198,9 +199,16 @@ export default function BirthFormScreen({ navigation }) {
       shakeAnimation();
       return false;
     }
-    if (step === 5 && !formData.place.trim()) {
-      shakeAnimation();
-      return false;
+    if (step === 5) {
+      if (!formData.place.trim()) {
+        shakeAnimation();
+        return false;
+      }
+      if (!formData.latitude || !formData.longitude) {
+        Alert.alert('Invalid Location', 'Please select a location from the suggestions to ensure accurate calculations.');
+        shakeAnimation();
+        return false;
+      }
     }
     return true;
   };
@@ -217,6 +225,13 @@ export default function BirthFormScreen({ navigation }) {
   };
 
   const handleSubmit = async () => {
+    // Final validation before submission
+    if (!formData.latitude || !formData.longitude) {
+      Alert.alert('Invalid Location', 'Please select a location from the suggestions.');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       const birthData = {
@@ -224,14 +239,14 @@ export default function BirthFormScreen({ navigation }) {
         date: formData.date.toISOString().split('T')[0],
         time: formData.time.toTimeString().split(' ')[0],
         place: formData.place,
-        latitude: formData.latitude || 0,
-        longitude: formData.longitude || 0,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         timezone: formData.timezone,
         gender: formData.gender,
       };
 
       const [chartData, yogiData] = await Promise.all([
-        chartAPI.calculateChartOnly(birthData),
+        chartAPI.calculateChart(birthData),
         chartAPI.calculateYogi(birthData)
       ]);
 
@@ -289,7 +304,7 @@ export default function BirthFormScreen({ navigation }) {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <Ionicons name="person" size={20} color="#ff6b35" />
-                <Text style={styles.headerTitle}>Birth Details</Text>
+                <Text style={styles.headerTitle}>{editProfile ? 'Edit Profile' : 'Birth Details'}</Text>
               </View>
               <View style={styles.placeholder} />
             </View>
@@ -392,26 +407,28 @@ export default function BirthFormScreen({ navigation }) {
 
                 {step === 5 && (
                   <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      value={formData.place}
-                      onChangeText={(value) => handleInputChange('place', value)}
-                      placeholder="City, State, Country"
-                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                    />
-                    {showSuggestions && suggestions.length > 0 && (
-                      <View style={styles.suggestionsList}>
-                        {suggestions.slice(0, 3).map(suggestion => (
-                          <TouchableOpacity
-                            key={suggestion.id}
-                            style={styles.suggestionItem}
-                            onPress={() => handlePlaceSelect(suggestion)}
-                          >
-                            <Text style={styles.suggestionText} numberOfLines={1}>📍 {suggestion.name}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
+                    <View style={styles.locationInputWrapper}>
+                      <TextInput
+                        style={styles.input}
+                        value={formData.place}
+                        onChangeText={(value) => handleInputChange('place', value)}
+                        placeholder="City, State, Country"
+                        placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      />
+                      {showSuggestions && suggestions.length > 0 && (
+                        <View style={styles.suggestionsList}>
+                          {suggestions.slice(0, 3).map(suggestion => (
+                            <TouchableOpacity
+                              key={suggestion.id}
+                              style={styles.suggestionItem}
+                              onPress={() => handlePlaceSelect(suggestion)}
+                            >
+                              <Text style={styles.suggestionText} numberOfLines={1}>📍 {suggestion.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 )}
 
@@ -506,7 +523,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -587,6 +603,10 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     width: '100%',
+  },
+  locationInputWrapper: {
+    position: 'relative',
+    zIndex: 1000,
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -674,12 +694,23 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   suggestionsList: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(30, 30, 30, 0.95)',
     borderRadius: 12,
-    marginTop: 12,
+    marginBottom: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 1001,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   suggestionItem: {
     padding: 16,

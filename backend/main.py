@@ -1156,6 +1156,10 @@ async def calculate_chart_only(birth_data: BirthData, node_type: str = 'mean', c
 
 @app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
+    # CRITICAL: Validate coordinates before saving
+    if not birth_data.latitude or not birth_data.longitude:
+        raise HTTPException(status_code=400, detail="Valid coordinates required. Please select location from suggestions.")
+    
     # Store birth data in database (update if exists)
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()

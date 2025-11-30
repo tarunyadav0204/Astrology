@@ -73,7 +73,22 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
       
       if (response.ok) {
         const data = await response.json();
+        
+        if (data.error) {
+          console.log('JAIMINI HOME BACKEND ERROR:', data.error);
+          console.log('JAIMINI HOME SYSTEM INFO:', data.system);
+          return;
+        }
+        
+        // Check if we have valid data structure
+        if (!data.periods || data.periods.length === 0) {
+          console.log('WARNING: No Jaimini periods data received in home component');
+          return;
+        }
+        
         setDashadata(data);
+      } else {
+        console.log('Response not OK:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to load Jaimini data:', error);
