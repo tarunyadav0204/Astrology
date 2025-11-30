@@ -186,9 +186,9 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     setDots('');
     
     const timeoutId = setTimeout(() => {
-      setError('Analysis timed out. Please try again.');
+      setError('Analysis is taking longer than expected. The AI service may be processing a complex chart. Please wait or try again.');
       setLoading(false);
-    }, 300000);
+    }, 300000); // Back to 5 minutes for complex analysis
     
     try {
       const requestBody = {
@@ -205,7 +205,7 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
       };
       
       const controller = new AbortController();
-      const timeoutSignal = setTimeout(() => controller.abort(), 300000);
+      const timeoutSignal = setTimeout(() => controller.abort(), 300000); // Back to 5 minutes
       
       const token = localStorage.getItem('token');
       const response = await fetch('/api/health/analyze', {
@@ -238,9 +238,9 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
       let streamTimeout = setTimeout(() => {
         if (!hasReceivedFinalMessage) {
           reader.cancel();
-          throw new Error('Stream timeout - no response received');
+          throw new Error('Stream timeout - AI analysis is taking longer than expected. This may be due to complex chart calculations. Please try again.');
         }
-      }, 240000);
+      }, 240000); // Back to 4 minutes for stream
       
       while (true) {
         const { done, value } = await reader.read();
@@ -290,7 +290,18 @@ const AIInsightsTab = ({ chartData, birthDetails }) => {
     } catch (error) {
       console.error('Error loading AI insights:', error);
       clearTimeout(timeoutId);
-      setError(error.message || 'Failed to load analysis');
+      
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Failed to load analysis';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Analysis was cancelled due to timeout. The AI service may be overloaded. Please try again in a few minutes.';
+      } else if (errorMessage.includes('Stream ended without final result')) {
+        errorMessage = 'The AI analysis was interrupted. This can happen with complex charts. Please try again.';
+      } else if (errorMessage.includes('timeout')) {
+        errorMessage = 'Analysis timed out due to complex calculations. Please try again - some charts require multiple attempts.';
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };

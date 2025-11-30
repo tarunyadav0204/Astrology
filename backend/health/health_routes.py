@@ -72,52 +72,45 @@ async def analyze_health(request: HealthAnalysisRequest, current_user: User = De
             
             # Health-specific AI question with advanced data utilization
             health_question = """
-As an expert Vedic astrologer, analyze the birth chart for **Health and Wellness**.
+You are an expert Vedic astrologer. Analyze the birth chart for Health and Wellness.
 
-CRITICAL DATA UTILIZATION INSTRUCTIONS:
-1. **Badhaka Analysis**: Check 'badhaka_analysis' in context. If the Badhaka Lord is active or afflicted, identify "hard-to-diagnose" or "karmic" issues.
-2. **Mrityu Bhaga**: Check 'mrityu_bhaga_analysis'. If any planet is in these fatal degrees, flag the corresponding organ/system as "High Risk".
-3. **D-30 (Trimsamsa)**: Use 'health_charts.d30_analysis' to determine if an ailment is "Curable" or "Chronic/Serious".
-4. **Functional Nature**: Differentiate between 'Natural Malefics' and 'Functional Malefics' using the 'functional_nature' data.
-5. **Body Parts Analysis**: Use 'body_parts_analysis' to correlate House (Location) with Sign (Nature of ailment).
+IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra fields or change field names.
 
-CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
-Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
 {
-  "quick_answer": "Summary of constitution (Prakriti) and primary health risks based on Ascendant and strongest planet.",
+  "quick_answer": "Brief health summary based on chart analysis",
   "detailed_analysis": [
     {
       "question": "What are my primary health vulnerabilities?",
-      "answer": "Analyze 6th/8th lord. **CRITICAL:** Mention if any planet is in **Mrityu Bhaga** (Fatal Degree) or is a **Badhaka** (Tormentor). Specify body parts using 'body_parts_analysis' data.",
-      "key_points": ["Vulnerability 1", "Vulnerability 2"],
-      "astrological_basis": "Explain planetary positions (e.g., 'Sun in Mrityu Bhaga affects heart')"
+      "answer": "Detailed analysis of 6th/8th house, lords, and afflictions",
+      "key_points": ["Point 1", "Point 2"],
+      "astrological_basis": "Planetary positions and aspects"
     },
     {
       "question": "When should I be extra cautious about health?",
-      "answer": "Identify Dasha periods of Maraka (2nd/7th) or 6th Lords. Check 'health_timing' data for vulnerable periods."
+      "answer": "Timing analysis based on dashas and transits",
+      "key_points": ["Period 1", "Period 2"],
+      "astrological_basis": "Dasha periods and planetary transits"
     },
     {
-      "question": "What body parts or systems need special attention?",
-      "answer": "Use 'body_parts_analysis' data. Correlate House (Location) with Sign (Nature of ailment). Highlight any Mrityu Bhaga connections."
-    },
-    {
-      "question": "Is there a risk of chronic or 'mystery' illnesses?",
-      "answer": "Analyze **Badhaka Lord** and **Saturn**. If Badhaka is active, mention 'undiagnosable issues'. Check **D-30 analysis** for severity (Curable vs Chronic)."
+      "question": "What body parts need special attention?",
+      "answer": "Body parts analysis based on houses and signs",
+      "key_points": ["Body part 1", "Body part 2"],
+      "astrological_basis": "House and sign correlations"
     },
     {
       "question": "How is my mental and emotional health?",
-      "answer": "Analyze Moon, Mercury, and 4th house. Check if Moon is in Mrityu Bhaga or afflicted by Badhaka."
-    },
-    {
-      "question": "What is my immunity and vitality level?",
-      "answer": "Analyze Ascendant lord, Sun, and Mars. Use 'vitality_analysis' data and check for Mrityu Bhaga afflictions."
+      "answer": "Moon, Mercury, and 4th house analysis",
+      "key_points": ["Mental aspect 1", "Mental aspect 2"],
+      "astrological_basis": "Moon and Mercury positions"
     },
     {
       "question": "What remedies can improve my health?",
-      "answer": "Suggest practical remedies. If Badhaka is involved, suggest spiritual/karmic remedies. Use 'remedial_measures' data."
+      "answer": "Practical remedies and suggestions",
+      "key_points": ["Remedy 1", "Remedy 2"],
+      "astrological_basis": "Planetary strengthening methods"
     }
   ],
-  "final_thoughts": "Positive summary emphasizing prevention and wellness path.",
+  "final_thoughts": "Positive health outlook and guidance",
   "follow_up_questions": [
     "🏥 How to improve my immunity?",
     "🧘 Best yoga/exercise for my body type?",
@@ -126,23 +119,69 @@ Start your response with { and end with }. Use markdown ** for bold text within 
   ]
 }
 
-CRITICAL: Your entire response must be valid JSON starting with { and ending with }.
-Do NOT include any text before or after the JSON object.
-Do NOT use HTML div tags or HTML formatting.
-Use <br> for line breaks within JSON strings.
-Escape quotes properly: \"text\"
-DISCLAIMER: Always mention this is astrological guidance, not medical advice
+CRITICAL RULES:
+1. Response must be ONLY valid JSON - no extra text
+2. Use EXACTLY the field names shown above
+3. Include exactly 5 questions in detailed_analysis array
+4. Always mention this is astrological guidance, not medical advice
+5. Use ** for bold text in JSON strings
 """
             
-            # Generate AI response
+            # Generate AI response with retry logic
             gemini_analyzer = GeminiChatAnalyzer()
-            ai_result = await gemini_analyzer.generate_chat_response(
-                health_question, 
-                context, 
-                [], 
-                request.language, 
-                request.response_style
-            )
+            
+            # Try up to 3 times with increasing timeouts
+            max_retries = 3
+            ai_result = None
+            
+            for attempt in range(max_retries):
+                try:
+                    print(f"🔄 Gemini API attempt {attempt + 1}/{max_retries}")
+                    
+                    # Send progress update to frontend
+                    if attempt > 0:
+                        progress_msg = f"Retrying analysis (attempt {attempt + 1}/{max_retries})..."
+                        yield f"data: {json.dumps({'status': 'processing', 'message': progress_msg})}\n\n"
+                    
+                    # Add timeout to the analyzer call
+                    ai_result = await asyncio.wait_for(
+                        gemini_analyzer.generate_chat_response(
+                            health_question, 
+                            context, 
+                            [], 
+                            request.language, 
+                            request.response_style
+                        ),
+                        timeout=180.0 + (attempt * 60)  # 3, 4, 5 minute timeouts
+                    )
+                    
+                    if ai_result and ai_result.get('success'):
+                        print(f"✅ Gemini API succeeded on attempt {attempt + 1}")
+                        break
+                    else:
+                        print(f"⚠️ Gemini API returned unsuccessful result on attempt {attempt + 1}")
+                        if attempt == max_retries - 1:
+                            raise Exception("Gemini API returned unsuccessful result after all retries")
+                        
+                except asyncio.TimeoutError:
+                    print(f"⏰ Gemini API timeout on attempt {attempt + 1}")
+                    if attempt == max_retries - 1:
+                        raise Exception("Gemini API timed out after all retry attempts. The analysis is too complex for current processing capacity.")
+                    
+                    # Send timeout message to frontend
+                    timeout_msg = f"Analysis timed out on attempt {attempt + 1}. Retrying with extended timeout..."
+                    yield f"data: {json.dumps({'status': 'processing', 'message': timeout_msg})}\n\n"
+                    await asyncio.sleep(5)  # Wait 5 seconds before retry
+                    
+                except Exception as e:
+                    print(f"❌ Gemini API error on attempt {attempt + 1}: {e}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    
+                    # Send error message to frontend
+                    error_msg = f"Attempt {attempt + 1} failed: {str(e)[:100]}. Retrying..."
+                    yield f"data: {json.dumps({'status': 'processing', 'message': error_msg})}\n\n"
+                    await asyncio.sleep(5)  # Wait 5 seconds before retry
             
             if ai_result['success']:
                 # Parse AI response
