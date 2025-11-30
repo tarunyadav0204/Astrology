@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ export default function ChartScreen({ visible, onClose }) {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
+  const chartWidgetRef = useRef(null);
 
   useEffect(() => {
     if (visible) {
@@ -99,6 +100,7 @@ export default function ChartScreen({ visible, onClose }) {
         ) : chartData && birthData ? (
           <ScrollView style={styles.chartContainer}>
             <ChartWidget 
+              ref={chartWidgetRef}
               chartData={chartData}
               birthData={birthData}
               defaultStyle="north"
@@ -112,12 +114,21 @@ export default function ChartScreen({ visible, onClose }) {
                 </Text>
                 <Text style={styles.chartDetails}>{birthData.place}</Text>
                 
-                <TouchableOpacity 
-                  style={styles.dashaBrowserButton}
-                  onPress={() => setShowDashaBrowser(true)}
-                >
-                  <Text style={styles.dashaBrowserButtonText}>⏰ Dasha Browser</Text>
-                </TouchableOpacity>
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => setShowDashaBrowser(true)}
+                  >
+                    <Text style={styles.actionButtonText}>⏰ Dashas</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => chartWidgetRef.current?.navigateToTransit()}
+                  >
+                    <Text style={styles.actionButtonText}>🪐 Transit</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </ScrollView>
@@ -212,21 +223,28 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: 16,
   },
-  dashaBrowserButton: {
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 15,
+  },
+  actionButton: {
     backgroundColor: COLORS.accent,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
-    marginTop: 15,
     shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
+    flex: 1,
+    maxWidth: 160,
   },
-  dashaBrowserButtonText: {
+  actionButtonText: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
   },

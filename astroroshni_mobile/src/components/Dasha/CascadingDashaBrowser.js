@@ -11,13 +11,13 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import JaiminiKalachakraHomeRN from './JaiminiKalachakraHomeRN';
 import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
+import DateNavigator from '../Common/DateNavigator';
 
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
@@ -668,71 +668,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   );
 
   const renderDateNavigation = () => (
-    <View style={styles.dateNav}>
-      <View style={styles.compactNavRow}>
-        <View style={styles.navButtonGroup}>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(-30)}>
-            <Text style={styles.compactNavText}>-1M</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(-7)}>
-            <Text style={styles.compactNavText}>-1W</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(-1)}>
-            <Text style={styles.compactNavText}>-1D</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity style={styles.compactDateButton} onPress={() => setTransitDate(new Date())}>
-          <Text style={styles.compactDateText}>{transitDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.compactCalendarButton} onPress={() => setShowDatePicker(true)}>
-          <Text style={styles.calendarIcon}>📅</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.navButtonGroup}>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(1)}>
-            <Text style={styles.compactNavText}>+1D</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(7)}>
-            <Text style={styles.compactNavText}>+1W</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.compactNavButton} onPress={() => adjustDate(30)}>
-            <Text style={styles.compactNavText}>+1M</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {showDatePicker && (
-        <View>
-          <DateTimePicker
-            value={transitDate}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(event, selectedDate) => {
-              if (Platform.OS === 'android') {
-                setShowDatePicker(false);
-                if (selectedDate) {
-                  setTransitDate(selectedDate);
-                }
-              } else {
-                if (selectedDate) {
-                  setTransitDate(selectedDate);
-                }
-              }
-            }}
-          />
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity 
-              style={styles.doneButton} 
-              onPress={() => setShowDatePicker(false)}
-            >
-              <Text style={styles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-    </View>
+    <DateNavigator date={transitDate} onDateChange={setTransitDate} />
   );
 
 

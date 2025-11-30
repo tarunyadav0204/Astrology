@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,11 @@ import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';
 import NorthIndianChart from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
+import DateNavigator from '../Common/DateNavigator';
 
 const { width } = Dimensions.get('window');
 
-const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'north' }) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaultStyle = 'north' }, ref) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -29,6 +30,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
   const [chartDataCache, setChartDataCache] = useState({ lagna: chartData });
   const [nextChartType, setNextChartType] = useState(null);
   const [prevChartType, setPrevChartType] = useState(null);
+  const [transitDate, setTransitDate] = useState(new Date());
   
   const chartTypes = [
     'lagna', 'navamsa', 'transit', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
@@ -190,9 +192,9 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
     }
   };
 
-  const loadChartData = async (type, setCurrent = true) => {
-    // Use cached data if available
-    if (chartDataCache[type]) {
+  const loadChartData = async (type, setCurrent = true, customDate = null) => {
+    // Use cached data if available (but not for transit with custom date)
+    if (chartDataCache[type] && !(type === 'transit' && customDate)) {
       if (setCurrent) setCurrentChartData(chartDataCache[type]);
       return;
     }
@@ -223,8 +225,9 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
         response = await chartAPI.calculateDivisionalChart(formattedData, chartDivisions[type]);
         data = response.data.divisional_chart;
       } else if (type === 'transit') {
-        const today = new Date().toISOString().split('T')[0];
-        response = await chartAPI.calculateTransits(formattedData, today);
+        const targetDate = customDate || transitDate;
+        const dateStr = targetDate.toISOString().split('T')[0];
+        response = await chartAPI.calculateTransits(formattedData, dateStr);
         data = response.data;
       }
       
@@ -303,6 +306,36 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
       slideAnim.setValue(0);
     });
   };
+  
+  const navigateToTransit = useCallback(() => {
+    setShowSwipeHint(false);
+    setCurrentChartType('transit');
+    
+    // Smooth programmatic transition
+    Animated.timing(slideAnim, {
+      toValue: -1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start(() => {
+      slideAnim.setValue(0);
+    });
+  }, [slideAnim]);
+  
+  // Reload transit chart when date changes
+  useEffect(() => {
+    if (currentChartType === 'transit') {
+      loadChartData('transit', true, transitDate);
+    }
+  }, [transitDate]);
+  
+  const handleTransitDateChange = (newDate) => {
+    setTransitDate(newDate);
+  };
+  
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    navigateToTransit
+  }), [navigateToTransit]);
   
   // Hide swipe hint after 3 seconds
   useEffect(() => {
@@ -386,6 +419,10 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
         </TouchableOpacity>
       </View>
       
+      {currentChartType === 'transit' && (
+        <DateNavigator date={transitDate} onDateChange={handleTransitDateChange} />
+      )}
+      
       <View style={styles.chartContainer}>
         <Animated.View 
           {...panResponder.panHandlers}
@@ -456,7 +493,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, defaultStyle = 'n
         )}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
