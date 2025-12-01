@@ -25,6 +25,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [viewMode, setViewMode] = useState('cards');
   const [showYearModal, setShowYearModal] = useState(false);
+  const yearScrollRef = useRef(null);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -34,10 +35,16 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   useEffect(() => {
     if (visible) {
+      console.log('EventPeriods: Loading for year', selectedYear);
       loadEventPeriods();
       startAnimations();
     }
   }, [visible, selectedYear]);
+
+  // Separate effect for debugging state changes
+  useEffect(() => {
+    console.log('EventPeriods state:', { loading, error, periodsCount: periods.length, selectedYear });
+  }, [loading, error, periods.length, selectedYear]);
 
   const startAnimations = () => {
     fadeAnim.setValue(0);
@@ -101,26 +108,57 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   const loadEventPeriods = async () => {
     try {
+      console.log('EventPeriods: Starting API call for year', selectedYear);
       setLoading(true);
       setError(null);
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/event-periods')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...birthData, selectedYear })
+        body: JSON.stringify({ ...birthData, selectedYear }),
+        signal: controller.signal
       });
       
-      if (!response.ok) throw new Error(`Failed to load event periods: ${response.status}`);
+      clearTimeout(timeoutId);
+      
+      console.log('EventPeriods: API response status', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to load event periods: ${response.status} - ${errorText}`);
+      }
 
       const data = await response.json();
-      const filteredPeriods = (data.periods || [])
-        .filter(period => new Date(period.start_date).getFullYear() === selectedYear)
-        .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+      console.log('EventPeriods: API data received', data);
       
+      const filteredPeriods = (data.periods || [])
+        .filter(period => {
+          try {
+            return new Date(period.start_date).getFullYear() === selectedYear;
+          } catch {
+            return false;
+          }
+        })
+        .sort((a, b) => {
+          try {
+            return new Date(a.start_date) - new Date(b.start_date);
+          } catch {
+            return 0;
+          }
+        });
+      
+      console.log('EventPeriods: Filtered periods count', filteredPeriods.length);
       setPeriods(filteredPeriods);
     } catch (err) {
+      console.error('EventPeriods: Error occurred', err);
       setError(err.message);
+      setPeriods([]);
     } finally {
+      console.log('EventPeriods: Loading complete');
       setLoading(false);
     }
   };
@@ -166,32 +204,63 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
     outputRange: ['0deg', '360deg'],
   });
 
-  if (loading) {
-    return (
-      <Modal visible={visible} animationType="slide">
-        <View style={styles.container}>
-          <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
-            <SafeAreaView style={styles.safeArea}>
-              <View style={styles.loadingContainer}>
-                <Animated.View style={[styles.cosmicOrb, { transform: [{ rotate: spin }] }]}>
-                  <LinearGradient
-                    colors={['#ff6b35', '#ffd700', '#ff6b35']}
-                    style={styles.orbGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <Text style={styles.orbIcon}>🎯</Text>
-                  </LinearGradient>
-                </Animated.View>
-                <Text style={styles.loadingText}>Finding Event Periods</Text>
-                <Text style={styles.loadingSubtext}>Analyzing planetary transits...</Text>
-              </View>
-            </SafeAreaView>
-          </LinearGradient>
+  // Always render the modal structure, show loading inside
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Animated.View style={[styles.cosmicOrb, { transform: [{ rotate: spin }] }]}>
+            <LinearGradient
+              colors={['#ff6b35', '#ffd700', '#ff6b35']}
+              style={styles.orbGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.orbIcon}>🎯</Text>
+            </LinearGradient>
+          </Animated.View>
+          <Text style={styles.loadingText}>Finding Event Periods</Text>
+          <Text style={styles.loadingSubtext}>Analyzing planetary transits for {selectedYear}...</Text>
         </View>
-      </Modal>
+      );
+    }
+
+    if (error) {
+      return (
+        <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyText}>Error loading periods: {error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={loadEventPeriods}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    }
+
+    if (periods.length === 0) {
+      return (
+        <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
+          <Text style={styles.emptyIcon}>🎯</Text>
+          <Text style={styles.emptyText}>No significant periods found for {selectedYear}</Text>
+        </Animated.View>
+      );
+    }
+
+    return (
+      <ScrollView 
+        style={styles.periodsContainer}
+        contentContainerStyle={styles.periodsContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {periods.map((period, index) => (
+          <PeriodCard key={period.id || `${index}-${period.start_date}`} period={period} index={index} />
+        ))}
+      </ScrollView>
     );
-  }
+  };
 
   const PeriodCard = ({ period, index }) => {
     const cardAnim = useRef(new Animated.Value(0)).current;
@@ -353,22 +422,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
             </Animated.View>
 
             {/* Content */}
-            {periods.length === 0 ? (
-              <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
-                <Text style={styles.emptyIcon}>🎯</Text>
-                <Text style={styles.emptyText}>No significant periods found for {selectedYear}</Text>
-              </Animated.View>
-            ) : (
-              <ScrollView 
-                style={styles.periodsContainer}
-                contentContainerStyle={styles.periodsContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {periods.map((period, index) => (
-                  <PeriodCard key={period.id || index} period={period} index={index} />
-                ))}
-              </ScrollView>
-            )}
+            {renderContent()}
 
           </SafeAreaView>
         </LinearGradient>
@@ -383,7 +437,23 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
               style={styles.yearModalGradient}
             >
               <Text style={styles.yearModalTitle}>Select Year</Text>
-              <ScrollView style={styles.yearList} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                ref={yearScrollRef}
+                style={styles.yearList} 
+                showsVerticalScrollIndicator={false}
+                onLayout={() => {
+                  // Auto-scroll to current year when modal opens
+                  const currentIndex = yearOptions.findIndex(year => year === selectedYear);
+                  if (currentIndex !== -1 && yearScrollRef.current) {
+                    setTimeout(() => {
+                      yearScrollRef.current.scrollTo({
+                        y: currentIndex * 56, // 56 is approximate height of yearOption
+                        animated: true
+                      });
+                    }, 100);
+                  }
+                }}
+              >
                 {yearOptions.map(year => (
                   <TouchableOpacity
                     key={year}
@@ -392,8 +462,11 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
                       year === selectedYear && styles.yearOptionSelected
                     ]}
                     onPress={() => {
-                      setSelectedYear(year);
+                      console.log('EventPeriods: Year selected', year);
                       setShowYearModal(false);
+                      if (year !== selectedYear) {
+                        setSelectedYear(year);
+                      }
                     }}
                   >
                     <Text style={[
@@ -631,6 +704,21 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.5)',
+  },
+  retryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
     textAlign: 'center',
   },
   yearModalOverlay: {

@@ -246,6 +246,7 @@ class BirthData(BaseModel):
     timezone: str
     place: str = ""
     gender: str = ""
+    relation: Optional[str] = "other"
     
     class Config:
         # Allow string coercion for timezone field
@@ -265,6 +266,7 @@ class UserCreate(BaseModel):
     name: str
     phone: str
     password: str
+    email: Optional[str] = None
     role: str = "user"
 
 class UserLogin(BaseModel):
@@ -337,9 +339,17 @@ def init_db():
                 phone TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 role TEXT DEFAULT 'user',
+                email TEXT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Add email column if it doesn't exist (backward compatibility)
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN email TEXT NULL')
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         # Create subscription plans table
         cursor.execute('''
@@ -407,11 +417,19 @@ def init_db():
                 timezone TEXT NOT NULL,
                 place TEXT DEFAULT '',
                 gender TEXT DEFAULT '',
+                relation TEXT DEFAULT 'other',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (userid) REFERENCES users (userid),
                 UNIQUE(userid, date, time, latitude, longitude)
             )
         ''')
+        
+        # Add relation column if it doesn't exist (backward compatibility)
+        try:
+            cursor.execute('ALTER TABLE birth_charts ADD COLUMN relation TEXT DEFAULT "other"')
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         # Add place column if it doesn't exist
         try:
@@ -543,6 +561,14 @@ def has_platform_access(userid: int, platform: str, feature: str = None) -> bool
     
     return True
 
+class UserRegistrationWithBirth(BaseModel):
+    name: str
+    phone: str
+    password: str
+    email: str
+    birth_details: Optional[BirthData] = None
+    role: str = "user"
+
 @app.post("/api/register")
 async def register(user_data: UserCreate):
     conn = sqlite3.connect('astrology.db')
@@ -555,12 +581,12 @@ async def register(user_data: UserCreate):
     
     hashed_password = hash_password(user_data.password)
     cursor.execute(
-        "INSERT INTO users (name, phone, password, role) VALUES (?, ?, ?, ?)",
-        (user_data.name, user_data.phone, hashed_password, user_data.role)
+        "INSERT INTO users (name, phone, password, role, email) VALUES (?, ?, ?, ?, ?)",
+        (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email)
     )
     conn.commit()
     
-    cursor.execute("SELECT userid, name, phone, role FROM users WHERE phone = ?", (user_data.phone,))
+    cursor.execute("SELECT userid, name, phone, role, email FROM users WHERE phone = ?", (user_data.phone,))
     user = cursor.fetchone()
     
     # Get free plans for both platforms
@@ -598,20 +624,110 @@ async def register(user_data: UserCreate):
             "userid": user[0], 
             "name": user[1], 
             "phone": user[2], 
-            "role": user[3]
+            "role": user[3],
+            "email": user[4] if len(user) > 4 else None
+        },
+        "self_birth_chart": None  # No birth chart in regular registration
+    }
+
+@app.post("/api/register-with-birth")
+async def register_with_birth(user_data: UserRegistrationWithBirth):
+    """Register user with birth details for mobile app"""
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT phone FROM users WHERE phone = ?", (user_data.phone,))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+    
+    # Create user
+    hashed_password = hash_password(user_data.password)
+    cursor.execute(
+        "INSERT INTO users (name, phone, password, role, email) VALUES (?, ?, ?, ?, ?)",
+        (user_data.name, user_data.phone, hashed_password, user_data.role, user_data.email)
+    )
+    conn.commit()
+    
+    cursor.execute("SELECT userid, name, phone, role, email FROM users WHERE phone = ?", (user_data.phone,))
+    user = cursor.fetchone()
+    
+    # Create birth chart if provided
+    birth_chart_data = None
+    if user_data.birth_details:
+        birth_data = user_data.birth_details
+        cursor.execute('''
+            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+        ''', (user[0], birth_data.name, birth_data.date, birth_data.time, 
+              birth_data.latitude, birth_data.longitude, birth_data.timezone, 
+              birth_data.place or '', birth_data.gender or ''))
+        
+        chart_id = cursor.lastrowid
+        birth_chart_data = {
+            'id': chart_id,
+            'name': birth_data.name,
+            'date': birth_data.date,
+            'time': birth_data.time,
+            'latitude': birth_data.latitude,
+            'longitude': birth_data.longitude,
+            'timezone': birth_data.timezone,
+            'place': birth_data.place or '',
+            'gender': birth_data.gender or '',
+            'relation': 'self'
         }
+    
+    # Get free plans for both platforms
+    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'")
+    astrovishnu_free = cursor.fetchone()
+    cursor.execute("SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'")
+    astroroshni_free = cursor.fetchone()
+    
+    # Give user free access to both platforms
+    from datetime import date, timedelta
+    start_date = date.today()
+    end_date = start_date + timedelta(days=365)  # 1 year free
+    
+    if astrovishnu_free:
+        cursor.execute(
+            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
+            (user[0], astrovishnu_free[0], start_date, end_date)
+        )
+    
+    if astroroshni_free:
+        cursor.execute(
+            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
+            (user[0], astroroshni_free[0], start_date, end_date)
+        )
+    
+    conn.commit()
+    conn.close()
+    
+    access_token = create_access_token(data={"sub": user_data.phone})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "userid": user[0], 
+            "name": user[1], 
+            "phone": user[2], 
+            "role": user[3],
+            "email": user[4] if len(user) > 4 else None
+        },
+        "self_birth_chart": birth_chart_data
     }
 
 @app.post("/api/login")
 async def login(user_data: UserLogin):
+    conn = None
     try:
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT userid, name, phone, password, role FROM users WHERE phone = ?", (user_data.phone,))
+        cursor.execute("SELECT userid, name, phone, password, role, email FROM users WHERE phone = ?", (user_data.phone,))
         user = cursor.fetchone()
         
         if not user:
-            conn.close()
             print(f"User not found for phone: {user_data.phone}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
@@ -621,9 +737,6 @@ async def login(user_data: UserLogin):
             print(f"CRITICAL: Password verification failed for user: {user_data.phone}")
             print(f"Hash: {user[3][:20]}...")
             print(f"Hash format valid: {user[3].startswith('$2b$')}")
-        
-        if not password_valid:
-            conn.close()
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
         # Get user's active subscriptions
@@ -635,7 +748,6 @@ async def login(user_data: UserLogin):
         ''', (user[0],))
         
         subscriptions = cursor.fetchall()
-        conn.close()
         
         # Format subscriptions
         user_subscriptions = {}
@@ -656,6 +768,33 @@ async def login(user_data: UserLogin):
                     'end_date': end_date
                 }
         
+        # Get user's "self" birth chart if exists
+        cursor.execute('''
+            SELECT id, name, date, time, latitude, longitude, timezone, place, gender, relation, created_at
+            FROM birth_charts 
+            WHERE userid = ? AND relation = 'self'
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (user[0],))
+        
+        self_birth_chart = cursor.fetchone()
+        birth_chart_data = None
+        
+        if self_birth_chart:
+            birth_chart_data = {
+                'id': self_birth_chart[0],
+                'name': self_birth_chart[1],
+                'date': self_birth_chart[2],
+                'time': self_birth_chart[3],
+                'latitude': self_birth_chart[4],
+                'longitude': self_birth_chart[5],
+                'timezone': self_birth_chart[6],
+                'place': self_birth_chart[7] or '',
+                'gender': self_birth_chart[8] or '',
+                'relation': self_birth_chart[9] or 'self',
+                'created_at': self_birth_chart[10]
+            }
+        
         access_token = create_access_token(data={"sub": user_data.phone})
         
         return {
@@ -666,8 +805,10 @@ async def login(user_data: UserLogin):
                 "name": user[1], 
                 "phone": user[2], 
                 "role": user[4],
+                "email": user[5] if len(user) > 5 else None,
                 "subscriptions": user_subscriptions
-            }
+            },
+            "self_birth_chart": birth_chart_data
         }
     except HTTPException:
         # Re-raise HTTP exceptions (like 401) without modification
@@ -681,6 +822,9 @@ async def login(user_data: UserLogin):
         }
         print(f"Login error details: {error_details}")
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
 
 @app.get("/api/me")
 async def get_me(current_user: User = Depends(get_current_user)):
@@ -1164,10 +1308,10 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender))
+          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other'))
     conn.commit()
     conn.close()
     
@@ -1449,14 +1593,14 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
         search_pattern = f'%{search.strip()}%'
         print(f"Using search pattern: {search_pattern}")
         cursor.execute('''
-            SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender FROM birth_charts 
+            SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation FROM birth_charts 
             WHERE userid = ? AND name LIKE ? 
             ORDER BY created_at DESC 
             LIMIT ?
         ''', (current_user.userid, search_pattern, limit))
     else:
         print("No search query, returning all charts")
-        cursor.execute('SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
+        cursor.execute('SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
     
     rows = cursor.fetchall()
     print(f"Found {len(rows)} charts")
@@ -1475,7 +1619,8 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
             'timezone': row[7],
             'created_at': row[8],
             'place': row[9] if row[9] else '',
-            'gender': row[10] if row[10] else ''
+            'gender': row[10] if row[10] else '',
+            'relation': row[11] if len(row) > 11 and row[11] else 'other'
         })
     
     return {"charts": charts}
@@ -1486,10 +1631,10 @@ async def update_birth_chart(chart_id: int, birth_data: BirthData):
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE birth_charts 
-        SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?
+        SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation=?
         WHERE id=?
     ''', (birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, chart_id))
+          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other', chart_id))
     conn.commit()
     conn.close()
     return {"message": "Chart updated successfully"}

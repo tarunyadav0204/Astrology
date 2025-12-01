@@ -96,6 +96,41 @@ export default function ChatGreeting({ birthData, onOptionSelect }) {
     }
   ];
 
+  const analysisOptions = [
+    { 
+      id: 'wealth', 
+      title: 'Wealth Analysis', 
+      icon: '💰', 
+      description: 'Financial prospects & opportunities',
+      gradient: ['#FFD700', '#FF8C00'],
+      cost: 5
+    },
+    { 
+      id: 'health', 
+      title: 'Health Analysis', 
+      icon: '🏥', 
+      description: 'Wellness insights & precautions',
+      gradient: ['#32CD32', '#228B22'],
+      cost: 5
+    },
+    { 
+      id: 'marriage', 
+      title: 'Marriage Analysis', 
+      icon: '💕', 
+      description: 'Relationship compatibility & timing',
+      gradient: ['#FF69B4', '#DC143C'],
+      cost: 5
+    },
+    { 
+      id: 'education', 
+      title: 'Education Analysis', 
+      icon: '🎓', 
+      description: 'Learning path & career guidance',
+      gradient: ['#4169E1', '#1E90FF'],
+      cost: 5
+    }
+  ];
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -217,6 +252,73 @@ export default function ChatGreeting({ birthData, onOptionSelect }) {
                       <Text style={styles.optionDescription}>{option.description}</Text>
                     </View>
                     <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.6)" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })}
+        </Animated.View>
+
+        {/* Analysis Options */}
+        <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.analysisTitle}>🔮 Specialized Analysis</Text>
+          {analysisOptions.map((option, index) => {
+            const cardDelay = (index + 3) * 200;
+            const cardAnim = useRef(new Animated.Value(0)).current;
+            
+            useEffect(() => {
+              Animated.sequence([
+                Animated.delay(cardDelay),
+                Animated.spring(cardAnim, {
+                  toValue: 1,
+                  tension: 50,
+                  friction: 7,
+                  useNativeDriver: true,
+                }),
+              ]).start();
+            }, []);
+            
+            return (
+              <Animated.View
+                key={option.id}
+                style={[
+                  styles.analysisCard,
+                  {
+                    opacity: cardAnim,
+                    transform: [
+                      {
+                        translateY: cardAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        }),
+                      },
+                      {
+                        scale: cardAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.9, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
+                  activeOpacity={0.9}
+                >
+                  <LinearGradient
+                    colors={option.gradient}
+                    style={styles.analysisGradient}
+                  >
+                    <View style={styles.analysisIconContainer}>
+                      <Text style={styles.analysisEmoji}>{option.icon}</Text>
+                    </View>
+                    <View style={styles.analysisContent}>
+                      <Text style={styles.analysisCardTitle}>{option.title}</Text>
+                      <Text style={styles.analysisDescription}>{option.description}</Text>
+                      <Text style={styles.analysisCost}>{option.cost} credits</Text>
+                    </View>
+                    <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
                   </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
@@ -389,5 +491,67 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(255, 255, 255, 0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
+  },
+  analysisContainer: {
+    marginBottom: 30,
+  },
+  analysisTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 24,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  analysisCard: {
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  analysisGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  analysisIconContainer: {
+    marginRight: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  analysisEmoji: {
+    fontSize: 28,
+  },
+  analysisContent: {
+    flex: 1,
+  },
+  analysisCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 6,
+  },
+  analysisDescription: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  analysisCost: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
   },
 });

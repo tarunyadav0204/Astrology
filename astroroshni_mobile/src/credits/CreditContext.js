@@ -45,12 +45,33 @@ export const CreditProvider = ({ children }) => {
 
   const redeemCode = async (code) => {
     try {
+      console.log('🔄 CreditContext: Redeeming code:', code);
       const response = await creditAPI.redeemPromoCode(code);
+      console.log('✅ CreditContext: Redeem API response:', response.data);
       await fetchBalance();
       return response.data;
     } catch (error) {
-      console.error('Redeem error:', error.response?.data || error.message);
-      throw error.response?.data || { message: 'Failed to redeem code' };
+      console.error('❌ CreditContext: Redeem error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Handle different error response formats
+      let errorData;
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorData = { message: error.response.data };
+        } else {
+          errorData = error.response.data;
+        }
+      } else {
+        errorData = { message: error.message || 'Failed to redeem code' };
+      }
+      
+      throw errorData;
     }
   };
 

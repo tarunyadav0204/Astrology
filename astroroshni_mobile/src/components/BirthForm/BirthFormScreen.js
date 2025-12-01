@@ -24,9 +24,10 @@ const { width } = Dimensions.get('window');
 
 export default function BirthFormScreen({ navigation, route }) {
   const editProfile = route?.params?.editProfile;
+  const prefillData = route?.params?.prefillData;
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    name: editProfile?.name || '',
+    name: editProfile?.name || prefillData?.name || '',
     date: editProfile?.date ? new Date(editProfile.date) : new Date(),
     time: editProfile?.time ? new Date(`2000-01-01T${editProfile.time}`) : new Date(),
     place: editProfile?.place || '',

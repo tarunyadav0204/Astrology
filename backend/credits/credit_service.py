@@ -190,58 +190,79 @@ class CreditService:
     
     def redeem_promo_code(self, userid: int, code: str) -> Dict:
         """Redeem promo code for credits"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT id, credits, max_uses, used_count, is_active, expires_at 
-            FROM promo_codes WHERE code = ?
-        """, (code,))
-        promo = cursor.fetchone()
-        
-        if not promo:
-            conn.close()
-            return {"success": False, "message": "Invalid promo code"}
-        
-        promo_id, credits, max_uses, used_count, is_active, expires_at = promo
-        
-        if not is_active:
-            conn.close()
-            return {"success": False, "message": "Promo code is inactive"}
-        
-        if expires_at and datetime.now() > datetime.fromisoformat(expires_at):
-            conn.close()
-            return {"success": False, "message": "Promo code has expired"}
-        
-        # Check how many times this user has used this promo code
-        cursor.execute("""
-            SELECT COUNT(*) FROM promo_code_usage WHERE promo_code_id = ? AND userid = ?
-        """, (promo_id, userid))
-        user_usage_count = cursor.fetchone()[0]
-        
-        if user_usage_count >= max_uses:
-            conn.close()
-            return {"success": False, "message": f"You have already used this promo code {max_uses} time(s)"}
-        
-        self.add_credits(userid, credits, 'promo_code', code, f"Promo code: {code}")
-        
-        cursor.execute("""
-            UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?
-        """, (promo_id,))
-        
-        cursor.execute("""
-            INSERT INTO promo_code_usage (promo_code_id, userid, credits_earned)
-            VALUES (?, ?, ?)
-        """, (promo_id, userid, credits))
-        
-        conn.commit()
-        conn.close()
-        
-        return {
-            "success": True, 
-            "message": f"Successfully redeemed {credits} credits!",
-            "credits_earned": credits
-        }
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            conn.execute('BEGIN IMMEDIATE')
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, credits, max_uses, used_count, is_active, expires_at 
+                FROM promo_codes WHERE code = ?
+            """, (code,))
+            promo = cursor.fetchone()
+            
+            if not promo:
+                return {"success": False, "message": "Invalid promo code"}
+            
+            promo_id, credits, max_uses, used_count, is_active, expires_at = promo
+            
+            if not is_active:
+                return {"success": False, "message": "Promo code is inactive"}
+            
+            if expires_at and datetime.now() > datetime.fromisoformat(expires_at):
+                return {"success": False, "message": "Promo code has expired"}
+            
+            # Check how many times this user has used this promo code
+            cursor.execute("""
+                SELECT COUNT(*) FROM promo_code_usage WHERE promo_code_id = ? AND userid = ?
+            """, (promo_id, userid))
+            user_usage_count = cursor.fetchone()[0]
+            
+            if user_usage_count >= max_uses:
+                return {"success": False, "message": f"You have already used this promo code {max_uses} time(s)"}
+            
+            # Record usage first
+            cursor.execute("""
+                INSERT INTO promo_code_usage (promo_code_id, userid, credits_earned)
+                VALUES (?, ?, ?)
+            """, (promo_id, userid, credits))
+            
+            # Update user credits directly in this transaction
+            current_balance = self.get_user_credits(userid)
+            new_balance = current_balance + credits
+            
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_credits (userid, credits, updated_at) 
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            """, (userid, new_balance))
+            
+            cursor.execute("""
+                INSERT INTO credit_transactions 
+                (userid, transaction_type, amount, balance_after, source, reference_id, description)
+                VALUES (?, 'earned', ?, ?, ?, ?, ?)
+            """, (userid, credits, new_balance, 'promo_code', code, f"Promo code: {code}"))
+            
+            # Update promo code usage count
+            cursor.execute("""
+                UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?
+            """, (promo_id,))
+            
+            conn.commit()
+            
+            return {
+                "success": True, 
+                "message": f"Successfully redeemed {credits} credits!",
+                "credits_earned": credits
+            }
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Error in redeem_promo_code: {str(e)}")
+            return {"success": False, "message": "An error occurred while redeeming the promo code"}
+        finally:
+            if conn:
+                conn.close()
     
     def get_credit_setting(self, setting_key: str) -> int:
         """Get credit cost setting"""

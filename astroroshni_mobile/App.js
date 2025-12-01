@@ -5,7 +5,7 @@ import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
-import LoginScreen from './src/components/Auth/LoginScreen';
+import ModernAuthFlow from './src/components/Auth/ModernAuthFlow';
 import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
@@ -13,6 +13,8 @@ import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
 import SelectNativeScreen from './src/components/Native/SelectNativeScreen';
 import CreditScreen from './src/credits/CreditScreen';
 import ProfileScreen from './src/components/Profile/ProfileScreen';
+import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
+import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 
 const Stack = createStackNavigator();
@@ -48,7 +50,7 @@ export default function App() {
           />
           <Stack.Screen 
             name="Login" 
-            component={LoginScreen}
+            component={ModernAuthFlow}
             options={{ headerShown: false }}
           />
           <Stack.Screen 
@@ -84,6 +86,16 @@ export default function App() {
           <Stack.Screen 
             name="Profile" 
             component={ProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AnalysisHub" 
+            component={AnalysisHubScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AnalysisDetail" 
+            component={AnalysisDetailScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

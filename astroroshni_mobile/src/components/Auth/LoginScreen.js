@@ -27,6 +27,7 @@ export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -37,6 +38,18 @@ export default function LoginScreen({ navigation }) {
   const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [registrationData, setRegistrationData] = useState(null);
+  const [showBirthDetailsOption, setShowBirthDetailsOption] = useState(false);
+  const [collectBirthDetails, setCollectBirthDetails] = useState(false);
+  const [birthDetails, setBirthDetails] = useState({
+    name: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '12:00:00',
+    place: '',
+    latitude: null,
+    longitude: null,
+    timezone: 'Asia/Kolkata',
+    gender: ''
+  });
   const [debugInfo, setDebugInfo] = useState('');
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorModalData, setErrorModalData] = useState({ title: '', message: '', actions: [] });
@@ -83,7 +96,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleAuth = async () => {
-    if (!phone || !password || (!isLogin && !name)) {
+    if (!phone || !password || (!isLogin && (!name || !email))) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -99,26 +112,32 @@ export default function LoginScreen({ navigation }) {
         // Refresh credits after successful login
         await refreshCredits();
         
-        // Check if user has existing charts
-        try {
-          const { chartAPI } = require('../../services/api');
-          const chartResponse = await chartAPI.getExistingCharts();
-          const hasCharts = chartResponse.data.charts && chartResponse.data.charts.length > 0;
-          
-          if (hasCharts) {
-            navigation.navigate('SelectNative');
-          } else {
+        // Check if user has self birth chart from login response
+        if (response.data.self_birth_chart) {
+          // User has self birth chart, go directly to main app
+          navigation.navigate('SelectNative');
+        } else {
+          // Check if user has existing charts
+          try {
+            const { chartAPI } = require('../../services/api');
+            const chartResponse = await chartAPI.getExistingCharts();
+            const hasCharts = chartResponse.data.charts && chartResponse.data.charts.length > 0;
+            
+            if (hasCharts) {
+              navigation.navigate('SelectNative');
+            } else {
+              navigation.navigate('BirthForm');
+            }
+          } catch (error) {
+            // If API fails, go to birth form
             navigation.navigate('BirthForm');
           }
-        } catch (error) {
-          // If API fails, go to birth form
-          navigation.navigate('BirthForm');
         }
       } else {
-        // For registration, send OTP using registration endpoint
-        setRegistrationData({ name, phone, password });
-        await authAPI.sendRegistrationOtp({ phone });
-        setShowOtpVerification(true);
+        // For registration, show birth details option first
+        setRegistrationData({ name, phone, password, email });
+        setBirthDetails(prev => ({ ...prev, name }));
+        setShowBirthDetailsOption(true);
       }
     } catch (error) {
       let errorMessage = isLogin ? 'Login failed' : 'Registration failed';
@@ -163,12 +182,29 @@ export default function LoginScreen({ navigation }) {
       await authAPI.verifyResetCode({ phone: registrationData.phone, code: otpCode });
       
       // If OTP is valid, proceed with registration
-      const response = await authAPI.register(registrationData);
+      let response;
+      if (collectBirthDetails && birthDetails.place && birthDetails.latitude && birthDetails.longitude) {
+        // Register with birth details
+        response = await authAPI.registerWithBirth({
+          ...registrationData,
+          birth_details: birthDetails
+        });
+      } else {
+        // Regular registration
+        response = await authAPI.register(registrationData);
+      }
+      
       await storage.setAuthToken(response.data.access_token);
       await storage.setUserData(response.data.user);
       
-      // After registration, always go to birth form to add first profile
-      navigation.navigate('BirthForm');
+      // Navigate based on whether birth details were provided
+      if (response.data.self_birth_chart) {
+        // User has self birth chart, go directly to main app
+        navigation.navigate('SelectNative');
+      } else {
+        // Go to birth form to add first profile
+        navigation.navigate('BirthForm');
+      }
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Invalid OTP or registration failed');
     } finally {
@@ -240,6 +276,115 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  const handleBirthDetailsOption = async (withBirthDetails) => {
+    setCollectBirthDetails(withBirthDetails);
+    setShowBirthDetailsOption(false);
+    
+    // Send OTP for registration
+    try {
+      await authAPI.sendRegistrationOtp({ phone: registrationData.phone });
+      setShowOtpVerification(true);
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to send OTP');
+    }
+  };
+
+  const searchPlaces = async (query) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+        { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
+      );
+      const data = await response.json();
+      return data.map(item => ({
+        id: item.place_id,
+        name: item.display_name,
+        latitude: parseFloat(item.lat),
+        longitude: parseFloat(item.lon),
+        timezone: 'Asia/Kolkata'
+      }));
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const handlePlaceSelect = (place) => {
+    setBirthDetails(prev => ({
+      ...prev,
+      place: place.name,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      timezone: place.timezone
+    }));
+  };
+
+  if (showBirthDetailsOption) {
+    return (
+      <LinearGradient
+        colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+        style={styles.container}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <View style={styles.formContainer}>
+            <View style={styles.logoContainer}>
+              <LinearGradient
+                colors={[COLORS.primary, COLORS.secondary, '#ffb347']}
+                style={styles.logoGradient}
+              >
+                <Text style={styles.logoEmoji}>🎯</Text>
+              </LinearGradient>
+              <Text style={styles.title}>Quick Setup</Text>
+              <Text style={styles.subtitle}>Would you like to add your birth details now for instant chart access?</Text>
+            </View>
+
+            <View style={styles.optionContainer}>
+              <TouchableOpacity
+                style={styles.optionCard}
+                onPress={() => handleBirthDetailsOption(true)}
+              >
+                <LinearGradient
+                  colors={[COLORS.primary, COLORS.secondary]}
+                  style={styles.optionGradient}
+                >
+                  <Text style={styles.optionIcon}>⚡</Text>
+                  <Text style={styles.optionTitle}>Yes, Add Birth Details</Text>
+                  <Text style={styles.optionSubtitle}>Skip the setup later and get instant access to your charts</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.optionCard}
+                onPress={() => handleBirthDetailsOption(false)}
+              >
+                <LinearGradient
+                  colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                  style={styles.optionGradient}
+                >
+                  <Text style={styles.optionIcon}>⏭️</Text>
+                  <Text style={styles.optionTitle}>Skip for Now</Text>
+                  <Text style={styles.optionSubtitle}>Add birth details later when needed</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.switchButton}
+              onPress={() => {
+                setShowBirthDetailsOption(false);
+                setRegistrationData(null);
+              }}
+            >
+              <Text style={styles.switchText}>← Back to Registration</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    );
+  }
+
   if (showOtpVerification) {
     return (
       <LinearGradient
@@ -275,6 +420,71 @@ export default function LoginScreen({ navigation }) {
                   maxLength={6}
                 />
               </View>
+              
+              {collectBirthDetails && (
+                <>
+                  <View style={styles.birthDetailsSection}>
+                    <Text style={styles.sectionTitle}>Birth Details (Optional)</Text>
+                    
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Birth Date (YYYY-MM-DD)"
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={birthDetails.date}
+                        onChangeText={(value) => setBirthDetails(prev => ({ ...prev, date: value }))}
+                      />
+                    </View>
+                    
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="time-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Birth Time (HH:MM:SS)"
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={birthDetails.time}
+                        onChangeText={(value) => setBirthDetails(prev => ({ ...prev, time: value }))}
+                      />
+                    </View>
+                    
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="location-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Birth Place (City, Country)"
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={birthDetails.place}
+                        onChangeText={async (value) => {
+                          setBirthDetails(prev => ({ ...prev, place: value, latitude: null, longitude: null }));
+                          if (value.length >= 3) {
+                            const places = await searchPlaces(value);
+                            if (places.length > 0) {
+                              handlePlaceSelect(places[0]);
+                            }
+                          }
+                        }}
+                      />
+                    </View>
+                    
+                    <View style={styles.genderRow}>
+                      <TouchableOpacity
+                        style={[styles.genderButton, birthDetails.gender === 'Male' && styles.genderButtonSelected]}
+                        onPress={() => setBirthDetails(prev => ({ ...prev, gender: 'Male' }))}
+                      >
+                        <Text style={[styles.genderButtonText, birthDetails.gender === 'Male' && styles.genderButtonTextSelected]}>Male</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.genderButton, birthDetails.gender === 'Female' && styles.genderButtonSelected]}
+                        onPress={() => setBirthDetails(prev => ({ ...prev, gender: 'Female' }))}
+                      >
+                        <Text style={[styles.genderButtonText, birthDetails.gender === 'Female' && styles.genderButtonTextSelected]}>Female</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              )}
+              
               <TouchableOpacity
                 style={[styles.modernButton, loading && styles.buttonDisabled]}
                 onPress={handleOtpVerification}
@@ -296,10 +506,14 @@ export default function LoginScreen({ navigation }) {
               onPress={() => {
                 setShowOtpVerification(false);
                 setOtpCode('');
-                setRegistrationData(null);
+                if (collectBirthDetails) {
+                  setShowBirthDetailsOption(true);
+                } else {
+                  setRegistrationData(null);
+                }
               }}
             >
-              <Text style={styles.switchText}>← Back to Registration</Text>
+              <Text style={styles.switchText}>← Back</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -317,7 +531,12 @@ export default function LoginScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
         >
-          <View style={styles.formContainer}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.formContainer}>
               <View style={styles.logoContainer}>
                 <LinearGradient
                   colors={[COLORS.primary, COLORS.secondary, '#ffb347']}
@@ -427,7 +646,8 @@ export default function LoginScreen({ navigation }) {
               >
                 <Text style={styles.switchText}>← Back to Login</Text>
               </TouchableOpacity>
-          </View>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
     );
@@ -442,16 +662,21 @@ export default function LoginScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <Animated.View 
-          style={[
-            styles.animatedContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.formContainer}>
+          <Animated.View 
+            style={[
+              styles.animatedContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.formContainer}>
               <View style={styles.logoContainer}>
                 <LinearGradient
                   colors={[COLORS.primary, COLORS.secondary, '#ffb347']}
@@ -465,17 +690,32 @@ export default function LoginScreen({ navigation }) {
 
               <View style={styles.inputContainer}>
                 {!isLogin && (
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.modernInput}
-                      placeholder="Full Name"
-                      placeholderTextColor={COLORS.textSecondary}
-                      value={name}
-                      onChangeText={setName}
-                      autoComplete="name"
-                    />
-                  </View>
+                  <>
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Full Name"
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={name}
+                        onChangeText={setName}
+                        autoComplete="name"
+                      />
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.modernInput}
+                        placeholder="Email Address"
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoComplete="email"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </>
                 )}
                 
                 <View style={styles.inputWrapper}>
@@ -566,8 +806,9 @@ export default function LoginScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
               ) : null}
-          </View>
-        </Animated.View>
+            </View>
+          </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
       
       {/* Error Modal */}
@@ -647,12 +888,14 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
   },
   animatedContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    width: '100%',
   },
   glassContainer: {
     borderRadius: 25,
@@ -826,6 +1069,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: '600',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   errorModalContent: {
     backgroundColor: COLORS.surface,
     borderRadius: 20,
@@ -880,5 +1129,84 @@ const styles = StyleSheet.create({
   },
   errorModalButtonTextSecondary: {
     color: COLORS.textPrimary,
+  },
+  optionContainer: {
+    width: '100%',
+    gap: 16,
+    marginBottom: 30,
+  },
+  optionCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  optionGradient: {
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+  },
+  optionIcon: {
+    fontSize: 32,
+    marginBottom: 12,
+  },
+  optionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  optionSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  birthDetailsSection: {
+    width: '100%',
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+  },
+  genderButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.lightGray,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  genderButtonSelected: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  genderButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+  },
+  genderButtonTextSelected: {
+    color: COLORS.white,
   },
 });

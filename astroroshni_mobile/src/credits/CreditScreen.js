@@ -82,14 +82,27 @@ const CreditScreen = ({ navigation }) => {
     }
 
     setRedeeming(true);
+    console.log('🎫 Attempting to redeem code:', promoCode.trim());
+    
     try {
       const result = await redeemCode(promoCode.trim());
-      Alert.alert('Success', result.message);
+      console.log('✅ Redeem success:', result);
+      Alert.alert('Success', result.message || 'Promo code redeemed successfully!');
       setPromoCode('');
       fetchHistory();
     } catch (error) {
-      // Decode HTML entities and get user-friendly message
-      let errorMessage = error.detail || error.message || 'Failed to redeem code';
+      console.error('❌ Redeem code error details:', {
+        error,
+        response: error.response,
+        data: error.response?.data,
+        status: error.response?.status,
+        message: error.message
+      });
+      
+      // Extract error message from different possible sources
+      let errorMessage = error.message || error.detail || 'Failed to redeem code';
+      
+      console.log('📝 Final error message:', errorMessage);
       
       // Decode HTML entities
       errorMessage = errorMessage
@@ -106,6 +119,8 @@ const CreditScreen = ({ navigation }) => {
         errorMessage = 'Invalid promo code. Please check the code and try again.';
       } else if (errorMessage.toLowerCase().includes('expired')) {
         errorMessage = 'This promo code has expired and is no longer valid.';
+      } else if (errorMessage.toLowerCase().includes('internal server error')) {
+        errorMessage = 'Server error occurred. Please try again later.';
       }
       
       Alert.alert('Redemption Failed', errorMessage);

@@ -15,74 +15,7 @@ import { COLORS } from '../../utils/constants';
 
 const { width, height } = Dimensions.get('window');
 
-const FloatingElement = ({ delay = 0, symbol, size = 20, duration = 8000 }) => {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    const animate = () => {
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.parallel([
-          Animated.timing(opacity, {
-            toValue: 0.6,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: -height,
-            duration: duration,
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateX, {
-            toValue: (Math.random() - 0.5) * 100,
-            duration: duration,
-            useNativeDriver: true,
-          }),
-          Animated.timing(rotate, {
-            toValue: 360,
-            duration: duration,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        opacity.setValue(0);
-        translateY.setValue(0);
-        translateX.setValue(0);
-        rotate.setValue(0);
-        animate();
-      });
-    };
-    animate();
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        styles.floatingElement,
-        {
-          opacity,
-          transform: [
-            { translateY },
-            { translateX },
-            { rotate: rotate.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] }) }
-          ],
-          left: Math.random() * width,
-          top: height + Math.random() * 100,
-        },
-      ]}
-    >
-      <Text style={[styles.floatingSymbol, { fontSize: size }]}>{symbol}</Text>
-    </Animated.View>
-  );
-};
 
 const TrustBadge = ({ icon, title, description, delay = 0 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -192,18 +125,18 @@ const WelcomeScreen = ({ navigation }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
   
-  const cosmicElements = ['✨', '🌟', '⭐', '🌙', '☀️', '🪐', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+
   
   const trustBadges = [
     { icon: 'shield-checkmark', title: 'Bank-Level Security', description: 'End-to-end encryption' },
-    { icon: 'target', title: 'NASA-Grade Precision', description: 'Swiss Ephemeris calculations' },
+    { icon: 'telescope', title: 'NASA-Grade Precision', description: 'Swiss Ephemeris calculations' },
     { icon: 'people', title: '10,000+ Happy Users', description: 'Trusted worldwide' },
     { icon: 'ribbon', title: 'Vedic Certified', description: 'Traditional authenticity' },
   ];
   
   const features = [
     { icon: '📊', title: 'Live Birth Charts', description: 'North & South Indian styles with real-time calculations' },
-    { icon: '🧠', title: 'Deepest Analysis Available', description: 'Unmatched astrological depth that no other app provides' },
+    { icon: '🔮', title: 'Life Analysis Suite', description: 'Wealth, Health, Marriage & Education insights' },
     { icon: '⏰', title: 'Real-Time Transits', description: 'Current planetary positions affecting you now' },
     { icon: '💬', title: 'Chat with Cosmos', description: 'Ask anything, get instant astrological guidance' },
   ];
@@ -276,26 +209,14 @@ const WelcomeScreen = ({ navigation }) => {
         end={{ x: 1, y: 1 }}
       />
 
-      {/* Floating Cosmic Elements */}
-      {cosmicElements.map((symbol, i) => (
-        <FloatingElement 
-          key={i} 
-          symbol={symbol} 
-          delay={i * 300} 
-          size={16 + Math.random() * 8}
-          duration={6000 + Math.random() * 4000}
-        />
-      ))}
 
-      <Animated.ScrollView 
+
+      <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}
+        bounces={true}
+        scrollEnabled={true}
       >
         {/* Hero Section */}
         <View style={styles.heroSection}>
@@ -304,14 +225,7 @@ const WelcomeScreen = ({ navigation }) => {
               styles.logoContainer,
               {
                 transform: [
-                  { scale: Animated.multiply(logoScale, pulseAnim) },
-                  {
-                    translateY: scrollY.interpolate({
-                      inputRange: [0, 200],
-                      outputRange: [0, -50],
-                      extrapolate: 'clamp',
-                    })
-                  }
+                  { scale: Animated.multiply(logoScale, pulseAnim) }
                 ],
               },
             ]}
@@ -460,13 +374,26 @@ const WelcomeScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
             
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('AnalysisHub')} 
+              activeOpacity={0.8}
+              style={styles.secondaryButton}
+            >
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                style={styles.secondaryButtonGradient}
+              >
+                <Text style={styles.secondaryButtonText}>🔮 Explore Life Analysis</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
             <View style={styles.ctaSubtext}>
               <Text style={styles.ctaSubtextMain}>Trusted by 10,000+ Users</Text>
               <Text style={styles.ctaSubtextSub}>Free to Start • No Hidden Fees</Text>
             </View>
           </Animated.View>
         </View>
-      </Animated.ScrollView>
+      </ScrollView>
     </View>
   );
 };
@@ -482,18 +409,13 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
+    pointerEvents: 'none',
   },
-  floatingElement: {
-    position: 'absolute',
-  },
-  floatingSymbol: {
-    color: 'rgba(255, 215, 0, 0.6)',
-    textShadowColor: 'rgba(255, 215, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 4,
-  },
+
   scrollView: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   scrollContent: {
     paddingBottom: 40,
@@ -821,6 +743,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '400',
+  },
+  secondaryButton: {
+    marginTop: 16,
+    borderRadius: 25,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  secondaryButtonGradient: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
