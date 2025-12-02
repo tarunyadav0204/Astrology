@@ -190,10 +190,12 @@ class GeminiChatAnalyzer:
             print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
             print(f"Prompt length: {len(prompt)} characters")
             
-            # CALL GEMINI ASYNC DIRECTLY
-            # This bypasses the sync wrapper and uses python's native async timeout
+            # CALL GEMINI ASYNC DIRECTLY with request_options
             response = await asyncio.wait_for(
-                selected_model.generate_content_async(prompt),
+                selected_model.generate_content_async(
+                    prompt,
+                    request_options={'timeout': 600}
+                ),
                 timeout=600.0
             )
             
