@@ -2,6 +2,7 @@ import google.generativeai as genai
 import json
 import os
 import html
+import asyncio
 from typing import Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
@@ -178,44 +179,26 @@ class GeminiChatAnalyzer:
         if moon_nakshatra:
             print(f"🌙 MOON NAKSHATRA: {moon_nakshatra.get('name', 'Unknown')} (cached for future requests)")
         
+        gemini_start_time = time.time()
         try:
-            # Run the synchronous Gemini API call in a thread pool to avoid blocking
-            import asyncio
+            # Select model
+            selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
+            model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
             
-            def _sync_generate_content():
-                try:
-                    # Select model based on premium analysis flag
-                    selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
-                    model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
-                    
-                    api_start_time = time.time()
-                    print(f"\n=== CALLING GEMINI API ===")
-                    print(f"Analysis Type: {model_type}")
-                    print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-                    
-                    # Explicitly set timeout to avoid 60s default limit
-                    response = selected_model.generate_content(
-                        prompt,
-                        request_options={'timeout': 600} 
-                    )
-                    
-                    api_time = time.time() - api_start_time
-                    print(f"⏱️ Gemini API call time: {api_time:.2f}s")
-                    return response
-                except Exception as e:
-                    raise e
-
-            # EXECUTION FIX: Use default executor instead of 'with ThreadPoolExecutor'
-            # This prevents the 'shutdown(wait=True)' block
-            loop = asyncio.get_running_loop()
+            print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+            print(f"Analysis Type: {model_type}")
+            print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+            print(f"Prompt length: {len(prompt)} characters")
             
-            # 600s timeout for the task itself
+            # CALL GEMINI ASYNC DIRECTLY
+            # This bypasses the sync wrapper and uses python's native async timeout
             response = await asyncio.wait_for(
-                loop.run_in_executor(None, _sync_generate_content),
+                selected_model.generate_content_async(prompt),
                 timeout=600.0
             )
             
-            gemini_total_time = time.time() - total_request_start
+            gemini_total_time = time.time() - gemini_start_time
+            print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
             
             if not response or not hasattr(response, 'text') or not response.text:
                 return {
@@ -304,6 +287,19 @@ class GeminiChatAnalyzer:
                     'total_request_time': total_request_time,
                     'prompt_creation_time': prompt_time,
                     'gemini_processing_time': gemini_total_time
+                }
+            }
+        except asyncio.TimeoutError:
+            total_request_time = time.time() - total_request_start
+            print(f"⏰ Gemini API timeout after {total_request_time:.2f}s")
+            return {
+                'success': False,
+                'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
+                'error': 'AI request timeout (600s)',
+                'timing': {
+                    'total_request_time': total_request_time,
+                    'prompt_creation_time': prompt_time,
+                    'gemini_processing_time': 600.0
                 }
             }
         except Exception as e:
