@@ -258,7 +258,7 @@ const WelcomeScreen = ({ navigation }) => {
             </View>
           </Animated.View>
 
-          <Animated.Text style={[styles.appTitle, { opacity: titleOpacity }]}>
+          <Animated.Text style={[styles.appTitle, { opacity: titleOpacity }]} numberOfLines={1} adjustsFontSizeToFit>
             AstroRoshni
           </Animated.Text>
           
@@ -369,7 +369,7 @@ const WelcomeScreen = ({ navigation }) => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.buttonText} numberOfLines={1}>Begin Your Cosmic Journey</Text>
+                <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>Begin Your Cosmic Journey</Text>
                 <Text style={styles.buttonIcon}>✨</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -491,33 +491,39 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   appTitle: {
-    fontSize: 42,
+    fontSize: width < 375 ? 32 : width < 414 ? 38 : 42,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: width < 375 ? 1 : 2,
     textAlign: 'center',
     textShadowColor: 'rgba(255, 215, 0, 0.5)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
     marginBottom: 20,
+    flexShrink: 0,
+    paddingHorizontal: 10,
   },
   taglineContainer: {
     alignItems: 'center',
   },
   tagline: {
-    fontSize: 22,
+    fontSize: width < 375 ? 18 : 22,
     color: '#FFD700',
     textAlign: 'center',
     marginBottom: 12,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: width < 375 ? 0.5 : 1,
+    flexShrink: 0,
+    paddingHorizontal: 10,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: width < 375 ? 14 : 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: width < 375 ? 20 : 24,
     fontWeight: '400',
+    flexShrink: 0,
+    paddingHorizontal: 10,
   },
   sectionTitle: {
     fontSize: 28,
@@ -722,10 +728,11 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: width < 375 ? 16 : 18,
     fontWeight: '700',
     marginRight: 8,
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
   buttonIcon: {
     fontSize: 20,

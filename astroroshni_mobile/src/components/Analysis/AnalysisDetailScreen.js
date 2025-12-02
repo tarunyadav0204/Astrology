@@ -145,14 +145,23 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         ...(token && { 'Authorization': `Bearer ${token}` })
       };
 
-      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/${analysisType}/analyze`)}`, {
+      const fullUrl = `${API_BASE_URL}${getEndpoint(`/${analysisType}/analyze`)}`;
+      console.log('Making request to:', fullUrl);
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
+      
+      const response = await fetch(fullUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody)
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
       if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.status}`);
+        const errorText = await response.text();
+        console.log('Error response body:', errorText);
+        throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
       }
 
       const responseText = await response.text();
@@ -248,9 +257,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
     } catch (error) {
       console.error('Analysis error:', error);
-      console.log('Full response text:', responseText);
-      console.log('Response lines:', lines);
-      console.log('Full content:', fullContent);
+      console.log('Error details:', {
+        message: error.message,
+        status: error.status,
+        analysisType,
+        requestUrl: `${API_BASE_URL}${getEndpoint(`/${analysisType}/analyze`)}`,
+        birthDataKeys: Object.keys(fixedBirthData || {})
+      });
       
       let errorMessage = 'Analysis failed. Please try again.';
       
@@ -262,6 +275,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         errorMessage = 'Storage error. Please restart the app.';
       } else if (error.message?.includes('Empty response')) {
         errorMessage = 'Server returned empty response. Please try again.';
+      } else if (error.message?.includes('Analysis failed: 404')) {
+        errorMessage = 'Analysis service not found. Please contact support.';
+      } else if (error.message?.includes('Analysis failed: 500')) {
+        errorMessage = 'Server error. Please try again later.';
       }
       
       Alert.alert('Error', errorMessage);
@@ -522,45 +539,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     Get comprehensive insights into your {analysisType} prospects with detailed astrological analysis
                   </Text>
                   
-                  {/* Debug buttons */}
-                  <TouchableOpacity
-                    style={styles.debugButton}
-                    onPress={async () => {
-                      const allKeys = await AsyncStorage.getAllKeys();
-                      const analysisKeys = allKeys.filter(k => k.startsWith('analysis_'));
-                      Alert.alert('Debug Info', `Birth data: ${birthData?.name}\nAnalysis keys: ${analysisKeys.join(', ')}\nExpected key: analysis_${analysisType}_${birthData?.name}`);
-                    }}
-                  >
-                    <Text style={styles.debugText}>Debug Storage</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.debugButton, { backgroundColor: 'rgba(0, 255, 0, 0.3)' }]}
-                    onPress={async () => {
-                      const testData = { test: 'data', timestamp: Date.now() };
-                      const key = `analysis_${analysisType}_${birthData?.name}`;
-                      console.log('Test save key:', key);
-                      try {
-                        await AsyncStorage.setItem(key, JSON.stringify(testData));
-                        console.log('Test data saved');
-                        const retrieved = await AsyncStorage.getItem(key);
-                        console.log('Test data retrieved:', retrieved);
-                        
-                        // Check all keys after save
-                        const allKeys = await AsyncStorage.getAllKeys();
-                        const analysisKeys = allKeys.filter(k => k.startsWith('analysis_'));
-                        console.log('All keys after test save:', allKeys);
-                        console.log('Analysis keys after test save:', analysisKeys);
-                        
-                        Alert.alert('Test Save', retrieved ? `Success: ${retrieved}` : 'Failed: Could not retrieve data');
-                      } catch (error) {
-                        console.error('Test save error:', error);
-                        Alert.alert('Test Save Error', error.message);
-                      }
-                    }}
-                  >
-                    <Text style={styles.debugText}>Test Save</Text>
-                  </TouchableOpacity>
+
                 </View>
 
                 <TouchableOpacity
@@ -969,17 +948,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  debugButton: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: 'rgba(255, 0, 0, 0.3)',
-    borderRadius: 8,
-  },
-  debugText: {
-    color: COLORS.white,
-    fontSize: 12,
-    textAlign: 'center',
-  },
+
   modalOverlay: {
     position: 'absolute',
     top: 0,

@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -106,7 +108,10 @@ export default function PhoneInputScreen({
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigateToScreen('welcome', 'back')}
@@ -198,7 +203,7 @@ export default function PhoneInputScreen({
           </Text>
         </Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

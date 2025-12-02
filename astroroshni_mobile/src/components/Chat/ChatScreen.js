@@ -747,17 +747,19 @@ export default function ChatScreen({ navigation }) {
             style={styles.header}
           >
             <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
-                <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.15)']}
-                  style={styles.nameChipGradient}
-                >
-                  <Text style={styles.nameChipIcon}>👤</Text>
-                  <Text style={styles.nameChipText}>{birthData?.name?.slice(0, 6)}{birthData?.name?.length > 6 ? '...' : ''}</Text>
-                  <Text style={styles.nameChipArrow}>▼</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              <View style={styles.headerTitleRow}>
+                <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>🌟 AstroRoshni</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.15)']}
+                    style={styles.nameChipGradient}
+                  >
+                    <Text style={styles.nameChipIcon}>👤</Text>
+                    <Text style={styles.nameChipText} numberOfLines={1}>{birthData?.name?.slice(0, 8)}{birthData?.name?.length > 8 ? '...' : ''}</Text>
+                    <Text style={styles.nameChipArrow}>▼</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={styles.headerButtons}>
               <TouchableOpacity
@@ -1591,15 +1593,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-start',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+  },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.4)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.3,
+    flexShrink: 1,
   },
   nameChip: {
     borderRadius: 16,

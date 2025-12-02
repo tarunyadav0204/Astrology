@@ -116,27 +116,58 @@ For every user query, structure your response exactly as follows:
     
     def __init__(self):
         self.static_cache = {}  # Cache static chart data
+        self.dynamic_cache = {}  # Cache dynamic context data
     
     def build_complete_context(self, birth_data: Dict, user_question: str = "", target_date: Optional[datetime] = None, requested_period: Optional[Dict] = None) -> Dict[str, Any]:
         """Build complete astrological context for chat"""
+        import time
+        import json
+        
+        context_start_time = time.time()
+        print(f"\n⏱️ CONTEXT PREPARATION STARTED")
         
         # Create birth hash for caching
         birth_hash = self._create_birth_hash(birth_data)
         
         # Get static data (cached)
+        static_start_time = time.time()
         if birth_hash not in self.static_cache:
+            print(f"   📊 Building static context (not cached)...")
             self.static_cache[birth_hash] = self._build_static_context(birth_data)
-        
+        else:
+            print(f"   ✅ Using cached static context")
         static_context = self.static_cache[birth_hash]
+        static_time = time.time() - static_start_time
+        print(f"   Static context time: {static_time:.2f}s")
         
-        # Add dynamic data
-        dynamic_context = self._build_dynamic_context(birth_data, user_question, target_date, requested_period)
+        # Dynamic Cache Key (birth_hash + current_date + requested_period)
+        current_date_str = datetime.now().strftime("%Y-%m-%d")
+        period_str = json.dumps(requested_period, sort_keys=True) if requested_period else "none"
+        dynamic_cache_key = f"{birth_hash}_{current_date_str}_{period_str}"
         
-        # Combine contexts
-        return {
+        # Check Dynamic Cache
+        dynamic_start_time = time.time()
+        if dynamic_cache_key not in self.dynamic_cache:
+            print(f"   🔄 Calculating fresh dynamic context...")
+            self.dynamic_cache[dynamic_cache_key] = self._build_dynamic_context(birth_data, user_question, target_date, requested_period)
+        else:
+            print(f"   ✅ Using cached dynamic context")
+        
+        dynamic_context = self.dynamic_cache[dynamic_cache_key]
+        dynamic_time = time.time() - dynamic_start_time
+        print(f"   Dynamic context time: {dynamic_time:.2f}s")
+        
+        total_context_time = time.time() - context_start_time
+        print(f"⏱️ TOTAL CONTEXT PREPARATION TIME: {total_context_time:.2f}s")
+        
+        # Combine contexts and apply minification
+        full_context = {
             **static_context,
             **dynamic_context
         }
+        
+        # Apply minification before returning
+        return self._minify_data(full_context)
     
     def _build_static_context(self, birth_data: Dict) -> Dict[str, Any]:
         """Build static chart context (cached per birth data)"""
@@ -211,10 +242,7 @@ For every user query, structure your response exactly as follows:
                 "formatted": f"{ascendant_sign_name} {ascendant_degree % 30:.2f}°"
             },
             
-            "d1_chart": self._add_sign_names_to_chart_copy(chart_data),
-            
-            # Bhav Chalit chart
-            "bhav_chalit_chart": chart_data.get('bhav_chalit', {})
+            "d1_chart": self._add_sign_names_to_chart_copy(chart_data)
         }
         
         # Calculate divisional charts
@@ -488,17 +516,33 @@ For every user query, structure your response exactly as follows:
         
         # Only calculate transit data if specifically requested by Gemini
         if requested_period:
+            import time
+            transit_start_time = time.time()
+            
             start_year = requested_period.get('start_year', current_year)
             end_year = requested_period.get('end_year', current_year + 2)
             year_range = end_year - start_year
-            print(f"🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
+            print(f"\n🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
+            print(f"⏱️ TRANSIT CALCULATION STARTED")
             
             try:
+                init_start = time.time()
                 print(f"📊 Initializing RealTransitCalculator...")
                 real_calc = RealTransitCalculator()
+                init_time = time.time() - init_start
+                print(f"   Initialization time: {init_time:.2f}s")
+                
+                aspects_start = time.time()
                 print(f"🔍 Finding real aspects for birth data...")
-                aspects = real_calc.find_real_aspects(birth_data)
-                print(f"   Found {len(aspects)} potential aspects")
+                all_aspects = real_calc.find_real_aspects(birth_data)
+                
+                # OPTIMIZATION: Only process major transits (slow-moving planets)
+                major_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu', 'Mars']
+                aspects = [a for a in all_aspects if a['transit_planet'] in major_planets]
+                
+                aspects_time = time.time() - aspects_start
+                print(f"   Found {len(all_aspects)} total aspects, filtered to {len(aspects)} major aspects in {aspects_time:.2f}s")
+                print(f"   Optimization: Skipped fast movers (Sun, Moon, Mercury, Venus) to reduce compute load")
                 
                 transit_activations = []
                 
@@ -542,12 +586,18 @@ For every user query, structure your response exactly as follows:
                             )
                             # print(f"       Dasha significance: {significance}")
                             
+                            # Convert heavy dasha objects to lightweight strings
+                            lightweight_dasha_periods = [
+                                f"{d.get('mahadasha', '')}-{d.get('antardasha', '')}-{d.get('pratyantardasha', '')}"
+                                for d in dasha_periods
+                            ]
+                            
                             transit_activations.append({
                                 **period,
                                 'transit_planet': aspect['transit_planet'],
                                 'natal_planet': aspect['natal_planet'],
                                 'aspect_number': aspect['aspect_number'],
-                                'dasha_periods': dasha_periods,
+                                'dasha_periods': lightweight_dasha_periods,
                                 'dasha_significance': significance
                             })
                     except Exception as aspect_error:
@@ -558,6 +608,25 @@ For every user query, structure your response exactly as follows:
                         continue
                 
                 context['transit_activations'] = transit_activations
+                
+                # Add logging to measure data size impact
+                import json
+                context_json = json.dumps(transit_activations)
+                print(f"🔍 TRANSIT DATA SIZE: {len(context_json)} characters")
+                print(f"🔍 TRANSIT COUNT: {len(transit_activations)}")
+                
+                # Sample first transit for inspection
+                if transit_activations:
+                    sample = transit_activations[0]
+                    sample_json = json.dumps(sample)
+                    print(f"🔍 SAMPLE TRANSIT SIZE: {len(sample_json)} characters")
+                    print(f"🔍 SAMPLE DASHA FORMAT: {sample.get('dasha_periods', [])[:2]}")
+                
+                # Validate transit data integrity
+                self._validate_transit_data(transit_activations)
+                
+                total_transit_time = time.time() - transit_start_time
+                print(f"⏱️ TOTAL TRANSIT CALCULATION TIME: {total_transit_time:.2f}s")
                 print(f"📊 TRANSIT DATA SENT TO GEMINI:")
                 print(f"   Period: {start_year}-{end_year}")
                 print(f"   Total activations: {len(transit_activations)}")
@@ -663,7 +732,8 @@ For every user query, structure your response exactly as follows:
                 #     print(f"     ... and {len(transit_activations) - 5} more")
                     
             except Exception as e:
-                print(f"❌ Error calculating transit activations: {e}")
+                total_transit_time = time.time() - transit_start_time
+                print(f"❌ Error calculating transit activations after {total_transit_time:.2f}s: {e}")
                 import traceback
                 traceback.print_exc()
                 context['transit_activations'] = []
@@ -850,6 +920,12 @@ For every user query, structure your response exactly as follows:
                     context.get('house_lordships', {})
                 )
                 
+                # Convert heavy dasha objects to lightweight strings for period data
+                lightweight_transit_planet_dashas = [
+                    f"{p.get('type', '')}: {p.get('planet', '')}"
+                    for p in transit_planet_dashas
+                ]
+                
                 periods.append({
                     'id': f"{activation['transit_planet']}-{activation['natal_planet']}-{activation['start_date']}",
                     'label': f"{activation['start_date']} to {activation['end_date']}: {activation['transit_planet']}→{activation['natal_planet']}",
@@ -862,8 +938,8 @@ For every user query, structure your response exactly as follows:
                     'period_data': {
                         **activation,
                         'aspect_number': aspect_number,
-                        'overlapping_dashas': overlapping_dashas,
-                        'transit_planet_dashas': transit_planet_dashas,
+                        # Remove 'overlapping_dashas' entirely (redundant)
+                        'transit_planet_dashas': lightweight_transit_planet_dashas,
                         'life_areas': life_areas
                     }
                 })
@@ -1091,3 +1167,32 @@ For every user query, structure your response exactly as follows:
             return "Maraka Placement (Stress)"
             
         return "Safe"
+    
+    def _minify_data(self, data: Any) -> Any:
+        """Recursively rounds floats to 2 decimal places to save tokens"""
+        if isinstance(data, dict):
+            return {k: self._minify_data(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._minify_data(i) for i in data]
+        elif isinstance(data, float):
+            return round(data, 2)
+        return data
+    
+    def _validate_transit_data(self, transit_activations: List[Dict]) -> None:
+        """Ensure essential data is preserved after optimization"""
+        for activation in transit_activations:
+            # Check required fields exist
+            assert 'transit_planet' in activation, "Missing transit_planet"
+            assert 'natal_planet' in activation, "Missing natal_planet"
+            assert 'start_date' in activation, "Missing start_date"
+            assert 'end_date' in activation, "Missing end_date"
+            assert 'dasha_periods' in activation, "Missing dasha_periods"
+            
+            # Check dasha_periods is list of strings (not objects)
+            assert isinstance(activation['dasha_periods'], list), "dasha_periods should be list"
+            if activation['dasha_periods']:
+                assert isinstance(activation['dasha_periods'][0], str), "dasha_periods should contain strings"
+                assert '-' in activation['dasha_periods'][0], "dasha_periods should be in format 'Planet-Planet-Planet'"
+        
+        print(f"✅ Transit data validation passed for {len(transit_activations)} transits")
+        return None

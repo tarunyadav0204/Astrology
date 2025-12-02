@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -152,7 +153,7 @@ export default function ChartScreen({ visible, onClose }) {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
       <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.container}>
-        
+        <SafeAreaView style={styles.safeArea}>
         {/* Compact Header */}
         <View style={styles.compactHeader}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -302,6 +303,7 @@ export default function ChartScreen({ visible, onClose }) {
             <Text style={styles.emptyText}>Please add birth details to view charts</Text>
           </View>
         )}
+        </SafeAreaView>
       </LinearGradient>
       
       <CascadingDashaBrowser 
@@ -315,6 +317,7 @@ export default function ChartScreen({ visible, onClose }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  safeArea: { flex: 1 },
   
   // Compact Header
   compactHeader: {

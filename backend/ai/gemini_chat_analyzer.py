@@ -62,6 +62,11 @@ class GeminiChatAnalyzer:
     
     async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False) -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION"""
+        import time
+        
+        total_request_start = time.time()
+        print(f"\n🚀 GEMINI CHAT REQUEST STARTED")
+        print(f"🔍 REQUEST TYPE: {'SECOND (with transit data)' if 'transit_activations' in astrological_context else 'FIRST (requesting transit data)'}")
         
         # Add current date context and calculate native's age
         enhanced_context = astrological_context.copy()
@@ -97,27 +102,81 @@ class GeminiChatAnalyzer:
             'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.'
         }
         
-        prompt = self._create_chat_prompt(user_question, enhanced_context, conversation_history or [], language, response_style, user_context)
+        # Prune context to reduce token load
+        print("✂️ Pruning context to reduce token load...")
+        pruned_context = self._prune_context(enhanced_context)
+        
+        # DEBUG: Check size reduction
+        import json
+        original_size = len(json.dumps(enhanced_context, default=str))
+        pruned_size = len(json.dumps(pruned_context, default=str))
+        print(f"📉 Context compressed: {original_size} -> {pruned_size} chars (Saved {original_size - pruned_size} chars)")
+        print(f"💾 COMPRESSION RATIO: {((original_size - pruned_size) / original_size * 100):.1f}% reduction")
+        
+        prompt_start = time.time()
+        prompt = self._create_chat_prompt(user_question, pruned_context, conversation_history or [], language, response_style, user_context)
+        prompt_time = time.time() - prompt_start
         
         print(f"\n=== SENDING TO AI (ASYNC) ===")
         print(f"Question: {user_question}")
         print(f"Prompt length: {len(prompt)} chars")
+        print(f"⏱️ Prompt creation time: {prompt_time:.2f}s")
+        print(f"📊 EXPECTED PERFORMANCE: {'Fast (cache hit likely)' if 'transit_activations' in enhanced_context else 'Slow (full processing)'}")
         print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
+        
+        # Cache optimization indicator
+        has_transit_data = 'transit_activations' in enhanced_context
+        print(f"🎯 CACHE STATUS: {'Second call (should benefit from caching)' if has_transit_data else 'First call (will populate cache)'}")
         print(f"History messages: {len(conversation_history or [])}")
         print(f"Language: {language}, Response style: {response_style}")
+        
+        # Log full prompt to file for debugging
+        import os
+        # Use project directory for easier access
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        log_dir = os.path.join(project_root, "logs", "gemini_logs")
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Determine if this is first or second call
+        is_transit_call = 'transit_activations' in enhanced_context
+        call_type = "SECOND_CALL_WITH_TRANSIT" if is_transit_call else "FIRST_CALL_REQUEST"
+        print(f"🎯 CALL TYPE DETECTED: {call_type}")
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_filename = f"{log_dir}/gemini_prompt_{call_type}_{timestamp}.txt"
+        
+        try:
+            with open(log_filename, 'w', encoding='utf-8') as f:
+                f.write(f"=== GEMINI {call_type} PROMPT LOG ===\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Question: {user_question}\n")
+                f.write(f"Prompt Length: {len(prompt)} characters\n")
+                f.write(f"Context Keys: {list(enhanced_context.keys())}\n")
+                f.write(f"Is Transit Call: {is_transit_call}\n")
+                f.write(f"Premium Analysis: {premium_analysis}\n")
+                f.write("\n" + "="*80 + "\n")
+                f.write("FULL PROMPT CONTENT:\n")
+                f.write("="*80 + "\n")
+                f.write(prompt)
+                f.write("\n" + "="*80 + "\n")
+            print(f"📝 FULL PROMPT LOGGED TO: {log_filename}")
+            print(f"📁 LOG DIRECTORY: {log_dir}")
+        except Exception as log_error:
+            print(f"⚠️ Failed to log prompt: {log_error}")
         
         # Log nakshatra data availability
         planetary_analysis = enhanced_context.get('planetary_analysis', {})
         nakshatra_count = sum(1 for planet_data in planetary_analysis.values() 
                              if isinstance(planet_data, dict) and 'nakshatra' in planet_data)
         print(f"Nakshatra data available for {nakshatra_count} planets")
+        print(f"⭐ NAKSHATRA IMPACT: {'Included in cached data' if nakshatra_count > 0 else 'No nakshatra data'}")
         
         # Log if Moon nakshatra is available (most important)
         moon_data = planetary_analysis.get('Moon', {})
         moon_nakshatra = moon_data.get('nakshatra', {}) if isinstance(moon_data, dict) else {}
         print(f"Moon nakshatra available: {bool(moon_nakshatra)}")
         if moon_nakshatra:
-            print(f"Moon nakshatra: {moon_nakshatra.get('name', 'Unknown')}")
+            print(f"🌙 MOON NAKSHATRA: {moon_nakshatra.get('name', 'Unknown')} (cached for future requests)")
         
         try:
             # Run the synchronous Gemini API call in a thread pool to avoid blocking
@@ -130,14 +189,24 @@ class GeminiChatAnalyzer:
                     selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
                     model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
                     
+                    api_start_time = time.time()
                     print(f"\n=== CALLING GEMINI API ===")
                     print(f"Analysis Type: {model_type}")
                     print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
                     print(f"Prompt length: {len(prompt)} characters")
                     
                     response = selected_model.generate_content(prompt)
+                    api_time = time.time() - api_start_time
                     
                     print(f"\n=== GEMINI API RESPONSE ===")
+                    print(f"⏱️ Gemini API call time: {api_time:.2f}s")
+                    
+                    # Explicit logging for first vs second response performance
+                    is_transit_call = 'transit_activations' in prompt
+                    if is_transit_call:
+                        print(f"🔄 SECOND RESPONSE TIME: {api_time:.2f}s (with transit data)")
+                    else:
+                        print(f"🚀 FIRST RESPONSE TIME: {api_time:.2f}s (requesting transit data)")
                     print(f"Response type: {type(response)}")
                     print(f"Has text: {hasattr(response, 'text')}")
                     if hasattr(response, 'text'):
@@ -168,6 +237,24 @@ class GeminiChatAnalyzer:
                             
                             # Log first 500 characters to see content
                             print(f"Response preview (first 500 chars): {response.text[:500]}")
+                            
+                            # Log full response to file for debugging
+                            response_log_filename = log_filename.replace('_prompt_', '_response_')
+                            try:
+                                with open(response_log_filename, 'w', encoding='utf-8') as f:
+                                    f.write(f"=== GEMINI {call_type} RESPONSE LOG ===\n")
+                                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                                    f.write(f"Response Length: {len(response.text)} characters\n")
+                                    f.write(f"API Call Time: {api_time:.2f}s\n")
+                                    f.write("\n" + "="*80 + "\n")
+                                    f.write("FULL RESPONSE CONTENT:\n")
+                                    f.write("="*80 + "\n")
+                                    f.write(response.text)
+                                    f.write("\n" + "="*80 + "\n")
+                                print(f"📝 FULL RESPONSE LOGGED TO: {response_log_filename}")
+                                print(f"📁 RESPONSE LOG DIRECTORY: {log_dir}")
+                            except Exception as log_error:
+                                print(f"⚠️ Failed to log response: {log_error}")
                     
                     return response
                 except Exception as api_error:
@@ -177,6 +264,7 @@ class GeminiChatAnalyzer:
                     raise api_error
             
             # Execute in thread pool with timeout
+            gemini_start_time = time.time()
             loop = asyncio.get_event_loop()
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = loop.run_in_executor(executor, _sync_generate_content)
@@ -184,12 +272,31 @@ class GeminiChatAnalyzer:
                     # 600 second timeout for Gemini API (10 minutes for large wealth analysis prompts)
                     response = await asyncio.wait_for(future, timeout=600.0)
                 except asyncio.TimeoutError:
+                    total_request_time = time.time() - total_request_start
                     print(f"\n=== AI TIMEOUT ===")
+                    print(f"⏱️ Timeout occurred after {total_request_time:.2f}s")
+                    print(f"⏰ TIMEOUT IN: {'SECOND CALL' if 'transit_activations' in enhanced_context else 'FIRST CALL'}")
                     return {
                         'success': False,
                         'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
-                        'error': 'AI request timeout (600s)'
+                        'error': 'AI request timeout (600s)',
+                        'timing': {
+                            'total_request_time': total_request_time,
+                            'prompt_creation_time': prompt_time,
+                            'gemini_processing_time': 600.0
+                        }
                     }
+            
+            gemini_total_time = time.time() - gemini_start_time
+            print(f"⏱️ Total Gemini processing time: {gemini_total_time:.2f}s")
+            
+            # Cache performance indicator
+            if 'transit_activations' in enhanced_context and gemini_total_time < 20:
+                print(f"🚀 CACHE HIT LIKELY: Second call completed in {gemini_total_time:.1f}s (expected with caching)")
+            elif 'transit_activations' not in enhanced_context and gemini_total_time > 25:
+                print(f"⏳ FULL PROCESSING: First call took {gemini_total_time:.1f}s (expected without cache)")
+            elif 'transit_activations' in enhanced_context and gemini_total_time > 30:
+                print(f"⚠️ CACHE MISS: Second call took {gemini_total_time:.1f}s (caching may not be working)")
             
             # Validate response
             if not response or not hasattr(response, 'text') or not response.text:
@@ -277,14 +384,32 @@ class GeminiChatAnalyzer:
             # Check if response contains JSON transit data request
             has_transit_request = "transitRequest" in cleaned_text and '"requestType"' in cleaned_text
             
+            total_request_time = time.time() - total_request_start
+            print(f"🚀 TOTAL GEMINI CHAT REQUEST TIME: {total_request_time:.2f}s")
+            
+            # Log performance summary for caching analysis
+            is_transit_call = 'transit_activations' in cleaned_text or 'transit_activations' in str(enhanced_context)
+            if is_transit_call:
+                print(f"📊 PERFORMANCE SUMMARY - SECOND CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
+            else:
+                print(f"📊 PERFORMANCE SUMMARY - FIRST CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
+            
             return {
                 'success': True,
                 'response': cleaned_text,
                 'raw_response': response_text,
-                'has_transit_request': has_transit_request
+                'has_transit_request': has_transit_request,
+                'timing': {
+                    'total_request_time': total_request_time,
+                    'prompt_creation_time': prompt_time,
+                    'gemini_processing_time': gemini_total_time
+                }
             }
         except Exception as e:
+            total_request_time = time.time() - total_request_start
             print(f"\n=== AI ERROR (ASYNC) ===")
+            print(f"⏱️ Error occurred after {total_request_time:.2f}s")
+            print(f"❌ ERROR IN: {'SECOND CALL' if 'transit_activations' in str(enhanced_context) else 'FIRST CALL'}")
             print(f"Error type: {type(e).__name__}")
             print(f"Error message: {str(e)}")
             
@@ -306,7 +431,12 @@ class GeminiChatAnalyzer:
                 'success': False,
                 'response': error_message,
                 'error': str(e),
-                'error_type': type(e).__name__
+                'error_type': type(e).__name__,
+                'timing': {
+                    'total_request_time': total_request_time,
+                    'prompt_creation_time': prompt_time if 'prompt_time' in locals() else 0,
+                    'gemini_processing_time': gemini_total_time if 'gemini_total_time' in locals() else 0
+                }
             }
     
     def _fix_response_formatting(self, response_text: str) -> str:
@@ -394,14 +524,55 @@ class GeminiChatAnalyzer:
         
         return response_text
     
+    def _prune_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Aggressively removes heavy, redundant data to reduce token count.
+        FIXED: Correctly handles nested dictionary paths found in logs.
+        """
+        import copy
+        clean = copy.deepcopy(context)
+        
+        # 1. Prune Ashtakavarga (Corrected Logic)
+        if 'ashtakavarga' in clean:
+            for chart in ['d1_rashi', 'd9_navamsa']:
+                if chart in clean['ashtakavarga']:
+                    chart_data = clean['ashtakavarga'][chart]
+                    
+                    # Fix A: 'individual_charts' is inside 'sarvashtakavarga'
+                    if 'sarvashtakavarga' in chart_data:
+                        if isinstance(chart_data['sarvashtakavarga'], dict):
+                            chart_data['sarvashtakavarga'].pop('individual_charts', None)
+                    
+                    # Fix B: 'bhinnashtakavarga' is at the chart root
+                    chart_data.pop('bhinnashtakavarga', None)
+
+        # 2. Prune Bhav Chalit Redundancy
+        if 'd1_chart' in clean and 'bhav_chalit' in clean['d1_chart']:
+            clean['d1_chart'].pop('bhav_chalit', None)
+
+        # 3. Prune Methodologies
+        if 'transit_data_availability' in clean:
+            clean['transit_data_availability'].pop('comprehensive_analysis_methodology', None)
+            clean['transit_data_availability'].pop('quick_answer_requirements', None)
+            
+        # 4. Remove Response Structure (It's in System Prompt)
+        clean.pop('RESPONSE_STRUCTURE_REQUIRED', None)
+        
+        return clean
+    
     def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed', user_context: Dict = None) -> str:
         """Create comprehensive chat prompt for Gemini"""
         
         history_text = ""
         if history:
             history_text = "\n\nCONVERSATION HISTORY:\n"
-            for msg in history[-5:]:  # Last 5 messages for context
-                history_text += f"User: {msg.get('question', '')}\nAssistant: {msg.get('response', '')}\n\n"
+            # Use last 3 messages for better context retention
+            recent_messages = history[-3:] if len(history) >= 3 else history
+            for msg in recent_messages:
+                question = msg.get('question', '')[:500]  # Max 500 chars
+                response = msg.get('response', '')[:500]   # Max 500 chars
+                history_text += f"User: {question}\nAssistant: {response}\n\n"
+            print(f"📝 CONVERSATION HISTORY: Using last {len(recent_messages)} message(s), total length: {len(history_text)} chars")
         
         # Get current date and time
         current_date = datetime.now()
@@ -468,6 +639,20 @@ Your Quick Answer MUST start with: "Based on {native_name}'s birth chart..."
             if isinstance(obj, datetime):
                 return obj.isoformat()
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+        
+        # Log context size breakdown
+        context_size_breakdown = {}
+        for key, value in context.items():
+            try:
+                size = len(json.dumps(value, default=json_serializer))
+                context_size_breakdown[key] = size
+            except:
+                context_size_breakdown[key] = len(str(value))
+        
+        total_context_size = sum(context_size_breakdown.values())
+        print(f"\n📊 CONTEXT SIZE BREAKDOWN (Total: {total_context_size:,} chars):")
+        for key, size in sorted(context_size_breakdown.items(), key=lambda x: x[1], reverse=True)[:10]:
+            print(f"   {key}: {size:,} chars ({size/total_context_size*100:.1f}%)")
         
         # Language-specific instructions
         language_instruction = ""
@@ -569,258 +754,50 @@ End your response with 3-4 relevant follow-up questions in this exact format:
         from chat.chat_context_builder import ChatContextBuilder
         system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
         
-        return f"""{system_instruction}
-
-{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
-
-CLASSICAL TEXT REFERENCES - MANDATORY REQUIREMENT:
-You MUST reference classical Vedic texts to support your predictions and analysis. Use these authoritative sources:
-
-**PRIMARY CLASSICS:**
-- *Brihat Parashara Hora Shastra* (BPHS) - Chapters 1-97, comprehensive system
-- *Jaimini Sutras* - Pada 1-4, advanced techniques
-- *Phaladeepika* - Chapters 1-28, practical predictions
-- *Saravali* - Chapters 1-55, detailed interpretations
-- *Hora Sara* - Classical planetary effects
-- *Jataka Parijata* - Chapters 1-18, yogas and results
-
-**SPECIALIZED TEXTS:**
-- *Uttara Kalamrita* - Timing and dashas
-- *Sanketa Nidhi* - Planetary combinations
-- *Prasna Marga* - Horary and remedial measures
-- *Sarvartha Chintamani* - Comprehensive predictions
-- *Bhavartha Ratnakara* - House significations
-- *Mansagari* - Practical applications
-
-**REFERENCE FORMAT REQUIREMENTS:**
-- Always cite specific text: "According to *Brihat Parashara Hora Shastra* Chapter 15..."
-- Include verse numbers when possible: "*BPHS* 15.23 states that..."
-- Reference multiple sources: "Both *Phaladeepika* and *Saravali* confirm..."
-- Use classical Sanskrit terms with translations: "*Rajayoga* (royal combination) as per *Jaimini Sutras*..."
-
-IMPORTANT CURRENT DATE INFORMATION:
+        # REORDERED FOR IMPLICIT CACHING: Static data first, dynamic data last
+        prompt_parts = []
+        
+        # 1. STATIC: System Instructions
+        prompt_parts.append(system_instruction)
+        prompt_parts.append(f"{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.")
+        
+        # 2. STATIC: Birth Chart Data (CRITICAL FIX for caching)
+        # Extract dynamic data to keep the static prefix identical across calls
+        import copy
+        static_context = copy.deepcopy(context)
+        
+        # Remove transit data from static context to maintain cache consistency
+        transits = static_context.pop('transit_activations', None)
+        
+        # Convert ONLY static context to JSON with deterministic ordering
+        chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=True)
+        prompt_parts.append(f"BIRTH CHART DATA:\n{chart_json}")
+        
+        # 3. DYNAMIC: Transit Data (if present) - This breaks cache prefix but that's OK
+        if transits:
+            transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=True)
+            prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
+            print(f"🌟 Transit data size: {len(transit_json):,} characters")
+        
+        # 4. DYNAMIC: Date/Time (MOVED DOWN - breaks cache here)
+        time_context = f"""IMPORTANT CURRENT DATE INFORMATION:
 - Today's Date: {current_date_str}
 - Current Time: {current_time_str}
 - Current Year: {current_date.year}
 
 CRITICAL CHART INFORMATION:
-{ascendant_summary}
-
-DESH KAAL PATRA (CONTEXT AWARENESS) - CRITICAL REQUIREMENT:
-You MUST consider the native's current age and life stage for appropriate predictions:
-
-**AGE-APPROPRIATE PREDICTIONS:**
-- **Children (0-12 years)**: Focus on health, education, family environment, early personality traits
-- **Teenagers (13-18 years)**: Education, career direction, personality development, family relationships
-- **Young Adults (19-30 years)**: Career establishment, marriage timing, higher education, independence
-- **Adults (31-50 years)**: Career growth, family responsibilities, children, property, investments
-- **Middle Age (51-65 years)**: Career peak, children's marriage, grandchildren, health maintenance
-- **Senior Citizens (65+ years)**: Health, spiritual growth, legacy, grandchildren, retirement planning
-
-**CONTEXTUAL GUIDELINES:**
-- For 10-year-old asking about career: Focus on educational aptitude and future potential, NOT immediate earning
-- For 70-year-old asking about marriage: Consider they may be married, widowed, or seeking companionship
-- For teenagers asking about children: Discuss future potential, not immediate timing
-- For seniors asking about career: Focus on legacy, mentoring, or post-retirement activities
-- Always acknowledge current life stage: "At your current age of X years..."
-
-**LIFE STAGE CONSIDERATIONS:**
-- Marriage predictions: Appropriate for unmarried individuals in marriageable age (18-40 typically)
-- Career predictions: Adjust based on whether native is student, working, or retired
-- Children predictions: Consider if native is of childbearing age and marital status
-- Health predictions: Age-appropriate concerns (growth for children, maintenance for adults, care for seniors)
-- Financial predictions: Match with typical earning/spending patterns for age group
-
-CRITICAL INSTRUCTIONS:
-- ALWAYS use the EXACT ascendant information provided in the context - DO NOT calculate or guess
-- The ascendant has been calculated using Swiss Ephemeris with Lahiri Ayanamsa - trust this calculation
-- Use the current date provided above for accurate timing references
-- MANDATORY: Check native's current age from current_date_info and adjust predictions accordingly
-- If transit data is provided in the context, you may discuss current transits using that calculated data
-- If NO transit data is provided but user asks about transits, explain you need calculated transit positions
-- Do NOT guess or assume planetary positions - only use provided calculated data
-- Focus primarily on birth chart analysis and dasha periods
-- For timing questions, prioritize dasha periods but include transit data if available
-- NEVER recalculate the ascendant - use the provided ascendant_info section
-- Use both Vimshottari (planetary) and Shoola Dasha (sign-based) systems for comprehensive timing analysis
-
-CRITICAL TRANSIT DATA USAGE RULES:
-- When transit_activations are provided, each entry shows 'transit_planet -> natal_planet (dates)'
-- This means the TRANSITING planet is activating/aspecting the NATAL planet during those dates
-- DO NOT assume: aspect types (7th/5th/9th), conjunctions, or transit degrees unless explicitly provided
-- ONLY use: which natal planet is activated, the activation dates, and natal planet's significations
-- Example: 'Jupiter -> Mars (2027-01-01 to 2027-01-25)' = Jupiter activates natal Mars Jan 1-25, focus on Mars significations being enhanced
-- FORBIDDEN: Guessing the transit house. ONLY state the transit house if it is explicitly listed in the transit_activations JSON data
-
-BHAVAM BHAVESH TECHNIQUE - CRITICAL FOR RELATIVE ANALYSIS:
-When analyzing relatives, ALWAYS apply Bhavam Bhavesh (house becomes ascendant) technique:
-
-PRIMARY RELATIONS:
-- **Spouse** → 7th house as lagna (analyze spouse's life from 7th house perspective)
-- **Children** → 5th house as lagna (analyze child's life from 5th house perspective)
-- **Mother** → 4th house as lagna (analyze mother's life from 4th house perspective)
-- **Father** → 9th house as lagna (analyze father's life from 9th house perspective)
-- **Siblings** → 3rd house as lagna (analyze sibling's life from 3rd house perspective)
-- **Maternal Uncle** → 6th house as lagna (4th from 4th)
-- **Paternal Uncle** → 12th house as lagna (4th from 9th)
-
-EXTENDED RELATIONS:
-- **Mother-in-law** → 10th house as lagna (4th from 7th)
-- **Father-in-law** → 1st house as lagna (7th from 7th)
-- **Spouse's siblings** → 9th house as lagna (3rd from 7th)
-- **Grandchildren** → 9th house as lagna (5th from 5th)
-- **Daughter-in-law** → 11th house as lagna (7th from 5th)
-- **Son-in-law** → 11th house as lagna (7th from 5th)
-
-BUSINESS RELATIONS:
-- **Business Partner** → 7th house as lagna
-- **Employees** → 6th house as lagna
-- **Boss/Employer** → 10th house as lagna
-
-IMPLEMENTATION:
-1. **Dual Analysis Required**: Always analyze BOTH the original house AND the bhavam bhavesh perspective
-2. **Example for Son**: Analyze 5th house (your relationship with son) AND 5th house as lagna (son's own life)
-3. **Rotated Chart Logic**: When 5th becomes lagna for son:
-   - 5th house = Son's 1st house (personality, health, general life)
-   - 6th house = Son's 2nd house (wealth, speech, family)
-   - 7th house = Son's 3rd house (siblings, courage, efforts)
-   - 8th house = Son's 4th house (home, mother, happiness)
-   - 9th house = Son's 5th house (son's children - your grandchildren)
-   - 10th house = Son's 6th house (son's health issues, enemies)
-   - 11th house = Son's 7th house (son's spouse, marriage)
-   - 12th house = Son's 8th house (son's longevity, transformation)
-   - 1st house = Son's 9th house (son's dharma, fortune, father)
-   - 2nd house = Son's 10th house (son's career, reputation)
-   - 3rd house = Son's 11th house (son's gains, elder siblings)
-   - 4th house = Son's 12th house (son's losses, foreign travel)
-
-4. **Complete Perspective**: Provide insights about the relative's own life, not just your relationship with them
-
-DASHA RELATIONSHIP MATRIX - UNIVERSAL BHAVAT BHAVAM:
-Consult the 'analysis_matrix' or 'rel_pos' for every dasha. If a Dasha Lord is in the 6th, 8th, or 12th house from a specific relative (Mother/Father/Spouse), predict significant challenges or separation regarding that relative. Use this for ALL life areas:
-- **from_Self**: Dasha lord's effect on personal life
-- **from_Mother**: Dasha lord's effect on mother's wellbeing
-- **from_Father**: Dasha lord's effect on father's wellbeing
-- **from_Spouse**: Dasha lord's effect on marriage/spouse
-- **from_Children**: Dasha lord's effect on children
-- **from_Career**: Dasha lord's effect on professional life
-
-CRITICAL SEVERITY RULE:
-If you see a Dasha Lord placed in the 8th House from a Relative (e.g., Saturn in 8th from Mother), combined with a Malefic Transit over their Longevity Axis (1st/8th/3rd), you must describe the period as "Critical Longevity Threat" or "End of a Life Cycle." Do NOT soften this to just "health issues." Use terms like "Transformation," "Departure," or "Critical Danger."
-
-CRITICAL MARAKA RULE:
-Check the maraka_analysis section in current_dashas. If a Dasha Lord is flagged as "Double Maraka" or "Maraka Lord" for a specific relative (e.g., "for_Second_Child"), AND there is a difficult transit (like Saturn in the 8th from that relative), you MUST predict a "Critical danger to longevity" or "Severe health crisis" for that person. Do not mask this as "career progress" or "relational dynamics." Maraka combinations override protective yogas.
-
-JAIMINI SHOOLA DASHA ANALYSIS:
-The context includes shoola_dasha data with sign-based periods (9 years each). Use this for:
-- **Longevity Analysis**: Cross-reference current Shoola period with Vimshottari for timing precision
-- **Relative Analysis**: Shoola Dasha reveals critical periods for family members' wellbeing
-- **Death Timing**: Shoola periods of 6th, 8th, 12th signs from relevant significators indicate challenging phases
-- **Dual System Validation**: When both Vimshottari and Shoola indicate similar themes, predictions gain classical authority
-
-NAKSHATRA ANALYSIS - CRITICAL REQUIREMENT:
-Each planet's nakshatra data is provided in planetary_analysis section. YOU MUST include nakshatra analysis:
-- **Moon's nakshatra**: Primary personality indicator, emotional nature, life path
-- **Ascendant nakshatra**: Physical appearance, first impressions, life approach
-- **Sun's nakshatra**: Soul purpose, father's influence, authority style
-- **All planetary nakshatras**: Each planet's nakshatra reveals deeper layer of expression
-
-NAKSHATRA USAGE REQUIREMENTS:
-- Always mention Moon's nakshatra when discussing personality or emotions
-- Reference nakshatra lords for deeper planetary relationships
-- Use nakshatra characteristics for timing and compatibility
-- Include nakshatra-based remedies and recommendations
-- Mention nakshatra padas (quarters) when relevant for precision
-- Do NOT calculate 'relative nakshatras'. A planet's Nakshatra (e.g., Sun in Hasta) remains the same for all derived charts (spouse, children, etc.). Only the House placement changes.
-
-ADVANCED ANALYSIS USAGE:
-The context includes advanced_analysis section with:
-- **planetary_wars**: Graha Yuddha when planets are within 1° (winner/loser effects)
-- **vargottama_positions**: Planets in same sign across divisional charts (exceptional strength)
-- **neecha_bhanga**: Cancellation of debilitation conditions (strength restoration)
-- **pancha_mahapurusha**: Five great person yogas (Mars, Mercury, Jupiter, Venus, Saturn)
-
-USE THESE for deeper insights:
-- Reference planetary wars when discussing conflicting influences
-- Mention Vargottama planets as exceptionally strong and reliable
-- Highlight Neecha Bhanga as transformation of weakness into strength
-- Emphasize Pancha Mahapurusha yogas as exceptional personality traits
-
-BIRTH CHART DATA:
-{json.dumps(context, indent=2, default=json_serializer)}
-
-{history_text}
-
-CURRENT QUESTION: {user_question}
-
-COMMUNICATION STYLE - HONEST AND DIRECT:
-- Be straightforward, honest, and realistic in your analysis
-- Present BOTH positive and negative aspects equally - do not sugar-coat challenges
-- Use clear, direct language without excessive positivity or encouragement
-- State difficulties, obstacles, and negative periods clearly when they exist
-- Avoid phrases like "wonderful", "amazing", "blessed", "fortunate" unless truly warranted
-- Focus on accuracy over comfort - astrology reveals truth, not just pleasant outcomes
-- When chart shows challenges, state them directly with remedial measures
-- Balance hope with realism - acknowledge both strengths and weaknesses
-
-GUIDELINES:
-- Use conversational, clear, and direct tone with proper formatting
-- Always explain astrological reasoning with **bold planetary names** and specific positions
-- Reference relevant *yogas*, *dashas*, and transit data when provided in the context
-- Provide practical guidance with clear bullet points
-- MANDATORY: Reference classical texts with specific chapters/verses (*BPHS* Ch.15, *Phaladeepika* 3.12, etc.)
-- Support ALL major predictions with classical authority
-- Use Sanskrit terms with English translations in parentheses
-- For timing questions, use dasha periods as primary method, supplemented by transit data if available
-- Be specific about planetary degrees, house positions, and aspects from the provided data
-- Use ### headers to organize different topics clearly
-- Present both favorable and unfavorable factors with equal weight - do NOT soften serious astrological indications
-- If asked about health, relationships, or career, use relevant chart factors
-- You may discuss transits IF calculated transit data is provided in the context
-- Avoid excessive emojis - use sparingly and only when appropriate
-- CRITICAL: Always check 'analysis_matrix' and 'rel_pos' in dasha data for relative analysis using Bhavat Bhavam principles
-- Reference both Vimshottari and Shoola Dasha systems - when they align, predictions have maximum classical authority
-- For longevity questions, prioritize Shoola Dasha analysis as per *Jaimini Sutras*
-- MANDATORY: Check maraka_analysis in current_dashas for relative safety - "Double Maraka" + difficult transits = life threat
-- Be direct about serious planetary combinations - use classical terminology for severe indications
-- When discussing house strength, explicitly mention the Ashtakavarga Bindu count (e.g., 'With only 20 points in the 2nd house...')
-
-RESPONSE FORMAT - CRITICAL:
-You MUST use these EXACT markdown headers (with ### symbols):
-- ### Key Insights (MANDATORY header)
-- ### Astrological Analysis (MANDATORY header)
-- ### Nakshatra Insights (MANDATORY header)
-- ### Timing & Guidance (MANDATORY header)
-
-Formatting requirements:
-- **Bold text** for important points and planetary names
-- ### Headers MUST include the ### symbols for proper formatting
-- • Bullet points for lists and key insights
-- *Italics* for Sanskrit terms and classical references
-- Line breaks between sections for readability
-
-CRITICAL FORMATTING REQUIREMENTS:
-You MUST use these EXACT section headers with proper markdown formatting:
-
-### Key Insights
-[Bullet points starting with • symbol]
-
-### Astrological Analysis
-[Detailed analysis with classical references]
-
-### Nakshatra Insights
-[Nakshatra analysis section]
-
-### Timing & Guidance
-[Recommendations and timing]
-
-Structure your response with:
-1. **Quick Answer** - Bold opening statement in div card
-2. ### Key Insights - MANDATORY bullet points format with • symbol
-3. ### Astrological Analysis - Header followed by specific chart references WITH classical text citations
-4. ### Nakshatra Insights - MANDATORY section with nakshatra analysis and classical references
-5. ### Timing & Guidance - Age-appropriate recommendations with classical timing methods
-6. <div class="final-thoughts-card">**Final Thoughts** - Balanced conclusion with classical wisdom</div>
-
-Remember: Be conversational yet structured, insightful yet accessible. Use formatting to make complex astrological information easy to read and visually appealing.
-"""
+{ascendant_summary}"""
+        prompt_parts.append(time_context)
+        
+        # 5. DYNAMIC: History & Question
+        prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
+        
+        full_prompt = "\n\n".join(prompt_parts)
+        
+        # Log cache optimization metrics
+        static_size = len(chart_json)
+        dynamic_size = len(transits) if transits else 0
+        print(f"🎯 CACHE OPTIMIZATION: Static={static_size:,} chars, Dynamic={dynamic_size:,} chars")
+        print(f"🔄 CACHE STATUS: {'SECOND_CALL (should hit cache)' if transits else 'FIRST_CALL (will populate cache)'}")
+        
+        return full_prompt

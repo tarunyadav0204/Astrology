@@ -157,19 +157,24 @@ const styles = StyleSheet.create({
   titleContainer: {
     alignItems: 'center',
     marginBottom: 80,
+    width: '100%',
+    paddingHorizontal: 10,
   },
   title: {
-    fontSize: 36,
+    fontSize: width < 375 ? 28 : 36,
     fontWeight: '800',
     color: '#ffffff',
     marginBottom: 12,
     textAlign: 'center',
+    letterSpacing: 1,
+    flexShrink: 0,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: width < 375 ? 16 : 18,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     fontWeight: '300',
+    flexShrink: 0,
   },
   buttonContainer: {
     width: '100%',
