@@ -21,7 +21,8 @@ fi
 
 # Activate virtual environment and install dependencies
 source venv/bin/activate
-pip install -r requirements.txt
+pip3 install -r requirements.txt
+pip3 install --upgrade google-generativeai
 echo "✅ Backend dependencies installed"
 
 # Frontend deployment
