@@ -181,7 +181,6 @@ class GeminiChatAnalyzer:
         try:
             # Run the synchronous Gemini API call in a thread pool to avoid blocking
             import asyncio
-            import concurrent.futures
             
             def _sync_generate_content():
                 try:
@@ -193,116 +192,32 @@ class GeminiChatAnalyzer:
                     print(f"\n=== CALLING GEMINI API ===")
                     print(f"Analysis Type: {model_type}")
                     print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-                    print(f"Prompt length: {len(prompt)} characters")
                     
-                    # Generate content without request_options to avoid gRPC error
-                    response = selected_model.generate_content(prompt)
+                    # Explicitly set timeout to avoid 60s default limit
+                    response = selected_model.generate_content(
+                        prompt,
+                        request_options={'timeout': 600} 
+                    )
                     
                     api_time = time.time() - api_start_time
-                    
-                    print(f"\n=== GEMINI API RESPONSE ===")
                     print(f"⏱️ Gemini API call time: {api_time:.2f}s")
-                    
-                    # Explicit logging for first vs second response performance
-                    is_transit_call = 'transit_activations' in prompt
-                    if is_transit_call:
-                        print(f"🔄 SECOND RESPONSE TIME: {api_time:.2f}s (with transit data)")
-                    else:
-                        print(f"🚀 FIRST RESPONSE TIME: {api_time:.2f}s (requesting transit data)")
-                    print(f"Response type: {type(response)}")
-                    print(f"Has text: {hasattr(response, 'text')}")
-                    if hasattr(response, 'text'):
-                        print(f"Text length: {len(response.text) if response.text else 0}")
-                        if response.text:
-                            print(f"Response ends with: '{response.text[-50:]}'")
-                            print(f"Contains null bytes: {chr(0) in response.text}")
-                            control_chars = '\n\r\t'
-                            print(f"Contains control chars: {any(ord(c) < 32 and c not in control_chars for c in response.text)}")
-                            
-                            # Check for JSON transit data requests
-                            if "transitRequest" in response.text:
-                                import re
-                                json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
-                                json_matches = re.findall(json_pattern, response.text)
-                                if json_matches:
-                                    try:
-                                        import json
-                                        transit_request = json.loads(json_matches[0])
-                                        start_year = transit_request.get('startYear')
-                                        end_year = transit_request.get('endYear')
-                                        months = transit_request.get('specificMonths', [])
-                                        print(f"🎯 GEMINI REQUESTED TRANSIT DATA: {start_year}-{end_year} ({', '.join(months)})")
-                                    except:
-                                        print(f"🎯 GEMINI MADE TRANSIT REQUEST (JSON parse failed)")
-                                else:
-                                    print(f"🎯 GEMINI MENTIONED TRANSIT REQUEST (no valid JSON)")
-                            
-                            # Log first 500 characters to see content
-                            print(f"Response preview (first 500 chars): {response.text[:500]}")
-                            
-                            # Log full response to file for debugging
-                            response_log_filename = log_filename.replace('_prompt_', '_response_')
-                            try:
-                                with open(response_log_filename, 'w', encoding='utf-8') as f:
-                                    f.write(f"=== GEMINI {call_type} RESPONSE LOG ===\n")
-                                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                                    f.write(f"Response Length: {len(response.text)} characters\n")
-                                    f.write(f"API Call Time: {api_time:.2f}s\n")
-                                    f.write("\n" + "="*80 + "\n")
-                                    f.write("FULL RESPONSE CONTENT:\n")
-                                    f.write("="*80 + "\n")
-                                    f.write(response.text)
-                                    f.write("\n" + "="*80 + "\n")
-                                print(f"📝 FULL RESPONSE LOGGED TO: {response_log_filename}")
-                                print(f"📁 RESPONSE LOG DIRECTORY: {log_dir}")
-                            except Exception as log_error:
-                                print(f"⚠️ Failed to log response: {log_error}")
-                    
                     return response
-                except Exception as api_error:
-                    print(f"\n=== GEMINI API ERROR ===")
-                    print(f"API Error type: {type(api_error).__name__}")
-                    print(f"API Error message: {str(api_error)}")
-                    raise api_error
+                except Exception as e:
+                    raise e
+
+            # EXECUTION FIX: Use default executor instead of 'with ThreadPoolExecutor'
+            # This prevents the 'shutdown(wait=True)' block
+            loop = asyncio.get_running_loop()
             
-            # Execute in thread pool with timeout
-            gemini_start_time = time.time()
-            loop = asyncio.get_event_loop()
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = loop.run_in_executor(executor, _sync_generate_content)
-                try:
-                    # 600 second timeout for Gemini API (10 minutes for large wealth analysis prompts)
-                    response = await asyncio.wait_for(future, timeout=600.0)
-                except asyncio.TimeoutError:
-                    total_request_time = time.time() - total_request_start
-                    print(f"\n=== AI TIMEOUT ===")
-                    print(f"⏱️ Timeout occurred after {total_request_time:.2f}s")
-                    print(f"⏰ TIMEOUT IN: {'SECOND CALL' if 'transit_activations' in enhanced_context else 'FIRST CALL'}")
-                    return {
-                        'success': False,
-                        'response': "Your question is taking longer than expected to process. Please try again with a more specific question.",
-                        'error': 'AI request timeout (600s)',
-                        'timing': {
-                            'total_request_time': total_request_time,
-                            'prompt_creation_time': prompt_time,
-                            'gemini_processing_time': 600.0
-                        }
-                    }
+            # 600s timeout for the task itself
+            response = await asyncio.wait_for(
+                loop.run_in_executor(None, _sync_generate_content),
+                timeout=600.0
+            )
             
-            gemini_total_time = time.time() - gemini_start_time
-            print(f"⏱️ Total Gemini processing time: {gemini_total_time:.2f}s")
+            gemini_total_time = time.time() - total_request_start
             
-            # Cache performance indicator
-            if 'transit_activations' in enhanced_context and gemini_total_time < 20:
-                print(f"🚀 CACHE HIT LIKELY: Second call completed in {gemini_total_time:.1f}s (expected with caching)")
-            elif 'transit_activations' not in enhanced_context and gemini_total_time > 25:
-                print(f"⏳ FULL PROCESSING: First call took {gemini_total_time:.1f}s (expected without cache)")
-            elif 'transit_activations' in enhanced_context and gemini_total_time > 30:
-                print(f"⚠️ CACHE MISS: Second call took {gemini_total_time:.1f}s (caching may not be working)")
-            
-            # Validate response
             if not response or not hasattr(response, 'text') or not response.text:
-                print(f"\n=== EMPTY AI RESPONSE ===")
                 return {
                     'success': False,
                     'response': "I apologize, but I couldn't generate a response. Please try asking your question again.",
@@ -311,7 +226,6 @@ class GeminiChatAnalyzer:
             
             response_text = response.text.strip()
             if len(response_text) == 0:
-                print(f"\n=== BLANK AI RESPONSE ===")
                 return {
                     'success': False,
                     'response': "I received your question but couldn't generate a proper response. Please try rephrasing your question.",
@@ -329,34 +243,19 @@ class GeminiChatAnalyzer:
             # Fix pronoun usage if this is a third-party consultation
             if user_context and user_context.get('user_relationship') != 'self':
                 native_name = astrological_context.get('birth_details', {}).get('name', 'the native')
-                print(f"\n=== PRONOUN FIX DEBUG ===")
-                print(f"User context: {user_context}")
-                print(f"User relationship: {user_context.get('user_relationship')}")
-                print(f"Native name: {native_name}")
-                print(f"Will fix pronouns: {native_name and native_name != 'the native'}")
                 if native_name and native_name != 'the native':
-                    original_text = cleaned_text[:200]
                     cleaned_text = self._fix_pronoun_usage(cleaned_text, native_name)
-                    fixed_text = cleaned_text[:200]
-                    print(f"Original: {original_text}")
-                    print(f"Fixed: {fixed_text}")
-                    print(f"Changes made: {original_text != fixed_text}")
             
             # Ensure response doesn't end abruptly (minimum length check)
             if len(cleaned_text) < 50:
-                print(f"\n=== SUSPICIOUSLY SHORT AI RESPONSE ===")
-                print(f"Original length: {len(response_text)}, Cleaned length: {len(cleaned_text)}")
                 return {
                     'success': False,
                     'response': "I received a partial response. Please try asking your question again.",
                     'error': 'Response too short or corrupted'
                 }
-            
-            print(f"\n=== RECEIVED FROM AI (ASYNC) ===")
-            print(f"Original length: {len(response_text)} chars")
-            print(f"Cleaned length: {len(cleaned_text)} chars")
-            print(f"Response preview: {cleaned_text[:200]}...")
-            print(f"Response ends with: '{cleaned_text[-50:]}'")
+            print(f"✅ Final response ready ({len(cleaned_text)} chars)")
+            print(f"📤 FINAL CLEANED RESPONSE (first 500 chars): {cleaned_text[:500]}...")
+            print(f"📤 FINAL CLEANED RESPONSE (last 200 chars): ...{cleaned_text[-200:]}")
             
             # Final check for JSON transit requests in cleaned text
             if "transitRequest" in cleaned_text:
@@ -409,11 +308,10 @@ class GeminiChatAnalyzer:
             }
         except Exception as e:
             total_request_time = time.time() - total_request_start
-            print(f"\n=== AI ERROR (ASYNC) ===")
-            print(f"⏱️ Error occurred after {total_request_time:.2f}s")
-            print(f"❌ ERROR IN: {'SECOND CALL' if 'transit_activations' in str(enhanced_context) else 'FIRST CALL'}")
-            print(f"Error type: {type(e).__name__}")
-            print(f"Error message: {str(e)}")
+            print(f"❌ Error in generate_chat_response: {type(e).__name__}: {str(e)}")
+            print(f"❌ Full error details: {repr(e)}")
+            import traceback
+            print(f"❌ Stack trace: {traceback.format_exc()}")
             
             # More specific error handling
             error_message = "I'm having trouble processing your question right now. Please try rephrasing it or try again later."
@@ -574,7 +472,7 @@ class GeminiChatAnalyzer:
                 question = msg.get('question', '')[:500]  # Max 500 chars
                 response = msg.get('response', '')[:500]   # Max 500 chars
                 history_text += f"User: {question}\nAssistant: {response}\n\n"
-            print(f"📝 CONVERSATION HISTORY: Using last {len(recent_messages)} message(s), total length: {len(history_text)} chars")
+
         
         # Get current date and time
         current_date = datetime.now()
@@ -642,19 +540,7 @@ Your Quick Answer MUST start with: "Based on {native_name}'s birth chart..."
                 return obj.isoformat()
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
         
-        # Log context size breakdown
-        context_size_breakdown = {}
-        for key, value in context.items():
-            try:
-                size = len(json.dumps(value, default=json_serializer))
-                context_size_breakdown[key] = size
-            except:
-                context_size_breakdown[key] = len(str(value))
-        
-        total_context_size = sum(context_size_breakdown.values())
-        print(f"\n📊 CONTEXT SIZE BREAKDOWN (Total: {total_context_size:,} chars):")
-        for key, size in sorted(context_size_breakdown.items(), key=lambda x: x[1], reverse=True)[:10]:
-            print(f"   {key}: {size:,} chars ({size/total_context_size*100:.1f}%)")
+
         
         # Language-specific instructions
         language_instruction = ""
@@ -779,7 +665,7 @@ End your response with 3-4 relevant follow-up questions in this exact format:
         if transits:
             transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=True)
             prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
-            print(f"🌟 Transit data size: {len(transit_json):,} characters")
+
         
         # 4. DYNAMIC: Date/Time (MOVED DOWN - breaks cache here)
         time_context = f"""IMPORTANT CURRENT DATE INFORMATION:
@@ -796,10 +682,6 @@ CRITICAL CHART INFORMATION:
         
         full_prompt = "\n\n".join(prompt_parts)
         
-        # Log cache optimization metrics
-        static_size = len(chart_json)
-        dynamic_size = len(transits) if transits else 0
-        print(f"🎯 CACHE OPTIMIZATION: Static={static_size:,} chars, Dynamic={dynamic_size:,} chars")
-        print(f"🔄 CACHE STATUS: {'SECOND_CALL (should hit cache)' if transits else 'FIRST_CALL (will populate cache)'}")
+
         
         return full_prompt

@@ -83,6 +83,7 @@ export default function ChatScreen({ navigation }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -95,7 +96,50 @@ export default function ChatScreen({ navigation }) {
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [currentPersonId, setCurrentPersonId] = useState(null);
+  const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
+  
+  // Pending message management (like web app)
+  const addPendingMessage = async (messageId) => {
+    const key = `pendingChatMessages_${currentPersonId}`;
+    const stored = await AsyncStorage.getItem(key);
+    const pendingIds = stored ? JSON.parse(stored) : [];
+    if (!pendingIds.includes(messageId)) {
+      pendingIds.push(messageId);
+      await AsyncStorage.setItem(key, JSON.stringify(pendingIds));
+    }
+    setPendingMessages(prev => new Set([...prev, messageId]));
+  };
+  
+  const removePendingMessage = async (messageId) => {
+    const key = `pendingChatMessages_${currentPersonId}`;
+    const stored = await AsyncStorage.getItem(key);
+    if (stored) {
+      const pendingIds = JSON.parse(stored).filter(id => id !== messageId);
+      await AsyncStorage.setItem(key, JSON.stringify(pendingIds));
+    }
+    setPendingMessages(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(messageId);
+      return newSet;
+    });
+  };
+  
+  const checkPendingResponses = async (personId = currentPersonId) => {
+    console.log('🔍 Checking pending responses for person:', personId);
+    const stored = await AsyncStorage.getItem(`pendingChatMessages_${personId}`);
+    if (stored) {
+      const pendingIds = JSON.parse(stored);
+      console.log('🔍 Found pending message IDs:', pendingIds);
+      pendingIds.forEach(messageId => {
+        console.log('🔄 Resuming polling for pending message:', messageId);
+        // Resume polling for each pending message
+        pollForResponse(messageId, null, sessionId, null, true); // true = resume mode
+      });
+    } else {
+      console.log('🔍 No pending messages found');
+    }
+  };
 
   const suggestions = [
     "What does my birth chart say about my career?",
@@ -123,18 +167,7 @@ export default function ChatScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!showGreeting) {
-        setShowGreeting(true);
-        setMessages([]);
-        return true; // Prevent default back action
-      }
-      return false; // Allow default back action
-    });
-
-    return () => backHandler.remove();
-  }, [showGreeting]);
+  // Remove problematic back handler that clears messages
 
   const fetchChatCost = async () => {
     try {
@@ -163,10 +196,116 @@ export default function ChatScreen({ navigation }) {
         setShowGreeting(true);
       }
       
-      setCurrentPersonId(personId);
-      loadChatHistory();
+      // Only update if person ID actually changed
+      if (currentPersonId !== personId) {
+        console.log('👤 Person changed from', currentPersonId, 'to', personId);
+        
+        // Set person ID first to avoid null issues
+        setCurrentPersonId(personId);
+        
+        // Load messages from storage immediately
+        loadMessagesFromStorage(personId).then(storedMessages => {
+          console.log('📱 PERSON_CHANGE: Found stored messages:', storedMessages.length);
+          if (storedMessages.length > 0) {
+            setMessages(storedMessages);
+            setShowGreeting(false);
+            
+            // Check for processing messages and resume polling
+            const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
+            if (processingMessage) {
+              console.log('🔄 RESUMING polling for stored processing message:', processingMessage.messageId);
+              setLoading(true);
+              setIsTyping(true);
+              // Use personId directly to avoid timing issues
+              setTimeout(() => {
+                pollForResponse(processingMessage.messageId, null, sessionId, null, true);
+              }, 100);
+            }
+          } else {
+            console.log('📱 No stored messages, showing greeting');
+            setShowGreeting(true);
+          }
+        });
+        
+        // Check pending responses after person ID is set
+        setTimeout(() => {
+          checkPendingResponses(personId);
+        }, 200);
+      }
     }
-  }, [birthData, currentPersonId]);
+  }, [birthData]);
+
+  // Save messages to AsyncStorage per person (like web app)
+  const saveMessagesToStorage = async (messages, personId = currentPersonId) => {
+    if (!personId) return;
+    try {
+      await AsyncStorage.setItem(`chatMessages_${personId}`, JSON.stringify(messages));
+      console.log('💾 Messages saved to storage for person:', personId);
+    } catch (error) {
+      console.error('Error saving messages:', error);
+    }
+  };
+
+  // Load messages from AsyncStorage per person (like web app)
+  const loadMessagesFromStorage = async (personId = currentPersonId) => {
+    if (!personId) return [];
+    try {
+      const stored = await AsyncStorage.getItem(`chatMessages_${personId}`);
+      if (stored) {
+        const messages = JSON.parse(stored);
+        console.log('📱 Loaded messages from storage:', messages.length);
+        return messages;
+      }
+    } catch (error) {
+      console.error('Error loading messages from storage:', error);
+    }
+    return [];
+  };
+
+  // Override setMessages to also save to storage
+  const setMessagesWithStorage = (messagesOrUpdater) => {
+    setMessages(prev => {
+      const newMessages = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
+      // Get current person ID from birthData if currentPersonId is null
+      const personId = currentPersonId || (birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null);
+      console.log('💾 Saving messages to storage:', newMessages.length, 'for person:', personId);
+      // Save to storage
+      if (personId) {
+        saveMessagesToStorage(newMessages, personId);
+      }
+      return newMessages;
+    });
+  };
+
+  // Load messages when screen focuses - but don't interfere with ongoing polling
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 Screen focused, checking for stored messages...');
+      if (currentPersonId) {
+        loadMessagesFromStorage(currentPersonId).then(storedMessages => {
+          console.log('📱 FOCUS: Found stored messages:', storedMessages.length);
+          if (storedMessages.length > 0) {
+            // Only update messages if we don't have any current messages to avoid overwriting
+            setMessages(prev => prev.length === 0 ? storedMessages : prev);
+            setShowGreeting(false);
+            
+            // Only resume polling if not already polling
+            if (!loading && !isTyping) {
+              const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
+              if (processingMessage) {
+                console.log('🔄 FOCUS: Resuming polling for processing message:', processingMessage.messageId);
+                setLoading(true);
+                setIsTyping(true);
+                pollForResponse(processingMessage.messageId, null, sessionId, null, true);
+              }
+            }
+          }
+        });
+      }
+    });
+    
+    return unsubscribe;
+  }, [currentPersonId, loading, isTyping]);
 
   const handleGreetingOptionSelect = async (option) => {
     console.log('🎯 Greeting option selected:', option);
@@ -182,37 +321,26 @@ export default function ChatScreen({ navigation }) {
       });
     } else {
       console.log('💬 Going to chat mode');
-      setShowGreeting(false);
       
-      // Get user data to differentiate from native
-      let userData = null;
-      try {
-        userData = await storage.getUserData();
-      } catch (error) {
-        console.log('Could not get user data:', error);
-      }
+      // First load any existing chat history
+      await loadChatHistory();
       
-      const userName = userData?.name || 'User';
-      const nativeName = birthData?.name || 'the native';
-      
-      // Create personalized welcome message
-      let welcomeContent;
-      if (userName.toLowerCase() === nativeName.toLowerCase()) {
-        // User and native are the same person
-        welcomeContent = `🌟 Welcome to your personalized astrological consultation, ${nativeName}!\n\nI'm here to help you understand your birth chart and provide insights about your life path. Feel free to ask me anything about:\n\n• Your personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits affecting you\n• Your strengths and areas for growth\n\nWhat would you like to explore first?`;
-      } else {
-        // User and native are different people
-        welcomeContent = `🌟 Welcome ${userName}! I'm here to help you understand ${nativeName}'s birth chart and provide astrological insights.\n\nFeel free to ask me anything about ${nativeName}'s:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits affecting them\n• Strengths and areas for growth\n\nWhat would you like to explore first about ${nativeName}'s chart?`;
-      }
-      
-      const welcomeMessage = {
-        id: Date.now().toString(),
-        content: welcomeContent,
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-      
-      setMessages([welcomeMessage]);
+      // Check if we need to show welcome message
+      setTimeout(async () => {
+        const storedMessages = await loadMessagesFromStorage(currentPersonId);
+        console.log('👋 Welcome check: stored messages:', storedMessages.length);
+        if (storedMessages.length === 0 && messages.length === 0) {
+          const welcomeMessage = {
+            id: Date.now().toString(),
+            content: `🌟 Welcome! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?`,
+            role: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+          console.log('👋 Adding welcome message');
+          setMessagesWithStorage([welcomeMessage]);
+          setShowGreeting(false);
+        }
+      }, 100);
     }
   };
 
@@ -250,66 +378,7 @@ export default function ChatScreen({ navigation }) {
   };
 
   const loadChatHistory = async () => {
-    try {
-      if (!birthData) return;
-      
-      const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/history')}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const sessions = data.sessions || [];
-        
-        if (sessions.length > 0) {
-          // Load the most recent session
-          const latestSession = sessions[0];
-          const sessionResponse = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${latestSession.session_id}`)}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          
-          if (sessionResponse.ok) {
-            const sessionData = await sessionResponse.json();
-            const messages = sessionData.messages || [];
-            
-            // Filter messages for current person
-            const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
-            const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
-            
-            // Only load if this session belongs to current person
-            if (!personSessions.includes(latestSession.session_id)) {
-              // This session doesn't belong to current person - start fresh
-              setShowGreeting(true);
-              return;
-            }
-            
-            // Convert to our message format
-            const formattedMessages = messages.map(msg => ({
-              id: `${msg.timestamp}_${Math.random()}`,
-              role: msg.sender === 'user' ? 'user' : 'assistant',
-              content: msg.content || '🔮 Analyzing your birth chart...',
-              timestamp: msg.timestamp
-            }));
-            
-            if (formattedMessages.length > 0) {
-              setMessages(formattedMessages);
-              setSessionId(latestSession.session_id);
-              setShowGreeting(false);
-            } else {
-              setShowGreeting(true);
-            }
-            return;
-          }
-        }
-      }
-      
-      // No history found - show greeting
-      setShowGreeting(true);
-    } catch (error) {
-      console.error('Error loading chat history:', error);
-      setShowGreeting(true);
-    }
+    console.log('📚 loadChatHistory called - skipping, using local storage');
   };
 
   const loadLanguagePreference = async () => {
@@ -335,13 +404,12 @@ export default function ChatScreen({ navigation }) {
         const newSessionId = data.session_id;
         setSessionId(newSessionId);
         
-        // Track this session for current person
+        // Immediately track this session for current person
         const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
         const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
-        if (!personSessions.includes(newSessionId)) {
-          personSessions.push(newSessionId);
-          await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
-        }
+        personSessions.push(newSessionId);
+        await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
+        console.log('💾 Session saved:', newSessionId);
         
         return newSessionId;
       }
@@ -357,74 +425,180 @@ export default function ChatScreen({ navigation }) {
     return;
   };
 
-  const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval) => {
+  const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval = null, isResume = false) => {
+    console.log('🔄 Starting polling for messageId:', messageId, 'isResume:', isResume);
+    console.log('🔄 Polling params:', { messageId, processingMessageId, currentSessionId, isResume });
+    
+    if (!messageId) {
+      console.error('❌ No messageId provided to pollForResponse');
+      return;
+    }
+    
     const maxPolls = 80; // 4 minutes max
     let pollCount = 0;
     
+    // Add to pending messages if not resuming
+    if (!isResume) {
+      await addPendingMessage(messageId);
+    }
+    
+    const loadingMessages = [
+      '🔮 Analyzing your birth chart...',
+      '⭐ Consulting the cosmic energies...',
+      '📊 Calculating planetary positions...',
+      '🌟 Interpreting astrological patterns...',
+      '✨ Preparing your personalized insights...'
+    ];
+    
     const poll = async () => {
       try {
+        console.log('🔍 Polling attempt', pollCount + 1, 'for messageId:', messageId);
         const token = await AsyncStorage.getItem('authToken');
-        const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`, {
+        const url = `${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`;
+        console.log('🔍 Polling URL:', url);
+        
+        const response = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        console.log('🔍 Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Poll response error:', response.status, errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
         
         const status = await response.json();
+        console.log('📊 Poll response for', messageId, ':', JSON.stringify(status, null, 2));
         
         if (status.status === 'completed') {
-          clearInterval(loadingInterval);
-          setMessages(prev => prev.map(msg => 
-            msg.id === processingMessageId 
-              ? { ...msg, content: status.content, isTyping: false }
-              : msg
-          ));
+          console.log('✅ Message completed:', messageId);
+          console.log('📝 Response content:', status.content);
+          
+          // Check if person changed during processing - use more reliable check
+          const currentPersonIdNow = birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null;
+          console.log('🔍 Person check - current:', currentPersonId, 'calculated:', currentPersonIdNow);
+          
+          // Only skip if we have a clear person change (both IDs exist and are different)
+          if (currentPersonId && currentPersonIdNow && currentPersonIdNow !== currentPersonId) {
+            console.log('👤 Person actually changed during processing, cleaning up');
+            await removePendingMessage(messageId);
+            return;
+          }
+          
+          if (loadingInterval) clearInterval(loadingInterval);
+          
+          // Update message with response content
+          setMessagesWithStorage(prev => {
+            const updated = prev.map(msg => 
+              msg.messageId === messageId 
+                ? { ...msg, content: status.content || 'Response received but content is empty', isTyping: false }
+                : msg
+            );
+            console.log('📋 Updated messages with response:', updated.length);
+            return updated;
+          });
+          
           setLoading(false);
+          setIsTyping(false);
+          await removePendingMessage(messageId);
           fetchBalance();
+          
+          // Scroll to bottom to show new response
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+          
           return;
         }
         
         if (status.status === 'failed') {
-          clearInterval(loadingInterval);
-          setMessages(prev => prev.map(msg => 
-            msg.id === processingMessageId 
+          console.log('❌ Message failed:', messageId, status.error_message);
+          if (loadingInterval) clearInterval(loadingInterval);
+          setMessagesWithStorage(prev => prev.map(msg => 
+            msg.messageId === messageId 
               ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isTyping: false }
               : msg
           ));
           setLoading(false);
+          setIsTyping(false);
+          await removePendingMessage(messageId);
           return;
         }
         
-        // Still processing - continue polling
+        // Still processing - update message and continue polling
         if (status.status === 'processing') {
+          const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+          console.log('⏳ Still processing, updating message:', randomMessage);
+          
+          setMessagesWithStorage(prev => {
+            const updated = prev.map(msg => 
+              msg.messageId === messageId 
+                ? { ...msg, content: randomMessage }
+                : msg
+            );
+            console.log('📋 Updated processing message, total messages:', updated.length);
+            return updated;
+          });
+          
           pollCount++;
           if (pollCount < maxPolls) {
             setTimeout(poll, 3000);
           } else {
-            // Timeout
-            clearInterval(loadingInterval);
-            setMessages(prev => prev.map(msg => 
-              msg.id === processingMessageId 
-                ? { ...msg, content: 'Analysis is taking longer than expected. Please try again.', isTyping: false }
+            // Timeout - show restart option
+            console.log('⏰ Polling timeout for messageId:', messageId);
+            if (loadingInterval) clearInterval(loadingInterval);
+            setMessagesWithStorage(prev => prev.map(msg => 
+              msg.messageId === messageId 
+                ? { 
+                    ...msg, 
+                    content: 'Analysis is taking longer than expected. The system is still working on your request.', 
+                    isTyping: false,
+                    showRestartButton: true
+                  }
                 : msg
             ));
             setLoading(false);
+            setIsTyping(false);
+            // Keep in pending messages for later resume
           }
+        } else {
+          console.log('❓ Unexpected status:', status.status);
         }
         
       } catch (error) {
-        console.error('Polling error:', error);
-        clearInterval(loadingInterval);
-        setMessages(prev => prev.map(msg => 
-          msg.id === processingMessageId 
-            ? { ...msg, content: 'Connection error. Please try again.', isTyping: false }
+        console.error('❌ Polling error for messageId:', messageId, error);
+        console.error('❌ Error details:', error.message, error.stack);
+        
+        if (loadingInterval) clearInterval(loadingInterval);
+        setMessagesWithStorage(prev => prev.map(msg => 
+          msg.messageId === messageId 
+            ? { ...msg, content: `Connection error: ${error.message}. Please try again.`, isTyping: false }
             : msg
         ));
         setLoading(false);
+        setIsTyping(false);
+        await removePendingMessage(messageId);
       }
     };
     
+    // Start polling immediately
+    console.log('🔄 Starting initial poll in 1 second...');
     setTimeout(poll, 1000);
+  };
+  
+  const restartPolling = (messageId) => {
+    // Update message to show restarting
+    setMessagesWithStorage(prev => prev.map(msg => 
+      msg.messageId === messageId 
+        ? { ...msg, content: '🔄 Checking for response...', isTyping: true, showRestartButton: false }
+        : msg
+    ));
+    setLoading(true);
+    
+    // Restart polling (resume mode)
+    pollForResponse(messageId, null, sessionId, null, true);
   };
 
   const sendMessage = async (messageText = inputText) => {
@@ -440,9 +614,12 @@ export default function ChatScreen({ navigation }) {
     // Clear input and set states immediately
     setInputText('');
     setLoading(true);
+    setIsTyping(true);
     setShowGreeting(false);
 
-    console.log('📝 Input cleared, loading set to true');
+    console.log('📝 Input cleared, loading and typing set to true');
+    
+    // Remove test message code
 
     // Add user message immediately
     const userMessage = {
@@ -453,7 +630,7 @@ export default function ChatScreen({ navigation }) {
     };
     
     console.log('👤 Adding user message:', userMessage);
-    setMessages(prev => {
+    setMessagesWithStorage(prev => {
       const newMessages = [...prev, userMessage];
       console.log('📋 Messages after adding user:', newMessages.length);
       return newMessages;
@@ -470,7 +647,7 @@ export default function ChatScreen({ navigation }) {
     };
     
     console.log('🤖 Adding processing message:', processingMessage);
-    setMessages(prev => {
+    setMessagesWithStorage(prev => {
       const newMessages = [...prev, processingMessage];
       console.log('📋 Messages after adding processing:', newMessages.length);
       return newMessages;
@@ -506,7 +683,7 @@ export default function ChatScreen({ navigation }) {
     let messageIndex = 0;
     const loadingInterval = setInterval(() => {
       messageIndex = (messageIndex + 1) % loadingMessages.length;
-      setMessages(prev => prev.map(msg => 
+      setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 
           ? { ...msg, content: loadingMessages[messageIndex] }
           : msg
@@ -550,8 +727,12 @@ export default function ChatScreen({ navigation }) {
       const messageId = result.message_id;
       console.log('🆔 Got message ID:', messageId);
 
+      if (!messageId) {
+        throw new Error('No message ID received from server');
+      }
+
       // Update processing message with messageId
-      setMessages(prev => prev.map(msg => 
+      setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId ? { ...msg, messageId } : msg
       ));
 
@@ -563,12 +744,13 @@ export default function ChatScreen({ navigation }) {
       clearInterval(loadingInterval);
       
       // Replace processing message with error
-      setMessages(prev => prev.map(msg => 
+      setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 
           ? { ...msg, content: 'Sorry, I encountered an error. Please try again.', isTyping: false }
           : msg
       ));
       setLoading(false);
+      setIsTyping(false);
     }
   };
 
@@ -724,7 +906,7 @@ export default function ChatScreen({ navigation }) {
             showsVerticalScrollIndicator={false}
           >
             {messages.map((item) => {
-              console.log('🎨 Rendering message:', item.id, item.role, item.content?.substring(0, 50));
+              console.log('📋 Rendering message:', item.id, 'role:', item.role, 'content length:', item.content?.length, 'isTyping:', item.isTyping);
               return (
                 <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
               );
@@ -1293,7 +1475,6 @@ export default function ChatScreen({ navigation }) {
             }}
             birthData={birthData}
             onPeriodSelect={(period) => {
-              console.log('🎯 Period selected:', period);
               setShowEventPeriods(false);
               setShowGreeting(false);
               const periodQuestion = `Tell me more about the period from ${new Date(period.start_date).toLocaleDateString()} to ${new Date(period.end_date).toLocaleDateString()} when ${period.transit_planet} activates ${period.natal_planet}. What specific events should I expect?`;
