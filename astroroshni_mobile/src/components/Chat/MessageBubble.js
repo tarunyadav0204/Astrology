@@ -639,6 +639,26 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
     return null;
   }
 
+  // Handle typing indicator
+  if (message.isTyping) {
+    return (
+      <Animated.View style={[
+        styles.container,
+        styles.assistantContainer,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+      ]}>
+        <View style={[styles.bubble, styles.assistantBubble]}>
+          <View style={styles.assistantHeader}>
+            <Text style={styles.assistantLabel}>🔮 AstroRoshni</Text>
+          </View>
+          <View style={styles.messageContent}>
+            <Text style={styles.typingText}>{message.content}</Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
   const formattedContent = formatContent(message.content);
   const renderedElements = renderFormattedText(formattedContent);
 
@@ -920,5 +940,27 @@ const styles = StyleSheet.create({
     color: '#ff6b35',
     fontSize: 13,
     fontWeight: '600',
+  },
+  typingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  typingText: {
+    fontSize: 15,
+    color: '#2c3e50',
+    flex: 1,
+    marginRight: 8,
+  },
+  typingDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ff6b35',
+    marginHorizontal: 2,
   },
 });

@@ -94,6 +94,7 @@ export default function ChatScreen({ navigation }) {
   const [showGreeting, setShowGreeting] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
+  const [currentPersonId, setCurrentPersonId] = useState(null);
   const scrollViewRef = useRef(null);
 
   const suggestions = [
@@ -151,9 +152,21 @@ export default function ChatScreen({ navigation }) {
 
   useEffect(() => {
     if (birthData) {
+      // Create unique person ID from birth data
+      const personId = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+      
+      // Check if person changed
+      if (currentPersonId && currentPersonId !== personId) {
+        // Different person selected - clear current state
+        setMessages([]);
+        setSessionId(null);
+        setShowGreeting(true);
+      }
+      
+      setCurrentPersonId(personId);
       loadChatHistory();
     }
-  }, [birthData]);
+  }, [birthData, currentPersonId]);
 
   const handleGreetingOptionSelect = async (option) => {
     console.log('🎯 Greeting option selected:', option);
@@ -239,18 +252,62 @@ export default function ChatScreen({ navigation }) {
   const loadChatHistory = async () => {
     try {
       if (!birthData) return;
-      const response = await chatAPI.getChatHistory(birthData);
-      const existingMessages = response.data.messages || [];
-      setMessages(existingMessages);
       
-      // Show greeting if no existing messages, otherwise go to chat
-      if (existingMessages.length === 0) {
-        setShowGreeting(true);
-      } else {
-        setShowGreeting(false);
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/history')}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const sessions = data.sessions || [];
+        
+        if (sessions.length > 0) {
+          // Load the most recent session
+          const latestSession = sessions[0];
+          const sessionResponse = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${latestSession.session_id}`)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (sessionResponse.ok) {
+            const sessionData = await sessionResponse.json();
+            const messages = sessionData.messages || [];
+            
+            // Filter messages for current person
+            const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+            const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
+            
+            // Only load if this session belongs to current person
+            if (!personSessions.includes(latestSession.session_id)) {
+              // This session doesn't belong to current person - start fresh
+              setShowGreeting(true);
+              return;
+            }
+            
+            // Convert to our message format
+            const formattedMessages = messages.map(msg => ({
+              id: `${msg.timestamp}_${Math.random()}`,
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content || '🔮 Analyzing your birth chart...',
+              timestamp: msg.timestamp
+            }));
+            
+            if (formattedMessages.length > 0) {
+              setMessages(formattedMessages);
+              setSessionId(latestSession.session_id);
+              setShowGreeting(false);
+            } else {
+              setShowGreeting(true);
+            }
+            return;
+          }
+        }
       }
+      
+      // No history found - show greeting
+      setShowGreeting(true);
     } catch (error) {
-      // Show greeting on error too
+      console.error('Error loading chat history:', error);
       setShowGreeting(true);
     }
   };
@@ -264,28 +321,110 @@ export default function ChatScreen({ navigation }) {
 
   const createSession = async () => {
     try {
-      const response = await chatAPI.createSession();
-      const newSessionId = response.data.session_id;
-      setSessionId(newSessionId);
-      return newSessionId;
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/session')}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const newSessionId = data.session_id;
+        setSessionId(newSessionId);
+        
+        // Track this session for current person
+        const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+        const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
+        if (!personSessions.includes(newSessionId)) {
+          personSessions.push(newSessionId);
+          await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
+        }
+        
+        return newSessionId;
+      }
     } catch (error) {
       console.error('Error creating session:', error);
-      return null;
     }
+    return null;
   };
 
-  const saveMessageToHistory = async (message, currentSessionId) => {
-    try {
-      if (!currentSessionId) return;
-      
-      await chatAPI.saveMessage(
-        currentSessionId,
-        message.role,
-        message.content
-      );
-    } catch (error) {
-      console.warn('Error saving message to history:', error);
-    }
+  const saveMessageToHistory = async (message, sessionId) => {
+    // This is handled by the backend when processing messages
+    // No need to save manually in mobile app
+    return;
+  };
+
+  const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval) => {
+    const maxPolls = 80; // 4 minutes max
+    let pollCount = 0;
+    
+    const poll = async () => {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const status = await response.json();
+        
+        if (status.status === 'completed') {
+          clearInterval(loadingInterval);
+          setMessages(prev => prev.map(msg => 
+            msg.id === processingMessageId 
+              ? { ...msg, content: status.content, isTyping: false }
+              : msg
+          ));
+          setLoading(false);
+          fetchBalance();
+          return;
+        }
+        
+        if (status.status === 'failed') {
+          clearInterval(loadingInterval);
+          setMessages(prev => prev.map(msg => 
+            msg.id === processingMessageId 
+              ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isTyping: false }
+              : msg
+          ));
+          setLoading(false);
+          return;
+        }
+        
+        // Still processing - continue polling
+        if (status.status === 'processing') {
+          pollCount++;
+          if (pollCount < maxPolls) {
+            setTimeout(poll, 3000);
+          } else {
+            // Timeout
+            clearInterval(loadingInterval);
+            setMessages(prev => prev.map(msg => 
+              msg.id === processingMessageId 
+                ? { ...msg, content: 'Analysis is taking longer than expected. Please try again.', isTyping: false }
+                : msg
+            ));
+            setLoading(false);
+          }
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error);
+        clearInterval(loadingInterval);
+        setMessages(prev => prev.map(msg => 
+          msg.id === processingMessageId 
+            ? { ...msg, content: 'Connection error. Please try again.', isTyping: false }
+            : msg
+        ));
+        setLoading(false);
+      }
+    };
+    
+    setTimeout(poll, 1000);
   };
 
   const sendMessage = async (messageText = inputText) => {
@@ -296,371 +435,140 @@ export default function ChatScreen({ navigation }) {
       return;
     }
 
-    // Hide greeting when sending first message
+    console.log('✅ Starting sendMessage process');
+    
+    // Clear input and set states immediately
+    setInputText('');
+    setLoading(true);
     setShowGreeting(false);
 
-    // Create session if first message
-    let currentSessionId = sessionId;
-    if (!currentSessionId) {
-      currentSessionId = await createSession();
-      if (!currentSessionId) return;
-    }
+    console.log('📝 Input cleared, loading set to true');
 
+    // Add user message immediately
     const userMessage = {
       id: Date.now().toString(),
       content: messageText,
       role: 'user',
       timestamp: new Date().toISOString(),
     };
+    
+    console.log('👤 Adding user message:', userMessage);
+    setMessages(prev => {
+      const newMessages = [...prev, userMessage];
+      console.log('📋 Messages after adding user:', newMessages.length);
+      return newMessages;
+    });
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-    setLoading(true);
-    
-    // Save user message to database
-    await saveMessageToHistory(userMessage, currentSessionId);
-    
-    // Scroll to bottom when user sends a message
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-
-    // Add typing indicator with engaging messages like web version
-    const loadingMessages = [
-      '🔮 Analyzing your birth chart...',
-      '⭐ Consulting the cosmic energies...',
-      '📊 Calculating planetary positions...',
-      '🌟 Interpreting astrological patterns...',
-      '✨ Preparing your personalized insights...',
-      '🌙 Reading lunar influences...',
-      '☀️ Examining solar aspects...',
-      '♃ Studying Jupiter blessings...',
-      '♀ Analyzing Venus placements...',
-      '♂ Checking Mars energy...',
-      '☿ Decoding Mercury messages...',
-      '♄ Understanding Saturn lessons...',
-      '🐉 Exploring Rahu-Ketu axis...',
-      '🏠 Examining house strengths...',
-      '🔄 Calculating dasha periods...',
-      '🎯 Identifying key yogas...',
-      '🌊 Flowing through nakshatras...',
-      '⚖️ Balancing planetary forces...',
-      '🎭 Unveiling karmic patterns...',
-      '🗝️ Unlocking hidden potentials...'
-    ];
-    
-    // Add initial typing message
-    const typingMessageId = Date.now() + '_typing';
-    const typingMessage = {
-      id: typingMessageId,
-      content: loadingMessages[0],
+    // Add processing message immediately
+    const processingMessageId = Date.now() + '_processing';
+    const processingMessage = {
+      id: processingMessageId,
+      content: '🔮 Analyzing your birth chart...',
       role: 'assistant',
       timestamp: new Date().toISOString(),
       isTyping: true,
     };
     
-    setMessages(prev => [...prev, typingMessage]);
-    
-    // Cycle through loading messages
-    let currentIndex = 0;
+    console.log('🤖 Adding processing message:', processingMessage);
+    setMessages(prev => {
+      const newMessages = [...prev, processingMessage];
+      console.log('📋 Messages after adding processing:', newMessages.length);
+      return newMessages;
+    });
+
+    // Scroll to bottom
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
+    // Create session if needed
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      console.log('🆕 Creating new session');
+      currentSessionId = await createSession();
+      if (!currentSessionId) {
+        console.log('❌ Failed to create session');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Loading messages for cycling
+    const loadingMessages = [
+      '🔮 Analyzing your birth chart...',
+      '⭐ Consulting the cosmic energies...',
+      '📊 Calculating planetary positions...',
+      '🌟 Interpreting astrological patterns...',
+      '✨ Preparing your personalized insights...'
+    ];
+
+    // Start cycling through loading messages
+    let messageIndex = 0;
     const loadingInterval = setInterval(() => {
-      currentIndex = (currentIndex + 1) % loadingMessages.length;
-      
-      setMessages(prev => {
-        return prev.map(msg => 
-          msg.id === typingMessageId 
-            ? { ...msg, content: loadingMessages[currentIndex] }
-            : msg
-        );
-      });
+      messageIndex = (messageIndex + 1) % loadingMessages.length;
+      setMessages(prev => prev.map(msg => 
+        msg.id === processingMessageId 
+          ? { ...msg, content: loadingMessages[messageIndex] }
+          : msg
+      ));
     }, 3000);
 
-    // Retry function with exponential backoff
-    const retryRequest = async (attempt = 1) => {
-      try {
-        // Fix date and time formats to match web version
-        const fixedBirthData = { ...birthData };
-        
-        // Fix date format - extract YYYY-MM-DD from ISO string
-        if (fixedBirthData.date && fixedBirthData.date.includes('T')) {
-          fixedBirthData.date = fixedBirthData.date.split('T')[0]; // Extract YYYY-MM-DD
-        }
-        
-        // Fix time format - extract HH:MM from ISO string
-        if (fixedBirthData.time && fixedBirthData.time.includes('T')) {
-          const timeDate = new Date(fixedBirthData.time);
-          fixedBirthData.time = timeDate.toTimeString().slice(0, 5); // Extract HH:MM
-        }
-        
-        // Get user context
-        let userData = null;
-        try {
-          userData = await storage.getUserData();
-        } catch (error) {
-          console.log('Could not get user data:', error);
-        }
-        
-        const userName = userData?.name || 'User';
-        const nativeName = birthData?.name || 'Native';
-        const relationship = (userName.toLowerCase() === nativeName.toLowerCase()) ? 'self' : 'other';
-        
-        const requestBody = { 
-          ...fixedBirthData, 
-          question: messageText, 
-          language: language || 'english', 
-          response_style: 'detailed',
-          premium_analysis: isPremiumAnalysis,
-          user_name: userName,
-          user_relationship: relationship
-        };
-        const fullUrl = `${API_BASE_URL}${getEndpoint('/chat/ask')}`;
-        console.log(`🌐 NETWORK REQUEST (attempt ${attempt})`);
-        console.log(`📍 Full URL: ${fullUrl}`);
-        console.log(`📦 Request Body:`, JSON.stringify(requestBody, null, 2));
-        
-        // Update loading message for retries
-        if (attempt > 1) {
-          setMessages(prev => {
-            return prev.map(msg => 
-              msg.id === typingMessageId 
-                ? { ...msg, content: `🔄 Server busy, retrying... (attempt ${attempt} of 3)` }
-                : msg
-            );
-          });
-        }
-        
-        // Get auth token for authenticated request
-        const token = await AsyncStorage.getItem('authToken');
-        const headers = {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        };
-        
-        const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/ask')}`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody)
-        });
-
-        console.log(`✅ NETWORK RESPONSE: ${response.status}`);
-        console.log(`🔗 Response URL: ${response.url}`);
-        console.log(`📊 Response Headers:`, response.headers);
-
-        // Check for server errors that should trigger retry
-        if (response.status === 502 || response.status === 503 || response.status === 504) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-
-        if (!response.ok) {
-          throw new Error(`Chat API error: ${response.status}`);
-        }
-        
-        return response;
-      } catch (error) {
-        const isRetryableError = error.message.includes('502') || 
-                               error.message.includes('503') || 
-                               error.message.includes('504') || 
-                               error.message.includes('upstream') ||
-                               error.message.includes('Network') ||
-                               error.message.includes('fetch');
-        
-        if (isRetryableError && attempt < 3) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000); // 1s, 2s, 4s
-          console.log(`Retrying in ${delay}ms due to:`, error.message);
-          
-          // Show retry message
-          setMessages(prev => {
-            return prev.map(msg => 
-              msg.id === typingMessageId 
-                ? { ...msg, content: `⏳ Connection issue detected, retrying in ${delay/1000}s...` }
-                : msg
-            );
-          });
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return retryRequest(attempt + 1);
-        }
-        throw error;
-      }
-    };
-    
     try {
-      const response = await retryRequest();
-
-      let assistantMessage = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toISOString()
+      console.log('🌐 Making API request');
+      const token = await AsyncStorage.getItem('authToken');
+      
+      const requestBody = {
+        session_id: currentSessionId,
+        question: messageText,
+        language: language || 'english',
+        response_style: 'detailed',
+        premium_analysis: isPremiumAnalysis
       };
       
-      // Update balance after successful response
-      fetchBalance();
+      console.log('📦 Request body:', requestBody);
+      
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
 
-      // Clear loading interval and replace typing message with actual response
-      clearInterval(loadingInterval);
-      setMessages(prev => [
-        ...prev.filter(msg => msg.id !== typingMessageId),
-        assistantMessage
-      ]);
+      console.log('📡 API response status:', response.status);
 
-      // Handle response exactly like web version
-      const responseText = await response.text();
-      console.log('Full response text:', responseText);
-      
-      let hasReceivedContent = false;
-      
-      // Process SSE format exactly like web
-      const lines = responseText.split('\n').filter(line => line.trim());
-      console.log('Total lines to process:', lines.length);
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          console.log('Processing data:', data);
-          
-          if (data === '[DONE]') break;
-          if (data && data.length > 0) {
-            try {
-              console.log('DEBUG: Attempting to parse JSON data');
-              // Decode HTML entities exactly like web version
-              const decodeHtmlEntities = (text) => {
-                // For React Native, we can't use textarea, so use manual replacement
-                return text
-                  .replace(/&quot;/g, '"')
-                  .replace(/&amp;/g, '&')
-                  .replace(/&lt;/g, '<')
-                  .replace(/&gt;/g, '>')
-                  .replace(/&#39;/g, "'")
-                  .replace(/&nbsp;/g, ' ');
-              };
-              
-              // First try to parse as-is, then decode if needed (exactly like web)
-              let parsed;
-              try {
-                parsed = JSON.parse(data);
-                console.log('DEBUG: JSON parsed successfully, status:', parsed.status);
-              } catch (parseError) {
-                console.log('DEBUG: Direct JSON parse failed, trying with HTML decode');
-                // If direct parsing fails, try decoding first
-                const decodedData = decodeHtmlEntities(data);
-                parsed = JSON.parse(decodedData);
-                console.log('DEBUG: JSON parsed after HTML decode, status:', parsed.status);
-              }
-              
-              console.log('Parsed data:', parsed);
-              
-              // Handle chunks like web version
-              if (parsed.status === 'chunk') {
-                console.log('DEBUG: Processing chunk response', parsed.chunk_index, 'of', parsed.total_chunks);
-                // Decode HTML entities in chunk content
-                let chunkContent = parsed.response || '';
-                if (chunkContent.includes('&lt;') || chunkContent.includes('&gt;') || chunkContent.includes('&quot;') || chunkContent.includes('&#39;')) {
-                  chunkContent = decodeHtmlEntities(chunkContent);
-                }
-                assistantMessage.content += chunkContent;
-                hasReceivedContent = true;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = { ...assistantMessage };
-                  return newMessages;
-                });
-              } else if (parsed.status === 'complete' && parsed.response) {
-                // Decode HTML entities in complete response
-                let responseContent = parsed.response;
-                if (responseContent.includes('&lt;') || responseContent.includes('&gt;') || responseContent.includes('&quot;') || responseContent.includes('&#39;')) {
-                  responseContent = decodeHtmlEntities(responseContent);
-                }
-                assistantMessage.content = responseContent;
-                hasReceivedContent = true;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = { ...assistantMessage };
-                  return newMessages;
-                });
-                break;
-              } else if (parsed.status === 'complete') {
-                // Complete without response means use accumulated content
-                console.log('DEBUG: Complete status without response, using accumulated content');
-                break;
-              } else if (parsed.status === 'error') {
-                throw new Error(parsed.error || 'AI analysis failed');
-              } else if (parsed.content) {
-                // Decode HTML entities in content like web version
-                let content = parsed.content;
-                if (content.includes('&lt;') || content.includes('&gt;') || content.includes('&quot;') || content.includes('&#39;')) {
-                  content = decodeHtmlEntities(content);
-                }
-                assistantMessage.content += content;
-                hasReceivedContent = true;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = { ...assistantMessage };
-                  return newMessages;
-                });
-              }
-            } catch (parseError) {
-              console.error('Error parsing chunk:', parseError);
-              console.log('Raw data causing error:', data);
-              
-              // Try regex extraction as fallback
-              const contentMatch = data.match(/["']content["']\s*:\s*["']((?:[^"'\\]|\\.)*)['"]/i);
-              if (contentMatch) {
-                const content = contentMatch[1]
-                  .replace(/\\n/g, '\n')
-                  .replace(/\\"/g, '"')
-                  .replace(/\\\\/g, '/');
-                console.log('Extracted content via regex:', content.substring(0, 100));
-                assistantMessage.content += content;
-                hasReceivedContent = true;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = { ...assistantMessage };
-                  return newMessages;
-                });
-              }
-            }
-          }
-        }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error Response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
+
+      const result = await response.json();
+      console.log('📝 API Response:', result);
       
-      // Final validation like web version
-      if (!hasReceivedContent || !assistantMessage.content.trim()) {
-        console.error('Empty response detected:', { hasReceivedContent, content: assistantMessage.content });
-        throw new Error('Empty response received - please try again');
-      }
-      
-      // Save assistant message to database
-      await saveMessageToHistory(assistantMessage, currentSessionId);
+      const messageId = result.message_id;
+      console.log('🆔 Got message ID:', messageId);
+
+      // Update processing message with messageId
+      setMessages(prev => prev.map(msg => 
+        msg.id === processingMessageId ? { ...msg, messageId } : msg
+      ));
+
+      // Start polling
+      pollForResponse(messageId, processingMessageId, currentSessionId, loadingInterval);
 
     } catch (error) {
-      console.error('Error sending message after retries:', error);
+      console.error('❌ Error sending message:', error);
       clearInterval(loadingInterval);
       
-      let errorContent = 'Sorry, I encountered an error. Please try again.';
-      
-      if (error.message.includes('502') || error.message.includes('503') || error.message.includes('upstream')) {
-        errorContent = 'Server is experiencing high load. Please try again in a few moments.';
-      } else if (error.message.includes('Network')) {
-        errorContent = 'Network connection issue. Please check your internet and try again.';
-      }
-      
-      // Remove empty assistant message and add error message
-      setMessages(prev => {
-        const filtered = prev.filter(msg => msg.id !== typingMessageId && !(msg.role === 'assistant' && !msg.content.trim()));
-        return [...filtered, {
-          id: Date.now().toString(),
-          content: errorContent,
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-        }];
-      });
-    } finally {
+      // Replace processing message with error
+      setMessages(prev => prev.map(msg => 
+        msg.id === processingMessageId 
+          ? { ...msg, content: 'Sorry, I encountered an error. Please try again.', isTyping: false }
+          : msg
+      ));
       setLoading(false);
-      // Clean up any empty messages
-      setTimeout(() => {
-        setMessages(prev => prev.filter(msg => !(msg.role === 'assistant' && !msg.content.trim())));
-      }, 1000);
     }
   };
 
@@ -815,9 +723,12 @@ export default function ChatScreen({ navigation }) {
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
-            {messages.map((item) => (
-              <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
-            ))}
+            {messages.map((item) => {
+              console.log('🎨 Rendering message:', item.id, item.role, item.content?.substring(0, 50));
+              return (
+                <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
+              );
+            })}
           </ScrollView>
         )}
 
