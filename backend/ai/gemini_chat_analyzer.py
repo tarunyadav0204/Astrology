@@ -195,7 +195,12 @@ class GeminiChatAnalyzer:
                     print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
                     print(f"Prompt length: {len(prompt)} characters")
                     
-                    response = selected_model.generate_content(prompt)
+                    # Fix for DeadlineExceeded: Increase timeout to 600s for Gemini 3.0's deep thinking
+                    response = selected_model.generate_content(
+                        prompt,
+                        request_options={'timeout': 600}  # 10 minutes timeout for deep reasoning
+                    )
+                    
                     api_time = time.time() - api_start_time
                     
                     print(f"\n=== GEMINI API RESPONSE ===")

@@ -1,7 +1,7 @@
 import React from 'react';
 import MessageBubble from './MessageBubble';
 
-const MessageList = ({ messages, language = 'english', onMessageHover, onFollowUpClick, onChartRefClick }) => {
+const MessageList = ({ messages, language = 'english', onMessageHover, onFollowUpClick, onChartRefClick, onRestartPolling }) => {
     return (
         <div className="message-list">
             {messages.map((message, index) => (
@@ -15,6 +15,7 @@ const MessageList = ({ messages, language = 'english', onMessageHover, onFollowU
                         language={language} 
                         onFollowUpClick={onFollowUpClick}
                         onChartRefClick={onChartRefClick}
+                        onRestartPolling={onRestartPolling}
                     />
                 </div>
             ))}

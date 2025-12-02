@@ -474,8 +474,9 @@
     margin-top: 4px;
 }
 
-/* Typing indicator styles */
-.message-bubble.typing {
+/* Typing and processing indicator styles */
+.message-bubble.typing,
+.message-bubble.processing {
     opacity: 0.8;
 }
 
@@ -493,6 +494,10 @@
     display: inline-block;
     margin: 0 2px;
     animation: typing 1.4s infinite ease-in-out;
+}
+
+.message-bubble.processing .typing-indicator span {
+    background: #4CAF50;
 }
 
 .typing-indicator span:nth-child(1) {

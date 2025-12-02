@@ -10,6 +10,7 @@ import { useCredits } from '../../context/CreditContext';
 import { showToast } from '../../utils/toast';
 import CreditsModal from '../Credits/CreditsModal';
 import ContextModal from './ContextModal';
+import { apiService } from '../../services/apiService';
 
 import './ChatModal.css';
 
@@ -29,6 +30,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [chatMode, setChatMode] = useState('greeting'); // 'greeting', 'question', 'periods'
     const [eventPeriods, setEventPeriods] = useState([]);
     const [isPremiumMode, setIsPremiumMode] = useState(false);
+    const [pendingMessages, setPendingMessages] = useState(new Set());
+    const [currentPersonId, setCurrentPersonId] = useState(null);
     
     // Check admin status
     useEffect(() => {
@@ -237,14 +240,66 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
 
     useEffect(() => {
         if (birthData) {
-            setShowBirthForm(false);
-            loadChatHistory();
-            // Add greeting message if no existing messages
-            if (messages.length === 0) {
-                addGreetingMessage();
+            // Create unique person ID from birth data
+            const personId = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+            
+            // Check if person changed
+            if (currentPersonId && currentPersonId !== personId) {
+                // Different person selected - clear current state immediately
+                setMessages([]);
+                setSessionId(null);
+                setIsLoading(false);
+                setChatMode('greeting');
             }
+            
+            setCurrentPersonId(personId);
+            setShowBirthForm(false);
+            loadChatHistory(personId);
+            // Check for pending responses when component loads
+            checkPendingResponses(personId);
         }
     }, [birthData]);
+    
+    // Check for pending responses on component mount and when returning to page
+    const checkPendingResponses = (personId = currentPersonId) => {
+        const stored = localStorage.getItem(`pendingChatMessages_${personId}`);
+        if (stored) {
+            const pendingIds = JSON.parse(stored);
+            pendingIds.forEach(messageId => {
+                // Resume polling for each pending message
+                pollForResponse(messageId, true); // true = resume mode
+            });
+        }
+    };
+    
+    // Save pending message to localStorage per person
+    const addPendingMessage = (messageId) => {
+        const key = `pendingChatMessages_${currentPersonId}`;
+        const stored = localStorage.getItem(key);
+        const pendingIds = stored ? JSON.parse(stored) : [];
+        if (!pendingIds.includes(messageId)) {
+            pendingIds.push(messageId);
+            localStorage.setItem(key, JSON.stringify(pendingIds));
+        }
+        setPendingMessages(prev => new Set([...prev, messageId]));
+    };
+    
+    // Remove completed message from localStorage per person
+    const removePendingMessage = (messageId) => {
+        const key = `pendingChatMessages_${currentPersonId}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+            const pendingIds = JSON.parse(stored).filter(id => id !== messageId);
+            localStorage.setItem(key, JSON.stringify(pendingIds));
+        }
+        setPendingMessages(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(messageId);
+            return newSet;
+        });
+    };
+    
+
     
     const addGreetingMessage = () => {
         // Set greeting mode instead of adding message
@@ -279,24 +334,76 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         setChatMode('greeting');
     };
 
-    const loadChatHistory = async () => {
+    const loadChatHistory = async (personId = currentPersonId) => {
         try {
-            const response = await fetch('/api/chat/history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(birthData)
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/chat-v2/history', {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await response.json();
-            const existingMessages = data.messages || [];
-            setMessages(existingMessages);
             
-            // Add greeting if no existing messages
-            if (existingMessages.length === 0) {
-                addGreetingMessage();
+            if (response.ok) {
+                const data = await response.json();
+                const sessions = data.sessions || [];
+                
+                if (sessions.length > 0) {
+                    // Load the most recent session
+                    const latestSession = sessions[0];
+                    const sessionResponse = await fetch(`/api/chat-v2/session/${latestSession.session_id}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (sessionResponse.ok) {
+                        const sessionData = await sessionResponse.json();
+                        const messages = sessionData.messages || [];
+                        
+                        // Filter messages for current person and convert format
+                        const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+                        
+                        // For now, since backend doesn't filter by birth data, we'll use localStorage to track per-person sessions
+                        const personSessions = JSON.parse(localStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
+                        
+                        // Only load if this session belongs to current person
+                        if (!personSessions.includes(latestSession.session_id)) {
+                            // This session doesn't belong to current person - start fresh
+                            addGreetingMessage();
+                            return;
+                        }
+                        
+                        const formattedMessages = messages.map(msg => {
+                            const formatted = {
+                                role: msg.sender === 'user' ? 'user' : 'assistant',
+                                content: msg.content || '🔮 Analyzing your birth chart...',
+                                timestamp: msg.timestamp
+                            };
+                            
+                            // Check if this is a pending message for this person
+                            const pendingIds = JSON.parse(localStorage.getItem(`pendingChatMessages_${personId}`) || '[]');
+                            if (msg.sender === 'assistant' && !msg.content && pendingIds.length > 0) {
+                                // This might be a pending message - add processing state
+                                formatted.isProcessing = true;
+                                formatted.messageId = pendingIds[pendingIds.length - 1]; // Assume latest pending
+                                formatted.showRestartButton = true;
+                            }
+                            
+                            return formatted;
+                        });
+                        
+                        if (formattedMessages.length > 0) {
+                            setMessages(formattedMessages);
+                            setSessionId(latestSession.session_id);
+                            setChatMode('question');
+                        } else {
+                            addGreetingMessage();
+                        }
+                        return;
+                    }
+                }
             }
+            
+            // No history found - show greeting
+            addGreetingMessage();
         } catch (error) {
             console.error('Error loading chat history:', error);
-            // Add greeting on error too
             addGreetingMessage();
         }
     };
@@ -304,7 +411,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const createSession = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('/api/chat/session', {
+            const response = await fetch('/api/chat-v2/session', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -314,8 +421,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             
             if (response.ok) {
                 const data = await response.json();
-                setSessionId(data.session_id);
-                return data.session_id;
+                const newSessionId = data.session_id;
+                setSessionId(newSessionId);
+                
+                // Track this session for current person
+                const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+                const personSessions = JSON.parse(localStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
+                if (!personSessions.includes(newSessionId)) {
+                    personSessions.push(newSessionId);
+                    localStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
+                }
+                
+                return newSessionId;
             }
         } catch (error) {
             console.error('Error creating session:', error);
@@ -323,25 +440,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         return null;
     };
 
-    const saveMessage = async (sessionId, sender, content) => {
-        try {
-            const token = localStorage.getItem('token');
-            await fetch('/api/chat/message', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    sender: sender,
-                    content: content
-                })
-            });
-        } catch (error) {
-            console.error('Error saving message:', error);
-        }
-    };
+
 
     const handleSendMessage = async (message, options = {}) => {
         if (!birthData) return;
@@ -356,14 +455,86 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
         setMessages(prev => [...prev, userMessage]);
         
-        // Save user message
-        await saveMessage(currentSessionId, 'user', message);
-        
-        // Scroll to bottom after user message is added
-        setTimeout(scrollToBottom, 100);
+        // Add processing message
+        const processingMessage = { 
+            role: 'assistant', 
+            content: '🔮 Analyzing your birth chart...', 
+            timestamp: new Date().toISOString(),
+            isProcessing: true,
+            messageId: null
+        };
+        setMessages(prev => [...prev, processingMessage]);
         setIsLoading(true);
+        
+        // Scroll to bottom after messages are added
+        setTimeout(scrollToBottom, 100);
 
-        // Add typing indicator with engaging messages
+        try {
+            const requestData = {
+                session_id: currentSessionId,
+                question: message,
+                language,
+                response_style: responseStyle,
+                premium_analysis: options.premium_analysis || false
+            };
+            
+            console.log('Chat request data:', requestData);
+            console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+            
+            // Start async processing
+            const response = await fetch('/api/chat-v2/ask', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            console.log('Chat response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Chat error response:', errorText);
+                
+                if (response.status === 402) {
+                    fetchBalance();
+                }
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            const result = await response.json();
+            const messageId = result.message_id;
+
+            // Update processing message with messageId
+            setMessages(prev => prev.map(msg => 
+                msg.isProcessing ? { ...msg, messageId } : msg
+            ));
+
+            // Start polling
+            pollForResponse(messageId);
+
+        } catch (error) {
+            console.error('Error starting chat:', error);
+            setMessages(prev => prev.map(msg => 
+                msg.isProcessing 
+                    ? { ...msg, content: 'Error starting analysis. Please try again.', isProcessing: false }
+                    : msg
+            ));
+            setIsLoading(false);
+        }
+    };
+
+    // Polling function
+    const pollForResponse = async (messageId, isResume = false) => {
+        const maxPolls = 80; // 4 minutes max (80 * 3s = 240s)
+        let pollCount = 0;
+        
+        // Add to pending messages if not resuming
+        if (!isResume) {
+            addPendingMessage(messageId);
+        }
+        
         const loadingMessages = [
             '🔮 Analyzing your birth chart...',
             '⭐ Consulting the cosmic energies...',
@@ -387,520 +558,110 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             '🗝️ Unlocking hidden potentials...'
         ];
         
-        // Add initial typing message
-        const typingMessageId = Date.now();
-        const typingMessage = { 
-            id: typingMessageId,
-            role: 'assistant', 
-            content: loadingMessages[0], 
-            timestamp: new Date().toISOString(),
-            isTyping: true
-        };
-        
-        setMessages(prev => [...prev, typingMessage]);
-        
-        // Cycle through loading messages
-        let currentIndex = 0;
-        const loadingInterval = setInterval(() => {
-            currentIndex = (currentIndex + 1) % loadingMessages.length;
-            
-            setMessages(prev => {
-                return prev.map(msg => 
-                    msg.id === typingMessageId 
-                        ? { ...msg, content: loadingMessages[currentIndex] }
-                        : msg
-                );
-            });
-        }, 3000);
-
-        // Retry function with exponential backoff
-        const retryRequest = async (attempt = 1) => {
+        const poll = async () => {
             try {
-                console.log(`Sending chat request (attempt ${attempt}):`, { ...birthData, question: message, language, response_style: responseStyle });
-                
-                // Update loading message for retries
-                if (attempt > 1) {
-                    setMessages(prev => {
-                        return prev.map(msg => 
-                            msg.id === typingMessageId 
-                                ? { ...msg, content: `🔄 Server busy, retrying... (attempt ${attempt} of 3)` }
-                                : msg
-                        );
-                    });
-                }
-                
-                // Get user context
-                let userData = null;
-                try {
-                    const userResponse = await fetch('/api/me', {
-                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                    });
-                    if (userResponse.ok) {
-                        userData = await userResponse.json();
-                    }
-                } catch (error) {
-                    console.log('Could not get user data:', error);
-                }
-                
-                const userName = userData?.name || 'User';
-                const nativeName = birthData?.name || 'Native';
-                const relationship = (userName.toLowerCase() === nativeName.toLowerCase()) ? 'self' : 'other';
-                
-                const token = localStorage.getItem('token');
-                const requestBody = { 
-                    ...birthData, 
-                    question: message, 
-                    language, 
-                    response_style: responseStyle,
-                    selected_period: options.selected_period,
-                    premium_analysis: options.premium_analysis || false,
-                    user_name: userName,
-                    user_relationship: relationship
-                };
-                
-                if (isAdmin) {
-                    requestBody.include_context = true;
-                }
-                
-                const response = await fetch('/api/chat/ask', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        ...(token && { 'Authorization': `Bearer ${token}` })
-                    },
-                    body: JSON.stringify(requestBody)
+                const response = await fetch(`/api/chat-v2/status/${messageId}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                 });
-
-                console.log('Chat response status:', response.status);
                 
-                // Check for server errors that should trigger retry
-                if (response.status === 502 || response.status === 503 || response.status === 504) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
-                if (!response.ok) {
-                    console.error('Chat API error:', response.status, response.statusText);
-                    
-                    // If 402 Payment Required, refresh credit balance
-                    if (response.status === 402) {
-                        console.log('🔄 402 error detected, refreshing credit balance...');
-                        fetchBalance();
+                const status = await response.json();
+                
+                if (status.status === 'completed') {
+                    // Check if person changed during processing
+                    const currentPersonIdNow = birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null;
+                    if (currentPersonIdNow !== currentPersonId) {
+                        // Person changed - don't show response, just clean up
+                        removePendingMessage(messageId);
+                        return;
                     }
                     
-                    throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+                    // Replace processing message with actual response
+                    setMessages(prev => prev.map(msg => 
+                        msg.messageId === messageId 
+                            ? { ...msg, content: status.content, isProcessing: false }
+                            : msg
+                    ));
+                    setIsLoading(false);
+                    removePendingMessage(messageId);
+                    return;
                 }
                 
-                return response;
-            } catch (error) {
-                const isRetryableError = error.message.includes('502') || 
-                                       error.message.includes('503') || 
-                                       error.message.includes('504') || 
-                                       error.message.includes('upstream') ||
-                                       error.message.includes('Network') ||
-                                       error.message.includes('fetch');
+                if (status.status === 'failed') {
+                    setMessages(prev => prev.map(msg => 
+                        msg.messageId === messageId 
+                            ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isProcessing: false }
+                            : msg
+                    ));
+                    setIsLoading(false);
+                    removePendingMessage(messageId);
+                    return;
+                }
                 
-                if (isRetryableError && attempt < 3) {
-                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000); // 1s, 2s, 4s
-                    console.log(`Retrying in ${delay}ms due to:`, error.message);
+                // Still processing - update message and continue polling
+                if (status.status === 'processing') {
+                    const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
                     
-                    // Show retry message
-                    setMessages(prev => {
-                        return prev.map(msg => 
-                            msg.id === typingMessageId 
-                                ? { ...msg, content: `⏳ Connection issue detected, retrying in ${delay/1000}s...` }
+                    setMessages(prev => prev.map(msg => 
+                        msg.messageId === messageId 
+                            ? { ...msg, content: randomMessage }
+                            : msg
+                    ));
+                    
+                    // Continue polling
+                    pollCount++;
+                    if (pollCount < maxPolls) {
+                        setTimeout(poll, 3000); // Poll every 3 seconds
+                    } else {
+                        // Timeout - show restart option
+                        setMessages(prev => prev.map(msg => 
+                            msg.messageId === messageId 
+                                ? { 
+                                    ...msg, 
+                                    content: 'Analysis is taking longer than expected. The system is still working on your request.', 
+                                    isProcessing: false,
+                                    showRestartButton: true
+                                }
                                 : msg
-                        );
-                    });
-                    
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return retryRequest(attempt + 1);
+                        ));
+                        setIsLoading(false);
+                        // Keep in pending messages for later resume
+                    }
                 }
-                throw error;
+                
+            } catch (error) {
+                console.error('Polling error:', error);
+                setMessages(prev => prev.map(msg => 
+                    msg.messageId === messageId 
+                        ? { ...msg, content: 'Connection error. Please try again.', isProcessing: false }
+                        : msg
+                ));
+                setIsLoading(false);
+                removePendingMessage(messageId);
             }
         };
         
-        try {
-            console.log('DEBUG: Starting streaming response processing');
-            const response = await retryRequest();
-            console.log('DEBUG: Got response from retryRequest');
+        // Start first poll after 1 second
+        setTimeout(poll, 1000);
+    };
 
-            let reader, decoder;
-            try {
-                reader = response.body.getReader();
-                decoder = new TextDecoder();
-                console.log('DEBUG: Stream reader initialized successfully');
-            } catch (streamError) {
-                console.error('STREAM INIT ERROR:', streamError);
-                console.error('Stream error stack:', streamError.stack);
-                throw streamError;
-            }
-            
-            // Clear loading interval
-            clearInterval(loadingInterval);
-            
-            let assistantMessage = { 
-                id: Date.now(),
-                role: 'assistant', 
-                content: '', 
-                timestamp: new Date().toISOString(),
-                chunks: null
-            };
-            
-            let messageAdded = false;
-            console.log('DEBUG: Starting stream reading loop');
-
-            while (true) {
-                let readResult;
-                try {
-                    readResult = await reader.read();
-                    console.log('DEBUG: Read chunk, done:', readResult.done, 'value length:', readResult.value?.length);
-                } catch (readError) {
-                    console.error('STREAM READ ERROR:', readError);
-                    console.error('Read error stack:', readError.stack);
-                    break;
-                }
-                
-                const { done, value } = readResult;
-                if (done) {
-                    console.log('DEBUG: Stream reading completed');
-                    break;
-                }
-
-                let chunk;
-                try {
-                    chunk = decoder.decode(value);
-                    console.log('DEBUG: Decoded chunk length:', chunk.length, 'preview:', chunk.substring(0, 100));
-                } catch (decodeError) {
-                    console.error('DECODE ERROR:', decodeError);
-                    continue;
-                }
-                
-                const lines = chunk.split('\n');
-                console.log('DEBUG: Processing', lines.length, 'lines');
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6).trim();
-                        console.log('DEBUG: Processing data line, length:', data.length);
-                        if (data === '[DONE]') {
-                            console.log('DEBUG: Received [DONE] marker');
-                            break;
-                        }
-                        if (data && data.length > 0) {
-                            try {
-                                console.log('DEBUG: Attempting to parse JSON data');
-                                console.log('DEBUG: Raw data contains "context":', data.includes('"context"'));
-                                // Decode HTML entities in the raw data
-                                const decodeHtmlEntities = (text) => {
-                                    const textarea = document.createElement('textarea');
-                                    textarea.innerHTML = text;
-                                    return textarea.value;
-                                };
-                                
-                                // First try to parse as-is, then decode if needed
-                                let parsed;
-                                try {
-                                    parsed = JSON.parse(data);
-                                    console.log('DEBUG: JSON parsed successfully, status:', parsed.status);
-                                } catch (parseError) {
-                                    console.log('DEBUG: Direct JSON parse failed, trying with HTML decode');
-                                    // If direct parsing fails, try decoding first
-                                    const decodedData = decodeHtmlEntities(data);
-                                    parsed = JSON.parse(decodedData);
-                                    console.log('DEBUG: JSON parsed after HTML decode, status:', parsed.status);
-                                }
-                                
-                                if (parsed.status === 'context') {
-                                    if (isAdmin && parsed.context) {
-                                        setContextData(parsed.context);
-                                    }
-                                } else if (parsed.status === 'chunk') {
-                                    console.log('DEBUG: Processing chunk response', parsed.chunk_index, 'of', parsed.total_chunks);
-                                    console.log('DEBUG: Chunk keys:', Object.keys(parsed));
-                                    
-                                    // Check if this is the last chunk and log for debugging
-                                    if (parsed.chunk_index === parsed.total_chunks - 1) {
-                                        console.log('DEBUG: Last chunk received, full chunk data:', JSON.stringify(parsed, null, 2));
-                                    }
-                                    // Accumulate chunks
-                                    if (!assistantMessage.chunks) {
-                                        assistantMessage.chunks = new Array(parsed.total_chunks);
-                                    }
-                                    
-                                    // Decode HTML entities in chunk before storing
-                                    let chunkText = parsed.response;
-                                    if (chunkText.includes('&lt;') || chunkText.includes('&gt;') || chunkText.includes('&quot;') || chunkText.includes('&#39;')) {
-                                        chunkText = decodeHtmlEntities(chunkText);
-                                    }
-                                    
-                                    assistantMessage.chunks[parsed.chunk_index] = chunkText;
-                                    console.log('DEBUG: Stored chunk', parsed.chunk_index, 'length:', chunkText.length);
-                                    
-                                    // Only add message once, then update with complete content when all chunks received
-                                    if (!messageAdded) {
-                                        // Add placeholder message
-                                        assistantMessage.content = 'Loading response...';
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === typingMessageId 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
-                                        messageAdded = true;
-                                        console.log('DEBUG: Added placeholder message for chunks');
-                                    }
-                                    
-                                    // Check if all chunks received
-                                    const allChunksReceived = assistantMessage.chunks.every(chunk => chunk !== undefined);
-                                    console.log('DEBUG: Chunks status:', assistantMessage.chunks.map((c, i) => `${i}: ${c ? 'received' : 'missing'}`));
-                                    
-                                    if (allChunksReceived) {
-                                        const completeText = assistantMessage.chunks.join('');
-                                        console.log('DEBUG: All chunks received, complete length:', completeText.length);
-                                        console.log('DEBUG: Complete text preview:', completeText.substring(0, 200));
-                                        console.log('DEBUG: Complete text contains nakshatra:', completeText.toLowerCase().includes('nakshatra'));
-                                        
-                                        assistantMessage.content = completeText.trim();
-                                        assistantMessage.shouldSave = true; // Mark for saving
-                                        
-                                        // Final update with complete content
-                                        setMessages(prev => {
-                                            const updated = prev.map(msg => 
-                                                msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage, content: completeText.trim() }
-                                                    : msg
-                                            );
-                                            console.log('DEBUG: Updated message with complete content');
-                                            return updated;
-                                        });
-                                    }
-                                } else if (parsed.status === 'complete' && parsed.response) {
-                                    console.log('DEBUG: Processing complete response');
-                                    console.log('DEBUG: Parsed keys:', Object.keys(parsed));
-                                    console.log('DEBUG: isAdmin:', isAdmin);
-                                    console.log('DEBUG: parsed.context exists:', !!parsed.context);
-                                    console.log('DEBUG: Full complete response:', JSON.stringify(parsed, null, 2));
-                                    
-                                    // Capture context data for admin
-                                    if (isAdmin && parsed.context) {
-                                        console.log('DEBUG: Setting context data:', parsed.context);
-                                        setContextData(parsed.context);
-                                    } else {
-                                        console.log('DEBUG: Not setting context - isAdmin:', isAdmin, 'hasContext:', !!parsed.context);
-                                    }
-                                    // Decode HTML entities in the response content
-                                    let responseText = parsed.response;
-                                    
-                                    // Check if response contains HTML entities and decode them
-                                    if (responseText.includes('&lt;') || responseText.includes('&gt;') || responseText.includes('&quot;') || responseText.includes('&#39;')) {
-                                        responseText = decodeHtmlEntities(responseText);
-                                        console.log('DEBUG: HTML entities decoded');
-                                    }
-                                    
-                                    responseText = responseText.trim();
-                                    
-                                    console.log('DEBUG: Response text length:', responseText.length);
-                                    
-                                    if (responseText.length > 0) {
-                                        assistantMessage.content = responseText;
-                                        console.log('DEBUG: Set assistant message content');
-                                        
-                                        assistantMessage.shouldSave = true; // Mark for saving
-                                        
-                                        if (!messageAdded) {
-                                            console.log('DEBUG: Adding new message to replace typing indicator');
-                                            // Replace typing message with actual response
-                                            try {
-                                                setMessages(prev => {
-                                                    console.log('DEBUG: setMessages called, prev length:', prev.length);
-                                                    const updated = prev.map(msg => 
-                                                        msg.id === typingMessageId 
-                                                            ? { ...assistantMessage }
-                                                            : msg
-                                                    );
-                                                    
-                                                    console.log('DEBUG: Messages updated, new length:', updated.length);
-                                                    
-                                                    return updated;
-                                                });
-                                                messageAdded = true;
-                                                console.log('DEBUG: Message added successfully');
-                                            } catch (setMessageError) {
-                                                console.error('SET MESSAGE ERROR:', setMessageError);
-                                                console.error('SetMessage error stack:', setMessageError.stack);
-                                            }
-                                        } else {
-                                            console.log('DEBUG: Updating existing message');
-                                            // Update existing message
-                                            try {
-                                                setMessages(prev => {
-                                                    return prev.map(msg => 
-                                                        msg.id === assistantMessage.id 
-                                                            ? { ...assistantMessage }
-                                                            : msg
-                                                    );
-                                                });
-                                            } catch (updateError) {
-                                                console.error('UPDATE MESSAGE ERROR:', updateError);
-                                            }
-                                        }
-                                    }
-                                } else if (parsed.status === 'complete' && !parsed.response) {
-                                    console.log('DEBUG: Processing completion signal for chunked response');
-                                    console.log('DEBUG: Completion signal keys:', Object.keys(parsed));
-                                    console.log('DEBUG: Full completion signal:', JSON.stringify(parsed, null, 2));
-                                    
-                                    // Capture context data for admin from completion signal
-                                    if (isAdmin && parsed.context) {
-                                        console.log('DEBUG: Setting context data from completion signal:', parsed.context);
-                                        setContextData(parsed.context);
-                                    } else {
-                                        console.log('DEBUG: No context in completion - isAdmin:', isAdmin, 'hasContext:', !!parsed.context);
-                                        console.log('DEBUG: Full parsed object:', JSON.stringify(parsed, null, 2));
-                                    }
-                                    
-                                    // Ensure final message state is correct
-                                    if (assistantMessage.chunks && assistantMessage.chunks.length > 0) {
-                                        const completeText = assistantMessage.chunks.join('');
-                                        assistantMessage.content = completeText.trim();
-                                        assistantMessage.shouldSave = true; // Mark for saving
-                                        
-                                        setMessages(prev => {
-                                            return prev.map(msg => 
-                                                msg.id === assistantMessage.id 
-                                                    ? { ...assistantMessage }
-                                                    : msg
-                                            );
-                                        });
-                                        console.log('DEBUG: Final update with complete chunked response');
-                                    }
-                                } else if (parsed.status === 'error') {
-                                    console.log('DEBUG: Processing error response');
-                                    assistantMessage.content = `Sorry, I encountered an error: ${parsed.error || 'Unknown error'}. Please try again.`;
-                                    
-                                    if (!messageAdded) {
-                                        try {
-                                            setMessages(prev => {
-                                                return prev.map(msg => 
-                                                    msg.id === typingMessageId 
-                                                        ? { ...assistantMessage }
-                                                        : msg
-                                                );
-                                            });
-                                            messageAdded = true;
-                                        } catch (errorSetError) {
-                                            console.error('ERROR SET MESSAGE ERROR:', errorSetError);
-                                        }
-                                    }
-                                }
-                            } catch (parseError) {
-                                console.log('DEBUG: JSON parsing failed, trying regex fallback');
-                                console.error('JSON PARSE ERROR:', parseError);
-                                console.error('Parse error stack:', parseError.stack);
-                                console.log('Problematic data:', data.substring(0, 200));
-                                
-                                try {
-                                    const statusMatch = data.match(/"status"\s*:\s*"([^"]+)"/);
-                                    const responseMatch = data.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                                    
-                                    if (statusMatch && responseMatch && statusMatch[1] === 'complete') {
-                                        console.log('DEBUG: Regex fallback successful');
-                                        let response = responseMatch[1]
-                                            .replace(/\\n/g, '\n')
-                                            .replace(/\\"/g, '"');
-                                        
-                                        // Check if response contains HTML entities and decode them
-                                        if (response.includes('&lt;') || response.includes('&gt;') || response.includes('&quot;') || response.includes('&#39;')) {
-                                            response = decodeHtmlEntities(response);
-                                        }
-                                        assistantMessage.content = response;
-                                        
-                                        assistantMessage.shouldSave = true; // Mark for saving
-                                        
-                                        if (!messageAdded) {
-                                            try {
-                                                setMessages(prev => {
-                                                    return prev.map(msg => 
-                                                        msg.id === typingMessageId 
-                                                            ? { ...assistantMessage }
-                                                            : msg
-                                                    );
-                                                });
-                                                messageAdded = true;
-                                            } catch (regexSetError) {
-                                                console.error('REGEX SET MESSAGE ERROR:', regexSetError);
-                                            }
-                                        }
-                                    }
-                                } catch (regexError) {
-                                    console.error('REGEX FALLBACK ERROR:', regexError);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            console.log('DEBUG: Stream processing completed, messageAdded:', messageAdded);
-            
-            // Save message only once when complete
-            if (assistantMessage.shouldSave && assistantMessage.content.trim()) {
-                try {
-                    await saveMessage(currentSessionId, 'assistant', assistantMessage.content.trim());
-                    console.log('DEBUG: Message saved to backend');
-                } catch (saveError) {
-                    console.error('SAVE MESSAGE ERROR:', saveError);
-                }
-            }
-            
-            // If no message was added, remove the typing indicator
-            if (!messageAdded) {
-                console.log('DEBUG: No message added, removing typing indicator');
-                try {
-                    setMessages(prev => prev.filter(msg => msg.id !== typingMessageId));
-                } catch (removeTypingError) {
-                    console.error('REMOVE TYPING ERROR:', removeTypingError);
-                }
-            }
-        } catch (error) {
-            console.error('MAIN STREAMING ERROR:', error);
-            console.error('Main error stack:', error.stack);
-            console.error('Main error name:', error.name);
-            console.error('Main error message:', error.message);
-            clearInterval(loadingInterval);
-            
-            let errorMessage = 'Sorry, I encountered an error after multiple attempts. Please try again.';
-            
-            if (error.message.includes('502') || error.message.includes('503') || error.message.includes('upstream')) {
-                errorMessage = 'Server is experiencing high load. Please try again in a few moments.';
-            } else if (error.message.includes('404')) {
-                errorMessage = 'Chat service is temporarily unavailable. Please try again later.';
-            } else if (error.message.includes('500')) {
-                errorMessage = 'Server error occurred. Please try again in a few moments.';
-            } else if (error.message.includes('Network')) {
-                errorMessage = 'Network connection issue. Please check your internet and try again.';
-            }
-            
-            setMessages(prev => {
-                return prev.map(msg => 
-                    msg.id === typingMessageId 
-                        ? { 
-                            id: Date.now(),
-                            role: 'assistant', 
-                            content: errorMessage, 
-                            timestamp: new Date().toISOString() 
-                        }
-                        : msg
-                );
-            });
-        } finally {
-            setIsLoading(false);
-        }
+    const restartPolling = (messageId) => {
+        // Update message to show restarting
+        setMessages(prev => prev.map(msg => 
+            msg.messageId === messageId 
+                ? { ...msg, content: '🔄 Checking for response...', isProcessing: true, showRestartButton: false }
+                : msg
+        ));
+        setIsLoading(true);
+        
+        // Restart polling (resume mode)
+        pollForResponse(messageId, true);
     };
 
     const handleBirthFormSubmit = () => {
         setShowBirthForm(false);
+        // Note: birthData change will be handled by useEffect above
     };
 
     // Cleanup speech when modal closes
@@ -928,6 +689,19 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             setHoveredMessage(null);
         }
     }, [showMobileMenu]);
+    
+    // Handle page visibility changes - resume polling when user returns
+    React.useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden && birthData && currentPersonId) {
+                // User returned to page - check for pending responses for current person
+                setTimeout(() => checkPendingResponses(currentPersonId), 1000);
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [birthData, currentPersonId]);
     
     const handleCopyMessage = async () => {
         if (!hoveredMessage) return;
@@ -1166,6 +940,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             }}
                                             onFollowUpClick={handleFollowUpClick}
                                             onChartRefClick={handleChartRefClick}
+                                            onRestartPolling={restartPolling}
                                         />
                                         {hoveredMessage && !showMobileMenu && (
                                             <button 

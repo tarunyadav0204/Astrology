@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
 
-const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick }) => {
+const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick, onRestartPolling }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [hasError, setHasError] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState(null);
@@ -330,12 +330,12 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
     return (
         <div 
             ref={messageRef}
-            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''}`}
+            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''}`}
             onTouchStart={isMobile() ? handleLongPress : undefined}
             onClick={() => isMobile() && showActions && setShowActions(false)}
         >
             {/* Action buttons */}
-            {showActions && !message.isTyping && isMobile() && (
+            {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
                 <div className="message-actions">
                     <button 
                         className="action-btn whatsapp-btn"
@@ -350,7 +350,7 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             )}
             
             <div className="message-content">
-                {message.role === 'assistant' && !message.isTyping && textToSpeech.isSupported && message.content && (
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && textToSpeech.isSupported && message.content && (
                     <div style={{ clearfix: 'both', marginBottom: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <select 
                             value={selectedVoice?.name || ''}
@@ -403,7 +403,25 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                         }
                     }}
                 />
-                {message.isTyping && (
+                {message.showRestartButton && (
+                    <button 
+                        onClick={() => onRestartPolling && onRestartPolling(message.messageId)}
+                        style={{
+                            background: '#ff6b35',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            marginTop: '10px',
+                            display: 'block'
+                        }}
+                    >
+                        🔄 Check for Response
+                    </button>
+                )}
+                {(message.isTyping || message.isProcessing) && (
                     <div className="typing-indicator">
                         <span></span>
                         <span></span>
