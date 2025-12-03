@@ -22,16 +22,16 @@ import { StatusBar } from 'react-native';
 
 import MessageBubble from './MessageBubble';
 import EventPeriods from './EventPeriods';
-import ChatGreeting from './ChatGreeting';
+import HomeScreen from './HomeScreen';
 import { storage } from '../../services/storage';
 import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
-import ChartScreen from '../Chart/ChartScreen';
+
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import { useCredits } from '../../credits/CreditContext';
 
-export default function ChatScreen({ navigation }) {
+export default function ChatScreen({ navigation, route }) {
   const { credits, fetchBalance } = useCredits();
   const [chatCost, setChatCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
@@ -89,7 +89,7 @@ export default function ChatScreen({ navigation }) {
   const [showMenu, setShowMenu] = useState(false);
   const drawerAnim = useRef(new Animated.Value(300)).current;
   const menuScrollViewRef = useRef(null);
-  const [showChart, setShowChart] = useState(false);
+
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
@@ -98,6 +98,11 @@ export default function ChatScreen({ navigation }) {
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
+  const [forceGreeting, setForceGreeting] = useState(false);
+  const [chartData, setChartData] = useState(null);
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [dashaData, setDashaData] = useState(null);
+  const [loadingDashas, setLoadingDashas] = useState(false);
   
   // Pending message management (like web app)
   const addPendingMessage = async (messageId) => {
@@ -151,6 +156,91 @@ export default function ChatScreen({ navigation }) {
     "What are my strengths and weaknesses?"
   ];
 
+  const getSignName = (signNumber) => {
+    const signs = {
+      1: 'Aries', 2: 'Taurus', 3: 'Gemini', 4: 'Cancer',
+      5: 'Leo', 6: 'Virgo', 7: 'Libra', 8: 'Scorpio',
+      9: 'Sagittarius', 10: 'Capricorn', 11: 'Aquarius', 12: 'Pisces'
+    };
+    return signs[signNumber] || signNumber;
+  };
+  
+  const getSignIcon = (signNumber) => {
+    const icons = {
+      1: '♈', 2: '♉', 3: '♊', 4: '♋',
+      5: '♌', 6: '♍', 7: '♎', 8: '♏',
+      9: '♐', 10: '♑', 11: '♒', 12: '♓'
+    };
+    return icons[signNumber] || '⭐';
+  };
+
+  const getPlanetColor = (planetName) => {
+    const colors = {
+      'Sun': '#ff6b35',
+      'Moon': '#e0e0e0',
+      'Mars': '#d32f2f',
+      'Mercury': '#4caf50',
+      'Jupiter': '#ffd700',
+      'Venus': '#e91e63',
+      'Saturn': '#2196f3',
+      'Rahu': '#9e9e9e',
+      'Ketu': '#795548',
+    };
+    return colors[planetName] || '#ffffff';
+  };
+
+  const loadChartData = async (birth) => {
+    try {
+      setLoadingChart(true);
+      const formattedData = {
+        ...birth,
+        date: typeof birth.date === 'string' ? birth.date.split('T')[0] : birth.date,
+        time: typeof birth.time === 'string' ? birth.time.split('T')[1]?.slice(0, 5) || birth.time : birth.time,
+        latitude: parseFloat(birth.latitude),
+        longitude: parseFloat(birth.longitude),
+        timezone: birth.timezone || 'Asia/Kolkata'
+      };
+      
+      const { chartAPI } = require('../../services/api');
+      // Use calculateChart instead of calculateChartOnly to save birth data to database
+      const response = await chartAPI.calculateChart(formattedData);
+      setChartData(response.data);
+      console.log('✅ Birth data saved to backend database for chat');
+    } catch (error) {
+      console.error('Error loading chart data:', error);
+    } finally {
+      setLoadingChart(false);
+    }
+  };
+
+  const loadDashaData = async (birth) => {
+    try {
+      setLoadingDashas(true);
+      const targetDate = new Date().toISOString().split('T')[0];
+      
+      const formattedBirthData = {
+        name: birth.name,
+        date: birth.date.includes('T') ? birth.date.split('T')[0] : birth.date,
+        time: birth.time.includes('T') ? new Date(birth.time).toTimeString().slice(0, 5) : birth.time,
+        latitude: parseFloat(birth.latitude),
+        longitude: parseFloat(birth.longitude),
+        timezone: birth.timezone || 'Asia/Kolkata',
+        location: birth.place || 'Unknown'
+      };
+      
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
+      
+      if (response.data && !response.data.error) {
+        setDashaData(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading dasha data:', error);
+    } finally {
+      setLoadingDashas(false);
+    }
+  };
+
 
 
   useEffect(() => {
@@ -160,12 +250,41 @@ export default function ChatScreen({ navigation }) {
     
     // Add focus listener to re-check birth data when returning to screen
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 Chat screen focused, re-checking birth data...');
+      console.log('🔄 Home screen focused, re-checking birth data...');
       checkBirthData();
     });
     
-    return unsubscribe;
-  }, [navigation]);
+    // Handle navigation params
+    if (route.params?.resetToGreeting) {
+      setShowGreeting(true);
+      navigation.setParams({ resetToGreeting: undefined });
+    }
+    
+    // Handle start chat param
+    if (route.params?.startChat) {
+      navigation.setParams({ startChat: undefined });
+      // Use the same logic as greeting option select for question action
+      handleGreetingOptionSelect({ action: 'question' });
+    }
+    
+    // Handle back button - go to home screen if in chat mode, exit if on home screen
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!showGreeting) {
+        // In chat mode, go back to home screen
+        setShowGreeting(true);
+        return true; // Prevent default back behavior
+      } else {
+        // On home screen, exit app
+        BackHandler.exitApp();
+        return true;
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+      backHandler.remove();
+    };
+  }, [navigation, showGreeting, route.params]);
 
   // Remove problematic back handler that clears messages
 
@@ -184,12 +303,17 @@ export default function ChatScreen({ navigation }) {
   };
 
   useEffect(() => {
+    console.log('🔄 birthData useEffect triggered, birthData:', JSON.stringify(birthData, null, 2));
+    console.log('🔄 birthData name:', birthData?.name);
+    
     if (birthData) {
       // Create unique person ID from birth data
       const personId = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+      console.log('🔄 Created personId:', personId);
       
       // Check if person changed
       if (currentPersonId && currentPersonId !== personId) {
+        console.log('👤 Person changed - clearing state');
         // Different person selected - clear current state
         setMessages([]);
         setSessionId(null);
@@ -199,16 +323,24 @@ export default function ChatScreen({ navigation }) {
       // Only update if person ID actually changed
       if (currentPersonId !== personId) {
         console.log('👤 Person changed from', currentPersonId, 'to', personId);
+        console.log('👤 New person name:', birthData.name);
         
         // Set person ID first to avoid null issues
         setCurrentPersonId(personId);
+        
+        // Load chart data for the new person
+        loadChartData(birthData);
+        loadDashaData(birthData);
         
         // Load messages from storage immediately
         loadMessagesFromStorage(personId).then(storedMessages => {
           console.log('📱 PERSON_CHANGE: Found stored messages:', storedMessages.length);
           if (storedMessages.length > 0) {
             setMessages(storedMessages);
-            setShowGreeting(false);
+            // Only auto-switch to chat if no messages exist or we're not coming from analysis
+            if (messages.length === 0) {
+              setShowGreeting(false);
+            }
             
             // Check for processing messages and resume polling
             const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
@@ -225,6 +357,10 @@ export default function ChatScreen({ navigation }) {
             console.log('📱 No stored messages, showing greeting');
             setShowGreeting(true);
           }
+          // Reset force greeting after handling
+          if (forceGreeting) {
+            setTimeout(() => setForceGreeting(false), 100);
+          }
         });
         
         // Check pending responses after person ID is set
@@ -232,6 +368,8 @@ export default function ChatScreen({ navigation }) {
           checkPendingResponses(personId);
         }, 200);
       }
+    } else {
+      console.log('🔄 birthData is null/undefined');
     }
   }, [birthData]);
 
@@ -287,7 +425,10 @@ export default function ChatScreen({ navigation }) {
           if (storedMessages.length > 0) {
             // Only update messages if we don't have any current messages to avoid overwriting
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
-            setShowGreeting(false);
+            // Don't auto-switch if we already have messages loaded
+            if (messages.length === 0) {
+              setShowGreeting(false);
+            }
             
             // Only resume polling if not already polling
             if (!loading && !isTyping) {
@@ -309,6 +450,10 @@ export default function ChatScreen({ navigation }) {
 
   const handleGreetingOptionSelect = async (option) => {
     console.log('🎯 Greeting option selected:', option);
+    console.log('🎯 Current birthData state:', JSON.stringify(birthData, null, 2));
+    console.log('🎯 birthData name specifically:', birthData?.name);
+    console.log('🎯 typeof birthData:', typeof birthData);
+    
     if (option.action === 'periods') {
       console.log('📅 Opening Event Periods modal');
       console.log('📊 Birth data available:', !!birthData);
@@ -321,24 +466,53 @@ export default function ChatScreen({ navigation }) {
       });
     } else {
       console.log('💬 Going to chat mode');
+      console.log('💬 birthData at chat start:', JSON.stringify(birthData, null, 2));
       
       // First load any existing chat history
       await loadChatHistory();
       
+      // Switch to chat mode immediately
+      setShowGreeting(false);
+      
       // Check if we need to show welcome message
       setTimeout(async () => {
+        console.log('👋 TIMEOUT: birthData state:', JSON.stringify(birthData, null, 2));
+        console.log('👋 TIMEOUT: birthData?.name:', birthData?.name);
+        
         const storedMessages = await loadMessagesFromStorage(currentPersonId);
         console.log('👋 Welcome check: stored messages:', storedMessages.length);
-        if (storedMessages.length === 0 && messages.length === 0) {
-          const welcomeMessage = {
-            id: Date.now().toString(),
-            content: `🌟 Welcome! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?`,
-            role: 'assistant',
-            timestamp: new Date().toISOString(),
-          };
-          console.log('👋 Adding welcome message');
+        console.log('👋 Birth data available:', !!birthData, 'Name:', birthData?.name);
+        
+        // Always show fresh welcome message when explicitly starting chat
+        const nativeName = birthData?.name || 'there';
+        console.log('👋 Using native name:', nativeName);
+        console.log('👋 Final welcome message will be: Welcome', nativeName + '!');
+        
+        const welcomeMessage = {
+          id: Date.now().toString(),
+          content: `🌟 Welcome ${nativeName}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?`,
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+        };
+        console.log('👋 Created welcome message content:', welcomeMessage.content.substring(0, 100));
+        
+        // If no stored messages, show welcome. If stored messages exist, prepend welcome if it's not already there
+        if (storedMessages.length === 0) {
+          console.log('👋 No stored messages, adding fresh welcome');
           setMessagesWithStorage([welcomeMessage]);
-          setShowGreeting(false);
+        } else {
+          // Check if first message is already a welcome message
+          const firstMessage = storedMessages[0];
+          console.log('👋 First stored message content:', firstMessage.content.substring(0, 50));
+          if (!firstMessage.content.includes('Welcome')) {
+            console.log('👋 Prepending welcome to existing messages');
+            setMessagesWithStorage([welcomeMessage, ...storedMessages]);
+          } else {
+            console.log('👋 Replacing old welcome with new personalized one');
+            // Replace old welcome with new personalized one
+            const updatedMessages = [welcomeMessage, ...storedMessages.slice(1)];
+            setMessagesWithStorage(updatedMessages);
+          }
         }
       }, 100);
     }
@@ -347,28 +521,53 @@ export default function ChatScreen({ navigation }) {
   const checkBirthData = async () => {
     try {
       const savedBirthData = await storage.getBirthDetails();
-      console.log('📊 Raw birth data from storage:', savedBirthData);
-      console.log('📊 Birth data type:', typeof savedBirthData);
-      console.log('📊 Birth data keys:', savedBirthData ? Object.keys(savedBirthData) : 'null');
+      console.log('📊 Raw birth data from storage:', JSON.stringify(savedBirthData, null, 2));
+      console.log('📊 Birth data name field:', savedBirthData?.name);
+      console.log('📊 Birth data name type:', typeof savedBirthData?.name);
       
       if (savedBirthData && typeof savedBirthData === 'object' && savedBirthData.name && savedBirthData.name.trim()) {
-        console.log('✅ Valid birth data found:', {
-          name: savedBirthData.name,
-          hasDate: !!savedBirthData.date,
-          hasTime: !!savedBirthData.time,
-          hasPlace: !!savedBirthData.place,
-          hasCoords: !!(savedBirthData.latitude && savedBirthData.longitude)
-        });
+        console.log('✅ Valid birth data found in storage, name:', savedBirthData.name);
+        console.log('✅ Setting birthData state with:', JSON.stringify(savedBirthData, null, 2));
         setBirthData(savedBirthData);
       } else {
-        console.log('❌ Invalid birth data:', {
-          exists: !!savedBirthData,
-          type: typeof savedBirthData,
-          hasName: savedBirthData?.name,
-          nameLength: savedBirthData?.name?.length
-        });
-        setBirthData(null);
-        navigation.navigate('BirthForm');
+        console.log('❌ No valid birth data in storage, checking database...');
+        
+        // Try to load first available chart from database
+        try {
+          const { chartAPI } = require('../../services/api');
+          const response = await chartAPI.getExistingCharts();
+          
+          if (response.data && response.data.charts && response.data.charts.length > 0) {
+            const firstChart = response.data.charts[0];
+            console.log('✅ Found chart in database:', firstChart.name);
+            
+            // Convert database chart to birth data format
+            const birthDataFromChart = {
+              name: firstChart.name,
+              date: firstChart.date,
+              time: firstChart.time,
+              latitude: firstChart.latitude,
+              longitude: firstChart.longitude,
+              timezone: firstChart.timezone,
+              place: firstChart.place,
+              gender: firstChart.gender
+            };
+            
+            console.log('✅ Created birthDataFromChart:', JSON.stringify(birthDataFromChart, null, 2));
+            
+            // Save to storage for future use
+            await storage.setBirthDetails(birthDataFromChart);
+            setBirthData(birthDataFromChart);
+          } else {
+            console.log('❌ No charts found in database');
+            setBirthData(null);
+            navigation.navigate('BirthForm');
+          }
+        } catch (apiError) {
+          console.error('❌ Error loading charts from database:', apiError);
+          setBirthData(null);
+          navigation.navigate('BirthForm');
+        }
       }
     } catch (error) {
       console.error('❌ Error checking birth data:', error);
@@ -699,10 +898,23 @@ export default function ChatScreen({ navigation }) {
         question: messageText,
         language: language || 'english',
         response_style: 'detailed',
-        premium_analysis: isPremiumAnalysis
+        premium_analysis: isPremiumAnalysis,
+        native_name: birthData?.name,
+        birth_details: {
+          name: birthData.name,
+          date: birthData.date,
+          time: birthData.time,
+          latitude: parseFloat(birthData.latitude),
+          longitude: parseFloat(birthData.longitude),
+          timezone: birthData.timezone || 'Asia/Kolkata',
+          place: birthData.place || '',
+          gender: birthData.gender || ''
+        }
       };
       
-      console.log('📦 Request body:', requestBody);
+      console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+      console.log('🌐 API URL:', `${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`);
+      console.log('🔑 Auth token exists:', !!token);
       
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
         method: 'POST',
@@ -836,41 +1048,40 @@ export default function ChatScreen({ navigation }) {
             colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
             style={styles.header}
           >
-            <View style={styles.headerLeft}>
-              <View style={styles.headerTitleRow}>
-                <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>🌟 AstroRoshni</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
-                  <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.15)']}
-                    style={styles.nameChipGradient}
-                  >
-                    <Text style={styles.nameChipIcon}>👤</Text>
-                    <Text style={styles.nameChipText} numberOfLines={1}>{birthData?.name?.slice(0, 8)}{birthData?.name?.length > 8 ? '...' : ''}</Text>
-                    <Text style={styles.nameChipArrow}>▼</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.headerButtons}>
+            {!showGreeting && (
               <TouchableOpacity
-                style={styles.creditButton}
+                style={styles.backButton}
+                onPress={() => setShowGreeting(true)}
+              >
+                <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+              </TouchableOpacity>
+            )}
+            
+            <View style={styles.headerCenter}>
+              {showGreeting ? (
+                <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+              ) : (
+                <Text style={styles.headerTitle}>Chat</Text>
+              )}
+              {birthData && (
+                <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
+                  <Text style={styles.nameChipText}>{birthData.name?.slice(0, 12)}{birthData.name?.length > 12 ? '...' : ''}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={[styles.creditButton, isPremiumAnalysis && styles.creditButtonPremium]}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
-                  style={styles.creditGradient}
-                >
-                  <Text style={styles.creditText}>💳 {credits}</Text>
-                </LinearGradient>
+                <Text style={styles.creditText}>
+                  {isPremiumAnalysis ? '⚡' : '💳'} {credits}
+                </Text>
               </TouchableOpacity>
+              
               <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => setShowLanguageModal(true)}
-              >
-                <Text style={styles.headerButtonText}>🌐</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerButton}
+                style={styles.menuButton}
                 onPress={() => {
                   setShowMenu(true);
                   Animated.spring(drawerAnim, {
@@ -879,7 +1090,6 @@ export default function ChatScreen({ navigation }) {
                     tension: 65,
                     friction: 11,
                   }).start(() => {
-                    // Reset scroll position when menu opens
                     setTimeout(() => {
                       menuScrollViewRef.current?.scrollTo({ y: 0, animated: false });
                     }, 100);
@@ -894,7 +1104,7 @@ export default function ChatScreen({ navigation }) {
 
         {/* Content */}
         {showGreeting ? (
-          <ChatGreeting 
+          <HomeScreen 
             birthData={birthData}
             onOptionSelect={handleGreetingOptionSelect}
           />
@@ -905,6 +1115,66 @@ export default function ChatScreen({ navigation }) {
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Signs Display */}
+            {birthData && (
+              <View style={styles.signsContainer}>
+                <LinearGradient
+                  colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
+                  style={styles.signsGradient}
+                >
+                  <Text style={styles.signsTitle}>✨ {birthData.name}'s Chart Essence</Text>
+                  <View style={styles.signsRow}>
+                    <View style={styles.signItem}>
+                      <Text style={styles.signLabel}>☀️ Sun</Text>
+                      <Text style={styles.signValue}>
+                        {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}
+                      </Text>
+                    </View>
+                    <View style={styles.signItem}>
+                      <Text style={styles.signLabel}>🌙 Moon</Text>
+                      <Text style={styles.signValue}>
+                        {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}
+                      </Text>
+                    </View>
+                    <View style={styles.signItem}>
+                      <Text style={styles.signLabel}>⬆️ Ascendant</Text>
+                      <Text style={styles.signValue}>
+                        {loadingChart ? '...' : `${getSignIcon(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)} ${getSignName(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)}`}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Current Running Dashas */}
+                  <View style={styles.dashasContainer}>
+                    <Text style={styles.dashasTitle}>Current Running Dashas</Text>
+                    <View style={styles.dashasRow}>
+                      {loadingDashas ? (
+                        <Text style={styles.dashasLoading}>Loading...</Text>
+                      ) : (
+                        [
+                          { level: 'Maha', data: dashaData?.maha_dashas?.find(d => d.current) },
+                          { level: 'Antar', data: dashaData?.antar_dashas?.find(d => d.current) },
+                          { level: 'Pratyantar', data: dashaData?.pratyantar_dashas?.find(d => d.current) },
+                          { level: 'Sookshma', data: dashaData?.sookshma_dashas?.find(d => d.current) },
+                          { level: 'Prana', data: dashaData?.prana_dashas?.find(d => d.current) }
+                        ].map((dasha, index) => {
+                          const planetColor = getPlanetColor(dasha.data?.planet);
+                          return (
+                            <View key={index} style={[styles.dashaChip, { borderColor: planetColor }]}>
+                              <Text style={styles.dashaLevel}>{dasha.level}</Text>
+                              <Text style={[styles.dashaPlanet, { color: planetColor }]}>
+                                {dasha.data?.planet || '...'}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      )}
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
+            
             {messages.map((item) => {
               console.log('📋 Rendering message:', item.id, 'role:', item.role, 'content length:', item.content?.length, 'isTyping:', item.isTyping);
               return (
@@ -942,26 +1212,7 @@ export default function ChatScreen({ navigation }) {
           </View>
         )}
 
-        {/* Floating Premium Badge - Auto-hides after 3s */}
-        {!showGreeting && showPremiumBadge && (
-          <Animated.View
-            style={[
-              styles.floatingPremiumBadge,
-              { opacity: badgeFadeAnim },
-            ]}
-          >
-            <TouchableOpacity onPress={() => setShowEnhancedPopup(true)} style={styles.floatingBadgeContent}>
-              <LinearGradient
-                colors={['#ff6b35', '#ff8c5a']}
-                style={styles.floatingBadgeGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.floatingBadgeText}>✨ Premium • {premiumChatCost} credits</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+
 
         {/* Unified Input Bar */}
         {!showGreeting && (
@@ -1052,7 +1303,7 @@ export default function ChatScreen({ navigation }) {
           <View style={styles.quickActionsBar}>
             <TouchableOpacity 
               style={styles.quickActionButton}
-              onPress={() => setShowChart(true)}
+              onPress={() => navigation.navigate('Chart', { birthData })}
             >
               <Ionicons name="pie-chart-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
               <Text style={styles.quickActionText}>Chart</Text>
@@ -1281,7 +1532,7 @@ export default function ChatScreen({ navigation }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
-                        setShowChart(true);
+                        navigation.navigate('Chart', { birthData });
                       });
                     }}
                   >
@@ -1422,6 +1673,36 @@ export default function ChatScreen({ navigation }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        setShowLanguageModal(true);
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🌐</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Language</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
 
 
                   <TouchableOpacity
@@ -1459,11 +1740,7 @@ export default function ChatScreen({ navigation }) {
           </TouchableOpacity>
         </Modal>
 
-        {/* Chart Modal */}
-        <ChartScreen 
-          visible={showChart} 
-          onClose={() => setShowChart(false)} 
-        />
+
 
         {/* Event Periods Modal */}
         {showEventPeriods && (
@@ -1668,110 +1945,80 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  headerLeft: {
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerCenter: {
     flex: 1,
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  headerTitleRow: {
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  nameChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginTop: 2,
+  },
+  nameChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    width: '100%',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    letterSpacing: 0.3,
-    flexShrink: 1,
-  },
-  nameChip: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  nameChipGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  nameChipIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  nameChipText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.white,
-    marginRight: 4,
-  },
-  nameChipArrow: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   creditButton: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  creditGradient: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  creditButtonPremium: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderColor: 'rgba(255, 215, 0, 0.4)',
   },
   creditText: {
     color: COLORS.white,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerButtonText: {
-    fontSize: 18,
   },
   messagesContainer: {
     flex: 1,
@@ -1807,29 +2054,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  floatingPremiumBadge: {
-    marginHorizontal: 12,
-    marginBottom: 8,
-  },
-  floatingBadgeContent: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  floatingBadgeGradient: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  floatingBadgeText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+
   unifiedInputContainer: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1952,6 +2177,83 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '600',
+  },
+  signsContainer: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  signsGradient: {
+    padding: 16,
+  },
+  signsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  signsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  signItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  signLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
+  },
+  signValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  dashasContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dashasTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  dashasRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  dashasLoading: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+  },
+  dashaChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+    minWidth: 50,
+  },
+  dashaLevel: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+  },
+  dashaPlanet: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 1,
   },
   modalOverlay: {
     flex: 1,

@@ -475,7 +475,17 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 question: message,
                 language,
                 response_style: responseStyle,
-                premium_analysis: options.premium_analysis || false
+                premium_analysis: options.premium_analysis || false,
+                birth_details: {
+                    name: birthData.name,
+                    date: birthData.date,
+                    time: birthData.time,
+                    latitude: parseFloat(birthData.latitude),
+                    longitude: parseFloat(birthData.longitude),
+                    timezone: birthData.timezone || 'Asia/Kolkata',
+                    place: birthData.place || '',
+                    gender: birthData.gender || ''
+                }
             };
             
             console.log('Chat request data:', requestData);

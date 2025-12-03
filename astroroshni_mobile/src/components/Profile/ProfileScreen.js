@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
+import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ export default function ProfileScreen({ navigation }) {
   const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, daysActive: 0 });
   const [chartData, setChartData] = useState(null);
   const [loadingChart, setLoadingChart] = useState(false);
+  const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -64,21 +66,25 @@ export default function ProfileScreen({ navigation }) {
       const user = await storage.getUserData();
       setUserData(user);
       
-      // For profile page, use user's own birth data, not selected native
-      if (user && user.date && user.time) {
-        setBirthData(user);
+      // Fetch user's self birth chart from API
+      const { authAPI } = require('../../services/api');
+      const response = await authAPI.getSelfBirthChart();
+      
+      if (response.data.has_self_chart) {
+        setBirthData(response.data);
         setStats({
           totalChats: 24,
           chartsViewed: 12,
           daysActive: 7,
         });
-        loadChartData(user);
+        loadChartData(response.data);
       } else {
         // User hasn't set their own birth details
         setBirthData(null);
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+      setBirthData(null);
     }
   };
   
@@ -219,6 +225,22 @@ export default function ProfileScreen({ navigation }) {
                   year: 'numeric' 
                 }) : 'Birth date not set'}
               </Text>
+              {birthData?.time && (
+                <Text style={styles.userSubtitle}>🕐 {birthData.time}</Text>
+              )}
+              {!birthData?.date && (
+                <TouchableOpacity 
+                  style={styles.connectChartButton}
+                  onPress={() => navigation.navigate('SelectNative', { fromProfile: true })}
+                >
+                  <LinearGradient
+                    colors={['#ff6b35', '#ff8c5a']}
+                    style={styles.connectChartGradient}
+                  >
+                    <Text style={styles.connectChartText}>📊 Connect Chart to Profile</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
               {birthData?.place && (
                 <Text style={styles.userLocation}>📍 {birthData.place}</Text>
               )}
@@ -261,7 +283,13 @@ export default function ProfileScreen({ navigation }) {
                 >
                   <TouchableOpacity 
                     style={styles.miniChart}
-                    onPress={() => navigation.navigate('Chat')}
+                    onPress={() => {
+                      if (birthData) {
+                        navigation.navigate('Chart', { birthData });
+                      } else {
+                        navigation.navigate('Home');
+                      }
+                    }}
                   >
                     <Text style={styles.miniChartIcon}>🔮</Text>
                     <Text style={styles.miniChartText}>View Full Chart</Text>
@@ -291,19 +319,31 @@ export default function ProfileScreen({ navigation }) {
                 <ActionButton 
                   icon="chatbubbles" 
                   label="New Chat" 
-                  onPress={() => navigation.navigate('Chat')}
+                  onPress={() => navigation.navigate('Home', { startChat: true })}
                   color="#4a90e2"
                 />
                 <ActionButton 
                   icon="pie-chart" 
                   label="View Chart" 
-                  onPress={() => navigation.navigate('Chat')}
+                  onPress={() => {
+                    if (birthData) {
+                      navigation.navigate('Chart', { birthData });
+                    } else {
+                      navigation.navigate('Home');
+                    }
+                  }}
                   color="#9c27b0"
                 />
                 <ActionButton 
                   icon="time" 
                   label="Dashas" 
-                  onPress={() => navigation.navigate('Chat')}
+                  onPress={() => {
+                    if (birthData) {
+                      setShowDashaBrowser(true);
+                    } else {
+                      navigation.navigate('Home');
+                    }
+                  }}
                   color="#ff6b35"
                 />
                 <ActionButton 
@@ -372,6 +412,12 @@ export default function ProfileScreen({ navigation }) {
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
+      
+      <CascadingDashaBrowser 
+        visible={showDashaBrowser} 
+        onClose={() => setShowDashaBrowser(false)}
+        birthData={birthData}
+      />
     </View>
   );
 }
@@ -433,4 +479,24 @@ const styles = StyleSheet.create({
   logoutButton: { backgroundColor: 'rgba(255, 107, 53, 0.2)', borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.5)', borderRadius: 16, padding: 16, alignItems: 'center', marginTop: 12 },
   logoutText: { color: '#ff6b35', fontSize: 16, fontWeight: '700' },
   bottomSpacer: { height: 20 },
+  connectChartButton: {
+    marginTop: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  connectChartGradient: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  connectChartText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

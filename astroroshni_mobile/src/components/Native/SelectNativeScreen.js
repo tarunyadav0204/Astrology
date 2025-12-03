@@ -18,7 +18,7 @@ import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 
-const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDelete, getZodiacSign }) => {
+const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDelete, onConnectToProfile, getZodiacSign }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const [isRevealed, setIsRevealed] = useState(false);
 
@@ -65,6 +65,12 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
             onPress={() => { closeSwipe(); onEdit(profile); }}
           >
             <Ionicons name="pencil" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.connectButton]}
+            onPress={() => { closeSwipe(); onConnectToProfile(profile); }}
+          >
+            <Ionicons name="person" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton]}
@@ -140,9 +146,10 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
   );
 };
 
-export default function SelectNativeScreen({ navigation }) {
+export default function SelectNativeScreen({ navigation, route }) {
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const fromProfile = route.params?.fromProfile;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -213,9 +220,17 @@ export default function SelectNativeScreen({ navigation }) {
 
   const selectProfile = async (profile) => {
     try {
-      await storage.setBirthDetails(profile);
-      setSelectedProfile(profile.name);
-      navigation.navigate('Chat');
+      if (fromProfile) {
+        // Connect chart to profile and return to Profile screen
+        const { authAPI } = require('../../services/api');
+        await authAPI.updateSelfBirthChart(profile);
+        navigation.navigate('Profile');
+      } else {
+        // Normal selection flow
+        await storage.setBirthDetails(profile);
+        setSelectedProfile(profile.name);
+        navigation.navigate('Home');
+      }
     } catch (error) {
       console.error('Error selecting profile:', error);
     }
@@ -243,6 +258,29 @@ export default function SelectNativeScreen({ navigation }) {
               loadProfiles();
             } catch (error) {
               Alert.alert('Error', 'Failed to delete profile');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleConnectToProfile = (profile) => {
+    Alert.alert(
+      'Connect to Profile',
+      `Connect ${profile.name}'s chart to your profile?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Connect', 
+          onPress: async () => {
+            try {
+              const { authAPI } = require('../../services/api');
+              await authAPI.updateSelfBirthChart(profile);
+              Alert.alert('Success', 'Chart connected to your profile!');
+              navigation.navigate('Profile');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to connect chart to profile');
             }
           }
         }
@@ -278,7 +316,7 @@ export default function SelectNativeScreen({ navigation }) {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.navigate('Chat')} style={styles.backButton}>
+            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Select Native</Text>
@@ -306,6 +344,7 @@ export default function SelectNativeScreen({ navigation }) {
                 onSelect={selectProfile}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onConnectToProfile={handleConnectToProfile}
                 getZodiacSign={getZodiacSign}
               />
             ))}
@@ -411,6 +450,9 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#4CAF50',
+  },
+  connectButton: {
+    backgroundColor: '#2196F3',
   },
   deleteButton: {
     backgroundColor: '#f44336',

@@ -109,7 +109,7 @@ export default function ChatViewScreen({ route, navigation }) {
   };
 
   const continueConversation = () => {
-    navigation.navigate('Chat');
+    navigation.navigate('Home');
   };
 
   return (

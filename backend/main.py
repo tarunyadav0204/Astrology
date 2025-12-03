@@ -1173,6 +1173,57 @@ async def reset_password(request: ResetPassword):
     
     return {"message": "Password reset successfully"}
 
+@app.get("/api/user/self-birth-chart")
+async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
+    """Get user's self birth chart"""
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT name, date, time, latitude, longitude, timezone, place, gender
+        FROM birth_charts WHERE userid = ? AND relation = 'self'
+    ''', (current_user.userid,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return {"has_self_chart": False}
+    
+    return {
+        "has_self_chart": True,
+        "name": result[0],
+        "date": result[1],
+        "time": result[2],
+        "latitude": result[3],
+        "longitude": result[4],
+        "timezone": result[5],
+        "place": result[6],
+        "gender": result[7]
+    }
+
+@app.put("/api/user/self-birth-chart")
+async def update_self_birth_chart(birth_data: BirthData, current_user: User = Depends(get_current_user)):
+    """Update user's self birth chart"""
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    # Remove existing self birth chart
+    cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+    
+    # Update existing chart to self or insert new one
+    cursor.execute('''
+        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+    ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
+          birth_data.latitude, birth_data.longitude, birth_data.timezone, 
+          birth_data.place or '', birth_data.gender or ''))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Self birth chart updated successfully"}
+
 @app.get("/api/health")
 async def api_health():
     try:

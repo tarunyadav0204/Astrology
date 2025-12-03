@@ -200,9 +200,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Validate required fields
     session_id = request.get("session_id")
     question = request.get("question")
+    birth_details = request.get("birth_details")
     
-    if not session_id or not question:
-        raise HTTPException(status_code=422, detail="Missing required fields: session_id and question")
+    if not session_id or not question or not birth_details:
+        raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
     
     # Optional fields with defaults
     language = request.get("language", "english")
@@ -238,7 +239,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Start background processing
     background_tasks.add_task(
         process_gemini_response,
-        message_id, session_id, question, current_user.userid, language, response_style, premium_analysis
+        message_id, session_id, question, current_user.userid, language, response_style, premium_analysis, birth_details
     )
     
     return {
@@ -285,7 +286,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     
     return response
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None):
     """Background task to process Gemini response"""
     import sys
     import os
@@ -295,29 +296,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from chat.chat_context_builder import ChatContextBuilder
     
     try:
-        # Get birth data for user from birth_charts table
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name, date, time, latitude, longitude, timezone, place, gender FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT 1", 
-            (user_id,)
-        )
-        chart_row = cursor.fetchone()
-        conn.close()
+        # Use birth data from request (required)
+        if not birth_details:
+            raise Exception("Birth details are required for chat analysis")
         
-        if not chart_row:
-            raise Exception("Birth data not found for user")
-        
-        birth_data = {
-            'name': chart_row[0],
-            'date': chart_row[1], 
-            'time': chart_row[2],
-            'latitude': chart_row[3],
-            'longitude': chart_row[4],
-            'timezone': chart_row[5],
-            'place': chart_row[6] or '',
-            'gender': chart_row[7] or ''
-        }
+        birth_data = birth_details
         
         # Build context
         context_builder = ChatContextBuilder()

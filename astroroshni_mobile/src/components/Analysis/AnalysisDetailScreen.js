@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   Animated,
+  BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +40,14 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       duration: 600,
       useNativeDriver: true,
     }).start();
+    
+    // Handle back button to go to Home screen (greeting state)
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      navigation.navigate('Home', { resetToGreeting: true });
+      return true;
+    });
+    
+    return () => backHandler.remove();
   }, []);
 
   useEffect(() => {
@@ -486,7 +495,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           <View style={styles.header}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => navigation.goBack()}
+              onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
             >
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
@@ -644,7 +653,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       <TouchableOpacity
                         key={index}
                         style={styles.followUpButton}
-                        onPress={() => navigation.navigate('Chat')}
+                        onPress={() => navigation.navigate('Home')}
                       >
                         <LinearGradient
                           colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}

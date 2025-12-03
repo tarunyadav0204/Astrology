@@ -108,6 +108,9 @@ export const authAPI = {
   },
   verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data),
   resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data),
+  updateSelfBirthChart: (birthData) => api.put(getEndpoint('/user/self-birth-chart'), birthData),
+  getSelfBirthChart: () => api.get(getEndpoint('/user/self-birth-chart')),
+
 };
 
 export const chatAPI = {

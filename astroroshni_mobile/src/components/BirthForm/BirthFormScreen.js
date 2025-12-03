@@ -267,7 +267,7 @@ export default function BirthFormScreen({ navigation, route }) {
       triggerConfetti();
       setTimeout(() => {
         Alert.alert('Success', 'Birth chart calculated successfully!', [
-          { text: 'OK', onPress: () => navigation.navigate('Chat') }
+          { text: 'OK', onPress: () => navigation.replace('Home') }
         ]);
       }, 1000);
     } catch (error) {

@@ -332,7 +332,7 @@ export default function ChatHistoryScreen({ navigation }) {
       {!searchQuery && (
         <TouchableOpacity
           style={styles.startChatButton}
-          onPress={() => navigation.navigate('Chat')}
+          onPress={() => navigation.navigate('Home')}
         >
           <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.startChatGradient}>
             <Text style={styles.startChatText}>Start Chatting</Text>

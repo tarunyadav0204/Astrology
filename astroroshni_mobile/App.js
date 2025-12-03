@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar } from 'react-native';
+import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
@@ -15,14 +15,67 @@ import CreditScreen from './src/credits/CreditScreen';
 import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
+import ChartScreen from './src/components/Chart/ChartScreen';
 import { CreditProvider } from './src/credits/CreditContext';
+import { storage } from './src/services/storage';
 
 const Stack = createStackNavigator();
 
 export default function App() {
-  React.useEffect(() => {
-    console.log('App.js loaded');
+  const [isLoading, setIsLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState('Welcome');
+
+  useEffect(() => {
+    checkAuthStatus();
   }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const authToken = await storage.getAuthToken();
+      
+      if (authToken) {
+        // User is logged in, check if they have charts
+        try {
+          const { chartAPI } = require('./src/services/api');
+          console.log('🔍 Checking for existing charts...');
+          const response = await chartAPI.getExistingCharts();
+          console.log('📊 Charts API response:', response.data);
+          
+          if (response.data && response.data.charts && response.data.charts.length > 0) {
+            // User has charts, go to Home
+            console.log('✅ User has charts, going to Home');
+            setInitialRoute('Home');
+          } else {
+            // User has no charts, go to BirthForm
+            console.log('❌ User has no charts, going to BirthForm');
+            setInitialRoute('BirthForm');
+          }
+        } catch (apiError) {
+          console.log('❌ Error checking charts:', apiError);
+          // If API fails, go to BirthForm as fallback
+          setInitialRoute('BirthForm');
+        }
+      } else {
+        // User not logged in, show Welcome
+        setInitialRoute('Welcome');
+      }
+    } catch (error) {
+      console.log('Error checking auth status:', error);
+      setInitialRoute('Welcome');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a23' }}>
+          <ActivityIndicator size="large" color="#ff6b35" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
   
   return (
     <SafeAreaProvider>
@@ -30,7 +83,7 @@ export default function App() {
         <NavigationContainer>
         <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator
-          initialRouteName="Welcome"
+          initialRouteName={initialRoute}
           screenOptions={{
             headerStyle: {
               backgroundColor: '#ff6b35',
@@ -54,7 +107,7 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen 
-            name="Chat" 
+            name="Home" 
             component={ChatScreen}
             options={{ headerShown: false }}
           />
@@ -96,6 +149,11 @@ export default function App() {
           <Stack.Screen 
             name="AnalysisDetail" 
             component={AnalysisDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="Chart" 
+            component={ChartScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

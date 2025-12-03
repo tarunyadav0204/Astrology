@@ -14,7 +14,7 @@ import { COLORS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
-export default function ChatGreeting({ birthData, onOptionSelect }) {
+export default function HomeScreen({ birthData, onOptionSelect }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;

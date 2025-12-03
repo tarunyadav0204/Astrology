@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ScrollView,
   StatusBar,
@@ -23,7 +22,7 @@ import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 
 const { width, height } = Dimensions.get('window');
 
-export default function ChartScreen({ visible, onClose }) {
+export default function ChartScreen({ navigation, route }) {
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -83,11 +82,9 @@ export default function ChartScreen({ visible, onClose }) {
   };
 
   useEffect(() => {
-    if (visible) {
-      loadBirthData();
-      startAnimations();
-    }
-  }, [visible]);
+    loadBirthData();
+    startAnimations();
+  }, []);
   
   const startAnimations = () => {
     Animated.loop(
@@ -108,9 +105,18 @@ export default function ChartScreen({ visible, onClose }) {
     try {
       setLoading(true);
       
-      // Always use current birth data from storage (most up-to-date)
-      const data = await storage.getBirthDetails();
-      console.log('ChartScreen - Birth data from storage:', data);
+      // Use navigation params if provided, otherwise use storage
+      const paramsBirthData = route?.params?.birthData;
+      let data;
+      
+      if (paramsBirthData && paramsBirthData.name) {
+        data = paramsBirthData;
+        console.log('ChartScreen - Using birth data from params:', data);
+      } else {
+        data = await storage.getBirthDetails();
+        console.log('ChartScreen - Birth data from storage:', data);
+      }
+      
       if (data && data.name) {
         setBirthData(data);
         await calculateChart(data);
@@ -150,13 +156,13 @@ export default function ChartScreen({ visible, onClose }) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
       <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
         {/* Compact Header */}
         <View style={styles.compactHeader}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => navigation && navigation.goBack ? navigation.goBack() : console.log('Navigation not available')}>
             <Ionicons name="close" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
@@ -311,7 +317,7 @@ export default function ChartScreen({ visible, onClose }) {
         onClose={() => setShowDashaBrowser(false)}
         birthData={birthData}
       />
-    </Modal>
+    </View>
   );
 }
 
@@ -413,6 +419,7 @@ const styles = StyleSheet.create({
   chartArea: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingBottom: 100,
   },
   chartWrapper: {
     flex: 1,

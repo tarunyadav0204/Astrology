@@ -696,7 +696,8 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   cosmicChartContainer: {
-    height: 400,
+    flex: 1,
+    minHeight: 400,
     padding: 10,
   },
   swipeArea: {

@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
+import { storage } from '../../services/storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -142,6 +143,9 @@ const WelcomeScreen = ({ navigation }) => {
   ];
 
   useEffect(() => {
+    // Check if user is already logged in
+    checkAuthStatus();
+    
     // Logo entrance animation
     Animated.sequence([
       Animated.timing(logoScale, {
@@ -191,6 +195,24 @@ const WelcomeScreen = ({ navigation }) => {
       ])
     ).start();
   }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const authToken = await storage.getAuthToken();
+      const birthDetails = await storage.getBirthDetails();
+      
+      if (authToken && birthDetails) {
+        // User is logged in and has birth details, go to Chat
+        navigation.replace('Home');
+      } else if (authToken) {
+        // User is logged in but no birth details, go to BirthForm
+        navigation.replace('BirthForm');
+      }
+      // If no auth token, stay on Welcome screen
+    } catch (error) {
+      console.log('Error checking auth status in Welcome:', error);
+    }
+  };
 
   const rotation = logoRotate.interpolate({
     inputRange: [0, 1],

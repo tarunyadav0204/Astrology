@@ -68,7 +68,7 @@ export default function PasswordScreen({
         
         // Navigate based on self_birth_chart
         if (response.data.self_birth_chart) {
-          navigation.navigate('SelectNative');
+          navigation.replace('Home');
         } else {
           // Check existing charts
           try {
@@ -77,12 +77,12 @@ export default function PasswordScreen({
             const hasCharts = chartResponse.data.charts && chartResponse.data.charts.length > 0;
             
             if (hasCharts) {
-              navigation.navigate('SelectNative');
+              navigation.replace('SelectNative');
             } else {
-              navigation.navigate('BirthForm');
+              navigation.replace('BirthForm');
             }
           } catch (error) {
-            navigation.navigate('BirthForm');
+            navigation.replace('BirthForm');
           }
         }
       } else {

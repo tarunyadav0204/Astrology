@@ -41,7 +41,7 @@ export default function WelcomeAfterRegistrationScreen({
   }, []);
 
   const handleCreateBirthChart = () => {
-    navigation.navigate('BirthForm', { 
+    navigation.replace('BirthForm', { 
       prefillData: { 
         name: formData.name 
       } 
@@ -116,7 +116,7 @@ export default function WelcomeAfterRegistrationScreen({
           {/* Skip Option */}
           <TouchableOpacity
             style={styles.skipButton}
-            onPress={() => navigation.navigate('Profile')}
+            onPress={() => navigation.replace('Home')}
           >
             <Text style={styles.skipText}>Skip for now</Text>
           </TouchableOpacity>
