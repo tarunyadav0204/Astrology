@@ -27,6 +27,8 @@ export default function ProfileScreen({ navigation }) {
   const [chartData, setChartData] = useState(null);
   const [loadingChart, setLoadingChart] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
+  const [dashaData, setDashaData] = useState(null);
+  const [loadingDashas, setLoadingDashas] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -35,7 +37,14 @@ export default function ProfileScreen({ navigation }) {
   useEffect(() => {
     loadUserData();
     startAnimations();
-  }, []);
+    
+    // Add focus listener to reload data when returning to screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUserData();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   const startAnimations = () => {
     Animated.parallel([
@@ -78,6 +87,7 @@ export default function ProfileScreen({ navigation }) {
           daysActive: 7,
         });
         loadChartData(response.data);
+        loadDashaData(response.data);
       } else {
         // User hasn't set their own birth details
         setBirthData(null);
@@ -127,6 +137,49 @@ export default function ProfileScreen({ navigation }) {
       9: '♐', 10: '♑', 11: '♒', 12: '♓'
     };
     return icons[signNumber] || '⭐';
+  };
+
+  const getPlanetColor = (planetName) => {
+    const colors = {
+      'Sun': '#ff6b35',
+      'Moon': '#e0e0e0',
+      'Mars': '#d32f2f',
+      'Mercury': '#4caf50',
+      'Jupiter': '#ffd700',
+      'Venus': '#e91e63',
+      'Saturn': '#2196f3',
+      'Rahu': '#9e9e9e',
+      'Ketu': '#795548',
+    };
+    return colors[planetName] || '#ffffff';
+  };
+
+  const loadDashaData = async (birth) => {
+    try {
+      setLoadingDashas(true);
+      const targetDate = new Date().toISOString().split('T')[0];
+      
+      const formattedBirthData = {
+        name: birth.name,
+        date: birth.date.includes('T') ? birth.date.split('T')[0] : birth.date,
+        time: birth.time.includes('T') ? new Date(birth.time).toTimeString().slice(0, 5) : birth.time,
+        latitude: parseFloat(birth.latitude),
+        longitude: parseFloat(birth.longitude),
+        timezone: birth.timezone || 'Asia/Kolkata',
+        location: birth.place || 'Unknown'
+      };
+      
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
+      
+      if (response.data && !response.data.error) {
+        setDashaData(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading dasha data:', error);
+    } finally {
+      setLoadingDashas(false);
+    }
   };
 
   const getZodiacSign = (date) => {
@@ -214,7 +267,7 @@ export default function ProfileScreen({ navigation }) {
                   />
                 </Animated.View>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{getZodiacSign(birthData?.date)}</Text>
+                  <Text style={styles.avatarText}>{chartData ? getSignIcon(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign) : getZodiacSign(birthData?.date)}</Text>
                 </View>
               </View>
               <Text style={styles.userName}>{userData?.name || 'User'}</Text>
@@ -309,6 +362,34 @@ export default function ProfileScreen({ navigation }) {
                       <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)} ${getSignName(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)}`}</Text>
                     </View>
                   </View>
+                  
+                  {/* Current Running Dashas */}
+                  <View style={styles.dashasContainer}>
+                    <Text style={styles.dashasTitle}>Current Running Dashas</Text>
+                    <View style={styles.dashasRow}>
+                      {loadingDashas ? (
+                        <Text style={styles.dashasLoading}>Loading...</Text>
+                      ) : (
+                        [
+                          { level: 'Maha', data: dashaData?.maha_dashas?.find(d => d.current) },
+                          { level: 'Antar', data: dashaData?.antar_dashas?.find(d => d.current) },
+                          { level: 'Pratyantar', data: dashaData?.pratyantar_dashas?.find(d => d.current) },
+                          { level: 'Sookshma', data: dashaData?.sookshma_dashas?.find(d => d.current) },
+                          { level: 'Prana', data: dashaData?.prana_dashas?.find(d => d.current) }
+                        ].map((dasha, index) => {
+                          const planetColor = getPlanetColor(dasha.data?.planet);
+                          return (
+                            <View key={index} style={[styles.dashaChip, { borderColor: planetColor }]}>
+                              <Text style={styles.dashaLevel}>{dasha.level}</Text>
+                              <Text style={[styles.dashaPlanet, { color: planetColor }]}>
+                                {dasha.data?.planet || '...'}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      )}
+                    </View>
+                  </View>
                 </LinearGradient>
               </View>
             </Animated.View>
@@ -358,7 +439,7 @@ export default function ProfileScreen({ navigation }) {
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
               <Text style={styles.sectionTitle}>⚙️ Settings</Text>
               <View style={styles.settingsCard}>
-                <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('BirthForm')}>
+                <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('BirthForm', { editProfile: birthData })}>
                   <View style={styles.settingLeft}>
                     <Ionicons name="person-outline" size={22} color="#ff6b35" />
                     <Text style={styles.settingText}>Edit Birth Details</Text>
@@ -465,6 +546,49 @@ const styles = StyleSheet.create({
   chartDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chartDetailLabel: { fontSize: 14, color: 'rgba(255, 255, 255, 0.7)' },
   chartDetailValue: { fontSize: 14, fontWeight: '600', color: COLORS.white },
+  dashasContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dashasTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  dashasRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  dashasLoading: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+  },
+  dashaChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+    minWidth: 50,
+  },
+  dashaLevel: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+  },
+  dashaPlanet: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 1,
+  },
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   actionButton: { width: (width - 52) / 2, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   actionGradient: { padding: 12, justifyContent: 'center' },

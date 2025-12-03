@@ -131,18 +131,13 @@ export default function ChatScreen({ navigation, route }) {
   };
   
   const checkPendingResponses = async (personId = currentPersonId) => {
-    console.log('🔍 Checking pending responses for person:', personId);
     const stored = await AsyncStorage.getItem(`pendingChatMessages_${personId}`);
     if (stored) {
       const pendingIds = JSON.parse(stored);
-      console.log('🔍 Found pending message IDs:', pendingIds);
       pendingIds.forEach(messageId => {
-        console.log('🔄 Resuming polling for pending message:', messageId);
         // Resume polling for each pending message
         pollForResponse(messageId, null, sessionId, null, true); // true = resume mode
       });
-    } else {
-      console.log('🔍 No pending messages found');
     }
   };
 
@@ -205,7 +200,7 @@ export default function ChatScreen({ navigation, route }) {
       // Use calculateChart instead of calculateChartOnly to save birth data to database
       const response = await chartAPI.calculateChart(formattedData);
       setChartData(response.data);
-      console.log('✅ Birth data saved to backend database for chat');
+
     } catch (error) {
       console.error('Error loading chart data:', error);
     } finally {
@@ -250,7 +245,6 @@ export default function ChatScreen({ navigation, route }) {
     
     // Add focus listener to re-check birth data when returning to screen
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 Home screen focused, re-checking birth data...');
       checkBirthData();
     });
     
@@ -625,9 +619,6 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval = null, isResume = false) => {
-    console.log('🔄 Starting polling for messageId:', messageId, 'isResume:', isResume);
-    console.log('🔄 Polling params:', { messageId, processingMessageId, currentSessionId, isResume });
-    
     if (!messageId) {
       console.error('❌ No messageId provided to pollForResponse');
       return;
@@ -651,16 +642,12 @@ export default function ChatScreen({ navigation, route }) {
     
     const poll = async () => {
       try {
-        console.log('🔍 Polling attempt', pollCount + 1, 'for messageId:', messageId);
         const token = await AsyncStorage.getItem('authToken');
         const url = `${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`;
-        console.log('🔍 Polling URL:', url);
         
         const response = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        console.log('🔍 Response status:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -669,19 +656,13 @@ export default function ChatScreen({ navigation, route }) {
         }
         
         const status = await response.json();
-        console.log('📊 Poll response for', messageId, ':', JSON.stringify(status, null, 2));
         
         if (status.status === 'completed') {
-          console.log('✅ Message completed:', messageId);
-          console.log('📝 Response content:', status.content);
-          
           // Check if person changed during processing - use more reliable check
           const currentPersonIdNow = birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null;
-          console.log('🔍 Person check - current:', currentPersonId, 'calculated:', currentPersonIdNow);
           
           // Only skip if we have a clear person change (both IDs exist and are different)
           if (currentPersonId && currentPersonIdNow && currentPersonIdNow !== currentPersonId) {
-            console.log('👤 Person actually changed during processing, cleaning up');
             await removePendingMessage(messageId);
             return;
           }
@@ -695,7 +676,6 @@ export default function ChatScreen({ navigation, route }) {
                 ? { ...msg, content: status.content || 'Response received but content is empty', isTyping: false }
                 : msg
             );
-            console.log('📋 Updated messages with response:', updated.length);
             return updated;
           });
           
@@ -713,7 +693,6 @@ export default function ChatScreen({ navigation, route }) {
         }
         
         if (status.status === 'failed') {
-          console.log('❌ Message failed:', messageId, status.error_message);
           if (loadingInterval) clearInterval(loadingInterval);
           setMessagesWithStorage(prev => prev.map(msg => 
             msg.messageId === messageId 
@@ -729,7 +708,6 @@ export default function ChatScreen({ navigation, route }) {
         // Still processing - update message and continue polling
         if (status.status === 'processing') {
           const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
-          console.log('⏳ Still processing, updating message:', randomMessage);
           
           setMessagesWithStorage(prev => {
             const updated = prev.map(msg => 
@@ -737,7 +715,6 @@ export default function ChatScreen({ navigation, route }) {
                 ? { ...msg, content: randomMessage }
                 : msg
             );
-            console.log('📋 Updated processing message, total messages:', updated.length);
             return updated;
           });
           
@@ -746,7 +723,6 @@ export default function ChatScreen({ navigation, route }) {
             setTimeout(poll, 3000);
           } else {
             // Timeout - show restart option
-            console.log('⏰ Polling timeout for messageId:', messageId);
             if (loadingInterval) clearInterval(loadingInterval);
             setMessagesWithStorage(prev => prev.map(msg => 
               msg.messageId === messageId 
@@ -762,13 +738,10 @@ export default function ChatScreen({ navigation, route }) {
             setIsTyping(false);
             // Keep in pending messages for later resume
           }
-        } else {
-          console.log('❓ Unexpected status:', status.status);
         }
         
       } catch (error) {
         console.error('❌ Polling error for messageId:', messageId, error);
-        console.error('❌ Error details:', error.message, error.stack);
         
         if (loadingInterval) clearInterval(loadingInterval);
         setMessagesWithStorage(prev => prev.map(msg => 
@@ -783,7 +756,6 @@ export default function ChatScreen({ navigation, route }) {
     };
     
     // Start polling immediately
-    console.log('🔄 Starting initial poll in 1 second...');
     setTimeout(poll, 1000);
   };
   
@@ -801,22 +773,15 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const sendMessage = async (messageText = inputText) => {
-    console.log('🚀 sendMessage called with:', { messageText, birthData: !!birthData });
-    
     if (!messageText.trim() || !birthData) {
-      console.log('❌ Validation failed:', { hasText: !!messageText.trim(), hasBirthData: !!birthData });
       return;
     }
 
-    console.log('✅ Starting sendMessage process');
-    
     // Clear input and set states immediately
     setInputText('');
     setLoading(true);
     setIsTyping(true);
     setShowGreeting(false);
-
-    console.log('📝 Input cleared, loading and typing set to true');
     
     // Remove test message code
 
@@ -828,10 +793,8 @@ export default function ChatScreen({ navigation, route }) {
       timestamp: new Date().toISOString(),
     };
     
-    console.log('👤 Adding user message:', userMessage);
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, userMessage];
-      console.log('📋 Messages after adding user:', newMessages.length);
       return newMessages;
     });
 
@@ -845,10 +808,8 @@ export default function ChatScreen({ navigation, route }) {
       isTyping: true,
     };
     
-    console.log('🤖 Adding processing message:', processingMessage);
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, processingMessage];
-      console.log('📋 Messages after adding processing:', newMessages.length);
       return newMessages;
     });
 
@@ -860,10 +821,8 @@ export default function ChatScreen({ navigation, route }) {
     // Create session if needed
     let currentSessionId = sessionId;
     if (!currentSessionId) {
-      console.log('🆕 Creating new session');
       currentSessionId = await createSession();
       if (!currentSessionId) {
-        console.log('❌ Failed to create session');
         setLoading(false);
         return;
       }
@@ -890,7 +849,6 @@ export default function ChatScreen({ navigation, route }) {
     }, 3000);
 
     try {
-      console.log('🌐 Making API request');
       const token = await AsyncStorage.getItem('authToken');
       
       const requestBody = {
@@ -912,9 +870,7 @@ export default function ChatScreen({ navigation, route }) {
         }
       };
       
-      console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
-      console.log('🌐 API URL:', `${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`);
-      console.log('🔑 Auth token exists:', !!token);
+
       
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
         method: 'POST',
@@ -925,7 +881,7 @@ export default function ChatScreen({ navigation, route }) {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('📡 API response status:', response.status);
+
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -934,10 +890,8 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       const result = await response.json();
-      console.log('📝 API Response:', result);
       
       const messageId = result.message_id;
-      console.log('🆔 Got message ID:', messageId);
 
       if (!messageId) {
         throw new Error('No message ID received from server');

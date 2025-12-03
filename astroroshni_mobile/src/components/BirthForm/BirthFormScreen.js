@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Animated,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -455,30 +456,87 @@ export default function BirthFormScreen({ navigation, route }) {
             </View>
 
             {/* Date Picker */}
-            {showDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.date}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) handleInputChange('date', selectedDate);
-                }}
-                maximumDate={new Date()}
-              />
+            {Platform.OS === 'ios' ? (
+              <Modal visible={showDatePicker} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.pickerGradient}>
+                      <View style={styles.pickerHeader}>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                          <Text style={styles.pickerButton}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={formData.date}
+                        mode="date"
+                        display="spinner"
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) handleInputChange('date', selectedDate);
+                        }}
+                        maximumDate={new Date()}
+                        style={styles.picker}
+                      />
+                    </LinearGradient>
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              showDatePicker && (
+                <DateTimePicker
+                  value={formData.date}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(false);
+                    if (selectedDate) handleInputChange('date', selectedDate);
+                  }}
+                  maximumDate={new Date()}
+                />
+              )
             )}
 
             {/* Time Picker */}
-            {showTimePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.time}
-                mode="time"
-                display="default"
-                onChange={(event, selectedTime) => {
-                  setShowTimePicker(false);
-                  if (selectedTime) handleInputChange('time', selectedTime);
-                }}
-              />
+            {Platform.OS === 'ios' ? (
+              <Modal visible={showTimePicker} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.pickerGradient}>
+                      <View style={styles.pickerHeader}>
+                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                          <Text style={styles.pickerButton}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={formData.time}
+                        mode="time"
+                        display="spinner"
+                        onChange={(event, selectedTime) => {
+                          if (selectedTime) handleInputChange('time', selectedTime);
+                        }}
+                        style={styles.picker}
+                      />
+                    </LinearGradient>
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              showTimePicker && (
+                <DateTimePicker
+                  value={formData.time}
+                  mode="time"
+                  display="default"
+                  onChange={(event, selectedTime) => {
+                    setShowTimePicker(false);
+                    if (selectedTime) handleInputChange('time', selectedTime);
+                  }}
+                />
+              )
             )}
 
             {/* Confetti */}
@@ -768,5 +826,38 @@ const styles = StyleSheet.create({
   },
   confettiText: {
     fontSize: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  pickerContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  pickerGradient: {
+    paddingBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  pickerButton: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  pickerButtonDone: {
+    color: '#ff6b35',
+    fontWeight: '700',
+  },
+  picker: {
+    height: 200,
   },
 });
