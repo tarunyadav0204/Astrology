@@ -225,6 +225,54 @@ async def readiness_check():
 async def test_endpoint():
     return {"status": "ok", "message": "API is working", "timestamp": datetime.now().isoformat()}
 
+@app.get("/api/test-gemini")
+async def test_gemini_connectivity():
+    """Test Gemini API connectivity and configuration"""
+    import os
+    import requests
+    
+    # Check API key
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        return {"success": False, "error": "GEMINI_API_KEY not set"}
+    
+    # Test network connectivity
+    try:
+        response = requests.get('https://generativelanguage.googleapis.com', timeout=10)
+        network_ok = True
+        network_status = response.status_code
+    except Exception as e:
+        network_ok = False
+        network_status = str(e)
+    
+    # Test Gemini API
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Simple test request
+        response = model.generate_content("Hello, just testing connectivity")
+        gemini_ok = True
+        gemini_response = response.text[:100] if response.text else "No response text"
+    except Exception as e:
+        gemini_ok = False
+        gemini_response = str(e)
+    
+    return {
+        "success": network_ok and gemini_ok,
+        "api_key_present": bool(api_key),
+        "api_key_length": len(api_key) if api_key else 0,
+        "network_connectivity": {
+            "success": network_ok,
+            "status": network_status
+        },
+        "gemini_api": {
+            "success": gemini_ok,
+            "response": gemini_response
+        }
+    }
+
 # Remove custom /docs override - let FastAPI handle it automatically
 # GCP health checks will use the default FastAPI /docs endpoint
 
