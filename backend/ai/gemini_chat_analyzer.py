@@ -131,39 +131,12 @@ class GeminiChatAnalyzer:
         print(f"History messages: {len(conversation_history or [])}")
         print(f"Language: {language}, Response style: {response_style}")
         
-        # Log full prompt to file for debugging
-        import os
-        # Use project directory for easier access
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        log_dir = os.path.join(project_root, "logs", "gemini_logs")
-        os.makedirs(log_dir, exist_ok=True)
-        
         # Determine if this is first or second call
         is_transit_call = 'transit_activations' in enhanced_context
         call_type = "SECOND_CALL_WITH_TRANSIT" if is_transit_call else "FIRST_CALL_REQUEST"
         print(f"🎯 CALL TYPE DETECTED: {call_type}")
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_filename = f"{log_dir}/gemini_prompt_{call_type}_{timestamp}.txt"
-        
-        try:
-            with open(log_filename, 'w', encoding='utf-8') as f:
-                f.write(f"=== GEMINI {call_type} PROMPT LOG ===\n")
-                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                f.write(f"Question: {user_question}\n")
-                f.write(f"Prompt Length: {len(prompt)} characters\n")
-                f.write(f"Context Keys: {list(enhanced_context.keys())}\n")
-                f.write(f"Is Transit Call: {is_transit_call}\n")
-                f.write(f"Premium Analysis: {premium_analysis}\n")
-                f.write("\n" + "="*80 + "\n")
-                f.write("FULL PROMPT CONTENT:\n")
-                f.write("="*80 + "\n")
-                f.write(prompt)
-                f.write("\n" + "="*80 + "\n")
-            print(f"📝 FULL PROMPT LOGGED TO: {log_filename}")
-            print(f"📁 LOG DIRECTORY: {log_dir}")
-        except Exception as log_error:
-            print(f"⚠️ Failed to log prompt: {log_error}")
+
         
         # Log nakshatra data availability
         planetary_analysis = enhanced_context.get('planetary_analysis', {})
