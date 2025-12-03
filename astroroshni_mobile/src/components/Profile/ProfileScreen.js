@@ -112,7 +112,7 @@ export default function ProfileScreen({ navigation }) {
       
       const { chartAPI } = require('../../services/api');
       const response = await chartAPI.calculateChartOnly(formattedData);
-      console.log('Chart API Response:', JSON.stringify(response.data, null, 2));
+      console.log('🔍 PROFILE CHART DATA STRUCTURE:', JSON.stringify(response.data, null, 2));
       setChartData(response.data);
     } catch (error) {
       console.error('Error loading chart data:', error);
@@ -123,18 +123,18 @@ export default function ProfileScreen({ navigation }) {
 
   const getSignName = (signNumber) => {
     const signs = {
-      1: 'Aries', 2: 'Taurus', 3: 'Gemini', 4: 'Cancer',
-      5: 'Leo', 6: 'Virgo', 7: 'Libra', 8: 'Scorpio',
-      9: 'Sagittarius', 10: 'Capricorn', 11: 'Aquarius', 12: 'Pisces'
+      0: 'Aries', 1: 'Taurus', 2: 'Gemini', 3: 'Cancer',
+      4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
+      8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
     };
     return signs[signNumber] || signNumber;
   };
   
   const getSignIcon = (signNumber) => {
     const icons = {
-      1: '♈', 2: '♉', 3: '♊', 4: '♋',
-      5: '♌', 6: '♍', 7: '♎', 8: '♏',
-      9: '♐', 10: '♑', 11: '♒', 12: '♓'
+      0: '♈', 1: '♉', 2: '♊', 3: '♋',
+      4: '♌', 5: '♍', 6: '♎', 7: '♏',
+      8: '♐', 9: '♑', 10: '♒', 11: '♓'
     };
     return icons[signNumber] || '⭐';
   };
@@ -359,7 +359,7 @@ export default function ProfileScreen({ navigation }) {
                     </View>
                     <View style={styles.chartDetailRow}>
                       <Text style={styles.chartDetailLabel}>⬆️ Ascendant</Text>
-                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)} ${getSignName(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)}`}</Text>
+                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
                     </View>
                   </View>
                   

@@ -153,18 +153,18 @@ export default function ChatScreen({ navigation, route }) {
 
   const getSignName = (signNumber) => {
     const signs = {
-      1: 'Aries', 2: 'Taurus', 3: 'Gemini', 4: 'Cancer',
-      5: 'Leo', 6: 'Virgo', 7: 'Libra', 8: 'Scorpio',
-      9: 'Sagittarius', 10: 'Capricorn', 11: 'Aquarius', 12: 'Pisces'
+      0: 'Aries', 1: 'Taurus', 2: 'Gemini', 3: 'Cancer',
+      4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
+      8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
     };
     return signs[signNumber] || signNumber;
   };
   
   const getSignIcon = (signNumber) => {
     const icons = {
-      1: '♈', 2: '♉', 3: '♊', 4: '♋',
-      5: '♌', 6: '♍', 7: '♎', 8: '♏',
-      9: '♐', 10: '♑', 11: '♒', 12: '♓'
+      0: '♈', 1: '♉', 2: '♊', 3: '♋',
+      4: '♌', 5: '♍', 6: '♎', 7: '♏',
+      8: '♐', 9: '♑', 10: '♒', 11: '♓'
     };
     return icons[signNumber] || '⭐';
   };
@@ -199,6 +199,7 @@ export default function ChatScreen({ navigation, route }) {
       const { chartAPI } = require('../../services/api');
       // Use calculateChart instead of calculateChartOnly to save birth data to database
       const response = await chartAPI.calculateChart(formattedData);
+      console.log('🔍 CHAT CHART DATA STRUCTURE:', JSON.stringify(response.data, null, 2));
       setChartData(response.data);
 
     } catch (error) {
@@ -860,8 +861,8 @@ export default function ChatScreen({ navigation, route }) {
         native_name: birthData?.name,
         birth_details: {
           name: birthData.name,
-          date: birthData.date,
-          time: birthData.time,
+          date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+          time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
           latitude: parseFloat(birthData.latitude),
           longitude: parseFloat(birthData.longitude),
           timezone: birthData.timezone || 'Asia/Kolkata',
@@ -1093,7 +1094,7 @@ export default function ChatScreen({ navigation, route }) {
                     <View style={styles.signItem}>
                       <Text style={styles.signLabel}>⬆️ Ascendant</Text>
                       <Text style={styles.signValue}>
-                        {loadingChart ? '...' : `${getSignIcon(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)} ${getSignName(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign)}`}
+                        {loadingChart ? '...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}
                       </Text>
                     </View>
                   </View>

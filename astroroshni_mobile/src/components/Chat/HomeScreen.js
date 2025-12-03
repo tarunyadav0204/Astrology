@@ -306,20 +306,26 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
                   onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
                   activeOpacity={0.9}
                 >
-                  <LinearGradient
-                    colors={option.gradient}
-                    style={styles.analysisGradient}
-                  >
-                    <View style={styles.analysisIconContainer}>
-                      <Text style={styles.analysisEmoji}>{option.icon}</Text>
-                    </View>
-                    <View style={styles.analysisContent}>
-                      <Text style={styles.analysisCardTitle}>{option.title}</Text>
-                      <Text style={styles.analysisDescription}>{option.description}</Text>
-                      <Text style={styles.analysisCost}>{option.cost} credits</Text>
-                    </View>
-                    <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
-                  </LinearGradient>
+                  <View style={styles.glassmorphismContainer}>
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.1)']}
+                      style={styles.glassmorphismOverlay}
+                    />
+                    <LinearGradient
+                      colors={option.gradient.map(color => color + '40')}
+                      style={styles.analysisGradient}
+                    >
+                      <View style={styles.analysisIconContainer}>
+                        <Text style={styles.analysisEmoji}>{option.icon}</Text>
+                      </View>
+                      <View style={styles.analysisContent}>
+                        <Text style={styles.analysisCardTitle}>{option.title}</Text>
+                        <Text style={styles.analysisDescription}>{option.description}</Text>
+                        <Text style={styles.analysisCost}>{option.cost} credits</Text>
+                      </View>
+                      <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
+                    </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </Animated.View>
             );
@@ -515,10 +521,26 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+  glassmorphismContainer: {
+    position: 'relative',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  glassmorphismOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
   analysisGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
+    zIndex: 2,
   },
   analysisIconContainer: {
     marginRight: 16,
