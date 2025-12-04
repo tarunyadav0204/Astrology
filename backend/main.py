@@ -1253,24 +1253,54 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
 @app.put("/api/user/self-birth-chart")
 async def update_self_birth_chart(birth_data: BirthData, current_user: User = Depends(get_current_user)):
     """Update user's self birth chart"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    # Remove existing self birth chart
-    cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
-    
-    # Update existing chart to self or insert new one
-    cursor.execute('''
-        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
-    ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone, 
-          birth_data.place or '', birth_data.gender or ''))
-    
-    conn.commit()
-    conn.close()
-    
-    return {"message": "Self birth chart updated successfully"}
+    conn = None
+    try:
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        # First, try to find existing chart with matching data
+        cursor.execute('''
+            SELECT id FROM birth_charts 
+            WHERE userid = ? AND name = ? AND date = ? AND time = ? 
+            AND latitude = ? AND longitude = ?
+        ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time,
+              birth_data.latitude, birth_data.longitude))
+        
+        existing_chart = cursor.fetchone()
+        
+        if existing_chart:
+            # Update existing chart to set relation = 'self'
+            # First clear any other 'self' charts
+            cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+            
+            # Set this chart as 'self'
+            cursor.execute("UPDATE birth_charts SET relation = 'self' WHERE id = ?", (existing_chart[0],))
+        else:
+            # Remove existing self birth chart
+            cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+            
+            # Insert new chart
+            cursor.execute('''
+                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+            ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
+                  birth_data.latitude, birth_data.longitude, birth_data.timezone, 
+                  birth_data.place or '', birth_data.gender or ''))
+        
+        conn.commit()
+        return {"message": "Self birth chart updated successfully"}
+        
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update self birth chart: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
 
 @app.get("/api/health")
 async def api_health():

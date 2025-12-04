@@ -163,4 +163,17 @@ export const creditAPI = {
     api.post(getEndpoint('/credits/spend'), { amount, feature, description }),
 };
 
+export const panchangAPI = {
+  calculateSunriseSunset: (date, latitude, longitude) => 
+    api.post(getEndpoint('/panchang/calculate-sunrise-sunset'), { date, latitude, longitude }),
+  calculateMoonPhase: (date) => 
+    api.post(getEndpoint('/panchang/calculate-moon-phase'), { date }),
+  calculateRahuKaal: (date, latitude, longitude) => 
+    api.post(getEndpoint('/panchang/calculate-rahu-kaal'), { date, latitude, longitude }),
+  calculateInauspiciousTimes: (date, latitude, longitude) => 
+    api.post(getEndpoint('/panchang/calculate-inauspicious-times'), { date, latitude, longitude }),
+  calculateDailyPanchang: (date, latitude, longitude) => 
+    api.get(getEndpoint(`/panchang/daily-detailed?date=${date}&latitude=${latitude}&longitude=${longitude}`)),
+};
+
 export default api;

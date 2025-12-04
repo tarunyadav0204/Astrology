@@ -211,7 +211,6 @@ export default function SelectNativeScreen({ navigation, route }) {
         setSelectedProfile(currentNative.name);
       }
     } catch (error) {
-      console.error('Error loading profiles:', error);
       // Fallback to local storage if API fails
       const savedProfiles = await storage.getBirthProfiles();
       setProfiles(savedProfiles);
@@ -224,6 +223,7 @@ export default function SelectNativeScreen({ navigation, route }) {
         // Connect chart to profile and return to Profile screen
         const { authAPI } = require('../../services/api');
         await authAPI.updateSelfBirthChart(profile);
+        Alert.alert('Success', '✅ Chart connected to your profile!');
         navigation.navigate('Profile');
       } else {
         // Normal selection flow
@@ -232,7 +232,13 @@ export default function SelectNativeScreen({ navigation, route }) {
         navigation.navigate('Home');
       }
     } catch (error) {
-      console.error('Error selecting profile:', error);
+      let errorMessage = '❌ Unable to select profile. Please try again.';
+      
+      if (error.message?.includes('Network Error')) {
+        errorMessage = '❌ Connection failed. Please check your internet.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -277,10 +283,20 @@ export default function SelectNativeScreen({ navigation, route }) {
             try {
               const { authAPI } = require('../../services/api');
               await authAPI.updateSelfBirthChart(profile);
-              Alert.alert('Success', 'Chart connected to your profile!');
+              Alert.alert('Success', '✅ Chart connected to your profile!');
               navigation.navigate('Profile');
             } catch (error) {
-              Alert.alert('Error', 'Failed to connect chart to profile');
+              let errorMessage = '❌ Something went wrong. Please try again.';
+              
+              if (error.message?.includes('Network Error') || error.code === 'NETWORK_ERROR') {
+                errorMessage = '❌ Connection failed. Please check your internet.';
+              } else if (error.response?.status >= 500) {
+                errorMessage = '❌ Server error. Please try again later.';
+              } else if (error.response?.data?.detail) {
+                errorMessage = `❌ ${error.response.data.detail}`;
+              }
+              
+              Alert.alert('Error', errorMessage);
             }
           }
         }

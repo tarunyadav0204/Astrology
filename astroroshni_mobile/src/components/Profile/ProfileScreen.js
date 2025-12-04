@@ -93,7 +93,6 @@ export default function ProfileScreen({ navigation }) {
         setBirthData(null);
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
       setBirthData(null);
     }
   };
@@ -112,10 +111,9 @@ export default function ProfileScreen({ navigation }) {
       
       const { chartAPI } = require('../../services/api');
       const response = await chartAPI.calculateChartOnly(formattedData);
-      console.log('🔍 PROFILE CHART DATA STRUCTURE:', JSON.stringify(response.data, null, 2));
       setChartData(response.data);
     } catch (error) {
-      console.error('Error loading chart data:', error);
+      // Chart data loading failed
     } finally {
       setLoadingChart(false);
     }
@@ -176,7 +174,7 @@ export default function ProfileScreen({ navigation }) {
         setDashaData(response.data);
       }
     } catch (error) {
-      console.error('Error loading dasha data:', error);
+      // Dasha data loading failed
     } finally {
       setLoadingDashas(false);
     }
@@ -267,7 +265,7 @@ export default function ProfileScreen({ navigation }) {
                   />
                 </Animated.View>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{chartData ? getSignIcon(chartData?.houses?.[1]?.sign || chartData?.ascendant?.sign || chartData?.lagna?.sign) : getZodiacSign(birthData?.date)}</Text>
+                  <Text style={styles.avatarText}>{chartData ? getSignIcon(Math.floor((chartData?.ascendant || 0) / 30)) : getZodiacSign(birthData?.date)}</Text>
                 </View>
               </View>
               <Text style={styles.userName}>{userData?.name || 'User'}</Text>

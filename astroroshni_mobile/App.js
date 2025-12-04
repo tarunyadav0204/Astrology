@@ -37,21 +37,16 @@ export default function App() {
         // User is logged in, check if they have charts
         try {
           const { chartAPI } = require('./src/services/api');
-          console.log('🔍 Checking for existing charts...');
           const response = await chartAPI.getExistingCharts();
-          console.log('📊 Charts API response:', response.data);
           
           if (response.data && response.data.charts && response.data.charts.length > 0) {
             // User has charts, go to Home with greeting
-            console.log('✅ User has charts, going to Home');
             setInitialRoute('Home');
           } else {
             // User has no charts, go to BirthForm
-            console.log('❌ User has no charts, going to BirthForm');
             setInitialRoute('BirthForm');
           }
         } catch (apiError) {
-          console.log('❌ Error checking charts:', apiError);
           // If API fails, go to BirthForm as fallback
           setInitialRoute('BirthForm');
         }
@@ -60,7 +55,6 @@ export default function App() {
         setInitialRoute('Welcome');
       }
     } catch (error) {
-      console.log('Error checking auth status:', error);
       setInitialRoute('Welcome');
     } finally {
       setIsLoading(false);

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,14 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Alert,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
+import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
+import { chartAPI, panchangAPI } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -20,6 +24,12 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const starAnims = useRef([...Array(20)].map(() => new Animated.Value(0))).current;
+  
+  const [dashData, setDashData] = useState(null);
+  const [chartData, setChartData] = useState(null);
+  const [transitData, setTransitData] = useState(null);
+  const [panchangData, setPanchangData] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     Animated.parallel([
@@ -74,7 +84,175 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
         ])
       ).start();
     });
+    
+    loadHomeData();
   }, []);
+  
+const loadHomeData = async () => {
+    if (!birthData) {
+      console.log('No birth data available');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      console.log('Loading home data for:', birthData.name);
+      
+      const targetDate = new Date().toISOString().split('T')[0];
+      const formattedBirthData = {
+        name: birthData.name,
+        date: birthData.date.includes('T') ? birthData.date.split('T')[0] : birthData.date,
+        time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        timezone: birthData.timezone || 'Asia/Kolkata',
+        location: birthData.place || 'Unknown'
+      };
+      
+      // Load available data in parallel
+      const [dashResponse, chartResponse, transitResponse, panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
+        chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
+        chartAPI.calculateChartOnly(formattedBirthData),
+chartAPI.calculateTransits(formattedBirthData, targetDate),
+        panchangAPI.calculateSunriseSunset(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude)),
+        panchangAPI.calculateRahuKaal(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude)),
+        panchangAPI.calculateInauspiciousTimes(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude)),
+        panchangAPI.calculateDailyPanchang(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude))
+      ]);
+      
+      console.log('API responses:', {
+        dasha: dashResponse.status,
+        chart: chartResponse.status,
+        transit: transitResponse.status
+      });
+      
+if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
+        console.log('Dasha data loaded:', JSON.stringify(dashResponse.value.data, null, 2));
+        setDashData(dashResponse.value.data);
+      } else {
+        console.log('Dasha failed:', dashResponse.reason || dashResponse.value?.data);
+      }
+      
+      if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
+        console.log('Chart data loaded');
+        setChartData(chartResponse.value.data);
+      } else {
+        console.log('Chart failed:', chartResponse.reason);
+      }
+      
+      if (transitResponse.status === 'fulfilled' && transitResponse.value?.data) {
+        console.log('Transit data loaded:', JSON.stringify(transitResponse.value.data, null, 2));
+        setTransitData(transitResponse.value.data);
+      } else {
+        console.log('Transit failed:', transitResponse.reason);
+      }
+      
+      if (panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {
+        console.log('=== PANCHANG API RESPONSE ===');
+        console.log('Full response:', JSON.stringify(panchangResponse.value.data, null, 2));
+        
+        let combinedPanchangData = panchangResponse.value.data;
+        
+        // Add Rahu Kaal data if available
+        if (rahuKaalResponse.status === 'fulfilled' && rahuKaalResponse.value?.data) {
+          console.log('Rahu Kaal data:', JSON.stringify(rahuKaalResponse.value.data, null, 2));
+          combinedPanchangData.rahu_kaal = rahuKaalResponse.value.data;
+        }
+        
+        // Add other inauspicious times if available
+        if (inauspiciousResponse.status === 'fulfilled' && inauspiciousResponse.value?.data) {
+          console.log('Inauspicious times data:', JSON.stringify(inauspiciousResponse.value.data, null, 2));
+          combinedPanchangData.inauspicious_times = inauspiciousResponse.value.data;
+        }
+        
+        // Add daily panchang data (includes nakshatra) if available
+        if (dailyPanchangResponse.status === 'fulfilled' && dailyPanchangResponse.value?.data) {
+          console.log('=== DAILY PANCHANG API RESPONSE ===');
+          console.log('Full daily panchang response:', JSON.stringify(dailyPanchangResponse.value.data, null, 2));
+          
+          // Access nested panchang data correctly
+          const basicPanchang = dailyPanchangResponse.value.data.basic_panchang;
+          if (basicPanchang) {
+            console.log('Nakshatra data:', basicPanchang.nakshatra);
+            console.log('Tithi data:', basicPanchang.tithi);
+            console.log('Yoga data:', basicPanchang.yoga);
+            console.log('Karana data:', basicPanchang.karana);
+            
+            // Store the basic panchang data at root level for easier access
+            combinedPanchangData.daily_panchang = {
+              ...dailyPanchangResponse.value.data,
+              nakshatra: basicPanchang.nakshatra,
+              tithi: basicPanchang.tithi,
+              yoga: basicPanchang.yoga,
+              karana: basicPanchang.karana,
+              vara: basicPanchang.vara
+            };
+          } else {
+            console.log('No basic_panchang found in response');
+            combinedPanchangData.daily_panchang = dailyPanchangResponse.value.data;
+          }
+        } else {
+          console.log('Daily panchang failed:', dailyPanchangResponse.reason || 'No data');
+          console.log('Daily panchang status:', dailyPanchangResponse.status);
+          if (dailyPanchangResponse.value) {
+            console.log('Daily panchang response structure:', Object.keys(dailyPanchangResponse.value));
+          }
+        }
+        
+        setPanchangData(combinedPanchangData);
+      } else {
+        console.log('Panchang failed:', panchangResponse.reason);
+        setPanchangData(null);
+      }
+      
+    } catch (error) {
+      console.error('Error loading home data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const getPlanetColor = (planetName) => {
+    const colors = {
+      'Sun': '#ff6b35',
+      'Moon': '#e0e0e0',
+      'Mars': '#d32f2f',
+      'Mercury': '#4caf50',
+      'Jupiter': '#ffd700',
+      'Venus': '#e91e63',
+      'Saturn': '#2196f3',
+      'Rahu': '#9e9e9e',
+      'Ketu': '#795548',
+    };
+    return colors[planetName] || '#ffffff';
+  };
+  
+  const getSignName = (signNumber) => {
+    const signs = {
+      0: 'Aries', 1: 'Taurus', 2: 'Gemini', 3: 'Cancer',
+      4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
+      8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
+    };
+    return signs[signNumber] || signNumber;
+  };
+  
+  const getSignIcon = (signNumber) => {
+    const icons = {
+      0: '♈', 1: '♉', 2: '♊', 3: '♋',
+      4: '♌', 5: '♍', 6: '♎', 7: '♏',
+      8: '♐', 9: '♑', 10: '♒', 11: '♓'
+    };
+    return icons[signNumber] || '⭐';
+  };
+  
+  const getSignColor = (signNumber) => {
+    const colors = {
+      0: '#FF5733', 1: '#4CAF50', 2: '#FFC300', 3: '#2196F3',
+      4: '#FF8C00', 5: '#8BC34A', 6: '#00BCD4', 7: '#673AB7',
+      8: '#E91E63', 9: '#009688', 10: '#3F51B5', 11: '#9C27B0'
+    };
+    return colors[signNumber] || '#ffffff';
+  };
   
   const place = birthData?.place || `${birthData?.latitude}, ${birthData?.longitude}`;
   const time = birthData?.time || 'Unknown time';
@@ -325,6 +503,304 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
             );
           })}
         </Animated.View>
+
+
+
+        {/* Magical Dashboard Cards - Moved to Bottom */}
+        <Animated.View style={[styles.dashboardContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.dashboardTitle}>✨ Your Cosmic Dashboard</Text>
+          
+
+
+          {/* Big 3 Signs Row */}
+          <View style={styles.bigThreeRow}>
+            <TouchableOpacity style={styles.signCard} onPress={() => onOptionSelect({ action: 'chart' })} activeOpacity={0.9}>
+              <LinearGradient colors={['#1E3A8A', '#3B82F6']} style={styles.signGradient}>
+                <Text style={styles.signEmoji}>⬆️</Text>
+                <Text style={styles.signLabel}>Ascendant</Text>
+                <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}` : loading ? '...' : 'N/A'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.signCard} onPress={() => onOptionSelect({ action: 'chart' })} activeOpacity={0.9}>
+              <LinearGradient colors={['#7C2D12', '#DC2626']} style={styles.signGradient}>
+                <Text style={styles.signEmoji}>🌙</Text>
+                <Text style={styles.signLabel}>Moon</Text>
+                <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}` : loading ? '...' : 'N/A'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.signCard} onPress={() => onOptionSelect({ action: 'chart' })} activeOpacity={0.9}>
+              <LinearGradient colors={['#B45309', '#F59E0B']} style={styles.signGradient}>
+                <Text style={styles.signEmoji}>☀️</Text>
+                <Text style={styles.signLabel}>Sun</Text>
+                <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}` : loading ? '...' : 'N/A'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Current Dasha Chips - Under Birth Chart */}
+          {dashData && (
+            <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
+              <Text style={styles.dashaSectionTitle}>⏰ Current Dasha Periods</Text>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={[
+                  dashData.maha_dashas?.find(d => d.current),
+                  dashData.antar_dashas?.find(d => d.current),
+                  dashData.pratyantar_dashas?.find(d => d.current),
+                  dashData.sookshma_dashas?.find(d => d.current),
+                  dashData.prana_dashas?.find(d => d.current)
+                ].filter(Boolean)}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item: dasha }) => {
+                  const planetColor = getPlanetColor(dasha.planet);
+                  const startDate = new Date(dasha.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+                  const endDate = new Date(dasha.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+                  return (
+                    <TouchableOpacity 
+                      style={[styles.dashaChip, { backgroundColor: planetColor + '20', borderColor: planetColor }]}
+                      onPress={() => onOptionSelect({ action: 'dasha' })}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
+                      <Text style={styles.dashaChipDates}>{startDate}</Text>
+                      <Text style={styles.dashaChipDates}>{endDate}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+                contentContainerStyle={styles.dashaFlatListContent}
+                snapToInterval={118}
+                decelerationRate="fast"
+                pagingEnabled={false}
+              />
+            </Animated.View>
+          )}
+
+          {/* Zodiac Wheel - Vibrant Design */}
+          <View style={styles.planetarySection}>
+            <Text style={styles.planetarySectionTitle}>🪐 Current Planetary Transits</Text>
+            <TouchableOpacity onPress={() => onOptionSelect({ action: 'transits' })} activeOpacity={0.9}>
+              <View style={styles.planetGrid}>
+                {transitData?.planets && Object.entries(transitData.planets).map(([planet, data]) => (
+                  <View key={planet} style={[
+                    styles.planetCard,
+                    { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
+                  ]}>
+                    <Text style={styles.planetName}>{planet}</Text>
+                    <Text style={styles.planetSign}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
+                    <Text style={styles.planetDegree}>{data.degree.toFixed(2)}°</Text>
+                  </View>
+                ))}
+                
+
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Panchang Timeline */}
+          {panchangData && (
+            <View style={styles.panchangCard}>
+              <Text style={[styles.panchangTitle, { marginBottom: 30 }]}>🌅 Today's Panchang</Text>
+              <View style={styles.sunTimesRow}>
+                <View style={styles.sunTimeItem}>
+                  <Text style={styles.sunTimeEmoji}>🌅</Text>
+                  <Text style={styles.sunTimeLabel}>Sunrise</Text>
+                  <Text style={styles.sunTimeValue}>{panchangData.sunrise ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:30 AM'}</Text>
+                </View>
+                <View style={styles.sunTimeItem}>
+                  <Text style={styles.sunTimeEmoji}>🌇</Text>
+                  <Text style={styles.sunTimeLabel}>Sunset</Text>
+                  <Text style={styles.sunTimeValue}>{panchangData.sunset ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:45 PM'}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.sunTimesRow}>
+                <View style={styles.sunTimeItem}>
+                  <Text style={styles.sunTimeEmoji}>🌙</Text>
+                  <Text style={styles.sunTimeLabel}>Moonrise</Text>
+                  <Text style={styles.sunTimeValue}>{panchangData.moonrise ? new Date(panchangData.moonrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '7:53 AM'}</Text>
+                </View>
+                <View style={styles.sunTimeItem}>
+                  <Text style={styles.sunTimeEmoji}>🌚</Text>
+                  <Text style={styles.sunTimeLabel}>Moonset</Text>
+                  <Text style={styles.sunTimeValue}>{panchangData.moonset ? new Date(panchangData.moonset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:06 PM'}</Text>
+                </View>
+              </View>
+              
+              {/* Panchang Elements Section */}
+              {panchangData.daily_panchang && (
+                <View style={styles.panchangElementsSection}>
+                  <Text style={styles.panchangElementsTitle}>🕉️ Panchang Elements</Text>
+                  
+                  {/* Nakshatra */}
+                  {panchangData.daily_panchang.nakshatra && (
+                    <View style={styles.panchangElement}>
+                      <Text style={styles.elementLabel}>⭐ Nakshatra:</Text>
+                      <Text style={styles.elementValue}>{panchangData.daily_panchang.nakshatra.name}</Text>
+                    </View>
+                  )}
+                  
+                  {/* Tithi */}
+                  {panchangData.daily_panchang.tithi && (
+                    <View style={styles.panchangElement}>
+                      <Text style={styles.elementLabel}>🌙 Tithi:</Text>
+                      <Text style={styles.elementValue}>{panchangData.daily_panchang.tithi.name}</Text>
+                    </View>
+                  )}
+                  
+                  {/* Yoga */}
+                  {panchangData.daily_panchang.yoga && (
+                    <View style={styles.panchangElement}>
+                      <Text style={styles.elementLabel}>🧘 Yoga:</Text>
+                      <Text style={styles.elementValue}>{panchangData.daily_panchang.yoga.name}</Text>
+                    </View>
+                  )}
+                  
+                  {/* Karana */}
+                  {panchangData.daily_panchang.karana && (
+                    <View style={styles.panchangElement}>
+                      <Text style={styles.elementLabel}>⚡ Karana:</Text>
+                      <Text style={styles.elementValue}>{panchangData.daily_panchang.karana.name}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              
+
+              
+              {/* Row 1: Moon Phase Text and Illumination */}
+              <View style={styles.moonPhaseTextRow}>
+                <Text style={styles.moonPhaseText}>{panchangData.moon_phase || 'Full Moon'}</Text>
+                <Text style={styles.moonIllumination}>{panchangData.moon_illumination ? `${panchangData.moon_illumination.toFixed(1)}%` : '98.5%'}</Text>
+              </View>
+              
+              {/* Row 2: Big Moon SVG Only */}
+              <View style={styles.moonSvgRow}>
+                <Svg width="80" height="80" viewBox="0 0 80 80">
+                  <Circle cx="40" cy="40" r="35" fill="#2a2a2a" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+                  {(() => {
+                    const illumination = panchangData.moon_illumination || 98.5;
+                    const phase = panchangData.moon_phase || 'Full Moon';
+                    
+                    if (illumination > 95) {
+                      // Full Moon
+                      return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
+                    } else if (illumination < 5) {
+                      // New Moon
+                      return null;
+                    } else if (phase.includes('Waxing') || illumination > 50) {
+                      // Waxing phases
+                      const offset = (100 - illumination) / 100 * 66;
+                      return (
+                        <>
+                          <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />
+                          <Path d={`M 40 7 A ${offset} 33 0 0 0 40 73 A 33 33 0 0 1 40 7`} fill="#2a2a2a" />
+                        </>
+                      );
+                    } else {
+                      // Waning phases
+                      const offset = illumination / 100 * 66;
+                      return (
+                        <>
+                          <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />
+                          <Path d={`M 40 7 A ${offset} 33 0 0 1 40 73 A 33 33 0 0 1 40 7`} fill="#2a2a2a" />
+                        </>
+                      );
+                    }
+                  })()}
+                </Svg>
+              </View>
+              
+              {/* Row 3: Day Progress */}
+              <View style={styles.dayProgressBar}>
+                <View style={styles.progressTrack}>
+                  {(() => {
+                    const now = new Date();
+                    const sunrise = new Date(panchangData.sunrise);
+                    const sunset = new Date(panchangData.sunset);
+                    const totalDayTime = sunset.getTime() - sunrise.getTime();
+                    const elapsedTime = now.getTime() - sunrise.getTime();
+                    const progress = Math.max(0, Math.min(100, (elapsedTime / totalDayTime) * 100));
+                    return (
+                      <>
+                        <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                        <View style={[styles.currentTimeDot, { left: `${progress}%` }]} />
+                      </>
+                    );
+                  })()}
+                </View>
+                <Text style={styles.progressLabel}>Day Progress</Text>
+              </View>
+              
+              <View style={styles.muhurtaSection}>
+                <Text style={styles.muhurtaTitle}>🕉️ Auspicious Times</Text>
+                <View style={styles.muhurtaRow}>
+                  <Text style={styles.muhurtaLabel}>Brahma Muhurta:</Text>
+                  <Text style={styles.muhurtaTime}>
+                    {panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end ? 
+                      `${new Date(panchangData.brahma_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.brahma_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                      '4:29 AM - 6:05 AM'
+                    }
+                  </Text>
+                </View>
+                <View style={styles.muhurtaRow}>
+                  <Text style={styles.muhurtaLabel}>Abhijit Muhurta:</Text>
+                  <Text style={styles.muhurtaTime}>
+                    {panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end ? 
+                      `${new Date(panchangData.abhijit_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.abhijit_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                      '11:36 AM - 12:24 PM'
+                    }
+                  </Text>
+                </View>
+              </View>
+              
+              {(panchangData.rahu_kaal || panchangData.inauspicious_times) && (
+                <View style={styles.inauspiciousSection}>
+                  <Text style={styles.inauspiciousTitle}>⚠️ Inauspicious Times</Text>
+                  
+                  {panchangData.rahu_kaal && (
+                    <View style={styles.muhurtaRow}>
+                      <Text style={styles.muhurtaLabel}>Rahu Kaal:</Text>
+                      <Text style={styles.inauspiciousTime}>
+                        {panchangData.rahu_kaal.rahu_kaal_start && panchangData.rahu_kaal.rahu_kaal_end ? 
+                          `${new Date(panchangData.rahu_kaal.rahu_kaal_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.rahu_kaal.rahu_kaal_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                          'Not available'
+                        }
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {panchangData.inauspicious_times?.dur_muhurta?.map((period, index) => (
+                    <View key={`dur-${index}`} style={styles.muhurtaRow}>
+                      <Text style={styles.muhurtaLabel}>Dur Muhurta:</Text>
+                      <Text style={styles.inauspiciousTime}>
+                        {period.start_time && period.end_time ? 
+                          `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                          'Not available'
+                        }
+                      </Text>
+                    </View>
+                  ))}
+                  
+                  {panchangData.inauspicious_times?.varjyam?.map((period, index) => (
+                    <View key={`varjyam-${index}`} style={styles.muhurtaRow}>
+                      <Text style={styles.muhurtaLabel}>Varjyam:</Text>
+                      <Text style={styles.inauspiciousTime}>
+                        {period.start_time && period.end_time ? 
+                          `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                          'Not available'
+                        }
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+        </Animated.View>
       </ScrollView>
       </LinearGradient>
     </View>
@@ -570,6 +1046,473 @@ const styles = StyleSheet.create({
   analysisCost: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+  },
+  // Dashboard Cards Styles
+  dashboardContainer: {
+    marginBottom: 30,
+  },
+  dashboardTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  dashboardCard: {
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+loadingText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  debugText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 10,
+    marginBottom: 8,
+  },
+  
+  // Dasha Timeline Card
+  dashaTimelineCard: {
+    height: 140,
+  },
+  dashaCardGradient: {
+    padding: 20,
+    height: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+  },
+  dashaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dashaEmoji: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  dashaTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  dashaContent: {
+    flex: 1,
+  },
+  dashaChipsContainer: {
+    marginBottom: 12,
+  },
+dashaSection: {
+    marginBottom: 24,
+  },
+  dashaSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+dashaChip: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginRight: 8,
+    width: 110,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dashaFlatListContent: {
+    paddingHorizontal: 4,
+  },
+  dashaChipPlanet: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  dashaChipDates: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+
+  
+  // Big Three Signs Row
+  bigThreeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+  },
+  signCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  signGradient: {
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  signEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  signLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  signValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  
+  // Zodiac Wheel - Vibrant Design
+  planetarySection: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  planetarySectionTitle: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: COLORS.white,
+    marginBottom: 20,
+    textAlign: 'center',
+    letterSpacing: 2,
+    textShadow: '0 0 10px rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+  },
+  planetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  planetCard: {
+    width: '30%',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  planetName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  planetSign: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 2,
+  },
+  planetDegree: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+  },
+
+  loadingOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -30 }, { translateY: -10 }],
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Panchang Card Styles
+  panchangCard: {
+    marginBottom: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  panchangTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  sunTimesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  sunTimeItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  sunTimeEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  sunTimeLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
+  },
+  sunTimeValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  dayProgressBar: {
+    alignItems: 'center',
+  },
+  progressTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    position: 'relative',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#ff6b35',
+    borderRadius: 3,
+  },
+  currentTimeDot: {
+    position: 'absolute',
+    right: '55%',
+    top: -3,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#ffd700',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  progressLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  muhurtaSection: {
+    marginTop: 20,
+    marginBottom: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  muhurtaTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10B981',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  muhurtaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+  },
+  muhurtaLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  muhurtaTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  inauspiciousSection: {
+    marginTop: 16,
+    marginBottom: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  inauspiciousTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  inauspiciousTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  panchangElementsSection: {
+    marginBottom: 16,
+  },
+  panchangElementsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffd700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  panchangElement: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  elementLabel: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  elementValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffd700',
+  },
+  moonPhaseTextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  moonSvgRow: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  moonPhaseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  moonIllumination: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  
+  // Panchang Weather Card
+  panchangWeatherCard: {
+    height: 200,
+  },
+  panchangCardGradient: {
+    padding: 20,
+    height: '100%',
+  },
+  panchangHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  panchangEmoji: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  panchangTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  panchangContent: {
+    flex: 1,
+  },
+  skyContainer: {
+    height: 60,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  skyGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sunIcon: {
+    fontSize: 24,
+  },
+  timeSlider: {
+    marginBottom: 16,
+  },
+  timeTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    position: 'relative',
+    marginBottom: 8,
+  },
+  auspiciousBlock: {
+    position: 'absolute',
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 3,
+  },
+  currentTimeIndicator: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FF6B35',
+    top: -3,
+  },
+  timeLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  timeLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  panchangInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  panchangDetail: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  panchangTithi: {
+    fontSize: 11,
+    color: COLORS.white,
     fontWeight: '600',
   },
 });
