@@ -9,6 +9,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -31,6 +33,7 @@ export default function PasswordScreen({
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
+  const scrollViewRef = useRef(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -50,6 +53,18 @@ export default function PasswordScreen({
   useEffect(() => {
     setIsValid(formData.password.length >= 6);
   }, [formData.password]);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      if (scrollViewRef.current && isLogin) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+    };
+  }, [isLogin]);
 
   const handleContinue = async () => {
     if (!isValid) return;
@@ -123,14 +138,20 @@ export default function PasswordScreen({
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigateToScreen('phone', 'back')}
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigateToScreen('phone', 'back')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
 
-      <View style={styles.content}>
+        <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.emoji}>🔐</Text>
           <Text style={styles.title}>
@@ -241,7 +262,8 @@ export default function PasswordScreen({
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
         )}
-      </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -249,6 +271,9 @@ export default function PasswordScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
   },
   backButton: {
@@ -263,6 +288,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
+    minHeight: 600,
   },
   header: {
     alignItems: 'center',

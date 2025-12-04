@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -21,9 +23,12 @@ export default function ForgotPasswordScreen({
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: phone, 2: code, 3: new password
   const [resetToken, setResetToken] = useState('');
+  const [localNewPassword, setLocalNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
+  const scrollViewRef = useRef(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -38,6 +43,18 @@ export default function ForgotPasswordScreen({
         useNativeDriver: true,
       }),
     ]).start();
+  }, []);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+    };
   }, []);
 
   const handleSendCode = async () => {
@@ -71,6 +88,7 @@ export default function ForgotPasswordScreen({
         code: formData.resetCode
       });
       setResetToken(response.data.reset_token);
+      setLocalNewPassword(''); // Reset password field
       Alert.alert('Success', 'Code verified! Enter new password.');
       setStep(3);
     } catch (error) {
@@ -81,7 +99,7 @@ export default function ForgotPasswordScreen({
   };
 
   const handleResetPassword = async () => {
-    if (!formData.newPassword) {
+    if (!localNewPassword) {
       Alert.alert('Error', 'Please enter new password');
       return;
     }
@@ -90,7 +108,7 @@ export default function ForgotPasswordScreen({
     try {
       await authAPI.resetPasswordWithToken({
         token: resetToken,
-        new_password: formData.newPassword
+        new_password: localNewPassword
       });
       Alert.alert('Success', 'Password reset successfully!', [
         { text: 'OK', onPress: () => navigateToScreen('welcome') }
@@ -198,14 +216,25 @@ export default function ForgotPasswordScreen({
               <View style={styles.inputWrapper}>
                 <Ionicons name="lock-closed-outline" size={20} color="rgba(255, 255, 255, 0.5)" />
                 <TextInput
+                  key="newPassword"
                   style={styles.input}
                   placeholder="New Password"
                   placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                  value={formData.newPassword}
-                  onChangeText={(value) => updateFormData('newPassword', value)}
-                  secureTextEntry
+                  value={localNewPassword}
+                  onChangeText={setLocalNewPassword}
+                  secureTextEntry={!showPassword}
                   autoFocus
+                  editable={true}
+                  selectTextOnFocus={true}
+                  textContentType="newPassword"
                 />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons 
+                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                    size={20} 
+                    color="rgba(255, 255, 255, 0.5)" 
+                  />
+                </TouchableOpacity>
               </View>
             </Animated.View>
 
@@ -228,7 +257,13 @@ export default function ForgotPasswordScreen({
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      ref={scrollViewRef}
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigateToScreen('password', 'back')}
@@ -239,14 +274,18 @@ export default function ForgotPasswordScreen({
       <View style={styles.content}>
         {renderStep()}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingBottom: 150,
   },
   backButton: {
     width: 44,
@@ -260,6 +299,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
+    minHeight: 600,
   },
   header: {
     alignItems: 'center',
@@ -304,7 +344,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   buttonContainer: {
-    marginBottom: 20,
+    marginBottom: 100,
   },
   continueButton: {
     borderRadius: 16,

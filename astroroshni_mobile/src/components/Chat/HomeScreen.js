@@ -306,13 +306,8 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
                   onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
                   activeOpacity={0.9}
                 >
-                  <View style={styles.glassmorphismContainer}>
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.1)']}
-                      style={styles.glassmorphismOverlay}
-                    />
-                    <LinearGradient
-                      colors={option.gradient.map(color => color + '40')}
+                      colors={option.gradient}
                       style={styles.analysisGradient}
                     >
                       <View style={styles.analysisIconContainer}>
@@ -325,7 +320,6 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
                       </View>
                       <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
                     </LinearGradient>
-                  </View>
                 </TouchableOpacity>
               </Animated.View>
             );
@@ -540,7 +534,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    zIndex: 2,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   analysisIconContainer: {
     marginRight: 16,

@@ -93,6 +93,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
+  const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [currentPersonId, setCurrentPersonId] = useState(null);
@@ -332,8 +333,8 @@ export default function ChatScreen({ navigation, route }) {
           console.log('📱 PERSON_CHANGE: Found stored messages:', storedMessages.length);
           if (storedMessages.length > 0) {
             setMessages(storedMessages);
-            // Only auto-switch to chat if no messages exist or we're not coming from analysis
-            if (messages.length === 0) {
+            // Only auto-switch to chat if not app startup
+            if (!isAppStartup && messages.length === 0) {
               setShowGreeting(false);
             }
             
@@ -352,9 +353,13 @@ export default function ChatScreen({ navigation, route }) {
             console.log('📱 No stored messages, showing greeting');
             setShowGreeting(true);
           }
-          // Reset force greeting after handling
+          // Reset force greeting and app startup after handling
           if (forceGreeting) {
             setTimeout(() => setForceGreeting(false), 100);
+          }
+          // Clear app startup flag after first load
+          if (isAppStartup) {
+            setTimeout(() => setIsAppStartup(false), 500);
           }
         });
         
@@ -420,8 +425,8 @@ export default function ChatScreen({ navigation, route }) {
           if (storedMessages.length > 0) {
             // Only update messages if we don't have any current messages to avoid overwriting
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
-            // Don't auto-switch if we already have messages loaded
-            if (messages.length === 0) {
+            // Don't auto-switch if app startup or we already have messages loaded
+            if (!isAppStartup && messages.length === 0) {
               setShowGreeting(false);
             }
             

@@ -42,7 +42,7 @@ export default function App() {
           console.log('📊 Charts API response:', response.data);
           
           if (response.data && response.data.charts && response.data.charts.length > 0) {
-            // User has charts, go to Home
+            // User has charts, go to Home with greeting
             console.log('✅ User has charts, going to Home');
             setInitialRoute('Home');
           } else {
