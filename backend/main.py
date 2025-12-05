@@ -1452,23 +1452,23 @@ async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
     
-    # Auto-detect IST for Indian coordinates, otherwise parse timezone
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        # Indian coordinates - use IST (UTC+5:30)
-        tz_offset = 5.5
+    # Parse timezone offset (e.g., "UTC+5:30" -> 5.5, "UTC+5" -> 5.0)
+    tz_offset = 0
+    if birth_data.timezone.startswith('UTC'):
+        tz_str = birth_data.timezone[3:]  # Remove 'UTC'
+        if tz_str:
+            if ':' in tz_str:
+                # Handle UTC+5:30 format
+                sign = 1 if tz_str[0] == '+' else -1
+                parts = tz_str[1:].split(':')
+                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+            else:
+                # Handle UTC+5 format
+                tz_offset = float(tz_str)
     else:
-        # Parse timezone offset (e.g., "UTC+5:30" -> 5.5)
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]  # Remove 'UTC'
-            if tz_str:
-                if ':' in tz_str:
-                    # Handle UTC+5:30 format
-                    sign = 1 if tz_str[0] == '+' else -1
-                    parts = tz_str[1:].split(':')
-                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
-                else:
-                    tz_offset = float(tz_str)
+        # Default to IST for Indian coordinates
+        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+            tz_offset = 5.5
     
     # Convert local time to UTC
     utc_hour = hour - tz_offset
@@ -2447,43 +2447,57 @@ async def predict_marriage_complete(birth_data: BirthData):
 @app.post("/api/calculate-accurate-dasha")
 async def calculate_accurate_dasha(birth_data: BirthData):
     """Calculate accurate Vimshottari Dasha using shared calculator"""
-    from shared.dasha_calculator import DashaCalculator
-    
-    # Convert BirthData to dict
-    birth_dict = {
-        'name': birth_data.name,
-        'date': birth_data.date,
-        'time': birth_data.time,
-        'latitude': birth_data.latitude,
-        'longitude': birth_data.longitude,
-        'timezone': birth_data.timezone
-    }
-    
-    calculator = DashaCalculator()
-    dasha_data = calculator.calculate_current_dashas(birth_dict)
-    
-    # Format maha_dashas for API response
-    maha_dashas = []
-    for maha in dasha_data.get('maha_dashas', []):
-        maha_dashas.append({
-            'planet': maha['planet'],
-            'start': maha['start'].strftime('%Y-%m-%d'),
-            'end': maha['end'].strftime('%Y-%m-%d'),
-            'years': maha['years']
-        })
-    
-    return {
-        "maha_dashas": maha_dashas,
-        "current_dashas": {
-            "mahadasha": dasha_data.get('mahadasha', {}),
-            "antardasha": dasha_data.get('antardasha', {}),
-            "pratyantardasha": dasha_data.get('pratyantardasha', {}),
-            "sookshma": dasha_data.get('sookshma', {}),
-            "prana": dasha_data.get('prana', {})
-        },
-        "moon_nakshatra": dasha_data.get('moon_nakshatra', 1),
-        "moon_lord": dasha_data.get('moon_lord', 'Sun')
-    }
+    try:
+        from shared.dasha_calculator import DashaCalculator
+        
+        print(f"🔍 Dasha calculation for: {birth_data.name}, timezone: {birth_data.timezone}")
+        
+        # Convert BirthData to dict
+        birth_dict = {
+            'name': birth_data.name,
+            'date': birth_data.date,
+            'time': birth_data.time,
+            'latitude': birth_data.latitude,
+            'longitude': birth_data.longitude,
+            'timezone': birth_data.timezone
+        }
+        
+        calculator = DashaCalculator()
+        dasha_data = calculator.calculate_current_dashas(birth_dict)
+        
+        print(f"✅ Dasha calculation successful, got {len(dasha_data.get('maha_dashas', []))} maha dashas")
+        
+        # Format maha_dashas for API response
+        maha_dashas = []
+        for maha in dasha_data.get('maha_dashas', []):
+            maha_dashas.append({
+                'planet': maha['planet'],
+                'start': maha['start'].strftime('%Y-%m-%d'),
+                'end': maha['end'].strftime('%Y-%m-%d'),
+                'years': maha['years']
+            })
+        
+        result = {
+            "maha_dashas": maha_dashas,
+            "current_dashas": {
+                "mahadasha": dasha_data.get('mahadasha', {}),
+                "antardasha": dasha_data.get('antardasha', {}),
+                "pratyantardasha": dasha_data.get('pratyantardasha', {}),
+                "sookshma": dasha_data.get('sookshma', {}),
+                "prana": dasha_data.get('prana', {})
+            },
+            "moon_nakshatra": dasha_data.get('moon_nakshatra', 1),
+            "moon_lord": dasha_data.get('moon_lord', 'Sun')
+        }
+        
+        print(f"📤 Returning dasha result with {len(result['maha_dashas'])} periods")
+        return result
+        
+    except Exception as e:
+        print(f"❌ Dasha calculation error: {str(e)}")
+        import traceback
+        print(f"📍 Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Dasha calculation failed: {str(e)}")
 
 @app.post("/api/calculate-cascading-dashas")
 async def calculate_cascading_dashas(request: dict):
@@ -2491,9 +2505,15 @@ async def calculate_cascading_dashas(request: dict):
     try:
         from shared.dasha_calculator import DashaCalculator
         
+        print(f"🔍 Cascading dasha request: {request.keys()}")
+        
         birth_data = BirthData(**request['birth_data'])
         target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+        
+        print(f"📊 Processing cascading dashas for: {birth_data.name}, timezone: {birth_data.timezone}")
+        
     except Exception as e:
+        print(f"❌ Input validation error: {str(e)}")
         return {
             'maha_dashas': [],
             'antar_dashas': [],
@@ -2517,7 +2537,13 @@ async def calculate_cascading_dashas(request: dict):
     calculator = DashaCalculator()
     
     # Get current dashas for target date
+    print(f"🔄 Calling calculate_current_dashas with target_date: {target_date}")
     current_dashas = calculator.calculate_current_dashas(birth_dict, target_date)
+    print(f"📊 Current dashas result keys: {list(current_dashas.keys())}")
+    print(f"📊 Maha dashas in result: {len(current_dashas.get('maha_dashas', []))}")
+    
+    if current_dashas.get('maha_dashas'):
+        print(f"📊 First maha dasha: {current_dashas['maha_dashas'][0]}")
     
     # Get all maha dashas
     maha_dashas = []
@@ -2537,6 +2563,8 @@ async def calculate_cascading_dashas(request: dict):
             current_maha = maha
             break
     
+    print(f"📈 Got {len(maha_dashas)} maha dashas from calculator")
+    
     result = {
         'maha_dashas': maha_dashas,
         'antar_dashas': [],
@@ -2545,6 +2573,8 @@ async def calculate_cascading_dashas(request: dict):
         'prana_dashas': [],
         'current_dashas': current_dashas.get('current_dashas', {})
     }
+    
+    print(f"🎯 Current maha found: {current_maha['planet'] if current_maha else 'None'}")
     
     if current_maha:
         # Calculate all antar dashas for current maha
@@ -2558,8 +2588,10 @@ async def calculate_cascading_dashas(request: dict):
             'dasha_type': 'antar',
             'target_date': target_date.strftime('%Y-%m-%d')
         }
+        print(f"🔄 Calculating antar dashas for {current_maha['planet']}")
         antar_result = await calculate_sub_dashas(antar_request)
         result['antar_dashas'] = antar_result['sub_dashas']
+        print(f"📊 Got {len(result['antar_dashas'])} antar dashas")
         
         # Find current antar
         current_antar = None
@@ -2620,7 +2652,9 @@ async def calculate_cascading_dashas(request: dict):
                     }
                     prana_result = await calculate_sub_dashas(prana_request)
                     result['prana_dashas'] = prana_result['sub_dashas']
+                    print(f"🎪 Got {len(result['prana_dashas'])} prana dashas")
     
+    print(f"✅ Cascading dasha calculation complete. Returning {len(result['maha_dashas'])} maha, {len(result['antar_dashas'])} antar, {len(result['pratyantar_dashas'])} pratyantar, {len(result['sookshma_dashas'])} sookshma, {len(result['prana_dashas'])} prana dashas")
     return result
 
 @app.post("/api/calculate-sub-dashas")
@@ -3320,7 +3354,6 @@ async def analyze_compatibility(request: CompatibilityRequest, current_user: Use
         "compatibility_analysis": result
     }
 
-# Initialize prediction engine on startup
 @app.on_event("startup")
 async def startup_event():
     try:
@@ -3339,6 +3372,8 @@ async def startup_event():
         print("House combinations and chat history databases initialized")
     except Exception as e:
         print(f"Warning: Could not initialize additional databases: {e}")
+    
+    # Timezone auto-fix disabled - manual correction required
 
 # Horoscope endpoints
 @app.get("/api/horoscope/daily/{zodiac_sign}")
@@ -3592,6 +3627,42 @@ async def get_admin_subscription_plans(current_user: User = Depends(get_current_
         })
     
     return {'plans': plans}
+
+@app.post("/api/admin/fix-timezones")
+async def fix_database_timezones(current_user: User = Depends(get_current_user)):
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    # Fix problematic formats with proper IST handling
+    cursor.execute("""SELECT id, latitude, longitude, timezone FROM birth_charts 
+                     WHERE timezone LIKE '%/%' OR timezone = 'Asia/Kolkata' 
+                     OR timezone LIKE 'UTC+%:%' OR timezone LIKE 'UTC-%:%'
+                     OR timezone LIKE 'UTC+%.%:%' OR timezone LIKE 'UTC-%.%:%'""")
+    charts = cursor.fetchall()
+    
+    fixed_count = 0
+    for chart_id, lat, lng, old_tz in charts:
+        if lat and lng:
+            # Calculate proper timezone with 30-minute precision
+            offset = lng / 15.0
+            hours = int(offset)
+            minutes = int((abs(offset) - abs(hours)) * 60)
+            
+            if minutes == 30:
+                new_tz = f"UTC{'+' if offset >= 0 else '-'}{abs(hours)}:30"
+            else:
+                new_tz = f"UTC{'+' if offset >= 0 else '-'}{abs(hours)}"
+            
+            cursor.execute("UPDATE birth_charts SET timezone = ? WHERE id = ?", (new_tz, chart_id))
+            fixed_count += 1
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": f"Fixed {fixed_count} timezone records"}
 
 @app.post("/api/calculate-kalchakra-dasha")
 async def calculate_kalchakra_dasha(request: dict):

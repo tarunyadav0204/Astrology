@@ -68,7 +68,12 @@ class DashaCalculator:
             elapsed_degrees = moon_pos - nakshatra_start
             balance_fraction = 1 - (elapsed_degrees / 13.333333333333334)
             
-            birth_datetime = datetime.strptime(f"{birth_data['date']} {birth_data['time']}", "%Y-%m-%d %H:%M")
+            # Handle time format with or without seconds
+            time_str = birth_data['time']
+            if len(time_str.split(':')) == 3:
+                birth_datetime = datetime.strptime(f"{birth_data['date']} {time_str}", "%Y-%m-%d %H:%M:%S")
+            else:
+                birth_datetime = datetime.strptime(f"{birth_data['date']} {time_str}", "%Y-%m-%d %H:%M")
             
             # Calculate all mahadashas
             maha_dashas = []
@@ -131,13 +136,18 @@ class DashaCalculator:
             }
             
         except Exception as e:
-            # print(f"Error calculating dashas: {e}")
+            print(f"Error calculating dashas: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return {
                 'mahadasha': {'planet': 'Sun'},
                 'antardasha': {'planet': 'Moon'},
                 'pratyantardasha': {'planet': 'Mars'},
                 'sookshma': {'planet': 'Mercury'},
-                'prana': {'planet': 'Jupiter'}
+                'prana': {'planet': 'Jupiter'},
+                'maha_dashas': [],  # Add this for cascading dasha compatibility
+                'moon_nakshatra': 1,
+                'moon_lord': 'Sun'
             }
     
     def _calculate_antardasha(self, maha_dasha: Dict, current_date: datetime) -> Dict:

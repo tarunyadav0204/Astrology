@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   BackHandler,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -31,6 +32,12 @@ import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/consta
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import { useCredits } from '../../credits/CreditContext';
 
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+const cardWidth = screenWidth * 0.22;
+const fontSize = isSmallScreen ? 11 : 13;
+const smallFontSize = isSmallScreen ? 9 : 10;
+
 export default function ChatScreen({ navigation, route }) {
   const { credits, fetchBalance } = useCredits();
   const [chatCost, setChatCost] = useState(1);
@@ -40,6 +47,7 @@ export default function ChatScreen({ navigation, route }) {
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (isPremiumAnalysis) {
@@ -1105,32 +1113,42 @@ export default function ChatScreen({ navigation, route }) {
                   </View>
                   
                   {/* Current Running Dashas */}
-                  <View style={styles.dashasContainer}>
-                    <Text style={styles.dashasTitle}>Current Running Dashas</Text>
-                    <View style={styles.dashasRow}>
-                      {loadingDashas ? (
-                        <Text style={styles.dashasLoading}>Loading...</Text>
-                      ) : (
-                        [
-                          { level: 'Maha', data: dashaData?.maha_dashas?.find(d => d.current) },
-                          { level: 'Antar', data: dashaData?.antar_dashas?.find(d => d.current) },
-                          { level: 'Pratyantar', data: dashaData?.pratyantar_dashas?.find(d => d.current) },
-                          { level: 'Sookshma', data: dashaData?.sookshma_dashas?.find(d => d.current) },
-                          { level: 'Prana', data: dashaData?.prana_dashas?.find(d => d.current) }
-                        ].map((dasha, index) => {
-                          const planetColor = getPlanetColor(dasha.data?.planet);
+                  {dashaData && (
+                    <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
+                      <FlatList
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        data={[
+                          dashaData.maha_dashas?.find(d => d.current),
+                          dashaData.antar_dashas?.find(d => d.current),
+                          dashaData.pratyantar_dashas?.find(d => d.current),
+                          dashaData.sookshma_dashas?.find(d => d.current),
+                          dashaData.prana_dashas?.find(d => d.current)
+                        ].filter(Boolean)}
+                        keyExtractor={(item, index) => index.toString()}
+                        renderItem={({ item: dasha }) => {
+                          const planetColor = getPlanetColor(dasha.planet);
+                          const startDate = new Date(dasha.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+                          const endDate = new Date(dasha.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
                           return (
-                            <View key={index} style={[styles.dashaChip, { borderColor: planetColor }]}>
-                              <Text style={styles.dashaLevel}>{dasha.level}</Text>
-                              <Text style={[styles.dashaPlanet, { color: planetColor }]}>
-                                {dasha.data?.planet || '...'}
-                              </Text>
-                            </View>
+                            <TouchableOpacity 
+                              style={[styles.dashaChip, { backgroundColor: planetColor + '20', borderColor: planetColor }]}
+                              onPress={() => setShowDashaBrowser(true)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
+                              <Text style={styles.dashaChipDates}>{startDate}</Text>
+                              <Text style={styles.dashaChipDates}>{endDate}</Text>
+                            </TouchableOpacity>
                           );
-                        })
-                      )}
-                    </View>
-                  </View>
+                        }}
+                        contentContainerStyle={styles.dashaFlatListContent}
+                        snapToInterval={cardWidth + 8}
+                        decelerationRate="fast"
+                        pagingEnabled={false}
+                      />
+                    </Animated.View>
+                  )}
                 </LinearGradient>
               </View>
             )}
@@ -2197,23 +2215,42 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dashaChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     alignItems: 'center',
-    minWidth: 50,
+    marginRight: 8,
+    width: cardWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  dashaLevel: {
-    fontSize: 9,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '600',
-  },
-  dashaPlanet: {
-    fontSize: 11,
+  dashaChipPlanet: {
+    fontSize: fontSize,
     fontWeight: '700',
-    marginTop: 1,
+    marginBottom: 2,
+  },
+  dashaChipDates: {
+    fontSize: smallFontSize,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  dashaSection: {
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  dashaSectionTitle: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  dashaFlatListContent: {
+    paddingHorizontal: 4,
   },
   modalOverlay: {
     flex: 1,

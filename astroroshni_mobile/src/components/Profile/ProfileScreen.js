@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -265,7 +266,7 @@ export default function ProfileScreen({ navigation }) {
                   />
                 </Animated.View>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{chartData ? getSignIcon(Math.floor((chartData?.ascendant || 0) / 30)) : getZodiacSign(birthData?.date)}</Text>
+                  <Text style={styles.avatarText}>{chartData ? getSignIcon((chartData?.houses?.[0]?.sign - 1 + 12) % 12) : getZodiacSign(birthData?.date)}</Text>
                 </View>
               </View>
               <Text style={styles.userName}>{userData?.name || 'User'}</Text>
@@ -357,7 +358,7 @@ export default function ProfileScreen({ navigation }) {
                     </View>
                     <View style={styles.chartDetailRow}>
                       <Text style={styles.chartDetailLabel}>⬆️ Ascendant</Text>
-                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
+                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon((chartData?.houses?.[0]?.sign - 1 + 12) % 12)} ${getSignName((chartData?.houses?.[0]?.sign - 1 + 12) % 12)}`}</Text>
                     </View>
                   </View>
                   
@@ -420,7 +421,8 @@ export default function ProfileScreen({ navigation }) {
                     if (birthData) {
                       setShowDashaBrowser(true);
                     } else {
-                      navigation.navigate('Home');
+                      // Show message that birth data is needed
+                      Alert.alert('Birth Data Required', 'Please connect your birth chart to view dashas.');
                     }
                   }}
                   color="#ff6b35"

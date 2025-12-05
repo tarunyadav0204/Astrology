@@ -9,7 +9,9 @@ import {
   Dimensions,
   Alert,
   FlatList,
+  AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line } from 'react-native-svg';
@@ -30,6 +32,12 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  useFocusEffect(
+    React.useCallback(() => {
+      loadHomeData();
+    }, [])
+  );
   
   useEffect(() => {
     Animated.parallel([
@@ -86,17 +94,43 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
     });
     
     loadHomeData();
+    
+    // Update Panchang daily at midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    const midnightTimer = setTimeout(() => {
+      loadHomeData();
+      // Set up daily interval after first midnight update
+      const dailyInterval = setInterval(loadHomeData, 24 * 60 * 60 * 1000);
+      return () => clearInterval(dailyInterval);
+    }, msUntilMidnight);
+    
+    // Update when app becomes active (user returns from background)
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active') {
+        loadHomeData();
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      clearTimeout(midnightTimer);
+      subscription?.remove();
+    };
   }, []);
   
 const loadHomeData = async () => {
     if (!birthData) {
-      console.log('No birth data available');
       return;
     }
     
     try {
       setLoading(true);
-      console.log('Loading home data for:', birthData.name);
       
       const targetDate = new Date().toISOString().split('T')[0];
       const formattedBirthData = {
@@ -120,63 +154,39 @@ chartAPI.calculateTransits(formattedBirthData, targetDate),
         panchangAPI.calculateDailyPanchang(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude))
       ]);
       
-      console.log('API responses:', {
-        dasha: dashResponse.status,
-        chart: chartResponse.status,
-        transit: transitResponse.status
-      });
+
       
 if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
-        console.log('Dasha data loaded:', JSON.stringify(dashResponse.value.data, null, 2));
         setDashData(dashResponse.value.data);
-      } else {
-        console.log('Dasha failed:', dashResponse.reason || dashResponse.value?.data);
       }
       
       if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
-        console.log('Chart data loaded');
         setChartData(chartResponse.value.data);
-      } else {
-        console.log('Chart failed:', chartResponse.reason);
       }
       
       if (transitResponse.status === 'fulfilled' && transitResponse.value?.data) {
-        console.log('Transit data loaded:', JSON.stringify(transitResponse.value.data, null, 2));
         setTransitData(transitResponse.value.data);
-      } else {
-        console.log('Transit failed:', transitResponse.reason);
       }
       
       if (panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {
-        console.log('=== PANCHANG API RESPONSE ===');
-        console.log('Full response:', JSON.stringify(panchangResponse.value.data, null, 2));
         
         let combinedPanchangData = panchangResponse.value.data;
         
         // Add Rahu Kaal data if available
         if (rahuKaalResponse.status === 'fulfilled' && rahuKaalResponse.value?.data) {
-          console.log('Rahu Kaal data:', JSON.stringify(rahuKaalResponse.value.data, null, 2));
           combinedPanchangData.rahu_kaal = rahuKaalResponse.value.data;
         }
         
         // Add other inauspicious times if available
         if (inauspiciousResponse.status === 'fulfilled' && inauspiciousResponse.value?.data) {
-          console.log('Inauspicious times data:', JSON.stringify(inauspiciousResponse.value.data, null, 2));
           combinedPanchangData.inauspicious_times = inauspiciousResponse.value.data;
         }
         
         // Add daily panchang data (includes nakshatra) if available
         if (dailyPanchangResponse.status === 'fulfilled' && dailyPanchangResponse.value?.data) {
-          console.log('=== DAILY PANCHANG API RESPONSE ===');
-          console.log('Full daily panchang response:', JSON.stringify(dailyPanchangResponse.value.data, null, 2));
-          
           // Access nested panchang data correctly
           const basicPanchang = dailyPanchangResponse.value.data.basic_panchang;
           if (basicPanchang) {
-            console.log('Nakshatra data:', basicPanchang.nakshatra);
-            console.log('Tithi data:', basicPanchang.tithi);
-            console.log('Yoga data:', basicPanchang.yoga);
-            console.log('Karana data:', basicPanchang.karana);
             
             // Store the basic panchang data at root level for easier access
             combinedPanchangData.daily_panchang = {
@@ -184,7 +194,19 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
               nakshatra: basicPanchang.nakshatra,
               tithi: basicPanchang.tithi,
               yoga: basicPanchang.yoga,
-              karana: basicPanchang.karana,
+              karana: basicPanchang.karana
+            };
+          }
+        }
+        
+        setPanchangData(combinedPanchangData);
+      }
+    } catch (error) {
+      // Error handling
+    } finally {
+      setLoading(false);
+    }
+  };g.karana,
               vara: basicPanchang.vara
             };
           } else {
@@ -514,29 +536,29 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
 
           {/* Big 3 Signs Row */}
           <View style={styles.bigThreeRow}>
-            <TouchableOpacity style={styles.signCard} onPress={() => onOptionSelect({ action: 'chart' })} activeOpacity={0.9}>
+            <View style={styles.signCard}>
               <LinearGradient colors={['#1E3A8A', '#3B82F6']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>⬆️</Text>
                 <Text style={styles.signLabel}>Ascendant</Text>
                 <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
-            </TouchableOpacity>
+            </View>
             
-            <TouchableOpacity style={styles.signCard} onPress={() => onOptionSelect({ action: 'chart' })} activeOpacity={0.9}>
+            <View style={styles.signCard}>
               <LinearGradient colors={['#7C2D12', '#DC2626']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>🌙</Text>
                 <Text style={styles.signLabel}>Moon</Text>
                 <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
-            </TouchableOpacity>
+            </View>
             
-            <TouchableOpacity style={styles.signCard} onPress={() => onOptionSelect({ action: 'chart' })} activeOpacity={0.9}>
+            <View style={styles.signCard}>
               <LinearGradient colors={['#B45309', '#F59E0B']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>☀️</Text>
                 <Text style={styles.signLabel}>Sun</Text>
                 <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
-            </TouchableOpacity>
+            </View>
           </View>
 
           {/* Current Dasha Chips - Under Birth Chart */}
@@ -559,15 +581,13 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
                   const startDate = new Date(dasha.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
                   const endDate = new Date(dasha.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
                   return (
-                    <TouchableOpacity 
+                    <View 
                       style={[styles.dashaChip, { backgroundColor: planetColor + '20', borderColor: planetColor }]}
-                      onPress={() => onOptionSelect({ action: 'dasha' })}
-                      activeOpacity={0.8}
                     >
                       <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
                       <Text style={styles.dashaChipDates}>{startDate}</Text>
                       <Text style={styles.dashaChipDates}>{endDate}</Text>
-                    </TouchableOpacity>
+                    </View>
                   );
                 }}
                 contentContainerStyle={styles.dashaFlatListContent}
@@ -581,28 +601,24 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
           {/* Zodiac Wheel - Vibrant Design */}
           <View style={styles.planetarySection}>
             <Text style={styles.planetarySectionTitle}>🪐 Current Planetary Transits</Text>
-            <TouchableOpacity onPress={() => onOptionSelect({ action: 'transits' })} activeOpacity={0.9}>
-              <View style={styles.planetGrid}>
-                {transitData?.planets && Object.entries(transitData.planets).map(([planet, data]) => (
-                  <View key={planet} style={[
-                    styles.planetCard,
-                    { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
-                  ]}>
-                    <Text style={styles.planetName}>{planet}</Text>
-                    <Text style={styles.planetSign}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
-                    <Text style={styles.planetDegree}>{data.degree.toFixed(2)}°</Text>
-                  </View>
-                ))}
-                
-
-              </View>
-            </TouchableOpacity>
+            <View style={styles.planetGrid}>
+              {transitData?.planets && Object.entries(transitData.planets).map(([planet, data]) => (
+                <View key={planet} style={[
+                  styles.planetCard,
+                  { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
+                ]}>
+                  <Text style={styles.planetName}>{planet}</Text>
+                  <Text style={styles.planetSign}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
+                  <Text style={styles.planetDegree}>{data.degree.toFixed(2)}°</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* Panchang Timeline */}
           {panchangData && (
             <View style={styles.panchangCard}>
-              <Text style={[styles.panchangTitle, { marginBottom: 30 }]}>🌅 Today's Panchang</Text>
+              <Text style={[styles.panchangTitle, { textAlign: 'center', marginBottom: 20 }]}>🌅 Today's Panchang</Text>
               <View style={styles.sunTimesRow}>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌅</Text>
@@ -620,12 +636,12 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌙</Text>
                   <Text style={styles.sunTimeLabel}>Moonrise</Text>
-                  <Text style={styles.sunTimeValue}>{panchangData.moonrise ? new Date(panchangData.moonrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '7:53 AM'}</Text>
+                  <Text style={styles.sunTimeValue}>{panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || '7:53 AM'}</Text>
                 </View>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌚</Text>
                   <Text style={styles.sunTimeLabel}>Moonset</Text>
-                  <Text style={styles.sunTimeValue}>{panchangData.moonset ? new Date(panchangData.moonset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:06 PM'}</Text>
+                  <Text style={styles.sunTimeValue}>{panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || '6:06 PM'}</Text>
                 </View>
               </View>
               
@@ -1116,6 +1132,7 @@ loadingText: {
     marginBottom: 12,
   },
 dashaSection: {
+    marginTop: 16,
     marginBottom: 24,
   },
   dashaSectionTitle: {
@@ -1124,6 +1141,7 @@ dashaSection: {
     color: COLORS.white,
     marginBottom: 12,
     paddingHorizontal: 4,
+    textAlign: 'center',
   },
 dashaChip: {
     borderWidth: 1.5,
@@ -1201,13 +1219,11 @@ dashaChip: {
   },
   planetarySectionTitle: {
     fontSize: 18,
-    fontWeight: '300',
+    fontWeight: '600',
     color: COLORS.white,
-    marginBottom: 20,
+    marginBottom: 12,
+    paddingHorizontal: 4,
     textAlign: 'center',
-    letterSpacing: 2,
-    textShadow: '0 0 10px rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
   },
   planetGrid: {
     flexDirection: 'row',
@@ -1260,11 +1276,12 @@ dashaChip: {
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   panchangTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: COLORS.white,
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   sunTimesRow: {
     flexDirection: 'row',

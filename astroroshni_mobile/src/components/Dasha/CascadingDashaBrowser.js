@@ -171,8 +171,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata',
-        location: birthData.place || 'Unknown'
+        timezone: birthData.timezone || 'UTC+5:30',
+        place: birthData.place || 'Unknown'
       };
       
       console.log('=== VIMSHOTTARI DASHA REQUEST ===');
@@ -183,8 +183,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       
       const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
       
-      console.log('Vimshottari response status:', response.status);
-      console.log('Vimshottari response data keys:', Object.keys(response.data));
+      console.log('🔍 FULL VIMSHOTTARI RESPONSE DEBUG:');
+      console.log('Response status:', response.status);
+      console.log('Response data type:', typeof response.data);
+      console.log('Response data keys:', Object.keys(response.data || {}));
+      console.log('Response data structure:', JSON.stringify(response.data, null, 2));
       
       if (response.data.error) {
         console.log('VIMSHOTTARI BACKEND ERROR:', response.data.error);
@@ -195,14 +198,23 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       
       // Check if we have maha_dashas in the response
       const mahadashas = response.data.maha_dashas || [];
+      console.log('📊 Maha dashas array:', mahadashas);
+      console.log('📊 Antar dashas array:', response.data.antar_dashas || []);
+      console.log('📊 Pratyantar dashas array:', response.data.pratyantar_dashas || []);
+      console.log('📊 Sookshma dashas array:', response.data.sookshma_dashas || []);
+      console.log('📊 Prana dashas array:', response.data.prana_dashas || []);
+      
       if (mahadashas.length === 0) {
-        console.log('WARNING: No Vimshottari maha_dashas received');
+        console.log('❌ WARNING: No Vimshottari maha_dashas received');
+        console.log('❌ Full response data:', response.data);
         setError('Vimshottari calculation returned no dasha periods.');
         return;
       }
       
-      console.log('Vimshottari maha dashas count:', mahadashas.length);
+      console.log('✅ Vimshottari maha dashas count:', mahadashas.length);
+      console.log('✅ Setting cascading data:', response.data);
       setCascadingData(response.data);
+      console.log('✅ Cascading data set successfully');
     } catch (err) {
       console.error('Cascading fetch error:', err);
       console.error('Error details:', err.response?.data);
@@ -260,7 +272,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 5.5,
+        timezone: birthData.timezone || 'UTC+5:30',
         location: birthData.place || 'Unknown'
       };
       
@@ -318,7 +330,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 5.5,
+        timezone: birthData.timezone || 'UTC+5:30',
         location: birthData.place || 'Unknown'
       };
       
@@ -425,26 +437,64 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   };
 
   const autoSelectCurrentDashas = () => {
-    if (!cascadingData) return;
+    console.log('🎯 AUTO-SELECTING CURRENT DASHAS');
+    if (!cascadingData) {
+      console.log('❌ No cascading data available for auto-selection');
+      return;
+    }
+    
+    console.log('📊 Available data keys:', Object.keys(cascadingData));
+    console.log('📊 Maha dashas:', cascadingData.maha_dashas?.length || 0);
+    console.log('📊 Antar dashas:', cascadingData.antar_dashas?.length || 0);
+    console.log('📊 Pratyantar dashas:', cascadingData.pratyantar_dashas?.length || 0);
+    console.log('📊 Sookshma dashas:', cascadingData.sookshma_dashas?.length || 0);
+    console.log('📊 Prana dashas:', cascadingData.prana_dashas?.length || 0);
     
     const currentSelections = {};
     
     const currentMaha = cascadingData.maha_dashas?.find(d => d.current);
-    if (currentMaha) currentSelections.maha = currentMaha.planet;
+    if (currentMaha) {
+      currentSelections.maha = currentMaha.planet;
+      console.log('✅ Found current maha:', currentMaha.planet);
+    } else {
+      console.log('❌ No current maha found');
+    }
     
     const currentAntar = cascadingData.antar_dashas?.find(d => d.current);
-    if (currentAntar) currentSelections.antar = currentAntar.planet;
+    if (currentAntar) {
+      currentSelections.antar = currentAntar.planet;
+      console.log('✅ Found current antar:', currentAntar.planet);
+    } else {
+      console.log('❌ No current antar found');
+    }
     
     const currentPratyantar = cascadingData.pratyantar_dashas?.find(d => d.current);
-    if (currentPratyantar) currentSelections.pratyantar = currentPratyantar.planet;
+    if (currentPratyantar) {
+      currentSelections.pratyantar = currentPratyantar.planet;
+      console.log('✅ Found current pratyantar:', currentPratyantar.planet);
+    } else {
+      console.log('❌ No current pratyantar found');
+    }
     
     const currentSookshma = cascadingData.sookshma_dashas?.find(d => d.current);
-    if (currentSookshma) currentSelections.sookshma = currentSookshma.planet;
+    if (currentSookshma) {
+      currentSelections.sookshma = currentSookshma.planet;
+      console.log('✅ Found current sookshma:', currentSookshma.planet);
+    } else {
+      console.log('❌ No current sookshma found');
+    }
     
     const currentPrana = cascadingData.prana_dashas?.find(d => d.current);
-    if (currentPrana) currentSelections.prana = currentPrana.planet;
+    if (currentPrana) {
+      currentSelections.prana = currentPrana.planet;
+      console.log('✅ Found current prana:', currentPrana.planet);
+    } else {
+      console.log('❌ No current prana found');
+    }
     
+    console.log('🎯 Final selections:', currentSelections);
     setSelectedDashas(currentSelections);
+    console.log('✅ Auto-selection complete');
   };
 
   const autoSelectCurrentJaiminiDashas = () => {
@@ -628,38 +678,61 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   };
 
   const getDashaOptions = (dashaLevel) => {
+    console.log(`🔍 Getting dasha options for level: ${dashaLevel}`);
+    
     if (dashaType === 'kalchakra') {
       if (dashaLevel === 'kalchakra_maha') {
-        return kalchakraData?.mahadashas || [];
+        const options = kalchakraData?.mahadashas || [];
+        console.log(`📊 Kalchakra maha options: ${options.length}`);
+        return options;
       } else if (dashaLevel === 'kalchakra_antar') {
         // Filter all_antardashas for the selected mahadasha
         const selectedMaha = selectedDashas.kalchakra_maha;
         if (selectedMaha && kalchakraData?.all_antardashas) {
-          return kalchakraData.all_antardashas.filter(antar => 
+          const filtered = kalchakraData.all_antardashas.filter(antar => 
             antar.maha_name === selectedMaha
           );
+          console.log(`📊 Kalchakra antar options for ${selectedMaha}: ${filtered.length}`);
+          return filtered;
         }
+        console.log(`📊 No kalchakra antar options available`);
         return [];
       }
       return [];
     }
     
-    if (!cascadingData) return [];
+    if (!cascadingData) {
+      console.log(`❌ No cascading data available for ${dashaLevel}`);
+      return [];
+    }
     
+    let options = [];
     switch (dashaLevel) {
       case 'maha':
-        return cascadingData.maha_dashas || [];
+        options = cascadingData.maha_dashas || [];
+        break;
       case 'antar':
-        return cascadingData.antar_dashas || [];
+        options = cascadingData.antar_dashas || [];
+        break;
       case 'pratyantar':
-        return cascadingData.pratyantar_dashas || [];
+        options = cascadingData.pratyantar_dashas || [];
+        break;
       case 'sookshma':
-        return cascadingData.sookshma_dashas || [];
+        options = cascadingData.sookshma_dashas || [];
+        break;
       case 'prana':
-        return cascadingData.prana_dashas || [];
+        options = cascadingData.prana_dashas || [];
+        break;
       default:
-        return [];
+        options = [];
     }
+    
+    console.log(`📊 ${dashaLevel} options: ${options.length}`);
+    if (options.length > 0) {
+      console.log(`📊 First ${dashaLevel} option:`, options[0]);
+    }
+    
+    return options;
   };
 
 

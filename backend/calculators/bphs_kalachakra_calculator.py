@@ -144,9 +144,15 @@ class BPHSKalachakraCalculator:
             raise ValueError("birth_data must include 'date' and 'time' keys.")
         tz = float(birth_data.get('timezone_offset', 0.0))
         Y, M, D = [int(x) for x in birth_data['date'].split('-')]
-        hh, mm = [int(x) for x in birth_data['time'].split(':')]
+        
+        # Handle time format with or without seconds
+        time_parts = birth_data['time'].split(':')
+        hh = int(time_parts[0])
+        mm = int(time_parts[1])
+        ss = int(time_parts[2]) if len(time_parts) > 2 else 0
+        
         ut_hour = hh - tz
-        return swe.julday(Y, M, D, ut_hour + mm/60.0)
+        return swe.julday(Y, M, D, ut_hour + mm/60.0 + ss/3600.0)
 
     def _moon_longitude_sidereal(self, jd: float) -> float:
         pos, flag = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)

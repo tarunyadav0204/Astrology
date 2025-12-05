@@ -46,6 +46,7 @@ const getApiUrl = () => {
 
 export const API_BASE_URL = getApiUrl();
 
+
 // Helper function to handle API endpoints for both dev and production
 export const getEndpoint = (path) => {
   return `/api${path}`; // Always use /api prefix to match web version
