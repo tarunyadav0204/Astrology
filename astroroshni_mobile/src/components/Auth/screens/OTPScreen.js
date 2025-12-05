@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -111,7 +113,11 @@ export default function OTPScreen({
   }, [formData.devOtpCode]);
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigateToScreen('phone', 'back')}
@@ -205,7 +211,7 @@ export default function OTPScreen({
           </TouchableOpacity>
         </Animated.View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

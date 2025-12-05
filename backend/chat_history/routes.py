@@ -7,6 +7,14 @@ import sqlite3
 import uuid
 from auth import get_current_user
 
+def sanitize_text(text):
+    """Remove invalid Unicode characters and surrogates to prevent encoding attacks"""
+    if not isinstance(text, str):
+        return str(text) if text is not None else ""
+    text = text.encode('utf-8', 'surrogatepass').decode('utf-8', 'ignore')
+    text = text.replace('\0', '')
+    return text.strip()
+
 router = APIRouter(prefix="/chat-v2", tags=["chat_history"])
 
 def init_chat_tables():
@@ -112,7 +120,7 @@ async def save_chat_message(request: dict, current_user = Depends(get_current_us
     
     cursor.execute(
         "INSERT INTO chat_messages (session_id, sender, content) VALUES (?, ?, ?)",
-        (session_id, sender, content)
+        (session_id, sender, sanitize_text(content))
     )
     
     conn.commit()
@@ -220,10 +228,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         conn.close()
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Save user question
+    # Save user question (sanitized)
     cursor.execute(
         "INSERT INTO chat_messages (session_id, sender, content, status, completed_at) VALUES (?, ?, ?, ?, ?)",
-        (session_id, "user", question, "completed", datetime.now())
+        (session_id, "user", sanitize_text(question), "completed", datetime.now())
     )
     
     # Create processing assistant message
@@ -239,7 +247,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Start background processing
     background_tasks.add_task(
         process_gemini_response,
-        message_id, session_id, question, current_user.userid, language, response_style, premium_analysis, birth_details
+        message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details
     )
     
     return {
@@ -307,22 +315,22 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         context = context_builder.build_complete_context(birth_data)
         
         # Get conversation history
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT sender, content FROM chat_messages 
-            WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-            ORDER BY timestamp DESC LIMIT 6
-        ''', (session_id,))
-        
-        history_rows = cursor.fetchall()
-        history = []
-        for i in range(0, len(history_rows), 2):
-            if i + 1 < len(history_rows):
-                history.append({
-                    "question": history_rows[i+1][1],
-                    "response": history_rows[i][1]
-                })
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT sender, content FROM chat_messages 
+                WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
+                ORDER BY timestamp DESC LIMIT 6
+            ''', (session_id,))
+            
+            history_rows = cursor.fetchall()
+            history = []
+            for i in range(0, len(history_rows), 2):
+                if i + 1 < len(history_rows):
+                    history.append({
+                        "question": history_rows[i+1][1],
+                        "response": history_rows[i][1]
+                    })
         
         # Generate response
         analyzer = GeminiChatAnalyzer()
@@ -336,36 +344,34 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         )
         
         # Update database with result
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        if result.get('success'):
-            cursor.execute(
-                "UPDATE chat_messages SET content = ?, status = ?, completed_at = ? WHERE message_id = ?",
-                (result['response'], "completed", datetime.now(), message_id)
-            )
-        else:
-            error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
-            cursor.execute(
-                "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                ("failed", error_msg, datetime.now(), message_id)
-            )
-        
-        conn.commit()
-        conn.close()
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            
+            if result.get('success'):
+                cursor.execute(
+                    "UPDATE chat_messages SET content = ?, status = ?, completed_at = ? WHERE message_id = ?",
+                    (sanitize_text(result['response']), "completed", datetime.now(), message_id)
+                )
+            else:
+                error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
+                cursor.execute(
+                    "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
+                    ("failed", error_msg, datetime.now(), message_id)
+                )
+            
+            conn.commit()
         
     except Exception as e:
         # Handle any errors with user-friendly message
         user_friendly_error = "I'm having trouble analyzing your chart right now. Please try again in a moment."
         
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-            ("failed", user_friendly_error, datetime.now(), message_id)
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
+                ("failed", user_friendly_error, datetime.now(), message_id)
+            )
+            conn.commit()
         print(f"Error processing message {message_id}: {e}")
         import traceback
         traceback.print_exc()
