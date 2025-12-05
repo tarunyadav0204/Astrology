@@ -36,7 +36,7 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
   useFocusEffect(
     React.useCallback(() => {
       loadHomeData();
-    }, [])
+    }, [birthData])
   );
   
   useEffect(() => {
@@ -122,113 +122,118 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
       clearTimeout(midnightTimer);
       subscription?.remove();
     };
-  }, []);
+  }, [birthData]);
   
 const loadHomeData = async () => {
-    if (!birthData) {
-      return;
-    }
-    
     try {
       setLoading(true);
       
       const targetDate = new Date().toISOString().split('T')[0];
-      const formattedBirthData = {
-        name: birthData.name,
-        date: birthData.date.includes('T') ? birthData.date.split('T')[0] : birthData.date,
-        time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
-        latitude: parseFloat(birthData.latitude),
-        longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata',
-        location: birthData.place || 'Unknown'
-      };
       
-      // Load available data in parallel
-      const [dashResponse, chartResponse, transitResponse, panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
-        chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
-        chartAPI.calculateChartOnly(formattedBirthData),
-chartAPI.calculateTransits(formattedBirthData, targetDate),
-        panchangAPI.calculateSunriseSunset(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude)),
-        panchangAPI.calculateRahuKaal(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude)),
-        panchangAPI.calculateInauspiciousTimes(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude)),
-        panchangAPI.calculateDailyPanchang(targetDate, parseFloat(birthData.latitude), parseFloat(birthData.longitude))
-      ]);
-      
-
-      
-if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
-        setDashData(dashResponse.value.data);
-      }
-      
-      if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
-        setChartData(chartResponse.value.data);
-      }
-      
-      if (transitResponse.status === 'fulfilled' && transitResponse.value?.data) {
-        setTransitData(transitResponse.value.data);
-      }
-      
-      if (panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {
-        
-        let combinedPanchangData = panchangResponse.value.data;
-        
-        // Add Rahu Kaal data if available
-        if (rahuKaalResponse.status === 'fulfilled' && rahuKaalResponse.value?.data) {
-          combinedPanchangData.rahu_kaal = rahuKaalResponse.value.data;
+      // Load transits (no birth data needed) - wrapped in try-catch to not block other loading
+      try {
+        const transitResponse = await chartAPI.calculateTransits({}, targetDate);
+        if (transitResponse?.data) {
+          setTransitData(transitResponse.data);
         }
+      } catch (transitError) {
+      }
+      
+      // Load panchang for Delhi (default location) - wrapped in try-catch to not block birth chart loading
+      try {
+        const defaultLat = 28.6139;
+        const defaultLon = 77.2090;
         
-        // Add other inauspicious times if available
-        if (inauspiciousResponse.status === 'fulfilled' && inauspiciousResponse.value?.data) {
-          combinedPanchangData.inauspicious_times = inauspiciousResponse.value.data;
-        }
+        const [panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
+          panchangAPI.calculateSunriseSunset(targetDate, defaultLat, defaultLon),
+          panchangAPI.calculateRahuKaal(targetDate, defaultLat, defaultLon),
+          panchangAPI.calculateInauspiciousTimes(targetDate, defaultLat, defaultLon),
+          panchangAPI.calculateDailyPanchang(targetDate, defaultLat, defaultLon)
+        ]);
         
-        // Add daily panchang data (includes nakshatra) if available
-        if (dailyPanchangResponse.status === 'fulfilled' && dailyPanchangResponse.value?.data) {
-          // Access nested panchang data correctly
-          const basicPanchang = dailyPanchangResponse.value.data.basic_panchang;
-          if (basicPanchang) {
-            
-            // Store the basic panchang data at root level for easier access
-            combinedPanchangData.daily_panchang = {
-              ...dailyPanchangResponse.value.data,
-              nakshatra: basicPanchang.nakshatra,
-              tithi: basicPanchang.tithi,
-              yoga: basicPanchang.yoga,
-              karana: basicPanchang.karana
-            };
+        if (panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {
+          let combinedPanchangData = panchangResponse.value.data;
+          
+          if (rahuKaalResponse.status === 'fulfilled' && rahuKaalResponse.value?.data) {
+            combinedPanchangData.rahu_kaal = rahuKaalResponse.value.data;
           }
+          
+          if (inauspiciousResponse.status === 'fulfilled' && inauspiciousResponse.value?.data) {
+            combinedPanchangData.inauspicious_times = inauspiciousResponse.value.data;
+          }
+          
+          if (dailyPanchangResponse.status === 'fulfilled' && dailyPanchangResponse.value?.data) {
+            const basicPanchang = dailyPanchangResponse.value.data.basic_panchang;
+            if (basicPanchang) {
+              combinedPanchangData.daily_panchang = {
+                ...dailyPanchangResponse.value.data,
+                nakshatra: basicPanchang.nakshatra,
+                tithi: basicPanchang.tithi,
+                yoga: basicPanchang.yoga,
+                karana: basicPanchang.karana
+              };
+            }
+          }
+          
+          setPanchangData(combinedPanchangData);
+        }
+      } catch (panchangError) {
+      }
+      
+      
+      // Load birth-dependent data if available
+      let currentBirthData = birthData;
+      
+      if (!currentBirthData) {
+        try {
+          const { storage } = require('../../services/storage');
+          let savedBirthData = await storage.getBirthData();
+          
+          // If not in storage, try to load from API
+          if (!savedBirthData || !savedBirthData.name) {
+            const { authAPI } = require('../../services/api');
+            const response = await authAPI.getSelfBirthChart();
+            if (response.data.has_self_chart) {
+              savedBirthData = response.data;
+              // Save to storage for future use
+              await storage.setBirthData(savedBirthData);
+            }
+          }
+          
+          if (savedBirthData && savedBirthData.name) {
+            currentBirthData = savedBirthData;
+          }
+        } catch (error) {
+        }
+      }
+      
+      
+      if (currentBirthData) {
+        const formattedBirthData = {
+          name: currentBirthData.name,
+          date: currentBirthData.date.includes('T') ? currentBirthData.date.split('T')[0] : currentBirthData.date,
+          time: currentBirthData.time.includes('T') ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : currentBirthData.time,
+          latitude: parseFloat(currentBirthData.latitude),
+          longitude: parseFloat(currentBirthData.longitude),
+          timezone: currentBirthData.timezone || 'Asia/Kolkata',
+          location: currentBirthData.place || 'Unknown'
+        };
+        
+        const [dashResponse, chartResponse] = await Promise.allSettled([
+          chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
+          chartAPI.calculateChartOnly(formattedBirthData)
+        ]);
+        
+        if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
+          setDashData(dashResponse.value.data);
         }
         
-        setPanchangData(combinedPanchangData);
-      }
-    } catch (error) {
-      // Error handling
-    } finally {
-      setLoading(false);
-    }
-  };g.karana,
-              vara: basicPanchang.vara
-            };
-          } else {
-            console.log('No basic_panchang found in response');
-            combinedPanchangData.daily_panchang = dailyPanchangResponse.value.data;
-          }
+        if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
+          setChartData(chartResponse.value.data);
         } else {
-          console.log('Daily panchang failed:', dailyPanchangResponse.reason || 'No data');
-          console.log('Daily panchang status:', dailyPanchangResponse.status);
-          if (dailyPanchangResponse.value) {
-            console.log('Daily panchang response structure:', Object.keys(dailyPanchangResponse.value));
-          }
         }
-        
-        setPanchangData(combinedPanchangData);
-      } else {
-        console.log('Panchang failed:', panchangResponse.reason);
-        setPanchangData(null);
       }
-      
     } catch (error) {
-      console.error('Error loading home data:', error);
     } finally {
       setLoading(false);
     }
@@ -349,6 +354,7 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
                   top: `${top}%`,
                   left: `${left}%`,
                   opacity: anim,
+                  zIndex: -1,
                 },
               ]}
             >
@@ -357,18 +363,23 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
           );
         })}
         
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={[styles.scrollView, { zIndex: 1 }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.greetingContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
-          <Animated.View style={[styles.cosmicOrb, { transform: [{ scale: pulseAnim }] }]}>
-            <LinearGradient
-              colors={['#ff6b35', '#ffd700', '#ff6b35']}
-              style={styles.orbGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.orbIcon}>🔮</Text>
-            </LinearGradient>
-          </Animated.View>
+          <View style={styles.avatarContainer}>
+            <Animated.View style={[styles.zodiacRing, { transform: [{ rotate: pulseAnim.interpolate({ inputRange: [1, 1.05], outputRange: ['0deg', '360deg'] }) }] }]}>
+              <LinearGradient
+                colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                style={styles.ringGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+            </Animated.View>
+            <Animated.View style={[styles.avatar, { transform: [{ scale: pulseAnim }] }]}>
+              <Text key={chartData ? 'chart-loaded' : 'chart-loading'} style={styles.avatarText}>
+                {chartData ? getSignIcon(chartData?.houses?.[0]?.sign) : '♈'}
+              </Text>
+            </Animated.View>
+          </View>
           
           <Text style={styles.greetingTitle}>
             Welcome, {birthData?.name}!
@@ -540,7 +551,7 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
               <LinearGradient colors={['#1E3A8A', '#3B82F6']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>⬆️</Text>
                 <Text style={styles.signLabel}>Ascendant</Text>
-                <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}` : loading ? '...' : 'N/A'}</Text>
+                <Text style={styles.signValue}>{chartData?.houses?.[0]?.sign !== undefined ? `${getSignIcon(chartData.houses[0].sign)} ${getSignName(chartData.houses[0].sign).slice(0, 3)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
             
@@ -548,7 +559,7 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
               <LinearGradient colors={['#7C2D12', '#DC2626']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>🌙</Text>
                 <Text style={styles.signLabel}>Moon</Text>
-                <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}` : loading ? '...' : 'N/A'}</Text>
+                <Text style={styles.signValue}>{chartData?.planets?.Moon?.sign !== undefined ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign).slice(0, 3)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
             
@@ -556,7 +567,7 @@ if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResp
               <LinearGradient colors={['#B45309', '#F59E0B']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>☀️</Text>
                 <Text style={styles.signLabel}>Sun</Text>
-                <Text style={styles.signValue}>{chartData ? `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}` : loading ? '...' : 'N/A'}</Text>
+                <Text style={styles.signValue}>{chartData?.planets?.Sun?.sign !== undefined ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign).slice(0, 3)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
           </View>
@@ -848,27 +859,40 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     paddingVertical: 30,
   },
-  cosmicOrb: {
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  zodiacRing: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    top: -10,
+    left: -10,
+  },
+  ringGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
+    opacity: 0.3,
+  },
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.6,
     shadowRadius: 20,
     elevation: 10,
   },
-  orbGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  orbIcon: {
+  avatarText: {
     fontSize: 48,
   },
   greetingTitle: {

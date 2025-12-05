@@ -35,7 +35,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   useEffect(() => {
     if (visible) {
-      console.log('EventPeriods: Loading for year', selectedYear);
       loadEventPeriods();
       startAnimations();
     }
@@ -43,7 +42,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   // Separate effect for debugging state changes
   useEffect(() => {
-    console.log('EventPeriods state:', { loading, error, periodsCount: periods.length, selectedYear });
   }, [loading, error, periods.length, selectedYear]);
 
   const startAnimations = () => {
@@ -108,7 +106,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   const loadEventPeriods = async () => {
     try {
-      console.log('EventPeriods: Starting API call for year', selectedYear);
       setLoading(true);
       setError(null);
       
@@ -125,7 +122,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
       
       clearTimeout(timeoutId);
       
-      console.log('EventPeriods: API response status', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -133,7 +129,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
       }
 
       const data = await response.json();
-      console.log('EventPeriods: API data received', data);
       
       const filteredPeriods = (data.periods || [])
         .filter(period => {
@@ -151,14 +146,12 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
           }
         });
       
-      console.log('EventPeriods: Filtered periods count', filteredPeriods.length);
       setPeriods(filteredPeriods);
     } catch (err) {
       console.error('EventPeriods: Error occurred', err);
       setError(err.message);
       setPeriods([]);
     } finally {
-      console.log('EventPeriods: Loading complete');
       setLoading(false);
     }
   };
@@ -462,7 +455,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
                       year === selectedYear && styles.yearOptionSelected
                     ]}
                     onPress={() => {
-                      console.log('EventPeriods: Year selected', year);
                       setShowYearModal(false);
                       if (year !== selectedYear) {
                         setSelectedYear(year);

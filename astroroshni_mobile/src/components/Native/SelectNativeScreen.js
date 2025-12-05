@@ -108,7 +108,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
             <View style={styles.profileInfo}>
               <View style={styles.profileLeft}>
                 <View style={styles.zodiacIcon}>
-                  <Text style={styles.zodiacText}>{getZodiacSign(profile.date)}</Text>
+                  <Text style={styles.zodiacText}>{getZodiacSign(profile.name)}</Text>
                 </View>
                 <View style={styles.profileDetails}>
                   <View style={styles.nameRow}>
@@ -149,6 +149,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
 export default function SelectNativeScreen({ navigation, route }) {
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [profileCharts, setProfileCharts] = useState({});
   const fromProfile = route.params?.fromProfile;
 
   useFocusEffect(
@@ -159,7 +160,6 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const loadProfiles = async () => {
     try {
-      const userData = await storage.getUserData();
       const currentNative = await storage.getBirthDetails();
       
       // Fetch saved charts from API
@@ -168,21 +168,6 @@ export default function SelectNativeScreen({ navigation, route }) {
       const apiCharts = response.data.charts || [];
       
       const profileList = [];
-      
-      // Add user's own profile if it exists
-      if (userData && userData.date && userData.time) {
-        profileList.push({
-          id: 'self',
-          name: userData.name || 'Me',
-          date: userData.date,
-          time: userData.time,
-          place: userData.place,
-          latitude: userData.latitude,
-          longitude: userData.longitude,
-          timezone: userData.timezone,
-          isSelf: true
-        });
-      }
       
       // Add charts from API
       apiCharts.forEach((chart) => {
@@ -196,16 +181,41 @@ export default function SelectNativeScreen({ navigation, route }) {
           longitude: chart.longitude,
           timezone: chart.timezone,
           gender: chart.gender,
-          isSelf: userData && chart.name === userData.name
+          relation: chart.relation,
+          isSelf: chart.relation === 'self'
         });
       });
       
-      // Remove duplicates based on name
-      const uniqueProfiles = profileList.filter((profile, index, self) => 
-        index === self.findIndex(p => p.name === profile.name)
-      );
+      setProfiles(profileList);
       
-      setProfiles(uniqueProfiles);
+      // Calculate chart data for each profile
+      const chartPromises = profileList.map(async (profile) => {
+        try {
+          // Fix incorrect UTC+5 timezone to UTC+5:30 for Indian locations
+          let timezone = profile.timezone || 'Asia/Kolkata';
+          if (timezone === 'UTC+5' && profile.latitude >= 8 && profile.latitude <= 37 && profile.longitude >= 68 && profile.longitude <= 97) {
+            timezone = 'UTC+5:30'; // Correct timezone for India
+          }
+          
+          const formattedData = {
+            name: profile.name,
+            date: profile.date.includes('T') ? profile.date.split('T')[0] : profile.date,
+            time: profile.time.includes('T') ? new Date(profile.time).toTimeString().slice(0, 5) : profile.time,
+            latitude: parseFloat(profile.latitude),
+            longitude: parseFloat(profile.longitude),
+            timezone: timezone
+          };
+          
+          const response = await chartAPI.calculateChartOnly(formattedData);
+          return { [profile.name]: response.data };
+        } catch (error) {
+          return { [profile.name]: null };
+        }
+      });
+      
+      const chartResults = await Promise.all(chartPromises);
+      const chartsMap = chartResults.reduce((acc, chart) => ({ ...acc, ...chart }), {});
+      setProfileCharts(chartsMap);
       
       if (currentNative) {
         setSelectedProfile(currentNative.name);
@@ -304,23 +314,21 @@ export default function SelectNativeScreen({ navigation, route }) {
     );
   };
 
-  const getZodiacSign = (date) => {
-    if (!date) return '♈';
-    const month = new Date(date).getMonth() + 1;
-    const day = new Date(date).getDate();
-    
-    if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return '♈';
-    if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return '♉';
-    if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return '♊';
-    if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return '♋';
-    if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return '♌';
-    if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return '♍';
-    if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return '♎';
-    if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return '♏';
-    if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return '♐';
-    if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return '♑';
-    if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return '♒';
-    return '♓';
+  const getSignIcon = (signNumber) => {
+    const icons = {
+      0: '♈', 1: '♉', 2: '♊', 3: '♋',
+      4: '♌', 5: '♍', 6: '♎', 7: '♏',
+      8: '♐', 9: '♑', 10: '♒', 11: '♓'
+    };
+    return icons[signNumber] !== undefined ? icons[signNumber] : '♈';
+  };
+
+  const getZodiacSign = (profileName) => {
+    const chartData = profileCharts[profileName];
+    if (chartData?.houses?.[0]?.sign !== undefined) {
+      return getSignIcon(chartData.houses[0].sign);
+    }
+    return '♈'; // Default to Aries if no chart data
   };
 
   return (

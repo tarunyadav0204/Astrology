@@ -126,7 +126,7 @@ export default function ChatHistoryScreen({ navigation }) {
         navigation.replace('Login');
       }
     } catch (error) {
-      console.error('Error loading chat history:', error);
+
     } finally {
       setLoading(false);
       setRefreshing(false);

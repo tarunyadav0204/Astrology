@@ -20,6 +20,10 @@ export const storage = {
     return data ? JSON.parse(data) : null;
   },
   
+  // Birth data (alias for birth details)
+  setBirthData: (data) => storage.setBirthDetails(data),
+  getBirthData: () => storage.getBirthDetails(),
+  
   // Language preference
   setLanguage: (language) => AsyncStorage.setItem('language', language),
   getLanguage: () => AsyncStorage.getItem('language'),

@@ -75,7 +75,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         }
       }
     } catch (err) {
-      console.error('Kalachakra fetch error:', err);
+
     } finally {
       setLoading(false);
     }
@@ -109,7 +109,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         setGatiData(data);
       }
     } catch (err) {
-      console.error('Gati analysis fetch error:', err);
+
     }
   };
 

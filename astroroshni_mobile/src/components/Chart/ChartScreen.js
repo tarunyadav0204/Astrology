@@ -111,17 +111,14 @@ export default function ChartScreen({ navigation, route }) {
       
       if (paramsBirthData && paramsBirthData.name) {
         data = paramsBirthData;
-        console.log('ChartScreen - Using birth data from params:', data);
       } else {
         data = await storage.getBirthDetails();
-        console.log('ChartScreen - Birth data from storage:', data);
       }
       
       if (data && data.name) {
         setBirthData(data);
         await calculateChart(data);
       } else {
-        console.log('ChartScreen - No valid birth data found');
       }
     } catch (error) {
       console.error('ChartScreen - Error loading birth data:', error);
@@ -132,7 +129,6 @@ export default function ChartScreen({ navigation, route }) {
 
   const calculateChart = async (data) => {
     try {
-      console.log('ChartScreen - Calculating chart for:', data);
       
       // Format data properly for API
       const formattedData = {
@@ -144,10 +140,8 @@ export default function ChartScreen({ navigation, route }) {
         timezone: data.timezone || 'Asia/Kolkata'
       };
       
-      console.log('ChartScreen - Formatted data:', formattedData);
       const response = await chartAPI.calculateChartOnly(formattedData);
       const chartResult = response.data;
-      console.log('ChartScreen - Chart calculated successfully');
       
       setChartData(chartResult);
     } catch (error) {
@@ -162,7 +156,7 @@ export default function ChartScreen({ navigation, route }) {
         <SafeAreaView style={styles.safeArea}>
         {/* Compact Header */}
         <View style={styles.compactHeader}>
-          <TouchableOpacity style={styles.closeButton} onPress={() => navigation && navigation.goBack ? navigation.goBack() : console.log('Navigation not available')}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
             <Ionicons name="close" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>

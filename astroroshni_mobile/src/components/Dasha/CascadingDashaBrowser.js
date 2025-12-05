@@ -175,49 +175,27 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         place: birthData.place || 'Unknown'
       };
       
-      console.log('=== VIMSHOTTARI DASHA REQUEST ===');
-      console.log('Original birthData:', birthData);
-      console.log('Formatted birth data:', formattedBirthData);
-      console.log('Target date:', targetDate);
-      console.log('Request payload:', { birth_data: formattedBirthData, target_date: targetDate });
       
       const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
       
-      console.log('🔍 FULL VIMSHOTTARI RESPONSE DEBUG:');
-      console.log('Response status:', response.status);
-      console.log('Response data type:', typeof response.data);
-      console.log('Response data keys:', Object.keys(response.data || {}));
-      console.log('Response data structure:', JSON.stringify(response.data, null, 2));
       
       if (response.data.error) {
-        console.log('VIMSHOTTARI BACKEND ERROR:', response.data.error);
-        console.log('VIMSHOTTARI SYSTEM INFO:', response.data.system);
         setError(`Vimshottari calculation failed: ${response.data.error}`);
         return;
       }
       
       // Check if we have maha_dashas in the response
       const mahadashas = response.data.maha_dashas || [];
-      console.log('📊 Maha dashas array:', mahadashas);
-      console.log('📊 Antar dashas array:', response.data.antar_dashas || []);
-      console.log('📊 Pratyantar dashas array:', response.data.pratyantar_dashas || []);
-      console.log('📊 Sookshma dashas array:', response.data.sookshma_dashas || []);
-      console.log('📊 Prana dashas array:', response.data.prana_dashas || []);
       
       if (mahadashas.length === 0) {
-        console.log('❌ WARNING: No Vimshottari maha_dashas received');
-        console.log('❌ Full response data:', response.data);
         setError('Vimshottari calculation returned no dasha periods.');
         return;
       }
       
-      console.log('✅ Vimshottari maha dashas count:', mahadashas.length);
-      console.log('✅ Setting cascading data:', response.data);
       setCascadingData(response.data);
-      console.log('✅ Cascading data set successfully');
     } catch (err) {
-      console.error('Cascading fetch error:', err);
-      console.error('Error details:', err.response?.data);
+
+
       setError('Failed to load cascading dasha data');
     } finally {
       setLoading(false);
@@ -255,7 +233,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         setJaiminiAntarData(antarData);
       }
     } catch (err) {
-      console.error('Jaimini antardasha fetch error:', err);
+
     }
   };
 
@@ -294,15 +272,12 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       const jaiminiData = await response.json();
       
       if (jaiminiData.error) {
-        console.log('JAIMINI BACKEND ERROR:', jaiminiData.error);
-        console.log('JAIMINI SYSTEM INFO:', jaiminiData.system);
         setError(`Jaimini calculation failed: ${jaiminiData.error}`);
         return;
       }
       
       // Check if we have valid data structure
       if (!jaiminiData.periods || jaiminiData.periods.length === 0) {
-        console.log('WARNING: No Jaimini periods data received');
         setError('Jaimini calculation returned no dasha periods. This may be due to a backend calculation error.');
         return;
       }
@@ -310,7 +285,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       setJaiminiData(jaiminiData);
       
     } catch (err) {
-      console.error('Jaimini Kalchakra fetch error:', err);
+
       setError('Failed to load Jaimini Kalchakra dasha data');
     } finally {
       setLoading(false);
@@ -351,24 +326,15 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       }
       
       const kalchakraData = await response.json();
-      console.log('=== FRONTEND KALCHAKRA DATA ===');
-      console.log('Keys:', Object.keys(kalchakraData));
-      console.log('Has all_antardashas:', 'all_antardashas' in kalchakraData);
-      console.log('All antardashas count:', kalchakraData.all_antardashas?.length || 0);
-      console.log('Current antardasha:', kalchakraData.current_antardasha);
       
       if (kalchakraData.error) {
-        console.log('BACKEND ERROR:', kalchakraData.error);
-        console.log('SYSTEM INFO:', kalchakraData.system);
         setError(`Kalchakra calculation failed: ${kalchakraData.error}`);
         return;
       }
       
-      console.log('=== END FRONTEND DEBUG ===');
       
       // Check if we have valid data structure
       if (!kalchakraData.mahadashas || kalchakraData.mahadashas.length === 0) {
-        console.log('WARNING: No mahadashas data received');
         setError('Kalchakra calculation returned no dasha periods. This may be due to a backend calculation error.');
         return;
       }
@@ -383,11 +349,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           setKalchakraSystemInfo(systemInfo);
         }
       } catch (infoErr) {
-        console.log('System info fetch failed:', infoErr);
       }
       
     } catch (err) {
-      console.error('Kalchakra fetch error:', err);
+
       setError('Failed to load Kalchakra dasha data');
     } finally {
       setLoading(false);
@@ -396,8 +361,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   
   const fetchKalchakraAntardasha = async (mahaSign) => {
     try {
-      console.log('=== FETCHING ANTARDASHA ===');
-      console.log('mahaSign:', mahaSign);
       const token = await AsyncStorage.getItem('authToken');
       
       const formattedBirthData = {
@@ -423,106 +386,77 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         })
       });
       
-      console.log('Antardasha response status:', response.status);
       if (response.ok) {
         const antarData = await response.json();
-        console.log('Antardasha data received:', antarData);
         setKalchakraAntarData(antarData);
       } else {
-        console.log('Antardasha response not ok:', response.status);
       }
     } catch (err) {
-      console.error('Kalchakra antardasha fetch error:', err);
+
     }
   };
 
   const autoSelectCurrentDashas = () => {
-    console.log('🎯 AUTO-SELECTING CURRENT DASHAS');
     if (!cascadingData) {
-      console.log('❌ No cascading data available for auto-selection');
       return;
     }
     
-    console.log('📊 Available data keys:', Object.keys(cascadingData));
-    console.log('📊 Maha dashas:', cascadingData.maha_dashas?.length || 0);
-    console.log('📊 Antar dashas:', cascadingData.antar_dashas?.length || 0);
-    console.log('📊 Pratyantar dashas:', cascadingData.pratyantar_dashas?.length || 0);
-    console.log('📊 Sookshma dashas:', cascadingData.sookshma_dashas?.length || 0);
-    console.log('📊 Prana dashas:', cascadingData.prana_dashas?.length || 0);
     
     const currentSelections = {};
     
     const currentMaha = cascadingData.maha_dashas?.find(d => d.current);
     if (currentMaha) {
       currentSelections.maha = currentMaha.planet;
-      console.log('✅ Found current maha:', currentMaha.planet);
     } else {
-      console.log('❌ No current maha found');
     }
     
     const currentAntar = cascadingData.antar_dashas?.find(d => d.current);
     if (currentAntar) {
       currentSelections.antar = currentAntar.planet;
-      console.log('✅ Found current antar:', currentAntar.planet);
     } else {
-      console.log('❌ No current antar found');
     }
     
     const currentPratyantar = cascadingData.pratyantar_dashas?.find(d => d.current);
     if (currentPratyantar) {
       currentSelections.pratyantar = currentPratyantar.planet;
-      console.log('✅ Found current pratyantar:', currentPratyantar.planet);
     } else {
-      console.log('❌ No current pratyantar found');
     }
     
     const currentSookshma = cascadingData.sookshma_dashas?.find(d => d.current);
     if (currentSookshma) {
       currentSelections.sookshma = currentSookshma.planet;
-      console.log('✅ Found current sookshma:', currentSookshma.planet);
     } else {
-      console.log('❌ No current sookshma found');
     }
     
     const currentPrana = cascadingData.prana_dashas?.find(d => d.current);
     if (currentPrana) {
       currentSelections.prana = currentPrana.planet;
-      console.log('✅ Found current prana:', currentPrana.planet);
     } else {
-      console.log('❌ No current prana found');
     }
     
-    console.log('🎯 Final selections:', currentSelections);
     setSelectedDashas(currentSelections);
-    console.log('✅ Auto-selection complete');
   };
 
   const autoSelectCurrentJaiminiDashas = () => {
     if (!jaiminiData?.periods) {
-      console.log('No jaimini periods data', jaiminiData);
       return;
     }
     
     if (jaiminiData.periods.length === 0) {
-      console.log('Jaimini periods array is empty');
       return;
     }
     
-    console.log('Jaimini periods:', jaiminiData.periods);
     
     // Find the period marked as current by backend
     const currentPeriod = jaiminiData.periods.find(period => period.current === true);
     
-    console.log('Current period found:', currentPeriod);
     
     if (currentPeriod) {
-      console.log('Selecting current period:', currentPeriod.sign || currentPeriod.planet);
       setSelectedDashas({ jaimini_maha: currentPeriod.id || currentPeriod.sign || currentPeriod.planet });
       fetchJaiminiAntardasha(currentPeriod.sign || currentPeriod.planet);
     } else if (jaiminiData.periods.length > 0) {
       // Fallback: select first period
       const firstPeriod = jaiminiData.periods[0];
-      console.log('Fallback: selecting first period:', firstPeriod.sign);
       setSelectedDashas({ jaimini_maha: firstPeriod.id || firstPeriod.sign });
       fetchJaiminiAntardasha(firstPeriod.sign);
     }
@@ -678,12 +612,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   };
 
   const getDashaOptions = (dashaLevel) => {
-    console.log(`🔍 Getting dasha options for level: ${dashaLevel}`);
     
     if (dashaType === 'kalchakra') {
       if (dashaLevel === 'kalchakra_maha') {
         const options = kalchakraData?.mahadashas || [];
-        console.log(`📊 Kalchakra maha options: ${options.length}`);
         return options;
       } else if (dashaLevel === 'kalchakra_antar') {
         // Filter all_antardashas for the selected mahadasha
@@ -692,17 +624,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           const filtered = kalchakraData.all_antardashas.filter(antar => 
             antar.maha_name === selectedMaha
           );
-          console.log(`📊 Kalchakra antar options for ${selectedMaha}: ${filtered.length}`);
           return filtered;
         }
-        console.log(`📊 No kalchakra antar options available`);
         return [];
       }
       return [];
     }
     
     if (!cascadingData) {
-      console.log(`❌ No cascading data available for ${dashaLevel}`);
       return [];
     }
     
@@ -727,9 +656,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         options = [];
     }
     
-    console.log(`📊 ${dashaLevel} options: ${options.length}`);
     if (options.length > 0) {
-      console.log(`📊 First ${dashaLevel} option:`, options[0]);
     }
     
     return options;
@@ -1421,15 +1348,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const birthDate = new Date(birthData.date);
     const currentAge = Math.floor((new Date() - birthDate) / (365.25 * 24 * 60 * 60 * 1000));
     
-    console.log('Birth date:', birthData.date, 'Current age:', currentAge);
-    console.log('Deha:', kalchakraData.deha, '-> sign number:', dehaSign);
-    console.log('Jeeva:', kalchakraData.jeeva, '-> sign number:', jeevaSign);
-    console.log('Mahadashas array:', mahadashas.map((m, i) => ({ index: i, name: m.name, years: m.years, sign: m.sign })));
     
     // Calculate cumulative ages for debugging
     let cumulativeAge = 0;
     mahadashas.forEach((maha, index) => {
-      console.log(`${index + 1}. ${maha.name}: ${cumulativeAge} - ${cumulativeAge + Math.round(maha.years)} (${Math.round(maha.years)}y)`);
       cumulativeAge += Math.round(maha.years);
     });
     

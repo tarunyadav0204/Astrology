@@ -58,7 +58,6 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('Analysis screen focused, checking for stored data...');
       if (birthData) {
         loadStoredAnalysis();
       }
@@ -78,7 +77,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         ]);
       }
     } catch (error) {
-      console.error('Error checking birth data:', error);
+
       navigation.navigate('BirthForm');
     }
   };
@@ -155,8 +154,6 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       };
 
       const fullUrl = `${API_BASE_URL}${getEndpoint(`/${analysisType}/analyze`)}`;
-      console.log('Making request to:', fullUrl);
-      console.log('Request body:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch(fullUrl, {
         method: 'POST',
@@ -164,21 +161,15 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.log('Error response body:', errorText);
         throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
       }
 
       const responseText = await response.text();
-      console.log('Raw response text length:', responseText.length);
-      console.log('Raw response preview:', responseText.substring(0, 500));
       
       const lines = responseText.split('\n').filter(line => line.trim());
-      console.log('Filtered lines count:', lines.length);
       let fullContent = '';
       
       for (const line of lines) {
@@ -195,13 +186,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 if (parsed.data && parsed.data[`${analysisType}_analysis`]) {
                   const analysisData = parsed.data[`${analysisType}_analysis`];
                   if (analysisData.json_response && typeof analysisData.json_response === 'object') {
-                    console.log('Setting analysis result from nested response');
                     setAnalysisResult(analysisData.json_response);
                     await saveAnalysis(analysisData.json_response);
                     fetchBalance();
                     return;
                   } else if (analysisData.raw_response) {
-                    console.log('Using raw_response, json_response was null');
                     fullContent = analysisData.raw_response;
                   } else {
                     fullContent = '';
@@ -214,7 +203,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 fullContent += parsed.content;
               }
             } catch (parseError) {
-              console.warn('Parse error:', parseError);
+
             }
           }
         }
@@ -222,8 +211,6 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
       if (fullContent && typeof fullContent === 'string' && fullContent.trim()) {
         try {
-          console.log('Processing fullContent, length:', fullContent.length);
-          console.log('Content preview:', fullContent.substring(0, 500));
           
           let cleanContent = fullContent.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
           
@@ -233,16 +220,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           // Try to extract JSON from the content
           const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
-            console.log('Found JSON match, parsing...');
-            console.log('JSON to parse:', jsonMatch[0].substring(0, 200) + '...');
             const analysisData = JSON.parse(jsonMatch[0]);
-            console.log('Setting analysis result from JSON match');
             setAnalysisResult(analysisData);
             await saveAnalysis(analysisData);
             fetchBalance();
           } else {
             // If no JSON found, create a simple structure from HTML content
-            console.log('No JSON found, creating simple structure from HTML');
             const htmlContent = cleanContent.replace(/<[^>]*>/g, '').trim();
             const simpleResult = {
               quick_answer: htmlContent.substring(0, 500) + (htmlContent.length > 500 ? '...' : ''),
@@ -256,8 +239,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             fetchBalance();
           }
         } catch (jsonError) {
-          console.error('JSON parse error:', jsonError);
-          console.log('Failed content:', fullContent.substring(0, 1000));
+
           Alert.alert('Error', 'Failed to parse analysis results');
         }
       } else {
@@ -265,15 +247,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       }
 
     } catch (error) {
-      console.error('Analysis error:', error);
-      console.log('Error details:', {
-        message: error.message,
-        status: error.status,
-        analysisType,
-        requestUrl: `${API_BASE_URL}${getEndpoint(`/${analysisType}/analyze`)}`,
-        birthDataKeys: Object.keys(fixedBirthData || {})
-      });
-      
+
       let errorMessage = 'Analysis failed. Please try again.';
       
       if (error.message?.includes('Network')) {
@@ -319,52 +293,42 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const loadStoredAnalysis = async () => {
     try {
       if (!birthData?.name) {
-        console.log('No birth data name available');
         return;
       }
       const key = `analysis_${analysisType}_${birthData.name}`;
-      console.log('Loading stored analysis with key:', key);
       
       // Debug: List all keys
       const allKeys = await AsyncStorage.getAllKeys();
-      console.log('All AsyncStorage keys:', allKeys);
       const analysisKeys = allKeys.filter(k => k.startsWith('analysis_'));
-      console.log('Analysis keys found:', analysisKeys);
       
       const stored = await AsyncStorage.getItem(key);
       if (stored) {
         const parsedData = JSON.parse(stored);
-        console.log('Found stored analysis:', parsedData);
         setAnalysisResult(parsedData);
       } else {
-        console.log('No stored analysis found for key:', key);
       }
     } catch (error) {
-      console.error('Error loading stored analysis:', error);
+
     }
   };
 
   const saveAnalysis = async (data) => {
     try {
       if (!birthData?.name) {
-        console.log('Cannot save: no birth data name');
         return;
       }
       const key = `analysis_${analysisType}_${birthData.name}`;
-      console.log('Saving analysis with key:', key);
-      console.log('Data to save:', JSON.stringify(data).substring(0, 200) + '...');
       
       await AsyncStorage.setItem(key, JSON.stringify(data));
       
       // Verify save
       const saved = await AsyncStorage.getItem(key);
       if (saved) {
-        console.log('Analysis saved and verified successfully');
       } else {
-        console.error('Save verification failed');
+
       }
     } catch (error) {
-      console.error('Failed to save analysis:', error);
+
     }
   };
 
@@ -389,7 +353,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         ]
       );
     } catch (error) {
-      console.error('PDF download error:', error);
+
       Alert.alert('Error', 'Failed to download PDF. Please try again.');
     }
   };
@@ -462,7 +426,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
       await Sharing.shareAsync(uri);
     } catch (error) {
-      console.error('PDF generation error:', error);
+
       Alert.alert('Error', 'Failed to generate PDF. Please try again.');
     }
   };

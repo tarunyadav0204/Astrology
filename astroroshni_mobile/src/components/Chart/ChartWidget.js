@@ -132,7 +132,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         loadAllCharts();
       }
     } catch (error) {
-      console.error('Error loading cached charts:', error);
+
       loadAllCharts();
     }
   };
@@ -145,7 +145,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       const { lagna, ...cacheToSave } = cache; // Don't save lagna as it's always available
       await storage.setItem(cacheKey, JSON.stringify(cacheToSave));
     } catch (error) {
-      console.error('Error saving chart cache:', error);
+
     }
   };
 
@@ -169,7 +169,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
           const response = await chartAPI.calculateDivisionalChart(formattedData, division);
           return { type, data: response.data.divisional_chart };
         } catch (error) {
-          console.error(`Error loading ${type}:`, error);
+
           return { type, data: null };
         }
       });
@@ -181,7 +181,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
           const response = await chartAPI.calculateTransits(formattedData, today);
           return { type: 'transit', data: response.data };
         } catch (error) {
-          console.error('Error loading transit:', error);
+
           return { type: 'transit', data: null };
         }
       })();
@@ -202,7 +202,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       await saveCacheToStorage(newCache);
       
     } catch (error) {
-      console.error('Error loading charts:', error);
+
     } finally {
       setLoading(false);
     }
@@ -230,7 +230,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         setCurrentChartData(data);
       }
     } catch (error) {
-      console.error(`Error loading divisional chart D${divisionNumber}:`, error);
+
     } finally {
       setLoading(false);
     }
@@ -280,7 +280,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         if (setCurrent) setCurrentChartData(data);
       }
     } catch (error) {
-      console.error(`Error loading ${type} chart:`, error);
+
     } finally {
       if (setCurrent) setLoading(false);
     }

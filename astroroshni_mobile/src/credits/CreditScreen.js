@@ -82,11 +82,9 @@ const CreditScreen = ({ navigation }) => {
     }
 
     setRedeeming(true);
-    console.log('🎫 Attempting to redeem code:', promoCode.trim());
     
     try {
       const result = await redeemCode(promoCode.trim());
-      console.log('✅ Redeem success:', result);
       Alert.alert('Success', result.message || 'Promo code redeemed successfully!');
       setPromoCode('');
       fetchHistory();
@@ -102,7 +100,6 @@ const CreditScreen = ({ navigation }) => {
       // Extract error message from different possible sources
       let errorMessage = error.message || error.detail || 'Failed to redeem code';
       
-      console.log('📝 Final error message:', errorMessage);
       
       // Decode HTML entities
       errorMessage = errorMessage

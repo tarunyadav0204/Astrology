@@ -208,7 +208,6 @@ export default function ChatScreen({ navigation, route }) {
       const { chartAPI } = require('../../services/api');
       // Use calculateChart instead of calculateChartOnly to save birth data to database
       const response = await chartAPI.calculateChart(formattedData);
-      console.log('🔍 CHAT CHART DATA STRUCTURE:', JSON.stringify(response.data, null, 2));
       setChartData(response.data);
 
     } catch (error) {
@@ -307,17 +306,13 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   useEffect(() => {
-    console.log('🔄 birthData useEffect triggered, birthData:', JSON.stringify(birthData, null, 2));
-    console.log('🔄 birthData name:', birthData?.name);
     
     if (birthData) {
       // Create unique person ID from birth data
       const personId = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
-      console.log('🔄 Created personId:', personId);
       
       // Check if person changed
       if (currentPersonId && currentPersonId !== personId) {
-        console.log('👤 Person changed - clearing state');
         // Different person selected - clear current state
         setMessages([]);
         setSessionId(null);
@@ -326,8 +321,6 @@ export default function ChatScreen({ navigation, route }) {
       
       // Only update if person ID actually changed
       if (currentPersonId !== personId) {
-        console.log('👤 Person changed from', currentPersonId, 'to', personId);
-        console.log('👤 New person name:', birthData.name);
         
         // Set person ID first to avoid null issues
         setCurrentPersonId(personId);
@@ -338,7 +331,6 @@ export default function ChatScreen({ navigation, route }) {
         
         // Load messages from storage immediately
         loadMessagesFromStorage(personId).then(storedMessages => {
-          console.log('📱 PERSON_CHANGE: Found stored messages:', storedMessages.length);
           if (storedMessages.length > 0) {
             setMessages(storedMessages);
             // Only auto-switch to chat if not app startup
@@ -349,7 +341,6 @@ export default function ChatScreen({ navigation, route }) {
             // Check for processing messages and resume polling
             const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
             if (processingMessage) {
-              console.log('🔄 RESUMING polling for stored processing message:', processingMessage.messageId);
               setLoading(true);
               setIsTyping(true);
               // Use personId directly to avoid timing issues
@@ -358,7 +349,6 @@ export default function ChatScreen({ navigation, route }) {
               }, 100);
             }
           } else {
-            console.log('📱 No stored messages, showing greeting');
             setShowGreeting(true);
           }
           // Reset force greeting and app startup after handling
@@ -377,7 +367,6 @@ export default function ChatScreen({ navigation, route }) {
         }, 200);
       }
     } else {
-      console.log('🔄 birthData is null/undefined');
     }
   }, [birthData]);
 
@@ -386,7 +375,6 @@ export default function ChatScreen({ navigation, route }) {
     if (!personId) return;
     try {
       await AsyncStorage.setItem(`chatMessages_${personId}`, JSON.stringify(messages));
-      console.log('💾 Messages saved to storage for person:', personId);
     } catch (error) {
       console.error('Error saving messages:', error);
     }
@@ -399,7 +387,6 @@ export default function ChatScreen({ navigation, route }) {
       const stored = await AsyncStorage.getItem(`chatMessages_${personId}`);
       if (stored) {
         const messages = JSON.parse(stored);
-        console.log('📱 Loaded messages from storage:', messages.length);
         return messages;
       }
     } catch (error) {
@@ -414,7 +401,6 @@ export default function ChatScreen({ navigation, route }) {
       const newMessages = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
       // Get current person ID from birthData if currentPersonId is null
       const personId = currentPersonId || (birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null);
-      console.log('💾 Saving messages to storage:', newMessages.length, 'for person:', personId);
       // Save to storage
       if (personId) {
         saveMessagesToStorage(newMessages, personId);
@@ -426,10 +412,8 @@ export default function ChatScreen({ navigation, route }) {
   // Load messages when screen focuses - but don't interfere with ongoing polling
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 Screen focused, checking for stored messages...');
       if (currentPersonId) {
         loadMessagesFromStorage(currentPersonId).then(storedMessages => {
-          console.log('📱 FOCUS: Found stored messages:', storedMessages.length);
           if (storedMessages.length > 0) {
             // Only update messages if we don't have any current messages to avoid overwriting
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
@@ -442,7 +426,6 @@ export default function ChatScreen({ navigation, route }) {
             if (!loading && !isTyping) {
               const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
               if (processingMessage) {
-                console.log('🔄 FOCUS: Resuming polling for processing message:', processingMessage.messageId);
                 setLoading(true);
                 setIsTyping(true);
                 pollForResponse(processingMessage.messageId, null, sessionId, null, true);
@@ -457,14 +440,8 @@ export default function ChatScreen({ navigation, route }) {
   }, [currentPersonId, loading, isTyping]);
 
   const handleGreetingOptionSelect = async (option) => {
-    console.log('🎯 Greeting option selected:', option);
-    console.log('🎯 Current birthData state:', JSON.stringify(birthData, null, 2));
-    console.log('🎯 birthData name specifically:', birthData?.name);
-    console.log('🎯 typeof birthData:', typeof birthData);
     
     if (option.action === 'periods') {
-      console.log('📅 Opening Event Periods modal');
-      console.log('📊 Birth data available:', !!birthData);
       setShowEventPeriods(true);
     } else if (option.action === 'analysis') {
       navigation.navigate('AnalysisDetail', { 
@@ -473,8 +450,6 @@ export default function ChatScreen({ navigation, route }) {
         cost: 5
       });
     } else {
-      console.log('💬 Going to chat mode');
-      console.log('💬 birthData at chat start:', JSON.stringify(birthData, null, 2));
       
       // First load any existing chat history
       await loadChatHistory();
@@ -484,17 +459,11 @@ export default function ChatScreen({ navigation, route }) {
       
       // Check if we need to show welcome message
       setTimeout(async () => {
-        console.log('👋 TIMEOUT: birthData state:', JSON.stringify(birthData, null, 2));
-        console.log('👋 TIMEOUT: birthData?.name:', birthData?.name);
         
         const storedMessages = await loadMessagesFromStorage(currentPersonId);
-        console.log('👋 Welcome check: stored messages:', storedMessages.length);
-        console.log('👋 Birth data available:', !!birthData, 'Name:', birthData?.name);
         
         // Always show fresh welcome message when explicitly starting chat
         const nativeName = birthData?.name || 'there';
-        console.log('👋 Using native name:', nativeName);
-        console.log('👋 Final welcome message will be: Welcome', nativeName + '!');
         
         const welcomeMessage = {
           id: Date.now().toString(),
@@ -502,21 +471,16 @@ export default function ChatScreen({ navigation, route }) {
           role: 'assistant',
           timestamp: new Date().toISOString(),
         };
-        console.log('👋 Created welcome message content:', welcomeMessage.content.substring(0, 100));
         
         // If no stored messages, show welcome. If stored messages exist, prepend welcome if it's not already there
         if (storedMessages.length === 0) {
-          console.log('👋 No stored messages, adding fresh welcome');
           setMessagesWithStorage([welcomeMessage]);
         } else {
           // Check if first message is already a welcome message
           const firstMessage = storedMessages[0];
-          console.log('👋 First stored message content:', firstMessage.content.substring(0, 50));
           if (!firstMessage.content.includes('Welcome')) {
-            console.log('👋 Prepending welcome to existing messages');
             setMessagesWithStorage([welcomeMessage, ...storedMessages]);
           } else {
-            console.log('👋 Replacing old welcome with new personalized one');
             // Replace old welcome with new personalized one
             const updatedMessages = [welcomeMessage, ...storedMessages.slice(1)];
             setMessagesWithStorage(updatedMessages);
@@ -529,16 +493,10 @@ export default function ChatScreen({ navigation, route }) {
   const checkBirthData = async () => {
     try {
       const savedBirthData = await storage.getBirthDetails();
-      console.log('📊 Raw birth data from storage:', JSON.stringify(savedBirthData, null, 2));
-      console.log('📊 Birth data name field:', savedBirthData?.name);
-      console.log('📊 Birth data name type:', typeof savedBirthData?.name);
       
       if (savedBirthData && typeof savedBirthData === 'object' && savedBirthData.name && savedBirthData.name.trim()) {
-        console.log('✅ Valid birth data found in storage, name:', savedBirthData.name);
-        console.log('✅ Setting birthData state with:', JSON.stringify(savedBirthData, null, 2));
         setBirthData(savedBirthData);
       } else {
-        console.log('❌ No valid birth data in storage, checking database...');
         
         // Try to load first available chart from database
         try {
@@ -547,7 +505,6 @@ export default function ChatScreen({ navigation, route }) {
           
           if (response.data && response.data.charts && response.data.charts.length > 0) {
             const firstChart = response.data.charts[0];
-            console.log('✅ Found chart in database:', firstChart.name);
             
             // Convert database chart to birth data format
             const birthDataFromChart = {
@@ -561,13 +518,11 @@ export default function ChatScreen({ navigation, route }) {
               gender: firstChart.gender
             };
             
-            console.log('✅ Created birthDataFromChart:', JSON.stringify(birthDataFromChart, null, 2));
             
             // Save to storage for future use
             await storage.setBirthDetails(birthDataFromChart);
             setBirthData(birthDataFromChart);
           } else {
-            console.log('❌ No charts found in database');
             setBirthData(null);
             navigation.navigate('BirthForm');
           }
@@ -585,7 +540,6 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const loadChatHistory = async () => {
-    console.log('📚 loadChatHistory called - skipping, using local storage');
   };
 
   const loadLanguagePreference = async () => {
@@ -616,7 +570,6 @@ export default function ChatScreen({ navigation, route }) {
         const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
         personSessions.push(newSessionId);
         await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
-        console.log('💾 Session saved:', newSessionId);
         
         return newSessionId;
       }
@@ -1154,7 +1107,6 @@ export default function ChatScreen({ navigation, route }) {
             )}
             
             {messages.map((item) => {
-              console.log('📋 Rendering message:', item.id, 'role:', item.role, 'content length:', item.content?.length, 'isTyping:', item.isTyping);
               return (
                 <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
               );
@@ -1725,7 +1677,6 @@ export default function ChatScreen({ navigation, route }) {
           <EventPeriods 
             visible={showEventPeriods} 
             onClose={() => {
-              console.log('📅 Closing Event Periods modal');
               setShowEventPeriods(false);
             }}
             birthData={birthData}

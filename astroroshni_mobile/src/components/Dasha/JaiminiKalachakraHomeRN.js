@@ -75,23 +75,23 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
         const data = await response.json();
         
         if (data.error) {
-          console.log('JAIMINI HOME BACKEND ERROR:', data.error);
-          console.log('JAIMINI HOME SYSTEM INFO:', data.system);
+
+
           return;
         }
         
         // Check if we have valid data structure
         if (!data.periods || data.periods.length === 0) {
-          console.log('WARNING: No Jaimini periods data received in home component');
+
           return;
         }
         
         setDashadata(data);
       } else {
-        console.log('Response not OK:', response.status, response.statusText);
+
       }
     } catch (error) {
-      console.error('Failed to load Jaimini data:', error);
+
     } finally {
       setLoading(false);
     }
@@ -140,7 +140,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
         }
       }
     } catch (error) {
-      console.error('Failed to load antardashas:', error);
+
     }
   };
 
@@ -220,7 +220,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
         setShowSkipReasons(true);
       }
     } catch (error) {
-      console.error('Failed to load skip reasons:', error);
+
     }
   };
 
@@ -408,7 +408,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
           <Text style={styles.sectionSubtitle}>Tap to see why these rashis are skipped in cycles</Text>
           <View style={styles.skippedContainer}>
             {dashadata.skipped_rashis.map((skipped, index) => {
-              console.log('Rendering skipped rashi:', skipped);
+
               return (
                 <TouchableOpacity
                   key={`${skipped.sign_name}-${skipped.cycle}-${index}`}

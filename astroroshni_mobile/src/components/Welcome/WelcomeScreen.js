@@ -210,7 +210,7 @@ const WelcomeScreen = ({ navigation }) => {
       }
       // If no auth token, stay on Welcome screen
     } catch (error) {
-      console.log('Error checking auth status in Welcome:', error);
+
     }
   };
 

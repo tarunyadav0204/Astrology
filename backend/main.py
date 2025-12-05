@@ -1227,13 +1227,29 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
+    # Debug: Check all charts for this user
+    cursor.execute('''
+        SELECT id, name, date, time, relation, created_at
+        FROM birth_charts WHERE userid = ?
+        ORDER BY created_at DESC
+    ''', (current_user.userid,))
+    
+    all_charts = cursor.fetchall()
+    print(f"DEBUG: User {current_user.userid} has {len(all_charts)} total charts:")
+    for chart in all_charts:
+        print(f"  Chart ID: {chart[0]}, Name: {chart[1]}, Relation: {chart[4]}, Created: {chart[5]}")
+    
+    # Look for chart with relation = 'self'
     cursor.execute('''
         SELECT name, date, time, latitude, longitude, timezone, place, gender
         FROM birth_charts WHERE userid = ? AND relation = 'self'
+        ORDER BY created_at DESC LIMIT 1
     ''', (current_user.userid,))
     
     result = cursor.fetchone()
     conn.close()
+    
+    print(f"DEBUG: Self chart query result: {result}")
     
     if not result:
         return {"has_self_chart": False}
@@ -1251,7 +1267,7 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     }
 
 @app.put("/api/user/self-birth-chart")
-async def update_self_birth_chart(birth_data: BirthData, current_user: User = Depends(get_current_user)):
+async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = True, current_user: User = Depends(get_current_user)):
     """Update user's self birth chart"""
     conn = None
     try:
@@ -1270,14 +1286,16 @@ async def update_self_birth_chart(birth_data: BirthData, current_user: User = De
         
         if existing_chart:
             # Update existing chart to set relation = 'self'
-            # First clear any other 'self' charts
-            cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+            # Only clear other 'self' charts if explicitly requested (profile connection)
+            if clear_existing:
+                cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
             # Set this chart as 'self'
             cursor.execute("UPDATE birth_charts SET relation = 'self' WHERE id = ?", (existing_chart[0],))
         else:
-            # Remove existing self birth chart
-            cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+            # Only remove existing self birth chart if explicitly requested
+            if clear_existing:
+                cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
             # Insert new chart
             cursor.execute('''

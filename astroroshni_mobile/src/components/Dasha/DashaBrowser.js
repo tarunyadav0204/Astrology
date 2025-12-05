@@ -36,27 +36,23 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
         longitude: parseFloat(birthData.longitude),
         timezone: birthData.timezone || 'Asia/Kolkata'
       };
-      
-      console.log('=== DASHA BROWSER REQUEST ===');
-      console.log('Original birthData:', birthData);
-      console.log('Formatted data:', formattedData);
-      console.log('Date:', date);
-      
+
+
+
+
       const response = await chartAPI.calculateDasha(formattedData);
-      
-      console.log('DashaBrowser response status:', response.status);
-      console.log('DashaBrowser response data:', response.data);
-      
+
+
       if (response.data.error) {
-        console.log('DASHA BROWSER BACKEND ERROR:', response.data.error);
+
         setError(`Dasha calculation failed: ${response.data.error}`);
         return;
       }
       
       setCascadingData(response.data);
     } catch (error) {
-      console.error('Error loading dasha data:', error);
-      console.error('Error details:', error.response?.data);
+
+
     } finally {
       setLoading(false);
     }

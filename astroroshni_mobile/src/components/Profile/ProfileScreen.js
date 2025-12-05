@@ -80,6 +80,7 @@ export default function ProfileScreen({ navigation }) {
       const { authAPI } = require('../../services/api');
       const response = await authAPI.getSelfBirthChart();
       
+      
       if (response.data.has_self_chart) {
         setBirthData(response.data);
         setStats({
@@ -266,7 +267,12 @@ export default function ProfileScreen({ navigation }) {
                   />
                 </Animated.View>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{chartData ? getSignIcon((chartData?.houses?.[0]?.sign - 1 + 12) % 12) : getZodiacSign(birthData?.date)}</Text>
+                  <Text style={styles.avatarText}>
+                    {chartData ? (() => {
+                      const signIndex = (chartData?.houses?.[0]?.sign - 1 + 12) % 12;
+                      return getSignIcon(signIndex);
+                    })() : getZodiacSign(birthData?.date)}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.userName}>{userData?.name || 'User'}</Text>

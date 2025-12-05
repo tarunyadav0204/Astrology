@@ -13,15 +13,12 @@ export const CreditProvider = ({ children }) => {
       // Check if user is authenticated first
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        console.log('⚠️ No auth token, skipping credit fetch');
         setCredits(0);
         return;
       }
       
       setLoading(true);
-      console.log('🔄 Fetching credits from API...');
       const response = await creditAPI.getBalance();
-      console.log('✅ Credits response:', response.data);
       setCredits(response.data.credits);
     } catch (error) {
       console.error('❌ Error fetching credits:', {
@@ -35,7 +32,6 @@ export const CreditProvider = ({ children }) => {
         }
       });
       if (error.response?.status === 401) {
-        console.log('User not authenticated for credits');
         setCredits(0);
       }
     } finally {
@@ -45,9 +41,7 @@ export const CreditProvider = ({ children }) => {
 
   const redeemCode = async (code) => {
     try {
-      console.log('🔄 CreditContext: Redeeming code:', code);
       const response = await creditAPI.redeemPromoCode(code);
-      console.log('✅ CreditContext: Redeem API response:', response.data);
       await fetchBalance();
       return response.data;
     } catch (error) {

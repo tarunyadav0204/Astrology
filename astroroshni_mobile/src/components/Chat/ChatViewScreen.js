@@ -104,7 +104,7 @@ export default function ChatViewScreen({ route, navigation }) {
         message: `🔮 AstroRoshni Chat - ${new Date(session.created_at || Date.now()).toLocaleDateString()}\n\n${chatText}\n\nShared from AstroRoshni App`,
       });
     } catch (error) {
-      console.error('Error sharing chat:', error);
+
     }
   };
 
