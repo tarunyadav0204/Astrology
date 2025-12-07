@@ -31,6 +31,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [expandedItems, setExpandedItems] = useState({});
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [analysisFocus, setAnalysisFocus] = useState('first_child');
+  const [childrenCount, setChildrenCount] = useState(0);
 
   useEffect(() => {
     checkBirthData();
@@ -58,7 +60,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 [DEBUG] Screen focused, reloading birth data...');
+      // Reload birth data when screen comes into focus (after gender update)
+      checkBirthData();
       if (birthData) {
+        console.log('🔄 [DEBUG] Birth data exists, loading stored analysis...');
         loadStoredAnalysis();
       }
     });
@@ -68,16 +74,27 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const checkBirthData = async () => {
     try {
+      console.log('🔍 [DEBUG] checkBirthData: Starting to load birth data...');
       const savedBirthData = await storage.getBirthDetails();
+      console.log('🔍 [DEBUG] checkBirthData: Raw storage data:', JSON.stringify(savedBirthData, null, 2));
+      
       if (savedBirthData && savedBirthData.name) {
+        console.log('✅ [DEBUG] checkBirthData: Valid birth data found');
+        console.log('👤 [DEBUG] checkBirthData: Name:', savedBirthData.name);
+        console.log('⚧️ [DEBUG] checkBirthData: Gender:', savedBirthData.gender);
+        console.log('📅 [DEBUG] checkBirthData: Date:', savedBirthData.date);
+        console.log('🕐 [DEBUG] checkBirthData: Time:', savedBirthData.time);
+        console.log('📍 [DEBUG] checkBirthData: Place:', savedBirthData.place);
+        console.log('🌍 [DEBUG] checkBirthData: Coordinates:', savedBirthData.latitude, savedBirthData.longitude);
         setBirthData(savedBirthData);
       } else {
+        console.log('❌ [DEBUG] checkBirthData: No valid birth data found');
         Alert.alert('Birth Data Required', 'Please complete your birth details first.', [
           { text: 'OK', onPress: () => navigation.navigate('BirthForm') }
         ]);
       }
     } catch (error) {
-
+      console.error('❌ [DEBUG] checkBirthData: Error loading birth data:', error);
       navigation.navigate('BirthForm');
     }
   };
@@ -86,6 +103,20 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     // Ensure forceRegenerate is a boolean
     const shouldForceRegenerate = forceRegenerate === true;
     console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
+    
+    // --- PROGENY VALIDATION BLOCK ---
+    if (analysisType === 'progeny') {
+      if ((analysisFocus === 'next_child' || analysisFocus === 'parenting') && childrenCount === 0) {
+        Alert.alert(
+          'Missing Information', 
+          'Please select how many children you currently have.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+    // ----------------------------
+    
     if (!birthData) {
       Alert.alert('Error', 'Birth data not available');
       return;
@@ -135,6 +166,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     try {
       const fixedBirthData = { ...birthData };
       
+      console.log('🔧 [DEBUG] Original birth data:', JSON.stringify(birthData, null, 2));
+      console.log('⚧️ [DEBUG] Original gender:', birthData?.gender);
+      
       if (fixedBirthData.date && fixedBirthData.date.includes('T')) {
         fixedBirthData.date = fixedBirthData.date.split('T')[0];
       }
@@ -143,16 +177,26 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         const timeDate = new Date(fixedBirthData.time);
         fixedBirthData.time = timeDate.toTimeString().slice(0, 5);
       }
+      
+      console.log('🔧 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
+      console.log('⚧️ [DEBUG] Fixed gender:', fixedBirthData?.gender);
 
       const requestBody = {
         ...fixedBirthData,
         language: 'english',
         response_style: 'detailed',
-        force_regenerate: shouldForceRegenerate
+        force_regenerate: shouldForceRegenerate,
+        ...(analysisType === 'progeny' && {
+          analysis_focus: analysisFocus,
+          children_count: childrenCount
+        })
       };
       
-      console.log('🚀 Starting analysis:', analysisType);
-      console.log('📊 Request body:', JSON.stringify(requestBody, null, 2));
+      console.log('🚀 [DEBUG] Starting analysis:', analysisType);
+      console.log('📊 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
+      console.log('📊 [DEBUG] Full request body:', JSON.stringify(requestBody, null, 2));
+      console.log('⚧️ [DEBUG] Gender in request:', requestBody.gender);
+      console.log('🔄 [DEBUG] Force regenerate:', shouldForceRegenerate);
 
       const token = await AsyncStorage.getItem('authToken');
       const headers = {
@@ -160,20 +204,29 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         ...(token && { 'Authorization': `Bearer ${token}` })
       };
 
-      // Career uses /ai-insights endpoint, others use /analyze
-      const endpoint = analysisType === 'career' ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`;
+      // Career and progeny use /ai-insights endpoint, others use /analyze
+      const endpoint = (analysisType === 'career' || analysisType === 'progeny') ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`;
       const fullUrl = `${API_BASE_URL}${getEndpoint(endpoint)}`;
       console.log('🌐 API URL:', fullUrl);
+      
+      console.log('🌐 [DEBUG] Making API request to:', fullUrl);
+      console.log('📤 [DEBUG] Request headers:', JSON.stringify(headers, null, 2));
+      console.log('📤 [DEBUG] Request body being sent:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch(fullUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody)
       });
+      
+      console.log('📥 [DEBUG] Response status:', response.status);
+      console.log('📥 [DEBUG] Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
 
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ [DEBUG] API Error Response:', errorText);
+        console.error('❌ [DEBUG] Response status:', response.status);
         throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
       }
 
@@ -193,22 +246,106 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           if (data && data.length > 0) {
             try {
               const parsed = JSON.parse(data);
-              console.log('✅ Parsed SSE data:', parsed.status, parsed.cached ? '(cached)' : '');
+              console.log('✅ [DEBUG] Parsed SSE data:', parsed.status, parsed.cached ? '(cached)' : '');
+              console.log('📊 [DEBUG] SSE parsed object:', JSON.stringify(parsed, null, 2));
               
-              if (parsed.status === 'chunk') {
+              if (parsed.status === 'error' && parsed.error_code === 'GENDER_REQUIRED') {
+                console.log('⚠️ [DEBUG] GENDER_REQUIRED error detected');
+                console.log('⚠️ [DEBUG] Error message:', parsed.message);
+                console.log('⚠️ [DEBUG] Current birth data gender:', birthData?.gender);
+                console.log('⚠️ [DEBUG] Request body gender:', requestBody.gender);
+                console.log('⚠️ [DEBUG] Fixed birth data gender:', fixedBirthData.gender);
+                
+                // Log all storage data for debugging
+                try {
+                  const allStorageData = await storage.getBirthDetails();
+                  console.log('⚠️ [DEBUG] Current storage data:', JSON.stringify(allStorageData, null, 2));
+                } catch (storageError) {
+                  console.error('⚠️ [DEBUG] Failed to read storage:', storageError);
+                }
+                
+                Alert.alert(
+                  'Gender Required',
+                  parsed.message || 'Gender is required for progeny analysis. Please update your profile to continue.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Update Profile', 
+                      onPress: async () => {
+                        // Get chart ID from backend and navigate to birth form
+                        try {
+                          const { authAPI } = require('../../services/api');
+                          const response = await authAPI.getSelfBirthChart();
+                          const chartId = response.data?.chart_id;
+                          console.log('🔍 [DEBUG] Got chart ID for update:', chartId);
+                          
+                          navigation.navigate('BirthForm', { 
+                            updateGender: true,
+                            chartId: chartId
+                          });
+                        } catch (error) {
+                          console.log('❌ [DEBUG] Failed to get chart ID:', error);
+                          // Navigate without chart ID as fallback
+                          navigation.navigate('BirthForm', { updateGender: true });
+                        }
+                      }
+                    }
+                  ]
+                );
+                return;
+              } else if (parsed.status === 'chunk') {
                 fullContent += parsed.response || '';
               } else if (parsed.status === 'complete') {
                 console.log('🎯 Complete status received');
                 console.log('📦 Data keys:', Object.keys(parsed.data || {}));
                 
-                // Handle nested response structure
-                if (parsed.data && parsed.data[`${analysisType}_analysis`]) {
-                  console.log('✅ Found analysis data for:', analysisType);
-                  const analysisData = parsed.data[`${analysisType}_analysis`];
+                // Handle nested response structure - try multiple formats
+                let analysisData = null;
+                
+                if (parsed.data && parsed.data.analysis) {
+                  console.log('✅ Found direct analysis data');
+                  analysisData = parsed.data.analysis;
+                } else if (parsed.data && parsed.data[`${analysisType}_analysis`]) {
+                  console.log('✅ Found typed analysis data for:', analysisType);
+                  analysisData = parsed.data[`${analysisType}_analysis`];
+                }
+                
+                if (analysisData) {
                   console.log('📋 Analysis data keys:', Object.keys(analysisData));
                   
-                  if (analysisData.json_response && typeof analysisData.json_response === 'object') {
-                    console.log('✅ Valid JSON response found');
+                  // Direct analysis object (new format)
+                  if (typeof analysisData === 'object' && analysisData.quick_answer) {
+                    console.log('✅ Valid analysis object found');
+                    console.log('📊 Response keys:', Object.keys(analysisData));
+                    setAnalysisResult(analysisData);
+                    await saveAnalysis(analysisData);
+                    if (!parsed.cached) {
+                      console.log('💳 Fetching balance (not cached)');
+                      fetchBalance();
+                    } else {
+                      console.log('💾 Using cached response, not fetching balance');
+                    }
+                    return;
+                  } else if (analysisData.detailed_analysis && analysisData.final_thoughts) {
+                    console.log('✅ Valid progeny analysis format found');
+                    console.log('📊 Response keys:', Object.keys(analysisData));
+                    // Transform progeny format to standard format
+                    const transformedData = {
+                      quick_answer: analysisData.final_thoughts,
+                      detailed_analysis: analysisData.detailed_analysis,
+                      final_thoughts: analysisData.final_thoughts
+                    };
+                    setAnalysisResult(transformedData);
+                    await saveAnalysis(transformedData);
+                    if (!parsed.cached) {
+                      console.log('💳 Fetching balance (not cached)');
+                      fetchBalance();
+                    } else {
+                      console.log('💾 Using cached response, not fetching balance');
+                    }
+                    return;
+                  } else if (analysisData.json_response && typeof analysisData.json_response === 'object') {
+                    console.log('✅ Valid JSON response found in legacy format');
                     console.log('📊 Response keys:', Object.keys(analysisData.json_response));
                     setAnalysisResult(analysisData.json_response);
                     await saveAnalysis(analysisData.json_response);
@@ -223,11 +360,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     console.log('⚠️ Raw response found, will parse');
                     fullContent = analysisData.raw_response;
                   } else {
-                    console.log('❌ No json_response or raw_response');
+                    console.log('❌ No valid response format in analysis data');
                     fullContent = '';
                   }
                 } else {
-                  console.log('⚠️ No analysis data, using response field');
+                  console.log('⚠️ No analysis data found, using response field');
                   fullContent = parsed.response || '';
                 }
                 break;
@@ -532,6 +669,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       case 'health': return '🏥';
       case 'marriage': return '💕';
       case 'education': return '🎓';
+      case 'progeny': return '👶';
       default: return '🔮';
     }
   };
@@ -543,6 +681,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       case 'health': return ['#32CD32', '#228B22'];
       case 'marriage': return ['#FF69B4', '#DC143C'];
       case 'education': return ['#4169E1', '#1E90FF'];
+      case 'progeny': return ['#FF69B4', '#FFB6C1'];
       default: return ['#ff6b35', '#ff8c5a'];
     }
   };
@@ -612,9 +751,100 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                   <Text style={styles.analysisDescription}>
                     Get comprehensive insights into your {analysisType} prospects with detailed astrological analysis
                   </Text>
-                  
-
                 </View>
+
+                {/* Progeny Focus Selector - only show when no existing analysis */}
+                {analysisType === 'progeny' && !analysisResult && (
+                  <View style={styles.focusSection}>
+                    <Text style={styles.focusTitle}>What is your primary focus today?</Text>
+                    
+                    <TouchableOpacity
+                      style={[styles.focusOption, analysisFocus === 'first_child' && styles.focusOptionSelected]}
+                      onPress={() => {
+                        if (!loading) {
+                          setAnalysisFocus('first_child');
+                          setChildrenCount(0);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <LinearGradient
+                        colors={analysisFocus === 'first_child' ? ['#FF69B4', '#FFB6C1'] : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
+                        style={styles.focusOptionGradient}
+                      >
+                        <Text style={styles.focusIcon}>👶</Text>
+                        <View style={styles.focusTextContainer}>
+                          <Text style={styles.focusOptionTitle}>Planning First Child</Text>
+                          <Text style={styles.focusOptionSubtitle}>Fertility & Timing</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.focusOption, analysisFocus === 'next_child' && styles.focusOptionSelected]}
+                      onPress={() => {
+                        if (!loading) {
+                          setAnalysisFocus('next_child');
+                          if (childrenCount === 0) setChildrenCount(1);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <LinearGradient
+                        colors={analysisFocus === 'next_child' ? ['#FF69B4', '#FFB6C1'] : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
+                        style={styles.focusOptionGradient}
+                      >
+                        <Text style={styles.focusIcon}>👨‍👩‍👧</Text>
+                        <View style={styles.focusTextContainer}>
+                          <Text style={styles.focusOptionTitle}>Have Children, Planning More</Text>
+                          <Text style={styles.focusOptionSubtitle}>Sibling Timing & Fertility</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.focusOption, analysisFocus === 'parenting' && styles.focusOptionSelected]}
+                      onPress={() => {
+                        if (!loading) {
+                          setAnalysisFocus('parenting');
+                          if (childrenCount === 0) setChildrenCount(1);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <LinearGradient
+                        colors={analysisFocus === 'parenting' ? ['#FF69B4', '#FFB6C1'] : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
+                        style={styles.focusOptionGradient}
+                      >
+                        <Text style={styles.focusIcon}>🧘</Text>
+                        <View style={styles.focusTextContainer}>
+                          <Text style={styles.focusOptionTitle}>Parenting & Well-being</Text>
+                          <Text style={styles.focusOptionSubtitle}>Relationship with existing children</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
+                      <View style={styles.childrenCountSection}>
+                        <Text style={styles.childrenCountTitle}>Number of children you have:</Text>
+                        <View style={styles.childrenCountButtons}>
+                          {[1, 2, 3, 4, 5].map(count => (
+                            <TouchableOpacity
+                              key={count}
+                              style={[styles.countButton, childrenCount === count && styles.countButtonSelected]}
+                              onPress={() => !loading && setChildrenCount(count)}
+                              disabled={loading}
+                            >
+                              <Text style={[styles.countButtonText, childrenCount === count && styles.countButtonTextSelected]}>
+                                {count}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
 
                 <TouchableOpacity
                   style={styles.startButton}
@@ -740,40 +970,108 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           {/* Regenerate Modal */}
           {showRegenerateModal && (
             <View style={styles.modalOverlay}>
-              <View style={styles.modalContainer}>
-                <LinearGradient
-                  colors={['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)']}
-                  style={styles.modalContent}
-                >
-                  <Text style={styles.modalTitle}>🔄 Regenerate Analysis</Text>
-                  <Text style={styles.modalText}>
-                    This will create a fresh {title.toLowerCase()} analysis with new insights.
-                  </Text>
-                  <View style={styles.modalCreditInfo}>
-                    <Text style={styles.modalCreditText}>💳 Credits to be charged: {cost}</Text>
-                    <Text style={styles.modalBalanceText}>Current balance: {credits}</Text>
-                  </View>
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={styles.modalCancelButton}
-                      onPress={() => setShowRegenerateModal(false)}
-                    >
-                      <Text style={styles.modalCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.modalConfirmButton}
-                      onPress={confirmRegenerate}
-                    >
-                      <LinearGradient
-                        colors={getAnalysisGradient()}
-                        style={styles.modalConfirmGradient}
+              <ScrollView contentContainerStyle={styles.modalScrollContainer}>
+                <View style={styles.modalContainer}>
+                  <LinearGradient
+                    colors={['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)']}
+                    style={styles.modalContent}
+                  >
+                    <Text style={styles.modalTitle}>🔄 Regenerate Analysis</Text>
+                    <Text style={styles.modalText}>
+                      This will create a fresh {title.toLowerCase()} analysis with new insights.
+                    </Text>
+                    
+                    {/* Progeny Focus Selector in Modal */}
+                    {analysisType === 'progeny' && (
+                      <View style={styles.modalFocusSection}>
+                        <Text style={styles.modalFocusTitle}>Update your focus:</Text>
+                        
+                        <TouchableOpacity
+                          style={[styles.modalFocusOption, analysisFocus === 'first_child' && styles.modalFocusOptionSelected]}
+                          onPress={() => {
+                            setAnalysisFocus('first_child');
+                            setChildrenCount(0);
+                          }}
+                        >
+                          <Text style={styles.modalFocusIcon}>👶</Text>
+                          <View style={styles.modalFocusTextContainer}>
+                            <Text style={styles.modalFocusOptionTitle}>Planning First Child</Text>
+                            <Text style={styles.modalFocusOptionSubtitle}>Fertility & Timing</Text>
+                          </View>
+                          {analysisFocus === 'first_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.modalFocusOption, analysisFocus === 'next_child' && styles.modalFocusOptionSelected]}
+                          onPress={() => setAnalysisFocus('next_child')}
+                        >
+                          <Text style={styles.modalFocusIcon}>👨👩👧</Text>
+                          <View style={styles.modalFocusTextContainer}>
+                            <Text style={styles.modalFocusOptionTitle}>Have Children, Planning More</Text>
+                            <Text style={styles.modalFocusOptionSubtitle}>Sibling Timing & Fertility</Text>
+                          </View>
+                          {analysisFocus === 'next_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.modalFocusOption, analysisFocus === 'parenting' && styles.modalFocusOptionSelected]}
+                          onPress={() => setAnalysisFocus('parenting')}
+                        >
+                          <Text style={styles.modalFocusIcon}>🧘</Text>
+                          <View style={styles.modalFocusTextContainer}>
+                            <Text style={styles.modalFocusOptionTitle}>Parenting & Well-being</Text>
+                            <Text style={styles.modalFocusOptionSubtitle}>Relationship with existing children</Text>
+                          </View>
+                          {analysisFocus === 'parenting' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                        </TouchableOpacity>
+
+                        {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
+                          <View style={styles.modalChildrenCountSection}>
+                            <Text style={styles.modalChildrenCountTitle}>Number of children you have:</Text>
+                            <View style={styles.modalChildrenCountButtons}>
+                              {[1, 2, 3, 4, 5].map(count => (
+                                <TouchableOpacity
+                                  key={count}
+                                  style={[styles.modalCountButton, childrenCount === count && styles.modalCountButtonSelected]}
+                                  onPress={() => setChildrenCount(count)}
+                                >
+                                  <Text style={[styles.modalCountButtonText, childrenCount === count && styles.modalCountButtonTextSelected]}>
+                                    {count}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    
+                    <View style={styles.modalCreditInfo}>
+                      <Text style={styles.modalCreditText}>💳 Credits to be charged: {cost}</Text>
+                      <Text style={styles.modalBalanceText}>Current balance: {credits}</Text>
+                    </View>
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        style={styles.modalCancelButton}
+                        onPress={() => setShowRegenerateModal(false)}
                       >
-                        <Text style={styles.modalConfirmText}>Regenerate</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                </LinearGradient>
-              </View>
+                        <Text style={styles.modalCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.modalConfirmButton}
+                        onPress={confirmRegenerate}
+                      >
+                        <LinearGradient
+                          colors={getAnalysisGradient()}
+                          style={styles.modalConfirmGradient}
+                        >
+                          <Text style={styles.modalConfirmText}>Regenerate</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </LinearGradient>
+                </View>
+              </ScrollView>
             </View>
           )}
         </SafeAreaView>
@@ -1130,5 +1428,185 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     numberOfLines: 1,
+  },
+  
+  // Progeny Focus Selector Styles
+  focusSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  focusTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  focusOption: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  focusOptionSelected: {
+    shadowColor: '#FF69B4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  focusOptionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  focusIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  focusTextContainer: {
+    flex: 1,
+  },
+  focusOptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  focusOptionSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  childrenCountSection: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  childrenCountTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  childrenCountButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  countButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  countButtonSelected: {
+    backgroundColor: '#FF69B4',
+    borderColor: '#FFB6C1',
+  },
+  countButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  countButtonTextSelected: {
+    color: COLORS.white,
+  },
+  
+  // Modal Focus Selector Styles
+  modalScrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  modalFocusSection: {
+    marginVertical: 20,
+    width: '100%',
+  },
+  modalFocusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalFocusOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalFocusOptionSelected: {
+    backgroundColor: 'rgba(255, 105, 180, 0.2)',
+    borderColor: '#FF69B4',
+  },
+  modalFocusIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  modalFocusTextContainer: {
+    flex: 1,
+  },
+  modalFocusOptionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 2,
+  },
+  modalFocusOptionSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  modalChildrenCountSection: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+  },
+  modalChildrenCountTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalChildrenCountButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  modalCountButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  modalCountButtonSelected: {
+    backgroundColor: '#FF69B4',
+    borderColor: '#FFB6C1',
+  },
+  modalCountButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  modalCountButtonTextSelected: {
+    color: COLORS.white,
   },
 });

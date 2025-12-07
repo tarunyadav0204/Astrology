@@ -18,7 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { storage } from '../../services/storage';
-import { chartAPI } from '../../services/api';
+import { chartAPI, authAPI } from '../../services/api';
 import { COLORS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
@@ -26,7 +26,8 @@ const { width } = Dimensions.get('window');
 export default function BirthFormScreen({ navigation, route }) {
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
-  const [step, setStep] = useState(1);
+  const updateGender = route?.params?.updateGender;
+  const [step, setStep] = useState(updateGender ? 2 : 1); // Start at gender step if updating gender
   const [formData, setFormData] = useState({
     name: editProfile?.name || prefillData?.name || '',
     date: editProfile?.date ? new Date(editProfile.date) : new Date(),
@@ -37,6 +38,7 @@ export default function BirthFormScreen({ navigation, route }) {
     timezone: editProfile?.timezone || 'UTC+5:30',
     gender: editProfile?.gender?.trim() || '',
   });
+  const [loadingExistingData, setLoadingExistingData] = useState(updateGender);
   
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -59,8 +61,38 @@ export default function BirthFormScreen({ navigation, route }) {
   }))).current;
 
   useEffect(() => {
+    if (updateGender && step === 2 && !formData.gender) {
+      loadExistingBirthData();
+    }
     animateStepTransition();
   }, [step]);
+  
+  const loadExistingBirthData = async () => {
+    try {
+      console.log('🔄 [DEBUG] BirthForm: Loading existing birth data for gender update...');
+      const existingData = await storage.getBirthDetails();
+      console.log('📂 [DEBUG] BirthForm: Existing data loaded:', JSON.stringify(existingData, null, 2));
+      
+      if (existingData) {
+        // Only load data if user hasn't made a selection yet
+        setFormData(prev => ({
+          name: existingData.name || prev.name,
+          date: existingData.date ? new Date(existingData.date) : prev.date,
+          time: existingData.time ? new Date(`2000-01-01T${existingData.time}`) : prev.time,
+          place: existingData.place || prev.place,
+          latitude: existingData.latitude || prev.latitude,
+          longitude: existingData.longitude || prev.longitude,
+          timezone: existingData.timezone || prev.timezone,
+          gender: prev.gender || '', // Keep existing selection, don't overwrite
+        }));
+        console.log('✅ [DEBUG] BirthForm: Data loaded without overwriting gender selection');
+      }
+    } catch (error) {
+      console.error('❌ [DEBUG] BirthForm: Failed to load existing birth data:', error);
+    } finally {
+      setLoadingExistingData(false);
+    }
+  };
 
   const animateStepTransition = () => {
     fadeAnim.setValue(0);
@@ -148,7 +180,12 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    console.log(`🔄 [DEBUG] BirthForm: handleInputChange - ${field}:`, value);
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      console.log('📝 [DEBUG] BirthForm: Updated form data:', JSON.stringify(newData, null, 2));
+      return newData;
+    });
     
     if (field === 'place') {
       setFormData(prev => ({ ...prev, [field]: value, latitude: null, longitude: null }));
@@ -279,8 +316,35 @@ export default function BirthFormScreen({ navigation, route }) {
         time: formData.time.toTimeString().split(' ')[0]
       };
       
+      console.log('💾 [DEBUG] BirthForm: Saving profile data:', JSON.stringify(profileData, null, 2));
+      console.log('⚧️ [DEBUG] BirthForm: Gender being saved:', profileData.gender);
+      console.log('🔄 [DEBUG] BirthForm: Update gender mode:', updateGender);
+      
       await storage.setBirthDetails(profileData);
       await storage.addBirthProfile(profileData);
+      
+      // Verify the save
+      const savedData = await storage.getBirthDetails();
+      console.log('✅ [DEBUG] BirthForm: Verified saved data:', JSON.stringify(savedData, null, 2));
+      console.log('✅ [DEBUG] BirthForm: Verified saved gender:', savedData?.gender);
+      
+      // Update backend database if updating existing chart
+      if (updateGender) {
+        try {
+          const token = await storage.getAuthToken();
+          if (token) {
+            console.log('🔄 [DEBUG] BirthForm: Updating backend with birth data:', JSON.stringify(birthData, null, 2));
+            // Update self birth chart with new gender
+            await authAPI.updateSelfBirthChart(birthData, false);
+            console.log('✅ [DEBUG] BirthForm: Self birth chart updated with gender:', formData.gender);
+          } else {
+            console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend update');
+          }
+        } catch (backendError) {
+          console.log('❌ [DEBUG] BirthForm: Failed to update self birth chart:', backendError.message);
+          console.log('❌ [DEBUG] BirthForm: Backend error details:', backendError);
+        }
+      }
       
       await storage.setChartData({
         birthData: birthData,
@@ -289,8 +353,13 @@ export default function BirthFormScreen({ navigation, route }) {
 
       triggerConfetti();
       setTimeout(() => {
-        Alert.alert('Success', 'Birth chart calculated successfully!', [
-          { text: 'OK', onPress: () => navigation.replace('Home') }
+        const successMessage = updateGender ? 'Gender updated successfully!' : 'Birth chart calculated successfully!';
+        console.log('✅ [DEBUG] BirthForm: Success! Navigating back to Home');
+        Alert.alert('Success', successMessage, [
+          { text: 'OK', onPress: () => {
+            console.log('🏠 [DEBUG] BirthForm: Navigating to Home screen');
+            navigation.replace('Home');
+          }}
         ]);
       }, 1000);
     } catch (error) {
@@ -328,7 +397,7 @@ export default function BirthFormScreen({ navigation, route }) {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <Ionicons name="person" size={20} color="#ff6b35" />
-                <Text style={styles.headerTitle}>{editProfile ? 'Edit Profile' : 'Birth Details'}</Text>
+                <Text style={styles.headerTitle}>{updateGender ? 'Update Gender' : editProfile ? 'Edit Profile' : 'Birth Details'}</Text>
               </View>
               <View style={styles.placeholder} />
             </View>
@@ -372,6 +441,7 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 2 && (
                   <View style={styles.genderContainer}>
+                    <Text style={styles.genderDebugText}>Current: {formData.gender || 'None selected'}</Text>
                     <TouchableOpacity
                       style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected]}
                       onPress={() => handleInputChange('gender', 'Male')}
@@ -382,6 +452,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       >
                         <Text style={styles.genderIcon}>♂️</Text>
                         <Text style={styles.genderText}>Male</Text>
+                        {formData.gender === 'Male' && <Text style={styles.selectedIndicator}>✓</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -394,6 +465,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       >
                         <Text style={styles.genderIcon}>♀️</Text>
                         <Text style={styles.genderText}>Female</Text>
+                        {formData.gender === 'Female' && <Text style={styles.selectedIndicator}>✓</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -733,6 +805,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.white,
+  },
+  genderDebugText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  selectedIndicator: {
+    fontSize: 24,
+    color: COLORS.white,
+    fontWeight: 'bold',
+    marginTop: 8,
   },
   dateTimeContainer: {
     width: '100%',

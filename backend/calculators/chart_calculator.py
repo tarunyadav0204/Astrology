@@ -39,7 +39,7 @@ class ChartCalculator(BaseCalculator):
         if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
             # Indian coordinates - verify IST
             if abs(tz_offset - 5.5) > 0.1:  # If not IST, override
-                print(f"DEBUG: Indian coordinates with incorrect timezone {birth_data.timezone} (offset: {tz_offset}), overriding to IST")
+                print(f"DEBUG: Indian coordinates with incorrect timezone {getattr(birth_data, 'timezone', 'None')} (offset: {tz_offset}), overriding to IST")
                 tz_offset = 5.5
             else:
                 print(f"DEBUG: Indian coordinates with correct IST timezone: {tz_offset}")

@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
-import { chartAPI, panchangAPI } from '../../services/api';
+import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +31,7 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
   const [chartData, setChartData] = useState(null);
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
+  const [pricing, setPricing] = useState({});
   const [loading, setLoading] = useState(true);
   
   useFocusEffect(
@@ -127,6 +128,16 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
 const loadHomeData = async () => {
     try {
       setLoading(true);
+      
+      // Load pricing first
+      try {
+        const pricingResponse = await pricingAPI.getAnalysisPricing();
+        if (pricingResponse?.data) {
+          setPricing(pricingResponse.data);
+        }
+      } catch (pricingError) {
+        console.log('Failed to load pricing:', pricingError);
+      }
       
       const targetDate = new Date().toISOString().split('T')[0];
       
@@ -308,7 +319,7 @@ const loadHomeData = async () => {
       icon: '💼', 
       description: 'Professional success & opportunities',
       gradient: ['#6366F1', '#8B5CF6'],
-      cost: 10
+      cost: pricing.career_analysis || 10
     },
     { 
       id: 'wealth', 
@@ -316,7 +327,7 @@ const loadHomeData = async () => {
       icon: '💰', 
       description: 'Financial prospects & opportunities',
       gradient: ['#FFD700', '#FF8C00'],
-      cost: 5
+      cost: pricing.wealth_analysis || 5
     },
     { 
       id: 'health', 
@@ -324,7 +335,7 @@ const loadHomeData = async () => {
       icon: '🏥', 
       description: 'Wellness insights & precautions',
       gradient: ['#32CD32', '#228B22'],
-      cost: 5
+      cost: pricing.health_analysis || 5
     },
     { 
       id: 'marriage', 
@@ -332,7 +343,7 @@ const loadHomeData = async () => {
       icon: '💕', 
       description: 'Relationship compatibility & timing',
       gradient: ['#FF69B4', '#DC143C'],
-      cost: 5
+      cost: pricing.marriage_analysis || 5
     },
     { 
       id: 'education', 
@@ -340,7 +351,15 @@ const loadHomeData = async () => {
       icon: '🎓', 
       description: 'Learning path & career guidance',
       gradient: ['#4169E1', '#1E90FF'],
-      cost: 5
+      cost: pricing.education_analysis || 5
+    },
+    { 
+      id: 'progeny', 
+      title: 'Progeny Analysis', 
+      icon: '👶', 
+      description: 'Fertility potential & family expansion',
+      gradient: ['#FF69B4', '#FF1493'],
+      cost: pricing.progeny_analysis || 15
     }
   ];
 
@@ -413,139 +432,27 @@ const loadHomeData = async () => {
 
         <Animated.View style={[styles.optionsContainer, { opacity: fadeAnim }]}>
           <Text style={styles.optionsTitle}>Choose Your Path</Text>
-          {options.map((option, index) => {
-            const cardDelay = (index + 1) * 200;
-            const cardAnim = useRef(new Animated.Value(0)).current;
-            
-            useEffect(() => {
-              Animated.sequence([
-                Animated.delay(cardDelay),
-                Animated.spring(cardAnim, {
-                  toValue: 1,
-                  tension: 50,
-                  friction: 7,
-                  useNativeDriver: true,
-                }),
-              ]).start();
-            }, []);
-            
-            return (
-              <Animated.View
-                key={option.id}
-                style={[
-                  styles.optionCard,
-                  {
-                    opacity: cardAnim,
-                    transform: [
-                      {
-                        translateY: cardAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        }),
-                      },
-                      {
-                        scale: cardAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.9, 1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => onOptionSelect(option)}
-                  activeOpacity={0.9}
-                >
-                  <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                    style={styles.optionGradient}
-                  >
-                    <View style={styles.optionIconContainer}>
-                      <LinearGradient
-                        colors={['#ff6b35', '#ff8c5a']}
-                        style={styles.optionIconGradient}
-                      >
-                        <Text style={styles.optionEmoji}>{option.icon}</Text>
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionTitle}>{option.title}</Text>
-                      <Text style={styles.optionDescription}>{option.description}</Text>
-                    </View>
-                    <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.6)" />
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          })}
+          {options.map((option, index) => (
+            <OptionCard
+              key={option.id}
+              option={option}
+              index={index}
+              onOptionSelect={onOptionSelect}
+            />
+          ))}
         </Animated.View>
 
         {/* Analysis Options */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
           <Text style={styles.analysisTitle}>🔮 Specialized Analysis</Text>
-          {analysisOptions.map((option, index) => {
-            const cardDelay = (index + 3) * 200;
-            const cardAnim = useRef(new Animated.Value(0)).current;
-            
-            useEffect(() => {
-              Animated.sequence([
-                Animated.delay(cardDelay),
-                Animated.spring(cardAnim, {
-                  toValue: 1,
-                  tension: 50,
-                  friction: 7,
-                  useNativeDriver: true,
-                }),
-              ]).start();
-            }, []);
-            
-            return (
-              <Animated.View
-                key={option.id}
-                style={[
-                  styles.analysisCard,
-                  {
-                    opacity: cardAnim,
-                    transform: [
-                      {
-                        translateY: cardAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        }),
-                      },
-                      {
-                        scale: cardAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.9, 1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
-                  activeOpacity={0.9}
-                >
-                    <LinearGradient
-                      colors={option.gradient}
-                      style={styles.analysisGradient}
-                    >
-                      <View style={styles.analysisIconContainer}>
-                        <Text style={styles.analysisEmoji}>{option.icon}</Text>
-                      </View>
-                      <View style={styles.analysisContent}>
-                        <Text style={styles.analysisCardTitle}>{option.title}</Text>
-                        <Text style={styles.analysisDescription}>{option.description}</Text>
-                        <Text style={styles.analysisCost}>{option.cost} credits</Text>
-                      </View>
-                      <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
-                    </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          })}
+          {analysisOptions.map((option, index) => (
+            <AnalysisCard
+              key={option.id}
+              option={option}
+              index={index}
+              onOptionSelect={onOptionSelect}
+            />
+          ))}
         </Animated.View>
 
 
@@ -860,6 +767,136 @@ const loadHomeData = async () => {
       </ScrollView>
       </LinearGradient>
     </View>
+  );
+}
+
+// Separate component to avoid hooks order violation
+function OptionCard({ option, index, onOptionSelect }) {
+  const cardDelay = (index + 1) * 200;
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(cardDelay),
+      Animated.spring(cardAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+  
+  return (
+    <Animated.View
+      style={[
+        styles.optionCard,
+        {
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+            {
+              scale: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.9, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => onOptionSelect(option)}
+        activeOpacity={0.9}
+      >
+        <LinearGradient
+          colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+          style={styles.optionGradient}
+        >
+          <View style={styles.optionIconContainer}>
+            <LinearGradient
+              colors={['#ff6b35', '#ff8c5a']}
+              style={styles.optionIconGradient}
+            >
+              <Text style={styles.optionEmoji}>{option.icon}</Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{option.title}</Text>
+            <Text style={styles.optionDescription}>{option.description}</Text>
+          </View>
+          <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.6)" />
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// Separate component to avoid hooks order violation
+function AnalysisCard({ option, index, onOptionSelect }) {
+  const cardDelay = (index + 3) * 200;
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(cardDelay),
+      Animated.spring(cardAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+  
+  return (
+    <Animated.View
+      style={[
+        styles.analysisCard,
+        {
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+            {
+              scale: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.9, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
+        activeOpacity={0.9}
+      >
+        <LinearGradient
+          colors={option.gradient}
+          style={styles.analysisGradient}
+        >
+          <View style={styles.analysisIconContainer}>
+            <Text style={styles.analysisEmoji}>{option.icon}</Text>
+          </View>
+          <View style={styles.analysisContent}>
+            <Text style={styles.analysisCardTitle}>{option.title}</Text>
+            <Text style={styles.analysisDescription}>{option.description}</Text>
+            <Text style={styles.analysisCost}>{option.cost} credits</Text>
+          </View>
+          <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 

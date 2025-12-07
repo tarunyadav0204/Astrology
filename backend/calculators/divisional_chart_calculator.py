@@ -24,6 +24,14 @@ class DivisionalChartCalculator(BaseCalculator):
                     navamsa_start = (sign + 4) % 12  # 5th from sign
                 return (navamsa_start + part) % 12
             
+            elif division == 7:  # Saptamsa (D7)
+                # Rule: Odd signs start from self; Even signs start from 7th house
+                if sign % 2 == 0:  # Odd Signs (0=Aries, 2=Gemini, etc.)
+                    d7_start = sign
+                else:  # Even Signs (1=Taurus, 3=Cancer, etc.)
+                    d7_start = (sign + 6) % 12
+                return (d7_start + part) % 12
+            
             elif division == 10:  # Dasamsa (D10)
                 return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
             
@@ -49,7 +57,11 @@ class DivisionalChartCalculator(BaseCalculator):
                 return (d20_start + part) % 12
             
             elif division == 24:  # Chaturvimsamsa (D24)
-                return (3 + part) % 12  # Cancer
+                if sign % 2 == 0:  # Odd Signs
+                    start = 4  # Leo
+                else:  # Even Signs
+                    start = 3  # Cancer
+                return (start + part) % 12
             
             elif division == 27:  # Saptavimsamsa (D27)
                 if sign in [0, 4, 8]:  # Fire signs
@@ -63,18 +75,19 @@ class DivisionalChartCalculator(BaseCalculator):
                 return (d27_start + part) % 12
             
             elif division == 30:  # Trimsamsa (D30)
-                if sign % 2 == 1:  # Odd signs
-                    if part < 5: return 3  # Mars (0-5 degrees)
-                    elif part < 10: return 6  # Saturn (5-10 degrees)
-                    elif part < 18: return 4  # Jupiter (10-18 degrees)
-                    elif part < 25: return 1  # Mercury (18-25 degrees)
-                    else: return 2  # Venus (25-30 degrees)
-                else:  # Even signs
-                    if part < 5: return 2  # Venus (0-5 degrees)
-                    elif part < 12: return 1  # Mercury (5-12 degrees)
-                    elif part < 20: return 4  # Jupiter (12-20 degrees)
-                    elif part < 25: return 6  # Saturn (20-25 degrees)
-                    else: return 3  # Mars (25-30 degrees)
+                # Use degree_in_sign directly for unequal parts
+                if sign % 2 == 0:  # Odd Signs
+                    if degree_in_sign < 5: return 0    # Aries (Mars)
+                    elif degree_in_sign < 10: return 10 # Aquarius (Saturn)
+                    elif degree_in_sign < 18: return 8  # Sagittarius (Jupiter)
+                    elif degree_in_sign < 25: return 2  # Gemini (Mercury)
+                    else: return 6                      # Libra (Venus)
+                else:  # Even Signs
+                    if degree_in_sign < 5: return 1     # Taurus (Venus)
+                    elif degree_in_sign < 12: return 5  # Virgo (Mercury)
+                    elif degree_in_sign < 20: return 11 # Pisces (Jupiter)
+                    elif degree_in_sign < 25: return 9  # Capricorn (Saturn)
+                    else: return 7                      # Scorpio (Mars)
             
             elif division == 40:  # Khavedamsa (D40)
                 if sign in [0, 3, 6, 9]:  # Movable signs
@@ -157,7 +170,7 @@ class DivisionalChartCalculator(BaseCalculator):
     def get_chart_name(self, division_number):
         """Get traditional name for divisional chart"""
         chart_names = {
-            1: 'Rasi (D1)', 9: 'Navamsa (D9)', 10: 'Dasamsa (D10)',
+            1: 'Rasi (D1)', 7: 'Saptamsa (D7)', 9: 'Navamsa (D9)', 10: 'Dasamsa (D10)',
             12: 'Dwadasamsa (D12)', 16: 'Shodasamsa (D16)', 20: 'Vimsamsa (D20)',
             24: 'Chaturvimsamsa (D24)', 27: 'Saptavimsamsa (D27)', 30: 'Trimsamsa (D30)',
             40: 'Khavedamsa (D40)', 45: 'Akshavedamsa (D45)', 60: 'Shashtyamsa (D60)'
@@ -168,6 +181,7 @@ class DivisionalChartCalculator(BaseCalculator):
         """Get significance of divisional chart"""
         significances = {
             1: 'Overall life, personality, general indications',
+            7: 'Children, progeny, creativity, grandchildren',
             9: 'Marriage, dharma, fortune, spiritual inclinations',
             10: 'Career, profession, status, reputation',
             12: 'Parents, ancestry, past life karma',

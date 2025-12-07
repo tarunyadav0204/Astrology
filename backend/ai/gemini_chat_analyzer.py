@@ -77,7 +77,6 @@ class GeminiChatAnalyzer:
         current_age = None
         if birth_date_str:
             try:
-                from datetime import datetime
                 birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d")
                 current_age = datetime.now().year - birth_date.year
                 # Adjust for birthday not yet occurred this year

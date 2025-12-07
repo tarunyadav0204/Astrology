@@ -59,6 +59,28 @@ export const chatAPI = {
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
 };
 
+export const wealthAPI = {
+  getWealthInsights: (birthData, language = 'english') => {
+    const requestData = {
+      ...birthData,
+      language,
+      response_style: 'detailed'
+    };
+    return api.post(getEndpoint('/wealth/ai-insights'), requestData);
+  },
+};
+
+export const healthAPI = {
+  getHealthInsights: (birthData, language = 'english') => {
+    const requestData = {
+      ...birthData,
+      language,
+      response_style: 'detailed'
+    };
+    return api.post(getEndpoint('/health/ai-insights'), requestData);
+  },
+};
+
 export const chartAPI = {
   calculateChart: (birthData) => api.post(getEndpoint('/calculate-chart'), birthData),
   calculateChartOnly: (birthData) => api.post(getEndpoint('/calculate-chart-only'), birthData),
@@ -104,6 +126,54 @@ export const panchangAPI = {
     api.post(getEndpoint('/panchang/calculate-inauspicious-times'), { date, latitude, longitude }),
   calculateDailyPanchang: (date, latitude, longitude) => 
     api.get(getEndpoint(`/panchang/daily-detailed?date=${date}&latitude=${latitude}&longitude=${longitude}`)),
+};
+
+export const progenyAPI = {
+  getProgenyInsights: (birthData, language = 'english') => {
+    const requestData = {
+      ...birthData,
+      language,
+      response_style: 'detailed'
+    };
+    return api.post(getEndpoint('/progeny/ai-insights'), requestData);
+  },
+};
+
+export const careerAPI = {
+  getCareerInsights: (birthData, language = 'english') => {
+    const requestData = {
+      ...birthData,
+      language,
+      response_style: 'detailed'
+    };
+    return api.post(getEndpoint('/career/ai-insights'), requestData);
+  },
+};
+
+export const educationAPI = {
+  getEducationInsights: (birthData, language = 'english') => {
+    const requestData = {
+      ...birthData,
+      language,
+      response_style: 'detailed'
+    };
+    return api.post(getEndpoint('/education/ai-insights'), requestData);
+  },
+};
+
+export const marriageAPI = {
+  getMarriageInsights: (birthData, language = 'english') => {
+    const requestData = {
+      ...birthData,
+      language,
+      response_style: 'detailed'
+    };
+    return api.post(getEndpoint('/marriage/ai-insights'), requestData);
+  },
+};
+
+export const pricingAPI = {
+  getAnalysisPricing: () => api.get(getEndpoint('/analysis-pricing')),
 };
 
 export default api;

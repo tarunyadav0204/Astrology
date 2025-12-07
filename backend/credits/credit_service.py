@@ -126,6 +126,20 @@ class CreditService:
                 VALUES ('premium_chat_cost', 10, 'Credits per premium deep analysis chat')
             ''')
         
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'career_analysis_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('career_analysis_cost', 12, 'Credits per career analysis')
+            ''')
+        
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'progeny_analysis_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('progeny_analysis_cost', 15, 'Credits per progeny analysis')
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -294,7 +308,7 @@ class CreditService:
         cursor.execute("""
             SELECT setting_key, setting_value, description 
             FROM credit_settings 
-            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost')
+            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost')
             ORDER BY setting_key
         """)
         

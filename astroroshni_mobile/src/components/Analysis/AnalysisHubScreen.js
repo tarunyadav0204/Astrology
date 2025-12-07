@@ -14,6 +14,7 @@ import { StatusBar } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 import { useCredits } from '../../credits/CreditContext';
+import { pricingAPI } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +22,8 @@ export default function AnalysisHubScreen({ navigation }) {
   const { credits } = useCredits();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
+  const [pricing, setPricing] = useState({});
+  const [loadingPricing, setLoadingPricing] = useState(true);
 
   useEffect(() => {
     Animated.parallel([
@@ -35,55 +38,89 @@ export default function AnalysisHubScreen({ navigation }) {
         useNativeDriver: true,
       }),
     ]).start();
+    
+    fetchPricing();
   }, []);
-
-  const analysisTypes = [
-    {
-      id: 'career',
-      title: 'Career Analysis',
-      subtitle: 'Professional success & opportunities',
-      icon: '💼',
-      gradient: ['#6366F1', '#8B5CF6'],
-      cost: 10,
-      description: 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
-    },
-    {
-      id: 'wealth',
-      title: 'Wealth Analysis',
-      subtitle: 'Financial prospects & opportunities',
-      icon: '💰',
-      gradient: ['#FFD700', '#FF8C00'],
-      cost: 5,
-      description: 'Discover your financial potential, investment timing, and wealth accumulation patterns'
-    },
-    {
-      id: 'health',
-      title: 'Health Analysis',
-      subtitle: 'Wellness insights & precautions',
-      icon: '🏥',
-      gradient: ['#32CD32', '#228B22'],
-      cost: 5,
-      description: 'Understand health vulnerabilities, body constitution, and preventive measures'
-    },
-    {
-      id: 'marriage',
-      title: 'Marriage Analysis',
-      subtitle: 'Relationship compatibility & timing',
-      icon: '💕',
-      gradient: ['#FF69B4', '#DC143C'],
-      cost: 5,
-      description: 'Explore relationship patterns, marriage timing, and partner compatibility'
-    },
-    {
-      id: 'education',
-      title: 'Education Analysis',
-      subtitle: 'Learning path & career guidance',
-      icon: '🎓',
-      gradient: ['#4169E1', '#1E90FF'],
-      cost: 5,
-      description: 'Identify educational strengths, career paths, and learning opportunities'
+  
+  const fetchPricing = async () => {
+    try {
+      const response = await pricingAPI.getAnalysisPricing();
+      if (response.data && response.data.pricing) {
+        setPricing(response.data.pricing);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pricing:', error);
+      // Use default pricing if API fails
+      setPricing({
+        career: 10,
+        wealth: 5,
+        health: 5,
+        marriage: 5,
+        education: 5,
+        progeny: 15
+      });
+    } finally {
+      setLoadingPricing(false);
     }
-  ];
+  };
+
+  const getAnalysisTypes = () => {
+    const baseTypes = [
+      {
+        id: 'career',
+        title: 'Career Analysis',
+        subtitle: 'Professional success & opportunities',
+        icon: '💼',
+        gradient: ['#6366F1', '#8B5CF6'],
+        description: 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
+      },
+      {
+        id: 'wealth',
+        title: 'Wealth Analysis',
+        subtitle: 'Financial prospects & opportunities',
+        icon: '💰',
+        gradient: ['#FFD700', '#FF8C00'],
+        description: 'Discover your financial potential, investment timing, and wealth accumulation patterns'
+      },
+      {
+        id: 'health',
+        title: 'Health Analysis',
+        subtitle: 'Wellness insights & precautions',
+        icon: '🏥',
+        gradient: ['#32CD32', '#228B22'],
+        description: 'Understand health vulnerabilities, body constitution, and preventive measures'
+      },
+      {
+        id: 'marriage',
+        title: 'Marriage Analysis',
+        subtitle: 'Relationship compatibility & timing',
+        icon: '💕',
+        gradient: ['#FF69B4', '#DC143C'],
+        description: 'Explore relationship patterns, marriage timing, and partner compatibility'
+      },
+      {
+        id: 'education',
+        title: 'Education Analysis',
+        subtitle: 'Learning path & career guidance',
+        icon: '🎓',
+        gradient: ['#4169E1', '#1E90FF'],
+        description: 'Identify educational strengths, career paths, and learning opportunities'
+      },
+      {
+        id: 'progeny',
+        title: 'Progeny Analysis',
+        subtitle: 'Children & family expansion',
+        icon: '👶',
+        gradient: ['#FF69B4', '#FFB6C1'],
+        description: 'Explore fertility potential, timing for children, and family expansion insights'
+      }
+    ];
+    
+    return baseTypes.map(type => ({
+      ...type,
+      cost: pricing[type.id] || 5
+    }));
+  };
 
   const handleAnalysisSelect = (analysisType) => {
     if (credits < analysisType.cost) {
@@ -158,7 +195,7 @@ export default function AnalysisHubScreen({ navigation }) {
 
               {/* Analysis Cards */}
               <View style={styles.analysisGrid}>
-                {analysisTypes.map((analysis, index) => (
+                {getAnalysisTypes().map((analysis, index) => (
                   <Animated.View
                     key={analysis.id}
                     style={[

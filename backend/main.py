@@ -46,6 +46,7 @@ from chat_history.admin_routes import router as chat_admin_router
 from credits.routes import router as credits_router
 from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
+from progeny.progeny_routes import router as progeny_router
 import math
 from datetime import timedelta
 import signal
@@ -201,6 +202,7 @@ app.include_router(chat_admin_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
+app.include_router(progeny_router, prefix="/api")
 
 
 # Root endpoint for health check
@@ -4678,6 +4680,66 @@ async def get_gati_meanings():
                 "themes": ["Versatility", "Multiple interests", "Adaptability"]
             }
         }
+
+@app.get("/api/analysis-pricing")
+async def get_analysis_pricing():
+    """Get pricing for different analysis types"""
+    try:
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        # Check if analysis_pricing table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='analysis_pricing'")
+        if not cursor.fetchone():
+            # Create table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE analysis_pricing (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_type TEXT UNIQUE NOT NULL,
+                    credits INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Insert default pricing
+            default_pricing = [
+                ('career', 10),
+                ('wealth', 5),
+                ('health', 5),
+                ('marriage', 5),
+                ('education', 5),
+                ('progeny', 15)
+            ]
+            
+            for analysis_type, credits in default_pricing:
+                cursor.execute(
+                    "INSERT INTO analysis_pricing (analysis_type, credits) VALUES (?, ?)",
+                    (analysis_type, credits)
+                )
+            
+            conn.commit()
+        
+        # Fetch current pricing
+        cursor.execute("SELECT analysis_type, credits FROM analysis_pricing")
+        pricing_data = cursor.fetchall()
+        conn.close()
+        
+        pricing = {}
+        for analysis_type, credits in pricing_data:
+            pricing[analysis_type] = credits
+        
+        return {"pricing": pricing}
+        
+    except Exception as e:
+        return {"error": f"Failed to fetch pricing: {str(e)}", "pricing": {
+            "career": 10,
+            "wealth": 5,
+            "health": 5,
+            "marriage": 5,
+            "education": 5,
+            "progeny": 15
+        }}
 
 if __name__ == "__main__":
     import uvicorn
