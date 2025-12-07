@@ -382,11 +382,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
       if (fullContent && typeof fullContent === 'string' && fullContent.trim()) {
         try {
-          
           let cleanContent = fullContent.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
           
-          // Remove markdown code blocks if present
-          cleanContent = cleanContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+          // Remove markdown code blocks more thoroughly
+          cleanContent = cleanContent.replace(/```json\s*/gi, '').replace(/```\s*$/gm, '').replace(/^```\s*/gm, '').replace(/```$/gm, '');
           
           // Try to extract JSON from the content
           const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
@@ -395,13 +394,23 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             setAnalysisResult(analysisData);
             await saveAnalysis(analysisData);
             fetchBalance();
-          } else {
-            // If no JSON found, create a simple structure from HTML content
+            return;
+          }
+          
+          // If no JSON found, try parsing the entire cleaned content
+          try {
+            const analysisData = JSON.parse(cleanContent.trim());
+            setAnalysisResult(analysisData);
+            await saveAnalysis(analysisData);
+            fetchBalance();
+            return;
+          } catch (directParseError) {
+            // If direct parsing fails, create a simple structure
             const htmlContent = cleanContent.replace(/<[^>]*>/g, '').trim();
             const simpleResult = {
               quick_answer: htmlContent.substring(0, 500) + (htmlContent.length > 500 ? '...' : ''),
               detailed_analysis: [{
-                question: 'Health Analysis',
+                question: `${analysisType.charAt(0).toUpperCase() + analysisType.slice(1)} Analysis`,
                 answer: htmlContent
               }]
             };
@@ -410,8 +419,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             fetchBalance();
           }
         } catch (jsonError) {
-
-          Alert.alert('Error', 'Failed to parse analysis results');
+          console.error('❌ JSON parsing failed:', jsonError);
+          throw new Error('Failed to parse analysis results');
         }
       } else {
         throw new Error('Empty response received');
