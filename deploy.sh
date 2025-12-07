@@ -23,6 +23,7 @@ fi
 source venv/bin/activate
 pip3 install -r requirements.txt
 pip3 install --upgrade google-generativeai
+pip3 install cryptography
 echo "✅ Backend dependencies installed"
 
 # Setup encryption (idempotent - safe to run multiple times)
