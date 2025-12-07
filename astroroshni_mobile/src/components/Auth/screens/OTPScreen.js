@@ -68,7 +68,7 @@ export default function OTPScreen({
     try {
       // For now, just proceed to next screen
       // In production, you'd verify the OTP with backend
-      console.log('Verifying OTP:', formData.otpCode);
+      // console.log('Verifying OTP:', formData.otpCode);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -102,10 +102,10 @@ export default function OTPScreen({
 
   // Show dev OTP on initial load if available from previous API call
   useEffect(() => {
-    console.log('📱 OTP Screen loaded for phone:', formData.phone);
+    // console.log('📱 OTP Screen loaded for phone:', formData.phone);
     
     if (formData.devOtpCode) {
-      console.log('📱 Development OTP Code available:', formData.devOtpCode);
+      // console.log('📱 Development OTP Code available:', formData.devOtpCode);
       setDevOtpCode(formData.devOtpCode);
     } else {
       console.log('💡 Check backend logs for development OTP code');

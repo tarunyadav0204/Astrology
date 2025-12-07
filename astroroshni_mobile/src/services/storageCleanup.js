@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const cleanupStorage = async () => {
   try {
     const keys = await AsyncStorage.getAllKeys();
-    console.log(`Found ${keys.length} storage keys`);
+    // console.log(`Found ${keys.length} storage keys`);
     
     // Remove old chat history and temporary data (but keep analysis results)
     const keysToRemove = keys.filter(key => 
@@ -15,7 +15,7 @@ export const cleanupStorage = async () => {
     
     if (keysToRemove.length > 0) {
       await AsyncStorage.multiRemove(keysToRemove);
-      console.log(`Cleaned up ${keysToRemove.length} storage keys`);
+      // console.log(`Cleaned up ${keysToRemove.length} storage keys`);
     }
     
     return true;

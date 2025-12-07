@@ -44,11 +44,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     });
                     if (response.ok) {
                         const userData = await response.json();
-                        console.log('👤 Admin check - User data:', userData);
+                        // console.log('👤 Admin check - User data:', userData);
                         setIsAdmin(userData.role === 'admin');
                     }
                 } catch (error) {
-                    console.log('Admin check failed:', error);
+                    // console.log('Admin check failed:', error);
                 }
             }
         };

@@ -54,27 +54,27 @@ export default function PhoneInputScreen({
     } else {
       // Check if phone exists by trying to send registration OTP
       setLoading(true);
-      console.log('🔍 Starting phone validation for:', formData.phone);
-      console.log('📡 API Request - Phone:', formData.phone);
-      console.log('🌐 Network info - API Base URL:', require('../../../utils/constants').API_BASE_URL);
+      // console.log('🔍 Starting phone validation for:', formData.phone);
+      // console.log('📡 API Request - Phone:', formData.phone);
+      // console.log('🌐 Network info - API Base URL:', require('../../../utils/constants').API_BASE_URL);
       
       const startTime = Date.now();
       try {
-        console.log('⏱️ Sending API request at:', new Date().toISOString());
+        // console.log('⏱️ Sending API request at:', new Date().toISOString());
         
         // Add network connectivity check
-        console.log('🔍 Checking network connectivity...');
+        // console.log('🔍 Checking network connectivity...');
         
         const response = await authAPI.sendRegistrationOtp({ phone: formData.phone });
         const endTime = Date.now();
         
-        console.log('✅ API Response received in', endTime - startTime, 'ms');
-        console.log('📥 Response status:', response.status);
-        console.log('📥 Response data:', response.data);
+        // console.log('✅ API Response received in', endTime - startTime, 'ms');
+        // console.log('📥 Response status:', response.status);
+        // console.log('📥 Response data:', response.data);
         
         // Store dev OTP code if available
         if (response.data.dev_code) {
-          console.log('📱 Development OTP Code:', response.data.dev_code);
+          // console.log('📱 Development OTP Code:', response.data.dev_code);
           updateFormData('devOtpCode', response.data.dev_code);
         }
         
@@ -82,14 +82,14 @@ export default function PhoneInputScreen({
         navigateToScreen('otp');
       } catch (error) {
         const endTime = Date.now();
-        console.log('❌ API Error after', endTime - startTime, 'ms');
-        console.log('📥 Error code:', error.code);
-        console.log('📥 Error status:', error.response?.status);
-        console.log('📥 Error data:', error.response?.data);
-        console.log('📥 Error message:', error.message);
-        console.log('📥 Error config URL:', error.config?.url);
-        console.log('📥 Error config method:', error.config?.method);
-        console.log('📥 Error config timeout:', error.config?.timeout);
+        // console.log('❌ API Error after', endTime - startTime, 'ms');
+        // console.log('📥 Error code:', error.code);
+        // console.log('📥 Error status:', error.response?.status);
+        // console.log('📥 Error data:', error.response?.data);
+        // console.log('📥 Error message:', error.message);
+        // console.log('📥 Error config URL:', error.config?.url);
+        // console.log('📥 Error config method:', error.config?.method);
+        // console.log('📥 Error config timeout:', error.config?.timeout);
         
         if (error.code === 'ECONNABORTED') {
           Alert.alert('Timeout Error', 'Request timed out. Please check your internet connection and try again.');
@@ -102,7 +102,7 @@ export default function PhoneInputScreen({
         }
       } finally {
         setLoading(false);
-        console.log('🏁 Phone validation completed');
+        // console.log('🏁 Phone validation completed');
       }
     }
   };

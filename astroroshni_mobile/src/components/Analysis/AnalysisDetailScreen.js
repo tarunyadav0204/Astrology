@@ -60,11 +60,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 [DEBUG] Screen focused, reloading birth data...');
+      // console.log('🔄 [DEBUG] Screen focused, reloading birth data...');
       // Reload birth data when screen comes into focus (after gender update)
       checkBirthData();
       if (birthData) {
-        console.log('🔄 [DEBUG] Birth data exists, loading stored analysis...');
+        // console.log('🔄 [DEBUG] Birth data exists, loading stored analysis...');
         loadStoredAnalysis();
       }
     });
@@ -74,21 +74,21 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const checkBirthData = async () => {
     try {
-      console.log('🔍 [DEBUG] checkBirthData: Starting to load birth data...');
+      // console.log('🔍 [DEBUG] checkBirthData: Starting to load birth data...');
       const savedBirthData = await storage.getBirthDetails();
-      console.log('🔍 [DEBUG] checkBirthData: Raw storage data:', JSON.stringify(savedBirthData, null, 2));
+      // console.log('🔍 [DEBUG] checkBirthData: Raw storage data:', JSON.stringify(savedBirthData, null, 2));
       
       if (savedBirthData && savedBirthData.name) {
-        console.log('✅ [DEBUG] checkBirthData: Valid birth data found');
-        console.log('👤 [DEBUG] checkBirthData: Name:', savedBirthData.name);
-        console.log('⚧️ [DEBUG] checkBirthData: Gender:', savedBirthData.gender);
-        console.log('📅 [DEBUG] checkBirthData: Date:', savedBirthData.date);
-        console.log('🕐 [DEBUG] checkBirthData: Time:', savedBirthData.time);
-        console.log('📍 [DEBUG] checkBirthData: Place:', savedBirthData.place);
-        console.log('🌍 [DEBUG] checkBirthData: Coordinates:', savedBirthData.latitude, savedBirthData.longitude);
+        // console.log('✅ [DEBUG] checkBirthData: Valid birth data found');
+        // console.log('👤 [DEBUG] checkBirthData: Name:', savedBirthData.name);
+        // console.log('⚧️ [DEBUG] checkBirthData: Gender:', savedBirthData.gender);
+        // console.log('📅 [DEBUG] checkBirthData: Date:', savedBirthData.date);
+        // console.log('🕐 [DEBUG] checkBirthData: Time:', savedBirthData.time);
+        // console.log('📍 [DEBUG] checkBirthData: Place:', savedBirthData.place);
+        // console.log('🌍 [DEBUG] checkBirthData: Coordinates:', savedBirthData.latitude, savedBirthData.longitude);
         setBirthData(savedBirthData);
       } else {
-        console.log('❌ [DEBUG] checkBirthData: No valid birth data found');
+        // console.log('❌ [DEBUG] checkBirthData: No valid birth data found');
         Alert.alert('Birth Data Required', 'Please complete your birth details first.', [
           { text: 'OK', onPress: () => navigation.navigate('BirthForm') }
         ]);
@@ -102,7 +102,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const startAnalysis = async (forceRegenerate) => {
     // Ensure forceRegenerate is a boolean
     const shouldForceRegenerate = forceRegenerate === true;
-    console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
+    // console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
     
     // --- PROGENY VALIDATION BLOCK ---
     if (analysisType === 'progeny') {
@@ -166,8 +166,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     try {
       const fixedBirthData = { ...birthData };
       
-      console.log('🔧 [DEBUG] Original birth data:', JSON.stringify(birthData, null, 2));
-      console.log('⚧️ [DEBUG] Original gender:', birthData?.gender);
+      // console.log('🔧 [DEBUG] Original birth data:', JSON.stringify(birthData, null, 2));
+      // console.log('⚧️ [DEBUG] Original gender:', birthData?.gender);
       
       if (fixedBirthData.date && fixedBirthData.date.includes('T')) {
         fixedBirthData.date = fixedBirthData.date.split('T')[0];
@@ -178,8 +178,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         fixedBirthData.time = timeDate.toTimeString().slice(0, 5);
       }
       
-      console.log('🔧 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
-      console.log('⚧️ [DEBUG] Fixed gender:', fixedBirthData?.gender);
+      // console.log('🔧 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
+      // console.log('⚧️ [DEBUG] Fixed gender:', fixedBirthData?.gender);
 
       const requestBody = {
         ...fixedBirthData,
@@ -192,11 +192,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         })
       };
       
-      console.log('🚀 [DEBUG] Starting analysis:', analysisType);
-      console.log('📊 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
-      console.log('📊 [DEBUG] Full request body:', JSON.stringify(requestBody, null, 2));
-      console.log('⚧️ [DEBUG] Gender in request:', requestBody.gender);
-      console.log('🔄 [DEBUG] Force regenerate:', shouldForceRegenerate);
+      // console.log('🚀 [DEBUG] Starting analysis:', analysisType);
+      // console.log('📊 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
+      // console.log('📊 [DEBUG] Full request body:', JSON.stringify(requestBody, null, 2));
+      // console.log('⚧️ [DEBUG] Gender in request:', requestBody.gender);
+      // console.log('🔄 [DEBUG] Force regenerate:', shouldForceRegenerate);
 
       const token = await AsyncStorage.getItem('authToken');
       const headers = {
@@ -207,11 +207,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       // Career and progeny use /ai-insights endpoint, others use /analyze
       const endpoint = (analysisType === 'career' || analysisType === 'progeny') ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`;
       const fullUrl = `${API_BASE_URL}${getEndpoint(endpoint)}`;
-      console.log('🌐 API URL:', fullUrl);
+      // console.log('🌐 API URL:', fullUrl);
       
-      console.log('🌐 [DEBUG] Making API request to:', fullUrl);
-      console.log('📤 [DEBUG] Request headers:', JSON.stringify(headers, null, 2));
-      console.log('📤 [DEBUG] Request body being sent:', JSON.stringify(requestBody, null, 2));
+      // console.log('🌐 [DEBUG] Making API request to:', fullUrl);
+      // console.log('📤 [DEBUG] Request headers:', JSON.stringify(headers, null, 2));
+      // console.log('📤 [DEBUG] Request body being sent:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch(fullUrl, {
         method: 'POST',
@@ -219,8 +219,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         body: JSON.stringify(requestBody)
       });
       
-      console.log('📥 [DEBUG] Response status:', response.status);
-      console.log('📥 [DEBUG] Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+      // console.log('📥 [DEBUG] Response status:', response.status);
+      // console.log('📥 [DEBUG] Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
 
 
       if (!response.ok) {
@@ -231,12 +231,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       }
 
       const responseText = await response.text();
-      console.log('📥 Response received, length:', responseText.length);
-      console.log('📥 First 500 chars:', responseText.substring(0, 500));
-      console.log('📥 Last 200 chars:', responseText.substring(responseText.length - 200));
+      // console.log('📥 Response received, length:', responseText.length);
+      // console.log('📥 First 500 chars:', responseText.substring(0, 500));
+      // console.log('📥 Last 200 chars:', responseText.substring(responseText.length - 200));
       
       const lines = responseText.split('\n').filter(line => line.trim());
-      console.log('📊 Total lines:', lines.length);
+      // console.log('📊 Total lines:', lines.length);
       let fullContent = '';
       
       for (const line of lines) {
@@ -246,20 +246,20 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           if (data && data.length > 0) {
             try {
               const parsed = JSON.parse(data);
-              console.log('✅ [DEBUG] Parsed SSE data:', parsed.status, parsed.cached ? '(cached)' : '');
-              console.log('📊 [DEBUG] SSE parsed object:', JSON.stringify(parsed, null, 2));
+              // console.log('✅ [DEBUG] Parsed SSE data:', parsed.status, parsed.cached ? '(cached)' : '');
+              // console.log('📊 [DEBUG] SSE parsed object:', JSON.stringify(parsed, null, 2));
               
               if (parsed.status === 'error' && parsed.error_code === 'GENDER_REQUIRED') {
-                console.log('⚠️ [DEBUG] GENDER_REQUIRED error detected');
-                console.log('⚠️ [DEBUG] Error message:', parsed.message);
-                console.log('⚠️ [DEBUG] Current birth data gender:', birthData?.gender);
-                console.log('⚠️ [DEBUG] Request body gender:', requestBody.gender);
-                console.log('⚠️ [DEBUG] Fixed birth data gender:', fixedBirthData.gender);
+                // console.log('⚠️ [DEBUG] GENDER_REQUIRED error detected');
+                // console.log('⚠️ [DEBUG] Error message:', parsed.message);
+                // console.log('⚠️ [DEBUG] Current birth data gender:', birthData?.gender);
+                // console.log('⚠️ [DEBUG] Request body gender:', requestBody.gender);
+                // console.log('⚠️ [DEBUG] Fixed birth data gender:', fixedBirthData.gender);
                 
                 // Log all storage data for debugging
                 try {
                   const allStorageData = await storage.getBirthDetails();
-                  console.log('⚠️ [DEBUG] Current storage data:', JSON.stringify(allStorageData, null, 2));
+                  // console.log('⚠️ [DEBUG] Current storage data:', JSON.stringify(allStorageData, null, 2));
                 } catch (storageError) {
                   console.error('⚠️ [DEBUG] Failed to read storage:', storageError);
                 }
@@ -277,7 +277,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           const { authAPI } = require('../../services/api');
                           const response = await authAPI.getSelfBirthChart();
                           const chartId = response.data?.chart_id;
-                          console.log('🔍 [DEBUG] Got chart ID for update:', chartId);
+                          // console.log('🔍 [DEBUG] Got chart ID for update:', chartId);
                           
                           navigation.navigate('BirthForm', { 
                             updateGender: true,
@@ -296,27 +296,27 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               } else if (parsed.status === 'chunk') {
                 fullContent += parsed.response || '';
               } else if (parsed.status === 'complete') {
-                console.log('🎯 Complete status received');
-                console.log('📦 Data keys:', Object.keys(parsed.data || {}));
+                // console.log('🎯 Complete status received');
+                // console.log('📦 Data keys:', Object.keys(parsed.data || {}));
                 
                 // Handle nested response structure - try multiple formats
                 let analysisData = null;
                 
                 if (parsed.data && parsed.data.analysis) {
-                  console.log('✅ Found direct analysis data');
+                  // console.log('✅ Found direct analysis data');
                   analysisData = parsed.data.analysis;
                 } else if (parsed.data && parsed.data[`${analysisType}_analysis`]) {
-                  console.log('✅ Found typed analysis data for:', analysisType);
+                  // console.log('✅ Found typed analysis data for:', analysisType);
                   analysisData = parsed.data[`${analysisType}_analysis`];
                 }
                 
                 if (analysisData) {
-                  console.log('📋 Analysis data keys:', Object.keys(analysisData));
+                  // console.log('📋 Analysis data keys:', Object.keys(analysisData));
                   
                   // Direct analysis object (new format)
                   if (typeof analysisData === 'object' && analysisData.quick_answer) {
-                    console.log('✅ Valid analysis object found');
-                    console.log('📊 Response keys:', Object.keys(analysisData));
+                    // console.log('✅ Valid analysis object found');
+                    // console.log('📊 Response keys:', Object.keys(analysisData));
                     setAnalysisResult(analysisData);
                     await saveAnalysis(analysisData);
                     if (!parsed.cached) {
@@ -327,8 +327,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     }
                     return;
                   } else if (analysisData.detailed_analysis && analysisData.final_thoughts) {
-                    console.log('✅ Valid progeny analysis format found');
-                    console.log('📊 Response keys:', Object.keys(analysisData));
+                    // console.log('✅ Valid progeny analysis format found');
+                    // console.log('📊 Response keys:', Object.keys(analysisData));
                     // Transform progeny format to standard format
                     const transformedData = {
                       quick_answer: analysisData.final_thoughts,
@@ -338,33 +338,33 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     setAnalysisResult(transformedData);
                     await saveAnalysis(transformedData);
                     if (!parsed.cached) {
-                      console.log('💳 Fetching balance (not cached)');
+                      // console.log('💳 Fetching balance (not cached)');
                       fetchBalance();
                     } else {
                       console.log('💾 Using cached response, not fetching balance');
                     }
                     return;
                   } else if (analysisData.json_response && typeof analysisData.json_response === 'object') {
-                    console.log('✅ Valid JSON response found in legacy format');
-                    console.log('📊 Response keys:', Object.keys(analysisData.json_response));
+                    // console.log('✅ Valid JSON response found in legacy format');
+                    // console.log('📊 Response keys:', Object.keys(analysisData.json_response));
                     setAnalysisResult(analysisData.json_response);
                     await saveAnalysis(analysisData.json_response);
                     if (!parsed.cached) {
-                      console.log('💳 Fetching balance (not cached)');
+                      // console.log('💳 Fetching balance (not cached)');
                       fetchBalance();
                     } else {
                       console.log('💾 Using cached response, not fetching balance');
                     }
                     return;
                   } else if (analysisData.raw_response) {
-                    console.log('⚠️ Raw response found, will parse');
+                    // console.log('⚠️ Raw response found, will parse');
                     fullContent = analysisData.raw_response;
                   } else {
-                    console.log('❌ No valid response format in analysis data');
+                    // console.log('❌ No valid response format in analysis data');
                     fullContent = '';
                   }
                 } else {
-                  console.log('⚠️ No analysis data found, using response field');
+                  // console.log('⚠️ No analysis data found, using response field');
                   fullContent = parsed.response || '';
                 }
                 break;
@@ -569,7 +569,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       if (birthData?.name) {
         const key = `analysis_${analysisType}_${birthData.name}`;
         await AsyncStorage.removeItem(key);
-        console.log('🗑️ Cleared cached analysis:', key);
+        // console.log('🗑️ Cleared cached analysis:', key);
       }
     } catch (error) {
       console.error('❌ Failed to clear cache:', error);

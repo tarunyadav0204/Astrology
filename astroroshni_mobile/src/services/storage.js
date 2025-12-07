@@ -15,18 +15,18 @@ export const storage = {
   
   // Birth details
   setBirthDetails: async (details) => {
-    console.log('💾 [DEBUG] Storage: setBirthDetails called with:', JSON.stringify(details, null, 2));
-    console.log('⚧️ [DEBUG] Storage: Gender being saved:', details?.gender);
+    // console.log('💾 [DEBUG] Storage: setBirthDetails called with:', JSON.stringify(details, null, 2));
+    // console.log('⚧️ [DEBUG] Storage: Gender being saved:', details?.gender);
     const result = await AsyncStorage.setItem('birthDetails', JSON.stringify(details));
-    console.log('✅ [DEBUG] Storage: setBirthDetails completed');
+    // console.log('✅ [DEBUG] Storage: setBirthDetails completed');
     return result;
   },
   getBirthDetails: async () => {
-    console.log('📂 [DEBUG] Storage: getBirthDetails called');
+    // console.log('📂 [DEBUG] Storage: getBirthDetails called');
     const data = await AsyncStorage.getItem('birthDetails');
     const parsed = data ? JSON.parse(data) : null;
-    console.log('📂 [DEBUG] Storage: getBirthDetails returning:', JSON.stringify(parsed, null, 2));
-    console.log('⚧️ [DEBUG] Storage: Gender from storage:', parsed?.gender);
+    // console.log('📂 [DEBUG] Storage: getBirthDetails returning:', JSON.stringify(parsed, null, 2));
+    // console.log('⚧️ [DEBUG] Storage: Gender from storage:', parsed?.gender);
     return parsed;
   },
   
@@ -63,13 +63,13 @@ export const storage = {
     return data ? JSON.parse(data) : [];
   },
   addBirthProfile: async (profile) => {
-    console.log('📁 [DEBUG] Storage: addBirthProfile called with:', JSON.stringify(profile, null, 2));
-    console.log('⚧️ [DEBUG] Storage: Profile gender:', profile?.gender);
+    // console.log('📁 [DEBUG] Storage: addBirthProfile called with:', JSON.stringify(profile, null, 2));
+    // console.log('⚧️ [DEBUG] Storage: Profile gender:', profile?.gender);
     const profiles = await storage.getBirthProfiles();
     const updatedProfiles = profiles.filter(p => p.name !== profile.name);
     updatedProfiles.push(profile);
     await storage.setBirthProfiles(updatedProfiles);
-    console.log('✅ [DEBUG] Storage: addBirthProfile completed');
+    // console.log('✅ [DEBUG] Storage: addBirthProfile completed');
   },
   removeBirthProfile: async (profileName) => {
     const profiles = await storage.getBirthProfiles();

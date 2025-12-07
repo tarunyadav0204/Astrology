@@ -69,9 +69,9 @@ export default function BirthFormScreen({ navigation, route }) {
   
   const loadExistingBirthData = async () => {
     try {
-      console.log('🔄 [DEBUG] BirthForm: Loading existing birth data for gender update...');
+      // console.log('🔄 [DEBUG] BirthForm: Loading existing birth data for gender update...');
       const existingData = await storage.getBirthDetails();
-      console.log('📂 [DEBUG] BirthForm: Existing data loaded:', JSON.stringify(existingData, null, 2));
+      // console.log('📂 [DEBUG] BirthForm: Existing data loaded:', JSON.stringify(existingData, null, 2));
       
       if (existingData) {
         // Only load data if user hasn't made a selection yet
@@ -85,7 +85,7 @@ export default function BirthFormScreen({ navigation, route }) {
           timezone: existingData.timezone || prev.timezone,
           gender: prev.gender || '', // Keep existing selection, don't overwrite
         }));
-        console.log('✅ [DEBUG] BirthForm: Data loaded without overwriting gender selection');
+        // console.log('✅ [DEBUG] BirthForm: Data loaded without overwriting gender selection');
       }
     } catch (error) {
       console.error('❌ [DEBUG] BirthForm: Failed to load existing birth data:', error);
@@ -180,10 +180,10 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const handleInputChange = (field, value) => {
-    console.log(`🔄 [DEBUG] BirthForm: handleInputChange - ${field}:`, value);
+    // console.log(`🔄 [DEBUG] BirthForm: handleInputChange - ${field}:`, value);
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-      console.log('📝 [DEBUG] BirthForm: Updated form data:', JSON.stringify(newData, null, 2));
+      // console.log('📝 [DEBUG] BirthForm: Updated form data:', JSON.stringify(newData, null, 2));
       return newData;
     });
     
@@ -316,27 +316,30 @@ export default function BirthFormScreen({ navigation, route }) {
         time: formData.time.toTimeString().split(' ')[0]
       };
       
-      console.log('💾 [DEBUG] BirthForm: Saving profile data:', JSON.stringify(profileData, null, 2));
-      console.log('⚧️ [DEBUG] BirthForm: Gender being saved:', profileData.gender);
-      console.log('🔄 [DEBUG] BirthForm: Update gender mode:', updateGender);
+      // console.log('💾 [DEBUG] BirthForm: Saving profile data:', JSON.stringify(profileData, null, 2));
+      // console.log('⚧️ [DEBUG] BirthForm: Gender being saved:', profileData.gender);
+      // console.log('🔄 [DEBUG] BirthForm: Update gender mode:', updateGender);
       
       await storage.setBirthDetails(profileData);
-      await storage.addBirthProfile(profileData);
+      // Only add to profiles list if this is a new profile, not an update
+      if (!updateGender && !editProfile) {
+        await storage.addBirthProfile(profileData);
+      }
       
       // Verify the save
       const savedData = await storage.getBirthDetails();
-      console.log('✅ [DEBUG] BirthForm: Verified saved data:', JSON.stringify(savedData, null, 2));
-      console.log('✅ [DEBUG] BirthForm: Verified saved gender:', savedData?.gender);
+      // console.log('✅ [DEBUG] BirthForm: Verified saved data:', JSON.stringify(savedData, null, 2));
+      // console.log('✅ [DEBUG] BirthForm: Verified saved gender:', savedData?.gender);
       
       // Update backend database if updating existing chart
       if (updateGender) {
         try {
           const token = await storage.getAuthToken();
           if (token) {
-            console.log('🔄 [DEBUG] BirthForm: Updating backend with birth data:', JSON.stringify(birthData, null, 2));
+            // console.log('🔄 [DEBUG] BirthForm: Updating backend with birth data:', JSON.stringify(birthData, null, 2));
             // Update self birth chart with new gender
             await authAPI.updateSelfBirthChart(birthData, false);
-            console.log('✅ [DEBUG] BirthForm: Self birth chart updated with gender:', formData.gender);
+            // console.log('✅ [DEBUG] BirthForm: Self birth chart updated with gender:', formData.gender);
           } else {
             console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend update');
           }
@@ -354,10 +357,10 @@ export default function BirthFormScreen({ navigation, route }) {
       triggerConfetti();
       setTimeout(() => {
         const successMessage = updateGender ? 'Gender updated successfully!' : 'Birth chart calculated successfully!';
-        console.log('✅ [DEBUG] BirthForm: Success! Navigating back to Home');
+        // console.log('✅ [DEBUG] BirthForm: Success! Navigating back to Home');
         Alert.alert('Success', successMessage, [
           { text: 'OK', onPress: () => {
-            console.log('🏠 [DEBUG] BirthForm: Navigating to Home screen');
+            // console.log('🏠 [DEBUG] BirthForm: Navigating to Home screen');
             navigation.replace('Home');
           }}
         ]);

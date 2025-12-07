@@ -101,12 +101,12 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    console.log('🔐 Attempting auth with:', { phone, name: name || 'N/A', isLogin });
+    // console.log('🔐 Attempting auth with:', { phone, name: name || 'N/A', isLogin });
     setLoading(true);
     try {
       if (isLogin) {
         const response = await authAPI.login({ phone, password });
-        console.log('✅ Login successful:', response.data);
+        // console.log('✅ Login successful:', response.data);
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
         // Refresh credits after successful login

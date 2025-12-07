@@ -376,33 +376,33 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         apiService.calculateSpecialMuhurtas(today, latitude, longitude)
       ]);
       
-      console.log('API Responses:', { choghadiya, hora, specialMuhurtas });
+      // console.log('API Responses:', { choghadiya, hora, specialMuhurtas });
       
       // Debug API calculations
-      console.log('=== API CALCULATION ANALYSIS ===');
-      console.log('Date requested:', today);
-      console.log('Location:', { latitude, longitude });
+      // console.log('=== API CALCULATION ANALYSIS ===');
+      // console.log('Date requested:', today);
+      // console.log('Location:', { latitude, longitude });
       
       // Check Brahma Muhurta calculation
       if (specialMuhurtas.muhurtas) {
         const brahmaMuhurta = specialMuhurtas.muhurtas.find(m => m.name === 'Brahma Muhurta');
         if (brahmaMuhurta) {
-          console.log('Brahma Muhurta Raw:', brahmaMuhurta);
-          console.log('Start:', new Date(brahmaMuhurta.start_time).toString());
-          console.log('End:', new Date(brahmaMuhurta.end_time).toString());
-          console.log('Duration (hours):', (new Date(brahmaMuhurta.end_time) - new Date(brahmaMuhurta.start_time)) / (1000 * 60 * 60));
+          // console.log('Brahma Muhurta Raw:', brahmaMuhurta);
+          // console.log('Start:', new Date(brahmaMuhurta.start_time).toString());
+          // console.log('End:', new Date(brahmaMuhurta.end_time).toString());
+          // console.log('Duration (hours):', (new Date(brahmaMuhurta.end_time) - new Date(brahmaMuhurta.start_time)) / (1000 * 60 * 60));
         }
       }
       
       // Check day duration
-      console.log('Day duration (hours):', specialMuhurtas.day_duration_hours);
-      console.log('Night duration (hours):', specialMuhurtas.night_duration_hours);
+      // console.log('Day duration (hours):', specialMuhurtas.day_duration_hours);
+      // console.log('Night duration (hours):', specialMuhurtas.night_duration_hours);
       
       // Check if times are in correct timezone
-      console.log('Current local time:', new Date().toString());
-      console.log('Current UTC time:', new Date().toISOString());
+      // console.log('Current local time:', new Date().toString());
+      // console.log('Current UTC time:', new Date().toISOString());
       
-      console.log('=== END ANALYSIS ===');
+      // console.log('=== END ANALYSIS ===');
       
       // Parse choghadiya data (combine day and night)
       const allChoghadiya = [...(choghadiya.day_choghadiya || []), ...(choghadiya.night_choghadiya || [])];
