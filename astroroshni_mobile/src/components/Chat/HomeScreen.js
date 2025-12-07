@@ -384,7 +384,10 @@ const loadHomeData = async () => {
             </Animated.View>
             <Animated.View style={[styles.avatar, { transform: [{ scale: pulseAnim }] }]}>
               <Text key={chartData ? 'chart-loaded' : 'chart-loading'} style={styles.avatarText}>
-                {chartData ? getSignIcon(chartData?.houses?.[0]?.sign) : '♈'}
+                {chartData ? (() => {
+                  const signIndex = (chartData?.houses?.[0]?.sign - 1 + 12) % 12;
+                  return getSignIcon(signIndex);
+                })() : '♈'}
               </Text>
             </Animated.View>
           </View>
@@ -559,7 +562,10 @@ const loadHomeData = async () => {
               <LinearGradient colors={['#1E3A8A', '#3B82F6']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>⬆️</Text>
                 <Text style={styles.signLabel}>Ascendant</Text>
-                <Text style={styles.signValue}>{chartData?.houses?.[0]?.sign !== undefined ? `${getSignIcon(chartData.houses[0].sign)} ${getSignName(chartData.houses[0].sign).slice(0, 3)}` : loading ? '...' : 'N/A'}</Text>
+                <Text style={styles.signValue}>{chartData?.houses?.[0]?.sign !== undefined ? (() => {
+                  const signIndex = (chartData.houses[0].sign - 1 + 12) % 12;
+                  return `${getSignIcon(signIndex)} ${getSignName(signIndex).slice(0, 3)}`;
+                })() : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
             
@@ -719,30 +725,45 @@ const loadHomeData = async () => {
                     const illumination = panchangData.moon_illumination || 98.5;
                     const phase = panchangData.moon_phase || 'Full Moon';
                     
-                    if (illumination > 95) {
-                      // Full Moon
+                    if (illumination >= 99) {
+                      // Full Moon (99%+)
                       return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
-                    } else if (illumination < 5) {
-                      // New Moon
+                    } else if (illumination <= 1) {
+                      // New Moon (1% or less)
                       return null;
-                    } else if (phase.includes('Waxing') || illumination > 50) {
-                      // Waxing phases
-                      const offset = (100 - illumination) / 100 * 66;
-                      return (
-                        <>
-                          <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />
-                          <Path d={`M 40 7 A ${offset} 33 0 0 0 40 73 A 33 33 0 0 1 40 7`} fill="#2a2a2a" />
-                        </>
-                      );
                     } else {
-                      // Waning phases
-                      const offset = illumination / 100 * 66;
-                      return (
-                        <>
-                          <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />
-                          <Path d={`M 40 7 A ${offset} 33 0 0 1 40 73 A 33 33 0 0 1 40 7`} fill="#2a2a2a" />
-                        </>
-                      );
+                      // Calculate accurate shadow for moon phase
+                      const darkPercent = 100 - illumination; // How much is dark (7% for 93% illumination)
+                      const isWaxing = phase.includes('Waxing') || (!phase.includes('Waning') && illumination > 50);
+                      
+                      // For accurate moon phases, use ellipse calculation
+                      const shadowOffset = (darkPercent / 100) * 33; // Scale shadow to radius
+                      
+                      if (isWaxing) {
+                        // Waxing: shadow on the left, light grows from right
+                        const lightWidth = (illumination / 100) * 66; // Width of illuminated part
+                        return (
+                          <>
+                            <Circle cx="40" cy="40" r="33" fill="#2a2a2a" />
+                            <Path 
+                              d={`M ${40 - shadowOffset} 7 A ${lightWidth/2} 33 0 0 1 ${40 - shadowOffset} 73 A 33 33 0 0 1 ${40 - shadowOffset} 7`} 
+                              fill="#f0f0f0" 
+                            />
+                          </>
+                        );
+                      } else {
+                        // Waning: shadow on the right, light shrinks from left
+                        const lightWidth = (illumination / 100) * 66; // Width of illuminated part
+                        return (
+                          <>
+                            <Circle cx="40" cy="40" r="33" fill="#2a2a2a" />
+                            <Path 
+                              d={`M ${40 + shadowOffset} 7 A ${lightWidth/2} 33 0 0 0 ${40 + shadowOffset} 73 A 33 33 0 0 0 ${40 + shadowOffset} 7`} 
+                              fill="#f0f0f0" 
+                            />
+                          </>
+                        );
+                      }
                     }
                   })()}
                 </Svg>

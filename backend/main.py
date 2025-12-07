@@ -1282,14 +1282,10 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     ''', (current_user.userid,))
     
     result = cursor.fetchone()
-    conn.close()
-    
     print(f"DEBUG: Self chart query result: {result}")
     
-    result = cursor.fetchone()
-    conn.close()
-
     if not result:
+        conn.close()
         return {"has_self_chart": False}
 
     # Decrypt data
@@ -1304,6 +1300,7 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
         name, date, time = result[0], result[1], result[2]
         lat, lon, place = result[3], result[4], result[6]
 
+    conn.close()
     return {
         "has_self_chart": True,
         "name": name,
@@ -1320,66 +1317,64 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
 @app.put("/api/user/self-birth-chart")
 async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = True, current_user: User = Depends(get_current_user)):
     """Update user's self birth chart"""
+    print(f"DEBUG: update_self_birth_chart called for user {current_user.userid}, clear_existing={clear_existing}")
+    print(f"DEBUG: Birth data - name: {birth_data.name}, date: {birth_data.date}")
+    
     conn = None
     try:
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
         
-        # First, try to find existing chart with matching data
+        # Prepare encrypted data for comparison
+        if encryptor:
+            enc_name = encryptor.encrypt(birth_data.name)
+            enc_date = encryptor.encrypt(birth_data.date)
+            enc_time = encryptor.encrypt(birth_data.time)
+            enc_lat = encryptor.encrypt(str(birth_data.latitude))
+            enc_lon = encryptor.encrypt(str(birth_data.longitude))
+            enc_place = encryptor.encrypt(birth_data.place or '')
+        else:
+            enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+            enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
+        
+        # Find existing chart with matching encrypted data
         cursor.execute('''
             SELECT id FROM birth_charts 
             WHERE userid = ? AND name = ? AND date = ? AND time = ? 
             AND latitude = ? AND longitude = ?
-        ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time,
-              birth_data.latitude, birth_data.longitude))
+        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon))
         
         existing_chart = cursor.fetchone()
         
         if existing_chart:
             # Update existing chart to set relation = 'self'
-            # Only clear other 'self' charts if explicitly requested (profile connection)
             if clear_existing:
                 cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
-            # Set this chart as 'self'
             cursor.execute("UPDATE birth_charts SET relation = 'self' WHERE id = ?", (existing_chart[0],))
+            print(f"DEBUG: Updated existing chart {existing_chart[0]} to relation='self'")
         else:
-            # Only remove existing self birth chart if explicitly requested
             if clear_existing:
                 cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
-            # Insert new chart
-            # cursor.execute('''
-            #     INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-            #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
-            # ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-            #       birth_data.latitude, birth_data.longitude, birth_data.timezone, 
-            #       birth_data.place or '', birth_data.gender or ''))
-            if encryptor:
-                enc_name = encryptor.encrypt(birth_data.name)
-                enc_date = encryptor.encrypt(birth_data.date)
-                enc_time = encryptor.encrypt(birth_data.time)
-                enc_lat = encryptor.encrypt(str(birth_data.latitude))
-                enc_lon = encryptor.encrypt(str(birth_data.longitude))
-                enc_place = encryptor.encrypt(birth_data.place or '')
-            else:
-                enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
-                enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
-
             cursor.execute('''
                 INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
                 birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
+            print(f"DEBUG: Inserted new chart as relation='self'")
 
         conn.commit()
+        print(f"DEBUG: Successfully updated self birth chart for user {current_user.userid}")
         return {"message": "Self birth chart updated successfully"}
         
     except sqlite3.Error as e:
+        print(f"ERROR: Database error in update_self_birth_chart: {str(e)}")
         if conn:
             conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
+        print(f"ERROR: Exception in update_self_birth_chart: {str(e)}")
         if conn:
             conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update self birth chart: {str(e)}")
