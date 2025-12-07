@@ -19,6 +19,7 @@ class BirthData(BaseModel):
     timezone: str
     place: str = ""
     gender: str = ""
+    relation: str = ""
 
 @router.post("/career/comprehensive-analysis")
 async def get_comprehensive_analysis(request: dict, current_user = Depends(get_current_user)):

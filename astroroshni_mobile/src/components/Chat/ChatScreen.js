@@ -206,8 +206,8 @@ export default function ChatScreen({ navigation, route }) {
       };
       
       const { chartAPI } = require('../../services/api');
-      // Use calculateChart instead of calculateChartOnly to save birth data to database
-      const response = await chartAPI.calculateChart(formattedData);
+      // Use calculateChartOnly to avoid duplicate database entries
+      const response = await chartAPI.calculateChartOnly(formattedData);
       setChartData(response.data);
 
     } catch (error) {

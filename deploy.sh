@@ -25,6 +25,15 @@ pip3 install -r requirements.txt
 pip3 install --upgrade google-generativeai
 echo "✅ Backend dependencies installed"
 
+# Setup encryption (idempotent - safe to run multiple times)
+echo "🔐 Setting up encryption..."
+python3 setup_encryption.py
+if [ $? -eq 0 ]; then
+    echo "✅ Encryption setup complete"
+else
+    echo "⚠️ Encryption setup failed, continuing without encryption"
+fi
+
 # Frontend deployment
 echo "⚛️ Building frontend..."
 cd ../frontend

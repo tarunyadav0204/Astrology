@@ -30,8 +30,8 @@ class EducationAnalysisRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
-    language: Optional[str] = 'english'
-    response_style: Optional[str] = 'detailed'
+    language: Optional[str] = None  # Mobile sends this, web doesn't
+    response_style: Optional[str] = None  # Mobile sends this, web doesn't
 
 router = APIRouter(prefix="/education", tags=["education"])
 
@@ -41,21 +41,37 @@ credit_service = CreditService()
 
 @router.post("/analyze")
 async def analyze_education(
-    birth_data: dict,
-    current_user: dict = Depends(get_current_user)
+    request: EducationAnalysisRequest,
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Analyze education prospects using classical Vedic astrology
+    Analyze education prospects - supports both web and mobile formats
+    Mobile: Uses AI analysis with credits
+    Web: Can use classical analysis (check if has required fields)
     """
+    # Check if this is a mobile AI request (has name, language, response_style)
+    # Mobile sends EducationAnalysisRequest with these fields
+    if hasattr(request, 'language') and hasattr(request, 'response_style'):
+        # Mobile app - use AI analysis
+        return await analyze_education_ai(request, current_user)
+    
+    # Web app - use classical analysis
     try:
-        # Calculate chart - convert dict to object-like structure
+        birth_data = {
+            'date': request.date,
+            'time': request.time,
+            'place': request.place,
+            'latitude': request.latitude or 28.6139,
+            'longitude': request.longitude or 77.2090,
+            'timezone': request.timezone or 'UTC+5:30'
+        }
+        
         from types import SimpleNamespace
         birth_obj = SimpleNamespace(**birth_data)
         
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
         
-        # Perform education analysis
         analyzer = EducationAnalyzer(birth_data, chart_data)
         analysis = analyzer.analyze_education()
         

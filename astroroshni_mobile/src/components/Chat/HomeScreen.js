@@ -303,6 +303,14 @@ const loadHomeData = async () => {
 
   const analysisOptions = [
     { 
+      id: 'career', 
+      title: 'Career Analysis', 
+      icon: '💼', 
+      description: 'Professional success & opportunities',
+      gradient: ['#6366F1', '#8B5CF6'],
+      cost: 10
+    },
+    { 
       id: 'wealth', 
       title: 'Wealth Analysis', 
       icon: '💰', 

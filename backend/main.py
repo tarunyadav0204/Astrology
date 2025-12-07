@@ -33,6 +33,7 @@ from classical_shadbala import router as classical_shadbala_router
 from auth import get_current_user as auth_get_current_user
 from app.kp.routes.kp_routes import router as kp_router
 from career_analysis.career_router import router as career_router
+from career_analysis.career_ai_router import router as career_ai_router
 from panchang.panchang_routes import router as panchang_router
 from panchang.muhurat_routes import router as muhurat_router
 from health.health_routes import router as health_router
@@ -51,6 +52,12 @@ import signal
 import sys
 import atexit
 import logging
+from encryption_utils import EncryptionManager
+try:
+    encryptor = EncryptionManager()
+except ValueError as e:
+    print(f"WARNING: Encryption not configured: {e}")
+    encryptor = None
 
 # Configure logging for shutdown events
 logging.basicConfig(
@@ -181,6 +188,7 @@ app.include_router(shadbala_router, prefix="/api")
 app.include_router(classical_shadbala_router, prefix="/api")
 app.include_router(kp_router, prefix="/api")
 app.include_router(career_router, prefix="/api")
+app.include_router(career_ai_router, prefix="/api")
 app.include_router(panchang_router, prefix="/api/panchang")
 app.include_router(muhurat_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
@@ -704,12 +712,23 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
     birth_chart_data = None
     if user_data.birth_details:
         birth_data = user_data.birth_details
+        if encryptor:
+            enc_name = encryptor.encrypt(birth_data.name)
+            enc_date = encryptor.encrypt(birth_data.date)
+            enc_time = encryptor.encrypt(birth_data.time)
+            enc_lat = encryptor.encrypt(str(birth_data.latitude))
+            enc_lon = encryptor.encrypt(str(birth_data.longitude))
+            enc_place = encryptor.encrypt(birth_data.place or '')
+        else:
+            enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+            enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
+
         cursor.execute('''
             INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
-        ''', (user[0], birth_data.name, birth_data.date, birth_data.time, 
-              birth_data.latitude, birth_data.longitude, birth_data.timezone, 
-              birth_data.place or '', birth_data.gender or ''))
+        ''', (user[0], enc_name, enc_date, enc_time, enc_lat, enc_lon, 
+            birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
+
         
         chart_id = cursor.lastrowid
         birth_chart_data = {
@@ -827,8 +846,23 @@ async def login(user_data: UserLogin):
         
         self_birth_chart = cursor.fetchone()
         birth_chart_data = None
-        
-        if self_birth_chart:
+
+        if self_birth_chart and encryptor:
+            birth_chart_data = {
+                'id': self_birth_chart[0],
+                'name': encryptor.decrypt(self_birth_chart[1]),
+                'date': encryptor.decrypt(self_birth_chart[2]),
+                'time': encryptor.decrypt(self_birth_chart[3]),
+                'latitude': float(encryptor.decrypt(str(self_birth_chart[4]))),
+                'longitude': float(encryptor.decrypt(str(self_birth_chart[5]))),
+                'timezone': self_birth_chart[6],
+                'place': encryptor.decrypt(self_birth_chart[7] or ''),
+                'gender': self_birth_chart[8] or '',
+                'relation': self_birth_chart[9] or 'self',
+                'created_at': self_birth_chart[10]
+            }
+        elif self_birth_chart:
+            # No encryption
             birth_chart_data = {
                 'id': self_birth_chart[0],
                 'name': self_birth_chart[1],
@@ -842,6 +876,7 @@ async def login(user_data: UserLogin):
                 'relation': self_birth_chart[9] or 'self',
                 'created_at': self_birth_chart[10]
             }
+
         
         access_token = create_access_token(data={"sub": user_data.phone})
         
@@ -1251,20 +1286,36 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     
     print(f"DEBUG: Self chart query result: {result}")
     
+    result = cursor.fetchone()
+    conn.close()
+
     if not result:
         return {"has_self_chart": False}
-    
+
+    # Decrypt data
+    if encryptor:
+        name = encryptor.decrypt(result[0])
+        date = encryptor.decrypt(result[1])
+        time = encryptor.decrypt(result[2])
+        lat = float(encryptor.decrypt(str(result[3])))
+        lon = float(encryptor.decrypt(str(result[4])))
+        place = encryptor.decrypt(result[6])
+    else:
+        name, date, time = result[0], result[1], result[2]
+        lat, lon, place = result[3], result[4], result[6]
+
     return {
         "has_self_chart": True,
-        "name": result[0],
-        "date": result[1],
-        "time": result[2],
-        "latitude": result[3],
-        "longitude": result[4],
+        "name": name,
+        "date": date,
+        "time": time,
+        "latitude": lat,
+        "longitude": lon,
         "timezone": result[5],
-        "place": result[6],
+        "place": place,
         "gender": result[7]
     }
+
 
 @app.put("/api/user/self-birth-chart")
 async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = True, current_user: User = Depends(get_current_user)):
@@ -1298,13 +1349,29 @@ async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = 
                 cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
             # Insert new chart
+            # cursor.execute('''
+            #     INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+            #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
+            # ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
+            #       birth_data.latitude, birth_data.longitude, birth_data.timezone, 
+            #       birth_data.place or '', birth_data.gender or ''))
+            if encryptor:
+                enc_name = encryptor.encrypt(birth_data.name)
+                enc_date = encryptor.encrypt(birth_data.date)
+                enc_time = encryptor.encrypt(birth_data.time)
+                enc_lat = encryptor.encrypt(str(birth_data.latitude))
+                enc_lon = encryptor.encrypt(str(birth_data.longitude))
+                enc_place = encryptor.encrypt(birth_data.place or '')
+            else:
+                enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+                enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
+
             cursor.execute('''
                 INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'self')
-            ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-                  birth_data.latitude, birth_data.longitude, birth_data.timezone, 
-                  birth_data.place or '', birth_data.gender or ''))
-        
+            ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
+                birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
+
         conn.commit()
         return {"message": "Self birth chart updated successfully"}
         
@@ -1454,11 +1521,28 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     # Store birth data in database (update if exists)
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
+    # cursor.execute('''
+    #     INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+    #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    # ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
+    #       birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other'))
+    if encryptor:
+        enc_name = encryptor.encrypt(birth_data.name)
+        enc_date = encryptor.encrypt(birth_data.date)
+        enc_time = encryptor.encrypt(birth_data.time)
+        enc_lat = encryptor.encrypt(str(birth_data.latitude))
+        enc_lon = encryptor.encrypt(str(birth_data.longitude))
+        enc_place = encryptor.encrypt(birth_data.place)
+    else:
+        enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+        enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
+
     cursor.execute('''
         INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other'))
+    ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
+        birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
+
     conn.commit()
     conn.close()
     
@@ -1750,38 +1834,74 @@ async def get_birth_charts(search: str = "", limit: int = 50, current_user: User
         cursor.execute('SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
     
     rows = cursor.fetchall()
-    print(f"Found {len(rows)} charts")
     conn.close()
-    
+
     charts = []
     for row in rows:
-        charts.append({
-            'id': row[0],
-            'userid': row[1],
-            'name': row[2],
-            'date': row[3],
-            'time': row[4],
-            'latitude': row[5],
-            'longitude': row[6],
-            'timezone': row[7],
-            'created_at': row[8],
-            'place': row[9] if row[9] else '',
-            'gender': row[10] if row[10] else '',
-            'relation': row[11] if len(row) > 11 and row[11] else 'other'
-        })
-    
+        if encryptor:
+            chart = {
+                'id': row[0],
+                'userid': row[1],
+                'name': encryptor.decrypt(row[2]),
+                'date': encryptor.decrypt(row[3]),
+                'time': encryptor.decrypt(row[4]),
+                'latitude': float(encryptor.decrypt(str(row[5]))),
+                'longitude': float(encryptor.decrypt(str(row[6]))),
+                'timezone': row[7],
+                'created_at': row[8],
+                'place': encryptor.decrypt(row[9] if row[9] else ''),
+                'gender': row[10] if row[10] else '',
+                'relation': row[11] if len(row) > 11 and row[11] else 'other'
+            }
+        else:
+            chart = {
+                'id': row[0],
+                'userid': row[1],
+                'name': row[2],
+                'date': row[3],
+                'time': row[4],
+                'latitude': row[5],
+                'longitude': row[6],
+                'timezone': row[7],
+                'created_at': row[8],
+                'place': row[9] if row[9] else '',
+                'gender': row[10] if row[10] else '',
+                'relation': row[11] if len(row) > 11 and row[11] else 'other'
+            }
+        charts.append(chart)
+
     return {"charts": charts}
+
 
 @app.put("/api/birth-charts/{chart_id}")
 async def update_birth_chart(chart_id: int, birth_data: BirthData):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
+    # cursor.execute('''
+    #     UPDATE birth_charts 
+    #     SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation=?
+    #     WHERE id=?
+    # ''', (birth_data.name, birth_data.date, birth_data.time, 
+    #       birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other', chart_id))
+    # AFTER:
+    if encryptor:
+        enc_name = encryptor.encrypt(birth_data.name)
+        enc_date = encryptor.encrypt(birth_data.date)
+        enc_time = encryptor.encrypt(birth_data.time)
+        enc_lat = encryptor.encrypt(str(birth_data.latitude))
+        enc_lon = encryptor.encrypt(str(birth_data.longitude))
+        enc_place = encryptor.encrypt(birth_data.place)
+    else:
+        enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
+        enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
+
     cursor.execute('''
         UPDATE birth_charts 
         SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation=?
         WHERE id=?
-    ''', (birth_data.name, birth_data.date, birth_data.time, 
-          birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other', chart_id))
+    ''', (enc_name, enc_date, enc_time, enc_lat, enc_lon, 
+        birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other', chart_id))
+
     conn.commit()
     conn.close()
     return {"message": "Chart updated successfully"}

@@ -3,8 +3,9 @@ from .base_calculator import BaseCalculator
 class D10Analyzer(BaseCalculator):
     """D10 (Dasamsa) chart analyzer for career analysis"""
     
-    def __init__(self, chart_data):
+    def __init__(self, chart_data, amatyakaraka=None):
         super().__init__(chart_data)
+        self.amatyakaraka = amatyakaraka
         self.d10_chart = self._calculate_d10_chart()
     
     def _calculate_d10_chart(self):
@@ -47,6 +48,7 @@ class D10Analyzer(BaseCalculator):
             'chart_positions': self.d10_chart,
             'ascendant_analysis': self._analyze_d10_ascendant(),
             'tenth_lord_analysis': self._analyze_d10_tenth_lord(),
+            'amatyakaraka_analysis': self._analyze_amk_in_d10(),
             'planet_analysis': self._analyze_d10_planets(),
             'career_indicators': self._get_career_indicators(),
             'professional_strength': self._calculate_professional_strength(),
@@ -100,11 +102,11 @@ class D10Analyzer(BaseCalculator):
         }
     
     def _analyze_d10_planets(self):
-        """Analyze all planets in D10 for career significance"""
+        """Analyze all planets in D10 including Rahu/Ketu for modern careers"""
         planet_analysis = {}
         d10_asc_sign = self.d10_chart['Ascendant']['sign']
         
-        career_significators = ['Sun', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        career_significators = ['Sun', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
         
         for planet in career_significators:
             if planet in self.d10_chart:
@@ -288,11 +290,9 @@ class D10Analyzer(BaseCalculator):
         return impacts.get(house, "Moderate career influence")
     
     def _assess_tenth_lord_strength(self, lord, position):
-        """Assess 10th lord strength in D10"""
-        # Simplified strength assessment
+        """Assess 10th lord strength in D10 (Enhanced with debilitation)"""
         sign = position['sign']
         
-        # Check if in own sign or exaltation
         own_signs = {
             'Sun': [4], 'Moon': [3], 'Mars': [0, 7], 'Mercury': [2, 5],
             'Jupiter': [8, 11], 'Venus': [1, 6], 'Saturn': [9, 10]
@@ -303,10 +303,17 @@ class D10Analyzer(BaseCalculator):
             'Jupiter': 3, 'Venus': 11, 'Saturn': 6
         }
         
+        debilitation_signs = {
+            'Sun': 6, 'Moon': 7, 'Mars': 3, 'Mercury': 11,
+            'Jupiter': 9, 'Venus': 5, 'Saturn': 0
+        }
+        
         if sign in own_signs.get(lord, []):
             return "Strong (Own sign)"
         elif sign == exaltation_signs.get(lord):
             return "Excellent (Exalted)"
+        elif sign == debilitation_signs.get(lord):
+            return "Weak (Debilitated)"
         else:
             return "Moderate"
     
@@ -319,7 +326,9 @@ class D10Analyzer(BaseCalculator):
             'Mercury': 'Business, communication, writing, trade',
             'Jupiter': 'Education, law, counseling, spirituality',
             'Venus': 'Arts, entertainment, luxury, beauty',
-            'Saturn': 'Service, labor, traditional professions'
+            'Saturn': 'Service, labor, traditional professions',
+            'Rahu': 'Technology, AI, Foreign MNCs, Innovation, Aviation',
+            'Ketu': 'Coding, Research, Mathematics, Spirituality, Precision work'
         }
         return significances.get(planet, 'General career influence')
     
@@ -386,6 +395,20 @@ class D10Analyzer(BaseCalculator):
                 'upachaya': 'Slow but steady career growth',
                 'dusthana': 'Career delays, hard work with limited recognition',
                 'default': 'Moderate service-oriented career influence'
+            },
+            'Rahu': {
+                'kendra': 'Excellent for Technology, AI, and Innovation careers',
+                'trikona': 'Luck through foreign lands or unconventional paths',
+                'upachaya': 'Massive sudden growth in career (Explosive success)',
+                'dusthana': 'Office politics or hidden enemies',
+                'default': 'Unconventional career influence'
+            },
+            'Ketu': {
+                'kendra': 'Career in coding (languages), research, or spirituality',
+                'trikona': 'Deep expertise in niche subjects',
+                'upachaya': 'Success through precise/microscopic skills',
+                'dusthana': 'Job dissatisfaction or frequent changes',
+                'default': 'Detached career influence'
             }
         }
         
@@ -425,3 +448,62 @@ class D10Analyzer(BaseCalculator):
             return "Moderate professional potential requiring focused effort"
         else:
             return "Professional growth requires significant effort and skill development"
+    
+    def _analyze_amk_in_d10(self):
+        """Analyze Amatyakaraka position in D10 (CRITICAL for career success)"""
+        if not self.amatyakaraka or self.amatyakaraka not in self.d10_chart:
+            return {
+                'status': 'Unknown',
+                'note': 'Amatyakaraka not provided or not found in D10 chart'
+            }
+        
+        amk_pos = self.d10_chart[self.amatyakaraka]
+        d10_asc_sign = self.d10_chart['Ascendant']['sign']
+        amk_house = self._get_house_from_ascendant(amk_pos['sign'], d10_asc_sign)
+        
+        # Check dignity in D10
+        amk_sign = amk_pos['sign']
+        dignity = self._assess_tenth_lord_strength(self.amatyakaraka, amk_pos)
+        
+        results = {
+            'planet': self.amatyakaraka,
+            'd10_house': amk_house,
+            'd10_sign': amk_pos['sign_name'],
+            'dignity': dignity,
+            'is_in_kendra': amk_house in [1, 4, 7, 10],
+            'is_in_trikona': amk_house in [1, 5, 9],
+            'is_in_dusthana': amk_house in [6, 8, 12],
+            'interpretation': '',
+            'career_impact': ''
+        }
+        
+        # Interpret AmK position
+        if amk_house == 10:
+            results['interpretation'] = "EXCELLENT: Amatyakaraka in 10th house of D10 indicates massive professional rise and recognition"
+            results['career_impact'] = "Peak career success, leadership roles, high authority"
+        elif amk_house in [1, 5, 9]:
+            results['interpretation'] = "STRONG: Amatyakaraka in Kendra/Trikona of D10 supports excellent career growth"
+            results['career_impact'] = "Strong professional foundation, steady rise, respected position"
+        elif amk_house == 4:
+            results['interpretation'] = "GOOD: Amatyakaraka in 4th of D10 shows stable career with property/education connection"
+            results['career_impact'] = "Stable career, possibly in education, real estate, or home-based business"
+        elif amk_house == 7:
+            results['interpretation'] = "GOOD: Amatyakaraka in 7th of D10 indicates partnership-based or foreign career success"
+            results['career_impact'] = "Success through partnerships, consulting, or international work"
+        elif amk_house == 11:
+            results['interpretation'] = "EXCELLENT: Amatyakaraka in 11th of D10 shows high gains and fulfillment through career"
+            results['career_impact'] = "Large organizations, networking, high income potential"
+        elif amk_house == 6:
+            results['interpretation'] = "CHALLENGING: Amatyakaraka in 6th of D10 shows success through hard work, service, or competition"
+            results['career_impact'] = "Service roles, competitive fields, success after struggle"
+        elif amk_house == 8:
+            results['interpretation'] = "UNSTABLE: Amatyakaraka in 8th of D10 indicates career changes, breaks, or research/occult work"
+            results['career_impact'] = "Sudden changes, transformation-based careers, research, or hidden work"
+        elif amk_house == 12:
+            results['interpretation'] = "FOREIGN/SPIRITUAL: Amatyakaraka in 12th of D10 shows foreign career or spiritual/charitable work"
+            results['career_impact'] = "Foreign lands, spirituality, hospitals, isolation-based work, or expenses through career"
+        else:
+            results['interpretation'] = f"MODERATE: Amatyakaraka in {amk_house}th house of D10"
+            results['career_impact'] = "Moderate career influence"
+        
+        return results

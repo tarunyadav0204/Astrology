@@ -682,7 +682,7 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
           {renderedElements}
         </View>
 
-        {message.role === 'assistant' && !message.isTyping && (
+        {!message.isTyping && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={styles.actionButton}

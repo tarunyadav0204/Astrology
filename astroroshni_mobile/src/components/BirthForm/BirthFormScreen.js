@@ -270,7 +270,7 @@ export default function BirthFormScreen({ navigation, route }) {
       };
 
       const [chartData, yogiData] = await Promise.all([
-        chartAPI.calculateChart(birthData),
+        chartAPI.calculateChartOnly(birthData),
         chartAPI.calculateYogi(birthData)
       ]);
 

@@ -26,8 +26,45 @@ class BirthDetailsRequest(BaseModel):
     force_regenerate: Optional[bool] = False
     user_role: Optional[str] = None
 
+class WealthAnalysisRequest(BaseModel):
+    name: Optional[str] = None
+    date: str
+    time: str
+    place: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    timezone: Optional[str] = None
+    gender: Optional[str] = None
+    language: Optional[str] = 'english'
+    response_style: Optional[str] = 'detailed'
+    force_regenerate: Optional[bool] = False
+
 router = APIRouter(prefix="/wealth", tags=["wealth"])
 credit_service = CreditService()
+
+@router.post("/analyze")
+async def analyze_wealth(request: WealthAnalysisRequest, current_user: User = Depends(get_current_user)):
+    """Analyze wealth prospects with AI - mobile app compatible endpoint"""
+    print(f"📱 MOBILE WEALTH ANALYSIS REQUEST:")
+    print(f"   Date: {request.date}")
+    print(f"   Time: {request.time}")
+    print(f"   Force regenerate from request: {request.force_regenerate}")
+    print(f"   Request object type: {type(request)}")
+    print(f"   Request dict: {request.dict()}")
+    
+    # Convert mobile request format to web format
+    birth_request = BirthDetailsRequest(
+        birth_date=request.date,
+        birth_time=request.time,
+        birth_place=request.place,
+        latitude=request.latitude,
+        longitude=request.longitude,
+        timezone=request.timezone,
+        force_regenerate=request.force_regenerate
+    )
+    print(f"🔄 Birth request force_regenerate: {birth_request.force_regenerate}")
+    # Call the existing enhanced insights endpoint
+    return await get_enhanced_wealth_insights(birth_request, current_user)
 
 def _create_birth_hash(birth_data):
     """Create unique hash for birth data"""
@@ -270,10 +307,12 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             
             # Check cache first
             force_regen = request.force_regenerate
+            print(f"🔍 Cache check - force_regenerate: {force_regen}")
             stored_insights = _get_stored_ai_insights(birth_hash)
+            print(f"💾 Cached insights found: {stored_insights is not None}")
             
             if stored_insights and not force_regen:
-                print(f"💾 Found cached insights, returning cached response")
+                print(f"💾 Using cached insights (force_regenerate={force_regen})")
                 # Format cached response properly
                 cached_response = {
                     'wealth_analysis': {
@@ -287,6 +326,8 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
                 }
                 yield f"data: {json.dumps({'status': 'complete', 'data': cached_response, 'cached': True})}\n\n"
                 return
+            elif stored_insights and force_regen:
+                print(f"🔄 Cache found but force_regenerate=True, generating fresh analysis")
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Building comprehensive astrological context...'})}\n\n"
             

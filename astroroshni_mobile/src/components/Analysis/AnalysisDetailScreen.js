@@ -82,7 +82,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }
   };
 
-  const startAnalysis = async () => {
+  const startAnalysis = async (forceRegenerate) => {
+    // Ensure forceRegenerate is a boolean
+    const shouldForceRegenerate = forceRegenerate === true;
+    console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
     if (!birthData) {
       Alert.alert('Error', 'Birth data not available');
       return;
@@ -144,8 +147,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       const requestBody = {
         ...fixedBirthData,
         language: 'english',
-        response_style: 'detailed'
+        response_style: 'detailed',
+        force_regenerate: shouldForceRegenerate
       };
+      
+      console.log('🚀 Starting analysis:', analysisType);
+      console.log('📊 Request body:', JSON.stringify(requestBody, null, 2));
 
       const token = await AsyncStorage.getItem('authToken');
       const headers = {
@@ -153,7 +160,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         ...(token && { 'Authorization': `Bearer ${token}` })
       };
 
-      const fullUrl = `${API_BASE_URL}${getEndpoint(`/${analysisType}/analyze`)}`;
+      // Career uses /ai-insights endpoint, others use /analyze
+      const endpoint = analysisType === 'career' ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`;
+      const fullUrl = `${API_BASE_URL}${getEndpoint(endpoint)}`;
+      console.log('🌐 API URL:', fullUrl);
       
       const response = await fetch(fullUrl, {
         method: 'POST',
@@ -168,34 +178,56 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       }
 
       const responseText = await response.text();
+      console.log('📥 Response received, length:', responseText.length);
+      console.log('📥 First 500 chars:', responseText.substring(0, 500));
+      console.log('📥 Last 200 chars:', responseText.substring(responseText.length - 200));
       
       const lines = responseText.split('\n').filter(line => line.trim());
+      console.log('📊 Total lines:', lines.length);
       let fullContent = '';
       
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
+          let data = line.slice(6).trim();
           if (data === '[DONE]') break;
           if (data && data.length > 0) {
             try {
               const parsed = JSON.parse(data);
+              console.log('✅ Parsed SSE data:', parsed.status, parsed.cached ? '(cached)' : '');
+              
               if (parsed.status === 'chunk') {
                 fullContent += parsed.response || '';
               } else if (parsed.status === 'complete') {
+                console.log('🎯 Complete status received');
+                console.log('📦 Data keys:', Object.keys(parsed.data || {}));
+                
                 // Handle nested response structure
                 if (parsed.data && parsed.data[`${analysisType}_analysis`]) {
+                  console.log('✅ Found analysis data for:', analysisType);
                   const analysisData = parsed.data[`${analysisType}_analysis`];
+                  console.log('📋 Analysis data keys:', Object.keys(analysisData));
+                  
                   if (analysisData.json_response && typeof analysisData.json_response === 'object') {
+                    console.log('✅ Valid JSON response found');
+                    console.log('📊 Response keys:', Object.keys(analysisData.json_response));
                     setAnalysisResult(analysisData.json_response);
                     await saveAnalysis(analysisData.json_response);
-                    fetchBalance();
+                    if (!parsed.cached) {
+                      console.log('💳 Fetching balance (not cached)');
+                      fetchBalance();
+                    } else {
+                      console.log('💾 Using cached response, not fetching balance');
+                    }
                     return;
                   } else if (analysisData.raw_response) {
+                    console.log('⚠️ Raw response found, will parse');
                     fullContent = analysisData.raw_response;
                   } else {
+                    console.log('❌ No json_response or raw_response');
                     fullContent = '';
                   }
                 } else {
+                  console.log('⚠️ No analysis data, using response field');
                   fullContent = parsed.response || '';
                 }
                 break;
@@ -203,7 +235,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 fullContent += parsed.content;
               }
             } catch (parseError) {
-
+              console.error('❌ Parse error:', parseError.message);
+              console.error('❌ Failed data (first 200 chars):', data.substring(0, 200));
+              console.error('❌ Failed data (last 200 chars):', data.substring(data.length - 200));
             }
           }
         }
@@ -279,14 +313,59 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }));
   };
 
-  const formatTextWithBold = (text) => {
+  const formatTextWithBold = (text, isFinalThoughts = false) => {
     if (!text) return null;
-    const parts = text.split(/\*\*(.*?)\*\*/g);
-    return parts.map((part, index) => {
-      if (index % 2 === 1) {
-        return <Text key={index} style={styles.boldYellowText}>{part}</Text>;
+    
+    // Replace HTML entities
+    let processedText = text
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+    
+    // Handle lists - convert to bullet points
+    processedText = processedText
+      .replace(/<ul>/gi, '')
+      .replace(/<\/ul>/gi, '\n')
+      .replace(/<li>/gi, '• ')
+      .replace(/<\/li>/gi, '\n');
+    
+    // Handle strong/bold tags
+    processedText = processedText
+      .replace(/<strong>/gi, '**')
+      .replace(/<\/strong>/gi, '**');
+    
+    // Split by paragraph tags and process each paragraph
+    const paragraphs = processedText.split(/<\/p>\s*<p>/gi);
+    
+    return paragraphs.map((paragraph, pIndex) => {
+      // Clean up opening/closing p tags
+      let cleanPara = paragraph.replace(/<\/?p>/gi, '').trim();
+      
+      // Replace <br> tags with line breaks
+      cleanPara = cleanPara.replace(/<br\s*\/?>/gi, '\n');
+      
+      // Split by ** for bold formatting
+      const parts = cleanPara.split(/\*\*(.*?)\*\*/g);
+      
+      const formattedParts = parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return <Text key={`${pIndex}-${index}`} style={isFinalThoughts ? styles.boldDarkText : styles.boldYellowText}>{part}</Text>;
+        }
+        // Return regular text with proper styling for final thoughts
+        return <Text key={`${pIndex}-${index}-text`} style={isFinalThoughts ? {color: '#333'} : undefined}>{part}</Text>;
+      });
+      
+      // Add paragraph spacing
+      if (pIndex < paragraphs.length - 1) {
+        return (
+          <Text key={pIndex}>
+            {formattedParts}
+            {'\n\n'}
+          </Text>
+        );
       }
-      return part;
+      return <Text key={pIndex}>{formattedParts}</Text>;
     });
   };
 
@@ -336,10 +415,25 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     setShowRegenerateModal(true);
   };
 
-  const confirmRegenerate = () => {
+  const confirmRegenerate = async () => {
     setShowRegenerateModal(false);
+    
+    // Clear cached analysis
+    try {
+      if (birthData?.name) {
+        const key = `analysis_${analysisType}_${birthData.name}`;
+        await AsyncStorage.removeItem(key);
+        console.log('🗑️ Cleared cached analysis:', key);
+      }
+    } catch (error) {
+      console.error('❌ Failed to clear cache:', error);
+    }
+    
     setAnalysisResult(null);
-    startAnalysis();
+    // Use setTimeout to ensure state updates before calling
+    setTimeout(() => {
+      startAnalysis(true);
+    }, 100);
   };
 
   const downloadPDF = async () => {
@@ -433,6 +527,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const getAnalysisIcon = () => {
     switch (analysisType) {
+      case 'career': return '💼';
       case 'wealth': return '💰';
       case 'health': return '🏥';
       case 'marriage': return '💕';
@@ -443,6 +538,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const getAnalysisGradient = () => {
     switch (analysisType) {
+      case 'career': return ['#6366F1', '#8B5CF6'];
       case 'wealth': return ['#FFD700', '#FF8C00'];
       case 'health': return ['#32CD32', '#228B22'];
       case 'marriage': return ['#FF69B4', '#DC143C'];
@@ -463,7 +559,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
             >
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{title}</Text>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>{title}</Text>
+              {birthData?.name && (
+                <Text style={styles.headerSubtitle}>for {birthData.name.length > 15 ? birthData.name.substring(0, 15) + '...' : birthData.name}</Text>
+              )}
+            </View>
             <View style={styles.headerRight}>
               {analysisResult && (
                 <TouchableOpacity 
@@ -581,14 +682,14 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                               <View style={styles.keyPointsSection}>
                                 <Text style={styles.keyPointsTitle}>Key Points:</Text>
                                 {item.key_points.map((point, pointIndex) => (
-                                  <Text key={pointIndex} style={styles.keyPoint}>• {point}</Text>
+                                  <Text key={pointIndex} style={styles.keyPoint}>• {formatTextWithBold(point)}</Text>
                                 ))}
                               </View>
                             )}
                             {item.astrological_basis && (
                               <View style={styles.basisSection}>
                                 <Text style={styles.basisTitle}>Astrological Basis:</Text>
-                                <Text style={styles.basisText}>{item.astrological_basis}</Text>
+                                <Text style={styles.basisText}>{formatTextWithBold(item.astrological_basis)}</Text>
                               </View>
                             )}
                           </View>
@@ -605,7 +706,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       style={styles.finalCard}
                     >
                       <Text style={styles.finalTitle}>🌟 Final Thoughts</Text>
-                      <Text style={styles.finalText}>{formatTextWithBold(analysisResult.final_thoughts)}</Text>
+                      <View style={styles.finalTextContainer}>
+                        {formatTextWithBold(analysisResult.final_thoughts, true)}
+                      </View>
                     </LinearGradient>
                   </View>
                 )}
@@ -686,27 +789,39 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 8,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 4,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
   },
-  creditButton: { borderRadius: 18, overflow: 'hidden' },
-  creditGradient: { paddingHorizontal: 14, paddingVertical: 8 },
-  creditText: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  creditButton: { borderRadius: 16, overflow: 'hidden' },
+  creditGradient: { paddingHorizontal: 10, paddingVertical: 6 },
+  creditText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
   content: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 30 },
@@ -872,14 +987,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   finalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#333',
     marginBottom: 12,
   },
-  finalText: { fontSize: 15, color: COLORS.white, lineHeight: 22 },
+  finalText: { fontSize: 15, color: '#333', lineHeight: 22 },
+  finalTextContainer: {
+    color: '#333',
+  },
   followUpSection: { paddingHorizontal: 20, paddingBottom: 20 },
   followUpButton: { marginBottom: 8, borderRadius: 12, overflow: 'hidden' },
   followUpGradient: {
@@ -900,23 +1019,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFD700',
   },
+  boldDarkText: {
+    fontWeight: 'bold',
+    color: '#1a0033',
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
   },
   regenerateButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   pdfButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',

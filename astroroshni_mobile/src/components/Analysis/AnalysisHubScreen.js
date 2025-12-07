@@ -39,6 +39,15 @@ export default function AnalysisHubScreen({ navigation }) {
 
   const analysisTypes = [
     {
+      id: 'career',
+      title: 'Career Analysis',
+      subtitle: 'Professional success & opportunities',
+      icon: '💼',
+      gradient: ['#6366F1', '#8B5CF6'],
+      cost: 10,
+      description: 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
+    },
+    {
       id: 'wealth',
       title: 'Wealth Analysis',
       subtitle: 'Financial prospects & opportunities',

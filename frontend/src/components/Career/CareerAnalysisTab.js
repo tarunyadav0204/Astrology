@@ -4,8 +4,6 @@ import { NAKSHATRA_CONFIG, CAREER_NAKSHATRA_ROLES } from '../../config/nakshatra
 import CareerPersonality from './CareerPersonality';
 import CareerPaths from './CareerPaths';
 import CareerProfessions from './CareerProfessions';
-import CareerTiming from './CareerTiming';
-import CareerStrategy from './CareerStrategy';
 import { renderYogiBadhakaDetails } from './YogiBadhakaDetails';
 import './CareerAnalysisTab.css';
 
@@ -20,31 +18,13 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
     { id: 'personality', label: '👤 Your Career Personality' },
     { id: 'professions', label: '💼 Suitable Professions' },
     { id: 'nakshatras', label: '⭐ Nakshatra Analysis' },
-    { id: 'timing', label: '⏰ Career Timing' },
-    { id: 'strategy', label: '🎯 Growth Strategy' },
     { id: 'complete', label: '🔍 Complete Analysis' }
   ];
 
   useEffect(() => {
-    const loadCareerAnalysis = async () => {
-      if (!birthDetails) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const data = await careerService.getComprehensiveAnalysis(birthDetails);
-        setCareerData(data);
-      } catch (error) {
-        console.error('Error loading career analysis:', error);
-        setError(error.message || 'Failed to load career analysis');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCareerAnalysis();
+    // Only load nakshatra analysis on mount
     loadNakshatraAnalysis();
+    setLoading(false);
   }, [birthDetails]);
   
   const loadNakshatraAnalysis = async () => {
@@ -110,13 +90,7 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
     return <CareerProfessions careerData={professionsData} />;
   };
   
-  const renderTiming = () => {
-    return <CareerTiming careerData={careerData} />;
-  };
-  
-  const renderStrategy = () => {
-    return <CareerStrategy careerData={careerData} />;
-  };
+
   
   const renderNakshatraAnalysis = () => {
     if (!nakshatraData || !nakshatraData.nakshatra_analysis) {
@@ -1976,10 +1950,6 @@ const CareerAnalysisTab = ({ chartData, birthDetails }) => {
         return renderCareerPersonality();
       case 'professions':
         return renderProfessions();
-      case 'timing':
-        return renderTiming();
-      case 'strategy':
-        return renderStrategy();
       case 'nakshatras':
         return renderNakshatraAnalysis();
       case 'complete':
