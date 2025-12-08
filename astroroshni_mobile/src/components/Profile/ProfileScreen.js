@@ -269,7 +269,7 @@ export default function ProfileScreen({ navigation }) {
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
                     {chartData ? (() => {
-                      const signIndex = (chartData?.houses?.[0]?.sign - 1 + 12) % 12;
+                      const signIndex = chartData?.houses?.[0]?.sign || 0;
                       return getSignIcon(signIndex);
                     })() : getZodiacSign(birthData?.date)}
                   </Text>
@@ -364,7 +364,7 @@ export default function ProfileScreen({ navigation }) {
                     </View>
                     <View style={styles.chartDetailRow}>
                       <Text style={styles.chartDetailLabel}>⬆️ Ascendant</Text>
-                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon((chartData?.houses?.[0]?.sign - 1 + 12) % 12)} ${getSignName((chartData?.houses?.[0]?.sign - 1 + 12) % 12)}`}</Text>
+                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
                     </View>
                   </View>
                   

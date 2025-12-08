@@ -444,11 +444,15 @@ export default function ChatScreen({ navigation, route }) {
     if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'analysis') {
-      navigation.navigate('AnalysisDetail', { 
-        analysisType: option.type,
-        title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
-        cost: 5
-      });
+      if (option.type === 'trading') {
+        navigation.navigate('TradingDashboard');
+      } else {
+        navigation.navigate('AnalysisDetail', { 
+          analysisType: option.type,
+          title: `${option.type.charAt(0).toUpperCase() + option.type.slice(1)} Analysis`,
+          cost: 5
+        });
+      }
     } else {
       
       // First load any existing chat history

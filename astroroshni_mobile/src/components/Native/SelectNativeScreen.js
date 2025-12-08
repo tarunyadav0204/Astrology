@@ -157,6 +157,15 @@ export default function SelectNativeScreen({ navigation, route }) {
       loadProfiles();
     }, [])
   );
+  
+  // Refresh profiles when screen comes into focus (after creating new profile)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProfiles();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   const loadProfiles = async () => {
     try {

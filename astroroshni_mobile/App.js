@@ -16,6 +16,8 @@ import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
 import ChartScreen from './src/components/Chart/ChartScreen';
+import TradingDashboardScreen from './src/components/Trading/TradingDashboardScreen';
+import TradingCalendarScreen from './src/components/Trading/TradingCalendarScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -148,6 +150,16 @@ export default function App() {
           <Stack.Screen 
             name="Chart" 
             component={ChartScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="TradingDashboard" 
+            component={TradingDashboardScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="TradingCalendar" 
+            component={TradingCalendarScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

@@ -360,6 +360,14 @@ const loadHomeData = async () => {
       description: 'Fertility potential & family expansion',
       gradient: ['#FF69B4', '#FF1493'],
       cost: pricing.progeny_analysis || 15
+    },
+    { 
+      id: 'trading', 
+      title: 'Trading Forecast', 
+      icon: '📈', 
+      description: 'Stock market predictions & timing',
+      gradient: ['#FFD700', '#FF8C00'],
+      cost: 5
     }
   ];
 
@@ -404,7 +412,7 @@ const loadHomeData = async () => {
             <Animated.View style={[styles.avatar, { transform: [{ scale: pulseAnim }] }]}>
               <Text key={chartData ? 'chart-loaded' : 'chart-loading'} style={styles.avatarText}>
                 {chartData ? (() => {
-                  const signIndex = (chartData?.houses?.[0]?.sign - 1 + 12) % 12;
+                  const signIndex = chartData?.houses?.[0]?.sign || 0;
                   return getSignIcon(signIndex);
                 })() : '♈'}
               </Text>
@@ -470,7 +478,7 @@ const loadHomeData = async () => {
                 <Text style={styles.signEmoji}>⬆️</Text>
                 <Text style={styles.signLabel}>Ascendant</Text>
                 <Text style={styles.signValue}>{chartData?.houses?.[0]?.sign !== undefined ? (() => {
-                  const signIndex = (chartData.houses[0].sign - 1 + 12) % 12;
+                  const signIndex = chartData.houses[0].sign;
                   return `${getSignIcon(signIndex)} ${getSignName(signIndex).slice(0, 3)}`;
                 })() : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>

@@ -331,22 +331,19 @@ export default function BirthFormScreen({ navigation, route }) {
       // console.log('✅ [DEBUG] BirthForm: Verified saved data:', JSON.stringify(savedData, null, 2));
       // console.log('✅ [DEBUG] BirthForm: Verified saved gender:', savedData?.gender);
       
-      // Update backend database if updating existing chart
-      if (updateGender) {
-        try {
-          const token = await storage.getAuthToken();
-          if (token) {
-            // console.log('🔄 [DEBUG] BirthForm: Updating backend with birth data:', JSON.stringify(birthData, null, 2));
-            // Update self birth chart with new gender
-            await authAPI.updateSelfBirthChart(birthData, false);
-            // console.log('✅ [DEBUG] BirthForm: Self birth chart updated with gender:', formData.gender);
-          } else {
-            console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend update');
-          }
-        } catch (backendError) {
-          console.log('❌ [DEBUG] BirthForm: Failed to update self birth chart:', backendError.message);
-          console.log('❌ [DEBUG] BirthForm: Backend error details:', backendError);
+      // Always save to backend database
+      try {
+        const token = await storage.getAuthToken();
+        if (token) {
+          console.log('🔄 [DEBUG] BirthForm: Saving to backend database:', JSON.stringify(birthData, null, 2));
+          await authAPI.updateSelfBirthChart(birthData, !updateGender && !editProfile);
+          console.log('✅ [DEBUG] BirthForm: Chart saved to database');
+        } else {
+          console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend save');
         }
+      } catch (backendError) {
+        console.log('❌ [DEBUG] BirthForm: Failed to save to database:', backendError.message);
+        console.log('❌ [DEBUG] BirthForm: Backend error details:', backendError);
       }
       
       await storage.setChartData({
@@ -444,7 +441,6 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 2 && (
                   <View style={styles.genderContainer}>
-                    <Text style={styles.genderDebugText}>Current: {formData.gender || 'None selected'}</Text>
                     <TouchableOpacity
                       style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected]}
                       onPress={() => handleInputChange('gender', 'Male')}

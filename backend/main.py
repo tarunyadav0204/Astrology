@@ -47,6 +47,7 @@ from credits.routes import router as credits_router
 from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
 from progeny.progeny_routes import router as progeny_router
+from trading_routes import router as trading_router
 import math
 from datetime import timedelta
 import signal
@@ -203,6 +204,7 @@ app.include_router(credits_router, prefix="/api/credits")
 app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
+app.include_router(trading_router)
 
 
 # Root endpoint for health check
