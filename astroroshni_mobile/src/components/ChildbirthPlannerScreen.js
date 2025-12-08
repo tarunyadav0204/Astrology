@@ -47,12 +47,14 @@ export default function ChildbirthPlannerScreen({ navigation }) {
       const data = await storage.getBirthData();
       if (data) {
         setMotherProfile(data);
-        // Default delivery location to mother's location
-        setDeliveryLocation({
-          latitude: parseFloat(data.latitude),
-          longitude: parseFloat(data.longitude),
-          name: data.place || "Mother's location"
-        });
+        // SAFETY: Ensure lat/long exist before setting delivery location
+        if (data.latitude && data.longitude) {
+          setDeliveryLocation({
+            latitude: parseFloat(data.latitude),
+            longitude: parseFloat(data.longitude),
+            name: data.place || "Mother's location"
+          });
+        }
       }
     } catch(e) { 
       console.error(e); 
@@ -80,6 +82,12 @@ export default function ChildbirthPlannerScreen({ navigation }) {
     
     if (!deliveryLocation) {
       Alert.alert("Missing Information", "Please select delivery location.");
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 30) {
+      Alert.alert("Date Range Limit", "Date range cannot exceed 30 days. Please adjust your selection.");
       return;
     }
 
@@ -298,7 +306,14 @@ export default function ChildbirthPlannerScreen({ navigation }) {
               minimumDate={startDate}
               onChange={(e, d) => { 
                 setShowEndPicker(false); 
-                if(d) setEndDate(d); 
+                if(d) {
+                  const daysDiff = Math.ceil((d - startDate) / (1000 * 60 * 60 * 24));
+                  if (daysDiff > 30) {
+                    Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                    return;
+                  }
+                  setEndDate(d);
+                }
               }}
             />
           )}

@@ -70,7 +70,7 @@ export default function LocationPicker({ onLocationSelect, onClose }) {
   return (
     <Modal visible={true} animationType="slide" onRequestClose={onClose}>
       <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Icon name="close" size={24} color={COLORS.white} />
