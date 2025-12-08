@@ -30,6 +30,7 @@ class TradingRequest(BaseModel):
     language: Optional[str] = 'english'
     response_style: Optional[str] = 'concise'
     premium_analysis: Optional[bool] = False
+    force_regenerate: Optional[bool] = False
 
 router = APIRouter(prefix="/trading", tags=["trading"])
 context_gen = TradingAIContextGenerator()
@@ -66,18 +67,22 @@ async def get_daily_forecast(request: TradingRequest, current_user: User = Depen
             )
         """)
         
-        cursor.execute("""
-            SELECT analysis_data FROM trading_daily_cache 
-            WHERE cache_key = ? AND DATE(created_at) = DATE('now')
-        """, (cache_key,))
+        # Skip cache if force_regenerate is True
+        if not request.force_regenerate:
+            cursor.execute("""
+                SELECT analysis_data FROM trading_daily_cache 
+                WHERE cache_key = ? AND DATE(created_at) = DATE('now')
+            """, (cache_key,))
+            
+            cached_result = cursor.fetchone()
+            
+            if cached_result:
+                conn.close()
+                cached_data = json.loads(cached_result[0])
+                cached_data['cached'] = True
+                return cached_data
         
-        cached_result = cursor.fetchone()
         conn.close()
-        
-        if cached_result:
-            cached_data = json.loads(cached_result[0])
-            cached_data['cached'] = True
-            return cached_data
             
     except Exception as cache_error:
         print(f"Cache check failed: {cache_error}")

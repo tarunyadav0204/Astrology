@@ -92,6 +92,7 @@ export default function TradingDashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(true);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [dailyCost, setDailyCost] = useState(5);
   const [premiumCost, setPremiumCost] = useState(50);
   const [isPremium, setIsPremium] = useState(false);
@@ -167,7 +168,7 @@ export default function TradingDashboardScreen({ navigation }) {
     }
   };
 
-  const fetchForecast = async () => {
+  const fetchForecast = async (forceRegenerate = false) => {
     try {
       setLoading(true);
       
@@ -238,16 +239,23 @@ export default function TradingDashboardScreen({ navigation }) {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/trading/daily-forecast`, {
+      console.log('🚀 Making API request to:', `${API_BASE_URL}/api/trading/daily-forecast`);
+      console.log('📤 Request payload:', JSON.stringify({ ...birthData, target_date: today, premium_analysis: isPremium }));
+      
+      const response = await fetch(`${API_BASE_URL}/api/trading/daily-forecast`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ ...birthData, target_date: today, premium_analysis: isPremium })
+        body: JSON.stringify({ ...birthData, target_date: today, premium_analysis: isPremium, force_regenerate: forceRegenerate })
       });
 
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+
       if (response.status === 402) {
+        console.log('❌ Insufficient credits (402)');
         Alert.alert("Insufficient Credits", "You need 5 credits for daily forecast. Please purchase more credits.", [
           { text: "OK", onPress: () => navigation.navigate('Credits') }
         ]);
@@ -255,27 +263,37 @@ export default function TradingDashboardScreen({ navigation }) {
       }
 
       const text = await response.text();
+      console.log('📄 Raw response text:', text);
+      console.log('📏 Response length:', text.length);
       
       try {
         const json = JSON.parse(text);
+        console.log('✅ Parsed JSON:', JSON.stringify(json, null, 2));
         
         if (json.status === 'success') {
           setData(json);
           fetchBalance();
         } else {
+          console.log('❌ API returned error status:', json.status, json.message);
           Alert.alert("Analysis Error", json.message || "Failed to generate forecast", [
             { text: "Retry", onPress: fetchForecast },
-            { text: "Cancel" }
+            { text: "Go Back", onPress: () => navigation.goBack() }
           ]);
         }
       } catch (parseError) {
-        Alert.alert("Parse Error", "Invalid response format from server");
+        console.log('❌ JSON Parse Error:', parseError.message);
+        console.log('❌ Failed to parse response:', text.substring(0, 500));
+        Alert.alert("Parse Error", `Invalid response format from server. Response: ${text.substring(0, 100)}...`, [
+          { text: "Go Back", onPress: () => navigation.goBack() }
+        ]);
       }
 
     } catch (e) {
-      Alert.alert("Connection Error", "Network issue. Please check your connection.", [
+      console.log('❌ Network/Connection Error:', e.message);
+      console.log('❌ Full error:', e);
+      Alert.alert("Connection Error", `Network issue: ${e.message}. Please check your connection.`, [
         { text: "Retry", onPress: fetchForecast },
-        { text: "Cancel" }
+        { text: "Go Back", onPress: () => navigation.goBack() }
       ]);
     } finally {
       setLoading(false);
@@ -358,14 +376,26 @@ export default function TradingDashboardScreen({ navigation }) {
     <View style={styles.centerContainer}>
         <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
           <SafeAreaView style={styles.safeArea}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Trading Cockpit</Text>
+                <View style={{width:24}}/>
+            </View>
             <View style={styles.loadingContainer}>
               <Ionicons name="warning-outline" size={48} color="#FF6D00" />
               <Text style={styles.errorTitle}>No Forecast Available</Text>
               <Text style={styles.errorSubtitle}>Unable to load trading data</Text>
-              <TouchableOpacity onPress={fetchForecast} style={styles.retryButton}>
-                  <Ionicons name="refresh" size={16} color="#000" />
-                  <Text style={styles.retryText}>Try Again</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.retryButton, {backgroundColor: '#666'}]}>
+                  <Text style={[styles.retryText, {color: '#fff'}]}>Go Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={fetchForecast} style={styles.retryButton}>
+                    <Ionicons name="refresh" size={16} color="#000" />
+                    <Text style={styles.retryText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </SafeAreaView>
         </LinearGradient>
@@ -386,7 +416,9 @@ export default function TradingDashboardScreen({ navigation }) {
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Trading Cockpit</Text>
-                <View style={{width:24}}/>
+                <TouchableOpacity onPress={() => setShowRegenerateModal(true)}>
+                    <Ionicons name="refresh" size={24} color="#fff" />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.heroSection}>
@@ -443,6 +475,46 @@ export default function TradingDashboardScreen({ navigation }) {
             </TouchableOpacity>
 
           </ScrollView>
+
+          <Modal visible={showRegenerateModal} transparent animationType="slide">
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Regenerate Analysis</Text>
+                  <TouchableOpacity onPress={() => setShowRegenerateModal(false)}>
+                    <Ionicons name="close-circle" size={28} color="#FF5252" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.premiumToggle}>
+                  <TouchableOpacity 
+                    style={[styles.toggleOption, !isPremium && styles.toggleActive]} 
+                    onPress={() => setIsPremium(false)}
+                  >
+                    <Text style={[styles.toggleText, !isPremium && styles.toggleTextActive]}>Standard</Text>
+                    <Text style={styles.toggleCost}>{dailyCost} credits</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.toggleOption, isPremium && styles.toggleActive]} 
+                    onPress={() => setIsPremium(true)}
+                  >
+                    <Text style={[styles.toggleText, isPremium && styles.toggleTextActive]}>Premium AI</Text>
+                    <Text style={styles.toggleCost}>{premiumCost} credits</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.errorSubtitle}>Your balance: {credits} credits</Text>
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity onPress={() => setShowRegenerateModal(false)} style={[styles.retryButton, {backgroundColor: '#666'}]}>
+                    <Text style={[styles.retryText, {color: '#fff'}]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowRegenerateModal(false); fetchForecast(true); }} style={styles.retryButton}>
+                    <Text style={styles.retryText}>Regenerate</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           <Modal visible={showDetailModal} transparent animationType="slide">
             <View style={styles.modalOverlay}>

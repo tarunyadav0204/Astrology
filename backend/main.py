@@ -204,7 +204,7 @@ app.include_router(credits_router, prefix="/api/credits")
 app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
-app.include_router(trading_router)
+app.include_router(trading_router, prefix="/api")
 
 
 # Root endpoint for health check
@@ -1549,30 +1549,43 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     return await _calculate_chart_data(birth_data, node_type)
 
 async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
+    print(f"🔍 CHART CALCULATION DEBUG for {birth_data.name}:")
+    print(f"📅 Date: {birth_data.date}")
+    print(f"🕐 Time: {birth_data.time}")
+    print(f"🌍 Location: {birth_data.latitude}, {birth_data.longitude}")
+    print(f"⏰ Original Timezone: {birth_data.timezone}")
     # Calculate Julian Day with proper timezone handling
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
+    print(f"🕐 Parsed hour: {hour}")
     
     # Parse timezone offset (e.g., "UTC+5:30" -> 5.5, "UTC+5" -> 5.0)
     tz_offset = 0
     if birth_data.timezone.startswith('UTC'):
         tz_str = birth_data.timezone[3:]  # Remove 'UTC'
+        print(f"⏰ Timezone string after UTC removal: '{tz_str}'")
         if tz_str:
             if ':' in tz_str:
                 # Handle UTC+5:30 format
                 sign = 1 if tz_str[0] == '+' else -1
                 parts = tz_str[1:].split(':')
                 tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+                print(f"⏰ Parsed timezone offset (with minutes): {tz_offset}")
             else:
                 # Handle UTC+5 format
                 tz_offset = float(tz_str)
+                print(f"⏰ Parsed timezone offset (hours only): {tz_offset}")
     else:
         # Default to IST for Indian coordinates
         if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
             tz_offset = 5.5
+            print(f"⏰ Using default IST offset: {tz_offset}")
+        else:
+            print(f"⏰ Non-Indian coordinates, using offset: {tz_offset}")
     
     # Convert local time to UTC
     utc_hour = hour - tz_offset
+    print(f"🌍 UTC hour calculated: {utc_hour} (local {hour} - offset {tz_offset})")
     
     jd = swe.julday(
         int(birth_data.date.split('-')[0]),
@@ -1722,6 +1735,9 @@ async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
         # House 1 starts from ascendant sign
         house_number = ((planet_sign - ascendant_sign) % 12) + 1
         planets[planet_name]['house'] = house_number
+    
+    print(f"✅ Chart calculation completed for {birth_data.name}")
+    print(f"📊 Final Moon data: Sign {planets['Moon']['sign']} ({['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][planets['Moon']['sign']]})")
     
     return {
         "planets": planets,

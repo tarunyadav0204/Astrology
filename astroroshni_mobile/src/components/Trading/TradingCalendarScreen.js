@@ -124,7 +124,7 @@ export default function TradingCalendarScreen({ navigation }) {
       
       const token = await AsyncStorage.getItem('authToken');
       
-      const response = await fetch(`${API_BASE_URL}/trading/monthly-calendar?year=${year}&month=${month}`, {
+      const response = await fetch(`${API_BASE_URL}/api/trading/monthly-calendar?year=${year}&month=${month}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({...birthData, premium_analysis: premiumAnalysis})
@@ -152,7 +152,7 @@ export default function TradingCalendarScreen({ navigation }) {
             } else if (json.status === 'error') {
                 Alert.alert("Calendar Error", json.message || "Failed to generate calendar", [
                   { text: "Retry", onPress: () => fetchMonthlyData(year, month) },
-                  { text: "Cancel" }
+                  { text: "Go Back", onPress: () => navigation.goBack() }
                 ]);
                 return;
             }
@@ -163,14 +163,14 @@ export default function TradingCalendarScreen({ navigation }) {
       if (!foundData) {
         Alert.alert("Data Error", "No calendar data received", [
           { text: "Retry", onPress: () => fetchMonthlyData(year, month) },
-          { text: "Cancel" }
+          { text: "Go Back", onPress: () => navigation.goBack() }
         ]);
       }
     } catch (error) {
       console.error(error);
       Alert.alert("Connection Error", "Network issue. Please check your connection.", [
         { text: "Retry", onPress: () => fetchMonthlyData(year, month) },
-        { text: "Cancel" }
+        { text: "Go Back", onPress: () => navigation.goBack() }
       ]);
     } finally {
       setLoading(false);
@@ -200,7 +200,8 @@ export default function TradingCalendarScreen({ navigation }) {
             onPress: () => {
               if (credits < cost) {
                 Alert.alert("Insufficient Credits", `You need ${cost} credits for monthly calendar.`, [
-                  { text: "Buy Credits", onPress: () => navigation.navigate('Credits') }
+                  { text: "Buy Credits", onPress: () => navigation.navigate('Credits') },
+                  { text: "Go Back", onPress: () => navigation.goBack() }
                 ]);
               } else {
                 setCurrentDate(newDate);
@@ -224,7 +225,7 @@ export default function TradingCalendarScreen({ navigation }) {
       if (!birthData) return false;
       
       const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/trading/monthly-calendar?year=${year}&month=${month}`, {
+      const response = await fetch(`${API_BASE_URL}/api/trading/monthly-calendar?year=${year}&month=${month}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({...birthData, premium_analysis: premiumAnalysis})
@@ -356,10 +357,15 @@ export default function TradingCalendarScreen({ navigation }) {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color="#666" />
               <Text style={styles.emptyTitle}>No Calendar Data</Text>
-              <TouchableOpacity onPress={() => fetchMonthlyData(currentDate.getFullYear(), currentDate.getMonth() + 1)} style={styles.retryButton}>
-                <Ionicons name="refresh" size={16} color="#fff" />
-                <Text style={styles.retryText}>Reload</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.retryButton, {backgroundColor: '#666'}]}>
+                  <Text style={[styles.retryText, {color: '#fff'}]}>Go Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => fetchMonthlyData(currentDate.getFullYear(), currentDate.getMonth() + 1)} style={styles.retryButton}>
+                  <Ionicons name="refresh" size={16} color="#fff" />
+                  <Text style={styles.retryText}>Reload</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <FlatList
