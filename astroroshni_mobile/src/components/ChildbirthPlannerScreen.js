@@ -103,7 +103,18 @@ export default function ChildbirthPlannerScreen({ navigation }) {
       return;
     }
 
-    setLoading(true);
+    // Confirmation dialog before deducting credits
+    Alert.alert(
+      "Confirm Calculation", 
+      `This will deduct ${creditInfo.cost} credits from your account. Do you want to proceed?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Proceed", onPress: () => performCalculation() }
+      ]
+    );
+  };
+
+  const performCalculation = async () => {
     try {
       const token = await storage.getAuthToken();
       const payload = {

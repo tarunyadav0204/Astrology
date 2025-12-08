@@ -92,14 +92,23 @@ async def get_childbirth_muhurat(request: ChildbirthMuhuratRequest, current_user
         mother_nak_id = int(moon_pos / (360/27)) + 1
         
         # Calculate muhurat
-        result = calculator.calculate_childbirth_muhurat(
-            request.start_date,
-            request.end_date,
-            request.delivery_latitude,
-            request.delivery_longitude,
-            mother_nak_id,
-            request.delivery_timezone
-        )
+        print(f"🔍 [ROUTES] Calling muhurat calculator...")
+        try:
+            result = calculator.calculate_childbirth_muhurat(
+                request.start_date,
+                request.end_date,
+                request.delivery_latitude,
+                request.delivery_longitude,
+                mother_nak_id,
+                request.delivery_timezone
+            )
+            print(f"✅ [ROUTES] Muhurat calculation completed")
+        except Exception as calc_error:
+            print(f"❌ [ROUTES ERROR] Muhurat calculation failed: {calc_error}")
+            print(f"  Error type: {type(calc_error).__name__}")
+            import traceback
+            print(f"  Traceback: {traceback.format_exc()}")
+            raise calc_error
         
         # Deduct credits after successful calculation
         credit_service.spend_credits(
