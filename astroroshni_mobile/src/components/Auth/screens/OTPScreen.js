@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -116,16 +117,21 @@ export default function OTPScreen({
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigateToScreen('phone', 'back')}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigateToScreen('phone', 'back')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
 
-      <View style={styles.content}>
+        <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.emoji}>📱</Text>
           <Text style={styles.title}>Enter OTP</Text>
@@ -186,6 +192,8 @@ export default function OTPScreen({
           </TouchableOpacity>
         </View>
 
+
+        
         <Animated.View
           style={[
             styles.buttonContainer,
@@ -210,7 +218,8 @@ export default function OTPScreen({
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
-      </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -218,7 +227,11 @@ export default function OTPScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingBottom: 120,
   },
   backButton: {
     width: 44,
@@ -232,6 +245,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
+    minHeight: 600,
   },
   header: {
     alignItems: 'center',
@@ -297,6 +311,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   buttonContainer: {
+    marginTop: 40,
     marginBottom: 40,
   },
   verifyButton: {

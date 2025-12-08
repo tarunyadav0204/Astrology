@@ -194,7 +194,7 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const handleDashaSelection = (dashaType, dasha) => {
-    console.log('📝 DASHBOARD DASHA SELECTION:', {
+    // console.log('📝 DASHBOARD DASHA SELECTION:', {
       dashaType,
       selectedPlanet: dasha?.planet,
       currentSelectedDashas: selectedDashas
@@ -220,7 +220,7 @@ export default function DashboardScreen({ navigation }) {
         delete newSelection.prana;
       }
       
-      console.log('📝 NEW SELECTED DASHAS:', newSelection);
+      // console.log('📝 NEW SELECTED DASHAS:', newSelection);
       return newSelection;
     });
   };

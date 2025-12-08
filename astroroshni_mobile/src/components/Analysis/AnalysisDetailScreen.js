@@ -33,6 +33,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [analysisFocus, setAnalysisFocus] = useState('first_child');
   const [childrenCount, setChildrenCount] = useState(0);
+  const [rotateAnim] = useState(new Animated.Value(0));
+  const [pulseAnim] = useState(new Animated.Value(1));
+  const [glowAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     checkBirthData();
@@ -131,6 +134,45 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }
 
     setLoading(true);
+    
+    // Start loading animations
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    ).start();
+    
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+    
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
     
     const loadingMessages = [
       '🔮 Analyzing your birth chart...',
@@ -449,6 +491,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       setLoading(false);
       setLoadingMessage('');
       clearInterval(messageInterval);
+      // Stop animations
+      rotateAnim.stopAnimation();
+      pulseAnim.stopAnimation();
+      glowAnim.stopAnimation();
     }
   };
 
@@ -855,21 +901,62 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                   </View>
                 )}
 
-                <TouchableOpacity
-                  style={styles.startButton}
-                  onPress={startAnalysis}
-                  disabled={loading || credits < cost}
-                >
-                  <LinearGradient
-                    colors={loading ? ['#666', '#888'] : getAnalysisGradient()}
-                    style={styles.startGradient}
+                {loading ? (
+                  <View style={styles.loadingSection}>
+                    <Animated.View style={[styles.cosmicLoadingOrb, {
+                      transform: [{ rotate: rotateAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg']
+                      }) }]
+                    }]}>
+                      <LinearGradient
+                        colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                        style={styles.loadingOrbGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                      >
+                        <Animated.Text style={[styles.loadingOrbIcon, {
+                          transform: [{ scale: pulseAnim }]
+                        }]}>☸️</Animated.Text>
+                      </LinearGradient>
+                    </Animated.View>
+                    <Animated.View style={[styles.loadingGlow, {
+                      opacity: glowAnim,
+                      transform: [{ scale: glowAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1.2]
+                      }) }]
+                    }]} />
+                    <Text style={styles.loadingTitle}>Analyzing Your Cosmic Blueprint</Text>
+                    <Text style={styles.loadingMessage}>{loadingMessage}</Text>
+                    <View style={styles.loadingDots}>
+                      <Animated.View style={[styles.dot, { opacity: pulseAnim }]} />
+                      <Animated.View style={[styles.dot, { opacity: pulseAnim.interpolate({
+                        inputRange: [0.8, 1, 1.2],
+                        outputRange: [0.3, 1, 0.3]
+                      }) }]} />
+                      <Animated.View style={[styles.dot, { opacity: pulseAnim.interpolate({
+                        inputRange: [0.6, 1, 1.4],
+                        outputRange: [0.3, 1, 0.3]
+                      }) }]} />
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.startButton}
+                    onPress={startAnalysis}
+                    disabled={loading || credits < cost}
                   >
-                    <Text style={styles.startButtonText}>
-                      {loading ? loadingMessage : `Start Analysis (${cost} credits)`}
-                    </Text>
-                    {loading && <Text style={styles.loadingIcon}>⏳</Text>}
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <LinearGradient
+                      colors={getAnalysisGradient()}
+                      style={styles.startGradient}
+                    >
+                      <Text style={styles.startButtonText}>
+                        Start Analysis ({cost} credits)
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
 
                 {credits < cost && (
                   <TouchableOpacity 
@@ -1197,7 +1284,68 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
   },
-  loadingIcon: { fontSize: 18 },
+  loadingSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    position: 'relative',
+  },
+  cosmicLoadingOrb: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 30,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  loadingOrbGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  loadingOrbIcon: {
+    fontSize: 50,
+  },
+  loadingGlow: {
+    position: 'absolute',
+    top: 20,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 107, 53, 0.3)',
+    zIndex: -1,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loadingMessage: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  loadingDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffd700',
+  },
   lowCreditBanner: {
     marginHorizontal: 20,
     paddingVertical: 12,

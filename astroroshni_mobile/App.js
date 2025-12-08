@@ -18,6 +18,7 @@ import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen
 import ChartScreen from './src/components/Chart/ChartScreen';
 import TradingDashboardScreen from './src/components/Trading/TradingDashboardScreen';
 import TradingCalendarScreen from './src/components/Trading/TradingCalendarScreen';
+import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -160,6 +161,11 @@ export default function App() {
           <Stack.Screen 
             name="TradingCalendar" 
             component={TradingCalendarScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChildbirthPlanner" 
+            component={ChildbirthPlannerScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

@@ -26,7 +26,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
   };
 
   const handlePlanetPress = (planet) => {
-    console.log('Planet pressed:', planet.name);
+    // console.log('Planet pressed:', planet.name);
     const planetData = chartData.planets?.[planet.name];
     const nakshatra = planetData?.longitude ? getNakshatra(planetData.longitude) : 'Unknown';
     const tooltipText = `${planet.name}: ${planet.degree}° in ${nakshatra}`;
@@ -35,7 +35,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
   };
 
   const handleRashiPress = (houseNumber, signIndex) => {
-    console.log('Rashi pressed: House', houseNumber, 'Sign', rashiNames[signIndex]);
+    // console.log('Rashi pressed: House', houseNumber, 'Sign', rashiNames[signIndex]);
     setTimeout(() => {
       setContextMenu({ show: true, houseNumber, signName: rashiNames[signIndex] });
     }, 200);
@@ -67,7 +67,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
         
         const distance = Math.sqrt(Math.pow(svgX - planetX, 2) + Math.pow(svgY - planetY, 2));
         if (distance < 15) {
-          console.log('Planet touched:', planet.name, 'at', planetX, planetY);
+          // console.log('Planet touched:', planet.name, 'at', planetX, planetY);
           return planet;
         }
       });
@@ -88,7 +88,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
       
       const distance = Math.sqrt(Math.pow(svgX - houseX, 2) + Math.pow(svgY - houseY, 2));
       if (distance < 20) {
-        console.log('House touched:', houseNumber, 'at', houseX, houseY);
+        // console.log('House touched:', houseNumber, 'at', houseX, houseY);
         return { houseNumber, signIndex: pos.sign };
       }
     }
@@ -374,7 +374,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                            fontWeight="bold"
                            onTouchStart={(e) => {
                              e.stopPropagation();
-                             console.log('House touched:', houseNumber);
+                            //  console.log('House touched:', houseNumber);
                              handleRashiPress(houseNumber, pos.sign);
                            }}>
                     {houseNumber}
@@ -424,7 +424,7 @@ const SouthIndianChart = ({ chartData, birthData }) => {
                           textAnchor="middle"
                           onTouchStart={(e) => {
                             e.stopPropagation();
-                            console.log('Planet touched:', planet.name);
+                            // console.log('Planet touched:', planet.name);
                             handlePlanetPress(planet);
                           }}>
                           {getPlanetSymbolWithStatus(planet)}

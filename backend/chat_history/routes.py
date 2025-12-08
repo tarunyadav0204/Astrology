@@ -129,10 +129,17 @@ async def save_chat_message(request: dict, current_user = Depends(get_current_us
     return {"message": "Message saved"}
 
 @router.get("/history")
-async def get_chat_history(current_user = Depends(get_current_user)):
-    """Get user's chat session history"""
+async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depends(get_current_user)):
+    """Get user's chat session history with pagination"""
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
+    
+    # Calculate offset
+    offset = (page - 1) * limit
+    
+    # Get total count
+    cursor.execute('SELECT COUNT(*) FROM chat_sessions WHERE user_id = ?', (current_user.userid,))
+    total_count = cursor.fetchone()[0]
     
     cursor.execute('''
         SELECT 
@@ -149,7 +156,8 @@ async def get_chat_history(current_user = Depends(get_current_user)):
             )
         WHERE cs.user_id = ?
         ORDER BY cs.created_at DESC
-    ''', (current_user.userid,))
+        LIMIT ? OFFSET ?
+    ''', (current_user.userid, limit, offset))
     
     sessions = cursor.fetchall()
     conn.close()
@@ -162,7 +170,15 @@ async def get_chat_history(current_user = Depends(get_current_user)):
             "preview": session[2][:100] + "..." if session[2] and len(session[2]) > 100 else session[2]
         })
     
-    return {"sessions": history}
+    return {
+        "sessions": history,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total": total_count,
+            "has_more": offset + limit < total_count
+        }
+    }
 
 @router.get("/session/{session_id}")
 async def get_chat_session(session_id: str, current_user = Depends(get_current_user)):

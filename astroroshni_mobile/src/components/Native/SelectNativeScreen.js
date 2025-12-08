@@ -151,6 +151,7 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [profileCharts, setProfileCharts] = useState({});
   const fromProfile = route.params?.fromProfile;
+  const returnTo = route.params?.returnTo;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -244,6 +245,11 @@ export default function SelectNativeScreen({ navigation, route }) {
         await authAPI.updateSelfBirthChart(profile);
         Alert.alert('Success', '✅ Chart connected to your profile!');
         navigation.navigate('Profile');
+      } else if (returnTo === 'ChildbirthPlanner') {
+        // Set as mother's profile for childbirth planner
+        await storage.setBirthDetails(profile);
+        setSelectedProfile(profile.name);
+        navigation.navigate('ChildbirthPlanner');
       } else {
         // Normal selection flow
         await storage.setBirthDetails(profile);
@@ -349,7 +355,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backButton}>
+            <TouchableOpacity onPress={() => returnTo ? navigation.navigate(returnTo) : navigation.navigate('Home')} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Select Native</Text>
@@ -366,7 +372,9 @@ export default function SelectNativeScreen({ navigation, route }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.subtitle}>Choose a profile for astrological analysis</Text>
+            <Text style={styles.subtitle}>
+              {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : 'Choose a profile for astrological analysis'}
+            </Text>
             <Text style={styles.instructionText}>👈 Swipe left for options</Text>
 
             {profiles.map((profile) => (

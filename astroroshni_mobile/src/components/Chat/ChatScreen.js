@@ -446,6 +446,8 @@ export default function ChatScreen({ navigation, route }) {
     } else if (option.action === 'analysis') {
       if (option.type === 'trading') {
         navigation.navigate('TradingDashboard');
+      } else if (option.type === 'childbirth') {
+        navigation.navigate('ChildbirthPlanner');
       } else {
         navigation.navigate('AnalysisDetail', { 
           analysisType: option.type,
@@ -1569,7 +1571,7 @@ export default function ChatScreen({ navigation, route }) {
                           colors={['#ff6b35', '#ff8c5a']}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🔮</Text>
+                          <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
                       <Text style={styles.menuText}>Life Analysis</Text>

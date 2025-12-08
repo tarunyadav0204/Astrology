@@ -61,6 +61,9 @@ export default function ChatHistoryScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -101,7 +104,7 @@ export default function ChatHistoryScreen({ navigation }) {
     } catch (error) {}
   };
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = async (pageNum = 1, append = false) => {
     try {
       const authToken = await storage.getAuthToken();
       if (!authToken) {
@@ -109,7 +112,7 @@ export default function ChatHistoryScreen({ navigation }) {
         return;
       }
       
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat/history')}`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/history')}?page=${pageNum}&limit=20`, {
         method: 'GET',
         headers: { 
           'Content-Type': 'application/json',
@@ -120,7 +123,19 @@ export default function ChatHistoryScreen({ navigation }) {
       if (response.ok) {
         const data = await response.json();
         const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-        setChatSessions(sessions);
+        
+        if (append) {
+          setChatSessions(prev => {
+            const existingIds = new Set(prev.map(s => s.session_id));
+            const newSessions = sessions.filter(s => !existingIds.has(s.session_id));
+            return [...prev, ...newSessions];
+          });
+        } else {
+          setChatSessions(sessions);
+          setPage(1);
+        }
+        
+        setHasMore(data.pagination?.has_more || false);
       } else if (response.status === 401) {
         await storage.removeAuthToken();
         navigation.replace('Login');
@@ -128,8 +143,12 @@ export default function ChatHistoryScreen({ navigation }) {
     } catch (error) {
 
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!append) {
+        setLoading(false);
+        setRefreshing(false);
+      } else {
+        setLoadingMore(false);
+      }
     }
   };
 
@@ -146,13 +165,24 @@ export default function ChatHistoryScreen({ navigation }) {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadChatHistory();
+    setPage(1);
+    setHasMore(true);
+    loadChatHistory(1, false);
+  };
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadChatHistory(nextPage, true);
+    }
   };
 
   const viewChatSession = async (session) => {
     try {
       const authToken = await storage.getAuthToken();
-      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat/session/${session.session_id}`)}`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${session.session_id}`)}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
@@ -210,7 +240,7 @@ export default function ChatHistoryScreen({ navigation }) {
     return then.toLocaleDateString();
   };
 
-  const ChatSessionCard = ({ item, index }) => {
+  const ChatSessionCard = React.memo(({ item, index }) => {
     const isFavorite = favorites.includes(item.session_id);
     const cardAnim = useRef(new Animated.Value(0)).current;
 
@@ -309,11 +339,11 @@ export default function ChatHistoryScreen({ navigation }) {
         </TouchableOpacity>
       </Animated.View>
     );
-  };
+  });
 
-  const renderChatSession = ({ item, index }) => (
+  const renderChatSession = React.useCallback(({ item, index }) => (
     <ChatSessionCard item={item} index={index} />
-  );
+  ), [favorites]);
 
   const renderEmptyState = () => (
     <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
@@ -388,8 +418,8 @@ export default function ChatHistoryScreen({ navigation }) {
             <FlatList
               data={filteredSessions}
               renderItem={renderChatSession}
-              keyExtractor={(item) => item.session_id || `session-${Math.random()}`}
-              contentContainerStyle={styles.listContainer}
+              keyExtractor={(item, index) => item.session_id || `session-${index}-${Date.now()}`}
+              contentContainerStyle={[styles.listContainer, { paddingBottom: loadingMore ? 200 : 100 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
@@ -399,9 +429,39 @@ export default function ChatHistoryScreen({ navigation }) {
                 />
               }
               ListEmptyComponent={renderEmptyState}
+              // onEndReached={loadMore}
+              // onEndReachedThreshold={0.5}
+              removeClippedSubviews={false}
+              maxToRenderPerBatch={5}
+              windowSize={5}
+              initialNumToRender={15}
+              ListFooterComponent={() => 
+                hasMore ? (
+                  <View style={styles.loadMoreContainer}>
+                    {loadingMore ? (
+                      <View style={styles.loadingMore}>
+                        <SkeletonCard />
+                        <SkeletonCard />
+                        <Text style={styles.loadingMoreText}>Loading more chats...</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.loadMoreButton} 
+                        onPress={loadMore}
+                      >
+                        <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.loadMoreGradient}>
+                          <Text style={styles.loadMoreText}>Load More Chats</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : null
+              }
             />
           )}
         </SafeAreaView>
+        
+
       </LinearGradient>
     </View>
   );
@@ -615,5 +675,49 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
+  },
+  loadingMore: {
+    paddingVertical: 10,
+  },
+  loadingMoreText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 20,
+  },
+  endSpacer: {
+    height: 80,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(26, 0, 51, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadMoreButton: {
+    margin: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  loadMoreGradient: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadMoreContainer: {
+    minHeight: 80,
   },
 });

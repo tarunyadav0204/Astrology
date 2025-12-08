@@ -356,7 +356,7 @@ const loadHomeData = async () => {
     { 
       id: 'progeny', 
       title: 'Progeny Analysis', 
-      icon: '👶', 
+      icon: '👨‍👩‍👧‍👦', 
       description: 'Fertility potential & family expansion',
       gradient: ['#FF69B4', '#FF1493'],
       cost: pricing.progeny_analysis || 15
@@ -368,6 +368,14 @@ const loadHomeData = async () => {
       description: 'Stock market predictions & timing',
       gradient: ['#FFD700', '#FF8C00'],
       cost: 5
+    },
+    { 
+      id: 'childbirth', 
+      title: 'Childbirth Planner', 
+      icon: '🤱', 
+      description: 'Auspicious dates for delivery',
+      gradient: ['#FF69B4', '#FF1493'],
+      cost: pricing.childbirth_planner || 8
     }
   ];
 
@@ -452,7 +460,7 @@ const loadHomeData = async () => {
 
         {/* Analysis Options */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.analysisTitle}>🔮 Specialized Analysis</Text>
+          <Text style={styles.analysisTitle}>🧘 Specialized Analysis</Text>
           {analysisOptions.map((option, index) => (
             <AnalysisCard
               key={option.id}

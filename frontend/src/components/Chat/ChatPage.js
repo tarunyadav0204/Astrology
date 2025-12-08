@@ -11,7 +11,7 @@ import { authService } from '../../services/authService';
 import './ChatPage.css';
 
 // Enable detailed logging for debugging
-console.log('ChatPage component loaded - debugging enabled');
+// console.log('ChatPage component loaded - debugging enabled');
 
 const ChatPage = () => {
     const location = useLocation();
@@ -46,22 +46,22 @@ const ChatPage = () => {
     useEffect(() => {
         const checkTokenValidity = async () => {
             const token = localStorage.getItem('token');
-            console.log('🔍 Checking token and admin status...');
+            // console.log('🔍 Checking token and admin status...');
             if (token) {
                 try {
                     const response = await fetch('/api/me', {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (response.status === 401) {
-                        console.log('🔐 Invalid token detected, clearing auth...');
+                        // console.log('🔐 Invalid token detected, clearing auth...');
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
                         window.location.href = '/login';
                     } else if (response.ok) {
                         const userData = await response.json();
-                        console.log('👤 User data:', userData);
-                        console.log('🔑 User role:', userData.role);
-                        console.log('👑 Is admin?', userData.role === 'admin');
+                        // console.log('👤 User data:', userData);
+                        // console.log('🔑 User role:', userData.role);
+                        // console.log('👑 Is admin?', userData.role === 'admin');
                         setIsAdmin(userData.role === 'admin');
                     }
                 } catch (error) {
@@ -86,7 +86,7 @@ const ChatPage = () => {
 
     const loadChatHistory = async () => {
         try {
-            console.log('Loading chat history for:', birthData);
+            // console.log('Loading chat history for:', birthData);
             const token = localStorage.getItem('token');
             const response = await fetch('/api/chat/history', {
                 method: 'POST',
@@ -98,11 +98,11 @@ const ChatPage = () => {
             });
             
             if (!response.ok) {
-                console.error('History response error:', response.status, response.statusText);
+                // console.error('History response error:', response.status, response.statusText);
             }
             
             const data = await response.json();
-            console.log('Chat history response:', data);
+            // console.log('Chat history response:', data);
             const existingMessages = data.history || data.messages || [];
             setMessages(existingMessages);
             
@@ -125,11 +125,11 @@ const ChatPage = () => {
         setIsLoading(true);
 
         try {
-            console.log('Sending chat request:', { ...birthData, question: message });
+            // console.log('Sending chat request:', { ...birthData, question: message });
             
             const token = localStorage.getItem('token');
-            console.log('Token exists:', !!token);
-            console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
+            // console.log('Token exists:', !!token);
+            // console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
             
             const requestBody = { ...birthData, question: message };
             if (isAdmin) {
@@ -145,8 +145,8 @@ const ChatPage = () => {
                 body: JSON.stringify(requestBody)
             });
 
-            console.log('Response status:', response.status, response.statusText);
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+            // console.log('Response status:', response.status, response.statusText);
+            // console.log('Response headers:', Object.fromEntries(response.headers.entries()));
             
             if (!response.ok) {
                 const errorText = await response.text();

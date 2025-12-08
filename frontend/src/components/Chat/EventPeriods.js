@@ -7,15 +7,15 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
     const [selectedYear, setSelectedYear] = useState(2024); // Start with 2024 instead of current year
     const [viewMode, setViewMode] = useState(window.innerWidth <= 768 ? 'cards' : 'timeline');
     
-    console.log('EventPeriods component rendered with birthData:', birthData);
-    console.log('Selected year:', selectedYear);
+    // console.log('EventPeriods component rendered with birthData:', birthData);
+    // console.log('Selected year:', selectedYear);
 
     useEffect(() => {
-        console.log('EventPeriods useEffect triggered, birthData:', birthData, 'selectedYear:', selectedYear);
+        // console.log('EventPeriods useEffect triggered, birthData:', birthData, 'selectedYear:', selectedYear);
         if (birthData) {
             loadEventPeriods();
         } else {
-            console.error('No birth data provided to EventPeriods');
+            // console.error('No birth data provided to EventPeriods');
             setError('Birth data is missing');
             setLoading(false);
         }
@@ -25,7 +25,7 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
         try {
             setLoading(true);
             setError(null);
-            console.log('Loading event periods for:', { birthData, selectedYear });
+            // console.log('Loading event periods for:', { birthData, selectedYear });
             
             // Fix time format for API call
             let cleanTime = birthData.time;
@@ -48,7 +48,7 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                 date: cleanDate
             };
             
-            console.log('Cleaned API data:', apiData);
+            // console.log('Cleaned API data:', apiData);
             
             const response = await fetch('/api/chat/event-periods', {
                 method: 'POST',
@@ -56,35 +56,35 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                 body: JSON.stringify(apiData)
             });
 
-            console.log('Response status:', response.status, response.statusText);
+            // console.log('Response status:', response.status, response.statusText);
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('API Error:', errorText);
+                // console.error('API Error:', errorText);
                 throw new Error(`Failed to load event periods: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('Event periods API response:', data);
-            console.log('Total periods received:', data.periods?.length || 0);
+            // console.log('Event periods API response:', data);
+            // console.log('Total periods received:', data.periods?.length || 0);
             
             // Filter periods for selected year and sort by date
             const allPeriods = data.periods || [];
-            console.log('All periods before filtering:', allPeriods.map(p => ({ start: p.start_date, year: new Date(p.start_date).getFullYear() })));
+            // console.log('All periods before filtering:', allPeriods.map(p => ({ start: p.start_date, year: new Date(p.start_date).getFullYear() })));
             
             const filteredPeriods = allPeriods.filter(period => {
                 const periodYear = new Date(period.start_date).getFullYear();
-                console.log(`Period ${period.start_date} year: ${periodYear}, selected: ${selectedYear}, match: ${periodYear === selectedYear}`);
+                // console.log(`Period ${period.start_date} year: ${periodYear}, selected: ${selectedYear}, match: ${periodYear === selectedYear}`);
                 return periodYear === selectedYear;
             }).sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
             
-            console.log('Filtered periods for year', selectedYear, ':', filteredPeriods.length);
+            // console.log('Filtered periods for year', selectedYear, ':', filteredPeriods.length);
             
             if (filteredPeriods.length === 0 && allPeriods.length > 0) {
-                console.log('No periods found for selected year, showing all periods');
+                // console.log('No periods found for selected year, showing all periods');
                 // If no periods for selected year, show all periods and update year selector
                 const firstPeriodYear = new Date(allPeriods[0].start_date).getFullYear();
-                console.log('Setting year to first period year:', firstPeriodYear);
+                // console.log('Setting year to first period year:', firstPeriodYear);
                 setSelectedYear(firstPeriodYear);
                 setPeriods(allPeriods.sort((a, b) => new Date(a.start_date) - new Date(b.start_date)));
             } else {
@@ -165,7 +165,7 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                     <select 
                         value={selectedYear} 
                         onChange={(e) => {
-                            console.log('Year changed to:', e.target.value);
+                            // console.log('Year changed to:', e.target.value);
                             setSelectedYear(parseInt(e.target.value));
                         }}
                         className="year-select-compact"
@@ -494,7 +494,7 @@ const EventPeriods = ({ birthData, onPeriodSelect, onBack }) => {
                                 <div style={{textAlign: 'center', padding: '20px', color: '#666'}}>
                                     <p>No periods to display</p>
                                     <button onClick={() => {
-                                        console.log('Raw periods data:', periods);
+                                        // console.log('Raw periods data:', periods);
                                         alert(`Periods: ${JSON.stringify(periods, null, 2)}`);
                                     }}>Show Raw Data</button>
                                 </div>

@@ -36,6 +36,7 @@ from career_analysis.career_router import router as career_router
 from career_analysis.career_ai_router import router as career_ai_router
 from panchang.panchang_routes import router as panchang_router
 from panchang.muhurat_routes import router as muhurat_router
+from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
 from wealth.wealth_routes import router as wealth_router
 from chat.chat_routes import router as chat_router
@@ -193,6 +194,7 @@ app.include_router(career_router, prefix="/api")
 app.include_router(career_ai_router, prefix="/api")
 app.include_router(panchang_router, prefix="/api/panchang")
 app.include_router(muhurat_router, prefix="/api")
+app.include_router(childbirth_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")

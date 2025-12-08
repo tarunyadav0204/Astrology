@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -44,15 +47,23 @@ export default function EmailInputScreen({
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigateToScreen('name', 'back')}
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigateToScreen('name', 'back')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
 
-      <View style={styles.content}>
+        <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.emoji}>📧</Text>
           <Text style={styles.title}>What's your email?</Text>
@@ -117,15 +128,21 @@ export default function EmailInputScreen({
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
-      </View>
-    </View>
+        </View>
+        <View style={styles.extraPadding} />
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    minHeight: '100%',
   },
   backButton: {
     width: 44,
@@ -212,5 +229,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  extraPadding: {
+    height: 120,
   },
 });

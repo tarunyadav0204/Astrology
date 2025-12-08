@@ -488,8 +488,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 }
             };
             
-            console.log('Chat request data:', requestData);
-            console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+            // console.log('Chat request data:', requestData);
+            // console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
             
             // Start async processing
             const response = await fetch('/api/chat-v2/ask', {
@@ -501,11 +501,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 body: JSON.stringify(requestData)
             });
 
-            console.log('Chat response status:', response.status);
+            // console.log('Chat response status:', response.status);
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Chat error response:', errorText);
+                // console.error('Chat error response:', errorText);
                 
                 if (response.status === 402) {
                     fetchBalance();
@@ -830,7 +830,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         {isAdmin && (
                             <button 
                                 onClick={() => {
-                                    console.log('Context button clicked, contextData:', contextData);
+                                    // console.log('Context button clicked, contextData:', contextData);
                                     setShowContextModal(true);
                                 }}
                                 style={{

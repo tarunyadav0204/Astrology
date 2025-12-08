@@ -40,9 +40,9 @@ class ApiService {
 
   async login(credentials) {
     try {
-      console.log('Attempting login with:', { phone: credentials.phone });
+      // console.log('Attempting login with:', { phone: credentials.phone });
       const response = await this.api.post('/login', credentials);
-      console.log('Login successful:', response.data);
+      // console.log('Login successful:', response.data);
       return response.data;
     } catch (error) {
       console.error('Login error details:', {

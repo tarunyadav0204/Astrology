@@ -350,32 +350,31 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
   return (
     <Modal visible={visible} animationType="slide">
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
-      <View style={styles.container}>
-        <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
-          
-          {/* Twinkling Stars */}
-          {starAnims.map((anim, index) => {
-            const top = Math.random() * 100;
-            const left = Math.random() * 100;
-            return (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.star,
-                  {
-                    top: `${top}%`,
-                    left: `${left}%`,
-                    opacity: anim,
-                  },
-                ]}
-              >
-                <Text style={styles.starText}>✨</Text>
-              </Animated.View>
-            );
-          })}
+      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        
+        {/* Twinkling Stars */}
+        {starAnims.map((anim, index) => {
+          const top = Math.random() * 100;
+          const left = Math.random() * 100;
+          return (
+            <Animated.View
+              key={index}
+              style={[
+                styles.star,
+                {
+                  top: `${top}%`,
+                  left: `${left}%`,
+                  opacity: anim,
+                },
+              ]}
+            >
+              <Text style={styles.starText}>✨</Text>
+            </Animated.View>
+          );
+        })}
 
-          <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             
             {/* Header */}
             <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
@@ -417,9 +416,8 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
             {/* Content */}
             {renderContent()}
 
-          </SafeAreaView>
-        </LinearGradient>
-      </View>
+        </SafeAreaView>
+      </LinearGradient>
 
       {/* Year Modal */}
       <Modal visible={showYearModal} transparent animationType="fade">
@@ -491,7 +489,6 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  gradient: { flex: 1 },
   safeArea: { flex: 1 },
   star: { position: 'absolute' },
   starText: { fontSize: 10 },
@@ -537,6 +534,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingTop: 16,
   },
   backButton: {
     width: 40,

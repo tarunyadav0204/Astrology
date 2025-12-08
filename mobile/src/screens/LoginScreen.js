@@ -43,9 +43,9 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      console.log('Starting login process...');
+      // console.log('Starting login process...');
       const response = await login(formData);
-      console.log('Login successful, navigating...');
+      // console.log('Login successful, navigating...');
       
       // Navigate to chart list
       navigation.reset({

@@ -239,8 +239,13 @@ export default function TradingDashboardScreen({ navigation }) {
         return;
       }
 
-      console.log('🚀 Making API request to:', `${API_BASE_URL}/api/trading/daily-forecast`);
-      console.log('📤 Request payload:', JSON.stringify({ ...birthData, target_date: today, premium_analysis: isPremium }));
+      // Fix timezone format for IST
+      if (birthData.timezone === 'UTC+5' || birthData.timezone === 'Asia/Kolkata') {
+        birthData.timezone = 'UTC+5:30';
+      }
+
+      // console.log('🚀 Making API request to:', `${API_BASE_URL}/api/trading/daily-forecast`);
+      // console.log('📤 Request payload:', JSON.stringify({ ...birthData, target_date: today, premium_analysis: isPremium }));
       
       const response = await fetch(`${API_BASE_URL}/api/trading/daily-forecast`, {
         method: 'POST',
@@ -251,8 +256,8 @@ export default function TradingDashboardScreen({ navigation }) {
         body: JSON.stringify({ ...birthData, target_date: today, premium_analysis: isPremium, force_regenerate: forceRegenerate })
       });
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+      // console.log('📥 Response status:', response.status);
+      // console.log('📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
 
       if (response.status === 402) {
         console.log('❌ Insufficient credits (402)');
@@ -263,12 +268,12 @@ export default function TradingDashboardScreen({ navigation }) {
       }
 
       const text = await response.text();
-      console.log('📄 Raw response text:', text);
-      console.log('📏 Response length:', text.length);
+      // console.log('📄 Raw response text:', text);
+      // console.log('📏 Response length:', text.length);
       
       try {
         const json = JSON.parse(text);
-        console.log('✅ Parsed JSON:', JSON.stringify(json, null, 2));
+        // console.log('✅ Parsed JSON:', JSON.stringify(json, null, 2));
         
         if (json.status === 'success') {
           setData(json);

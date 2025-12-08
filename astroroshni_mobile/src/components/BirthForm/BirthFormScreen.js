@@ -335,9 +335,9 @@ export default function BirthFormScreen({ navigation, route }) {
       try {
         const token = await storage.getAuthToken();
         if (token) {
-          console.log('🔄 [DEBUG] BirthForm: Saving to backend database:', JSON.stringify(birthData, null, 2));
+          // console.log('🔄 [DEBUG] BirthForm: Saving to backend database:', JSON.stringify(birthData, null, 2));
           await authAPI.updateSelfBirthChart(birthData, !updateGender && !editProfile);
-          console.log('✅ [DEBUG] BirthForm: Chart saved to database');
+          // console.log('✅ [DEBUG] BirthForm: Chart saved to database');
         } else {
           console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend save');
         }

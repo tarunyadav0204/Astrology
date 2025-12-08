@@ -11,6 +11,8 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +32,7 @@ const CreditScreen = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scrollViewRef = useRef(null);
 
   useEffect(() => {
     fetchHistory();
@@ -173,71 +176,17 @@ const CreditScreen = ({ navigation }) => {
         style={styles.backgroundGradient}
       >
         <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
-          <Animated.View 
-            style={[
-              styles.header,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
+          <KeyboardAvoidingView 
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
           >
-            <TouchableOpacity 
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            
-            <View style={styles.headerContent}>
-              <View style={styles.cosmicOrb}>
-                <LinearGradient
-                  colors={['#ff6b35', '#ffd700', '#ff6b35']}
-                  style={styles.orbGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Ionicons name="diamond" size={32} color="white" />
-                </LinearGradient>
-              </View>
-              
-              <Text style={styles.headerTitle}>Cosmic Credits</Text>
-              <Text style={styles.headerSubtitle}>Fuel your astrological journey</Text>
-            </View>
-          </Animated.View>
-
-          {/* Current Balance */}
-          <Animated.View 
-            style={[
-              styles.balanceCard,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: pulseAnim }]
-              }
-            ]}
-          >
-            <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
-              style={styles.balanceGradient}
-            >
-              <View style={styles.balanceContent}>
-                <Text style={styles.balanceLabel}>Your Balance</Text>
-                <Text style={styles.balanceAmount}>{credits}</Text>
-                <Text style={styles.balanceCreditsText}>Credits</Text>
-              </View>
-              
-              <View style={styles.balanceDecoration}>
-                <View style={styles.decorationCircle} />
-                <View style={[styles.decorationCircle, styles.decorationCircle2]} />
-                <View style={[styles.decorationCircle, styles.decorationCircle3]} />
-              </View>
-            </LinearGradient>
-          </Animated.View>
-
           <ScrollView 
+            ref={scrollViewRef}
             style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl 
                 refreshing={refreshing} 
@@ -246,6 +195,68 @@ const CreditScreen = ({ navigation }) => {
               />
             }
           >
+            {/* Header */}
+            <Animated.View 
+              style={[
+                styles.header,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }]
+                }
+              ]}
+            >
+              <TouchableOpacity 
+                onPress={() => navigation.goBack()}
+                style={styles.backButton}
+              >
+                <Ionicons name="arrow-back" size={24} color="#333" />
+              </TouchableOpacity>
+              
+              <View style={styles.headerContent}>
+                <View style={styles.cosmicOrb}>
+                  <LinearGradient
+                    colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                    style={styles.orbGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Ionicons name="diamond" size={32} color="white" />
+                  </LinearGradient>
+                </View>
+                
+                <Text style={styles.headerTitle}>Cosmic Credits</Text>
+                <Text style={styles.headerSubtitle}>Fuel your astrological journey</Text>
+              </View>
+            </Animated.View>
+
+            {/* Current Balance */}
+            <Animated.View 
+              style={[
+                styles.balanceCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ scale: pulseAnim }]
+                }
+              ]}
+            >
+              <LinearGradient
+                colors={['#ffffff', '#f8f9fa']}
+                style={styles.balanceGradient}
+              >
+                <View style={styles.balanceContent}>
+                  <Text style={styles.balanceLabel}>Your Balance</Text>
+                  <Text style={styles.balanceAmount}>{credits}</Text>
+                  <Text style={styles.balanceCreditsText}>Credits</Text>
+                </View>
+                
+                <View style={styles.balanceDecoration}>
+                  <View style={styles.decorationCircle} />
+                  <View style={[styles.decorationCircle, styles.decorationCircle2]} />
+                  <View style={[styles.decorationCircle, styles.decorationCircle3]} />
+                </View>
+              </LinearGradient>
+            </Animated.View>
+
             {/* Promo Code Section */}
             <View style={styles.promoSection}>
               <Text style={styles.sectionTitle}>Have a Promo Code?</Text>
@@ -259,6 +270,11 @@ const CreditScreen = ({ navigation }) => {
                     value={promoCode}
                     onChangeText={setPromoCode}
                     autoCapitalize="characters"
+                    onFocus={() => {
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({ y: 200, animated: true });
+                      }, 100);
+                    }}
                   />
                 </View>
                 <TouchableOpacity
@@ -299,6 +315,7 @@ const CreditScreen = ({ navigation }) => {
               )}
             </View>
           </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -313,6 +330,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
     flex: 1,
   },
   header: {
@@ -439,6 +459,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 150,
   },
 
   sectionTitle: {
