@@ -245,10 +245,15 @@ For every user query, structure your response exactly as follows:
             "d1_chart": self._add_sign_names_to_chart_copy(chart_data)
         }
         
-        # Calculate divisional charts
+        # Calculate divisional charts with dignity analysis
         d9_chart = divisional_calc.calculate_divisional_chart(9)
         d10_chart = divisional_calc.calculate_divisional_chart(10)
         d12_chart = divisional_calc.calculate_divisional_chart(12)
+        
+        # Add sign names to divisional charts to prevent indexing confusion
+        d9_chart = self._add_sign_names_to_divisional_chart(d9_chart)
+        d10_chart = self._add_sign_names_to_divisional_chart(d10_chart)
+        d12_chart = self._add_sign_names_to_divisional_chart(d12_chart)
         
         divisional_charts = {
             "d9_navamsa": d9_chart,
@@ -260,12 +265,17 @@ For every user query, structure your response exactly as follows:
         vargottama_calc = VargottamaCalculator(chart_data, divisional_charts)
         neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, divisional_charts)
         
+        # Initialize D9 analyzer for separate analysis
+        d9_data_structure = d9_chart.get('divisional_chart', d9_chart)
+        d9_planet_analyzer = PlanetAnalyzer(d9_data_structure, birth_obj)
+        
         context.update({
             # Key divisional charts
             "divisional_charts": divisional_charts,
             
             # Planetary analysis
-            "planetary_analysis": {},
+            "planetary_analysis": {},  # D1 (Rashi)
+            "d9_planetary_analysis": {},  # D9 (Navamsa)
             
             # Special points
             "special_points": {
@@ -318,14 +328,22 @@ For every user query, structure your response exactly as follows:
             ).get_all_sniper_points()
         })
         
-        # Add minimal planetary analysis (raw data only, no text bloat)
-        planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'InduLagna']
+        # Add planetary analysis for both D1 and D9
+        planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
+        
         for planet in planets:
+            # D1 Analysis (existing)
             try:
                 full_analysis = planet_analyzer.analyze_planet(planet)
                 context["planetary_analysis"][planet] = self._filter_planetary_analysis(full_analysis, chart_calc)
             except Exception as e:
-                # print(f"Error analyzing {planet}: {e}")
+                continue
+            
+            # D9 Analysis (new)
+            try:
+                d9_full = d9_planet_analyzer.analyze_planet(planet)
+                context["d9_planetary_analysis"][planet] = self._filter_planetary_analysis(d9_full, chart_calc)
+            except Exception as e:
                 continue
         
         return context
@@ -336,6 +354,7 @@ For every user query, structure your response exactly as follows:
             'basic_info': {
                 'planet': full_analysis['basic_info']['planet'],
                 'sign': full_analysis['basic_info']['sign'],
+                'sign_name': full_analysis['basic_info'].get('sign_name'),
                 'house': full_analysis['basic_info']['house'],
                 'degree': full_analysis['basic_info']['degree'],
                 'longitude': full_analysis['basic_info']['longitude'],
@@ -1196,3 +1215,20 @@ For every user query, structure your response exactly as follows:
         
         print(f"✅ Transit data validation passed for {len(transit_activations)} transits")
         return None
+    
+    def _add_sign_names_to_divisional_chart(self, divisional_chart: Dict) -> Dict:
+        """Add sign names to divisional chart to prevent Gemini indexing confusion"""
+        import copy
+        chart_copy = copy.deepcopy(divisional_chart)
+        
+        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        
+        # Add sign names to divisional chart planets
+        if 'divisional_chart' in chart_copy and 'planets' in chart_copy['divisional_chart']:
+            for planet_name, planet_data in chart_copy['divisional_chart']['planets'].items():
+                if 'sign' in planet_data:
+                    sign_index = planet_data['sign']
+                    planet_data['sign_name'] = sign_names[sign_index]
+        
+        return chart_copy

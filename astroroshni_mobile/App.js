@@ -19,6 +19,8 @@ import ChartScreen from './src/components/Chart/ChartScreen';
 import TradingDashboardScreen from './src/components/Trading/TradingDashboardScreen';
 import TradingCalendarScreen from './src/components/Trading/TradingCalendarScreen';
 import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
+import MuhuratHubScreen from './src/components/MuhuratHubScreen';
+import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -166,6 +168,16 @@ export default function App() {
           <Stack.Screen 
             name="ChildbirthPlanner" 
             component={ChildbirthPlannerScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="MuhuratHub" 
+            component={MuhuratHubScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="UniversalMuhurat" 
+            component={UniversalMuhuratScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

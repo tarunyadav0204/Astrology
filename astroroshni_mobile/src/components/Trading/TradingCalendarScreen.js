@@ -278,6 +278,13 @@ export default function TradingCalendarScreen({ navigation }) {
     <View style={styles.container}>
       <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
         <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Trading Planner</Text>
+            <View style={{ width: 24 }} />
+          </View>
           <View style={styles.loader}>
             <Ionicons name="calendar" size={48} color="#FFD700" />
             <Text style={styles.emptyTitle}>Monthly Trading Calendar</Text>

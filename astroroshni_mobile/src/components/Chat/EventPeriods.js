@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
@@ -26,6 +26,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   const [viewMode, setViewMode] = useState('cards');
   const [showYearModal, setShowYearModal] = useState(false);
   const yearScrollRef = useRef(null);
+  const insets = useSafeAreaInsets();
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -351,7 +352,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
   return (
     <Modal visible={visible} animationType="slide">
       <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="light-content" backgroundColor="#1a0033" />
         
         {/* Twinkling Stars */}
         {starAnims.map((anim, index) => {
@@ -374,7 +375,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
           );
         })}
 
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={[styles.safeArea, { paddingTop: insets.top }]}>
             
             {/* Header */}
             <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
@@ -416,7 +417,7 @@ export default function EventPeriods({ visible, onClose, birthData, onPeriodSele
             {/* Content */}
             {renderContent()}
 
-        </SafeAreaView>
+        </View>
       </LinearGradient>
 
       {/* Year Modal */}
@@ -534,7 +535,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    paddingTop: 16,
   },
   backButton: {
     width: 40,

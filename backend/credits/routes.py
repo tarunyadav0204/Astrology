@@ -260,6 +260,31 @@ async def get_premium_chat_cost():
     cost = credit_service.get_credit_setting('premium_chat_cost')
     return {"cost": cost}
 
+@router.get("/settings/childbirth-cost")
+async def get_childbirth_cost():
+    cost = credit_service.get_credit_setting('childbirth_planner_cost')
+    return {"cost": cost}
+
+@router.get("/settings/vehicle-cost")
+async def get_vehicle_cost():
+    cost = credit_service.get_credit_setting('vehicle_purchase_cost')
+    return {"cost": cost}
+
+@router.get("/settings/griha-pravesh-cost")
+async def get_griha_pravesh_cost():
+    cost = credit_service.get_credit_setting('griha_pravesh_cost')
+    return {"cost": cost}
+
+@router.get("/settings/gold-cost")
+async def get_gold_cost():
+    cost = credit_service.get_credit_setting('gold_purchase_cost')
+    return {"cost": cost}
+
+@router.get("/settings/business-cost")
+async def get_business_cost():
+    cost = credit_service.get_credit_setting('business_opening_cost')
+    return {"cost": cost}
+
 @router.post("/admin/bulk-promo-codes")
 async def create_bulk_promo_codes(request: dict, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':

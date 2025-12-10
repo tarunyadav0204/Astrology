@@ -323,6 +323,13 @@ export default function TradingDashboardScreen({ navigation }) {
     <View style={styles.centerContainer}>
       <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
         <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Trading Cockpit</Text>
+            <View style={{width:24}}/>
+          </View>
           <View style={styles.loadingContainer}>
             <Ionicons name="card" size={48} color="#FFD700" />
             <Text style={styles.errorTitle}>Trading Analysis</Text>
@@ -363,6 +370,13 @@ export default function TradingDashboardScreen({ navigation }) {
     <View style={styles.centerContainer}>
         <LinearGradient colors={['#0f0c29', '#302b63']} style={styles.bg}>
           <SafeAreaView style={styles.safeArea}>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Ionicons name="arrow-back" size={24} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Trading Cockpit</Text>
+              <View style={{width:24}}/>
+            </View>
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#00C853" />
               <Text style={styles.loadingText}>Aligning Market Stars...</Text>
@@ -608,9 +622,9 @@ const styles = StyleSheet.create({
   
   gridContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 },
   gridItem: { width: '31%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 10, alignItems: 'center' },
-  gridLabel: { color: '#888', fontSize: 10, marginBottom: 2 },
+  gridLabel: { color: '#fff', fontSize: 10, marginBottom: 2 },
   gridValue: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  gridSub: { color: '#aaa', fontSize: 9 },
+  gridSub: { color: '#fff', fontSize: 9 },
   
   aiCard: { marginHorizontal: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, padding: 16, marginBottom: 20 },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },

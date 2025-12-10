@@ -443,6 +443,8 @@ export default function ChatScreen({ navigation, route }) {
     
     if (option.action === 'periods') {
       setShowEventPeriods(true);
+    } else if (option.action === 'muhurat') {
+      navigation.navigate('MuhuratHub');
     } else if (option.action === 'analysis') {
       if (option.type === 'trading') {
         navigation.navigate('TradingDashboard');

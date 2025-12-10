@@ -161,6 +161,34 @@ class CreditService:
                 VALUES ('childbirth_planner_cost', 8, 'Credits per childbirth muhurat planning')
             ''')
         
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'vehicle_purchase_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('vehicle_purchase_cost', 10, 'Credits per vehicle purchase muhurat')
+            ''')
+        
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'griha_pravesh_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('griha_pravesh_cost', 15, 'Credits per griha pravesh muhurat')
+            ''')
+        
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'gold_purchase_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('gold_purchase_cost', 12, 'Credits per gold purchase muhurat')
+            ''')
+        
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'business_opening_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('business_opening_cost', 20, 'Credits per business opening muhurat')
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -329,7 +357,7 @@ class CreditService:
         cursor.execute("""
             SELECT setting_key, setting_value, description 
             FROM credit_settings 
-            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost')
+            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost')
             ORDER BY setting_key
         """)
         

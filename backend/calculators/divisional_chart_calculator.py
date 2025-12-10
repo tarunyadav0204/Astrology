@@ -124,12 +124,13 @@ class DivisionalChartCalculator(BaseCalculator):
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
         divisional_data['ascendant'] = divisional_asc_sign * 30 + 15  # Middle of sign
         
-        # Calculate divisional houses
+        # Calculate divisional houses with house numbers
         for i in range(12):
             house_sign = (divisional_asc_sign + i) % 12
             divisional_data['houses'].append({
                 'longitude': house_sign * 30,
-                'sign': house_sign
+                'sign': house_sign,
+                'house_number': i + 1
             })
         
         # Calculate divisional positions for planets
@@ -154,11 +155,24 @@ class DivisionalChartCalculator(BaseCalculator):
                 
                 divisional_longitude = divisional_sign * 30 + actual_degree
                 
+                # Calculate house position relative to divisional ascendant
+                house_number = ((divisional_sign - divisional_asc_sign) % 12) + 1
+                
+                # Calculate dignity for divisional chart
+                dignity_info = self._calculate_divisional_dignity(planet, divisional_sign, divisional_asc_sign)
+                
+                # Add sign name to prevent indexing confusion
+                sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                             'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+                
                 divisional_data['planets'][planet] = {
                     'longitude': divisional_longitude,
                     'sign': divisional_sign,
+                    'sign_name': sign_names[divisional_sign],
                     'degree': actual_degree,
-                    'retrograde': planet_data.get('retrograde', False)
+                    'retrograde': planet_data.get('retrograde', False),
+                    'house': house_number,
+                    **dignity_info
                 }
         
         return {
@@ -195,3 +209,129 @@ class DivisionalChartCalculator(BaseCalculator):
             60: 'Past life, karmic influences, subtle effects'
         }
         return significances.get(division_number, 'Specific life area analysis')
+    
+    def _calculate_divisional_dignity(self, planet, sign, divisional_asc_sign=None):
+        """Calculate planetary dignity in divisional charts"""
+        # Planetary rulerships and dignities
+        EXALTATION_SIGNS = {
+            'Sun': 0,      # Aries
+            'Moon': 1,     # Taurus
+            'Mars': 9,     # Capricorn
+            'Mercury': 5,  # Virgo
+            'Jupiter': 3,  # Cancer
+            'Venus': 11,   # Pisces
+            'Saturn': 6    # Libra
+        }
+        
+        DEBILITATION_SIGNS = {
+            'Sun': 6,      # Libra
+            'Moon': 7,     # Scorpio
+            'Mars': 3,     # Cancer
+            'Mercury': 11, # Pisces
+            'Jupiter': 9,  # Capricorn
+            'Venus': 5,    # Virgo
+            'Saturn': 0    # Aries
+        }
+        
+        OWN_SIGNS = {
+            'Sun': [4],           # Leo
+            'Moon': [3],          # Cancer
+            'Mars': [0, 7],       # Aries, Scorpio
+            'Mercury': [2, 5],    # Gemini, Virgo
+            'Jupiter': [8, 11],   # Sagittarius, Pisces
+            'Venus': [1, 6],      # Taurus, Libra
+            'Saturn': [9, 10]     # Capricorn, Aquarius
+        }
+        
+        MOOLATRIKONA_SIGNS = {
+            'Sun': 4,      # Leo
+            'Moon': 1,     # Taurus
+            'Mars': 0,     # Aries
+            'Mercury': 5,  # Virgo
+            'Jupiter': 8,  # Sagittarius
+            'Venus': 6,    # Libra
+            'Saturn': 10   # Aquarius
+        }
+        
+        # Rahu and Ketu don't have traditional dignities
+        if planet in ['Rahu', 'Ketu']:
+            return {
+                'dignity': 'neutral',
+                'functional_nature': 'neutral',
+                'strength_multiplier': 1.0
+            }
+        
+        # Check dignity
+        if sign == EXALTATION_SIGNS.get(planet):
+            dignity = 'exalted'
+            strength_multiplier = 2.0
+        elif sign == DEBILITATION_SIGNS.get(planet):
+            dignity = 'debilitated'
+            strength_multiplier = 0.25
+        elif sign == MOOLATRIKONA_SIGNS.get(planet):
+            dignity = 'moolatrikona'
+            strength_multiplier = 1.5
+        elif sign in OWN_SIGNS.get(planet, []):
+            dignity = 'own_sign'
+            strength_multiplier = 1.25
+        else:
+            dignity = 'neutral'
+            strength_multiplier = 1.0
+        
+        # Determine functional nature based on divisional ascendant if provided
+        if divisional_asc_sign is not None:
+            functional_nature = self._get_functional_nature_for_ascendant(planet, divisional_asc_sign)
+        else:
+            # Fallback to dignity-based functional nature
+            if dignity in ['exalted', 'moolatrikona', 'own_sign']:
+                functional_nature = 'benefic'
+            elif dignity == 'debilitated':
+                functional_nature = 'malefic'
+            else:
+                functional_nature = 'neutral'
+        
+        return {
+            'dignity': dignity,
+            'functional_nature': functional_nature,
+            'strength_multiplier': strength_multiplier
+        }
+    
+    def _get_functional_nature_for_ascendant(self, planet, ascendant_sign):
+        """Get functional benefic/malefic nature based on ascendant sign"""
+        # Simplified functional benefic/malefic system for divisional charts
+        functional_benefics = {
+            0: ['Sun', 'Mars', 'Jupiter'],  # Aries
+            1: ['Mercury', 'Venus', 'Saturn'],  # Taurus
+            2: ['Mercury', 'Venus'],  # Gemini
+            3: ['Moon', 'Mars'],  # Cancer
+            4: ['Sun', 'Mars'],  # Leo
+            5: ['Mercury', 'Venus'],  # Virgo
+            6: ['Venus', 'Saturn'],  # Libra
+            7: ['Moon', 'Jupiter'],  # Scorpio
+            8: ['Sun', 'Mars', 'Jupiter'],  # Sagittarius
+            9: ['Venus', 'Saturn'],  # Capricorn
+            10: ['Venus', 'Saturn'],  # Aquarius
+            11: ['Sun', 'Mars', 'Jupiter']  # Pisces
+        }
+        
+        functional_malefics = {
+            0: ['Mercury', 'Venus', 'Saturn'],
+            1: ['Sun', 'Mars', 'Jupiter'],
+            2: ['Mars', 'Jupiter'],
+            3: ['Sun', 'Venus', 'Saturn'],
+            4: ['Mercury', 'Venus', 'Saturn'],
+            5: ['Sun', 'Mars', 'Jupiter'],
+            6: ['Sun', 'Mars', 'Jupiter'],
+            7: ['Sun', 'Venus', 'Saturn'],
+            8: ['Mercury', 'Venus', 'Saturn'],
+            9: ['Sun', 'Mars', 'Jupiter'],
+            10: ['Sun', 'Mars', 'Jupiter'],
+            11: ['Mercury', 'Venus', 'Saturn']
+        }
+        
+        if planet in functional_benefics.get(ascendant_sign, []):
+            return 'benefic'
+        elif planet in functional_malefics.get(ascendant_sign, []):
+            return 'malefic'
+        else:
+            return 'neutral'

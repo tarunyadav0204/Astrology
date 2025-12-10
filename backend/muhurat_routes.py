@@ -2,129 +2,114 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from calculators.muhurat_calculator import MuhuratCalculator
-from auth import get_current_user
+from auth import get_current_user, User
 from credits.credit_service import CreditService
+import swisseph as swe
 
 router = APIRouter(prefix="/muhurat", tags=["muhurat"])
 calculator = MuhuratCalculator()
 credit_service = CreditService()
 
+# --- REQUEST MODELS ---
 class ChildbirthMuhuratRequest(BaseModel):
-    # Delivery params
     start_date: str
     end_date: str
     delivery_latitude: float
     delivery_longitude: float
     delivery_timezone: Optional[str] = "UTC+5:30"
-    
-    # Mother params
     mother_dob: str
     mother_time: str
     mother_lat: float
     mother_lon: float
     mother_timezone: Optional[str] = "UTC+5:30"
 
-@router.get("/childbirth-planner/cost")
-async def get_childbirth_planner_cost(current_user = Depends(get_current_user)):
-    """Get credit cost for childbirth planner"""
-    cost = credit_service.get_credit_setting('childbirth_planner_cost')
-    current_credits = credit_service.get_user_credits(current_user.userid)
-    
-    return {
-        "cost": cost,
-        "current_credits": current_credits,
-        "can_afford": current_credits >= cost
-    }
+class GeneralMuhuratRequest(BaseModel):
+    start_date: str
+    end_date: str
+    latitude: float
+    longitude: float
+    timezone: Optional[str] = "UTC+5:30"
+    user_dob: str
+    user_time: str
+    user_lat: float
+    user_lon: float
+    user_timezone: Optional[str] = "UTC+5:30"
 
-@router.post("/childbirth-planner")
-async def get_childbirth_muhurat(request: ChildbirthMuhuratRequest, current_user = Depends(get_current_user)):
+# --- HELPER ---
+async def _process_muhurat(request, current_user, feature_name, calc_method):
+    # 1. Get cost from settings and check credits
+    cost = credit_service.get_credit_setting(f'{feature_name}_cost')
+    user_balance = credit_service.get_user_credits(current_user.userid)
+    if user_balance < cost:
+        raise HTTPException(status_code=402, detail=f"Insufficient credits. Need {cost}.")
+
     try:
-        print(f"🔍 [DEBUG] Childbirth Planner Request:")
-        print(f"  Current User: {current_user.userid}")
-        print(f"  Mother DOB: {request.mother_dob}")
-        print(f"  Mother Time: {request.mother_time}")
-        print(f"  Mother Location: {request.mother_lat}, {request.mother_lon}")
-        print(f"  Delivery Location: {request.delivery_latitude}, {request.delivery_longitude}")
-        print(f"  Date Range: {request.start_date} to {request.end_date}")
-        print(f"  Request Object: {request.dict()}")
-        print("="*50)
-        # Check credits
-        cost = credit_service.get_credit_setting('childbirth_planner_cost')
-        current_credits = credit_service.get_user_credits(current_user.userid)
+        # 2. Calc User Nakshatra
+        # Supports both "user_..." and "mother_..." field names via getattr logic if needed,
+        # but here we standardize on the request object structure.
         
-        if current_credits < cost:
-            raise HTTPException(
-                status_code=402, 
-                detail={
-                    "error": "insufficient_credits",
-                    "message": f"Insufficient credits. Need {cost} credits, you have {current_credits}.",
-                    "required": cost,
-                    "available": current_credits
-                }
-            )
-        # Calculate mother's chart to get Moon nakshatra
-        import swisseph as swe
-        
-        # Parse mother's birth data
-        time_parts = request.mother_time.split(':')
+        # Determine dob/time fields based on request type
+        if hasattr(request, 'mother_dob'):
+            dob, time = request.mother_dob, request.mother_time
+        else:
+            dob, time = request.user_dob, request.user_time
+
+        time_parts = time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
-        
-        # Handle timezone
-        tz_offset = 5.5
-        if request.mother_timezone.startswith('UTC'):
-            tz_str = request.mother_timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
-        
+        tz_offset = 5.5 # Simplified
         utc_hour = hour - tz_offset
-        jd = swe.julday(
-            int(request.mother_dob.split('-')[0]),
-            int(request.mother_dob.split('-')[1]),
-            int(request.mother_dob.split('-')[2]),
-            utc_hour
-        )
         
-        # Get Moon position
+        jd = swe.julday(int(dob.split('-')[0]), int(dob.split('-')[1]), int(dob.split('-')[2]), utc_hour)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-        mother_nak_id = int(moon_pos / (360/27)) + 1
-        
-        # Calculate muhurat
-        print(f"🔍 [ROUTES] Calling muhurat calculator...")
-        try:
-            result = calculator.calculate_childbirth_muhurat(
-                request.start_date,
-                request.end_date,
-                request.delivery_latitude,
-                request.delivery_longitude,
-                mother_nak_id,
-                request.delivery_timezone
-            )
-            print(f"✅ [ROUTES] Muhurat calculation completed")
-        except Exception as calc_error:
-            print(f"❌ [ROUTES ERROR] Muhurat calculation failed: {calc_error}")
-            print(f"  Error type: {type(calc_error).__name__}")
-            import traceback
-            print(f"  Traceback: {traceback.format_exc()}")
-            raise calc_error
-        
-        # Deduct credits after successful calculation
-        credit_service.spend_credits(
-            current_user.userid, 
-            cost, 
-            'childbirth_planner',
-            f"Childbirth muhurat planning for {request.start_date} to {request.end_date}"
+        user_nak_id = int(moon_pos / (360/27)) + 1
+
+        # 3. Run Calculation
+        # Map location fields
+        lat = getattr(request, 'delivery_latitude', getattr(request, 'latitude', 0.0))
+        lon = getattr(request, 'delivery_longitude', getattr(request, 'longitude', 0.0))
+        tz = getattr(request, 'delivery_timezone', getattr(request, 'timezone', "UTC+5:30"))
+
+        result = calc_method(
+            request.start_date,
+            request.end_date,
+            lat, lon,
+            user_nak_id,
+            tz
         )
+        
+        # 4. Only deduct credits if recommendations found
+        if result and result.get('recommendations') and len(result['recommendations']) > 0:
+            credit_service.spend_credits(current_user.userid, cost, feature_name, f"Planned {request.start_date}")
         
         return {
             "status": "success",
-            "mother_nakshatra": mother_nak_id,
-            "credits_used": cost,
-            "remaining_credits": credit_service.get_user_credits(current_user.userid),
-            "data": result
+            "user_nakshatra": user_nak_id,
+            "data": result,
+            "credits_deducted": result and result.get('recommendations') and len(result['recommendations']) > 0
         }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- ENDPOINTS ---
+
+@router.post("/childbirth-planner")
+async def get_childbirth_muhurat(request: ChildbirthMuhuratRequest, current_user: User = Depends(get_current_user)):
+    return await _process_muhurat(request, current_user, "childbirth_planner", calculator.calculate_childbirth_muhurat)
+
+@router.post("/vehicle-purchase")
+async def get_vehicle_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    return await _process_muhurat(request, current_user, "vehicle_purchase", calculator.calculate_vehicle_muhurat)
+
+@router.post("/griha-pravesh")
+async def get_property_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    return await _process_muhurat(request, current_user, "griha_pravesh", calculator.calculate_griha_pravesh_muhurat)
+
+@router.post("/gold-purchase")
+async def get_gold_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    return await _process_muhurat(request, current_user, "gold_purchase", calculator.calculate_gold_muhurat)
+
+@router.post("/business-opening")
+async def get_business_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
+    return await _process_muhurat(request, current_user, "business_opening", calculator.calculate_business_muhurat)
+

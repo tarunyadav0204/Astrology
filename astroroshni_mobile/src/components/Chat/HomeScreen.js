@@ -376,6 +376,14 @@ const loadHomeData = async () => {
       description: 'Auspicious dates for delivery',
       gradient: ['#FF69B4', '#FF1493'],
       cost: pricing.childbirth_planner || 8
+    },
+    { 
+      id: 'muhurat', 
+      title: 'Muhurat Planner', 
+      icon: '🕉️', 
+      description: 'Auspicious timing for all events',
+      gradient: ['#9C27B0', '#7B1FA2'],
+      cost: 0
     }
   ];
 
@@ -458,14 +466,29 @@ const loadHomeData = async () => {
           ))}
         </Animated.View>
 
-        {/* Analysis Options */}
+        {/* Life Analysis Options */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.analysisTitle}>🧘 Specialized Analysis</Text>
-          {analysisOptions.map((option, index) => (
+          <Text style={styles.analysisTitle}>🧘 Life Analysis</Text>
+          <View style={styles.lifeAnalysisGrid}>
+            {analysisOptions.slice(0, 6).map((option, index) => (
+              <LifeAnalysisCard
+                key={option.id}
+                option={option}
+                index={index}
+                onOptionSelect={onOptionSelect}
+              />
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* Timing Planners */}
+        <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.analysisTitle}>⏰ Timing Planners</Text>
+          {analysisOptions.slice(6).map((option, index) => (
             <AnalysisCard
               key={option.id}
               option={option}
-              index={index}
+              index={index + 6}
               onOptionSelect={onOptionSelect}
             />
           ))}
@@ -643,51 +666,53 @@ const loadHomeData = async () => {
               {/* Row 2: Big Moon SVG Only */}
               <View style={styles.moonSvgRow}>
                 <Svg width="80" height="80" viewBox="0 0 80 80">
-                  <Circle cx="40" cy="40" r="35" fill="#2a2a2a" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+                  {/* Dark Background Circle */}
+                  <Circle cx="40" cy="40" r="35" fill="#1a1a1a" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  
                   {(() => {
                     const illumination = panchangData.moon_illumination || 98.5;
                     const phase = panchangData.moon_phase || 'Full Moon';
+                    const r = 33;
+                    const cx = 40;
+                    const cy = 40;
                     
+                    const isWaxing = phase.includes('Waxing') || (!phase.includes('Waning') && !phase.includes('Full') && !phase.includes('New'));
+
                     if (illumination >= 99) {
-                      // Full Moon (99%+)
                       return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
                     } else if (illumination <= 1) {
-                      // New Moon (1% or less)
                       return null;
-                    } else {
-                      // Calculate accurate shadow for moon phase
-                      const darkPercent = 100 - illumination; // How much is dark (7% for 93% illumination)
-                      const isWaxing = phase.includes('Waxing') || (!phase.includes('Waning') && illumination > 50);
+                    } 
+                    
+                    const ellipseRadiusX = r * Math.abs(1 - (2 * illumination / 100));
+                    
+                    let pathData = "";
+
+                    if (isWaxing) {
+                      pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`;
                       
-                      // For accurate moon phases, use ellipse calculation
-                      const shadowOffset = (darkPercent / 100) * 33; // Scale shadow to radius
-                      
-                      if (isWaxing) {
-                        // Waxing: shadow on the left, light grows from right
-                        const lightWidth = (illumination / 100) * 66; // Width of illuminated part
-                        return (
-                          <>
-                            <Circle cx="40" cy="40" r="33" fill="#2a2a2a" />
-                            <Path 
-                              d={`M ${40 - shadowOffset} 7 A ${lightWidth/2} 33 0 0 1 ${40 - shadowOffset} 73 A 33 33 0 0 1 ${40 - shadowOffset} 7`} 
-                              fill="#f0f0f0" 
-                            />
-                          </>
-                        );
+                      if (illumination > 50) {
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r}`;
                       } else {
-                        // Waning: shadow on the right, light shrinks from left
-                        const lightWidth = (illumination / 100) * 66; // Width of illuminated part
-                        return (
-                          <>
-                            <Circle cx="40" cy="40" r="33" fill="#2a2a2a" />
-                            <Path 
-                              d={`M ${40 + shadowOffset} 7 A ${lightWidth/2} 33 0 0 0 ${40 + shadowOffset} 73 A 33 33 0 0 0 ${40 + shadowOffset} 7`} 
-                              fill="#f0f0f0" 
-                            />
-                          </>
-                        );
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r}`;
+                      }
+                    } else {
+                      pathData = `M ${cx} ${cy + r} A ${r} ${r} 0 0 1 ${cx} ${cy - r}`;
+                      
+                      if (illumination > 50) {
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy + r}`;
+                      } else {
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy + r}`;
                       }
                     }
+
+                    return (
+                      <Path 
+                        d={pathData} 
+                        fill="#f0f0f0"
+                        stroke="none"
+                      />
+                    );
                   })()}
                 </Svg>
               </View>
@@ -853,9 +878,66 @@ function OptionCard({ option, index, onOptionSelect }) {
   );
 }
 
-// Separate component to avoid hooks order violation
-function AnalysisCard({ option, index, onOptionSelect }) {
+// Life Analysis Card - 3 per row
+function LifeAnalysisCard({ option, index, onOptionSelect }) {
   const cardDelay = (index + 3) * 200;
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(cardDelay),
+      Animated.spring(cardAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+  
+  return (
+    <Animated.View
+      style={[
+        styles.lifeAnalysisCard,
+        {
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+            {
+              scale: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.9, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
+        activeOpacity={0.9}
+      >
+        <LinearGradient
+          colors={option.gradient}
+          style={styles.lifeAnalysisGradient}
+        >
+          <Text style={styles.lifeAnalysisEmoji}>{option.icon}</Text>
+          <Text style={styles.lifeAnalysisTitle}>{option.title}</Text>
+          <Text style={styles.lifeAnalysisDescription}>{option.description}</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// Full width Analysis Card for Timing Planners
+function AnalysisCard({ option, index, onOptionSelect }) {
+  const cardDelay = (index + 9) * 200;
   const cardAnim = useRef(new Animated.Value(0)).current;
   
   useEffect(() => {
@@ -894,7 +976,13 @@ function AnalysisCard({ option, index, onOptionSelect }) {
       ]}
     >
       <TouchableOpacity
-        onPress={() => onOptionSelect({ action: 'analysis', type: option.id })}
+        onPress={() => {
+          if (option.id === 'muhurat') {
+            onOptionSelect({ action: 'muhurat' });
+          } else {
+            onOptionSelect({ action: 'analysis', type: option.id });
+          }
+        }}
         activeOpacity={0.9}
       >
         <LinearGradient
@@ -907,7 +995,6 @@ function AnalysisCard({ option, index, onOptionSelect }) {
           <View style={styles.analysisContent}>
             <Text style={styles.analysisCardTitle}>{option.title}</Text>
             <Text style={styles.analysisDescription}>{option.description}</Text>
-            <Text style={styles.analysisCost}>{option.cost} credits</Text>
           </View>
           <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
         </LinearGradient>
@@ -1167,6 +1254,53 @@ const styles = StyleSheet.create({
   },
   analysisCost: {
     fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+  },
+  // Life Analysis Grid Styles
+  lifeAnalysisGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  lifeAnalysisCard: {
+    width: '30%',
+    marginBottom: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  lifeAnalysisGradient: {
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    height: 110,
+  },
+  lifeAnalysisEmoji: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  lifeAnalysisTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  lifeAnalysisDescription: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  lifeAnalysisCost: {
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '600',
   },

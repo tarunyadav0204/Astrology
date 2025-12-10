@@ -195,6 +195,7 @@ app.include_router(career_ai_router, prefix="/api")
 app.include_router(panchang_router, prefix="/api/panchang")
 app.include_router(muhurat_router, prefix="/api")
 app.include_router(childbirth_router, prefix="/api")
+# Note: childbirth_router already includes vehicle and griha pravesh endpoints
 app.include_router(health_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")

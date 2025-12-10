@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -7,15 +8,17 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { storage } from '../services/storage';
 import { API_BASE_URL, getEndpoint, COLORS } from '../utils/constants';
 import LocationPicker from './LocationPicker';
+import { useCredits } from '../credits/CreditContext';
 
 
 export default function ChildbirthPlannerScreen({ navigation }) {
+  const { credits, fetchBalance } = useCredits();
   const [loading, setLoading] = useState(false);
   const [motherProfile, setMotherProfile] = useState(null);
   
   // Date state
   const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date(new Date().setDate(new Date().getDate() + 7)));
+  const [endDate, setEndDate] = useState(new Date(new Date().setDate(new Date().getDate() + 30)));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   
@@ -33,6 +36,21 @@ export default function ChildbirthPlannerScreen({ navigation }) {
     loadProfile();
     loadCreditInfo();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchBalance();
+      loadCreditInfo();
+    }, [])
+  );
+
+  useEffect(() => {
+    setCreditInfo(prev => ({
+      ...prev,
+      current_credits: credits,
+      can_afford: credits >= prev.cost
+    }));
+  }, [credits]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -64,11 +82,15 @@ export default function ChildbirthPlannerScreen({ navigation }) {
   const loadCreditInfo = async () => {
     try {
       const token = await storage.getAuthToken();
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/muhurat/childbirth-planner/cost')}`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/childbirth-cost')}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      setCreditInfo(data);
+      setCreditInfo({
+        cost: data.cost || 0,
+        current_credits: credits,
+        can_afford: credits >= (data.cost || 0)
+      });
     } catch(e) {
       console.error('Failed to load credit info:', e);
     }
@@ -152,11 +174,11 @@ export default function ChildbirthPlannerScreen({ navigation }) {
         );
       } else if (json.status === 'success') {
         setResults(json.data);
-        // Update credit info after successful calculation
+        await fetchBalance();
         setCreditInfo(prev => ({
           ...prev,
-          current_credits: json.remaining_credits,
-          can_afford: json.remaining_credits >= prev.cost
+          current_credits: json.remaining_credits || credits - prev.cost,
+          can_afford: (json.remaining_credits || credits - prev.cost) >= prev.cost
         }));
       } else {
         Alert.alert("Error", "Calculation failed. Please check inputs.");
@@ -187,8 +209,8 @@ export default function ChildbirthPlannerScreen({ navigation }) {
             <View style={styles.creditCard}>
               <View style={styles.creditRow}>
                 <Text style={styles.creditLabel}>💎 Cost: {creditInfo.cost} credits</Text>
-                <Text style={[styles.creditBalance, { color: creditInfo.can_afford ? '#00C853' : '#FF5722' }]}>
-                  Balance: {creditInfo.current_credits}
+                <Text style={[styles.creditBalance, { color: credits >= creditInfo.cost ? '#00C853' : '#FF5722' }]}>
+                  Balance: {credits}
                 </Text>
               </View>
               {!creditInfo.can_afford && (
@@ -269,8 +291,11 @@ export default function ChildbirthPlannerScreen({ navigation }) {
                 <Text style={styles.resultHeader}>✨ Recommended Slots</Text>
                 {results.recommendations.length === 0 ? (
                   <View style={styles.noDataCard}>
-                    <Text style={styles.noDataText}>No fully auspicious dates found in this range.</Text>
-                    <Text style={styles.noDataHint}>Try extending the date range.</Text>
+                    <Text style={styles.noDataText}>No auspicious dates found in this period</Text>
+                    <Text style={styles.noDataHint}>Vedic astrology has strict rules for auspicious timing. Try:</Text>
+                    <Text style={styles.noDataTip}>• Extending the date range to 60-90 days</Text>
+                    <Text style={styles.noDataTip}>• Avoiding eclipse periods and inauspicious months</Text>
+                    <Text style={styles.noDataTip}>• Checking different lunar months</Text>
                   </View>
                 ) : (
                   results.recommendations.map((day, idx) => (
@@ -299,34 +324,103 @@ export default function ChildbirthPlannerScreen({ navigation }) {
           </ScrollView>
 
           {/* Date Pickers */}
-          {showStartPicker && (
-            <DateTimePicker
-              value={startDate}
-              mode="date"
-              minimumDate={new Date()}
-              onChange={(e, d) => { 
-                setShowStartPicker(false); 
-                if(d) setStartDate(d); 
-              }}
-            />
-          )}
-          {showEndPicker && (
-            <DateTimePicker
-              value={endDate}
-              mode="date"
-              minimumDate={startDate}
-              onChange={(e, d) => { 
-                setShowEndPicker(false); 
-                if(d) {
-                  const daysDiff = Math.ceil((d - startDate) / (1000 * 60 * 60 * 24));
-                  if (daysDiff > 30) {
-                    Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
-                    return;
-                  }
-                  setEndDate(d);
-                }
-              }}
-            />
+          {Platform.OS === 'ios' ? (
+            <>
+              <Modal visible={showStartPicker} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerGradient}>
+                      <View style={styles.pickerHeader}>
+                        <TouchableOpacity onPress={() => setShowStartPicker(false)}>
+                          <Text style={styles.pickerButton}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowStartPicker(false)}>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={startDate}
+                        mode="date"
+                        display="spinner"
+                        minimumDate={new Date()}
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) setStartDate(selectedDate);
+                        }}
+                        style={styles.iosPicker}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+              
+              <Modal visible={showEndPicker} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerGradient}>
+                      <View style={styles.pickerHeader}>
+                        <TouchableOpacity onPress={() => setShowEndPicker(false)}>
+                          <Text style={styles.pickerButton}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => {
+                          const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+                          if (daysDiff > 30) {
+                            Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                            return;
+                          }
+                          setShowEndPicker(false);
+                        }}>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={endDate}
+                        mode="date"
+                        display="spinner"
+                        minimumDate={startDate}
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) setEndDate(selectedDate);
+                        }}
+                        style={styles.iosPicker}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            </>
+          ) : (
+            <>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display="default"
+                  minimumDate={new Date()}
+                  onChange={(e, d) => { 
+                    setShowStartPicker(false); 
+                    if(d) setStartDate(d); 
+                  }}
+                />
+              )}
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  display="default"
+                  minimumDate={startDate}
+                  onChange={(e, d) => { 
+                    setShowEndPicker(false); 
+                    if(d) {
+                      const daysDiff = Math.ceil((d - startDate) / (1000 * 60 * 60 * 24));
+                      if (daysDiff > 30) {
+                        Alert.alert("Date Range Limit", "Please select a date within 30 days of start date.");
+                        return;
+                      }
+                      setEndDate(d);
+                    }
+                  }}
+                />
+              )}
+            </>
           )}
 
 
@@ -549,6 +643,56 @@ const styles = StyleSheet.create({
   noDataHint: {
     color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
-    fontSize: 14
+    fontSize: 14,
+    marginBottom: 10
+  },
+  noDataTip: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    marginBottom: 5,
+    paddingLeft: 10
+  },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+    justifyContent: 'flex-end' 
+  },
+  pickerContainer: { 
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20, 
+    borderTopRightRadius: 20, 
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10
+  },
+  pickerGradient: { 
+    paddingBottom: 30,
+    backgroundColor: '#fff'
+  },
+  pickerHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingHorizontal: 20, 
+    paddingVertical: 16, 
+    borderBottomWidth: 0.5, 
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#f8f9fa'
+  },
+  pickerButton: { 
+    fontSize: 17, 
+    color: '#007AFF', 
+    fontWeight: '400' 
+  },
+  pickerButtonDone: { 
+    color: '#007AFF', 
+    fontWeight: '600' 
+  },
+  iosPicker: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20
   }
 });
