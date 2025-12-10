@@ -1514,6 +1514,48 @@ async def calculate_chart_only(birth_data: BirthData, node_type: str = 'mean', c
     # Calculate chart without saving to database
     return await _calculate_chart_data(birth_data, node_type)
 
+@app.post("/api/calculate-all-charts")
+async def calculate_all_charts(birth_data: BirthData, current_user: User = Depends(get_current_user)):
+    """Calculate all charts at once for instant switching"""
+    try:
+        # Calculate base chart
+        base_chart = await _calculate_chart_data(birth_data, 'mean')
+        
+        # Calculate all divisional charts
+        divisions = [9, 10, 12, 16, 20, 24, 30, 40, 45, 60]
+        divisional_charts = {}
+        
+        for division in divisions:
+            try:
+                div_result = await calculate_divisional_chart({
+                    'birth_data': birth_data.model_dump(),
+                    'division': division
+                }, current_user)
+                divisional_charts[f'd{division}'] = div_result['divisional_chart']
+            except Exception as e:
+                print(f"Error calculating D{division}: {e}")
+                continue
+        
+        # Calculate transit chart
+        try:
+            transit_request = TransitRequest(
+                birth_data=birth_data,
+                transit_date=datetime.now().strftime('%Y-%m-%d')
+            )
+            transit_chart = await calculate_transits(transit_request)
+            divisional_charts['transit'] = transit_chart
+        except Exception as e:
+            print(f"Error calculating transit: {e}")
+        
+        return {
+            'lagna': base_chart,
+            'divisional_charts': divisional_charts,
+            'calculated_at': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch calculation failed: {str(e)}")
+
 @app.post("/api/calculate-chart")
 async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
     # CRITICAL: Validate coordinates before saving

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,9 +35,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   const [slideAnim] = useState(new Animated.Value(0));
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [chartDataCache, setChartDataCache] = useState({ lagna: chartData });
-  const [nextChartType, setNextChartType] = useState(null);
-  const [prevChartType, setPrevChartType] = useState(null);
   const [transitDate, setTransitDate] = useState(new Date());
+  
+  // Ref to prevent stale state updates
+  const activeChartTypeRef = useRef(currentChartType);
+  
+  useEffect(() => {
+    activeChartTypeRef.current = currentChartType;
+  }, [currentChartType]);
   
   const chartTypes = [
     'lagna', 'navamsa', 'transit', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
@@ -86,29 +91,27 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   };
 
   useEffect(() => {
-    // For lagna chart, always use passed chartData directly
-    if (currentChartType === 'lagna') {
+    // Always use chartData from props when available
+    if (chartData) {
       setCurrentChartData(chartData);
-    } else if (currentChartType === 'transit') {
-      loadChartData(currentChartType, true);
-    } else if (division) {
-      // Load divisional chart using the division prop
-      loadDivisionalChart(division);
-    } else {
-      // Load the specific chart type data
-      loadChartData(currentChartType, true);
+      setLoading(false);
     }
-  }, [currentChartType, chartData, division]);
+  }, [chartData]);
   
   useEffect(() => {
-    // Update adjacent chart types
-    const currentIndex = chartTypes.indexOf(currentChartType);
-    const nextIndex = (currentIndex + 1) % chartTypes.length;
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : chartTypes.length - 1;
-    
-    setNextChartType(chartTypes[nextIndex]);
-    setPrevChartType(chartTypes[prevIndex]);
-  }, [currentChartType]);
+    // Only load data if not provided by parent
+    if (!chartData) {
+      if (currentChartType === 'transit') {
+        loadChartData('transit', true);
+      } else if (division) {
+        loadDivisionalChart(division);
+      } else {
+        loadChartData(currentChartType, true);
+      }
+    }
+  }, [currentChartType, division]);
+  
+
   
   const loadCachedCharts = async () => {
     if (!birthData) return;
@@ -211,6 +214,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   const loadDivisionalChart = async (divisionNumber) => {
     if (!birthData || !divisionNumber || loading) return;
     
+    const typeAtStart = currentChartType;
+    
     try {
       setLoading(true);
       const formattedData = {
@@ -225,19 +230,21 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       const response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
       const data = response.data.divisional_chart;
       
-      if (data) {
+      // Only update if user hasn't switched charts while loading
+      if (data && activeChartTypeRef.current === typeAtStart) {
         setChartDataCache(prev => ({ ...prev, [currentChartType]: data }));
         setCurrentChartData(data);
       }
     } catch (error) {
 
     } finally {
-      setLoading(false);
+      if (activeChartTypeRef.current === typeAtStart) {
+        setLoading(false);
+      }
     }
   };
 
   const loadChartData = async (type, setCurrent = true, customDate = null) => {
-    // Use cached data if available (but not for transit with custom date)
     if (chartDataCache[type] && !(type === 'transit' && customDate)) {
       if (setCurrent) setCurrentChartData(chartDataCache[type]);
       return;
@@ -251,6 +258,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     }
     
     if (!birthData || loading) return;
+    
+    const typeAtStart = currentChartType;
     
     try {
       if (setCurrent) setLoading(true);
@@ -275,14 +284,17 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         data = response.data;
       }
       
-      if (data) {
+      // Only update if user hasn't switched charts while loading
+      if (data && activeChartTypeRef.current === typeAtStart) {
         setChartDataCache(prev => ({ ...prev, [type]: data }));
         if (setCurrent) setCurrentChartData(data);
       }
     } catch (error) {
 
     } finally {
-      if (setCurrent) setLoading(false);
+      if (setCurrent && activeChartTypeRef.current === typeAtStart) {
+        setLoading(false);
+      }
     }
   };
 

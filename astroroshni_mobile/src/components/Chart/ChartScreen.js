@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-g
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
+import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 
@@ -27,9 +28,11 @@ export default function ChartScreen({ navigation, route }) {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
-  const [activeChartIndex, setActiveChartIndex] = useState(0);
+  const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const chartScrollRef = useRef(null);
   const bottomNavScrollRef = useRef(null);
+  const swipeTimeoutRef = useRef(null);
+  const lastSwipeTime = useRef(0);
   
   const chartTypes = [
     { id: 'lagna', name: 'Lagna (D1)', icon: '🏠', description: 'Main Birth Chart' },
@@ -52,34 +55,65 @@ export default function ChartScreen({ navigation, route }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   
-  const handleSwipe = (event) => {
+  const handleSwipe = useCallback((event) => {
     if (event.nativeEvent.state === State.END) {
+      const now = Date.now();
       const { translationX } = event.nativeEvent;
       const swipeThreshold = 50;
       
-      if (translationX > swipeThreshold && activeChartIndex > 0) {
-        // Swipe right - previous chart
-        const newIndex = activeChartIndex - 1;
-        setActiveChartIndex(newIndex);
-        scrollToActiveTab(newIndex);
-      } else if (translationX < -swipeThreshold && activeChartIndex < chartTypes.length - 1) {
-        // Swipe left - next chart
-        const newIndex = activeChartIndex + 1;
-        setActiveChartIndex(newIndex);
+      // Prevent swipes faster than 100ms
+      if (now - lastSwipeTime.current < 100) {
+        return;
+      }
+      lastSwipeTime.current = now;
+      
+      let newIndex = currentChartIndex;
+      
+      if (translationX > swipeThreshold && currentChartIndex > 0) {
+        newIndex = currentChartIndex - 1;
+      } else if (translationX < -swipeThreshold && currentChartIndex < chartTypes.length - 1) {
+        newIndex = currentChartIndex + 1;
+      }
+      
+      if (newIndex !== currentChartIndex) {
+        setCurrentChartIndex(newIndex);
         scrollToActiveTab(newIndex);
       }
     }
-  };
+  }, [currentChartIndex]);
   
-  const scrollToActiveTab = (index) => {
-    if (bottomNavScrollRef.current) {
-      const tabWidth = 76; // minWidth (60) + paddingHorizontal (24) + marginHorizontal (8)
-      const scrollX = Math.max(0, (index * tabWidth) - (width / 2) + (tabWidth / 2));
-      setTimeout(() => {
-        bottomNavScrollRef.current.scrollTo({ x: scrollX, animated: true });
-      }, 100);
+  const changeChart = useCallback((newIndex) => {
+    if (newIndex === currentChartIndex) return;
+    setCurrentChartIndex(newIndex);
+    scrollToActiveTab(newIndex);
+  }, [currentChartIndex]);
+  
+  const getChartDataForType = useCallback((chartType) => {
+    if (!birthData) return null;
+    
+    // Get from preloader cache
+    const cachedChart = chartPreloader.getChart(birthData, chartType);
+    if (cachedChart) {
+      console.log(`Using cached data for ${chartType}`);
+      return cachedChart;
     }
-  };
+    
+    // If it's the main chart (lagna), return the state data
+    if (chartType === 'lagna') return chartData;
+
+    // CRITICAL FIX: Return null for other charts if not cached.
+    // This forces ChartWidget to fetch the data itself instead of showing Lagna.
+    console.log(`No cached data for ${chartType}, returning null`);
+    return null; 
+  }, [birthData, chartData]);
+  
+  const scrollToActiveTab = useCallback((index) => {
+    if (bottomNavScrollRef.current) {
+      const tabWidth = 76;
+      const scrollX = Math.max(0, (index * tabWidth) - (width / 2) + (tabWidth / 2));
+      bottomNavScrollRef.current.scrollTo({ x: scrollX, animated: true });
+    }
+  }, []);
 
   useEffect(() => {
     loadBirthData();
@@ -117,7 +151,7 @@ export default function ChartScreen({ navigation, route }) {
       
       if (data && data.name) {
         setBirthData(data);
-        await calculateChart(data);
+        await preloadAllCharts(data);
       } else {
       }
     } catch (error) {
@@ -127,9 +161,8 @@ export default function ChartScreen({ navigation, route }) {
     }
   };
 
-  const calculateChart = async (data) => {
+  const preloadAllCharts = async (data) => {
     try {
-      
       // Format data properly for API
       const formattedData = {
         ...data,
@@ -140,12 +173,19 @@ export default function ChartScreen({ navigation, route }) {
         timezone: data.timezone || 'Asia/Kolkata'
       };
       
-      const response = await chartAPI.calculateChartOnly(formattedData);
-      const chartResult = response.data;
+      // Pre-load all charts at once
+      const allCharts = await chartPreloader.preloadAllCharts(formattedData);
+      setChartData(allCharts.lagna); // Set initial chart data
       
-      setChartData(chartResult);
     } catch (error) {
-      console.error('ChartScreen - Error calculating chart:', error);
+      console.error('ChartScreen - Error preloading charts:', error);
+      // Fallback to individual calculation
+      try {
+        const response = await chartAPI.calculateChartOnly(formattedData);
+        setChartData(response.data);
+      } catch (fallbackError) {
+        console.error('ChartScreen - Fallback calculation failed:', fallbackError);
+      }
     }
   };
 
@@ -160,11 +200,11 @@ export default function ChartScreen({ navigation, route }) {
             <Ionicons name="close" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={styles.chartName}>{chartTypes[activeChartIndex]?.name}</Text>
+            <Text style={styles.chartName}>{chartTypes[currentChartIndex]?.name}</Text>
             <Text style={styles.nativeName}>{birthData?.name}</Text>
           </View>
           <View style={styles.chartPosition}>
-            <Text style={styles.positionText}>{activeChartIndex + 1}/{chartTypes.length}</Text>
+            <Text style={styles.positionText}>{currentChartIndex + 1}/{chartTypes.length}</Text>
           </View>
         </View>
 
@@ -189,81 +229,36 @@ export default function ChartScreen({ navigation, route }) {
             <GestureHandlerRootView style={styles.chartArea}>
               <PanGestureHandler onHandlerStateChange={handleSwipe}>
                 <Animated.View style={styles.chartWrapper}>
-                  {(() => {
-                    const chart = chartTypes[activeChartIndex];
-                    if (chart.id === 'transit') {
-                      return (
-                        <ChartWidget 
-                          chartData={chartData}
-                          birthData={birthData}
-                          defaultStyle="north"
-                          showTransits={true}
-                          disableSwipe={true}
-                          hideHeader={true}
-                          cosmicTheme={true}
-                          chartType="transit"
-                          onOpenDasha={() => setShowDashaBrowser(true)}
-                          onNavigateToTransit={() => {
-                            const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
-                            if (transitIndex !== -1) {
-                              setActiveChartIndex(transitIndex);
-                              scrollToActiveTab(transitIndex);
-                            }
-                          }}
-                        />
-                      );
-                    } else if (chart.id === 'lagna') {
-                      return (
-                        <ChartWidget 
-                          chartData={chartData}
-                          birthData={birthData}
-                          defaultStyle="north"
-                          disableSwipe={true}
-                          hideHeader={true}
-                          cosmicTheme={true}
-                          chartType="lagna"
-                          onOpenDasha={() => setShowDashaBrowser(true)}
-                          onNavigateToTransit={() => {
-                            const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
-                            if (transitIndex !== -1) {
-                              setActiveChartIndex(transitIndex);
-                              scrollToActiveTab(transitIndex);
-                            }
-                          }}
-                        />
-                      );
-                    } else {
-                      return (
-                        <ChartWidget 
-                          chartData={chartData}
-                          birthData={birthData}
-                          defaultStyle="north"
-                          disableSwipe={true}
-                          hideHeader={true}
-                          cosmicTheme={true}
-                          chartType={chart.id}
-                          onOpenDasha={() => setShowDashaBrowser(true)}
-                          onNavigateToTransit={() => {
-                            const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
-                            if (transitIndex !== -1) {
-                              setActiveChartIndex(transitIndex);
-                              scrollToActiveTab(transitIndex);
-                            }
-                          }}
-                          division={chart.id === 'navamsa' ? 9 : 
-                                   chart.id === 'dashamsa' ? 10 :
-                                   chart.id === 'dwadashamsa' ? 12 :
-                                   chart.id === 'shodamsa' ? 16 :
-                                   chart.id === 'vimsamsa' ? 20 :
-                                   chart.id === 'chaturvimsamsa' ? 24 :
-                                   chart.id === 'trimsamsa' ? 30 :
-                                   chart.id === 'khavedamsa' ? 40 :
-                                   chart.id === 'akshavedamsa' ? 45 :
-                                   chart.id === 'shashtyamsa' ? 60 : 1}
-                        />
-                      );
-                    }
-                  })()} 
+
+                  <ChartWidget 
+                    key={currentChartIndex}
+                    chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
+                    birthData={birthData}
+                    defaultStyle="north"
+                    showTransits={chartTypes[currentChartIndex].id === 'transit'}
+                    disableSwipe={true}
+                    hideHeader={true}
+                    cosmicTheme={true}
+                    chartType={chartTypes[currentChartIndex].id}
+                    onOpenDasha={() => setShowDashaBrowser(true)}
+                    onNavigateToTransit={() => {
+                      const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
+                      if (transitIndex !== -1) {
+                        setCurrentChartIndex(transitIndex);
+                        scrollToActiveTab(transitIndex);
+                      }
+                    }}
+                    division={chartTypes[currentChartIndex].id === 'navamsa' ? 9 : 
+                             chartTypes[currentChartIndex].id === 'dashamsa' ? 10 :
+                             chartTypes[currentChartIndex].id === 'dwadashamsa' ? 12 :
+                             chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :
+                             chartTypes[currentChartIndex].id === 'vimsamsa' ? 20 :
+                             chartTypes[currentChartIndex].id === 'chaturvimsamsa' ? 24 :
+                             chartTypes[currentChartIndex].id === 'trimsamsa' ? 30 :
+                             chartTypes[currentChartIndex].id === 'khavedamsa' ? 40 :
+                             chartTypes[currentChartIndex].id === 'akshavedamsa' ? 45 :
+                             chartTypes[currentChartIndex].id === 'shashtyamsa' ? 60 : 1}
+                  /> 
                 </Animated.View>
               </PanGestureHandler>
             </GestureHandlerRootView>
@@ -279,16 +274,17 @@ export default function ChartScreen({ navigation, route }) {
                 {chartTypes.map((chart, index) => (
                   <TouchableOpacity
                     key={chart.id}
-                    style={[styles.navPill, activeChartIndex === index && styles.navPillActive]}
-                    onPress={() => {
-                      setActiveChartIndex(index);
-                      scrollToActiveTab(index);
-                    }}
+                    style={[
+                      styles.navPill, 
+                      currentChartIndex === index && styles.navPillActive
+                    ]}
+                    onPress={() => changeChart(index)}
+                    disabled={false}
                   >
-                    <Text style={[styles.navIcon, activeChartIndex === index && styles.navIconActive]}>
+                    <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>
                       {chart.icon}
                     </Text>
-                    <Text style={[styles.navText, activeChartIndex === index && styles.navTextActive]}>
+                    <Text style={[styles.navText, currentChartIndex === index && styles.navTextActive]}>
                       {chart.name.split(' ')[0]}
                     </Text>
                   </TouchableOpacity>
@@ -418,6 +414,34 @@ const styles = StyleSheet.create({
   chartWrapper: {
     flex: 1,
   },
+  transitionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  transitionSpinner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 107, 53, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  transitionIcon: {
+    fontSize: 20,
+    color: '#fff',
+  },
   
   // Bottom Navigation
   bottomNav: {
@@ -442,6 +466,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     minWidth: 60,
+    opacity: 1,
   },
   navPillActive: {
     backgroundColor: 'rgba(255, 107, 53, 0.8)',
@@ -452,6 +477,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+
   navIcon: {
     fontSize: 16,
     marginBottom: 2,

@@ -84,6 +84,7 @@ export const healthAPI = {
 export const chartAPI = {
   calculateChart: (birthData) => api.post(getEndpoint('/calculate-chart'), birthData),
   calculateChartOnly: (birthData) => api.post(getEndpoint('/calculate-chart-only'), birthData),
+  calculateAllCharts: (birthData) => api.post(getEndpoint('/calculate-all-charts'), birthData),
   calculateDivisionalChart: (birthData, division = 9) => 
     api.post(getEndpoint('/calculate-divisional-chart'), { birth_data: birthData, division }),
   calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => 
