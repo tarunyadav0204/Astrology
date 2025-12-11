@@ -16,6 +16,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from chat.chat_context_builder import ChatContextBuilder
 from chat.chat_session_manager import ChatSessionManager
 from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from calculators.chart_calculator import ChartCalculator
+from calculators.real_transit_calculator import RealTransitCalculator
+from calculators.event_predictor import EventPredictor
+from calculators.ashtakavarga import AshtakavargaCalculator
+from shared.dasha_calculator import DashaCalculator
 
 class ChatRequest(BaseModel):
     name: Optional[str] = None
@@ -607,4 +612,63 @@ async def save_message(request: dict):
         }
         
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/monthly-events")
+async def get_monthly_events(request: ClearChatRequest):
+    """
+    Get comprehensive monthly event predictions for a specific year.
+    Uses existing Chart and Transit calculators to ensure consistency.
+    """
+    try:
+        # 1. Prepare Birth Data Object (SimpleNamespace)
+        from types import SimpleNamespace
+        
+        # Normalize date/time format
+        date_str = request.date.split('T')[0] if 'T' in request.date else request.date
+        time_str = request.time.split('T')[1][:5] if 'T' in request.time else request.time
+        
+        birth_data_dict = {
+            'name': request.name,
+            'date': date_str,
+            'time': time_str,
+            'place': request.place,
+            'latitude': request.latitude or 28.6139,
+            'longitude': request.longitude or 77.2090,
+            'timezone': request.timezone or 'UTC+5:30',
+            'gender': request.gender
+        }
+        
+        # Create object for ChartCalculator
+        birth_obj = SimpleNamespace(**birth_data_dict)
+        
+        # 2. Determine Year
+        target_year = request.selectedYear or datetime.now().year
+        
+        # 3. Instantiate Existing Calculators
+        chart_calc = ChartCalculator({}) 
+        transit_calc = RealTransitCalculator()
+        
+        # Import DashaCalculator
+        from shared.dasha_calculator import DashaCalculator
+        dasha_calc = DashaCalculator()
+        
+        # 4. Pass them to the new AI-powered Predictor
+        predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
+        
+        # 5. Generate Predictions (Pass the DICT, await the result)
+        print(f"🔮 Generating monthly predictions for {target_year}...")
+        # FIX: Passing birth_data_dict (Dict) instead of birth_obj (Namespace)
+        predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
+        
+        return {
+            "status": "success",
+            "year": target_year,
+            "data": predictions
+        }
+        
+    except Exception as e:
+        print(f"❌ Monthly Event Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

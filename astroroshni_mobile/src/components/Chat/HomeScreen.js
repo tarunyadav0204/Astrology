@@ -309,6 +309,13 @@ const loadHomeData = async () => {
       title: 'Find Event Periods',
       description: 'Discover high-probability periods when specific events might happen',
       action: 'periods'
+    },
+    {
+      id: 'events',
+      icon: '🌟',
+      title: 'Event Timeline',
+      description: 'AI-powered yearly predictions with monthly breakdowns and major milestones',
+      action: 'events'
     }
   ];
 
@@ -828,6 +835,11 @@ function OptionCard({ option, index, onOptionSelect }) {
     ]).start();
   }, []);
   
+  // Special gradient for Event Timeline
+  const gradientColors = option.id === 'events' 
+    ? ['#FFD700', '#FF8C00'] 
+    : ['#ff6b35', '#ff8c5a'];
+  
   return (
     <Animated.View
       style={[
@@ -861,7 +873,7 @@ function OptionCard({ option, index, onOptionSelect }) {
         >
           <View style={styles.optionIconContainer}>
             <LinearGradient
-              colors={['#ff6b35', '#ff8c5a']}
+              colors={gradientColors}
               style={styles.optionIconGradient}
             >
               <Text style={styles.optionEmoji}>{option.icon}</Text>
@@ -1280,7 +1292,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    minHeight: 120,
+    minHeight: width * 0.32,
   },
   lifeAnalysisEmoji: {
     fontSize: 18,

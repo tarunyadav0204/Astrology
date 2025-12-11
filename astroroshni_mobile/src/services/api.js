@@ -1,10 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, getEndpoint } from '../utils/constants';
+import { API_BASE_URL, getEndpoint, API_TIMEOUT } from '../utils/constants';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // Increased timeout to 30 seconds
+  timeout: API_TIMEOUT, // 5 minutes timeout
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -57,6 +57,8 @@ export const chatAPI = {
   createSession: () => api.post(getEndpoint('/chat/session')),
   saveMessage: (sessionId, sender, content) => 
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
+  getEventPeriods: (birthData) => api.post(getEndpoint('/chat/event-periods'), birthData),
+  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData),
 };
 
 export const wealthAPI = {

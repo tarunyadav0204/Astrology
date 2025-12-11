@@ -34,18 +34,20 @@ import { Platform } from 'react-native';
 // API Configuration for AstroRoshni
 const getApiUrl = () => {
   // Localhost for testing
-  // if (Platform.OS === 'ios') {
-  //   return 'http://localhost:8001';
-  // } else {
-  //   return 'http://10.0.2.2:8001';
-  // }
+  if (Platform.OS === 'ios') {
+    return 'http://localhost:8001';
+  } else {
+    return 'http://10.0.2.2:8001';
+  }
   
   // Production
-  return 'https://astroroshni.com';
+  // return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();
 
+// Timeout configuration
+export const API_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 // Helper function to handle API endpoints for both dev and production
 export const getEndpoint = (path) => {

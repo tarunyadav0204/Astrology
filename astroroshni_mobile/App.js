@@ -21,6 +21,7 @@ import TradingCalendarScreen from './src/components/Trading/TradingCalendarScree
 import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
 import MuhuratHubScreen from './src/components/MuhuratHubScreen';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
+import EventScreen from './src/components/EventScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -178,6 +179,11 @@ export default function App() {
           <Stack.Screen 
             name="UniversalMuhurat" 
             component={UniversalMuhuratScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="EventScreen" 
+            component={EventScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
