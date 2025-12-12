@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function MonthlyAccordion({ data, onChatPress }) {
@@ -10,33 +10,39 @@ export default function MonthlyAccordion({ data, onChatPress }) {
     setExpanded(!expanded);
   };
 
-  // Get top focus tags
-  const tags = data.focus_areas ? data.focus_areas.slice(0, 3) : [];
+  // Get all focus tags (no limit)
+  const tags = data.focus_areas || [];
+  console.log(`${data.month} focus areas:`, tags.length, tags);
 
   return (
     <View style={styles.card}>
       {/* Header (Always Visible) */}
-      <TouchableOpacity onPress={toggleExpand} style={styles.header} activeOpacity={0.7}>
-        <View style={styles.leftCol}>
+      <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7}>
+        {/* Row 1: Month name + chevron */}
+        <View style={styles.headerRow}>
           <Text style={styles.monthName}>{data.month}</Text>
-        </View>
-        
-        <View style={styles.rightCol}>
-          {!expanded && (
-            <View style={styles.tagContainer}>
-              {tags.map((tag, i) => (
-                <View key={i} style={styles.miniTag}>
-                  <Text style={styles.miniTagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
           <Ionicons 
             name={expanded ? "chevron-up" : "chevron-down"} 
             size={20} 
             color="#666" 
           />
         </View>
+        
+        {/* Row 2: All chips in horizontal scroll (only when collapsed) */}
+        {!expanded && tags.length > 0 && (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsRow}
+            contentContainerStyle={styles.chipsContent}
+          >
+            {tags.map((tag, i) => (
+              <View key={`chip-${i}`} style={styles.miniTag}>
+                <Text style={styles.miniTagText}>{tag}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
       </TouchableOpacity>
 
       {/* Expanded Content */}
@@ -95,16 +101,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333'
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    height: 60,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
-  leftCol: { width: 60 },
   monthName: { fontSize: 16, fontWeight: 'bold', color: 'white', textTransform: 'uppercase' },
-  rightCol: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10 },
-  tagContainer: { flexDirection: 'row', gap: 6 },
+  chipsRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  chipsContent: {
+    gap: 6,
+  },
   miniTag: { backgroundColor: '#333', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   miniTagText: { color: '#CCC', fontSize: 10, fontWeight: '600' },
   

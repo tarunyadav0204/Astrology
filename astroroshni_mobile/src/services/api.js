@@ -59,6 +59,13 @@ export const chatAPI = {
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
   getEventPeriods: (birthData) => api.post(getEndpoint('/chat/event-periods'), birthData),
   getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData),
+  getMonthlyEventsStatus: (jobId) => api.get(getEndpoint(`/chat/monthly-events/status/${jobId}`)),
+  getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), birthData),
+  deductCredits: (amount) => api.post(getEndpoint('/credits/spend'), { 
+    amount, 
+    feature: 'event_timeline', 
+    description: 'Cosmic Timeline Analysis' 
+  }),
 };
 
 export const wealthAPI = {
@@ -116,6 +123,7 @@ export const creditAPI = {
     }),
   spendCredits: (amount, feature, description) => 
     api.post(getEndpoint('/credits/spend'), { amount, feature, description }),
+  getEventTimelineCost: () => api.get(getEndpoint('/credits/settings/event-timeline-cost')),
 };
 
 export const panchangAPI = {

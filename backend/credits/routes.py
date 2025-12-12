@@ -285,6 +285,17 @@ async def get_business_cost():
     cost = credit_service.get_credit_setting('business_opening_cost')
     return {"cost": cost}
 
+@router.get("/settings/event-timeline-cost")
+async def get_event_timeline_cost():
+    cost = credit_service.get_credit_setting('event_timeline_cost')
+    return {"cost": cost}
+
+@router.get("/settings")
+async def get_all_settings():
+    """Get all credit settings for frontend use"""
+    settings = credit_service.get_all_credit_settings()
+    return settings
+
 @router.post("/admin/bulk-promo-codes")
 async def create_bulk_promo_codes(request: dict, current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':

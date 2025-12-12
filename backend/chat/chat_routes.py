@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -8,6 +8,7 @@ import json
 import asyncio
 import html
 import re
+from datetime import datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
 
@@ -614,15 +615,55 @@ async def save_message(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def init_event_timeline_table():
+    """Initialize event timeline jobs table"""
+    import sqlite3
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS event_timeline_jobs (
+            job_id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            birth_data TEXT NOT NULL,
+            selected_year INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+            result_data TEXT,
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (userid)
+        )
+    ''')
+    
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_user_id ON event_timeline_jobs (user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_status ON event_timeline_jobs (status)')
+    
+    conn.commit()
+    conn.close()
+
 @router.post("/monthly-events")
-async def get_monthly_events(request: ClearChatRequest):
+async def get_monthly_events(request: ClearChatRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """
-    Get comprehensive monthly event predictions for a specific year.
-    Uses existing Chart and Transit calculators to ensure consistency.
+    Start async event timeline generation - returns job_id for polling
     """
+    import uuid
+    import sqlite3
+    
     try:
-        # 1. Prepare Birth Data Object (SimpleNamespace)
-        from types import SimpleNamespace
+        # Initialize table if needed
+        init_event_timeline_table()
+        
+        # Check credit cost and user balance
+        event_timeline_cost = credit_service.get_credit_setting('event_timeline_cost')
+        user_balance = credit_service.get_user_credits(current_user.userid)
+        
+        if user_balance < event_timeline_cost:
+            raise HTTPException(
+                status_code=402, 
+                detail=f"Insufficient credits for Event Timeline Analysis. You need {event_timeline_cost} credits but have {user_balance}."
+            )
         
         # Normalize date/time format
         date_str = request.date.split('T')[0] if 'T' in request.date else request.date
@@ -639,36 +680,171 @@ async def get_monthly_events(request: ClearChatRequest):
             'gender': request.gender
         }
         
-        # Create object for ChartCalculator
-        birth_obj = SimpleNamespace(**birth_data_dict)
-        
-        # 2. Determine Year
         target_year = request.selectedYear or datetime.now().year
         
-        # 3. Instantiate Existing Calculators
-        chart_calc = ChartCalculator({}) 
-        transit_calc = RealTransitCalculator()
+        # Create job
+        job_id = str(uuid.uuid4())
         
-        # Import DashaCalculator
-        from shared.dasha_calculator import DashaCalculator
-        dasha_calc = DashaCalculator()
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
         
-        # 4. Pass them to the new AI-powered Predictor
-        predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
+        cursor.execute(
+            "INSERT INTO event_timeline_jobs (job_id, user_id, birth_data, selected_year, status) VALUES (?, ?, ?, ?, ?)",
+            (job_id, current_user.userid, json.dumps(birth_data_dict), target_year, 'pending')
+        )
         
-        # 5. Generate Predictions (Pass the DICT, await the result)
-        print(f"🔮 Generating monthly predictions for {target_year}...")
-        # FIX: Passing birth_data_dict (Dict) instead of birth_obj (Namespace)
-        predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
+        conn.commit()
+        conn.close()
+        
+        # Start background processing
+        background_tasks.add_task(
+            process_event_timeline,
+            job_id, birth_data_dict, target_year, current_user.userid, event_timeline_cost
+        )
         
         return {
-            "status": "success",
-            "year": target_year,
-            "data": predictions
+            "job_id": job_id,
+            "status": "pending",
+            "message": "Generating your cosmic timeline..."
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Monthly Event Error: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/monthly-events/status/{job_id}")
+async def get_event_timeline_status(job_id: str, current_user: User = Depends(get_current_user)):
+    """Poll event timeline job status"""
+    import sqlite3
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT status, result_data, error_message, started_at, completed_at
+        FROM event_timeline_jobs
+        WHERE job_id = ? AND user_id = ?
+    ''', (job_id, current_user.userid))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    status, result_data, error_message, started_at, completed_at = result
+    
+    response = {"status": status}
+    
+    if status == "completed" and result_data:
+        response["data"] = json.loads(result_data)
+        response["completed_at"] = completed_at
+    elif status == "failed":
+        response["error"] = error_message or "Analysis failed"
+    elif status in ["pending", "processing"]:
+        response["message"] = "Analyzing planetary positions..."
+        if started_at:
+            response["started_at"] = started_at
+    
+    return response
+
+@router.post("/monthly-events/cached")
+async def get_cached_timeline(request: ClearChatRequest, current_user: User = Depends(get_current_user)):
+    """Get cached event timeline if exists for user and year"""
+    import sqlite3
+    
+    try:
+        target_year = request.selectedYear or datetime.now().year
+        
+        print(f"🔍 Checking cache for user {current_user.userid}, year {target_year}")
+        
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        # Find most recent completed job for this user/year
+        cursor.execute('''
+            SELECT result_data, completed_at, job_id
+            FROM event_timeline_jobs
+            WHERE user_id = ? AND selected_year = ? AND status = 'completed'
+            ORDER BY completed_at DESC
+            LIMIT 1
+        ''', (current_user.userid, target_year))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            print(f"✅ Found cached timeline: job_id={result[2]}, cached_at={result[1]}")
+            return {
+                "cached": True,
+                "data": json.loads(result[0]),
+                "cached_at": result[1]
+            }
+        
+        print(f"❌ No cached timeline found")
+        return {"cached": False}
+        
+    except Exception as e:
+        print(f"❌ Error fetching cached timeline: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"cached": False}
+
+async def process_event_timeline(job_id: str, birth_data_dict: dict, target_year: int, user_id: int, cost: int):
+    """Background task to process event timeline"""
+    import sqlite3
+    
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    
+    try:
+        # Update status to processing
+        cursor.execute(
+            "UPDATE event_timeline_jobs SET status = ?, started_at = ? WHERE job_id = ?",
+            ('processing', datetime.now(), job_id)
+        )
+        conn.commit()
+        
+        # Generate predictions
+        chart_calc = ChartCalculator({}) 
+        transit_calc = RealTransitCalculator()
+        from shared.dasha_calculator import DashaCalculator
+        dasha_calc = DashaCalculator()
+        
+        predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
+        predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
+        
+        if predictions.get('status') == 'success':
+            # Deduct credits
+            success = credit_service.spend_credits(
+                user_id, 
+                cost, 
+                'event_timeline', 
+                f"Cosmic Timeline Analysis for {target_year}"
+            )
+            
+            if not success:
+                raise Exception("Credit deduction failed")
+            
+            # Save result
+            cursor.execute(
+                "UPDATE event_timeline_jobs SET status = ?, result_data = ?, completed_at = ? WHERE job_id = ?",
+                ('completed', json.dumps(predictions), datetime.now(), job_id)
+            )
+            conn.commit()
+        else:
+            raise Exception(predictions.get('error', 'Prediction failed'))
+        
+    except Exception as e:
+        print(f"❌ Background task error: {str(e)}")
+        cursor.execute(
+            "UPDATE event_timeline_jobs SET status = ?, error_message = ?, completed_at = ? WHERE job_id = ?",
+            ('failed', str(e), datetime.now(), job_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()

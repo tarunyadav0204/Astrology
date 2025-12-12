@@ -189,6 +189,13 @@ class CreditService:
                 VALUES ('business_opening_cost', 20, 'Credits per business opening muhurat')
             ''')
         
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'event_timeline_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('event_timeline_cost', 100, 'Credits per yearly event timeline analysis')
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -357,7 +364,7 @@ class CreditService:
         cursor.execute("""
             SELECT setting_key, setting_value, description 
             FROM credit_settings 
-            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost')
+            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost')
             ORDER BY setting_key
         """)
         
