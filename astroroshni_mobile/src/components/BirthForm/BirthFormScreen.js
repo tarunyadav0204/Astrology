@@ -313,12 +313,14 @@ export default function BirthFormScreen({ navigation, route }) {
 
       const profileData = {
         ...formData,
-        time: formData.time.toTimeString().split(' ')[0]
+        time: formData.time.toTimeString().split(' ')[0],
+        id: birthChartId // Add the database ID
       };
       
       // console.log('💾 [DEBUG] BirthForm: Saving profile data:', JSON.stringify(profileData, null, 2));
       // console.log('⚧️ [DEBUG] BirthForm: Gender being saved:', profileData.gender);
       // console.log('🔄 [DEBUG] BirthForm: Update gender mode:', updateGender);
+      // console.log('🆔 [DEBUG] BirthForm: Birth chart ID:', birthChartId);
       
       await storage.setBirthDetails(profileData);
       // Only add to profiles list if this is a new profile, not an update
@@ -332,12 +334,14 @@ export default function BirthFormScreen({ navigation, route }) {
       // console.log('✅ [DEBUG] BirthForm: Verified saved gender:', savedData?.gender);
       
       // Always save to backend database
+      let birthChartId = null;
       try {
         const token = await storage.getAuthToken();
         if (token) {
           // console.log('🔄 [DEBUG] BirthForm: Saving to backend database:', JSON.stringify(birthData, null, 2));
-          await authAPI.updateSelfBirthChart(birthData, !updateGender && !editProfile);
-          // console.log('✅ [DEBUG] BirthForm: Chart saved to database');
+          const response = await authAPI.updateSelfBirthChart(birthData, !updateGender && !editProfile);
+          birthChartId = response.data?.birth_chart_id;
+          // console.log('✅ [DEBUG] BirthForm: Chart saved to database with id:', birthChartId);
         } else {
           console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend save');
         }

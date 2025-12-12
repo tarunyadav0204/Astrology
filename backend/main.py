@@ -1283,7 +1283,7 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     
     # Look for chart with relation = 'self'
     cursor.execute('''
-        SELECT name, date, time, latitude, longitude, timezone, place, gender
+        SELECT id, name, date, time, latitude, longitude, timezone, place, gender
         FROM birth_charts WHERE userid = ? AND relation = 'self'
         ORDER BY created_at DESC LIMIT 1
     ''', (current_user.userid,))
@@ -1296,28 +1296,30 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
         return {"has_self_chart": False}
 
     # Decrypt data
+    birth_chart_id = result[0]
     if encryptor:
-        name = encryptor.decrypt(result[0])
-        date = encryptor.decrypt(result[1])
-        time = encryptor.decrypt(result[2])
-        lat = float(encryptor.decrypt(str(result[3])))
-        lon = float(encryptor.decrypt(str(result[4])))
-        place = encryptor.decrypt(result[6])
+        name = encryptor.decrypt(result[1])
+        date = encryptor.decrypt(result[2])
+        time = encryptor.decrypt(result[3])
+        lat = float(encryptor.decrypt(str(result[4])))
+        lon = float(encryptor.decrypt(str(result[5])))
+        place = encryptor.decrypt(result[7])
     else:
-        name, date, time = result[0], result[1], result[2]
-        lat, lon, place = result[3], result[4], result[6]
+        name, date, time = result[1], result[2], result[3]
+        lat, lon, place = result[4], result[5], result[7]
 
     conn.close()
     return {
         "has_self_chart": True,
+        "birth_chart_id": birth_chart_id,
         "name": name,
         "date": date,
         "time": time,
         "latitude": lat,
         "longitude": lon,
-        "timezone": result[5],
+        "timezone": result[6],
         "place": place,
-        "gender": result[7]
+        "gender": result[8]
     }
 
 
@@ -1360,6 +1362,7 @@ async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = 
             
             cursor.execute("UPDATE birth_charts SET relation = 'self' WHERE id = ?", (existing_chart[0],))
             print(f"DEBUG: Updated existing chart {existing_chart[0]} to relation='self'")
+            birth_chart_id = existing_chart[0]
         else:
             if clear_existing:
                 cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
@@ -1369,11 +1372,12 @@ async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
                 birth_data.timezone, enc_place, birth_data.gender or '', 'self'))
-            print(f"DEBUG: Inserted new chart as relation='self'")
+            birth_chart_id = cursor.lastrowid
+            print(f"DEBUG: Inserted new chart as relation='self' with id={birth_chart_id}")
 
         conn.commit()
-        print(f"DEBUG: Successfully updated self birth chart for user {current_user.userid}")
-        return {"message": "Self birth chart updated successfully"}
+        print(f"DEBUG: Successfully updated self birth chart for user {current_user.userid}, id={birth_chart_id}")
+        return {"message": "Self birth chart updated successfully", "birth_chart_id": birth_chart_id}
         
     except sqlite3.Error as e:
         print(f"ERROR: Database error in update_self_birth_chart: {str(e)}")

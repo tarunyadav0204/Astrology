@@ -25,6 +25,13 @@ import MonthlyAccordion from './MonthlyAccordion';
 
 const { width } = Dimensions.get('window');
 
+// Layout constants for FlatList
+const START_YEAR = 1950;
+const ITEM_WIDTH = 80;
+const ITEM_GAP = 12;
+const TOTAL_ITEM_SIZE = ITEM_WIDTH + ITEM_GAP;
+const SIDE_PADDING = (width - ITEM_WIDTH) / 2;
+
 export default function EventScreen({ route }) {
   const navigation = useNavigation();
   const { credits, fetchBalance } = useCredits();
@@ -37,6 +44,8 @@ export default function EventScreen({ route }) {
   const [analysisStarted, setAnalysisStarted] = useState(false);
   const [creditCost, setCreditCost] = useState(100);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const progressIntervalRef = useRef(null);
   const [nativeName, setNativeName] = useState('');
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const yearSliderRef = useRef(null);
@@ -132,13 +141,39 @@ export default function EventScreen({ route }) {
       setLoadingMessageIndex(prev => (prev + 1) % loadingMessages.length);
     }, 3000);
     
+    // Start progress bar animation
+    setLoadingProgress(0);
+    let elapsed = 0;
+    progressIntervalRef.current = setInterval(() => {
+      elapsed += 100;
+      if (elapsed <= 60000) {
+        setLoadingProgress((elapsed / 60000) * 90);
+      } else if (elapsed <= 90000) {
+        setLoadingProgress(90);
+      } else {
+        setLoadingProgress(-1);
+      }
+    }, 100);
+    
     try {
       const birthData = await getBirthDetails();
       if (!birthData) return;
       
+      if (!birthData.id) {
+        Alert.alert('Error', 'Birth chart ID not found. Please re-select your birth chart.');
+        setAnalysisStarted(false);
+        setLoadingMonthly(false);
+        if (loadingIntervalRef.current) {
+          clearInterval(loadingIntervalRef.current);
+          loadingIntervalRef.current = null;
+        }
+        return;
+      }
+      
       const startResponse = await chatAPI.getMonthlyEvents({
         ...birthData,
-        selectedYear: year
+        selectedYear: year,
+        birth_chart_id: birthData.id
       });
       
       // Check if we got the old format (direct data) or new format (job_id)
@@ -149,6 +184,10 @@ export default function EventScreen({ route }) {
         if (loadingIntervalRef.current) {
           clearInterval(loadingIntervalRef.current);
           loadingIntervalRef.current = null;
+        }
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
         }
         return;
       }
@@ -173,6 +212,10 @@ export default function EventScreen({ route }) {
               clearInterval(loadingIntervalRef.current);
               loadingIntervalRef.current = null;
             }
+            if (progressIntervalRef.current) {
+              clearInterval(progressIntervalRef.current);
+              progressIntervalRef.current = null;
+            }
           } else if (status === 'failed') {
             clearInterval(pollInterval);
             throw new Error(statusResponse.data.error || 'Analysis failed');
@@ -191,6 +234,10 @@ export default function EventScreen({ route }) {
           if (loadingIntervalRef.current) {
             clearInterval(loadingIntervalRef.current);
             loadingIntervalRef.current = null;
+          }
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
           }
           Alert.alert('Timeout', 'Analysis is taking longer than expected. Please try again.');
           setAnalysisStarted(false);
@@ -219,6 +266,10 @@ export default function EventScreen({ route }) {
         clearInterval(loadingIntervalRef.current);
         loadingIntervalRef.current = null;
       }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
     }
   }, [fetchBalance, loadingMessages.length]);
 
@@ -233,14 +284,36 @@ export default function EventScreen({ route }) {
         const birthData = await getBirthDetails();
         if (!birthData) return;
         
+        console.log('🔍 Checking cache with:', { 
+          birth_chart_id: birthData.id, 
+          selectedYear: selectedYear,
+          name: birthData.name 
+        });
+        
         const cacheResponse = await chatAPI.getCachedMonthlyEvents({
           ...birthData,
-          selectedYear: selectedYear
+          selectedYear: selectedYear,
+          birth_chart_id: birthData.id
         });
+        
+        console.log('📦 Cache response:', cacheResponse.data);
         
         if (cacheResponse.data?.cached && cacheResponse.data?.data) {
           setMonthlyData(cacheResponse.data.data);
         } else {
+          // No cached data - check credits before generating
+          await fetchBalance();
+          const freshBalance = await creditAPI.getBalance();
+          const actualCredits = freshBalance.data.balance;
+          
+          if (actualCredits < creditCost) {
+            Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
+              { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+              { text: 'Cancel', onPress: () => setAnalysisStarted(false) }
+            ]);
+            return;
+          }
+          
           fetchMonthlyGuide(selectedYear);
         }
       } catch (error) {
@@ -257,6 +330,9 @@ export default function EventScreen({ route }) {
       if (loadingIntervalRef.current) {
         clearInterval(loadingIntervalRef.current);
       }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
     };
   }, [selectedYear, analysisStarted]);
 
@@ -265,12 +341,30 @@ export default function EventScreen({ route }) {
     fetchMonthlyGuide(selectedYear).then(() => setRefreshing(false));
   }, [selectedYear]);
 
+  const years = React.useMemo(() => Array.from({length: 101}, (_, i) => START_YEAR + i), []);
+
+  useEffect(() => {
+    if (yearSliderRef.current && !analysisStarted) {
+      const index = selectedYear - START_YEAR;
+      setTimeout(() => {
+        yearSliderRef.current?.scrollToIndex({ 
+          index, 
+          animated: false,
+          viewPosition: 0
+        });
+      }, 100);
+    }
+  }, [analysisStarted]);
+
   const handleYearChange = (year) => {
     setSelectedYear(year);
-    setTimeout(() => {
-      const index = year - 1950;
-      yearSliderRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
-    }, 100);
+    setMonthlyData(null); // Clear data when year changes
+    const index = year - START_YEAR;
+    yearSliderRef.current?.scrollToIndex({ 
+      index, 
+      animated: true, 
+      viewPosition: 0 
+    });
   };
 
   const navigateToChat = (context, type) => {
@@ -281,24 +375,52 @@ export default function EventScreen({ route }) {
     });
   };
 
-  const handleStartAnalysis = async () => {
-    // Fetch fresh balance to ensure sync with backend
-    await fetchBalance();
-    
-    // Re-check after fetching fresh balance
-    const freshBalance = await creditAPI.getBalance();
-    const actualCredits = freshBalance.data.balance;
-    
-    if (actualCredits < creditCost) {
-      Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
-        { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
-        { text: 'Cancel', style: 'cancel' }
-      ]);
-      return;
+  const handleContinue = async () => {
+    try {
+      const birthData = await getBirthDetails();
+      if (!birthData || !birthData.id) {
+        Alert.alert('Error', 'Birth chart not found. Please select a birth chart.');
+        return;
+      }
+      
+      // Check if cached data exists
+      const cacheResponse = await chatAPI.getCachedMonthlyEvents({
+        ...birthData,
+        selectedYear: selectedYear,
+        birth_chart_id: birthData.id
+      });
+      
+      if (cacheResponse.data?.cached) {
+        // Cached data exists - proceed directly
+        setAnalysisStarted(true);
+      } else {
+        // No cache - show credit confirmation modal
+        await fetchBalance();
+        const freshBalance = await creditAPI.getBalance();
+        const actualCredits = freshBalance.data.balance;
+        
+        if (actualCredits < creditCost) {
+          Alert.alert('Insufficient Credits', `You need ${creditCost} credits for this analysis. You have ${actualCredits} credits.`, [
+            { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+          return;
+        }
+        
+        // Show confirmation modal
+        Alert.alert(
+          'Generate Predictions',
+          `This will cost ${creditCost} credits to generate predictions for ${selectedYear}. Continue?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => setAnalysisStarted(true) }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error checking cache:', error);
+      Alert.alert('Error', 'Failed to check for existing predictions. Please try again.');
     }
-
-    // Don't manually deduct credits - the monthly-events endpoint handles it automatically
-    setAnalysisStarted(true);
   };
 
   const getMonthName = (monthId) => {
@@ -359,7 +481,7 @@ export default function EventScreen({ route }) {
       </Modal>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => analysisStarted ? setAnalysisStarted(false) : navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{analysisStarted ? `${selectedYear} Predictions` : 'Select Year'}</Text>
@@ -383,41 +505,51 @@ export default function EventScreen({ route }) {
           <Text style={styles.selectionTitle}>🌟 Select Your Year</Text>
           <Text style={styles.selectionSubtitle}>Which year would you like to explore?</Text>
           
-          {/* Year Picker */}
-          <View style={styles.yearPickerContainer}>
+          {/* Year Picker - Horizontal Chips */}
+          <View style={styles.yearChipsContainer}>
             <FlatList
               ref={yearSliderRef}
-              data={Array.from({length: 101}, (_, i) => 1950 + i)}
+              horizontal
+              data={years}
               keyExtractor={(item) => item.toString()}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.yearPickerContent}
-              snapToInterval={60}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.yearChipsContent}
               decelerationRate="fast"
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.yearItem}
-                  onPress={() => handleYearChange(item)}
-                >
-                  <Text style={[styles.yearText, selectedYear === item && styles.selectedYearText]}>
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
               getItemLayout={(data, index) => ({
-                length: 60,
-                offset: 60 * index,
+                length: TOTAL_ITEM_SIZE,
+                offset: TOTAL_ITEM_SIZE * index,
                 index,
               })}
-              initialScrollIndex={selectedYear - 1950}
               onScrollToIndexFailed={(info) => {
-                setTimeout(() => {
-                  yearSliderRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
-                }, 100);
+                const wait = new Promise(resolve => setTimeout(resolve, 500));
+                wait.then(() => {
+                  yearSliderRef.current?.scrollToIndex({ 
+                    index: info.index, 
+                    animated: true,
+                    viewPosition: 0
+                  });
+                });
               }}
+              renderItem={({ item }) => (
+                <View style={{ width: TOTAL_ITEM_SIZE }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.yearChip,
+                      selectedYear === item && styles.yearChipSelected,
+                      { width: ITEM_WIDTH }
+                    ]}
+                    onPress={() => handleYearChange(item)}
+                  >
+                    <Text style={[
+                      styles.yearChipText,
+                      selectedYear === item && styles.yearChipTextSelected
+                    ]}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             />
-            <View style={styles.yearPickerOverlay} pointerEvents="none">
-              <View style={styles.yearPickerHighlight} />
-            </View>
           </View>
 
           {/* Quick Select */}
@@ -457,23 +589,14 @@ export default function EventScreen({ route }) {
             </View>
           </View>
 
-          {/* Unlock or Get Credits Button */}
+          {/* Continue Button */}
           <View style={styles.unlockButtonContainer}>
-                {credits < creditCost ? (
-              <TouchableOpacity style={styles.unlockButton} onPress={() => navigation.navigate('Credits')}>
-                <LinearGradient colors={['#FF6B6B', '#FF8E53']} style={styles.unlockGradient}>
-                  <Text style={styles.unlockButtonText}>Get {creditCost - credits} More Credits</Text>
-                  <Ionicons name="card" size={20} color="#000" />
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.unlockButton} onPress={handleStartAnalysis}>
-                <LinearGradient colors={['#FFD700', '#FFA500']} style={styles.unlockGradient}>
-                  <Text style={styles.unlockButtonText}>Unlock for {creditCost} Credits</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#000" />
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.unlockButton} onPress={handleContinue}>
+              <LinearGradient colors={['#FFD700', '#FFA500']} style={styles.unlockGradient}>
+                <Text style={styles.unlockButtonText}>Continue</Text>
+                <Ionicons name="arrow-forward" size={20} color="#000" />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       ) : (
@@ -511,17 +634,19 @@ export default function EventScreen({ route }) {
               <ActivityIndicator size="large" color="#FFD700" />
               <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
               <Text style={styles.loadingText}>{loadingMessages[loadingMessageIndex].text}</Text>
-              <View style={styles.loadingDotsContainer}>
-                {loadingMessages.map((_, index) => (
-                  <View 
-                    key={index} 
-                    style={[
-                      styles.loadingDot,
-                      index === loadingMessageIndex && styles.loadingDotActive
-                    ]} 
-                  />
-                ))}
-              </View>
+              
+              {loadingProgress >= 0 ? (
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarTrack}>
+                    <View style={[styles.progressBarFill, { width: `${loadingProgress}%` }]} />
+                  </View>
+                  <Text style={styles.progressPercentText}>
+                    {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : 'Almost there...'}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.takingLongerText}>Taking longer than usual...</Text>
+              )}
             </View>
           </View>
         ) : monthlyData?.monthly_predictions ? (
@@ -594,11 +719,13 @@ const styles = StyleSheet.create({
   trendText: { color: '#DDD', fontSize: 14, lineHeight: 20, flex: 1 },
   
   loadingContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
-  loadingIcon: { fontSize: 48, marginTop: 16, marginBottom: 8 },
+  loadingIcon: { fontSize: 48, marginTop: 16, marginBottom: 8, color: 'white' },
   loadingText: { color: 'white', marginTop: 12, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 24 },
-  loadingDotsContainer: { flexDirection: 'row', marginTop: 20, gap: 8 },
-  loadingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#333' },
-  loadingDotActive: { backgroundColor: '#FFD700', width: 24 },
+  progressBarContainer: { width: '100%', marginTop: 24, alignItems: 'center' },
+  progressBarTrack: { width: '100%', height: 6, backgroundColor: '#333', borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 3 },
+  progressPercentText: { color: '#FFD700', fontSize: 14, fontWeight: '600', marginTop: 8 },
+  takingLongerText: { color: '#AAA', fontSize: 14, marginTop: 24, fontStyle: 'italic' },
   
   waitingContainer: { 
     flex: 1, 
@@ -632,42 +759,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20
   },
-  yearPickerContainer: {
-    height: 180,
-    marginBottom: 16,
-    position: 'relative'
+  yearChipsContainer: {
+    marginBottom: 20,
+    height: 60
   },
-  yearPickerContent: {
-    paddingVertical: 60
+  yearChipsContent: {
+    paddingHorizontal: (width - 80) / 2
   },
-  yearItem: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  yearText: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#555'
-  },
-  selectedYearText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#FFD700'
-  },
-  yearPickerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  yearChip: {
+    paddingVertical: 12,
+    backgroundColor: '#2A2A40',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#444',
+    alignItems: 'center',
     justifyContent: 'center'
   },
-  yearPickerHighlight: {
-    height: 60,
-    borderTopWidth: 2,
-    borderBottomWidth: 2,
+  yearChipSelected: {
+    backgroundColor: '#FFD700',
     borderColor: '#FFD700'
+  },
+  yearChipText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#AAA'
+  },
+  yearChipTextSelected: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000'
   },
   quickSelectContainer: {
     flexDirection: 'row',

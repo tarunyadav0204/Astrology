@@ -52,6 +52,7 @@ class ClearChatRequest(BaseModel):
     timezone: Optional[str] = None
     gender: Optional[str] = None
     selectedYear: Optional[int] = None
+    birth_chart_id: Optional[int] = None
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -625,7 +626,7 @@ def init_event_timeline_table():
         CREATE TABLE IF NOT EXISTS event_timeline_jobs (
             job_id TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL,
-            birth_data TEXT NOT NULL,
+            birth_chart_id INTEGER NOT NULL,
             selected_year INTEGER NOT NULL,
             status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
             result_data TEXT,
@@ -633,11 +634,13 @@ def init_event_timeline_table():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             started_at TIMESTAMP,
             completed_at TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (userid)
+            FOREIGN KEY (user_id) REFERENCES users (userid),
+            FOREIGN KEY (birth_chart_id) REFERENCES birth_charts (id)
         )
     ''')
     
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_user_id ON event_timeline_jobs (user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_birth_chart ON event_timeline_jobs (birth_chart_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_timeline_status ON event_timeline_jobs (status)')
     
     conn.commit()
@@ -688,9 +691,14 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
         
+        birth_chart_id = request.birth_chart_id
+        if not birth_chart_id:
+            print(f"❌ Missing birth_chart_id in request: {request}")
+            raise HTTPException(status_code=400, detail="birth_chart_id is required. Please ensure birth chart is saved to database.")
+        
         cursor.execute(
-            "INSERT INTO event_timeline_jobs (job_id, user_id, birth_data, selected_year, status) VALUES (?, ?, ?, ?, ?)",
-            (job_id, current_user.userid, json.dumps(birth_data_dict), target_year, 'pending')
+            "INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, status) VALUES (?, ?, ?, ?, ?)",
+            (job_id, current_user.userid, birth_chart_id, target_year, 'pending')
         )
         
         conn.commit()
@@ -699,7 +707,7 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
         # Start background processing
         background_tasks.add_task(
             process_event_timeline,
-            job_id, birth_data_dict, target_year, current_user.userid, event_timeline_cost
+            job_id, birth_chart_id, target_year, current_user.userid, event_timeline_cost
         )
         
         return {
@@ -760,19 +768,36 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
     try:
         target_year = request.selectedYear or datetime.now().year
         
-        print(f"🔍 Checking cache for user {current_user.userid}, year {target_year}")
+        print(f"🔍 Checking cache for user {current_user.userid}, birth_chart_id {request.birth_chart_id}, year {target_year}")
         
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
         
-        # Find most recent completed job for this user/year
+        birth_chart_id = request.birth_chart_id
+        if not birth_chart_id:
+            print(f"⚠️ No birth_chart_id provided for cache lookup")
+            return {"cached": False}
+        
+        # Debug: Show all jobs for this user and birth_chart
+        cursor.execute('''
+            SELECT job_id, birth_chart_id, selected_year, status
+            FROM event_timeline_jobs
+            WHERE user_id = ? AND birth_chart_id = ?
+            ORDER BY created_at DESC
+        ''', (current_user.userid, birth_chart_id))
+        all_jobs = cursor.fetchall()
+        print(f"📊 All jobs for user {current_user.userid}, birth_chart {birth_chart_id}: {all_jobs}")
+        
+        # Find most recent completed job for this user/birth_chart/year
         cursor.execute('''
             SELECT result_data, completed_at, job_id
             FROM event_timeline_jobs
-            WHERE user_id = ? AND selected_year = ? AND status = 'completed'
+            WHERE user_id = ? AND birth_chart_id = ? AND selected_year = ? AND status = 'completed'
             ORDER BY completed_at DESC
             LIMIT 1
-        ''', (current_user.userid, target_year))
+        ''', (current_user.userid, birth_chart_id, target_year))
+        
+        print(f"🔎 Cache query params: user_id={current_user.userid}, birth_chart_id={birth_chart_id}, year={target_year}")
         
         result = cursor.fetchone()
         conn.close()
@@ -794,7 +819,7 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
         traceback.print_exc()
         return {"cached": False}
 
-async def process_event_timeline(job_id: str, birth_data_dict: dict, target_year: int, user_id: int, cost: int):
+async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: int, user_id: int, cost: int):
     """Background task to process event timeline"""
     import sqlite3
     
@@ -808,6 +833,41 @@ async def process_event_timeline(job_id: str, birth_data_dict: dict, target_year
             ('processing', datetime.now(), job_id)
         )
         conn.commit()
+        
+        # Fetch birth data from database
+        cursor.execute('''
+            SELECT name, date, time, latitude, longitude, timezone, place, gender
+            FROM birth_charts WHERE id = ?
+        ''', (birth_chart_id,))
+        
+        birth_row = cursor.fetchone()
+        if not birth_row:
+            raise Exception("Birth chart not found")
+        
+        from encryption_utils import EncryptionManager
+        try:
+            encryptor = EncryptionManager()
+            birth_data_dict = {
+                'name': encryptor.decrypt(birth_row[0]),
+                'date': encryptor.decrypt(birth_row[1]),
+                'time': encryptor.decrypt(birth_row[2]),
+                'latitude': float(encryptor.decrypt(str(birth_row[3]))),
+                'longitude': float(encryptor.decrypt(str(birth_row[4]))),
+                'timezone': birth_row[5],
+                'place': encryptor.decrypt(birth_row[6] or ''),
+                'gender': birth_row[7] or ''
+            }
+        except:
+            birth_data_dict = {
+                'name': birth_row[0],
+                'date': birth_row[1],
+                'time': birth_row[2],
+                'latitude': birth_row[3],
+                'longitude': birth_row[4],
+                'timezone': birth_row[5],
+                'place': birth_row[6] or '',
+                'gender': birth_row[7] or ''
+            }
         
         # Generate predictions
         chart_calc = ChartCalculator({}) 

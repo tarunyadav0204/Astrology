@@ -10,7 +10,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
@@ -21,6 +21,7 @@ import DateNavigator from '../Common/DateNavigator';
 
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
+  const insets = useSafeAreaInsets();
   const [cascadingData, setCascadingData] = useState(null);
   const [kalchakraData, setKalchakraData] = useState(null);
   const [kalchakraAntarData, setKalchakraAntarData] = useState(null);
@@ -2055,9 +2056,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   if (loading) {
     return (
-      <Modal visible={visible} animationType="slide">
-        <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
-        <SafeAreaView style={styles.container}>
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+        <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
+          <StatusBar barStyle="dark-content" />
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeIcon}>✕</Text>
@@ -2069,16 +2070,16 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             <ActivityIndicator size="large" color={COLORS.accent} />
             <Text style={styles.loadingText}>Loading Dasha Data...</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     );
   }
 
   if (error) {
     return (
-      <Modal visible={visible} animationType="slide">
-        <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
-        <SafeAreaView style={styles.container}>
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+        <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
+          <StatusBar barStyle="dark-content" />
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeIcon}>✕</Text>
@@ -2092,15 +2093,15 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     );
   }
 
   return (
-    <Modal visible={visible} animationType="slide">
-      <StatusBar barStyle="light-content" backgroundColor="#ff6f00" translucent={false} />
-      <SafeAreaView style={styles.container}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+      <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
+        <StatusBar barStyle="dark-content" />
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Text style={styles.closeIcon}>✕</Text>
@@ -2136,7 +2137,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         </ScrollView>
         
         {renderSystemInfoModal()}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
@@ -2145,6 +2146,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === 'ios' ? 0 : 0,
   },
   header: {
     flexDirection: 'row',

@@ -82,14 +82,20 @@ export default function ProfileScreen({ navigation }) {
       
       
       if (response.data.has_self_chart) {
-        setBirthData(response.data);
+        const birthDataWithId = {
+          ...response.data,
+          id: response.data.birth_chart_id // Ensure id is included
+        };
+        setBirthData(birthDataWithId);
+        // Also update local storage with the id
+        await storage.setBirthDetails(birthDataWithId);
         setStats({
           totalChats: 24,
           chartsViewed: 12,
           daysActive: 7,
         });
-        loadChartData(response.data);
-        loadDashaData(response.data);
+        loadChartData(birthDataWithId);
+        loadDashaData(birthDataWithId);
       } else {
         // User hasn't set their own birth details
         setBirthData(null);

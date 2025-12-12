@@ -12,7 +12,6 @@ export default function MonthlyAccordion({ data, onChatPress }) {
 
   // Get all focus tags (no limit)
   const tags = data.focus_areas || [];
-  console.log(`${data.month} focus areas:`, tags.length, tags);
 
   return (
     <View style={styles.card}>
