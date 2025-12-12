@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { storage } from '../../services/storage';
@@ -28,20 +29,38 @@ export default function BirthFormScreen({ navigation, route }) {
   const prefillData = route?.params?.prefillData;
   const updateGender = route?.params?.updateGender;
   const [step, setStep] = useState(updateGender ? 2 : 1); // Start at gender step if updating gender
+  const getTimeDate = (timeString) => {
+    if (!timeString) return new Date();
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    return date;
+  };
+
   const [formData, setFormData] = useState({
     name: editProfile?.name || prefillData?.name || '',
     date: editProfile?.date ? new Date(editProfile.date) : new Date(),
-    time: editProfile?.time ? new Date(`2000-01-01T${editProfile.time}`) : new Date(),
+    time: editProfile?.time ? getTimeDate(editProfile.time) : new Date(),
     place: editProfile?.place || '',
     latitude: editProfile?.latitude || null,
     longitude: editProfile?.longitude || null,
     timezone: editProfile?.timezone || 'UTC+5:30',
     gender: editProfile?.gender?.trim() || '',
   });
+  
+  const getPickerDate = () => {
+    const d = new Date();
+    d.setHours(formData.time.getHours(), formData.time.getMinutes(), 0, 0);
+    return d;
+  };
   const [loadingExistingData, setLoadingExistingData] = useState(updateGender);
   
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempTime, setTempTime] = useState(null);
+  const [tempHour, setTempHour] = useState(12);
+  const [tempMinute, setTempMinute] = useState(0);
+  const [tempPeriod, setTempPeriod] = useState('AM');
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -53,6 +72,7 @@ export default function BirthFormScreen({ navigation, route }) {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const stableDateRef = useRef(null);
   const confettiAnims = useRef([...Array(20)].map(() => ({
     x: new Animated.Value(0),
     y: new Animated.Value(0),
@@ -78,7 +98,7 @@ export default function BirthFormScreen({ navigation, route }) {
         setFormData(prev => ({
           name: existingData.name || prev.name,
           date: existingData.date ? new Date(existingData.date) : prev.date,
-          time: existingData.time ? new Date(`2000-01-01T${existingData.time}`) : prev.time,
+          time: existingData.time ? getTimeDate(existingData.time) : prev.time,
           place: existingData.place || prev.place,
           latitude: existingData.latitude || prev.latitude,
           longitude: existingData.longitude || prev.longitude,
@@ -180,10 +200,11 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const handleInputChange = (field, value) => {
-    // console.log(`🔄 [DEBUG] BirthForm: handleInputChange - ${field}:`, value);
+    if (field === 'time') {
+      console.log('⏰ Time change:', value, 'Hours:', value.getHours(), 'Minutes:', value.getMinutes());
+    }
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-      // console.log('📝 [DEBUG] BirthForm: Updated form data:', JSON.stringify(newData, null, 2));
       return newData;
     });
     
@@ -297,7 +318,7 @@ export default function BirthFormScreen({ navigation, route }) {
     try {
       const birthData = {
         name: formData.name,
-        date: formData.date.toISOString().split('T')[0],
+        date: `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`,
         time: formData.time.toTimeString().split(' ')[0],
         place: formData.place,
         latitude: formData.latitude,
@@ -493,7 +514,14 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 4 && (
                   <View style={styles.dateTimeContainer}>
-                    <TouchableOpacity style={styles.dateTimeCard} onPress={() => setShowTimePicker(true)}>
+                    <TouchableOpacity style={styles.dateTimeCard} onPress={() => {
+                      const hours = formData.time.getHours();
+                      const minutes = formData.time.getMinutes();
+                      setTempHour(hours % 12 || 12);
+                      setTempMinute(minutes);
+                      setTempPeriod(hours >= 12 ? 'PM' : 'AM');
+                      setShowTimePicker(true);
+                    }}>
                       <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']} style={styles.dateTimeGradient}>
                         <Text style={styles.dateTimeIcon}>🕐</Text>
                         <Text style={styles.dateTimeValue}>
@@ -605,19 +633,47 @@ export default function BirthFormScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => setShowTimePicker(false)}>
                           <Text style={styles.pickerButton}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                        <TouchableOpacity onPress={() => {
+                          const hours = tempPeriod === 'PM' ? (tempHour === 12 ? 12 : tempHour + 12) : (tempHour === 12 ? 0 : tempHour);
+                          const newTime = new Date();
+                          newTime.setHours(hours, tempMinute, 0, 0);
+                          handleInputChange('time', newTime);
+                          setShowTimePicker(false);
+                        }}>
                           <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
                         </TouchableOpacity>
                       </View>
-                      <DateTimePicker
-                        value={formData.time}
-                        mode="time"
-                        display="spinner"
-                        onChange={(event, selectedTime) => {
-                          if (selectedTime) handleInputChange('time', selectedTime);
-                        }}
-                        style={styles.picker}
-                      />
+                      <View style={styles.customPickerRow}>
+                        <Picker
+                          selectedValue={tempHour}
+                          onValueChange={setTempHour}
+                          style={styles.customPicker}
+                          itemStyle={styles.pickerItem}
+                        >
+                          {[...Array(12)].map((_, i) => (
+                            <Picker.Item key={i + 1} label={String(i + 1)} value={i + 1} />
+                          ))}
+                        </Picker>
+                        <Picker
+                          selectedValue={tempMinute}
+                          onValueChange={setTempMinute}
+                          style={styles.customPicker}
+                          itemStyle={styles.pickerItem}
+                        >
+                          {[...Array(60)].map((_, i) => (
+                            <Picker.Item key={i} label={String(i).padStart(2, '0')} value={i} />
+                          ))}
+                        </Picker>
+                        <Picker
+                          selectedValue={tempPeriod}
+                          onValueChange={setTempPeriod}
+                          style={styles.customPicker}
+                          itemStyle={styles.pickerItem}
+                        >
+                          <Picker.Item label="AM" value="AM" />
+                          <Picker.Item label="PM" value="PM" />
+                        </Picker>
+                      </View>
                     </LinearGradient>
                   </View>
                 </View>
@@ -967,6 +1023,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   picker: {
+    height: 200,
+  },
+  customPickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  customPicker: {
+    flex: 1,
+    height: 200,
+  },
+  pickerItem: {
+    fontSize: 20,
     height: 200,
   },
 });
