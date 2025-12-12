@@ -11,7 +11,7 @@ from calculators.divisional_chart_calculator import DivisionalChartCalculator
 class EventPredictor:
     """
     AI-Powered Event Predictor using Grand Synthesis method.
-    Implements "Natal-Transit Resonance" logic.
+    Implements "Natal-Transit Resonance" logic with Age-Based Context (Desha Kala Patra).
     """
     
     def __init__(self, chart_calculator, real_transit_calculator, dasha_calculator, ashtakavarga_calculator_cls):
@@ -37,11 +37,17 @@ class EventPredictor:
 
     async def predict_yearly_events(self, birth_data: Dict, year: int) -> Dict[str, Any]:
         try:
+            # Calculate Age for Context
+            birth_year = int(birth_data['date'].split('-')[0])
+            current_age = year - birth_year
+            
             raw_data = self._prepare_yearly_data(birth_data, year)
-            prompt = self._create_prediction_prompt(raw_data, year)
+            
+            # Pass Age to prompt generator for Desha Kala Patra logic
+            prompt = self._create_prediction_prompt(raw_data, year, current_age)
             
             # Debug Log
-            print(f"\n🔮 GEMINI PROMPT FOR {year}:")
+            print(f"\n🔮 GEMINI PROMPT FOR {year} (Age: {current_age}):")
             print("=" * 80)
             print(prompt)
             print("=" * 80)
@@ -60,6 +66,11 @@ class EventPredictor:
         birth_obj = SimpleNamespace(**birth_data)
         d1_chart = self.chart_calc.calculate_chart(birth_obj)
         asc_sign = int(d1_chart['ascendant'] / 30)
+        
+        # --- FIX: CONVERT INDEX TO NAME ---
+        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        asc_name = sign_names[asc_sign]
         
         # 1a. Map Natal Positions & Nakshatra Lords
         natal_map = {}
@@ -156,7 +167,7 @@ class EventPredictor:
             monthly_data.append(f"Month {month}: {dasha_str} || {', '.join(transits)}")
 
         return f"""
-NATAL CONTEXT: Asc Index {asc_sign}
+NATAL CONTEXT: Ascendant {asc_name} (Index {asc_sign})
 D9: {self._format_chart(d9_data['divisional_chart'])}
 D10: {self._format_chart(d10_data['divisional_chart'])}
 SAV: {', '.join(sav_summary)}
@@ -165,7 +176,42 @@ MONTHLY FORENSIC DATA (With Resonance & Hits):
 {chr(10).join(monthly_data)}
 """
 
-    def _create_prediction_prompt(self, raw_data: str, year: int) -> str:
+    def _create_prediction_prompt(self, raw_data: str, year: int, age: int) -> str:
+        """
+        Dynamically adjusts prompt based on User Age (Desha Kala Patra).
+        """
+        
+        # 1. Determine Life Stage Context
+        if age < 23:
+            life_stage_context = """
+**USER PROFILE: STUDENT (Education Phase)**
+**INTERPRETATION RULES (Desha Kala Patra):**
+* **5th House:** Primary signification is **EXAMS, GRADES, INTELLIGENCE**. (Secondary: Romance).
+* **4th House:** Signifies **SCHOOLING/COLLEGE STUDY**.
+* **9th House:** Signifies **HIGHER EDUCATION/ADMISSION/COLLEGE**.
+* **11th House:** Signifies **EXAM RESULTS/ADMISSION SUCCESS**. (Not Salary).
+* **6th House:** Signifies **COMPETITIVE EXAMS** (Not Divorce/Job).
+* **10th House:** Signifies **ACADEMIC RANK/ACHIEVEMENT**.
+"""
+        elif age > 60:
+            life_stage_context = """
+**USER PROFILE: SENIOR (Retirement/Moksha Phase)**
+**INTERPRETATION RULES (Desha Kala Patra):**
+* **5th House:** Signifies **GRANDCHILDREN/MANTRA/DEVOTION**.
+* **6th House:** Signifies **HEALTH ISSUES/DISEASE**.
+* **1st House:** Signifies **VITALITY/LONGEVITY**.
+* **12th House:** Signifies **HOSPITALS/SPIRITUAL RETREAT**.
+"""
+        else:
+            life_stage_context = """
+**USER PROFILE: CAREER/ADULT (Artha/Kama Phase)**
+**INTERPRETATION RULES (Desha Kala Patra):**
+* **5th House:** Signifies **CHILDREN/SPECULATION**.
+* **10th House:** Signifies **CAREER/PROMOTION**.
+* **11th House:** Signifies **WEALTH/SALARY/GAINS**.
+* **7th House:** Signifies **MARRIAGE/BUSINESS PARTNERS**.
+"""
+
         return f"""
 You are an expert Vedic Astrologer using the **"Natal Resonance" Method**.
 
@@ -173,6 +219,8 @@ Your Goal: Predict specific life events for {year}.
 
 INPUT DATA:
 {raw_data}
+
+{life_stage_context}
 
 ### 1. THE "ALL-SIGNIFICATION" RULE
 Do not limit a house to one meaning. Check ALL possibilities for every activated house.
@@ -182,7 +230,6 @@ Do not limit a house to one meaning. Check ALL possibilities for every activated
     * *Interpretation B:* **High Expenditure/Investment**.
     * *Interpretation C:* **Hospitalization/Sleep Issues**.
     * *Interpretation D:* **Spiritual Retreat**.
-    * *Example:* "Jupiter in 12H (High SAV) triggers a successful Foreign Relocation AND high expenses."
 
 * **9th House Activation:**
     * *Interpretation A:* **Long Distance Travel** (Pilgrimage/Vacation).
@@ -194,7 +241,6 @@ Do not limit a house to one meaning. Check ALL possibilities for every activated
     * *Interpretation B:* **Mother** (Health/Relationship).
     * *Interpretation C:* **Vehicles** (Purchase/Accident).
     * *Interpretation D:* **Domestic Peace/Chaos**.
-    * *Example:* "Rahu in 4th (High SAV) -> Domestic Chaos AND Vehicle trouble."
 
 * **11th House Activation:**
     * *Interpretation A:* **Financial Gains**.
@@ -225,7 +271,7 @@ NOTE: The focus_areas shown below are examples only. Use any relevant life domai
     "monthly_predictions": [
         {{
             "month_id": 1,
-            "focus_areas": ["Career", "Health", "Finance", "Relationships", "Family", "Travel", "Property", "Spirituality"], 
+            "focus_areas": ["Career", "Health", "Finance", "Relationships", "Family", "Travel", "Property", "Spirituality"],
             "events": [
                 {{
                     "type": "Event Type",
