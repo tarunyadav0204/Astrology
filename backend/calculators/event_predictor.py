@@ -218,12 +218,14 @@ Do not limit a house to one meaning. Check ALL possibilities for every activated
 ### OUTPUT JSON:
 Predict **multiple distinct events** per month (e.g., one for Travel, one for Family, one for Health).
 
+NOTE: The focus_areas shown below are examples only. Use any relevant life domains based on the astrological data (Career, Health, Finance, Relationships, Family, Travel, Property, Spirituality, Education, Legal, Business, Creativity, Social, etc.).
+
 {{
-    "macro_trends": ["Trend 1", "Trend 2"],
+    "macro_trends": ["Trend 1", "Trend 2", "Trend 3"],
     "monthly_predictions": [
         {{
             "month_id": 1,
-            "focus_areas": ["Tag1", "Tag2"], 
+            "focus_areas": ["Career", "Health", "Finance", "Relationships", "Family", "Travel", "Property", "Spirituality"], 
             "events": [
                 {{
                     "type": "Event Type",
