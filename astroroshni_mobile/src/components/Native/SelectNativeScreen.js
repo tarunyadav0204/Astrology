@@ -239,20 +239,26 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const selectProfile = async (profile) => {
     try {
+      // Ensure profile includes id
+      const profileWithId = {
+        ...profile,
+        id: profile.id || profile._id
+      };
+      
       if (fromProfile) {
         // Connect chart to profile and return to Profile screen
         const { authAPI } = require('../../services/api');
-        await authAPI.updateSelfBirthChart(profile);
+        await authAPI.updateSelfBirthChart(profileWithId);
         Alert.alert('Success', '✅ Chart connected to your profile!');
         navigation.navigate('Profile');
       } else if (returnTo === 'ChildbirthPlanner') {
         // Set as mother's profile for childbirth planner
-        await storage.setBirthDetails(profile);
+        await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate('ChildbirthPlanner');
       } else {
         // Normal selection flow
-        await storage.setBirthDetails(profile);
+        await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate('Home');
       }

@@ -504,8 +504,36 @@ export default function ChatScreen({ navigation, route }) {
     try {
       const savedBirthData = await storage.getBirthDetails();
       
+      // Check if saved data has ID, if not fetch from database
       if (savedBirthData && typeof savedBirthData === 'object' && savedBirthData.name && savedBirthData.name.trim()) {
-        setBirthData(savedBirthData);
+        if (savedBirthData.id) {
+          // Has ID, use it
+          setBirthData(savedBirthData);
+        } else {
+          // No ID, fetch from database to get it
+          try {
+            const { chartAPI } = require('../../services/api');
+            const response = await chartAPI.getExistingCharts();
+            const matchingChart = response.data?.charts?.find(c => 
+              c.date === savedBirthData.date && 
+              c.time === savedBirthData.time && 
+              c.latitude === savedBirthData.latitude && 
+              c.longitude === savedBirthData.longitude
+            );
+            
+            if (matchingChart) {
+              const birthDataWithId = { ...savedBirthData, id: matchingChart.id };
+              await storage.setBirthDetails(birthDataWithId);
+              setBirthData(birthDataWithId);
+            } else {
+              // Chart not in database, use without ID (will fail session creation)
+              setBirthData(savedBirthData);
+            }
+          } catch (error) {
+            console.error('❌ Error fetching chart ID:', error);
+            setBirthData(savedBirthData);
+          }
+        }
       } else {
         
         // Try to load first available chart from database
@@ -516,8 +544,9 @@ export default function ChatScreen({ navigation, route }) {
           if (response.data && response.data.charts && response.data.charts.length > 0) {
             const firstChart = response.data.charts[0];
             
-            // Convert database chart to birth data format
+            // Convert database chart to birth data format - INCLUDE ID
             const birthDataFromChart = {
+              id: firstChart.id,
               name: firstChart.name,
               date: firstChart.date,
               time: firstChart.time,
@@ -562,12 +591,20 @@ export default function ChatScreen({ navigation, route }) {
   const createSession = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
+      const birth_chart_id = birthData?.id;
+      
+      if (!birth_chart_id) {
+        console.error('❌ Cannot create session: birth_chart_id is missing from birthData');
+        return null;
+      }
+      
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/session')}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ birth_chart_id })
       });
       
       if (response.ok) {

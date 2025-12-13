@@ -296,7 +296,12 @@ export default function ChatHistoryScreen({ navigation }) {
                 </LinearGradient>
               </View>
               <View style={styles.sessionInfo}>
-                <Text style={styles.sessionDate}>{getRelativeTime(item.created_at)}</Text>
+                <View style={styles.sessionTitleRow}>
+                  {item.native_name && (
+                    <Text style={styles.nativeName}>{item.native_name}</Text>
+                  )}
+                  <Text style={styles.sessionDate}>{getRelativeTime(item.created_at)}</Text>
+                </View>
                 {item.unread && (
                   <Animated.View style={[styles.unreadBadge, { transform: [{ scale: pulseAnim }] }]}>
                     <Text style={styles.unreadText}>New</Text>
@@ -556,14 +561,23 @@ const styles = StyleSheet.create({
   },
   sessionInfo: {
     flex: 1,
+  },
+  sessionTitleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  nativeName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginRight: 8,
   },
   sessionDate: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: COLORS.white,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   unreadBadge: {
     backgroundColor: '#ff6b35',

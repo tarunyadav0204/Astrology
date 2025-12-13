@@ -23,6 +23,32 @@ export default function ChatViewScreen({ route, navigation }) {
   const { session } = route.params;
   const [messages] = useState(session.messages || []);
   
+  // Debug logging
+  useEffect(() => {
+    console.log('📅 TIMESTAMP DEBUG:');
+    console.log('Session created_at:', session.created_at);
+    console.log('Session created_at type:', typeof session.created_at);
+    
+    const firstMsg = messages.find(m => m.sender === 'user');
+    if (firstMsg) {
+      console.log('First user message timestamp:', firstMsg.timestamp);
+      console.log('First user message timestamp type:', typeof firstMsg.timestamp);
+      
+      const date = new Date(firstMsg.timestamp);
+      console.log('Parsed Date object:', date);
+      console.log('Date.toString():', date.toString());
+      console.log('Date.toISOString():', date.toISOString());
+      console.log('Date.toLocaleString():', date.toLocaleString());
+      console.log('Date.toLocaleTimeString():', date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
+      console.log('Device timezone offset (minutes):', new Date().getTimezoneOffset());
+    }
+    
+    console.log('All messages:', JSON.stringify(messages, null, 2));
+  }, []);
+  
+  // Count conversation pairs (question + answer = 1 conversation)
+  const conversationCount = Math.floor(messages.filter(m => m.sender === 'user').length);
+  
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -156,11 +182,14 @@ export default function ChatViewScreen({ route, navigation }) {
                 </LinearGradient>
               </View>
               <View style={styles.headerTextContainer}>
+                {session.native_name && (
+                  <Text style={styles.nativeName}>{session.native_name}</Text>
+                )}
                 <Text style={styles.headerTitle}>
                   {getRelativeTime(session.created_at)}
                 </Text>
                 <Text style={styles.headerSubtitle}>
-                  {Array.isArray(messages) ? messages.length : 0} messages
+                  {conversationCount} {conversationCount === 1 ? 'conversation' : 'conversations'}
                 </Text>
               </View>
             </View>
@@ -179,27 +208,46 @@ export default function ChatViewScreen({ route, navigation }) {
               <View style={styles.infoItem}>
                 <Icon name="calendar-outline" size={16} color="rgba(255, 255, 255, 0.8)" />
                 <Text style={styles.infoText}>
-                  {new Date(session.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                  })}
+                  {(() => {
+                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const timestamp = firstMsg?.timestamp || session.created_at;
+                    // Backend sends UTC time without 'Z', so append it
+                    const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+                    return new Date(utcTimestamp).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    });
+                  })()}
                 </Text>
               </View>
               <View style={styles.infoDivider} />
               <View style={styles.infoItem}>
                 <Icon name="time-outline" size={16} color="rgba(255, 255, 255, 0.8)" />
                 <Text style={styles.infoText}>
-                  {new Date(session.created_at).toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
+                  {(() => {
+                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const timestamp = firstMsg?.timestamp || session.created_at;
+                    console.log('🕐 Raw timestamp from backend:', timestamp);
+                    // Backend sends UTC time without 'Z', so append it
+                    const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+                    console.log('🕐 Converted to UTC format:', utcTimestamp);
+                    const date = new Date(utcTimestamp);
+                    console.log('🕐 Parsed Date (local):', date.toString());
+                    const timeStr = date.toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    console.log('🕐 Final formatted time:', timeStr);
+                    return timeStr;
+                  })()}
                 </Text>
               </View>
               <View style={styles.infoDivider} />
               <View style={styles.infoItem}>
                 <Icon name="chatbubbles-outline" size={16} color="rgba(255, 255, 255, 0.8)" />
-                <Text style={styles.infoText}>{messages.length}</Text>
+                <Text style={styles.infoText}>{conversationCount}</Text>
               </View>
             </LinearGradient>
           </Animated.View>
@@ -330,10 +378,16 @@ const styles = StyleSheet.create({
   },
   headerIcon: { fontSize: 22 },
   headerTextContainer: { flex: 1 },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+  nativeName: {
+    fontSize: 18,
+    fontWeight: '800',
     color: COLORS.white,
+    marginBottom: 2,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   headerSubtitle: {
     fontSize: 12,

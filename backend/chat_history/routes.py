@@ -26,10 +26,18 @@ def init_chat_tables():
         CREATE TABLE IF NOT EXISTS chat_sessions (
             session_id TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL,
+            birth_chart_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (userid)
+            FOREIGN KEY (user_id) REFERENCES users (userid),
+            FOREIGN KEY (birth_chart_id) REFERENCES birth_charts (id)
         )
     ''')
+    
+    # Add birth_chart_id column if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE chat_sessions ADD COLUMN birth_chart_id INTEGER')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
@@ -69,6 +77,7 @@ def init_chat_tables():
     
     # Add indexes for performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_birth_chart ON chat_sessions (birth_chart_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON chat_sessions (created_at)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages (session_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_status ON chat_messages (status)')
@@ -77,16 +86,17 @@ def init_chat_tables():
     conn.close()
 
 @router.post("/session")
-async def create_chat_session(current_user = Depends(get_current_user)):
+async def create_chat_session(request: dict, current_user = Depends(get_current_user)):
     """Create a new chat session"""
     session_id = str(uuid.uuid4())
+    birth_chart_id = request.get("birth_chart_id")
     
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
     cursor.execute(
-        "INSERT INTO chat_sessions (session_id, user_id) VALUES (?, ?)",
-        (session_id, current_user.userid)
+        "INSERT INTO chat_sessions (session_id, user_id, birth_chart_id) VALUES (?, ?, ?)",
+        (session_id, current_user.userid, birth_chart_id)
     )
     
     conn.commit()
@@ -145,7 +155,9 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
         SELECT 
             cs.session_id,
             cs.created_at,
-            cm.content as first_message
+            cm.content as first_message,
+            cs.birth_chart_id,
+            bc.name as native_name
         FROM chat_sessions cs
         LEFT JOIN chat_messages cm ON cs.session_id = cm.session_id 
             AND cm.sender = 'user'
@@ -154,6 +166,7 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
                 FROM chat_messages 
                 WHERE session_id = cs.session_id AND sender = 'user'
             )
+        LEFT JOIN birth_charts bc ON cs.birth_chart_id = bc.id
         WHERE cs.user_id = ?
         ORDER BY cs.created_at DESC
         LIMIT ? OFFSET ?
@@ -162,12 +175,24 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
     sessions = cursor.fetchall()
     conn.close()
     
+    from encryption_utils import EncryptionManager
+    encryptor = EncryptionManager()
+    
     history = []
     for session in sessions:
+        native_name = None
+        if session[4]:  # If native_name exists
+            try:
+                native_name = encryptor.decrypt(session[4])
+            except:
+                native_name = session[4]  # Use as-is if decryption fails
+        
         history.append({
             "session_id": session[0],
             "created_at": session[1],
-            "preview": session[2][:100] + "..." if session[2] and len(session[2]) > 100 else session[2]
+            "preview": session[2][:100] + "..." if session[2] and len(session[2]) > 100 else session[2],
+            "birth_chart_id": session[3],
+            "native_name": native_name
         })
     
     return {
