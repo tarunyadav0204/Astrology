@@ -117,19 +117,11 @@ class GeminiChatAnalyzer:
         prompt = self._create_chat_prompt(user_question, pruned_context, conversation_history or [], language, response_style, user_context)
         prompt_time = time.time() - prompt_start
         
-        # print(f"\n=== SENDING TO AI (ASYNC) ===")
-        # print(f"Question: {user_question}")
-        # print(f"Prompt length: {len(prompt)} chars")
-        # print(f"⏱️ Prompt creation time: {prompt_time:.2f}s")
-        # print(f"📊 EXPECTED PERFORMANCE: {'Fast (cache hit likely)' if 'transit_activations' in enhanced_context else 'Slow (full processing)'}")
-        # print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
+      
         
         # Cache optimization indicator
         has_transit_data = 'transit_activations' in enhanced_context
-        # print(f"🎯 CACHE STATUS: {'Second call (should benefit from caching)' if has_transit_data else 'First call (will populate cache)'}")
-        # print(f"History messages: {len(conversation_history or [])}")
-        # print(f"Language: {language}, Response style: {response_style}")
-        
+       
         # Determine if this is first or second call
         is_transit_call = 'transit_activations' in enhanced_context
         call_type = "SECOND_CALL_WITH_TRANSIT" if is_transit_call else "FIRST_CALL_REQUEST"
@@ -157,18 +149,18 @@ class GeminiChatAnalyzer:
             selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
             model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
             
-            print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-            print(f"Analysis Type: {model_type}")
-            print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-            print(f"Prompt length: {len(prompt)} characters")
+            # print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+            # print(f"Analysis Type: {model_type}")
+            # print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+            # print(f"Prompt length: {len(prompt)} characters")
             
             # LOG COMPLETE REQUEST
-            print(f"\n{'='*80}")
-            print(f"📤 GEMINI REQUEST #{call_type}")
-            print(f"{'='*80}")
-            print(f"Question: {user_question}")
-            print(f"\nCOMPLETE PROMPT:\n{prompt}")
-            print(f"{'='*80}\n")
+            # print(f"\n{'='*80}")
+            # print(f"📤 GEMINI REQUEST #{call_type}")
+            # print(f"{'='*80}")
+            # print(f"Question: {user_question}")
+            # print(f"\nCOMPLETE PROMPT:\n{prompt}")
+            # print(f"{'='*80}\n")
             
             # CALL GEMINI ASYNC DIRECTLY with request_options
             response = await asyncio.wait_for(
@@ -180,17 +172,17 @@ class GeminiChatAnalyzer:
             )
             
             # LOG COMPLETE RESPONSE
-            print(f"\n{'='*80}")
-            print(f"📥 GEMINI RESPONSE #{call_type}")
-            print(f"{'='*80}")
-            if response and hasattr(response, 'text'):
-                print(f"\nCOMPLETE RESPONSE:\n{response.text}")
-            else:
-                print(f"No response or empty response")
-            print(f"{'='*80}\n")
+            # print(f"\n{'='*80}")
+            # print(f"📥 GEMINI RESPONSE #{call_type}")
+            # print(f"{'='*80}")
+            # if response and hasattr(response, 'text'):
+            #     print(f"\nCOMPLETE RESPONSE:\n{response.text}")
+            # else:
+            #     print(f"No response or empty response")
+            # print(f"{'='*80}\n")
             
-            gemini_total_time = time.time() - gemini_start_time
-            print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
+            # gemini_total_time = time.time() - gemini_start_time
+            # print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
             
             if not response or not hasattr(response, 'text') or not response.text:
                 return {
@@ -244,7 +236,7 @@ class GeminiChatAnalyzer:
                         start_year = transit_request.get('startYear')
                         end_year = transit_request.get('endYear')
                         months = transit_request.get('specificMonths', [])
-                        print(f"🎯 FINAL: GEMINI REQUESTED TRANSIT DATA: {start_year}-{end_year} ({', '.join(months)})")
+                        # print(f"🎯 FINAL: GEMINI REQUESTED TRANSIT DATA: {start_year}-{end_year} ({', '.join(months)})")
                     except:
                         print(f"🎯 FINAL: GEMINI MADE TRANSIT REQUEST (JSON parse failed)")
                 else:
@@ -636,10 +628,10 @@ End your response with 3-4 relevant follow-up questions in this exact format:
             # Inject actual names into synastry instruction
             native_name = context.get('native', {}).get('birth_details', {}).get('name', 'Native')
             partner_name = context.get('partner', {}).get('birth_details', {}).get('name', 'Partner')
-            print(f"\n👥 SYNASTRY MODE DETECTED")
-            print(f"   Native: {native_name}")
-            print(f"   Partner: {partner_name}")
-            print(f"   Context structure: native + partner (dual charts)")
+            # print(f"\n👥 SYNASTRY MODE DETECTED")
+            # print(f"   Native: {native_name}")
+            # print(f"   Partner: {partner_name}")
+            # print(f"   Context structure: native + partner (dual charts)")
             system_instruction = ChatContextBuilder.SYNASTRY_SYSTEM_INSTRUCTION.replace('{native_name}', native_name).replace('{partner_name}', partner_name)
         else:
             system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
@@ -660,17 +652,17 @@ End your response with 3-4 relevant follow-up questions in this exact format:
         transits = static_context.pop('transit_activations', None)
         
         # Log context structure
-        if is_synastry:
-            print(f"\n📋 CONTEXT STRUCTURE (SYNASTRY):")
-            print(f"   - analysis_type: {static_context.get('analysis_type')}")
-            print(f"   - native.birth_details: {static_context.get('native', {}).get('birth_details', {}).get('name')}")
-            print(f"   - partner.birth_details: {static_context.get('partner', {}).get('birth_details', {}).get('name')}")
-            print(f"   - native context keys: {list(static_context.get('native', {}).keys())[:10]}...")
-            print(f"   - partner context keys: {list(static_context.get('partner', {}).keys())[:10]}...")
-        else:
-            print(f"\n📋 CONTEXT STRUCTURE (SINGLE):")
-            print(f"   - birth_details: {static_context.get('birth_details', {}).get('name')}")
-            print(f"   - context keys: {list(static_context.keys())[:15]}...")
+        # if is_synastry:
+        #     print(f"\n📋 CONTEXT STRUCTURE (SYNASTRY):")
+        #     print(f"   - analysis_type: {static_context.get('analysis_type')}")
+        #     print(f"   - native.birth_details: {static_context.get('native', {}).get('birth_details', {}).get('name')}")
+        #     print(f"   - partner.birth_details: {static_context.get('partner', {}).get('birth_details', {}).get('name')}")
+        #     print(f"   - native context keys: {list(static_context.get('native', {}).keys())[:10]}...")
+        #     print(f"   - partner context keys: {list(static_context.get('partner', {}).keys())[:10]}...")
+        # else:
+        #     print(f"\n📋 CONTEXT STRUCTURE (SINGLE):")
+        #     print(f"   - birth_details: {static_context.get('birth_details', {}).get('name')}")
+        #     print(f"   - context keys: {list(static_context.keys())[:15]}...")
         
         # Convert ONLY static context to JSON with deterministic ordering
         chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=True)
