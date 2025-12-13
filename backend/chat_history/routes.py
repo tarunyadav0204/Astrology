@@ -387,6 +387,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from ai.gemini_chat_analyzer import GeminiChatAnalyzer
     from chat.chat_context_builder import ChatContextBuilder
     from credits.credit_service import CreditService
+    from ai.intent_router import IntentRouter
     
     try:
         # Use birth data from request (required)
@@ -398,24 +399,75 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Build context
         context_builder = ChatContextBuilder()
         
+        # === INTENT ROUTING ===
+        import time
+        routing_start = time.time()
+        
+        intent = {'mode': 'birth', 'category': 'general'}  # Default
+        
+        if not partnership_mode:
+            # Use AI to classify (Fast)
+            print(f"\n{'='*80}")
+            print(f"🛣️ ROUTING DECISION STARTED")
+            print(f"{'='*80}")
+            
+            intent_router = IntentRouter()
+            intent = await intent_router.classify_intent(question)
+            
+            routing_time = time.time() - routing_start
+            print(f"✅ ROUTING DECISION COMPLETE: {intent['mode'].upper()} mode")
+            print(f"Category: {intent.get('category', 'general')}")
+            print(f"Routing time: {routing_time:.3f}s")
+            print(f"{'='*80}\n")
+        
+        # Build context based on intent
+        context_start = time.time()
+        
         if partnership_mode and partner_birth_details:
-            print(f"\n👥 PARTNERSHIP MODE - Building synastry context")
-            print(f"   Native: {birth_data.get('name')}")
-            print(f"   Partner: {partner_birth_details.get('name')}")
+            print(f"\n{'='*80}")
+            print(f"👥 PARTNERSHIP MODE - Building synastry context")
+            print(f"{'='*80}")
+            print(f"Native: {birth_data.get('name')}")
+            print(f"Partner: {partner_birth_details.get('name')}")
             context = context_builder.build_synastry_context(birth_data, partner_birth_details, question)
-            print(f"   ✅ Synastry context built")
-            print(f"   📊 Context structure verification:")
-            print(f"      - analysis_type: {context.get('analysis_type')}")
-            print(f"      - Has 'native' key: {'native' in context}")
-            print(f"      - Has 'partner' key: {'partner' in context}")
-            if 'native' in context:
-                print(f"      - Native chart name: {context['native'].get('birth_details', {}).get('name')}")
-                print(f"      - Native has d1_chart: {'d1_chart' in context['native']}")
-            if 'partner' in context:
-                print(f"      - Partner chart name: {context['partner'].get('birth_details', {}).get('name')}")
-                print(f"      - Partner has d1_chart: {'d1_chart' in context['partner']}")
+            context_time = time.time() - context_start
+            print(f"✅ Synastry context built in {context_time:.3f}s")
+            print(f"{'='*80}\n")
+            
+        elif intent['mode'] == 'prashna':
+            # === PRASHNA MODE ===
+            print(f"\n{'='*80}")
+            print(f"🔮 PRASHNA MODE ACTIVATED")
+            print(f"{'='*80}")
+            print(f"Question: {question}")
+            print(f"Category: {intent.get('category', 'general')}")
+            
+            user_location = {
+                'latitude': birth_data.get('latitude'),
+                'longitude': birth_data.get('longitude'),
+                'timezone': birth_data.get('timezone', 'Asia/Kolkata'),
+                'place': birth_data.get('place', 'Query Location')
+            }
+            
+            context = context_builder.build_prashna_context(
+                user_location,
+                question,
+                intent.get('category', 'general')
+            )
+            
+            context_time = time.time() - context_start
+            print(f"✅ PRASHNA CONTEXT READY in {context_time:.3f}s")
+            print(f"{'='*80}\n")
+            
         else:
+            # === BIRTH CHART MODE (Standard) ===
+            print(f"\n{'='*80}")
+            print(f"🔮 BIRTH CHART MODE (Standard)")
+            print(f"{'='*80}")
             context = context_builder.build_complete_context(birth_data)
+            context_time = time.time() - context_start
+            print(f"✅ Birth chart context built in {context_time:.3f}s")
+            print(f"{'='*80}\n")
         
         # Get conversation history
         with sqlite3.connect('astrology.db') as conn:

@@ -181,8 +181,8 @@ class GeminiChatAnalyzer:
             #     print(f"No response or empty response")
             # print(f"{'='*80}\n")
             
-            # gemini_total_time = time.time() - gemini_start_time
-            # print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
+            gemini_total_time = time.time() - gemini_start_time
+            print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
             
             if not response or not hasattr(response, 'text') or not response.text:
                 return {
@@ -621,19 +621,27 @@ End your response with 3-4 relevant follow-up questions in this exact format:
         # Import the system instruction from ChatContextBuilder
         from chat.chat_context_builder import ChatContextBuilder
         
-        # Check if this is synastry analysis
-        is_synastry = context.get('analysis_type') == 'synastry'
+        # Check analysis type
+        analysis_type = context.get('analysis_type', 'birth')
         
-        if is_synastry:
+        if analysis_type == 'synastry':
             # Inject actual names into synastry instruction
             native_name = context.get('native', {}).get('birth_details', {}).get('name', 'Native')
             partner_name = context.get('partner', {}).get('birth_details', {}).get('name', 'Partner')
-            # print(f"\n👥 SYNASTRY MODE DETECTED")
-            # print(f"   Native: {native_name}")
-            # print(f"   Partner: {partner_name}")
-            # print(f"   Context structure: native + partner (dual charts)")
+            print(f"\n👥 SYNASTRY MODE DETECTED")
+            print(f"   Native: {native_name}")
+            print(f"   Partner: {partner_name}")
             system_instruction = ChatContextBuilder.SYNASTRY_SYSTEM_INSTRUCTION.replace('{native_name}', native_name).replace('{partner_name}', partner_name)
+            
+        elif analysis_type == 'prashna':
+            # === PRASHNA MODE ===
+            print(f"\n🔮 PRASHNA MODE DETECTED")
+            print(f"   Category: {context.get('prashna_focus_category', 'general')}")
+            print(f"   Question time: {context.get('question_time', {})}")
+            system_instruction = ChatContextBuilder.PRASHNA_SYSTEM_INSTRUCTION
+            
         else:
+            # Default to Birth Chart
             system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
         
         # REORDERED FOR IMPLICIT CACHING: Static data first, dynamic data last

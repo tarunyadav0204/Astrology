@@ -28,9 +28,56 @@ from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
+from calculators.prashna_calculator import PrashnaCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
+    
+    # Prashna System Instruction for Horary Analysis
+    PRASHNA_SYSTEM_INSTRUCTION = """
+You are an expert in **Tajik Neelakanthi (Prashna Shastra)**. You are analyzing a Horary Chart cast for the exact moment of a user's question to provide a deterministic, binary answer.
+
+Objective: Provide a clear "Yes", "No", or "Conditional" verdict based on the positions of the Lagna Lord (Querent) and the Karyesha (Object of Inquiry).
+
+## CRITICAL: CATEGORY FOCUS
+The context contains `prashna_focus_category` which indicates the question type. You MUST use the corresponding pre-calculated analysis:
+- If category is "job" → Use `prashna_tools['analysis_job']`
+- If category is "love" → Use `prashna_tools['analysis_love']`
+- If category is "health" → Use `prashna_tools['analysis_health']`
+- If category is "finance" → Use `prashna_tools['analysis_finance']`
+- And so on...
+
+The pre-calculated analysis contains the verdict, yoga type, timing, and all necessary details. Base your response on this specific analysis.
+
+## CORE PRASHNA RULES (TAJIK SHASTRA)
+1. **Identify the Players:**
+   - Lagna Lord = The User (Querent).
+   - Moon = The Mind/Flow of events.
+   - Karyesha = The Lord of the House related to the question (e.g., 10th for Job, 7th for Love, 6th for Illness).
+2. **The Verdict Logic:**
+   - Strong Ithasala (Applying Aspect) between Lagna Lord & Karyesha = **YES**.
+   - Easarpha (Separating Aspect) = **NO/Past Event**.
+   - Moon transferring light (Nakta) = **YES**.
+   - Combustion or Retrograde Karyesha = **DELAY/FAILURE**.
+
+## RESPONSE FORMAT (STRICT)
+<div class="quick-answer-card">**Verdict**: **[YES / NO / DELAYED]**. [2-sentence summary of the outcome based on the yoga.]</div>
+
+### Key Insights
+- **The Querent:** [Planet] in [Sign].
+- **The Objective:** [Planet] in [Sign].
+- **The Yoga:** Describe the connection (Ithasala, Easarpha, etc.).
+
+### Prashna Analysis
+- **Planetary Dynamics:** Is the aspect applying or separating?
+- **Moon's Flow:** What is the Moon connecting to next?
+
+### Timing & Guidance
+- **Timing:** Estimate time based on degrees.
+- **Advice:** What action to take now?
+
+<div class="final-thoughts-card">**Final Outlook**: [One sentence conclusion].</div>
+"""
     
     # Synastry System Instruction for Partnership Analysis
     SYNASTRY_SYSTEM_INSTRUCTION = """
@@ -181,6 +228,106 @@ For every user query, structure your response exactly as follows:
             'native': self.build_complete_context(native_birth_data, user_question),
             'partner': self.build_complete_context(partner_birth_data, user_question)
         }
+    
+    def build_prashna_context(self, user_location_data: Dict, user_question: str, category: str = 'general') -> Dict[str, Any]:
+        """Build Horary (Prashna) context based on CURRENT time and User's Location."""
+        from types import SimpleNamespace
+        from calculators.panchang_calculator import PanchangCalculator
+        import time
+        import json
+        
+        prashna_start = time.time()
+        print(f"\n{'='*80}")
+        print(f"🔮 PRASHNA CONTEXT BUILDING STARTED")
+        print(f"{'='*80}")
+        print(f"Question: {user_question}")
+        print(f"Category: {category}")
+        print(f"Location: {user_location_data}")
+        
+        # 1. Get "Right Now" Data
+        now = datetime.now()
+        prashna_data = {
+            'name': 'Prashna',
+            'date': now.strftime('%Y-%m-%d'),
+            'time': now.strftime('%H:%M'),
+            'latitude': user_location_data.get('latitude', 28.6139),
+            'longitude': user_location_data.get('longitude', 77.2090),
+            'timezone': user_location_data.get('timezone', 'Asia/Kolkata'),
+            'place': user_location_data.get('place', 'Query Location')
+        }
+        print(f"\n⏰ Question Time: {prashna_data['date']} {prashna_data['time']}")
+        
+        # 2. Calculate the Chart for NOW
+        chart_start = time.time()
+        prashna_obj = SimpleNamespace(**prashna_data)
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(prashna_obj)
+        chart_time = time.time() - chart_start
+        print(f"✅ Chart calculation: {chart_time:.3f}s")
+        
+        # 3. Add Sign Names
+        chart_data_enriched = self._add_sign_names_to_chart_copy(chart_data)
+        print(f"✅ Chart enrichment complete")
+        
+        # 4. Run the Physics Engine (Tajik Aspects)
+        tajik_start = time.time()
+        prashna_calc = PrashnaCalculator(chart_data_enriched)
+        print(f"\n🔬 TAJIK PHYSICS ENGINE INITIALIZED")
+        print(f"Lagna: {chart_data_enriched.get('ascendant', 0):.2f}°")
+        print(f"Lagna Lord: {prashna_calc.lagna_lord_name}")
+        
+        # 5. Pre-calculate multiple categories for Gemini to choose from
+        print(f"\n📊 CALCULATING PRASHNA TOOLS...")
+        categories_to_calc = ['job', 'love', 'health', 'wealth', 'lost_item', 'travel', 'property', 'education']
+        prashna_tools = {}
+        
+        for cat in categories_to_calc:
+            cat_start = time.time()
+            analysis = prashna_calc.analyze_question(cat)
+            cat_time = time.time() - cat_start
+            prashna_tools[f'analysis_{cat}'] = analysis
+            
+            # Log focused category with full details
+            if cat == category:
+                print(f"\n⭐ FOCUSED CATEGORY: {cat.upper()}")
+                print(f"   Verdict: {analysis['verdict']}")
+                print(f"   Confidence: {analysis['confidence']}")
+                print(f"   Summary: {analysis['summary']}")
+                print(f"   Yoga: {analysis['analysis']['yoga']['name']} ({analysis['analysis']['yoga']['aspect']})")
+                print(f"   Timing: {analysis['timing']['prediction']}")
+                print(f"   Calculation time: {cat_time:.3f}s")
+            else:
+                print(f"   {cat}: {analysis['verdict']} ({cat_time:.3f}s)")
+        
+        tajik_time = time.time() - tajik_start
+        print(f"\n✅ All Tajik calculations: {tajik_time:.3f}s")
+        
+        # 6. Get current panchang
+        panchang_start = time.time()
+        pc = PanchangCalculator()
+        current_panchang = pc.calculate_birth_panchang(prashna_data)
+        panchang_time = time.time() - panchang_start
+        print(f"✅ Panchang calculation: {panchang_time:.3f}s")
+        
+        # 7. Build the Context Payload
+        context = {
+            'analysis_type': 'prashna',
+            'prashna_focus_category': category,
+            'question_time': prashna_data,
+            'd1_chart': chart_data_enriched,
+            'prashna_tools': prashna_tools,
+            'current_panchang': current_panchang
+        }
+        
+        total_time = time.time() - prashna_start
+        context_size = len(json.dumps(context, default=str))
+        
+        print(f"\n✅ PRASHNA CONTEXT COMPLETE")
+        print(f"Total time: {total_time:.3f}s")
+        print(f"Context size: {context_size:,} characters")
+        print(f"{'='*80}\n")
+        
+        return context
     
     def build_complete_context(self, birth_data: Dict, user_question: str = "", target_date: Optional[datetime] = None, requested_period: Optional[Dict] = None) -> Dict[str, Any]:
         """Build complete astrological context for chat"""
