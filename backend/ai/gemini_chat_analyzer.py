@@ -103,37 +103,37 @@ class GeminiChatAnalyzer:
         }
         
         # Prune context to reduce token load
-        print("✂️ Pruning context to reduce token load...")
+        # print("✂️ Pruning context to reduce token load...")
         pruned_context = self._prune_context(enhanced_context)
         
         # DEBUG: Check size reduction
         import json
         original_size = len(json.dumps(enhanced_context, default=str))
         pruned_size = len(json.dumps(pruned_context, default=str))
-        print(f"📉 Context compressed: {original_size} -> {pruned_size} chars (Saved {original_size - pruned_size} chars)")
-        print(f"💾 COMPRESSION RATIO: {((original_size - pruned_size) / original_size * 100):.1f}% reduction")
+        # print(f"📉 Context compressed: {original_size} -> {pruned_size} chars (Saved {original_size - pruned_size} chars)")
+        # print(f"💾 COMPRESSION RATIO: {((original_size - pruned_size) / original_size * 100):.1f}% reduction")
         
         prompt_start = time.time()
         prompt = self._create_chat_prompt(user_question, pruned_context, conversation_history or [], language, response_style, user_context)
         prompt_time = time.time() - prompt_start
         
-        print(f"\n=== SENDING TO AI (ASYNC) ===")
-        print(f"Question: {user_question}")
-        print(f"Prompt length: {len(prompt)} chars")
-        print(f"⏱️ Prompt creation time: {prompt_time:.2f}s")
-        print(f"📊 EXPECTED PERFORMANCE: {'Fast (cache hit likely)' if 'transit_activations' in enhanced_context else 'Slow (full processing)'}")
-        print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
+        # print(f"\n=== SENDING TO AI (ASYNC) ===")
+        # print(f"Question: {user_question}")
+        # print(f"Prompt length: {len(prompt)} chars")
+        # print(f"⏱️ Prompt creation time: {prompt_time:.2f}s")
+        # print(f"📊 EXPECTED PERFORMANCE: {'Fast (cache hit likely)' if 'transit_activations' in enhanced_context else 'Slow (full processing)'}")
+        # print(f"Context keys: {list(enhanced_context.keys()) if enhanced_context else 'None'}")
         
         # Cache optimization indicator
         has_transit_data = 'transit_activations' in enhanced_context
-        print(f"🎯 CACHE STATUS: {'Second call (should benefit from caching)' if has_transit_data else 'First call (will populate cache)'}")
-        print(f"History messages: {len(conversation_history or [])}")
-        print(f"Language: {language}, Response style: {response_style}")
+        # print(f"🎯 CACHE STATUS: {'Second call (should benefit from caching)' if has_transit_data else 'First call (will populate cache)'}")
+        # print(f"History messages: {len(conversation_history or [])}")
+        # print(f"Language: {language}, Response style: {response_style}")
         
         # Determine if this is first or second call
         is_transit_call = 'transit_activations' in enhanced_context
         call_type = "SECOND_CALL_WITH_TRANSIT" if is_transit_call else "FIRST_CALL_REQUEST"
-        print(f"🎯 CALL TYPE DETECTED: {call_type}")
+        # print(f"🎯 CALL TYPE DETECTED: {call_type}")
         
 
         
@@ -141,13 +141,13 @@ class GeminiChatAnalyzer:
         planetary_analysis = enhanced_context.get('planetary_analysis', {})
         nakshatra_count = sum(1 for planet_data in planetary_analysis.values() 
                              if isinstance(planet_data, dict) and 'nakshatra' in planet_data)
-        print(f"Nakshatra data available for {nakshatra_count} planets")
-        print(f"⭐ NAKSHATRA IMPACT: {'Included in cached data' if nakshatra_count > 0 else 'No nakshatra data'}")
+        # print(f"Nakshatra data available for {nakshatra_count} planets")
+        # print(f"⭐ NAKSHATRA IMPACT: {'Included in cached data' if nakshatra_count > 0 else 'No nakshatra data'}")
         
         # Log if Moon nakshatra is available (most important)
         moon_data = planetary_analysis.get('Moon', {})
         moon_nakshatra = moon_data.get('nakshatra', {}) if isinstance(moon_data, dict) else {}
-        print(f"Moon nakshatra available: {bool(moon_nakshatra)}")
+        # print(f"Moon nakshatra available: {bool(moon_nakshatra)}")
         if moon_nakshatra:
             print(f"🌙 MOON NAKSHATRA: {moon_nakshatra.get('name', 'Unknown')} (cached for future requests)")
         
@@ -157,10 +157,18 @@ class GeminiChatAnalyzer:
             selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
             model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
             
-            print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-            print(f"Analysis Type: {model_type}")
-            print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-            print(f"Prompt length: {len(prompt)} characters")
+            # print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+            # print(f"Analysis Type: {model_type}")
+            # print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+            # print(f"Prompt length: {len(prompt)} characters")
+            
+            # LOG COMPLETE REQUEST
+            # print(f"\n{'='*80}")
+            # print(f"📤 GEMINI REQUEST #{call_type}")
+            # print(f"{'='*80}")
+            # print(f"Question: {user_question}")
+            # print(f"\nCOMPLETE PROMPT:\n{prompt}")
+            # print(f"{'='*80}\n")
             
             # CALL GEMINI ASYNC DIRECTLY with request_options
             response = await asyncio.wait_for(
@@ -170,6 +178,16 @@ class GeminiChatAnalyzer:
                 ),
                 timeout=600.0
             )
+            
+            # LOG COMPLETE RESPONSE
+            # print(f"\n{'='*80}")
+            # print(f"📥 GEMINI RESPONSE #{call_type}")
+            # print(f"{'='*80}")
+            # if response and hasattr(response, 'text'):
+            #     print(f"\nCOMPLETE RESPONSE:\n{response.text}")
+            # else:
+            #     print(f"No response or empty response")
+            # print(f"{'='*80}\n")
             
             gemini_total_time = time.time() - gemini_start_time
             print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
@@ -210,9 +228,9 @@ class GeminiChatAnalyzer:
                     'response': "I received a partial response. Please try asking your question again.",
                     'error': 'Response too short or corrupted'
                 }
-            print(f"✅ Final response ready ({len(cleaned_text)} chars)")
-            print(f"📤 FINAL CLEANED RESPONSE (first 500 chars): {cleaned_text[:500]}...")
-            print(f"📤 FINAL CLEANED RESPONSE (last 200 chars): ...{cleaned_text[-200:]}")
+            # print(f"✅ Final response ready ({len(cleaned_text)} chars)")
+            # print(f"📤 FINAL CLEANED RESPONSE (first 500 chars): {cleaned_text[:500]}...")
+            # print(f"📤 FINAL CLEANED RESPONSE (last 200 chars): ...{cleaned_text[-200:]}")
             
             # Final check for JSON transit requests in cleaned text
             if "transitRequest" in cleaned_text:
@@ -235,9 +253,9 @@ class GeminiChatAnalyzer:
             # Check for specific sections to debug missing content
             has_nakshatra = 'nakshatra' in cleaned_text.lower() or 'नक्षत्र' in cleaned_text
             has_analysis_header = '### nakshatra insights' in cleaned_text.lower()
-            print(f"Contains nakshatra content: {has_nakshatra}")
-            print(f"Contains nakshatra header: {has_analysis_header}")
-            print(f"Response sections count: {cleaned_text.count('###')}")
+            # print(f"Contains nakshatra content: {has_nakshatra}")
+            # print(f"Contains nakshatra header: {has_analysis_header}")
+            # print(f"Response sections count: {cleaned_text.count('###')}")
             
             # Check if response contains JSON transit data request
             has_transit_request = "transitRequest" in cleaned_text and '"requestType"' in cleaned_text

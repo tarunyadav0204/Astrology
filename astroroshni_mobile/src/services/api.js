@@ -102,6 +102,8 @@ export const chartAPI = {
   calculateCascadingDashas: (birthData, targetDate) => 
     api.post(getEndpoint('/calculate-cascading-dashas'), { birth_data: birthData, target_date: targetDate }),
   calculateDasha: (birthData) => api.post(getEndpoint('/calculate-dasha'), birthData),
+  calculateYoginiDasha: (birthData, years = 5) => 
+    api.post(getEndpoint('/yogini-dasha'), { ...birthData, years }),
 
 
   getExistingCharts: (search = '') => {

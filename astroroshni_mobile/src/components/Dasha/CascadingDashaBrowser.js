@@ -16,6 +16,7 @@ import { COLORS, API_BASE_URL } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import JaiminiKalachakraHomeRN from './JaiminiKalachakraHomeRN';
+import YoginiDashaTab from './YoginiDashaTab';
 import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import DateNavigator from '../Common/DateNavigator';
 
@@ -33,7 +34,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const [transitDate, setTransitDate] = useState(new Date());
   const [selectedDashas, setSelectedDashas] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dashaType, setDashaType] = useState('vimshottari'); // 'vimshottari', 'kalchakra', or 'jaimini'
+  const [dashaType, setDashaType] = useState('vimshottari'); // 'vimshottari', 'kalchakra', 'jaimini', or 'yogini'
+  const [yoginiData, setYoginiData] = useState(null);
   const [showSystemInfo, setShowSystemInfo] = useState(false);
   const [showKalachakraViz, setShowKalachakraViz] = useState(false);
   const [kalchakraViewMode, setKalchakraViewMode] = useState('chips'); // 'chips', 'wheel', 'timeline'
@@ -80,6 +82,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         fetchKalchakraDashas();
       } else if (dashaType === 'jaimini') {
         fetchJaiminiKalchakraDashas();
+      } else if (dashaType === 'yogini') {
+        fetchYoginiDasha();
       }
     }
   }, [visible, birthData, transitDate, dashaType]);
@@ -235,6 +239,34 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       }
     } catch (err) {
 
+    }
+  };
+
+  const fetchYoginiDasha = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const formattedBirthData = {
+        date: birthData.date.includes('T') ? birthData.date.split('T')[0] : birthData.date,
+        time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        timezone: birthData.timezone || 'Asia/Kolkata'
+      };
+      
+      const response = await chartAPI.calculateYoginiDasha(formattedBirthData, 5);
+      
+      if (response.data.error) {
+        setError(`Yogini Dasha calculation failed: ${response.data.error}`);
+        return;
+      }
+      
+      setYoginiData(response.data);
+    } catch (err) {
+      setError('Failed to load Yogini Dasha data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -704,6 +736,17 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             )}
           </View>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.dashaTypeTab, dashaType === 'yogini' && styles.activeDashaTypeTab]}
+          onPress={() => {
+            setDashaType('yogini');
+            setSelectedDashas({});
+          }}
+        >
+          <Text style={[styles.dashaTypeTabText, dashaType === 'yogini' && styles.activeDashaTypeTabText]} numberOfLines={1}>
+            Yogini Dasha
+          </Text>
+        </TouchableOpacity>
 
       </View>
     </View>
@@ -802,6 +845,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       return renderKalchakraCurrentStatus();
     } else if (dashaType === 'jaimini') {
       return renderJaiminiCurrentStatus();
+    } else if (dashaType === 'yogini') {
+      return null; // Yogini Dasha has its own hero section, no breadcrumb needed
     }
     
     if (!cascadingData) {
@@ -2128,6 +2173,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               <React.Fragment>
                 {renderKalchakraDashaList()}
               </React.Fragment>
+            ) : dashaType === 'yogini' ? (
+              <YoginiDashaTab data={yoginiData} />
             ) : (
               <React.Fragment>
                 {renderJaiminiTabs()}

@@ -27,6 +27,7 @@ from shared.dasha_calculator import DashaCalculator
 from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
+from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -63,6 +64,14 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
 - Data Integrity: The provided JSON might use 0-indexed integers for signs (0=Aries, 11=Pisces) or 1-indexed integers (1=Aries, 12=Pisces).
 - Your Job: Contextualize strictly. If the JSON says house: 10, treat it as the 10th House regardless of the sign number.
 
+### D. The "Micro-Timing" Rule (Yogini Dasha)
+- **Purpose:** Use Yogini Dasha (found in context) to confirm sudden or karmic events that Vimshottari might miss.
+- **Interpretation Keys:**
+    - **Sankata (Rahu):** Predict Transformation, Crisis, or High Pressure. If current, advise caution.
+    - **Mangala (Moon) / Siddha (Venus):** Predict Success, Auspiciousness, and Ease.
+    - **Ulka (Saturn):** Predict Labor, Workload, or Sudden Changes.
+- **Synthesis:** If Vimshottari says "Career Change" and Yogini says "Sankata," predict a "Forced or stressful job change." If Yogini says "Siddha," predict a "Smooth and lucky transition."
+
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
 - Check the Lagna Lord and Sun first.
@@ -98,9 +107,10 @@ For every user query, structure your response exactly as follows:
 **Key Insights**: 3-4 bullet points highlighting the Strength (D9) and the Challenge (D1).
 
 **Detailed Analysis**:
-- The Promise (Chart Analysis): Planetary positions and Yogas.
-- The Timing (Dashas & Transits): What is happening now.
-- The Synthesis: How the D9/Internal strength modifies the D1/External situation.
+- **The Promise (Chart Analysis):** Planetary positions and Yogas.
+- **The Master Clock (Vimshottari):** What the main Dasha indicates.
+- **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction using the current Yogini period (e.g., "While Vimshottari shows growth, Yogini Ulka suggests high workload").
+- **The Synthesis:** How D9 modifies the final outcome.
 
 **Practical Guidance**: Actionable advice or cautions.
 """
@@ -462,6 +472,11 @@ For every user query, structure your response exactly as follows:
         # Add Shoola Dasha (Jaimini longevity system)
         shoola_calc = ShoolaDashaCalculator(chart_data)
         context['shoola_dasha'] = shoola_calc.calculate_shoola_dasha(birth_data)
+        
+        # Add Yogini Dasha
+        yogini_calc = YoginiDashaCalculator()
+        moon_lon = chart_data['planets']['Moon']['longitude']
+        context['yogini_dasha'] = yogini_calc.calculate_current_yogini(birth_data, moon_lon, target_date)
         
         # Add specific date dashas if requested
         if target_date:
