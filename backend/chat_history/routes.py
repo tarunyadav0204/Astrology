@@ -220,6 +220,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 @router.post("/ask")
 async def ask_question_async(request: dict, background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
     """Start async chat processing - returns immediately with message_id for polling"""
+    from credits.credit_service import CreditService
     
     # Validate required fields
     session_id = request.get("session_id")
@@ -233,6 +234,28 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     language = request.get("language", "english")
     response_style = request.get("response_style", "detailed")
     premium_analysis = request.get("premium_analysis", False)
+    
+    # Check credit cost and user balance
+    credit_service = CreditService()
+    if premium_analysis:
+        chat_cost = credit_service.get_credit_setting('premium_chat_cost')
+    else:
+        chat_cost = credit_service.get_credit_setting('chat_question_cost')
+    user_balance = credit_service.get_user_credits(current_user.userid)
+    
+    print(f"💳 CREDIT CHECK (chat-v2):")
+    print(f"   User ID: {current_user.userid}")
+    print(f"   Premium Analysis: {premium_analysis}")
+    print(f"   Chat cost: {chat_cost} credits")
+    print(f"   User balance: {user_balance} credits")
+    
+    if user_balance < chat_cost:
+        analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Analysis"
+        print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
+        raise HTTPException(
+            status_code=402, 
+            detail=f"Insufficient credits for {analysis_type}. You need {chat_cost} credits but have {user_balance}."
+        )
     
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
@@ -263,7 +286,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Start background processing
     background_tasks.add_task(
         process_gemini_response,
-        message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details
+        message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost
     )
     
     return {
@@ -310,7 +333,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     
     return response
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1):
     """Background task to process Gemini response"""
     import sys
     import os
@@ -318,6 +341,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     
     from ai.gemini_chat_analyzer import GeminiChatAnalyzer
     from chat.chat_context_builder import ChatContextBuilder
+    from credits.credit_service import CreditService
     
     try:
         # Use birth data from request (required)
@@ -364,10 +388,28 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             cursor = conn.cursor()
             
             if result.get('success'):
-                cursor.execute(
-                    "UPDATE chat_messages SET content = ?, status = ?, completed_at = ? WHERE message_id = ?",
-                    (sanitize_text(result['response']), "completed", datetime.now(), message_id)
+                # Deduct credits on successful response
+                credit_service = CreditService()
+                analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
+                success = credit_service.spend_credits(
+                    user_id, 
+                    chat_cost, 
+                    'chat_question', 
+                    f"{analysis_type}: {question[:50]}..."
                 )
+                
+                if success:
+                    print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
+                    cursor.execute(
+                        "UPDATE chat_messages SET content = ?, status = ?, completed_at = ? WHERE message_id = ?",
+                        (sanitize_text(result['response']), "completed", datetime.now(), message_id)
+                    )
+                else:
+                    print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
+                    cursor.execute(
+                        "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
+                        ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
+                    )
             else:
                 error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
                 cursor.execute(
