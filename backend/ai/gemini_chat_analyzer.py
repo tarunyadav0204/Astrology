@@ -157,18 +157,18 @@ class GeminiChatAnalyzer:
             selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
             model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
             
-            # print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-            # print(f"Analysis Type: {model_type}")
-            # print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-            # print(f"Prompt length: {len(prompt)} characters")
+            print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+            print(f"Analysis Type: {model_type}")
+            print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+            print(f"Prompt length: {len(prompt)} characters")
             
             # LOG COMPLETE REQUEST
-            # print(f"\n{'='*80}")
-            # print(f"📤 GEMINI REQUEST #{call_type}")
-            # print(f"{'='*80}")
-            # print(f"Question: {user_question}")
-            # print(f"\nCOMPLETE PROMPT:\n{prompt}")
-            # print(f"{'='*80}\n")
+            print(f"\n{'='*80}")
+            print(f"📤 GEMINI REQUEST #{call_type}")
+            print(f"{'='*80}")
+            print(f"Question: {user_question}")
+            print(f"\nCOMPLETE PROMPT:\n{prompt}")
+            print(f"{'='*80}\n")
             
             # CALL GEMINI ASYNC DIRECTLY with request_options
             response = await asyncio.wait_for(
@@ -180,14 +180,14 @@ class GeminiChatAnalyzer:
             )
             
             # LOG COMPLETE RESPONSE
-            # print(f"\n{'='*80}")
-            # print(f"📥 GEMINI RESPONSE #{call_type}")
-            # print(f"{'='*80}")
-            # if response and hasattr(response, 'text'):
-            #     print(f"\nCOMPLETE RESPONSE:\n{response.text}")
-            # else:
-            #     print(f"No response or empty response")
-            # print(f"{'='*80}\n")
+            print(f"\n{'='*80}")
+            print(f"📥 GEMINI RESPONSE #{call_type}")
+            print(f"{'='*80}")
+            if response and hasattr(response, 'text'):
+                print(f"\nCOMPLETE RESPONSE:\n{response.text}")
+            else:
+                print(f"No response or empty response")
+            print(f"{'='*80}\n")
             
             gemini_total_time = time.time() - gemini_start_time
             print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
@@ -628,7 +628,21 @@ End your response with 3-4 relevant follow-up questions in this exact format:
         
         # Import the system instruction from ChatContextBuilder
         from chat.chat_context_builder import ChatContextBuilder
-        system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
+        
+        # Check if this is synastry analysis
+        is_synastry = context.get('analysis_type') == 'synastry'
+        
+        if is_synastry:
+            # Inject actual names into synastry instruction
+            native_name = context.get('native', {}).get('birth_details', {}).get('name', 'Native')
+            partner_name = context.get('partner', {}).get('birth_details', {}).get('name', 'Partner')
+            print(f"\n👥 SYNASTRY MODE DETECTED")
+            print(f"   Native: {native_name}")
+            print(f"   Partner: {partner_name}")
+            print(f"   Context structure: native + partner (dual charts)")
+            system_instruction = ChatContextBuilder.SYNASTRY_SYSTEM_INSTRUCTION.replace('{native_name}', native_name).replace('{partner_name}', partner_name)
+        else:
+            system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
         
         # REORDERED FOR IMPLICIT CACHING: Static data first, dynamic data last
         prompt_parts = []
@@ -645,14 +659,30 @@ End your response with 3-4 relevant follow-up questions in this exact format:
         # Remove transit data from static context to maintain cache consistency
         transits = static_context.pop('transit_activations', None)
         
+        # Log context structure
+        if is_synastry:
+            print(f"\n📋 CONTEXT STRUCTURE (SYNASTRY):")
+            print(f"   - analysis_type: {static_context.get('analysis_type')}")
+            print(f"   - native.birth_details: {static_context.get('native', {}).get('birth_details', {}).get('name')}")
+            print(f"   - partner.birth_details: {static_context.get('partner', {}).get('birth_details', {}).get('name')}")
+            print(f"   - native context keys: {list(static_context.get('native', {}).keys())[:10]}...")
+            print(f"   - partner context keys: {list(static_context.get('partner', {}).keys())[:10]}...")
+        else:
+            print(f"\n📋 CONTEXT STRUCTURE (SINGLE):")
+            print(f"   - birth_details: {static_context.get('birth_details', {}).get('name')}")
+            print(f"   - context keys: {list(static_context.keys())[:15]}...")
+        
         # Convert ONLY static context to JSON with deterministic ordering
         chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=True)
         prompt_parts.append(f"BIRTH CHART DATA:\n{chart_json}")
+        
+        print(f"   - Total context size: {len(chart_json)} characters")
         
         # 3. DYNAMIC: Transit Data (if present) - This breaks cache prefix but that's OK
         if transits:
             transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=True)
             prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
+            print(f"   - Transit data included: {len(transits)} activations")
 
         
         # 4. DYNAMIC: Date/Time (MOVED DOWN - breaks cache here)

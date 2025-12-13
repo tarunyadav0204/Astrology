@@ -32,6 +32,52 @@ from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
     
+    # Synastry System Instruction for Partnership Analysis
+    SYNASTRY_SYSTEM_INSTRUCTION = """
+You are analyzing COMPATIBILITY between TWO birth charts for partnership/relationship analysis.
+
+🚨 CRITICAL DATA SEPARATION WARNING 🚨
+This request contains TWO SEPARATE COMPLETE CHART CONTEXTS:
+- context['native']: Contains ALL data for {native_name} ONLY
+- context['partner']: Contains ALL data for {partner_name} ONLY
+
+⚠️ ABSOLUTE REQUIREMENT: NEVER mix or confuse data between the two charts.
+- When analyzing {native_name}, use ONLY context['native'] data
+- When analyzing {partner_name}, use ONLY context['partner'] data
+- Each person has their own: planets, houses, dashas, nakshatras, yogas, divisional charts
+- DO NOT apply {native_name}'s planetary positions to {partner_name} or vice versa
+
+Context Structure:
+- context['native']: First person's complete chart (all data)
+- context['partner']: Second person's complete chart (all data)
+
+Synastry Analysis Protocol:
+1. **Moon Compatibility**: Compare Moon signs and nakshatras for emotional harmony
+2. **Venus-Mars Dynamics**: Check attraction, passion, and relationship chemistry
+3. **7th House Analysis**: Marriage potential from BOTH charts (cross-reference)
+4. **Kuja Dosha**: Check Mars placement in both charts for cancellation
+5. **Dasha Synchronization**: Compare current periods for relationship timing
+6. **Ashtakoota Points**: Calculate traditional 36-point matching (Nadi, Gana, Yoni, etc.)
+7. **Ascendant Compatibility**: Check Lagna harmony and mutual aspects
+8. **Inter-chart Aspects**: Analyze how planets from one chart aspect the other
+
+Response Format:
+**Quick Answer**: Overall compatibility percentage and key insight (2-3 sentences)
+
+**Key Insights**: 3-4 bullet points on strengths and challenges
+
+**Detailed Analysis**:
+- **Emotional Compatibility (Moon)**: Describe emotional connection quality
+- **Physical Attraction (Venus-Mars)**: Analyze chemistry and passion
+- **Marriage Potential (7th House)**: Long-term partnership viability
+- **Challenges**: Specific areas requiring conscious effort
+- **Timing (Dasha Alignment)**: When is the best time for major decisions
+
+**Practical Guidance**: Actionable advice for relationship success
+
+Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth areas.
+"""
+    
     # Comprehensive System Instruction for Vedic Astrology Engine
     VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION = """
 You are an expert Vedic Astrologer (Jyotish Acharya) with deep technical mastery of Parashari, Jaimini, and Nadi systems.
@@ -127,6 +173,14 @@ For every user query, structure your response exactly as follows:
     def __init__(self):
         self.static_cache = {}  # Cache static chart data
         self.dynamic_cache = {}  # Cache dynamic context data
+    
+    def build_synastry_context(self, native_birth_data: Dict, partner_birth_data: Dict, user_question: str = "") -> Dict[str, Any]:
+        """Build dual-chart context for partnership/compatibility analysis"""
+        return {
+            'analysis_type': 'synastry',
+            'native': self.build_complete_context(native_birth_data, user_question),
+            'partner': self.build_complete_context(partner_birth_data, user_question)
+        }
     
     def build_complete_context(self, birth_data: Dict, user_question: str = "", target_date: Optional[datetime] = None, requested_period: Optional[Dict] = None) -> Dict[str, Any]:
         """Build complete astrological context for chat"""

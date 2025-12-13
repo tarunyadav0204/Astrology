@@ -14,9 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 
-export default function MessageBubble({ message, language, onFollowUpClick }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const isPartnership = partnership || message.partnership_mode;
 
   useEffect(() => {
     Animated.parallel([
@@ -670,7 +671,8 @@ export default function MessageBubble({ message, language, onFollowUpClick }) {
     ]}>
       <View style={[
         styles.bubble,
-        message.role === 'user' ? styles.userBubble : styles.assistantBubble
+        message.role === 'user' ? styles.userBubble : styles.assistantBubble,
+        isPartnership && styles.partnershipBubble
       ]}>
         {message.role === 'assistant' && (
           <View style={styles.assistantHeader}>
@@ -962,5 +964,24 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#ff6b35',
     marginHorizontal: 2,
+  },
+  partnershipBubble: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.partnershipBorder,
+  },
+  partnershipLabel: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: COLORS.partnershipBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  partnershipLabelText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

@@ -113,6 +113,14 @@ export default function ChatScreen({ navigation, route }) {
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
   
+  // Partnership mode state
+  const [partnershipMode, setPartnershipMode] = useState(false);
+  const [nativeChart, setNativeChart] = useState(null);
+  const [partnerChart, setPartnerChart] = useState(null);
+  const [showChartPicker, setShowChartPicker] = useState(false);
+  const [selectingFor, setSelectingFor] = useState(null); // 'native' or 'partner'
+  const [savedCharts, setSavedCharts] = useState([]);
+  
   // Pending message management (like web app)
   const addPendingMessage = async (messageId) => {
     const key = `pendingChatMessages_${currentPersonId}`;
@@ -149,6 +157,40 @@ export default function ChatScreen({ navigation, route }) {
       });
     }
   };
+  
+  // Load saved charts for partnership mode
+  const loadSavedCharts = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/birth-charts')}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSavedCharts(data.charts || []);
+      } else {
+        setSavedCharts([]);
+      }
+    } catch (error) {
+      console.error('Error loading saved charts:', error);
+      setSavedCharts([]);
+    }
+  };
+  
+  // Load charts when component mounts
+  useEffect(() => {
+    loadSavedCharts();
+  }, []);
+  
+  // Reload charts when picker opens
+  useEffect(() => {
+    if (showChartPicker) {
+      loadSavedCharts();
+    }
+  }, [showChartPicker]);
 
   const suggestions = [
     "What does my birth chart say about my career?",
@@ -698,11 +740,6 @@ export default function ChatScreen({ navigation, route }) {
           await removePendingMessage(messageId);
           fetchBalance();
           
-          // Scroll to bottom to show new response
-          setTimeout(() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-          }, 100);
-          
           return;
         }
         
@@ -865,6 +902,16 @@ export default function ChatScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem('authToken');
       
+      // Partnership mode validation
+      if (partnershipMode && (!nativeChart || !partnerChart)) {
+        Alert.alert('Error', 'Please select both charts for partnership analysis');
+        clearInterval(loadingInterval);
+        setMessagesWithStorage(prev => prev.filter(msg => msg.id !== processingMessageId));
+        setLoading(false);
+        setIsTyping(false);
+        return;
+      }
+      
       const requestBody = {
         session_id: currentSessionId,
         question: messageText,
@@ -881,7 +928,19 @@ export default function ChatScreen({ navigation, route }) {
           timezone: birthData.timezone || 'Asia/Kolkata',
           place: birthData.place || '',
           gender: birthData.gender || ''
-        }
+        },
+        // Partnership mode fields
+        partnership_mode: partnershipMode,
+        ...(partnershipMode && partnerChart && {
+          partner_name: partnerChart.name,
+          partner_date: typeof partnerChart.date === 'string' ? partnerChart.date.split('T')[0] : partnerChart.date,
+          partner_time: typeof partnerChart.time === 'string' ? partnerChart.time.split('T')[1]?.slice(0, 5) || partnerChart.time : partnerChart.time,
+          partner_place: partnerChart.place || '',
+          partner_latitude: parseFloat(partnerChart.latitude),
+          partner_longitude: parseFloat(partnerChart.longitude),
+          partner_timezone: partnerChart.timezone || 'Asia/Kolkata',
+          partner_gender: partnerChart.gender || ''
+        })
       };
       
 
@@ -1028,13 +1087,40 @@ export default function ChatScreen({ navigation, route }) {
             <View style={styles.headerCenter}>
               {showGreeting ? (
                 <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+              ) : !partnershipMode ? (
+                <>
+                  <Text style={styles.headerTitle}>Chat</Text>
+                  {birthData && (
+                    <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
+                      <Text style={styles.nameChipText}>{birthData.name?.slice(0, 12)}{birthData.name?.length > 12 ? '...' : ''}</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
               ) : (
-                <Text style={styles.headerTitle}>Chat</Text>
-              )}
-              {birthData && (
-                <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
-                  <Text style={styles.nameChipText}>{birthData.name?.slice(0, 12)}{birthData.name?.length > 12 ? '...' : ''}</Text>
-                </TouchableOpacity>
+                <View style={styles.partnershipChipsContainer}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setSelectingFor('native');
+                      setShowChartPicker(true);
+                    }} 
+                    style={[styles.nameChip, styles.nativeChip, styles.compactChip]}
+                  >
+                    <Text style={styles.compactChipText}>
+                      {nativeChart?.name?.slice(0, 6) || 'Native'}{nativeChart?.name?.length > 6 ? '..' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setSelectingFor('partner');
+                      setShowChartPicker(true);
+                    }} 
+                    style={[styles.nameChip, styles.partnerChip, styles.compactChip]}
+                  >
+                    <Text style={styles.compactChipText}>
+                      {partnerChart?.name?.slice(0, 6) || 'Partner'}{partnerChart?.name?.length > 6 ? '..' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
             
@@ -1077,6 +1163,26 @@ export default function ChatScreen({ navigation, route }) {
             onOptionSelect={handleGreetingOptionSelect}
           />
         ) : (
+          <>
+          {partnershipMode && (
+            <TouchableOpacity 
+              style={styles.floatingPartnershipBadge}
+              onPress={() => {
+                setPartnershipMode(false);
+                setNativeChart(null);
+                setPartnerChart(null);
+              }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#ec4899', '#f472b6']}
+                style={styles.partnershipBadgeGradient}
+              >
+                <Text style={styles.partnershipBadgeText}>👥 Partnership Mode</Text>
+                <Ionicons name="close-circle" size={16} color={COLORS.white} style={styles.partnershipBadgeIcon} />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
           <ScrollView 
             ref={scrollViewRef}
             style={styles.messagesContainer}
@@ -1153,12 +1259,15 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             )}
             
+
+            
             {messages.map((item) => {
               return (
-                <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} />
+                <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} />
               );
             })}
           </ScrollView>
+          </>
         )}
 
 
@@ -1680,7 +1789,59 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      if (!partnershipMode) {
+                        Alert.alert(
+                          'Partnership Mode',
+                          'Partnership mode uses 2 credits per question for comprehensive compatibility analysis. Continue?',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                              text: 'Continue', 
+                              onPress: () => {
+                                setPartnershipMode(true);
+                                Animated.timing(drawerAnim, {
+                                  toValue: 300,
+                                  duration: 250,
+                                  useNativeDriver: true,
+                                }).start(() => {
+                                  setShowMenu(false);
+                                  setShowChartPicker(true);
+                                });
+                              }
+                            }
+                          ]
+                        );
+                      } else {
+                        setPartnershipMode(false);
+                        setNativeChart(null);
+                        setPartnerChart(null);
+                        Animated.timing(drawerAnim, {
+                          toValue: 300,
+                          duration: 250,
+                          useNativeDriver: true,
+                        }).start(() => setShowMenu(false));
+                      }
+                    }}
+                  >
+                    <LinearGradient
+                      colors={partnershipMode ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={partnershipMode ? ['#9333ea', '#a855f7'] : ['#ff6b35', '#ff8c5a']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>👥</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Partnership {partnershipMode ? 'ON' : 'OFF'}</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.menuOption, styles.menuOptionLast]}
@@ -1894,6 +2055,60 @@ export default function ChatScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
+        
+        {/* Chart Picker Modal */}
+        <Modal
+          visible={showChartPicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowChartPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.chartPickerModal}>
+              <View style={styles.chartPickerHeader}>
+                <Text style={styles.chartPickerTitle}>
+                  Select {selectingFor === 'native' ? 'Native' : 'Partner'} Chart
+                </Text>
+                <TouchableOpacity onPress={() => setShowChartPicker(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.chartPickerList}>
+                {savedCharts.map((chart, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.chartPickerItem}
+                    onPress={() => {
+                      if (selectingFor === 'native') {
+                        setNativeChart(chart);
+                      } else {
+                        setPartnerChart(chart);
+                      }
+                      setShowChartPicker(false);
+                    }}
+                  >
+                    <View style={styles.chartPickerItemContent}>
+                      <Text style={styles.chartPickerItemName}>{chart.name}</Text>
+                      <Text style={styles.chartPickerItemDetails}>
+                        {chart.date} • {chart.time}
+                      </Text>
+                      <Text style={styles.chartPickerItemPlace}>{chart.place}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                ))}
+                
+                {savedCharts.length === 0 && (
+                  <View style={styles.emptyChartList}>
+                    <Text style={styles.emptyChartText}>No saved charts found</Text>
+                    <Text style={styles.emptyChartSubtext}>Please save charts first</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
       </LinearGradient>
@@ -1962,6 +2177,29 @@ const styles = StyleSheet.create({
   },
   nameChipText: {
     fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  partnershipChipsContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 2,
+  },
+  nativeChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.5)',
+  },
+  partnerChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(236, 72, 153, 0.5)',
+  },
+  compactChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  compactChipText: {
+    fontSize: 10,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
@@ -2606,5 +2844,160 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 18,
     fontWeight: '700',
+  },
+  // Partnership mode styles
+  chartSelectionContainer: {
+    padding: 16,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    margin: 16,
+  },
+  chartSelectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+  },
+  chartSelectButton: {
+    padding: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 8,
+  },
+  chartSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.quickAnswerStart,
+  },
+  chartSelectText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  chartsDisplayContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+  },
+  miniChartCard: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  miniChartLabel: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  miniChartName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  miniChartDetails: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  chartPickerModal: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  chartPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  chartPickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  chartPickerList: {
+    padding: 16,
+  },
+  chartPickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  chartPickerItemContent: {
+    flex: 1,
+  },
+  chartPickerItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  chartPickerItemDetails: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+  },
+  chartPickerItemPlace: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  emptyChartList: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyChartText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+  },
+  emptyChartSubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  floatingPartnershipBadge: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+    alignSelf: 'flex-end',
+    shadowColor: '#ec4899',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  partnershipBadgeGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  partnershipBadgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  partnershipBadgeIcon: {
+    marginLeft: 2,
   },
 });

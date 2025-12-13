@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 import sys
 import os
@@ -39,8 +39,21 @@ class ChatRequest(BaseModel):
     include_context: Optional[bool] = False
     premium_analysis: Optional[bool] = False
     # User context
-    user_name: Optional[str] = None
-    user_relationship: Optional[str] = 'self'
+    user_name: Optional[str] = Field(None, alias="userName")
+    user_relationship: Optional[str] = Field('self', alias="userRelationship")
+    # Partnership mode
+    partnership_mode: Optional[bool] = Field(False, alias="partnershipMode")
+    partner_name: Optional[str] = Field(None, alias="partnerName")
+    partner_date: Optional[str] = Field(None, alias="partnerDate")
+    partner_time: Optional[str] = Field(None, alias="partnerTime")
+    partner_place: Optional[str] = Field(None, alias="partnerPlace")
+    partner_latitude: Optional[float] = Field(None, alias="partnerLatitude")
+    partner_longitude: Optional[float] = Field(None, alias="partnerLongitude")
+    partner_timezone: Optional[str] = Field(None, alias="partnerTimezone")
+    partner_gender: Optional[str] = Field(None, alias="partnerGender")
+    
+    class Config:
+        populate_by_name = True  # Allows both snake_case and camelCase
 
 class ClearChatRequest(BaseModel):
     name: Optional[str] = None
@@ -93,7 +106,10 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     """Ask astrological question with streaming response - requires credits"""
     
     # Check credit cost and user balance
-    if request.premium_analysis:
+    if request.partnership_mode:
+        base_cost = credit_service.get_credit_setting('chat_question_cost')
+        chat_cost = base_cost * 2  # Partnership mode costs double
+    elif request.premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
@@ -101,13 +117,19 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
     
     print(f"💳 CREDIT CHECK DEBUG:")
     print(f"   User ID: {current_user.userid}")
+    print(f"   Partnership Mode: {request.partnership_mode}")
     print(f"   Premium Analysis: {request.premium_analysis}")
     print(f"   Chat cost: {chat_cost} credits")
     print(f"   User balance: {user_balance} credits")
     print(f"   Has sufficient credits: {user_balance >= chat_cost}")
     
     if user_balance < chat_cost:
-        analysis_type = "Premium Deep Analysis" if request.premium_analysis else "Standard Analysis"
+        if request.partnership_mode:
+            analysis_type = "Partnership Analysis"
+        elif request.premium_analysis:
+            analysis_type = "Premium Deep Analysis"
+        else:
+            analysis_type = "Standard Analysis"
         print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
         raise HTTPException(
             status_code=402, 
@@ -149,11 +171,43 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             # Build astrological context with requested period (run in thread pool)
             import asyncio
             try:
-                context = await asyncio.get_event_loop().run_in_executor(
-                    None, 
-                    context_builder.build_complete_context,
-                    birth_data, request.question, None, requested_period
-                )
+                # Check if partnership mode
+                if request.partnership_mode:
+                    print(f"\n👥 PARTNERSHIP MODE REQUEST DETECTED")
+                    print(f"   Native: {birth_data.get('name')}")
+                    print(f"   Partner: {request.partner_name}")
+                    print(f"   Question: {request.question}")
+                    
+                    # Validate partner data
+                    if not all([request.partner_date, request.partner_time, request.partner_place]):
+                        print(f"   ❌ Missing partner data")
+                        yield f"data: {json.dumps({'status': 'error', 'error': 'Partner birth details are required for partnership mode'})}\n\n"
+                        return
+                    
+                    partner_birth_data = {
+                        'name': request.partner_name,
+                        'date': request.partner_date,
+                        'time': request.partner_time,
+                        'place': request.partner_place,
+                        'latitude': request.partner_latitude or 28.6139,
+                        'longitude': request.partner_longitude or 77.2090,
+                        'timezone': request.partner_timezone,
+                        'gender': request.partner_gender
+                    }
+                    
+                    print(f"   ✅ Building synastry context for both charts...")
+                    context = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        context_builder.build_synastry_context,
+                        birth_data, partner_birth_data, request.question
+                    )
+                    print(f"   ✅ Synastry context built successfully")
+                else:
+                    context = await asyncio.get_event_loop().run_in_executor(
+                        None, 
+                        context_builder.build_complete_context,
+                        birth_data, request.question, None, requested_period
+                    )
             except Exception as context_error:
                 print(f"❌ CONTEXT BUILDING ERROR: {context_error}")
                 import traceback
@@ -187,7 +241,13 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 
                 # Add instruction for Gemini about transit data requests
                 enhanced_question = request.question
-                if not requested_period and context.get('transit_data_availability'):
+                
+                # Add partnership mode clarification
+                if request.partnership_mode:
+                    native_name = birth_data.get('name', 'Native')
+                    partner_name = partner_birth_data.get('name', 'Partner')
+                    enhanced_question = f"PARTNERSHIP ANALYSIS REQUEST:\nNative: {native_name}\nPartner: {partner_name}\n\nQuestion: {request.question}\n\nIMPORTANT: Use context['native'] for {native_name}'s data and context['partner'] for {partner_name}'s data. Do not mix their planetary positions, dashas, or chart details."
+                elif not requested_period and context.get('transit_data_availability'):
                     enhanced_question += "\n\nIMPORTANT: For PRECISE event prediction, use the advanced methodology in transit_data_availability. When dasha planets recreate their natal relationships through transits, events manifest with highest probability. For timing questions, you MUST request transit data using the JSON format. Do NOT provide a complete response - only request the transit data."
                 
                 # Extract user context

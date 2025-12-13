@@ -27,6 +27,10 @@ export const COLORS = {
   quickAnswerEnd: 'rgba(236, 72, 153, 0.1)',
   finalThoughtsStart: 'rgba(254, 247, 240, 0.9)',
   finalThoughtsEnd: 'rgba(254, 215, 215, 0.9)',
+  
+  // Partnership mode colors
+  partnershipBubble: 'rgba(236, 72, 153, 0.08)',
+  partnershipBorder: '#ec4899',
 };
 
 import { Platform } from 'react-native';
@@ -61,4 +65,9 @@ export const LANGUAGES = [
   { code: 'gujarati', name: 'ગુજરાતી', flag: '🇮🇳' },
   { code: 'tamil', name: 'தமிழ்', flag: '🇮🇳' },
 ];
+
+export const CREDIT_COSTS = {
+  SINGLE_CHAT: 1,
+  PARTNERSHIP_CHAT: 2,
+};
 

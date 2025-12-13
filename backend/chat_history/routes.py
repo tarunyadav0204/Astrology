@@ -259,10 +259,24 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     language = request.get("language", "english")
     response_style = request.get("response_style", "detailed")
     premium_analysis = request.get("premium_analysis", False)
+    partnership_mode = request.get("partnership_mode", False) or request.get("partnershipMode", False)
+    partner_birth_details = request.get("partner_birth_details") or {
+        'name': request.get('partner_name') or request.get('partnerName'),
+        'date': request.get('partner_date') or request.get('partnerDate'),
+        'time': request.get('partner_time') or request.get('partnerTime'),
+        'place': request.get('partner_place') or request.get('partnerPlace'),
+        'latitude': request.get('partner_latitude') or request.get('partnerLatitude'),
+        'longitude': request.get('partner_longitude') or request.get('partnerLongitude'),
+        'timezone': request.get('partner_timezone') or request.get('partnerTimezone'),
+        'gender': request.get('partner_gender') or request.get('partnerGender')
+    } if partnership_mode else None
     
     # Check credit cost and user balance
     credit_service = CreditService()
-    if premium_analysis:
+    if partnership_mode:
+        base_cost = credit_service.get_credit_setting('chat_question_cost')
+        chat_cost = base_cost * 2  # Partnership mode costs double
+    elif premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
@@ -270,12 +284,18 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     
     print(f"💳 CREDIT CHECK (chat-v2):")
     print(f"   User ID: {current_user.userid}")
+    print(f"   Partnership Mode: {partnership_mode}")
     print(f"   Premium Analysis: {premium_analysis}")
     print(f"   Chat cost: {chat_cost} credits")
     print(f"   User balance: {user_balance} credits")
     
     if user_balance < chat_cost:
-        analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Analysis"
+        if partnership_mode:
+            analysis_type = "Partnership Analysis"
+        elif premium_analysis:
+            analysis_type = "Premium Deep Analysis"
+        else:
+            analysis_type = "Standard Analysis"
         print(f"❌ INSUFFICIENT CREDITS: Need {chat_cost}, have {user_balance}")
         raise HTTPException(
             status_code=402, 
@@ -311,7 +331,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # Start background processing
     background_tasks.add_task(
         process_gemini_response,
-        message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost
+        message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details
     )
     
     return {
@@ -358,7 +378,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     
     return response
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1):
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None):
     """Background task to process Gemini response"""
     import sys
     import os
@@ -377,7 +397,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         # Build context
         context_builder = ChatContextBuilder()
-        context = context_builder.build_complete_context(birth_data)
+        
+        if partnership_mode and partner_birth_details:
+            print(f"\n👥 PARTNERSHIP MODE - Building synastry context")
+            print(f"   Native: {birth_data.get('name')}")
+            print(f"   Partner: {partner_birth_details.get('name')}")
+            context = context_builder.build_synastry_context(birth_data, partner_birth_details, question)
+            print(f"   ✅ Synastry context built")
+            print(f"   📊 Context structure verification:")
+            print(f"      - analysis_type: {context.get('analysis_type')}")
+            print(f"      - Has 'native' key: {'native' in context}")
+            print(f"      - Has 'partner' key: {'partner' in context}")
+            if 'native' in context:
+                print(f"      - Native chart name: {context['native'].get('birth_details', {}).get('name')}")
+                print(f"      - Native has d1_chart: {'d1_chart' in context['native']}")
+            if 'partner' in context:
+                print(f"      - Partner chart name: {context['partner'].get('birth_details', {}).get('name')}")
+                print(f"      - Partner has d1_chart: {'d1_chart' in context['partner']}")
+        else:
+            context = context_builder.build_complete_context(birth_data)
         
         # Get conversation history
         with sqlite3.connect('astrology.db') as conn:
