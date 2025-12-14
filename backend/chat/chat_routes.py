@@ -647,6 +647,102 @@ async def get_question_suggestions():
         "suggestions": suggestions
     }
 
+@router.get("/scan-timeline")
+async def scan_timeline(birth_chart_id: int, current_user: User = Depends(get_current_user)):
+    """Silent background scan for calibration events"""
+    import sqlite3
+    
+    try:
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT name, date, time, latitude, longitude, timezone, place, gender
+            FROM birth_charts WHERE id = ? AND userid = ?
+        ''', (birth_chart_id, current_user.userid))
+        
+        birth_row = cursor.fetchone()
+        conn.close()
+        
+        if not birth_row:
+            return {"events": []}
+        
+        from encryption_utils import EncryptionManager
+        try:
+            encryptor = EncryptionManager()
+            birth_data = {
+                'name': encryptor.decrypt(birth_row[0]),
+                'date': encryptor.decrypt(birth_row[1]),
+                'time': encryptor.decrypt(birth_row[2]),
+                'latitude': float(encryptor.decrypt(str(birth_row[3]))),
+                'longitude': float(encryptor.decrypt(str(birth_row[4]))),
+                'timezone': birth_row[5],
+                'place': encryptor.decrypt(birth_row[6] or ''),
+                'gender': birth_row[7] or ''
+            }
+        except:
+            birth_data = {
+                'name': birth_row[0],
+                'date': birth_row[1],
+                'time': birth_row[2],
+                'latitude': birth_row[3],
+                'longitude': birth_row[4],
+                'timezone': birth_row[5],
+                'place': birth_row[6] or '',
+                'gender': birth_row[7] or ''
+            }
+        
+        from calculators.life_event_scanner import LifeEventScanner
+        from calculators.chart_calculator import ChartCalculator
+        from shared.dasha_calculator import DashaCalculator
+        from calculators.real_transit_calculator import RealTransitCalculator
+        
+        scanner = LifeEventScanner(
+            ChartCalculator({}), 
+            DashaCalculator(), 
+            RealTransitCalculator()
+        )
+        
+        events = scanner.scan_timeline(birth_data, start_age=18)
+        high_confidence = [e for e in events if e['confidence'] == 'High']
+        
+        return {"events": high_confidence[:1]}
+        
+    except Exception as e:
+        print(f"❌ Timeline scan error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"events": []}
+
+@router.post("/verify-calibration")
+async def verify_calibration(request: dict, current_user: User = Depends(get_current_user)):
+    """Store user's verification response"""
+    import sqlite3
+    
+    try:
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE birth_charts 
+            SET is_rectified = ?, calibration_year = ?
+            WHERE id = ? AND userid = ?
+        ''', (
+            1 if request.get('verified') else 0,
+            request.get('event_year'),
+            request.get('birth_chart_id'),
+            current_user.userid
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return {"success": True}
+        
+    except Exception as e:
+        print(f"❌ Calibration verification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/save-message")
 async def save_message(request: dict):
     """Save individual message to chat history"""

@@ -189,4 +189,13 @@ export const pricingAPI = {
   getAnalysisPricing: () => api.get(getEndpoint('/analysis-pricing')),
 };
 
+export const lifeEventsAPI = {
+  scanLifeEvents: (birthData, startAge = 18, endAge = 50) => 
+    api.post(getEndpoint('/scan-life-events'), {
+      birth_data: birthData,
+      start_age: startAge,
+      end_age: endAge
+    }),
+};
+
 export default api;

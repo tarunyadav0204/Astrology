@@ -15,18 +15,15 @@ export const storage = {
   
   // Birth details
   setBirthDetails: async (details) => {
-    // console.log('💾 [DEBUG] Storage: setBirthDetails called with:', JSON.stringify(details, null, 2));
-    // console.log('⚧️ [DEBUG] Storage: Gender being saved:', details?.gender);
+    console.log('💾 [DEBUG] Storage: setBirthDetails called with:', JSON.stringify({ name: details.name, id: details.id }, null, 2));
     const result = await AsyncStorage.setItem('birthDetails', JSON.stringify(details));
-    // console.log('✅ [DEBUG] Storage: setBirthDetails completed');
+    console.log('✅ [DEBUG] Storage: setBirthDetails completed');
     return result;
   },
   getBirthDetails: async () => {
-    // console.log('📂 [DEBUG] Storage: getBirthDetails called');
     const data = await AsyncStorage.getItem('birthDetails');
     const parsed = data ? JSON.parse(data) : null;
-    // console.log('📂 [DEBUG] Storage: getBirthDetails returning:', JSON.stringify(parsed, null, 2));
-    // console.log('⚧️ [DEBUG] Storage: Gender from storage:', parsed?.gender);
+    console.log('📂 [DEBUG] Storage: getBirthDetails returning:', parsed ? { name: parsed.name, id: parsed.id } : null);
     return parsed;
   },
   
@@ -57,19 +54,28 @@ export const storage = {
   clearBirthDetails: () => AsyncStorage.removeItem('birthDetails'),
   
   // Birth profiles (multiple natives)
-  setBirthProfiles: (profiles) => AsyncStorage.setItem('birthProfiles', JSON.stringify(profiles)),
+  setBirthProfiles: (profiles) => {
+    console.log('💾 [DEBUG] Storage: setBirthProfiles called with count:', profiles.length);
+    console.log('💾 [DEBUG] Storage: setBirthProfiles profiles:', profiles.map(p => ({ name: p.name, id: p.id })));
+    return AsyncStorage.setItem('birthProfiles', JSON.stringify(profiles));
+  },
   getBirthProfiles: async () => {
     const data = await AsyncStorage.getItem('birthProfiles');
-    return data ? JSON.parse(data) : [];
+    const profiles = data ? JSON.parse(data) : [];
+    console.log('📂 [DEBUG] Storage: getBirthProfiles returning count:', profiles.length);
+    console.log('📂 [DEBUG] Storage: getBirthProfiles profiles:', profiles.map(p => ({ name: p.name, id: p.id })));
+    return profiles;
   },
   addBirthProfile: async (profile) => {
-    // console.log('📁 [DEBUG] Storage: addBirthProfile called with:', JSON.stringify(profile, null, 2));
-    // console.log('⚧️ [DEBUG] Storage: Profile gender:', profile?.gender);
+    console.log('📁 [DEBUG] Storage: addBirthProfile called with:', JSON.stringify({ name: profile.name, id: profile.id }, null, 2));
     const profiles = await storage.getBirthProfiles();
-    const updatedProfiles = profiles.filter(p => p.name !== profile.name);
+    console.log('📋 [DEBUG] Storage: Current profiles before filter:', profiles.map(p => ({ name: p.name, id: p.id })));
+    const updatedProfiles = profiles.filter(p => p.id !== profile.id);
+    console.log('📋 [DEBUG] Storage: Profiles after filter:', updatedProfiles.map(p => ({ name: p.name, id: p.id })));
     updatedProfiles.push(profile);
+    console.log('📋 [DEBUG] Storage: Final profiles list:', updatedProfiles.map(p => ({ name: p.name, id: p.id })));
     await storage.setBirthProfiles(updatedProfiles);
-    // console.log('✅ [DEBUG] Storage: addBirthProfile completed');
+    console.log('✅ [DEBUG] Storage: addBirthProfile completed');
   },
   removeBirthProfile: async (profileName) => {
     const profiles = await storage.getBirthProfiles();

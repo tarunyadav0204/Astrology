@@ -316,6 +316,18 @@ export default function BirthFormScreen({ navigation, route }) {
     
     setLoading(true);
     try {
+      console.log('🚀 [DEBUG] BirthForm: Starting handleSubmit');
+      console.log('📝 [DEBUG] BirthForm: Form data:', JSON.stringify({
+        name: formData.name,
+        updateGender,
+        editProfile
+      }, null, 2));
+      
+      // Check existing profiles BEFORE any changes
+      const existingProfiles = await storage.getBirthProfiles();
+      console.log('📋 [DEBUG] BirthForm: BEFORE - Existing profiles count:', existingProfiles.length);
+      console.log('📋 [DEBUG] BirthForm: BEFORE - Existing profiles:', existingProfiles.map(p => ({ name: p.name, id: p.id })));
+      
       const birthData = {
         name: formData.name,
         date: `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`,
@@ -327,50 +339,49 @@ export default function BirthFormScreen({ navigation, route }) {
         gender: formData.gender,
       };
 
+      // 1. Calculate chart for validation
       const [chartData, yogiData] = await Promise.all([
         chartAPI.calculateChartOnly(birthData),
         chartAPI.calculateYogi(birthData)
       ]);
 
+      // 2. Save to database FIRST to get real ID
+      let birthChartId = null;
+      const token = await storage.getAuthToken();
+      if (token) {
+        // For new profiles: clear_existing=true (mark this as 'self', others as 'other')
+        // For updates: clear_existing=false (don't change other profiles)
+        const shouldClearExisting = !updateGender && !editProfile;
+        const response = await authAPI.updateSelfBirthChart(birthData, shouldClearExisting);
+        birthChartId = response.data?.birth_chart_id;
+      } else {
+        // Generate temporary ID if no auth token
+        birthChartId = Date.now() + Math.random();
+      }
+
+      // 3. Create profile data with REAL ID from database
       const profileData = {
         ...formData,
         time: formData.time.toTimeString().split(' ')[0],
-        id: birthChartId // Add the database ID
+        id: birthChartId
       };
       
-      // console.log('💾 [DEBUG] BirthForm: Saving profile data:', JSON.stringify(profileData, null, 2));
-      // console.log('⚧️ [DEBUG] BirthForm: Gender being saved:', profileData.gender);
-      // console.log('🔄 [DEBUG] BirthForm: Update gender mode:', updateGender);
-      // console.log('🆔 [DEBUG] BirthForm: Birth chart ID:', birthChartId);
-      
+      // 4. THEN save to local storage with real ID
       await storage.setBirthDetails(profileData);
-      // Only add to profiles list if this is a new profile, not an update
       if (!updateGender && !editProfile) {
+        console.log('📝 [DEBUG] BirthForm: Adding to profiles list (new profile)...');
         await storage.addBirthProfile(profileData);
+        console.log('✅ [DEBUG] BirthForm: addBirthProfile completed');
+        
+        // Check profiles AFTER adding
+        const updatedProfiles = await storage.getBirthProfiles();
+        console.log('📋 [DEBUG] BirthForm: AFTER - Updated profiles count:', updatedProfiles.length);
+        console.log('📋 [DEBUG] BirthForm: AFTER - Updated profiles:', updatedProfiles.map(p => ({ name: p.name, id: p.id })));
+      } else {
+        console.log('⏭️ [DEBUG] BirthForm: Skipping addBirthProfile (update/edit mode)');
       }
       
-      // Verify the save
-      const savedData = await storage.getBirthDetails();
-      // console.log('✅ [DEBUG] BirthForm: Verified saved data:', JSON.stringify(savedData, null, 2));
-      // console.log('✅ [DEBUG] BirthForm: Verified saved gender:', savedData?.gender);
-      
-      // Always save to backend database
-      let birthChartId = null;
-      try {
-        const token = await storage.getAuthToken();
-        if (token) {
-          // console.log('🔄 [DEBUG] BirthForm: Saving to backend database:', JSON.stringify(birthData, null, 2));
-          const response = await authAPI.updateSelfBirthChart(birthData, !updateGender && !editProfile);
-          birthChartId = response.data?.birth_chart_id;
-          // console.log('✅ [DEBUG] BirthForm: Chart saved to database with id:', birthChartId);
-        } else {
-          console.log('⚠️ [DEBUG] BirthForm: No auth token found for backend save');
-        }
-      } catch (backendError) {
-        console.log('❌ [DEBUG] BirthForm: Failed to save to database:', backendError.message);
-        console.log('❌ [DEBUG] BirthForm: Backend error details:', backendError);
-      }
-      
+      // 5. Save chart data
       await storage.setChartData({
         birthData: birthData,
         chartData: chartData
@@ -379,10 +390,8 @@ export default function BirthFormScreen({ navigation, route }) {
       triggerConfetti();
       setTimeout(() => {
         const successMessage = updateGender ? 'Gender updated successfully!' : 'Birth chart calculated successfully!';
-        // console.log('✅ [DEBUG] BirthForm: Success! Navigating back to Home');
         Alert.alert('Success', successMessage, [
           { text: 'OK', onPress: () => {
-            // console.log('🏠 [DEBUG] BirthForm: Navigating to Home screen');
             navigation.replace('Home');
           }}
         ]);

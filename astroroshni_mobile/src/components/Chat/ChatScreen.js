@@ -24,6 +24,7 @@ import { StatusBar } from 'react-native';
 import MessageBubble from './MessageBubble';
 import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
+import CalibrationCard from './CalibrationCard';
 import { storage } from '../../services/storage';
 import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -113,6 +114,9 @@ export default function ChatScreen({ navigation, route }) {
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
   
+  // Calibration state
+  const [calibrationEvent, setCalibrationEvent] = useState(null);
+  
   // Partnership mode state
   const [partnershipMode, setPartnershipMode] = useState(false);
   const [nativeChart, setNativeChart] = useState(null);
@@ -191,6 +195,98 @@ export default function ChatScreen({ navigation, route }) {
       loadSavedCharts();
     }
   }, [showChartPicker]);
+  
+  // Fetch calibration event when birth data changes
+  useEffect(() => {
+    console.log('🔍 Calibration Check:', {
+      birthDataId: birthData?.id,
+      showGreeting,
+      birthDataKeys: birthData ? Object.keys(birthData) : 'no birthData'
+    });
+    if (birthData?.id && !showGreeting) {
+      console.log('✅ Calling fetchCalibrationEvent');
+      fetchCalibrationEvent();
+    } else {
+      console.log('❌ Not calling fetchCalibrationEvent - missing id or showing greeting');
+    }
+  }, [birthData?.id, showGreeting]);
+  
+  const fetchCalibrationEvent = async () => {
+    try {
+      console.log('🚀 fetchCalibrationEvent called with birthData.id:', birthData.id);
+      
+      // Use the proper API service instead of direct fetch
+      const { lifeEventsAPI } = require('../../services/api');
+      
+      const response = await lifeEventsAPI.scanLifeEvents({
+        name: birthData.name,
+        date: birthData.date,
+        time: birthData.time,
+        latitude: birthData.latitude,
+        longitude: birthData.longitude,
+        timezone: birthData.timezone,
+        place: birthData.place || '',
+        gender: birthData.gender || ''
+      }, 18, 50);
+      
+      console.log('📥 Response status:', response.status);
+      console.log('📊 Response data:', response.data);
+      
+      if (response.data && response.data.events && response.data.events.length > 0) {
+        console.log('✅ Setting calibration event:', response.data.events[0]);
+        setCalibrationEvent(response.data.events[0]);
+      } else {
+        console.log('❌ No events in response');
+      }
+    } catch (error) {
+      console.log('❌ fetchCalibrationEvent error:', error.response?.data || error.message);
+    }
+  };
+  
+  const handleCalibrationConfirm = async (event) => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      await fetch(`${API_BASE_URL}${getEndpoint('/chat/verify-calibration')}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          birth_chart_id: birthData.id,
+          event_year: event.year,
+          verified: true
+        })
+      });
+      
+      setCalibrationEvent({ ...event, verified: true });
+      Alert.alert('✅ Verified', 'Chart calibrated successfully!');
+    } catch (error) {
+      console.error('Calibration error:', error);
+    }
+  };
+  
+  const handleCalibrationReject = async (event) => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      await fetch(`${API_BASE_URL}${getEndpoint('/chat/verify-calibration')}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          birth_chart_id: birthData.id,
+          event_year: event.year,
+          verified: false
+        })
+      });
+      
+      setCalibrationEvent(null);
+    } catch (error) {
+      console.error('Calibration error:', error);
+    }
+  };
 
   const suggestions = [
     "What does my birth chart say about my career?",
@@ -1189,6 +1285,15 @@ export default function ChatScreen({ navigation, route }) {
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Calibration Card */}
+            {calibrationEvent && !calibrationEvent.verified && (
+              <CalibrationCard 
+                data={calibrationEvent}
+                onConfirm={() => handleCalibrationConfirm(calibrationEvent)}
+                onReject={() => handleCalibrationReject(calibrationEvent)}
+              />
+            )}
+            
             {/* Signs Display */}
             {birthData && (
               <View style={styles.signsContainer}>

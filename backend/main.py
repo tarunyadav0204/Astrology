@@ -1367,7 +1367,8 @@ async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = 
             birth_chart_id = existing_chart[0]
         else:
             if clear_existing:
-                cursor.execute("DELETE FROM birth_charts WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+                # Only change other charts from 'self' to 'other', don't delete them
+                cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
             cursor.execute('''
                 INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
@@ -4723,6 +4724,77 @@ async def calculate_lifetime_gatis(request: dict):
         return {"error": "BPHS Kalchakra calculator not available"}
     except Exception as e:
         return {"error": f"Gati analysis failed: {str(e)}"}
+
+@app.post("/api/scan-life-events")
+async def scan_life_events(request: dict, current_user: User = Depends(get_current_user)):
+    """Scan user's timeline for major life events using astronomical data"""
+    try:
+        from calculators.life_event_scanner import LifeEventScanner
+        from calculators.chart_calculator import ChartCalculator
+        from calculators.real_transit_calculator import RealTransitCalculator
+        from shared.dasha_calculator import DashaCalculator
+        
+        birth_data = BirthData(**request['birth_data'])
+        start_age = request.get('start_age', 18)
+        end_age = request.get('end_age', 50)
+        
+        # Initialize calculators
+        chart_calculator = ChartCalculator({})
+        dasha_calculator = DashaCalculator()
+        real_transit_calculator = RealTransitCalculator()
+        
+        # Initialize life event scanner
+        scanner = LifeEventScanner(
+            chart_calculator=chart_calculator,
+            dasha_calculator=dasha_calculator,
+            real_transit_calculator=real_transit_calculator
+        )
+        
+        # Convert birth data to dict format
+        birth_dict = {
+            'name': birth_data.name,
+            'date': birth_data.date,
+            'time': birth_data.time,
+            'latitude': birth_data.latitude,
+            'longitude': birth_data.longitude,
+            'timezone': birth_data.timezone,
+            'place': birth_data.place or '',
+            'gender': birth_data.gender or ''
+        }
+        
+        # Scan timeline for events
+        events = scanner.scan_timeline(birth_dict, start_age, end_age)
+        
+        return {
+            "birth_info": {
+                "name": birth_data.name,
+                "date": birth_data.date
+            },
+            "scan_parameters": {
+                "start_age": start_age,
+                "end_age": end_age
+            },
+            "events": events,
+            "algorithm_info": {
+                "method": "Double Transit Analysis",
+                "data_source": "Swiss Ephemeris (Real Astronomical Data)",
+                "accuracy": "High - Uses actual planetary positions",
+                "features": [
+                    "Real Saturn/Jupiter transits",
+                    "Vimshottari Dasha activation",
+                    "7th/10th house significance analysis",
+                    "Multi-layer confirmation system"
+                ]
+            }
+        }
+        
+    except ImportError as e:
+        return {"error": f"Required calculator not available: {str(e)}"}
+    except Exception as e:
+        import traceback
+        print(f"Life event scanning error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return {"error": f"Life event scanning failed: {str(e)}"}
 
 @app.get("/api/gati-meanings")
 async def get_gati_meanings():
