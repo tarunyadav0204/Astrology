@@ -230,7 +230,10 @@ export default function ChatScreen({ navigation, route }) {
       }, 18, 50);
       
       console.log('📥 Response status:', response.status);
-      console.log('📊 Response data:', response.data);
+      console.log('📊 Life Events API Response:', {
+        events_count: response.data?.events?.length || 0,
+        birth_info: response.data?.birth_info || 'not provided'
+      });
       
       if (response.data && response.data.events && response.data.events.length > 0) {
         console.log('✅ Setting calibration event:', response.data.events[0]);
@@ -642,69 +645,46 @@ export default function ChatScreen({ navigation, route }) {
     try {
       const savedBirthData = await storage.getBirthDetails();
       
-      // Check if saved data has ID, if not fetch from database
-      if (savedBirthData && typeof savedBirthData === 'object' && savedBirthData.name && savedBirthData.name.trim()) {
-        if (savedBirthData.id) {
-          // Has ID, use it
+      // Always fetch fresh data from database to avoid corruption
+      try {
+        const { chartAPI } = require('../../services/api');
+        const response = await chartAPI.getExistingCharts();
+        
+        if (response.data && response.data.charts && response.data.charts.length > 0) {
+          const firstChart = response.data.charts[0];
+          
+          // Convert database chart to birth data format with proper date/time handling
+          const birthDataFromChart = {
+            id: firstChart.id,
+            name: firstChart.name,
+            date: firstChart.date.includes('T') ? firstChart.date.split('T')[0] : firstChart.date,
+            time: firstChart.time.includes('T') ? firstChart.time.split('T')[1].slice(0, 5) : firstChart.time,
+            latitude: firstChart.latitude,
+            longitude: firstChart.longitude,
+            timezone: firstChart.timezone,
+            place: firstChart.place,
+            gender: firstChart.gender
+          };
+          
+          console.log('✅ Fresh birth data from database:', {
+            name: birthDataFromChart.name,
+            date: birthDataFromChart.date,
+            time: birthDataFromChart.time
+          });
+          
+          // Save corrected data to storage
+          await storage.setBirthDetails(birthDataFromChart);
+          setBirthData(birthDataFromChart);
+        } else {
+          setBirthData(null);
+          navigation.navigate('BirthForm');
+        }
+      } catch (apiError) {
+        console.error('❌ Error loading charts from database:', apiError);
+        // Fallback to saved data if API fails
+        if (savedBirthData && savedBirthData.name) {
           setBirthData(savedBirthData);
         } else {
-          // No ID, fetch from database to get it
-          try {
-            const { chartAPI } = require('../../services/api');
-            const response = await chartAPI.getExistingCharts();
-            const matchingChart = response.data?.charts?.find(c => 
-              c.date === savedBirthData.date && 
-              c.time === savedBirthData.time && 
-              c.latitude === savedBirthData.latitude && 
-              c.longitude === savedBirthData.longitude
-            );
-            
-            if (matchingChart) {
-              const birthDataWithId = { ...savedBirthData, id: matchingChart.id };
-              await storage.setBirthDetails(birthDataWithId);
-              setBirthData(birthDataWithId);
-            } else {
-              // Chart not in database, use without ID (will fail session creation)
-              setBirthData(savedBirthData);
-            }
-          } catch (error) {
-            console.error('❌ Error fetching chart ID:', error);
-            setBirthData(savedBirthData);
-          }
-        }
-      } else {
-        
-        // Try to load first available chart from database
-        try {
-          const { chartAPI } = require('../../services/api');
-          const response = await chartAPI.getExistingCharts();
-          
-          if (response.data && response.data.charts && response.data.charts.length > 0) {
-            const firstChart = response.data.charts[0];
-            
-            // Convert database chart to birth data format - INCLUDE ID
-            const birthDataFromChart = {
-              id: firstChart.id,
-              name: firstChart.name,
-              date: firstChart.date,
-              time: firstChart.time,
-              latitude: firstChart.latitude,
-              longitude: firstChart.longitude,
-              timezone: firstChart.timezone,
-              place: firstChart.place,
-              gender: firstChart.gender
-            };
-            
-            
-            // Save to storage for future use
-            await storage.setBirthDetails(birthDataFromChart);
-            setBirthData(birthDataFromChart);
-          } else {
-            setBirthData(null);
-            navigation.navigate('BirthForm');
-          }
-        } catch (apiError) {
-          console.error('❌ Error loading charts from database:', apiError);
           setBirthData(null);
           navigation.navigate('BirthForm');
         }
