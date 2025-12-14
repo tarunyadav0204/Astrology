@@ -640,6 +640,29 @@ End your response with 3-4 relevant follow-up questions in this exact format:
             print(f"   Question time: {context.get('question_time', {})}")
             system_instruction = ChatContextBuilder.PRASHNA_SYSTEM_INSTRUCTION
             
+        elif analysis_type == 'annual_forecast':
+            # === ANNUAL MODE ===
+            print(f"\n📅 ANNUAL MODE DETECTED")
+            target_year = context.get('focus_year')
+            annual_instruction = f"""
+## SPECIAL INSTRUCTION: ANNUAL ANALYSIS ({target_year})
+You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long-term) with the Varshphal (This Year Only).
+
+### SYNTHESIS PROTOCOL (MANDATORY):
+1. **The "Background Tone" (Birth Chart):**
+   - Check the Vimshottari Dasha first. If it is negative (e.g., Saturn-Rahu), the year will have an undercurrent of stress, even if the Varshphal is good.
+   
+2. **The "Active Focus" (Varshphal):**
+   - **Look at the MUNTHA:** This is the most important point. The house the Muntha occupies in the Varshphal chart indicates the *inescapable focus* of the year (e.g., Muntha in 6th = Health/Enemies focus).
+   - **Look at the MUDDA DASHA:** Use the 'mudda_dasha' list to predict specific months (e.g. "Mars Mudda runs from Feb-March, bringing energy").
+
+3. **Response Structure for Annual Queries:**
+   - **Quick Answer:** Summarize the year's "Theme" (based on Muntha).
+   - **Key Insights:** List 3 wins and 1 challenge for {target_year}.
+   - **Monthly Breakdown:** Group the year into phases based on the Mudda Dasha timeline.
+"""
+            system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION + "\n\n" + annual_instruction
+            
         else:
             # Default to Birth Chart
             system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION

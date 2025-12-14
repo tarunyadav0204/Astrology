@@ -434,6 +434,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"✅ Synastry context built in {context_time:.3f}s")
             print(f"{'='*80}\n")
             
+        elif intent['mode'] == 'annual':
+            # === ANNUAL MODE ===
+            print(f"\n{'='*80}")
+            print(f"📅 ANNUAL MODE ACTIVATED")
+            print(f"{'='*80}")
+            target_year = intent.get('year', datetime.now().year)
+            print(f"Target year: {target_year}")
+            
+            context = context_builder.build_annual_context(birth_data, target_year, question)
+            context_time = time.time() - context_start
+            print(f"✅ Annual context built in {context_time:.3f}s")
+            print(f"{'='*80}\n")
+            
         elif intent['mode'] == 'prashna':
             # === PRASHNA MODE ===
             print(f"\n{'='*80}")

@@ -29,6 +29,7 @@ from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 from calculators.prashna_calculator import PrashnaCalculator
+from calculators.varshphal_calculator import VarshphalCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -228,6 +229,31 @@ For every user query, structure your response exactly as follows:
             'native': self.build_complete_context(native_birth_data, user_question),
             'partner': self.build_complete_context(partner_birth_data, user_question)
         }
+    
+    def build_annual_context(self, birth_data: Dict, target_year: int, user_question: str = "") -> Dict[str, Any]:
+        """Builds context with BOTH Birth Chart (Base) and Varshphal (Overlay)."""
+        print(f"📅 Building Annual Context for Year: {target_year}")
+        
+        base_context = self.build_complete_context(birth_data, user_question)
+        
+        chart_calc = ChartCalculator({})
+        vp_calc = VarshphalCalculator(chart_calc)
+        
+        try:
+            varshphal_data = vp_calc.calculate_varshphal(birth_data, target_year)
+            
+            base_context['analysis_type'] = 'annual_forecast'
+            base_context['focus_year'] = target_year
+            base_context['varshphal'] = {
+                'muntha': varshphal_data['muntha'],
+                'year_lord': varshphal_data['year_lord'],
+                'mudda_dasha': varshphal_data['mudda_dasha']
+            }
+        except Exception as e:
+            print(f"❌ Varshphal calculation failed: {e}")
+            base_context['analysis_error'] = f"Annual calculation failed: {str(e)}"
+            
+        return base_context
     
     def build_prashna_context(self, user_location_data: Dict, user_question: str, category: str = 'general') -> Dict[str, Any]:
         """Build Horary (Prashna) context based on CURRENT time and User's Location."""

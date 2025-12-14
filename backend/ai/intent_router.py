@@ -27,38 +27,19 @@ class IntentRouter:
         print(f"Question: {user_question}")
         
         prompt = f"""
-        Classify this astrology question into one of two modes:
+        Classify this astrology question into one of THREE modes:
         
-        1. "prashna": ONLY for SPECIFIC BINARY OUTCOMES or immediate crisis resolution. These are YES/NO questions about a specific event or decision happening RIGHT NOW.
-           Examples: 
-           - "Will I get THIS job?" (specific job offer)
-           - "Where is my lost wallet?"
-           - "Will he propose to me?" (specific action)
-           - "Should I sign this contract today?"
-           - "Is she cheating on me?" (specific suspicion)
-           - "Will I recover from this illness?" (current health crisis)
-           
-        2. "birth": For general life analysis, personality, relationships, timeline forecasts (monthly/yearly), "When will..." questions, "How is..." questions, and ongoing situations.
-           Examples:
-           - "When will I get married?" (general timing)
-           - "What is my career path?"
-           - "How is my relationship with my wife?" (ongoing relationship analysis)
-           - "How is my month/year?" (timeline forecast)
-           - "Tell me about my health" (general health analysis)
-           - "What does my chart say about love?" (general analysis)
-           - "How is 2026 for me?" (yearly forecast)
-
-        CRITICAL RULES:
-        - If the question asks "How is..." or "What about..." or "Tell me about..." → ALWAYS "birth"
-        - If the question mentions a time period (this month, this year, 2026, etc.) → ALWAYS "birth"
-        - If the question is "When will..." → ALWAYS "birth"
-        - ONLY use "prashna" for specific YES/NO decisions or lost object queries
+        1. "prashna": Questions about IMMEDIATE outcomes, lost objects, specific events happening NOW or very soon, or YES/NO questions. (e.g. "Will I get this job?", "Where is my wallet?", "Will he call me back?", "How is my relationship this month?")
+        
+        2. "annual": Questions specifically asking about a YEARLY forecast, the upcoming year, or a specific calendar year. (e.g. "How is my 2026?", "What does next year hold?", "Annual forecast for 2025", "Birthday prediction").
+        
+        3. "birth": Questions about general life path, personality, long-term future, destiny, or "When will..." questions about general timing. (e.g. "When will I get married?", "What is my career path?", "What are my strengths?").
 
         Question: "{user_question}"
 
-        Return ONLY a JSON object: {{"mode": "prashna" or "birth", "category": "category_name"}}
+        Return ONLY a JSON object: {{"mode": "prashna" or "annual" or "birth", "category": "category_name", "year": 202X (only for annual)}}
         
-        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, lost_item, court_case, enemy, competition
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, lost_item, court_case, enemy, competition, general
         """
         
         print(f"\n📤 INTENT ROUTER REQUEST:")
