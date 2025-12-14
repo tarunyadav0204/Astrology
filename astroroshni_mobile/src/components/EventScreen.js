@@ -22,6 +22,7 @@ import { chatAPI, creditAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import { API_BASE_URL } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
 
@@ -119,12 +120,19 @@ export default function EventScreen({ route }) {
   useEffect(() => {
     const fetchCreditCost = async () => {
       try {
+        console.log('💰 Fetching credit cost from:', API_BASE_URL + '/api/credits/settings/event-timeline-cost');
         const response = await creditAPI.getEventTimelineCost();
+        console.log('✅ Credit cost response:', response.data);
         if (response.data.cost) {
           setCreditCost(response.data.cost);
         }
       } catch (error) {
-        console.error('Error fetching credit cost:', error);
+        console.error('❌ Error fetching credit cost:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url
+        });
       }
     };
     fetchCreditCost();
@@ -159,6 +167,8 @@ export default function EventScreen({ route }) {
       const birthData = await getBirthDetails();
       if (!birthData) return;
       
+      console.log('👤 Birth data loaded:', { id: birthData.id, name: birthData.name?.substring(0, 5) });
+      
       if (!birthData.id) {
         Alert.alert('Error', 'Birth chart ID not found. Please re-select your birth chart.');
         setAnalysisStarted(false);
@@ -170,11 +180,13 @@ export default function EventScreen({ route }) {
         return;
       }
       
+      console.log('🚀 Starting monthly events request for year:', year);
       const startResponse = await chatAPI.getMonthlyEvents({
         ...birthData,
         selectedYear: year,
         birth_chart_id: birthData.id
       });
+      console.log('✅ Monthly events response:', startResponse.data);
       
       // Check if we got the old format (direct data) or new format (job_id)
       if (startResponse.data?.data && !startResponse.data?.job_id) {
@@ -245,9 +257,24 @@ export default function EventScreen({ route }) {
       }, 300000);
       
     } catch (error) {
+      console.error('❌ EventScreen Error Details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        headers: error.config?.headers
+      });
+      
       let errorMessage = 'Failed to load timeline. Please try again.';
       
-      if (error.response?.status === 402) {
+      if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please login again.';
+        Alert.alert('Authentication Error', errorMessage, [
+          { text: 'Login', onPress: () => navigation.navigate('Login') },
+          { text: 'Cancel' }
+        ]);
+      } else if (error.response?.status === 402) {
         errorMessage = 'You need more credits for this analysis.';
         Alert.alert('Insufficient Credits', errorMessage, [
           { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
@@ -256,8 +283,11 @@ export default function EventScreen({ route }) {
       } else if (error.response?.status === 500) {
         errorMessage = 'Server error. Please contact support or try again later.';
         Alert.alert('Server Error', errorMessage);
+      } else if (error.message === 'Network Error' || !error.response) {
+        errorMessage = 'Cannot connect to server. Check your internet connection.';
+        Alert.alert('Network Error', errorMessage);
       } else {
-        Alert.alert('Error', errorMessage);
+        Alert.alert('Error', errorMessage + '\n\nDetails: ' + (error.response?.data?.detail || error.message));
       }
       
       setAnalysisStarted(false);
@@ -418,8 +448,22 @@ export default function EventScreen({ route }) {
         );
       }
     } catch (error) {
-      console.error('Error checking cache:', error);
-      Alert.alert('Error', 'Failed to check for existing predictions. Please try again.');
+      console.error('❌ Cache Check Error Details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      
+      if (error.response?.status === 401) {
+        Alert.alert('Authentication Error', 'Session expired. Please login again.', [
+          { text: 'Login', onPress: () => navigation.navigate('Login') },
+          { text: 'Cancel' }
+        ]);
+      } else {
+        Alert.alert('Error', 'Failed to check for existing predictions. Please try again.');
+      }
     }
   };
 

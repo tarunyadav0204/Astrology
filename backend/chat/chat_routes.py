@@ -756,6 +756,18 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
             print(f"❌ Missing birth_chart_id in request: {request}")
             raise HTTPException(status_code=400, detail="birth_chart_id is required. Please ensure birth chart is saved to database.")
         
+        # Verify birth chart exists and belongs to user
+        cursor.execute(
+            "SELECT id FROM birth_charts WHERE id = ? AND userid = ?",
+            (birth_chart_id, current_user.userid)
+        )
+        if not cursor.fetchone():
+            print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Birth chart not found. Please re-select your birth chart from the profile screen."
+            )
+        
         cursor.execute(
             "INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, status) VALUES (?, ?, ?, ?, ?)",
             (job_id, current_user.userid, birth_chart_id, target_year, 'pending')
@@ -895,17 +907,22 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         conn.commit()
         
         # Fetch birth data from database
+        print(f"🔍 Fetching birth chart {birth_chart_id} from database...")
         cursor.execute('''
             SELECT name, date, time, latitude, longitude, timezone, place, gender
             FROM birth_charts WHERE id = ?
         ''', (birth_chart_id,))
         
         birth_row = cursor.fetchone()
+        print(f"📊 Birth row result: {birth_row}")
+        
         if not birth_row:
-            raise Exception("Birth chart not found")
+            print(f"❌ Birth chart {birth_chart_id} not found in database")
+            raise Exception(f"Birth chart with ID {birth_chart_id} not found in database")
         
         from encryption_utils import EncryptionManager
         try:
+            print(f"🔐 Attempting to decrypt birth data...")
             encryptor = EncryptionManager()
             birth_data_dict = {
                 'name': encryptor.decrypt(birth_row[0]),
@@ -917,7 +934,9 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
                 'place': encryptor.decrypt(birth_row[6] or ''),
                 'gender': birth_row[7] or ''
             }
-        except:
+            print(f"✅ Birth data decrypted successfully")
+        except Exception as decrypt_error:
+            print(f"⚠️ Decryption failed, using raw data: {decrypt_error}")
             birth_data_dict = {
                 'name': birth_row[0],
                 'date': birth_row[1],
@@ -928,6 +947,8 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
                 'place': birth_row[6] or '',
                 'gender': birth_row[7] or ''
             }
+        
+        print(f"📅 Birth data prepared: date={birth_data_dict['date']}, time={birth_data_dict['time']}, place={birth_data_dict['place'][:20]}...")
         
         # Generate predictions
         chart_calc = ChartCalculator({}) 
@@ -961,6 +982,8 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         
     except Exception as e:
         print(f"❌ Background task error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         cursor.execute(
             "UPDATE event_timeline_jobs SET status = ?, error_message = ?, completed_at = ? WHERE job_id = ?",
             ('failed', str(e), datetime.now(), job_id)
