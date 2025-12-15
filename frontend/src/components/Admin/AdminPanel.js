@@ -26,7 +26,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [pendingSubscription, setPendingSubscription] = useState(null);
   const [promoCodes, setPromoCodes] = useState([]);
   const [creditStats, setCreditStats] = useState({});
-  const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1 });
+  const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1, max_uses_per_user: 1 });
   const [creditSettings, setCreditSettings] = useState([]);
   const [editingPromoCode, setEditingPromoCode] = useState(null);
   const [editFormData, setEditFormData] = useState({});
@@ -185,7 +185,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: JSON.stringify({ prefix, count, credits, max_uses: 1 })
+          body: JSON.stringify({ prefix, count, credits, max_uses: 1, max_uses_per_user: 1 })
         });
         
         if (response.ok) {
@@ -624,12 +624,21 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   />
                 </div>
                 <div className="form-field">
-                  <label>Max Uses Per User</label>
+                  <label>Max Uses (Total)</label>
                   <input
                     type="number"
                     placeholder="1"
                     value={newPromoCode.max_uses}
                     onChange={(e) => setNewPromoCode({...newPromoCode, max_uses: parseInt(e.target.value)})}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Max Uses Per User</label>
+                  <input
+                    type="number"
+                    placeholder="1"
+                    value={newPromoCode.max_uses_per_user}
+                    onChange={(e) => setNewPromoCode({...newPromoCode, max_uses_per_user: parseInt(e.target.value)})}
                   />
                 </div>
                 <div className="form-buttons">
@@ -651,6 +660,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     <tr>
                       <th>Code</th>
                       <th>Credits</th>
+                      <th>Max Uses (Total)</th>
                       <th>Max Uses Per User</th>
                       <th>Used Count</th>
                       <th>Status</th>
@@ -684,6 +694,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             />
                           ) : (
                             code.max_uses
+                          )}
+                        </td>
+                        <td>
+                          {editingPromoCode === code.code ? (
+                            <input
+                              type="number"
+                              value={editFormData.max_uses_per_user || code.max_uses_per_user}
+                              onChange={(e) => setEditFormData({...editFormData, max_uses_per_user: parseInt(e.target.value)})}
+                              style={{ width: '60px' }}
+                            />
+                          ) : (
+                            code.max_uses_per_user
                           )}
                         </td>
                         <td>{code.used_count}</td>
