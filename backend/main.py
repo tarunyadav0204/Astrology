@@ -50,6 +50,8 @@ from marriage.marriage_routes import router as marriage_router
 from progeny.progeny_routes import router as progeny_router
 from trading_routes import router as trading_router
 from yogini_dasha_routes import router as yogini_dasha_router
+from physical_scan_routes import router as physical_scan_router
+from physical_feedback_routes import router as physical_feedback_router
 import math
 from datetime import timedelta
 import signal
@@ -210,6 +212,8 @@ app.include_router(marriage_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
 app.include_router(trading_router, prefix="/api")
 app.include_router(yogini_dasha_router, prefix="/api")
+app.include_router(physical_scan_router, prefix="/api")
+app.include_router(physical_feedback_router, prefix="/api")
 
 
 # Root endpoint for health check

@@ -17,6 +17,8 @@ import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
 import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
+import { BiometricTeaserCard } from '../BiometricTeaserCard';
+import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 
 const { width } = Dimensions.get('window');
 
@@ -33,11 +35,17 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
   const [panchangData, setPanchangData] = useState(null);
   const [pricing, setPricing] = useState({});
   const [loading, setLoading] = useState(true);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [physicalTraits, setPhysicalTraits] = useState(null);
+  const [currentNativeData, setCurrentNativeData] = useState(null);
+  const [showTraitsModal, setShowTraitsModal] = useState(false);
+  const [hasFeedback, setHasFeedback] = useState(false);
   
   useFocusEffect(
     React.useCallback(() => {
+      loadCurrentNative();
       loadHomeData();
-    }, [birthData])
+    }, [])
   );
   
   useEffect(() => {
@@ -125,6 +133,17 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
     };
   }, [birthData]);
   
+const loadCurrentNative = async () => {
+    try {
+      const { storage } = require('../../services/storage');
+      const selectedNative = await storage.getBirthDetails();
+      console.log('🔄 Loading current native:', selectedNative?.name);
+      setCurrentNativeData(selectedNative);
+    } catch (error) {
+      console.log('Error loading current native:', error);
+    }
+  };
+
 const loadHomeData = async () => {
     try {
       setLoading(true);
@@ -192,8 +211,8 @@ const loadHomeData = async () => {
       }
       
       
-      // Load birth-dependent data if available
-      let currentBirthData = birthData;
+      // Use current native data from state
+      let currentBirthData = currentNativeData || birthData;
       
       if (!currentBirthData) {
         try {
@@ -213,6 +232,10 @@ const loadHomeData = async () => {
           
           if (savedBirthData && savedBirthData.name) {
             currentBirthData = savedBirthData;
+            // Don't override currentNativeData if it's already set from native selection
+            if (!currentNativeData) {
+              setCurrentNativeData(savedBirthData);
+            }
           }
         } catch (error) {
         }
@@ -292,8 +315,98 @@ const loadHomeData = async () => {
     return colors[signNumber] || '#ffffff';
   };
   
-  const place = birthData?.place || `${birthData?.latitude}, ${birthData?.longitude}`;
-  const time = birthData?.time || 'Unknown time';
+  // Use current native data for display
+  const displayData = currentNativeData || birthData;
+  const place = displayData?.place || `${displayData?.latitude}, ${displayData?.longitude}`;
+  const time = displayData?.time || 'Unknown time';
+
+  const handlePhysicalScan = async () => {
+    console.log('🔍 Starting physical scan...');
+    
+    // Use current native data for scan
+    const scanBirthData = currentNativeData || birthData;
+    if (!scanBirthData) {
+      console.log('❌ No birth data available');
+      Alert.alert('Error', 'Birth data not available for physical scan.');
+      return;
+    }
+
+    console.log('📊 Using current native data for scan:', scanBirthData);
+    setScanLoading(true);
+    try {
+      const scanData = {
+        name: scanBirthData.name,
+        date: scanBirthData.date,
+        time: scanBirthData.time,
+        latitude: scanBirthData.latitude,
+        longitude: scanBirthData.longitude,
+        timezone: scanBirthData.timezone || 'Asia/Kolkata',
+        place: scanBirthData.place || ''
+      };
+      
+      console.log('🚀 Sending scan request with data:', scanData);
+      const result = await chartAPI.scanPhysicalTraits(scanData, scanBirthData.id);
+      console.log('✅ Scan result received:', result);
+      
+      if (result.data?.success && result.data?.traits?.length > 0) {
+        console.log('🎆 Traits found:', result.data.traits.length);
+        console.log('🔍 First trait structure:', result.data.traits[0]);
+        setPhysicalTraits(result.data.traits);
+        setHasFeedback(result.data.has_feedback || false);
+        setShowTraitsModal(true);
+      } else {
+        console.log('⚠️ No traits found in result:', result.data);
+        Alert.alert('Physical Scan', 'No distinctive physical traits found in your chart.');
+      }
+    } catch (error) {
+      console.error('❌ Physical scan error:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      Alert.alert('Error', `Failed to perform physical scan: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const handleTraitsFeedback = async (feedbackType) => {
+    // Store feedback in database
+    try {
+      const scanBirthData = currentNativeData || birthData;
+      if (scanBirthData && chartData) {
+        const feedbackData = {
+          chart_data: chartData,
+          birth_data: {
+            name: scanBirthData.name,
+            date: scanBirthData.date,
+            time: scanBirthData.time,
+            latitude: scanBirthData.latitude,
+            longitude: scanBirthData.longitude,
+            timezone: scanBirthData.timezone || 'Asia/Kolkata',
+            place: scanBirthData.place || '',
+            gender: scanBirthData.gender || ''
+          },
+          feedback: feedbackType,
+          birth_chart_id: scanBirthData.id
+        };
+        
+        await chartAPI.submitPhysicalFeedback(feedbackData);
+        setHasFeedback(true); // Update state to hide buttons
+      }
+    } catch (error) {
+      console.error('Failed to store feedback:', error);
+    }
+    
+    setShowTraitsModal(false);
+    
+    if (feedbackType === 'accurate') {
+      setTimeout(() => {
+        Alert.alert('Amazing!', 'Vedic astrology reveals so much about us! ✨');
+      }, 300);
+    } else {
+      setTimeout(() => {
+        Alert.alert('Feedback', 'Thank you for the feedback. We will improve our accuracy.');
+      }, 300);
+    }
+  };
 
   const options = [
     {
@@ -443,11 +556,11 @@ const loadHomeData = async () => {
           </View>
           
           <Text style={styles.greetingTitle}>
-            Welcome, {birthData?.name}!
+            Welcome, {displayData?.name}!
           </Text>
           <View style={styles.birthInfoCard}>
             <Text style={styles.birthInfoText}>
-              📅 {new Date(birthData?.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              📅 {displayData?.date ? new Date(displayData.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown date'}
             </Text>
             <Text style={styles.birthInfoText}>
               🕐 {time}
@@ -460,6 +573,15 @@ const loadHomeData = async () => {
             Your cosmic blueprint awaits. Choose your path to enlightenment.
           </Text>
         </Animated.View>
+
+        {/* Biometric Teaser Card */}
+        <BiometricTeaserCard 
+          onPressReveal={() => {
+            console.log('🔄 BiometricTeaserCard pressed');
+            handlePhysicalScan();
+          }}
+          isLoading={scanLoading}
+        />
 
         <Animated.View style={[styles.optionsContainer, { opacity: fadeAnim }]}>
           <Text style={styles.optionsTitle}>Choose Your Path</Text>
@@ -813,6 +935,16 @@ const loadHomeData = async () => {
 
         </Animated.View>
       </ScrollView>
+      
+      {/* Physical Traits Modal */}
+      <PhysicalTraitsModal
+        visible={showTraitsModal}
+        traits={physicalTraits || []}
+        onClose={() => setShowTraitsModal(false)}
+        onFeedback={handleTraitsFeedback}
+        hasFeedback={hasFeedback}
+      />
+      
       </LinearGradient>
     </View>
   );
