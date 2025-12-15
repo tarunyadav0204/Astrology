@@ -31,7 +31,8 @@ class PhysicalTraitScanner:
             
             # DEBUG: More detailed logging
             logging.info(f"🎯 Ascendant: {asc_degree}° -> Sign: {asc_sign} ({self._get_sign_name(asc_sign)}), Exact degree: {asc_exact_deg}°")
-            logging.info(f"🌟 All planets: {[(p, f"{data['longitude']:.2f}°") for p, data in chart['planets'].items()]}")
+            planet_positions = [(p, f"{data['longitude']:.2f}°") for p, data in chart['planets'].items()]
+            logging.info(f"🌟 All planets: {planet_positions}")
             
             # --- FEATURE 1: COMPLEXION (Primary) ---
             occupants = self._get_occupants_detailed(chart, asc_sign)
