@@ -429,7 +429,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"{'='*80}")
             print(f"Native: {birth_data.get('name')}")
             print(f"Partner: {partner_birth_details.get('name')}")
-            context = context_builder.build_synastry_context(birth_data, partner_birth_details, question)
+            context = context_builder.build_synastry_context(birth_data, partner_birth_details, question, intent)
             context_time = time.time() - context_start
             print(f"✅ Synastry context built in {context_time:.3f}s")
             print(f"{'='*80}\n")
@@ -442,7 +442,26 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             target_year = intent.get('year', datetime.now().year)
             print(f"Target year: {target_year}")
             
-            context = context_builder.build_annual_context(birth_data, target_year, question)
+            # Convert intent router transit request to old format if needed
+            requested_period = None
+            if intent.get('needs_transits') and intent.get('transit_request'):
+                tr = intent['transit_request']
+                requested_period = {
+                    'start_year': tr['startYear'],
+                    'end_year': tr['endYear'],
+                    'yearMonthMap': tr.get('yearMonthMap', {})
+                }
+                print(f"Transit period: {tr['startYear']}-{tr['endYear']}")
+            
+            # Use build_complete_context with intent_result to get transit data
+            context = context_builder.build_complete_context(
+                birth_data, question, None, requested_period, intent
+            )
+            
+            # Add annual-specific data
+            context['analysis_type'] = 'annual_forecast'
+            context['focus_year'] = target_year
+            
             context_time = time.time() - context_start
             print(f"✅ Annual context built in {context_time:.3f}s")
             print(f"{'='*80}\n")
@@ -477,7 +496,21 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"\n{'='*80}")
             print(f"🔮 BIRTH CHART MODE (Standard)")
             print(f"{'='*80}")
-            context = context_builder.build_complete_context(birth_data)
+            
+            # Convert intent router transit request to old format if needed
+            requested_period = None
+            if intent.get('needs_transits') and intent.get('transit_request'):
+                tr = intent['transit_request']
+                requested_period = {
+                    'start_year': tr['startYear'],
+                    'end_year': tr['endYear'],
+                    'yearMonthMap': tr.get('yearMonthMap', {})
+                }
+                print(f"Transit period: {tr['startYear']}-{tr['endYear']}")
+            
+            context = context_builder.build_complete_context(
+                birth_data, question, None, requested_period, intent
+            )
             context_time = time.time() - context_start
             print(f"✅ Birth chart context built in {context_time:.3f}s")
             print(f"{'='*80}\n")

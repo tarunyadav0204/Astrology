@@ -222,19 +222,19 @@ For every user query, structure your response exactly as follows:
         self.static_cache = {}  # Cache static chart data
         self.dynamic_cache = {}  # Cache dynamic context data
     
-    def build_synastry_context(self, native_birth_data: Dict, partner_birth_data: Dict, user_question: str = "") -> Dict[str, Any]:
+    def build_synastry_context(self, native_birth_data: Dict, partner_birth_data: Dict, user_question: str = "", intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Build dual-chart context for partnership/compatibility analysis"""
         return {
             'analysis_type': 'synastry',
-            'native': self.build_complete_context(native_birth_data, user_question),
-            'partner': self.build_complete_context(partner_birth_data, user_question)
+            'native': self.build_complete_context(native_birth_data, user_question, None, None, intent_result),
+            'partner': self.build_complete_context(partner_birth_data, user_question, None, None, intent_result)
         }
     
-    def build_annual_context(self, birth_data: Dict, target_year: int, user_question: str = "") -> Dict[str, Any]:
+    def build_annual_context(self, birth_data: Dict, target_year: int, user_question: str = "", intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Builds context with BOTH Birth Chart (Base) and Varshphal (Overlay)."""
         print(f"📅 Building Annual Context for Year: {target_year}")
         
-        base_context = self.build_complete_context(birth_data, user_question)
+        base_context = self.build_complete_context(birth_data, user_question, None, None, intent_result)
         
         chart_calc = ChartCalculator({})
         vp_calc = VarshphalCalculator(chart_calc)
@@ -355,7 +355,7 @@ For every user query, structure your response exactly as follows:
         
         return context
     
-    def build_complete_context(self, birth_data: Dict, user_question: str = "", target_date: Optional[datetime] = None, requested_period: Optional[Dict] = None) -> Dict[str, Any]:
+    def build_complete_context(self, birth_data: Dict, user_question: str = "", target_date: Optional[datetime] = None, requested_period: Optional[Dict] = None, intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Build complete astrological context for chat"""
         import time
         import json
@@ -377,16 +377,17 @@ For every user query, structure your response exactly as follows:
         static_time = time.time() - static_start_time
         print(f"   Static context time: {static_time:.2f}s")
         
-        # Dynamic Cache Key (birth_hash + current_date + requested_period)
+        # Dynamic Cache Key (birth_hash + current_date + requested_period + intent_result)
         current_date_str = datetime.now().strftime("%Y-%m-%d")
         period_str = json.dumps(requested_period, sort_keys=True) if requested_period else "none"
-        dynamic_cache_key = f"{birth_hash}_{current_date_str}_{period_str}"
+        intent_str = json.dumps(intent_result, sort_keys=True) if intent_result else "none"
+        dynamic_cache_key = f"{birth_hash}_{current_date_str}_{period_str}_{intent_str}"
         
         # Check Dynamic Cache
         dynamic_start_time = time.time()
         if dynamic_cache_key not in self.dynamic_cache:
             print(f"   🔄 Calculating fresh dynamic context...")
-            self.dynamic_cache[dynamic_cache_key] = self._build_dynamic_context(birth_data, user_question, target_date, requested_period)
+            self.dynamic_cache[dynamic_cache_key] = self._build_dynamic_context(birth_data, user_question, target_date, requested_period, intent_result)
         else:
             print(f"   ✅ Using cached dynamic context")
         
@@ -650,7 +651,7 @@ For every user query, structure your response exactly as follows:
             # Removed friendship_analysis - massive redundancy eliminated
         }
     
-    def _build_dynamic_context(self, birth_data: Dict, user_question: str, target_date: Optional[datetime], requested_period: Optional[Dict] = None) -> Dict[str, Any]:
+    def _build_dynamic_context(self, birth_data: Dict, user_question: str, target_date: Optional[datetime], requested_period: Optional[Dict] = None, intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Build dynamic context based on question and date"""
         
         context = {}
@@ -775,15 +776,39 @@ For every user query, structure your response exactly as follows:
             }
         }
         
-        # Only calculate transit data if specifically requested by Gemini
-        if requested_period:
+        # Calculate transit data if requested by Intent Router or Gemini
+        transit_request = None
+        print(f"\n🔍 TRANSIT REQUEST DEBUG:")
+        print(f"   intent_result type: {type(intent_result)}")
+        print(f"   intent_result exists: {intent_result is not None}")
+        print(f"   intent_result value: {intent_result}")
+        if intent_result:
+            print(f"   needs_transits: {intent_result.get('needs_transits')}")
+            print(f"   transit_request exists: {'transit_request' in intent_result}")
+            if 'transit_request' in intent_result:
+                print(f"   transit_request: {intent_result['transit_request']}")
+        print(f"   requested_period: {requested_period}")
+        
+        if intent_result and intent_result.get('needs_transits') and intent_result.get('transit_request'):
+            transit_request = intent_result['transit_request']
+            print(f"\n🎯 INTENT ROUTER REQUESTED TRANSITS: {transit_request['startYear']}-{transit_request['endYear']}")
+        elif requested_period:
+            transit_request = requested_period
+            print(f"\n🎯 GEMINI REQUESTED TRANSITS: {requested_period}")
+        else:
+            print(f"\n❌ NO TRANSIT REQUEST DETECTED - intent_result: {intent_result}, requested_period: {requested_period}")
+        
+        
+        print(f"\n🎯 FINAL TRANSIT REQUEST: {transit_request}")
+        if transit_request:
             import time
             transit_start_time = time.time()
             
-            start_year = requested_period.get('start_year', current_year)
-            end_year = requested_period.get('end_year', current_year + 2)
+            # Handle both formats: Intent Router uses 'startYear', old format uses 'start_year'
+            start_year = transit_request.get('startYear') or transit_request.get('start_year', current_year)
+            end_year = transit_request.get('endYear') or transit_request.get('end_year', current_year + 2)
             year_range = end_year - start_year
-            print(f"\n🎯 GEMINI REQUESTED TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
+            print(f"\n🎯 TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
             print(f"⏱️ TRANSIT CALCULATION STARTED")
             
             try:
@@ -998,6 +1023,20 @@ For every user query, structure your response exactly as follows:
                 import traceback
                 traceback.print_exc()
                 context['transit_activations'] = []
+                
+        # Add transit optimization flag
+        if intent_result and intent_result.get('needs_transits'):
+            context['transit_optimization'] = {
+                "source": "intent_router",
+                "pre_calculated": True,
+                "eliminates_second_call": True
+            }
+        elif requested_period:
+            context['transit_optimization'] = {
+                "source": "gemini_request", 
+                "pre_calculated": False,
+                "second_call_required": True
+            }
         
         # Add period focus instructions if this is for a specific period
         if hasattr(self, '_selected_period_data'):

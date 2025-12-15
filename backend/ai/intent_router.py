@@ -16,9 +16,10 @@ class IntentRouter:
         
     async def classify_intent(self, user_question: str) -> Dict[str, str]:
         """
-        Returns: {'mode': 'prashna' | 'birth', 'category': 'job'|'love'|...}
+        Returns: {'mode': 'prashna' | 'birth' | 'annual', 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}}
         """
         import time
+        from datetime import datetime
         
         intent_start = time.time()
         print(f"\n{'='*80}")
@@ -26,18 +27,54 @@ class IntentRouter:
         print(f"{'='*80}")
         print(f"Question: {user_question}")
         
+        current_year = datetime.now().year
+        
         prompt = f"""
-        Classify this astrology question into one of THREE modes:
-        
-        1. "prashna": Questions about IMMEDIATE outcomes, lost objects, specific events happening NOW or very soon, or YES/NO questions. (e.g. "Will I get this job?", "Where is my wallet?", "Will he call me back?", "How is my relationship this month?")
-        
-        2. "annual": Questions specifically asking about a YEARLY forecast, the upcoming year, or a specific calendar year. (e.g. "How is my 2026?", "What does next year hold?", "Annual forecast for 2025", "Birthday prediction").
-        
-        3. "birth": Questions about general life path, personality, long-term future, destiny, or "When will..." questions about general timing. (e.g. "When will I get married?", "What is my career path?", "What are my strengths?").
+        Classify this astrology question and determine if transit data is needed:
+
+        MODES:
+        1. "prashna": IMMEDIATE outcomes, lost objects, YES/NO questions (e.g. "Will I get this job?", "Where is my wallet?")
+        2. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        3. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+        - Prashna questions → needs_transits: false
 
         Question: "{user_question}"
 
-        Return ONLY a JSON object: {{"mode": "prashna" or "annual" or "birth", "category": "category_name", "year": 202X (only for annual)}}
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: {current_year + 1}, endYear: {current_year + 1}
+        - For general timing questions without specific year, use startYear: {current_year}, endYear: {current_year + 2}
+
+        Return ONLY a JSON object:
+        {{
+            "mode": "prashna" or "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "transit_request": {{
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {{
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }}
+            }}
+        }}
+
+        EXAMPLES:
+        - "Tell me about my health in 2026" → startYear: 2026, endYear: 2026, yearMonthMap: {{"2026": [all 12 months]}}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {{"2026": ["January", "February", "March"]}}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {{"2025": ["March", "April", "May", "June"]}}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: {current_year}, endYear: {current_year + 2} (general timing)
         
         Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, lost_item, court_case, enemy, competition, general
         """
@@ -65,12 +102,53 @@ class IntentRouter:
             print(f"Total time: {total_time:.3f}s")
             print(f"{'='*80}\n")
             
+            # Add fallback values if missing
+            if 'needs_transits' not in result:
+                result['needs_transits'] = result['mode'] in ['birth', 'annual'] and any(word in user_question.lower() for word in ['when', 'timing', 'period', 'year', '2025', '2026', '2027'])
+            
+            if result.get('needs_transits') and 'transit_request' not in result:
+                result['transit_request'] = {
+                    "startYear": current_year,
+                    "endYear": current_year + 2,
+                    "yearMonthMap": {
+                        str(current_year): ["January", "February", "March", "April", "May", "June"],
+                        str(current_year + 1): ["January", "February", "March", "April", "May", "June"],
+                        str(current_year + 2): ["January", "February", "March", "April", "May", "June"]
+                    }
+                }
+            
             return result
         except Exception as e:
             total_time = time.time() - intent_start
             print(f"\n❌ INTENT CLASSIFICATION FAILED")
             print(f"Error: {e}")
             print(f"Total time: {total_time:.3f}s")
-            print(f"Falling back to birth mode")
-            print(f"{'='*80}\n")
-            return {"mode": "birth", "category": "general"}
+            
+            # Fallback with crude keyword detection for timing questions
+            is_timing_question = any(w in user_question.lower() for w in ['when', 'time', 'date', 'year', 'month', 'will i', 'should i'])
+            
+            if is_timing_question:
+                print(f"🔍 Fallback detected timing question, enabling transits")
+                print(f"{'='*80}\n")
+                return {
+                    "mode": "birth",
+                    "category": "timing",
+                    "needs_transits": True,
+                    "transit_request": {
+                        "startYear": current_year,
+                        "endYear": current_year + 2,
+                        "yearMonthMap": {
+                            str(current_year): ["January", "February", "March", "April", "May", "June"],
+                            str(current_year + 1): ["January", "February", "March", "April", "May", "June"],
+                            str(current_year + 2): ["January", "February", "March", "April", "May", "June"]
+                        }
+                    }
+                }
+            else:
+                print(f"Falling back to birth mode without transits")
+                print(f"{'='*80}\n")
+                return {
+                    "mode": "birth", 
+                    "category": "general",
+                    "needs_transits": False
+                }

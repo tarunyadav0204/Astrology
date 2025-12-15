@@ -17,6 +17,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from chat.chat_context_builder import ChatContextBuilder
 from chat.chat_session_manager import ChatSessionManager
 from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from ai.intent_router import IntentRouter
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.event_predictor import EventPredictor
@@ -73,6 +74,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 context_builder = ChatContextBuilder()
 session_manager = ChatSessionManager()
 credit_service = CreditService()
+intent_router = IntentRouter()
 
 def _smart_chunk_response(response_text: str, max_size: int) -> List[str]:
     """Simple chunking that breaks at paragraph boundaries"""
@@ -161,8 +163,10 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             
             birth_hash = session_manager.create_birth_hash(birth_data)
             
-            # Build astrological context (no pre-processing needed for JSON format)
-            requested_period = None
+            # Use Intent Router to classify question and determine transit needs
+            print(f"\n🧠 CLASSIFYING INTENT FOR: {request.question}")
+            intent_result = await intent_router.classify_intent(request.question)
+            print(f"✅ INTENT CLASSIFICATION RESULT: {intent_result}")
             
             # Set selected period if provided
             if request.selected_period:
@@ -199,14 +203,73 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                     context = await asyncio.get_event_loop().run_in_executor(
                         None,
                         context_builder.build_synastry_context,
-                        birth_data, partner_birth_data, request.question
+                        birth_data, partner_birth_data, request.question, intent_result
                     )
                     print(f"   ✅ Synastry context built successfully")
-                else:
+                elif intent_result.get('mode') == 'prashna':
+                    print(f"\n🔮 PRASHNA MODE DETECTED")
+                    print(f"   Category: {intent_result.get('category')}")
+                    
+                    # Build prashna context using user's location (approximate)
+                    user_location = {
+                        'latitude': birth_data['latitude'],
+                        'longitude': birth_data['longitude'],
+                        'place': birth_data['place']
+                    }
+                    
                     context = await asyncio.get_event_loop().run_in_executor(
-                        None, 
-                        context_builder.build_complete_context,
-                        birth_data, request.question, None, requested_period
+                        None,
+                        context_builder.build_prashna_context,
+                        user_location, request.question, intent_result.get('category', 'general')
+                    )
+                    print(f"   ✅ Prashna context built successfully")
+                elif intent_result.get('mode') == 'annual':
+                    print(f"\n📅 ANNUAL MODE DETECTED")
+                    target_year = intent_result.get('year', datetime.now().year + 1)
+                    print(f"   Target year: {target_year}")
+                    
+                    # Convert intent router transit request to old format if needed
+                    requested_period = None
+                    if intent_result.get('needs_transits') and intent_result.get('transit_request'):
+                        tr = intent_result['transit_request']
+                        requested_period = {
+                            'start_year': tr['startYear'],
+                            'end_year': tr['endYear'],
+                            'yearMonthMap': tr.get('yearMonthMap', {})
+                        }
+                        print(f"   Transit period: {tr['startYear']}-{tr['endYear']}")
+                    
+                    # Use build_complete_context to handle transit requests properly
+                    # Pass intent_result directly without thread executor to avoid serialization issues
+                    print(f"   🔧 Calling build_complete_context with intent_result: {intent_result is not None}")
+                    context = context_builder.build_complete_context(
+                        birth_data, request.question, None, requested_period, intent_result
+                    )
+                    
+                    # Add annual-specific data
+                    context['analysis_type'] = 'annual_forecast'
+                    context['focus_year'] = target_year
+                    
+                    print(f"   ✅ Annual context built successfully")
+                else:
+                    print(f"\n🌟 BIRTH CHART MODE (Default)")
+                    print(f"   Needs transits: {intent_result.get('needs_transits', False)}")
+                    
+                    # Convert intent router transit request to old format if needed
+                    requested_period = None
+                    if intent_result.get('needs_transits') and intent_result.get('transit_request'):
+                        tr = intent_result['transit_request']
+                        requested_period = {
+                            'start_year': tr['startYear'],
+                            'end_year': tr['endYear'],
+                            'yearMonthMap': tr.get('yearMonthMap', {})
+                        }
+                        print(f"   Transit period: {tr['startYear']}-{tr['endYear']}")
+                    
+                    # Pass intent_result directly without thread executor to avoid serialization issues
+                    print(f"   🔧 Calling build_complete_context with intent_result: {intent_result is not None}")
+                    context = context_builder.build_complete_context(
+                        birth_data, request.question, None, requested_period, intent_result
                     )
             except Exception as context_error:
                 print(f"❌ CONTEXT BUILDING ERROR: {context_error}")
@@ -239,16 +302,18 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 # print(f"Context type: {type(context)}")
                 # print(f"History length: {len(history)}")
                 
-                # Add instruction for Gemini about transit data requests
+                # Add instruction for Gemini based on intent classification
                 enhanced_question = request.question
                 
-                # Add partnership mode clarification
+                # Add mode-specific instructions
                 if request.partnership_mode:
                     native_name = birth_data.get('name', 'Native')
                     partner_name = partner_birth_data.get('name', 'Partner')
                     enhanced_question = f"PARTNERSHIP ANALYSIS REQUEST:\nNative: {native_name}\nPartner: {partner_name}\n\nQuestion: {request.question}\n\nIMPORTANT: Use context['native'] for {native_name}'s data and context['partner'] for {partner_name}'s data. Do not mix their planetary positions, dashas, or chart details."
-                elif not requested_period and context.get('transit_data_availability'):
-                    enhanced_question += "\n\nIMPORTANT: For PRECISE event prediction, use the advanced methodology in transit_data_availability. When dasha planets recreate their natal relationships through transits, events manifest with highest probability. For timing questions, you MUST request transit data using the JSON format. Do NOT provide a complete response - only request the transit data."
+                elif intent_result.get('needs_transits') and context.get('transit_activations'):
+                    enhanced_question += "\n\nIMPORTANT: Transit data has been pre-calculated based on your question. Use the provided transit_activations to predict SPECIFIC EVENTS with EXACT DATES. Focus on house significations and dasha correlations for accurate predictions."
+                elif not intent_result.get('needs_transits') and intent_result.get('mode') == 'birth':
+                    enhanced_question += "\n\nNOTE: This is a general birth chart analysis. Focus on personality, yogas, and long-term life patterns rather than specific timing predictions."
                 
                 # Extract user context
                 user_context = {
@@ -271,87 +336,13 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                 if ai_result['success']:
                     response_text = ai_result['response']
                     
-                    # Check if Gemini requested transit data via JSON and make second call if needed
-                    if ai_result.get('has_transit_request', False):
-                        print(f"🔍 TRANSIT REQUEST DETECTED - NOT showing first response to user")
-                        
-                        # Look for JSON transit request in response
-                        json_pattern = r'\{[^}]*"requestType"\s*:\s*"transitRequest"[^}]*\}'
-                        json_matches = re.findall(json_pattern, response_text)
-                        
-                        if json_matches:
-                            try:
-                                print(f"🔍 TRANSIT REQUEST DEBUG: Found JSON match: {json_matches[0]}")
-                                transit_request = json.loads(json_matches[0])
-                                start_year = transit_request.get('startYear')
-                                end_year = transit_request.get('endYear')
-                                specific_months = transit_request.get('specificMonths', [])
-                                
-                                print(f"🔄 MAKING SECOND CALL WITH TRANSIT DATA: {start_year}-{end_year}")
-                                print(f"   Specific months: {specific_months}")
-                                print(f"   Birth data: {birth_data}")
-                                
-                                # Validate years
-                                if not start_year or not end_year or start_year < 1900 or end_year > 2100:
-                                    print(f"❌ INVALID YEAR RANGE: {start_year}-{end_year}")
-                                    response_text = "Invalid year range requested for transit data. Please try again."
-                                else:
-                                    try:
-                                        # Build context with transit data (run in thread pool)
-                                        print(f"🏗️ Building transit context...")
-                                        transit_context = await asyncio.get_event_loop().run_in_executor(
-                                            None,
-                                            context_builder.build_complete_context,
-                                            birth_data, 
-                                            request.question, 
-                                            None,
-                                            {'start_year': start_year, 'end_year': end_year}
-                                        )
-                                        
-                                        print(f"✅ Transit context built successfully")
-                                        print(f"   Transit activations found: {len(transit_context.get('transit_activations', []))}")
-                                        
-                                        # Make second API call with transit data
-                                        enhanced_question = request.question + "\n\nIMPORTANT: Use the provided transit_activations data to predict SPECIFIC EVENTS with EXACT DATES. In your Quick Answer, provide 2-3 concrete events (like 'property purchase', 'job promotion', 'relationship milestone') with precise date ranges from the transit data. Focus on house significations of activated planets and combine with dasha context for accurate predictions."
-                                        
-                                        print(f"🤖 Making second Gemini call...")
-                                        second_ai_result = await gemini_analyzer.generate_chat_response(
-                                            enhanced_question, transit_context, history, request.language, request.response_style, user_context, request.premium_analysis
-                                        )
-                                        
-                                        if second_ai_result['success']:
-                                            response_text = second_ai_result['response']
-                                            print(f"✅ SECOND CALL SUCCESSFUL - Response length: {len(response_text)}")
-                                            # Only deduct credits on successful second call
-                                            should_deduct_credits = True
-                                        else:
-                                            print(f"❌ SECOND CALL FAILED: {second_ai_result.get('error')}")
-                                            response_text = f"I'm having trouble calculating precise transit data for your timing question. Error: {second_ai_result.get('error', 'Unknown error')}. Please try again."
-                                            # Don't deduct credits if second call fails
-                                            should_deduct_credits = False
-                                    
-                                    except Exception as context_error:
-                                        print(f"❌ CONTEXT BUILDING ERROR: {context_error}")
-                                        import traceback
-                                        traceback.print_exc()
-                                        response_text = f"I encountered an error building transit context: {str(context_error)}. Please try again."
-                                    
-                            except json.JSONDecodeError as e:
-                                print(f"❌ FAILED TO PARSE TRANSIT REQUEST JSON: {e}")
-                                print(f"   Raw JSON: {json_matches[0]}")
-                                response_text = "I encountered an issue processing your timing question. Please try rephrasing it."
-                            except Exception as e:
-                                print(f"❌ UNEXPECTED ERROR IN TRANSIT PROCESSING: {e}")
-                                import traceback
-                                traceback.print_exc()
-                                response_text = f"Unexpected error in transit processing: {str(e)}. Please try again."
-                        else:
-                            print(f"❌ NO VALID JSON TRANSIT REQUEST FOUND")
-                            print(f"   Response text preview: {response_text[:200]}...")
-                            response_text = "I need to request additional data for your timing question but encountered a formatting issue. Please try again."
+                    # Transit data is now pre-calculated by Intent Router, no second call needed
+                    print(f"✅ SINGLE CALL COMPLETE - Response length: {len(response_text)}")
+                    if context.get('transit_optimization', {}).get('source') == 'intent_router':
+                        print(f"🚀 OPTIMIZATION SUCCESS: Eliminated second Gemini call using Intent Router")
                     
-                    # Only deduct credits if response was successful (including second AI call)
-                    should_deduct = locals().get('should_deduct_credits', True)
+                    # Deduct credits for successful response
+                    should_deduct = True
                     
                     if should_deduct:
                         print(f"💰 DEDUCTING CREDITS: {chat_cost} credits for user {current_user.userid}")
