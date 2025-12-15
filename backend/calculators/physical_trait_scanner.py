@@ -36,7 +36,8 @@ class PhysicalTraitScanner:
             
             # --- FEATURE 1: COMPLEXION (Primary) ---
             occupants = self._get_occupants_detailed(chart, asc_sign)
-            logging.info(f"1st house occupants: {[f"{p['name']} at {p['degree']:.1f}°" for p in occupants]}")
+            occupant_details = [f"{p['name']} at {p['degree']:.1f}°" for p in occupants]
+            logging.info(f"1st house occupants: {occupant_details}")
             occupants.sort(key=lambda x: abs(x['degree'] - asc_exact_deg))
             
             complexion = self._analyze_complexion(asc_sign, occupants)
@@ -51,7 +52,8 @@ class PhysicalTraitScanner:
                 
                 # If planet is dominant (< 8 deg from Lagna), it's a defining feature
                 degree_diff = abs(planet_data['degree'] - asc_exact_deg)
-                logging.info(f"{p_name}: {degree_diff:.1f}° from ASC -> {'Dominant' if degree_diff < 8 else 'Normal'}")
+                status = 'Dominant' if degree_diff < 8 else 'Normal'
+                logging.info(f"{p_name}: {degree_diff:.1f}° from ASC -> {status}")
                 
                 if degree_diff < 8:
                     p_trait['label'] = f"Dominant Feature: {p_trait['label']}"
