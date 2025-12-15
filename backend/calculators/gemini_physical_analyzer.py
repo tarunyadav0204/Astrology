@@ -290,7 +290,7 @@ INSTRUCTIONS:
 4. Combine planetary influences with ascendant sign characteristics
 5. Be specific about observable features
 6. Use realistic, moderate language
-7. Focus on 3-4 most prominent traits
+7. Identify all significant observable traits
 
 FORMAT: Return ONLY a valid JSON array:
 [
@@ -360,9 +360,9 @@ Generate the JSON array now:
             if json_str:
                 traits_data = json.loads(json_str)
                 
-                # Convert to our format
+                # Convert to our format - no limit
                 formatted_traits = []
-                for i, trait in enumerate(traits_data[:4]):  # Limit to 4 traits
+                for i, trait in enumerate(traits_data):  # No limit on traits
                     trait_label = trait.get('trait', 'Distinctive appearance')
                     formatted_traits.append({
                         'feature': f'physical_trait_{i+1}',
