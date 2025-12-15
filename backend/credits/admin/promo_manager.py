@@ -6,7 +6,7 @@ class PromoCodeManager:
     def __init__(self, db_path: str = 'astrology.db'):
         self.db_path = db_path
     
-    def create_bulk_codes(self, prefix: str, count: int, credits: int, max_uses: int = 1, expires_days: int = 30) -> List[str]:
+    def create_bulk_codes(self, prefix: str, count: int, credits: int, max_uses: int = 1, max_uses_per_user: int = 1, expires_days: int = 30) -> List[str]:
         """Create multiple promo codes with sequential numbering"""
         import random
         import string
@@ -23,9 +23,9 @@ class PromoCodeManager:
             
             try:
                 cursor.execute("""
-                    INSERT INTO promo_codes (code, credits, max_uses, expires_at, created_by)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (code, credits, max_uses, expires_at, None))  # No created_by for now
+                    INSERT INTO promo_codes (code, credits, max_uses, max_uses_per_user, expires_at, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (code, credits, max_uses, max_uses_per_user, expires_at, None))  # No created_by for now
                 codes.append(code)
             except sqlite3.IntegrityError:
                 # Code already exists, skip

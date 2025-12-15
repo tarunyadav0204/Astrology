@@ -17,11 +17,13 @@ class CreatePromoCodeRequest(BaseModel):
     code: str
     credits: int
     max_uses: int = 1
+    max_uses_per_user: int = 1
     expires_at: Optional[str] = None
 
 class UpdatePromoCodeRequest(BaseModel):
     credits: int
     max_uses: int
+    max_uses_per_user: int
     is_active: bool
 
 @router.get("/balance")
@@ -74,12 +76,13 @@ async def create_promo_code(request: CreatePromoCodeRequest, current_user: User 
     
     try:
         cursor.execute("""
-            INSERT INTO promo_codes (code, credits, max_uses, expires_at, created_by)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO promo_codes (code, credits, max_uses, max_uses_per_user, expires_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             request.code.upper(),
             request.credits,
             request.max_uses,
+            request.max_uses_per_user,
             request.expires_at,
             current_user.userid
         ))
@@ -100,7 +103,7 @@ async def get_promo_codes(current_user: User = Depends(get_current_user)):
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT code, credits, max_uses, used_count, is_active, expires_at, created_at
+        SELECT code, credits, max_uses, max_uses_per_user, used_count, is_active, expires_at, created_at
         FROM promo_codes 
         ORDER BY created_at DESC
     """)
@@ -111,10 +114,11 @@ async def get_promo_codes(current_user: User = Depends(get_current_user)):
             "code": row[0],
             "credits": row[1],
             "max_uses": row[2],
-            "used_count": row[3],
-            "is_active": row[4],
-            "expires_at": row[5],
-            "created_at": row[6]
+            "max_uses_per_user": row[3],
+            "used_count": row[4],
+            "is_active": row[5],
+            "expires_at": row[6],
+            "created_at": row[7]
         })
     
     conn.close()
@@ -130,9 +134,9 @@ async def update_promo_code(code: str, request: UpdatePromoCodeRequest, current_
     
     cursor.execute("""
         UPDATE promo_codes 
-        SET credits = ?, max_uses = ?, is_active = ?
+        SET credits = ?, max_uses = ?, max_uses_per_user = ?, is_active = ?
         WHERE code = ?
-    """, (request.credits, request.max_uses, request.is_active, code.upper()))
+    """, (request.credits, request.max_uses, request.max_uses_per_user, request.is_active, code.upper()))
     
     if cursor.rowcount == 0:
         conn.close()
@@ -305,9 +309,10 @@ async def create_bulk_promo_codes(request: dict, current_user: User = Depends(ge
     count = request.get("count", 10)
     credits = request.get("credits", 100)
     max_uses = request.get("max_uses", 1)
+    max_uses_per_user = request.get("max_uses_per_user", 1)
     expires_days = request.get("expires_days", 30)
     
-    codes = promo_manager.create_bulk_codes(prefix, count, credits, max_uses, expires_days)
+    codes = promo_manager.create_bulk_codes(prefix, count, credits, max_uses, max_uses_per_user, expires_days)
     
     return {
         "message": f"Created {len(codes)} promo codes",

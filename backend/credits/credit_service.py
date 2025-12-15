@@ -49,6 +49,7 @@ class CreditService:
                 code TEXT UNIQUE NOT NULL,
                 credits INTEGER NOT NULL,
                 max_uses INTEGER DEFAULT 1,
+                max_uses_per_user INTEGER DEFAULT 1,
                 used_count INTEGER DEFAULT 0,
                 is_active BOOLEAN DEFAULT TRUE,
                 expires_at TIMESTAMP,
@@ -67,8 +68,7 @@ class CreditService:
                 credits_earned INTEGER NOT NULL,
                 used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (promo_code_id) REFERENCES promo_codes (id),
-                FOREIGN KEY (userid) REFERENCES users (userid),
-                UNIQUE(promo_code_id, userid)
+                FOREIGN KEY (userid) REFERENCES users (userid)
             )
         ''')
         
@@ -267,7 +267,7 @@ class CreditService:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT id, credits, max_uses, used_count, is_active, expires_at 
+                SELECT id, credits, max_uses, max_uses_per_user, used_count, is_active, expires_at 
                 FROM promo_codes WHERE code = ?
             """, (code,))
             promo = cursor.fetchone()
@@ -275,7 +275,7 @@ class CreditService:
             if not promo:
                 return {"success": False, "message": "Invalid promo code"}
             
-            promo_id, credits, max_uses, used_count, is_active, expires_at = promo
+            promo_id, credits, max_uses, max_uses_per_user, used_count, is_active, expires_at = promo
             
             if not is_active:
                 return {"success": False, "message": "Promo code is inactive"}
@@ -289,8 +289,8 @@ class CreditService:
             """, (promo_id, userid))
             user_usage_count = cursor.fetchone()[0]
             
-            if user_usage_count >= max_uses:
-                return {"success": False, "message": f"You have already used this promo code {max_uses} time(s)"}
+            if user_usage_count >= max_uses_per_user:
+                return {"success": False, "message": f"You have already used this promo code {max_uses_per_user} time(s)"}
             
             # Record usage first
             cursor.execute("""
