@@ -274,6 +274,32 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
                 {rashiIndex + 1}
               </SvgText>
               
+              {/* Ascendant marker for house 1 */}
+              {houseNumber === 1 && (
+                <G>
+                  <SvgText 
+                    x={houseData.center.x + 25} 
+                    y={houseData.center.y + 45} 
+                    fontSize="12" 
+                    fill={cosmicTheme ? "#ff6b35" : "#e91e63"} 
+                    fontWeight="900" 
+                    textAnchor="middle">
+                    ASC
+                  </SvgText>
+                  {chartData.ascendant && (
+                    <SvgText 
+                      x={houseData.center.x + 25} 
+                      y={houseData.center.y + 60} 
+                      fontSize="8" 
+                      fill={cosmicTheme ? "rgba(255, 255, 255, 0.7)" : "#666"} 
+                      fontWeight="500" 
+                      textAnchor="middle">
+                      {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                    </SvgText>
+                  )}
+                </G>
+              )}
+              
 
               
               {/* Planets */}

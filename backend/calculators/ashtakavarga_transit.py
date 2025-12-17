@@ -78,8 +78,8 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         weak_signs = []
         
         for sign in range(12):
-            transit_points = transit_av['sarvashtakavarga'][sign]
-            birth_points = birth_av['sarvashtakavarga'][sign]
+            transit_points = transit_av['sarvashtakavarga'].get(str(sign), 0)
+            birth_points = birth_av['sarvashtakavarga'].get(str(sign), 0)
             
             # Track changes from birth chart
             if transit_points > birth_points + 2:
@@ -99,7 +99,7 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         
         for planet, data in transit_planets.items():
             planet_sign = data['sign']
-            transit_bindus = transit_av['sarvashtakavarga'][planet_sign]
+            transit_bindus = transit_av['sarvashtakavarga'].get(str(planet_sign), 0)
             
             if transit_bindus >= 30:
                 planets_in_strong_signs.append(planet)
@@ -181,7 +181,7 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         total_transit = sum(transit_av['sarvashtakavarga'].values())
         
         # Calculate distribution variance to show how much the energy has shifted
-        total_absolute_change = sum(abs(transit_av['sarvashtakavarga'][i] - birth_av['sarvashtakavarga'][i]) for i in range(12))
+        total_absolute_change = sum(abs(transit_av['sarvashtakavarga'].get(str(i), 0) - birth_av['sarvashtakavarga'].get(str(i), 0)) for i in range(12))
         distribution_shift = total_absolute_change / 2  # Divide by 2 since each change is counted twice
         
         significant_changes = 0
@@ -189,8 +189,8 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         reduced_count = 0
         
         for sign in range(12):
-            birth_points = birth_av['sarvashtakavarga'][sign]
-            transit_points = transit_av['sarvashtakavarga'][sign]
+            birth_points = birth_av['sarvashtakavarga'].get(str(sign), 0)
+            transit_points = transit_av['sarvashtakavarga'].get(str(sign), 0)
             difference = transit_points - birth_points
             
             # Determine status with more nuanced categories
@@ -266,8 +266,11 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
             for sign, bindus in chart['bindus'].items():
                 sarva[sign] += bindus
         
+        # Convert keys to strings for consistent API response
+        sarva_str_keys = {str(k): v for k, v in sarva.items()}
+        
         return {
-            'sarvashtakavarga': sarva,
+            'sarvashtakavarga': sarva_str_keys,
             'total_bindus': sum(sarva.values()),
             'individual_charts': individual_charts
         }

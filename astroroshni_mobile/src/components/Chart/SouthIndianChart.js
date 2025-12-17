@@ -137,6 +137,32 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
                 {houseNumber}
               </SvgText>
               
+              {/* Ascendant marker for house 1 */}
+              {houseNumber === 1 && (
+                <G>
+                  <SvgText 
+                    x={pos.x + pos.width - 8} 
+                    y={pos.y + pos.height - 20} 
+                    fontSize="9" 
+                    fill="#e91e63" 
+                    fontWeight="900" 
+                    textAnchor="end">
+                    ASC
+                  </SvgText>
+                  {chartData.ascendant && (
+                    <SvgText 
+                      x={pos.x + pos.width - 8} 
+                      y={pos.y + pos.height - 8} 
+                      fontSize="7" 
+                      fill="#666" 
+                      fontWeight="500" 
+                      textAnchor="end">
+                      {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                    </SvgText>
+                  )}
+                </G>
+              )}
+              
               {/* Planets */}
               {planetsInSign.map((planet, pIndex) => (
                 <G key={pIndex}>

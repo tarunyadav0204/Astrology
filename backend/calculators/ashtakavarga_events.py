@@ -37,7 +37,7 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
         }
         
         for sign in range(12):
-            bindus = birth_av['sarvashtakavarga'][sign]
+            bindus = birth_av['sarvashtakavarga'].get(str(sign), 0)
             if bindus >= 35:
                 critical['very_strong'].append(sign)
             elif bindus >= 30:
@@ -159,7 +159,7 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
                 
                 # Check if benefics are in strong signs for this event
                 for sign in event_signs:
-                    sign_bindus = birth_av['sarvashtakavarga'][sign]
+                    sign_bindus = birth_av['sarvashtakavarga'].get(str(sign), 0)
                     
                     if jupiter_sign == sign and sign_bindus >= 30:
                         month_strength += 40
@@ -230,7 +230,7 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
         # 3. 5th house bindus strength
         # 4. Avoid Saturn in 5th house (delays)
         
-        primary_sign_bindus = birth_av['sarvashtakavarga'][children_signs['primary']]
+        primary_sign_bindus = birth_av['sarvashtakavarga'].get(str(children_signs['primary']), 0)
         
         for month in range(1, 13):
             jd = swe.julday(year, month, 15, 12.0)
@@ -253,11 +253,11 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
                 month_strength += jupiter_boost
                 factors.append(f"Jupiter in 5th house ({primary_sign_bindus} bindus)")
             elif jupiter_sign in children_signs['fortune'] + children_signs['gains']:
-                month_strength += birth_av['sarvashtakavarga'][jupiter_sign] * 1.8
+                month_strength += birth_av['sarvashtakavarga'].get(str(jupiter_sign), 0) * 1.8
                 factors.append(f"Jupiter in children-supportive sign")
             
             # Moon in strong signs (fertility support)
-            moon_bindus = birth_av['sarvashtakavarga'][moon_sign]
+            moon_bindus = birth_av['sarvashtakavarga'].get(str(moon_sign), 0)
             if moon_bindus >= 28:  # Lower threshold for Moon
                 month_strength += moon_bindus * 0.8
                 factors.append(f"Moon in fertile sign ({moon_bindus} bindus)")
@@ -352,7 +352,7 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
         # 3. 7th house bindus strength
         # 4. Dasha periods of 7th lord or Venus
         
-        primary_sign_bindus = birth_av['sarvashtakavarga'][marriage_signs['primary']]
+        primary_sign_bindus = birth_av['sarvashtakavarga'].get(str(marriage_signs['primary']), 0)
         
         for month in range(1, 13):
             jd = swe.julday(year, month, 15, 12.0)
@@ -372,11 +372,11 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
                 month_strength += jupiter_boost
                 factors.append(f"Jupiter in 7th house ({primary_sign_bindus} bindus)")
             elif jupiter_sign in marriage_signs['secondary'] + marriage_signs['fulfillment']:
-                month_strength += birth_av['sarvashtakavarga'][jupiter_sign] * 1.5
+                month_strength += birth_av['sarvashtakavarga'].get(str(jupiter_sign), 0) * 1.5
                 factors.append(f"Jupiter in marriage-supportive sign")
             
             # Venus in strong signs (secondary importance)
-            venus_bindus = birth_av['sarvashtakavarga'][venus_sign]
+            venus_bindus = birth_av['sarvashtakavarga'].get(str(venus_sign), 0)
             if venus_bindus >= 30:
                 month_strength += venus_bindus
                 factors.append(f"Venus in strong sign ({venus_bindus} bindus)")
@@ -471,8 +471,8 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
             planet_sign = int(pos / 30)
             
             # Get bindu strength for this planet in this sign
-            birth_bindus = birth_av['sarvashtakavarga'][planet_sign]
-            transit_bindus = transit_av['sarvashtakavarga'][planet_sign]
+            birth_bindus = birth_av['sarvashtakavarga'].get(str(planet_sign), 0)
+            transit_bindus = transit_av['sarvashtakavarga'].get(str(planet_sign), 0)
             
             # Planet-specific strength calculation
             planet_strength = self._calculate_planet_daily_strength(
