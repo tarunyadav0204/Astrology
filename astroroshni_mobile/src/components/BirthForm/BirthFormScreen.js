@@ -316,7 +316,7 @@ export default function BirthFormScreen({ navigation, route }) {
     
     setLoading(true);
     try {
-      console.log('🚀 [DEBUG] BirthForm: Starting handleSubmit');
+      // console.log('🚀 [DEBUG] BirthForm: Starting handleSubmit');
       console.log('📝 [DEBUG] BirthForm: Form data:', JSON.stringify({
         name: formData.name,
         updateGender,
@@ -325,8 +325,8 @@ export default function BirthFormScreen({ navigation, route }) {
       
       // Check existing profiles BEFORE any changes
       const existingProfiles = await storage.getBirthProfiles();
-      console.log('📋 [DEBUG] BirthForm: BEFORE - Existing profiles count:', existingProfiles.length);
-      console.log('📋 [DEBUG] BirthForm: BEFORE - Existing profiles:', existingProfiles.map(p => ({ name: p.name, id: p.id })));
+      // console.log('📋 [DEBUG] BirthForm: BEFORE - Existing profiles count:', existingProfiles.length);
+      // console.log('📋 [DEBUG] BirthForm: BEFORE - Existing profiles:', existingProfiles.map(p => ({ name: p.name, id: p.id })));
       
       const birthData = {
         name: formData.name,
@@ -369,14 +369,14 @@ export default function BirthFormScreen({ navigation, route }) {
       // 4. THEN save to local storage with real ID
       await storage.setBirthDetails(profileData);
       if (!updateGender && !editProfile) {
-        console.log('📝 [DEBUG] BirthForm: Adding to profiles list (new profile)...');
+        // console.log('📝 [DEBUG] BirthForm: Adding to profiles list (new profile)...');
         await storage.addBirthProfile(profileData);
-        console.log('✅ [DEBUG] BirthForm: addBirthProfile completed');
+        // console.log('✅ [DEBUG] BirthForm: addBirthProfile completed');
         
         // Check profiles AFTER adding
         const updatedProfiles = await storage.getBirthProfiles();
-        console.log('📋 [DEBUG] BirthForm: AFTER - Updated profiles count:', updatedProfiles.length);
-        console.log('📋 [DEBUG] BirthForm: AFTER - Updated profiles:', updatedProfiles.map(p => ({ name: p.name, id: p.id })));
+        // console.log('📋 [DEBUG] BirthForm: AFTER - Updated profiles count:', updatedProfiles.length);
+        // console.log('📋 [DEBUG] BirthForm: AFTER - Updated profiles:', updatedProfiles.map(p => ({ name: p.name, id: p.id })));
       } else {
         console.log('⏭️ [DEBUG] BirthForm: Skipping addBirthProfile (update/edit mode)');
       }

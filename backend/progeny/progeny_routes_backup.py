@@ -45,12 +45,12 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
     """Analyze Progeny/Childbirth prospects - Requires Credits"""
     
     # Debug logging for gender validation
-    print(f"🔍 [DEBUG] Progeny API: Received request for user {current_user.userid}")
-    print(f"🔍 [DEBUG] Progeny API: Request data: {request.dict()}")
-    print(f"⚧️ [DEBUG] Progeny API: Gender value: '{request.gender}'")
-    print(f"⚧️ [DEBUG] Progeny API: Gender type: {type(request.gender)}")
-    print(f"⚧️ [DEBUG] Progeny API: Gender stripped: '{request.gender.strip() if request.gender else None}'")
-    print(f"⚧️ [DEBUG] Progeny API: Gender validation: not request.gender = {not request.gender}, gender.strip() == '' = {request.gender.strip() == '' if request.gender else 'N/A'}")
+    # print(f"🔍 [DEBUG] Progeny API: Received request for user {current_user.userid}")
+    # print(f"🔍 [DEBUG] Progeny API: Request data: {request.dict()}")
+    # print(f"⚧️ [DEBUG] Progeny API: Gender value: '{request.gender}'")
+    # print(f"⚧️ [DEBUG] Progeny API: Gender type: {type(request.gender)}")
+    # print(f"⚧️ [DEBUG] Progeny API: Gender stripped: '{request.gender.strip() if request.gender else None}'")
+    # print(f"⚧️ [DEBUG] Progeny API: Gender validation: not request.gender = {not request.gender}, gender.strip() == '' = {request.gender.strip() == '' if request.gender else 'N/A'}")
     
     # Validate gender is provided
     if not request.gender or request.gender.strip() == "":
@@ -59,7 +59,7 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
             yield f"data: {json.dumps({'status': 'error', 'error_code': 'GENDER_REQUIRED', 'message': 'Gender is required for progeny analysis. Please update your profile to continue.'})}\n\n"
         return StreamingResponse(gender_required_response(), media_type="text/plain")
     
-    print(f"✅ [DEBUG] Progeny API: Gender validation PASSED - proceeding with analysis")
+    # print(f"✅ [DEBUG] Progeny API: Gender validation PASSED - proceeding with analysis")
     
     # 1. Check Cache First (Prevent duplicate charges) - Skip if regenerating
     birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}_{request.gender}_progeny".encode()).hexdigest()
@@ -96,11 +96,11 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
     async def generate_analysis():
         try:
             birth_data = request.dict()
-            print(f"🔍 [DEBUG] Progeny API: Birth data for analysis: {birth_data}")
-            print(f"⚧️ [DEBUG] Progeny API: Gender in birth_data: '{birth_data.get('gender')}'")
+            # print(f"🔍 [DEBUG] Progeny API: Birth data for analysis: {birth_data}")
+            # print(f"⚧️ [DEBUG] Progeny API: Gender in birth_data: '{birth_data.get('gender')}'")
             
             # Build Context with Transit Data
-            print(f"🔄 [DEBUG] Progeny API: Building context with birth_data...")
+            # print(f"🔄 [DEBUG] Progeny API: Building context with birth_data...")
             try:
                 # Build base progeny context
                 context = await asyncio.get_event_loop().run_in_executor(
@@ -112,7 +112,7 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
                 chat_builder = ChatContextBuilder()
                 current_year = datetime.now().year
                 
-                print(f"🔄 [DEBUG] Progeny API: Adding transit data for {current_year}-{current_year + 1}...")
+                # print(f"🔄 [DEBUG] Progeny API: Adding transit data for {current_year}-{current_year + 1}...")
                 
                 # Build static context first to populate cache
                 try:
@@ -130,13 +130,13 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
                 # Merge transit data into progeny context
                 if 'transit_activations' in transit_context:
                     context['transit_activations'] = transit_context['transit_activations']
-                    print(f"✅ [DEBUG] Progeny API: Added {len(context['transit_activations'])} transit activations")
+                    # print(f"✅ [DEBUG] Progeny API: Added {len(context['transit_activations'])} transit activations")
                 
                 if 'current_dashas' in transit_context:
                     context['current_dashas'] = transit_context['current_dashas']
-                    print(f"✅ [DEBUG] Progeny API: Added current dasha information")
+                    # print(f"✅ [DEBUG] Progeny API: Added current dasha information")
                 
-                print(f"✅ [DEBUG] Progeny API: Context built successfully with transit data")
+                # print(f"✅ [DEBUG] Progeny API: Context built successfully with transit data")
             except Exception as context_error:
                 print(f"❌ [DEBUG] Progeny API: Context building failed: {context_error}")
                 print(f"❌ [DEBUG] Progeny API: Context error type: {type(context_error)}")

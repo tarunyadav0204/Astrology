@@ -122,7 +122,7 @@ export default function AshtakvargaOracle({ navigation }) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Ashtakvarga data received:', data);
+        // console.log('Ashtakvarga data received:', data);
         setOracleData(data);
       } else {
         throw new Error(`Failed to fetch ashtakvarga data: ${response.status}`);
@@ -272,9 +272,11 @@ export default function AshtakvargaOracle({ navigation }) {
     }
 
     return (
-      <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.mapTitle}>Sarvashtakvarga Chart</Text>
-        <Text style={styles.mapSubtitle}>Tap any house to see its cosmic strength</Text>
+      <View style={styles.tabContent}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.mapTitle}>Sarvashtakvarga Chart</Text>
+          <Text style={styles.mapSubtitle}>Tap any house to see its cosmic strength</Text>
+        </View>
         
         <View style={styles.chartContainer}>
           <AshtakvargaChart 
@@ -357,7 +359,7 @@ export default function AshtakvargaOracle({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     );
   };
 
@@ -441,7 +443,7 @@ export default function AshtakvargaOracle({ navigation }) {
 
       if (response.ok) {
         const predictions = await response.json();
-        console.log('Life predictions received:', predictions);
+        // console.log('Life predictions received:', predictions);
         setLoadingProgress(100);
         setTimeout(() => {
           setLifePredictions(predictions);
@@ -709,7 +711,16 @@ const styles = {
     fontWeight: '600',
   },
   
-  tabContent: { flex: 1, paddingHorizontal: 20 },
+  tabContent: { 
+    flex: 1, 
+    paddingHorizontal: 20,
+    justifyContent: 'space-between'
+  },
+  
+  titleContainer: {
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
   
   cosmicWeatherHeader: {
     borderRadius: 20,
@@ -776,8 +787,8 @@ const styles = {
   powerActionsContainer: { marginBottom: 10 },
   
   lifePredictionsContainer: { 
-    marginBottom: 20,
-    marginTop: 10,
+    marginBottom: 10,
+    marginTop: 5,
   },
   lifePredictionsButton: {
     borderRadius: 16,
@@ -792,23 +803,23 @@ const styles = {
     shadowColor: '#2c3e50',
   },
   lifePredictionsGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   lifePredictionsIcon: {
-    fontSize: 24,
-    marginBottom: 6,
+    fontSize: 18,
+    marginBottom: 3,
   },
   lifePredictionsText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   lifePredictionsSubtext: {
-    fontSize: 12,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     fontStyle: 'italic',
@@ -882,39 +893,43 @@ const styles = {
   },
   
   mapTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   mapSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   chartContainer: {
-    height: 350,
-    marginBottom: 30,
-    paddingHorizontal: 10,
+    flex: 1,
+    maxHeight: height * 0.45, // Responsive height based on screen
+    marginBottom: 10,
+    paddingHorizontal: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   
-  planetaryToggle: { marginBottom: 20 },
+  planetaryToggle: { 
+    marginBottom: 8,
+    paddingVertical: 5
+  },
   toggleTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.white,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   planetButton: {
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 12,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginRight: 8,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   planetIcon: { fontSize: 20, marginBottom: 4, color: '#ffd700' },
