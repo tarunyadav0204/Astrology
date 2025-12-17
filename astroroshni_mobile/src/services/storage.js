@@ -15,9 +15,8 @@ export const storage = {
   
   // Birth details
   setBirthDetails: async (details) => {
-    console.log('💾 [DEBUG] Storage: setBirthDetails called with:', JSON.stringify({ name: details.name, id: details.id }, null, 2));
+    console.log('💾 [CRITICAL] setBirthDetails called with:', details.name, 'ID:', details.id);
     const result = await AsyncStorage.setItem('birthDetails', JSON.stringify(details));
-    console.log('✅ [DEBUG] Storage: setBirthDetails completed');
     return result;
   },
   getBirthDetails: async () => {

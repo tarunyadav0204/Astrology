@@ -489,7 +489,7 @@ def init_db():
                 relation TEXT DEFAULT 'other',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (userid) REFERENCES users (userid),
-                UNIQUE(userid, date, time, latitude, longitude)
+                UNIQUE(userid, name, date, time, latitude, longitude)
             )
         ''')
         
@@ -1573,14 +1573,10 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
     if not birth_data.latitude or not birth_data.longitude:
         raise HTTPException(status_code=400, detail="Valid coordinates required. Please select location from suggestions.")
     
-    # Store birth data in database (update if exists)
+    # Store birth data in database (update if exists for current user only)
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    # cursor.execute('''
-    #     INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-    #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    # ''', (current_user.userid, birth_data.name, birth_data.date, birth_data.time, 
-    #       birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other'))
+    
     if encryptor:
         enc_name = encryptor.encrypt(birth_data.name)
         enc_date = encryptor.encrypt(birth_data.date)
@@ -1592,11 +1588,28 @@ async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', curren
         enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
         enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
+    # Check if chart exists for this user with same details
     cursor.execute('''
-        INSERT OR REPLACE INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-        birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
+        SELECT id FROM birth_charts 
+        WHERE userid = ? AND name = ? AND date = ? AND time = ? AND latitude = ? AND longitude = ?
+    ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon))
+    
+    existing_chart = cursor.fetchone()
+    
+    if existing_chart:
+        # Update existing chart for this user
+        cursor.execute('''
+            UPDATE birth_charts 
+            SET timezone=?, place=?, gender=?, relation=?
+            WHERE id=?
+        ''', (birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other', existing_chart[0]))
+    else:
+        # Insert new chart for this user
+        cursor.execute('''
+            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
+            birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
 
     conn.commit()
     conn.close()
@@ -2993,20 +3006,35 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
             birth_data=birth_data,
             transit_date=transit_date
         )
-        chart_data = await calculate_transits(transit_request, current_user)
+        chart_data = await calculate_transits(transit_request)
     else:
-        # For birth charts (lagna, navamsa), use birth positions
-        chart_data = await calculate_chart(birth_data, 'mean', current_user)
+        # For birth charts (lagna, navamsa), use birth positions - DON'T SAVE TO DATABASE
+        chart_data = await _calculate_chart_data(birth_data, 'mean')
     
     calculator = AshtakavargaCalculator(birth_data, chart_data)
     
     sarva = calculator.calculate_sarvashtakavarga()
     analysis = calculator.get_ashtakavarga_analysis(chart_type)
     
+    # Format Ashtakvarga data for chart display
+    chart_ashtakavarga = {}
+    ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data.get('ascendant') else 0
+    
+    for sign_num in range(12):
+        house_num = ((sign_num - ascendant_sign) % 12) + 1
+        bindus = sarva['sarvashtakavarga'].get(str(sign_num), 0)
+        chart_ashtakavarga[str(house_num)] = {
+            'bindus': bindus,
+            'sign': sign_num,
+            'strength': 'Strong' if bindus >= 30 else 'Weak' if bindus <= 25 else 'Moderate'
+        }
+    
     return {
         "ashtakavarga": sarva,
         "analysis": analysis,
-        "chart_type": chart_type
+        "chart_type": chart_type,
+        "chart_data": chart_data,  # Include chart_data for oracle calculations
+        "chart_ashtakavarga": chart_ashtakavarga  # Formatted for chart widget
     }
 
 @app.post("/api/ashtakavarga/transit-analysis")
@@ -3017,7 +3045,7 @@ async def get_transit_ashtakavarga(request: dict, current_user: User = Depends(g
     birth_data = BirthData(**request['birth_data'])
     transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
     
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    chart_data = await _calculate_chart_data(birth_data, 'mean')
     calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
     
     transit_av = calculator.calculate_transit_ashtakavarga(transit_date)
@@ -3039,7 +3067,7 @@ async def get_monthly_ashtakavarga_forecast(request: dict, current_user: User = 
     birth_data = BirthData(**request['birth_data'])
     start_date = datetime.strptime(request.get('start_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
     
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    chart_data = await _calculate_chart_data(birth_data, 'mean')
     calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
     
     forecast = []
@@ -3067,7 +3095,7 @@ async def predict_ashtakavarga_events(request: dict, current_user: User = Depend
     birth_data = BirthData(**request['birth_data'])
     year = request.get('year', datetime.now().year)
     
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    chart_data = await _calculate_chart_data(birth_data, 'mean')
     predictor = AshtakavargaEventPredictor(birth_data, chart_data)
     
     events = predictor.predict_events_for_year(year)
@@ -3088,7 +3116,7 @@ async def predict_specific_event(request: dict, current_user: User = Depends(get
     start_year = request.get('start_year', datetime.now().year)
     end_year = request.get('end_year', start_year + 5)
     
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    chart_data = await _calculate_chart_data(birth_data, 'mean')
     predictor = AshtakavargaEventPredictor(birth_data, chart_data)
     
     predictions = predictor.predict_specific_event_timing(event_type, start_year, end_year)
@@ -3107,12 +3135,44 @@ async def get_daily_ashtakavarga_strength(request: dict, current_user: User = De
     birth_data = BirthData(**request['birth_data'])
     date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
     
-    chart_data = await calculate_chart(birth_data, 'mean', current_user)
+    chart_data = await _calculate_chart_data(birth_data, 'mean')
     predictor = AshtakavargaEventPredictor(birth_data, chart_data)
     
     daily_analysis = predictor.get_daily_ashtakavarga_strength(date)
     
     return daily_analysis
+
+@app.post("/api/ashtakavarga/oracle-insight")
+async def get_ashtakavarga_oracle_insight(request: dict, current_user: User = Depends(get_current_user)):
+    """Generate Gemini-powered Ashtakvarga Oracle insights"""
+    try:
+        from calculators.ashtakvarga_oracle import get_oracle_instance
+        
+        birth_data = request['birth_data']
+        ashtakvarga_data = request['ashtakvarga_data']
+        date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
+        query_type = request.get('query_type', 'general')
+        
+        oracle = get_oracle_instance()
+        complete_oracle = oracle.generate_complete_oracle(birth_data, ashtakvarga_data, date, query_type)
+        
+        # Return complete oracle data including timeline_events
+        return complete_oracle
+        
+    except Exception as e:
+        print(f"Oracle insight error: {str(e)}")
+        return {
+            "oracle_message": "The cosmic energies are aligning. Your Ashtakvarga reveals hidden patterns of strength and opportunity.",
+            "power_actions": [
+                {"type": "do", "text": "Focus on morning activities"},
+                {"type": "do", "text": "Wear bright colors today"},
+                {"type": "avoid", "text": "Avoid major decisions after sunset"}
+            ],
+            "cosmic_strength": 65,
+            "pillar_insights": [f"Sign {i+1} holds cosmic significance in your chart." for i in range(12)]
+        }
+
+# Timeline endpoint removed - frontend handles timeline data from oracle-insight response
 
 @app.get("/api/interpretations/planet-nakshatra")
 async def get_planet_nakshatra_interpretation(
@@ -4885,6 +4945,79 @@ async def get_analysis_pricing():
             "education": 5,
             "progeny": 15
         }}
+
+@app.post("/api/ashtakavarga/complete-oracle")
+async def get_complete_ashtakavarga_oracle(request: dict, current_user: User = Depends(get_current_user)):
+    """Get complete oracle response with both insights and timeline in single call"""
+    try:
+        from calculators.ashtakvarga_oracle import get_oracle_instance
+        
+        birth_data = request['birth_data']
+        ashtakvarga_data = request['ashtakvarga_data']
+        date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
+        query_type = request.get('query_type', 'general')
+        timeline_years = request.get('timeline_years', 3)
+        
+        oracle = get_oracle_instance()
+        complete_response = oracle.generate_complete_oracle(birth_data, ashtakvarga_data, date, query_type, timeline_years)
+        
+        return complete_response
+        
+    except Exception as e:
+        print(f"Complete oracle error: {str(e)}")
+        return {
+            "oracle_message": "Oracle service temporarily unavailable.",
+            "power_actions": [{"type": "error", "text": "Service unavailable"}],
+            "cosmic_strength": 50,
+            "pillar_insights": ["Service temporarily unavailable." for _ in range(12)],
+            "timeline_events": [],
+            "error": str(e)
+        }
+
+@app.post("/api/ashtakavarga/life-predictions")
+async def generate_ashtakavarga_life_predictions(request: dict, current_user: User = Depends(get_current_user)):
+    """Generate life predictions using Vinay Aditya's 'Dots of Destiny' methodology"""
+    try:
+        from calculators.ashtakavarga import AshtakavargaCalculator
+        
+        birth_data = BirthData(**request['birth_data'])
+        
+        # Calculate chart data
+        chart_data = await _calculate_chart_data(birth_data, 'mean')
+        
+        # Calculate dasha data
+        dasha_data = await calculate_accurate_dasha(birth_data)
+        
+        # Calculate current transits
+        transit_request = TransitRequest(
+            birth_data=birth_data,
+            transit_date=datetime.now().strftime('%Y-%m-%d')
+        )
+        transit_data = await calculate_transits(transit_request)
+        
+        # Initialize Ashtakavarga calculator
+        calculator = AshtakavargaCalculator(birth_data, chart_data)
+        
+        # Generate life predictions using Vinay Aditya's methodology
+        predictions = calculator.generate_life_predictions(dasha_data, transit_data['planets'])
+        
+        return {
+            "birth_info": {
+                "name": birth_data.name,
+                "date": birth_data.date
+            },
+            "predictions": predictions,
+            "generated_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Life predictions error: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            "error": f"Life predictions generation failed: {str(e)}",
+            "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings"
+        }
 
 if __name__ == "__main__":
     import uvicorn

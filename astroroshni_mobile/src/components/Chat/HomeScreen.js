@@ -43,8 +43,12 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
   
   useFocusEffect(
     React.useCallback(() => {
-      loadCurrentNative();
-      loadHomeData();
+      const loadData = async () => {
+        console.log('🔄 HomeScreen focused - loading data');
+        const nativeData = await loadCurrentNative();
+        await loadHomeData(nativeData);
+      };
+      loadData();
     }, [])
   );
   
@@ -102,7 +106,7 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
       ).start();
     });
     
-    loadHomeData();
+    // Removed duplicate loadHomeData call - handled by useFocusEffect
     
     // Update Panchang daily at midnight
     const now = new Date();
@@ -131,22 +135,44 @@ export default function HomeScreen({ birthData, onOptionSelect }) {
       clearTimeout(midnightTimer);
       subscription?.remove();
     };
-  }, [birthData]);
+  }, []);
   
 const loadCurrentNative = async () => {
     try {
       const { storage } = require('../../services/storage');
-      const selectedNative = await storage.getBirthDetails();
-      console.log('🔄 Loading current native:', selectedNative?.name);
+      
+      // First try to get single birth details
+      let selectedNative = await storage.getBirthDetails();
+      console.log('🔄 Single birth details:', selectedNative?.name, 'ID:', selectedNative?.id);
+      
+      // If no single birth details, get from profiles
+      if (!selectedNative) {
+        const profiles = await storage.getBirthProfiles();
+        console.log('📋 Found profiles:', profiles?.length || 0);
+        
+        if (profiles && profiles.length > 0) {
+          // Use the first profile or find 'self' relation
+          selectedNative = profiles.find(p => p.relation === 'self') || profiles[0];
+          console.log('📊 Using profile:', selectedNative?.name, 'ID:', selectedNative?.id);
+        }
+      }
+      
+      console.log('🔄 Loading current native:', selectedNative?.name, 'ID:', selectedNative?.id);
       setCurrentNativeData(selectedNative);
+      return selectedNative;
     } catch (error) {
       console.log('Error loading current native:', error);
+      return null;
     }
   };
 
-const loadHomeData = async () => {
+const loadHomeData = async (nativeData = null) => {
     try {
       setLoading(true);
+      
+      // Clear existing chart data first
+      setChartData(null);
+      setDashData(null);
       
       // Load pricing first
       try {
@@ -160,16 +186,17 @@ const loadHomeData = async () => {
       
       const targetDate = new Date().toISOString().split('T')[0];
       
-      // Load transits (no birth data needed) - wrapped in try-catch to not block other loading
+      // Load transits (no birth data needed)
       try {
         const transitResponse = await chartAPI.calculateTransits({}, targetDate);
         if (transitResponse?.data) {
           setTransitData(transitResponse.data);
         }
       } catch (transitError) {
+        console.log('Transit error:', transitError);
       }
       
-      // Load panchang for Delhi (default location) - wrapped in try-catch to not block birth chart loading
+      // Load panchang for Delhi (default location)
       try {
         const defaultLat = 28.6139;
         const defaultLon = 77.2090;
@@ -208,41 +235,34 @@ const loadHomeData = async () => {
           setPanchangData(combinedPanchangData);
         }
       } catch (panchangError) {
+        console.log('Panchang error:', panchangError);
       }
       
-      
-      // Use current native data from state
-      let currentBirthData = currentNativeData || birthData;
-      
+      // Use provided native data or get fresh from storage
+      let currentBirthData = nativeData;
       if (!currentBirthData) {
-        try {
-          const { storage } = require('../../services/storage');
-          let savedBirthData = await storage.getBirthData();
-          
-          // If not in storage, try to load from API
-          if (!savedBirthData || !savedBirthData.name) {
-            const { authAPI } = require('../../services/api');
-            const response = await authAPI.getSelfBirthChart();
-            if (response.data.has_self_chart) {
-              savedBirthData = response.data;
-              // Save to storage for future use
-              await storage.setBirthData(savedBirthData);
-            }
+        const { storage } = require('../../services/storage');
+        
+        // First try single birth details
+        currentBirthData = await storage.getBirthDetails();
+        
+        // If no single birth details, get from profiles
+        if (!currentBirthData) {
+          const profiles = await storage.getBirthProfiles();
+          if (profiles && profiles.length > 0) {
+            currentBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
           }
-          
-          if (savedBirthData && savedBirthData.name) {
-            currentBirthData = savedBirthData;
-            // Don't override currentNativeData if it's already set from native selection
-            if (!currentNativeData) {
-              setCurrentNativeData(savedBirthData);
-            }
-          }
-        } catch (error) {
         }
       }
       
+      // Fallback to props if no native data
+      if (!currentBirthData) {
+        currentBirthData = birthData;
+      }
       
       if (currentBirthData) {
+        console.log('📊 Loading chart for:', currentBirthData.name, 'ID:', currentBirthData.id);
+        
         const formattedBirthData = {
           name: currentBirthData.name,
           date: currentBirthData.date.includes('T') ? currentBirthData.date.split('T')[0] : currentBirthData.date,
@@ -253,6 +273,8 @@ const loadHomeData = async () => {
           location: currentBirthData.place || 'Unknown'
         };
         
+        console.log('🚀 Calculating fresh chart with data:', formattedBirthData);
+        
         const [dashResponse, chartResponse] = await Promise.allSettled([
           chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
           chartAPI.calculateChartOnly(formattedBirthData)
@@ -260,14 +282,16 @@ const loadHomeData = async () => {
         
         if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
           setDashData(dashResponse.value.data);
+          console.log('✅ Dasha data loaded for:', currentBirthData.name);
         }
         
         if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
           setChartData(chartResponse.value.data);
-        } else {
+          console.log('✅ Chart data loaded for:', currentBirthData.name, 'Ascendant:', chartResponse.value.data.ascendant);
         }
       }
     } catch (error) {
+      console.error('❌ Error in loadHomeData:', error);
     } finally {
       setLoading(false);
     }
@@ -317,6 +341,12 @@ const loadHomeData = async () => {
   
   // Use current native data for display
   const displayData = currentNativeData || birthData;
+  
+  // Don't render if no birth data available
+  if (!displayData) {
+    return null;
+  }
+  
   const place = displayData?.place || `${displayData?.latitude}, ${displayData?.longitude}`;
   const time = displayData?.time || 'Unknown time';
 
@@ -416,6 +446,7 @@ const loadHomeData = async () => {
       description: 'Get insights about your personality, relationships, career, or any astrological topic',
       action: 'question'
     },
+
     {
       id: 'periods',
       icon: '🎯',
@@ -967,9 +998,11 @@ function OptionCard({ option, index, onOptionSelect }) {
     ]).start();
   }, []);
   
-  // Special gradient for Event Timeline
+  // Special gradients for different options
   const gradientColors = option.id === 'events' 
     ? ['#FFD700', '#FF8C00'] 
+    : option.id === 'ashtakvarga'
+    ? ['#9C27B0', '#E91E63']
     : ['#ff6b35', '#ff8c5a'];
   
   return (

@@ -347,12 +347,14 @@ export default function ChatScreen({ navigation, route }) {
       };
       
       const { chartAPI } = require('../../services/api');
-      // Use calculateChartOnly to avoid duplicate database entries
       const response = await chartAPI.calculateChartOnly(formattedData);
       setChartData(response.data);
 
     } catch (error) {
       console.error('Error loading chart data:', error);
+      if (error.response?.status === 503) {
+        console.log('⚠️ Server temporarily unavailable - chart data will load when server is back');
+      }
     } finally {
       setLoadingChart(false);
     }
@@ -381,6 +383,9 @@ export default function ChatScreen({ navigation, route }) {
       }
     } catch (error) {
       console.error('Error loading dasha data:', error);
+      if (error.response?.status === 503) {
+        console.log('⚠️ Server temporarily unavailable - dasha data will load when server is back');
+      }
     } finally {
       setLoadingDashas(false);
     }
@@ -586,6 +591,8 @@ export default function ChatScreen({ navigation, route }) {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
       navigation.navigate('EventScreen');
+    } else if (option.action === 'ashtakvarga') {
+      navigation.navigate('AshtakvargaOracle');
     } else if (option.action === 'muhurat') {
       navigation.navigate('MuhuratHub');
     } else if (option.action === 'analysis') {
@@ -643,51 +650,47 @@ export default function ChatScreen({ navigation, route }) {
 
   const checkBirthData = async () => {
     try {
-      const savedBirthData = await storage.getBirthDetails();
+      // First try to get single birth details
+      let selectedBirthData = await storage.getBirthDetails();
+      console.log('🔄 Single birth details:', selectedBirthData?.name, 'ID:', selectedBirthData?.id);
       
-      // Always fetch fresh data from database to avoid corruption
-      try {
-        const { chartAPI } = require('../../services/api');
-        const response = await chartAPI.getExistingCharts();
+      // If no single birth details, get from profiles
+      if (!selectedBirthData) {
+        const profiles = await storage.getBirthProfiles();
+        console.log('📋 Found profiles:', profiles?.length || 0);
         
-        if (response.data && response.data.charts && response.data.charts.length > 0) {
-          const firstChart = response.data.charts[0];
-          
-          // Convert database chart to birth data format with proper date/time handling
-          const birthDataFromChart = {
-            id: firstChart.id,
-            name: firstChart.name,
-            date: firstChart.date.includes('T') ? firstChart.date.split('T')[0] : firstChart.date,
-            time: firstChart.time.includes('T') ? firstChart.time.split('T')[1].slice(0, 5) : firstChart.time,
-            latitude: firstChart.latitude,
-            longitude: firstChart.longitude,
-            timezone: firstChart.timezone,
-            place: firstChart.place,
-            gender: firstChart.gender
-          };
-          
-          console.log('✅ Fresh birth data from database:', {
-            name: birthDataFromChart.name,
-            date: birthDataFromChart.date,
-            time: birthDataFromChart.time
-          });
-          
-          // Save corrected data to storage
-          await storage.setBirthDetails(birthDataFromChart);
-          setBirthData(birthDataFromChart);
-        } else {
-          setBirthData(null);
+        if (profiles && profiles.length > 0) {
+          // Use the first profile or find 'self' relation
+          selectedBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
+          console.log('📊 Using profile:', selectedBirthData?.name, 'ID:', selectedBirthData?.id);
+        }
+      }
+      
+      if (selectedBirthData && selectedBirthData.name) {
+        console.log('✅ Using birth data:', {
+          name: selectedBirthData.name,
+          id: selectedBirthData.id,
+          date: selectedBirthData.date,
+          time: selectedBirthData.time
+        });
+        setBirthData(selectedBirthData);
+      } else {
+        // Check if charts exist on server
+        try {
+          const { chartAPI } = require('../../services/api');
+          const response = await chartAPI.getExistingCharts();
+          if (response.data && response.data.charts && response.data.charts.length > 0) {
+            console.log('📊 Charts found on server, navigating to SelectNative');
+            navigation.navigate('SelectNative');
+          } else {
+            console.log('❌ No charts found, navigating to BirthForm');
+            navigation.navigate('BirthForm');
+          }
+        } catch (apiError) {
+          console.log('❌ API error, navigating to BirthForm');
           navigation.navigate('BirthForm');
         }
-      } catch (apiError) {
-        console.error('❌ Error loading charts from database:', apiError);
-        // Fallback to saved data if API fails
-        if (savedBirthData && savedBirthData.name) {
-          setBirthData(savedBirthData);
-        } else {
-          setBirthData(null);
-          navigation.navigate('BirthForm');
-        }
+        setBirthData(null);
       }
     } catch (error) {
       console.error('❌ Error checking birth data:', error);
@@ -1750,6 +1753,36 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={styles.menuText}>Dasha Browser</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('AshtakvargaOracle');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#9C27B0', '#E91E63']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>⊞</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Ashtakvarga</Text>
                       <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
                     </LinearGradient>
                   </TouchableOpacity>

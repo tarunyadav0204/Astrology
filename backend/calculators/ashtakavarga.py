@@ -127,8 +127,11 @@ class AshtakavargaCalculator:
             for sign, bindus in chart['bindus'].items():
                 sarva[sign] += bindus
         
+        # Convert keys to strings for consistent API response
+        sarva_str_keys = {str(k): v for k, v in sarva.items()}
+        
         return {
-            'sarvashtakavarga': sarva,
+            'sarvashtakavarga': sarva_str_keys,
             'total_bindus': sum(sarva.values()),
             'individual_charts': individual_charts
         }
@@ -148,8 +151,8 @@ class AshtakavargaCalculator:
         """Analyze Ashtakavarga for Lagna chart"""
         sarva = self.calculate_sarvashtakavarga()
         bindus = sarva['sarvashtakavarga']
-        strongest_sign = max(bindus, key=bindus.get)
-        weakest_sign = min(bindus, key=bindus.get)
+        strongest_sign = int(max(bindus, key=bindus.get))
+        weakest_sign = int(min(bindus, key=bindus.get))
         
         sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
@@ -169,102 +172,103 @@ class AshtakavargaCalculator:
         
         # Analyze each sign relative to ascendant
         for sign, count in bindus.items():
-            house_num = (sign - asc_sign) % 12
+            sign_num = int(sign) if isinstance(sign, str) else sign
+            house_num = (sign_num - asc_sign) % 12
             house_meaning = house_meanings[house_num]
             
             if count >= 30:
                 if house_num == 0:
-                    recommendations.append(f"Your {house_num + 1}st house ({sign_names[sign]}) has {count} bindus - Strong vitality and confidence. Good health and leadership abilities.")
+                    recommendations.append(f"Your {house_num + 1}st house ({sign_names[sign_num]}) has {count} bindus - Strong vitality and confidence. Good health and leadership abilities.")
                 elif house_num == 1:
-                    recommendations.append(f"Your {house_num + 1}nd house ({sign_names[sign]}) has {count} bindus - Strong financial potential. Good for wealth accumulation and family harmony.")
+                    recommendations.append(f"Your {house_num + 1}nd house ({sign_names[sign_num]}) has {count} bindus - Strong financial potential. Good for wealth accumulation and family harmony.")
                 elif house_num == 6:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong marriage prospects. Harmonious partnerships and business relationships.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong marriage prospects. Harmonious partnerships and business relationships.")
                 elif house_num == 9:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong career potential. Recognition, authority, and professional success.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong career potential. Recognition, authority, and professional success.")
                 elif house_num == 10:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Excellent for gains and friendships. Strong network and income potential.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Excellent for gains and friendships. Strong network and income potential.")
                 elif house_num == 11:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong spiritual inclination. Good for charitable giving and letting go of attachments.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong spiritual inclination. Good for charitable giving and letting go of attachments.")
                 elif house_num == 2:
-                    recommendations.append(f"Your {house_num + 1}rd house ({sign_names[sign]}) has {count} bindus - Excellent communication skills. Strong bonds with siblings.")
+                    recommendations.append(f"Your {house_num + 1}rd house ({sign_names[sign_num]}) has {count} bindus - Excellent communication skills. Strong bonds with siblings.")
                 elif house_num == 3:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong connection with home and mother. Good property prospects.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong connection with home and mother. Good property prospects.")
                 elif house_num == 4:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Excellent for education and children. Creative abilities.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Excellent for education and children. Creative abilities.")
                 elif house_num == 5:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Good health and ability to overcome obstacles.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Good health and ability to overcome obstacles.")
                 elif house_num == 7:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong transformative abilities. Good longevity.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong transformative abilities. Good longevity.")
                 elif house_num == 8:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong fortune and dharmic path. Good for higher learning.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong fortune and dharmic path. Good for higher learning.")
                 else:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Strong support for {house_meaning}.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Strong support for {house_meaning}.")
             elif count <= 25:
                 if house_num == 0:
-                    recommendations.append(f"Your {house_num + 1}st house ({sign_names[sign]}) has {count} bindus - Focus on health and self-care. Build confidence gradually.")
+                    recommendations.append(f"Your {house_num + 1}st house ({sign_names[sign_num]}) has {count} bindus - Focus on health and self-care. Build confidence gradually.")
                 elif house_num == 1:
-                    recommendations.append(f"Your {house_num + 1}nd house ({sign_names[sign]}) has {count} bindus - Be careful with finances. Plan investments wisely.")
+                    recommendations.append(f"Your {house_num + 1}nd house ({sign_names[sign_num]}) has {count} bindus - Be careful with finances. Plan investments wisely.")
                 elif house_num == 2:
-                    recommendations.append(f"Your {house_num + 1}rd house ({sign_names[sign]}) has {count} bindus - Work on communication skills. Strengthen sibling relationships.")
+                    recommendations.append(f"Your {house_num + 1}rd house ({sign_names[sign_num]}) has {count} bindus - Work on communication skills. Strengthen sibling relationships.")
                 elif house_num == 3:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Focus on home harmony. Be patient with mother's health.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Focus on home harmony. Be patient with mother's health.")
                 elif house_num == 4:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Education may need extra effort. Be patient with children.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Education may need extra effort. Be patient with children.")
                 elif house_num == 5:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Focus on health maintenance. Avoid unnecessary conflicts.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Focus on health maintenance. Avoid unnecessary conflicts.")
                 elif house_num == 6:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Marriage may need extra effort. Work on relationship skills.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Marriage may need extra effort. Work on relationship skills.")
                 elif house_num == 7:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Be prepared for life changes. Focus on inner strength.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Be prepared for life changes. Focus on inner strength.")
                 elif house_num == 8:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Develop spiritual practices. Be patient with fortune.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Develop spiritual practices. Be patient with fortune.")
                 elif house_num == 9:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Career growth requires patience. Build skills steadily.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Career growth requires patience. Build skills steadily.")
                 elif house_num == 10:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Focus on building genuine friendships. Be cautious with investments.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Focus on building genuine friendships. Be cautious with investments.")
                 elif house_num == 11:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Control unnecessary expenses. Develop spiritual practices for inner peace.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Control unnecessary expenses. Develop spiritual practices for inner peace.")
                 else:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - {house_meaning.title()} may need extra attention.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - {house_meaning.title()} may need extra attention.")
             else:
                 # Average strength houses (26-29 bindus)
                 if house_num == 0:
-                    recommendations.append(f"Your {house_num + 1}st house ({sign_names[sign]}) has {count} bindus - Moderate health and confidence. Maintain good habits.")
+                    recommendations.append(f"Your {house_num + 1}st house ({sign_names[sign_num]}) has {count} bindus - Moderate health and confidence. Maintain good habits.")
                 elif house_num == 1:
-                    recommendations.append(f"Your {house_num + 1}nd house ({sign_names[sign]}) has {count} bindus - Steady financial growth. Balance saving and spending.")
+                    recommendations.append(f"Your {house_num + 1}nd house ({sign_names[sign_num]}) has {count} bindus - Steady financial growth. Balance saving and spending.")
                 elif house_num == 2:
-                    recommendations.append(f"Your {house_num + 1}rd house ({sign_names[sign]}) has {count} bindus - Good communication abilities. Keep nurturing sibling bonds.")
+                    recommendations.append(f"Your {house_num + 1}rd house ({sign_names[sign_num]}) has {count} bindus - Good communication abilities. Keep nurturing sibling bonds.")
                 elif house_num == 3:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Stable home environment. Maintain family connections.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Stable home environment. Maintain family connections.")
                 elif house_num == 4:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Steady progress in education. Good relationship with children.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Steady progress in education. Good relationship with children.")
                 elif house_num == 5:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Moderate health. Handle conflicts diplomatically.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Moderate health. Handle conflicts diplomatically.")
                 elif house_num == 6:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Stable relationships. Work on deeper connections.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Stable relationships. Work on deeper connections.")
                 elif house_num == 7:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Gradual transformation. Embrace change positively.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Gradual transformation. Embrace change positively.")
                 elif house_num == 8:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Steady fortune. Continue dharmic practices.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Steady fortune. Continue dharmic practices.")
                 elif house_num == 9:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Consistent career progress. Keep building reputation.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Consistent career progress. Keep building reputation.")
                 elif house_num == 10:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Moderate gains. Maintain good friendships.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Moderate gains. Maintain good friendships.")
                 elif house_num == 11:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Balanced expenses. Continue spiritual practices.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Balanced expenses. Continue spiritual practices.")
                 else:
-                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign]}) has {count} bindus - Moderate support for {house_meaning}.")
+                    recommendations.append(f"Your {house_num + 1}th house ({sign_names[sign_num]}) has {count} bindus - Moderate support for {house_meaning}.")
         
         return {
             'strongest_sign': {
                 'sign': strongest_sign,
                 'name': sign_names[strongest_sign],
-                'bindus': bindus[strongest_sign]
+                'bindus': bindus[str(strongest_sign)]
             },
             'weakest_sign': {
                 'sign': weakest_sign,
                 'name': sign_names[weakest_sign],
-                'bindus': bindus[weakest_sign]
+                'bindus': bindus[str(weakest_sign)]
             },
             'recommendations': recommendations
         }
@@ -286,17 +290,20 @@ class AshtakavargaCalculator:
             jupiter_sign = self.planets['Jupiter']['sign']
         
         recommendations = []
-        if bindus[venus_sign] >= 28:
-            recommendations.append(f"Venus in {sign_names[venus_sign]} has {bindus[venus_sign]} bindus - Excellent marriage compatibility and romantic happiness.")
-        elif bindus[venus_sign] >= 25:
-            recommendations.append(f"Venus in {sign_names[venus_sign]} has {bindus[venus_sign]} bindus - Good marriage prospects with some adjustments needed.")
+        venus_bindus = bindus[str(venus_sign)]
+        jupiter_bindus = bindus[str(jupiter_sign)]
+        
+        if venus_bindus >= 28:
+            recommendations.append(f"Venus in {sign_names[venus_sign]} has {venus_bindus} bindus - Excellent marriage compatibility and romantic happiness.")
+        elif venus_bindus >= 25:
+            recommendations.append(f"Venus in {sign_names[venus_sign]} has {venus_bindus} bindus - Good marriage prospects with some adjustments needed.")
         else:
-            recommendations.append(f"Venus in {sign_names[venus_sign]} has {bindus[venus_sign]} bindus - Marriage requires patience and understanding.")
+            recommendations.append(f"Venus in {sign_names[venus_sign]} has {venus_bindus} bindus - Marriage requires patience and understanding.")
             
-        if bindus[jupiter_sign] >= 28:
-            recommendations.append(f"Jupiter in {sign_names[jupiter_sign]} has {bindus[jupiter_sign]} bindus - Strong spiritual growth and wisdom development.")
+        if jupiter_bindus >= 28:
+            recommendations.append(f"Jupiter in {sign_names[jupiter_sign]} has {jupiter_bindus} bindus - Strong spiritual growth and wisdom development.")
         else:
-            recommendations.append(f"Jupiter in {sign_names[jupiter_sign]} has {bindus[jupiter_sign]} bindus - Spiritual progress through dedicated practice.")
+            recommendations.append(f"Jupiter in {sign_names[jupiter_sign]} has {jupiter_bindus} bindus - Spiritual progress through dedicated practice.")
         
         return {
             'focus': 'Marriage and spiritual growth',
@@ -312,8 +319,8 @@ class AshtakavargaCalculator:
                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
         
         # Find best timing signs
-        best_signs = [sign for sign, count in bindus.items() if count >= 30]
-        avoid_signs = [sign for sign, count in bindus.items() if count <= 25]
+        best_signs = [int(sign) for sign, count in bindus.items() if count >= 30]
+        avoid_signs = [int(sign) for sign, count in bindus.items() if count <= 25]
         
         recommendations = []
         if best_signs:
@@ -340,3 +347,159 @@ class AshtakavargaCalculator:
             'analysis': f'Your chart has {strong_count} areas of natural strength and {weak_count} areas needing attention',
             'recommendations': [f"Focus on developing your {strong_count} strong areas while gradually improving the {weak_count} weaker areas through conscious effort."]
         }
+    
+    def generate_life_predictions(self, dasha_data, transit_data):
+        """Generate life predictions using Vinay Aditya's 'Dots of Destiny' methodology via Gemini AI"""
+        try:
+            import google.generativeai as genai
+            import os
+            import json
+            
+            # Configure Gemini
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                return {"error": "Gemini API key not configured"}
+            
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            
+            # Prepare comprehensive data payload
+            sarva = self.calculate_sarvashtakavarga()
+            bindus = sarva['sarvashtakavarga']
+            individual_charts = sarva['individual_charts']
+            
+            # Build complete data package
+            data_payload = {
+                "birth_data": {
+                    "name": self.birth_data.name,
+                    "date": self.birth_data.date,
+                    "time": self.birth_data.time,
+                    "place": getattr(self.birth_data, 'place', '')
+                },
+                "natal_chart": {
+                    "ascendant": self.chart_data['ascendant'],
+                    "planets": self.chart_data['planets']
+                },
+                "sarvashtakavarga": bindus,
+                "bhinnashtakavarga": individual_charts,
+                "current_dashas": dasha_data,
+                "current_transits": transit_data,
+                "analysis_date": self._get_current_date()
+            }
+            
+            # Create Vinay Aditya methodology prompt
+            prompt = f"""
+Role: You are an expert Vedic Astrologer specializing in the Ashtakavarga system, specifically applying the principles from Vinay Aditya's book "Dots of Destiny: Applications of Ashtakavarga" and the teachings of K.N. Rao.
+
+Task: Analyze the provided JSON data to make predictions for the user's current life phase.
+
+Methodology:
+
+1. Sarvashtakavarga (SAV) Analysis: Identify "Strong" signs (>30 points) and "Weak" signs (<25 points) as defined in Dots of Destiny.
+
+2. Transit Logic (The Trigger):
+   - Saturn: Analyze Saturn's current transit. If it is in a sign with low SAV points (<25), predict a period of struggle or karmic settlement. If >30, predict structural growth.
+   - Jupiter: If Jupiter transits a high-point sign (>30), predict expansion and opportunity.
+
+3. Dasha Synthesis: Weight the Dasha Lord's results based on the Ashtakavarga strength of its natal house.
+
+4. Kakshya Analysis (Prastar): If precise planetary degrees are available, check which Kakshya (orbital zone) Saturn and Jupiter are transiting. If they transit a Kakshya with a Bindu, predict immediate results (as per Vinay Aditya's Prastar rules).
+
+Data:
+{json.dumps(data_payload, indent=2)}
+
+Provide predictions in this JSON format:
+{{
+  "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
+  "current_life_phase": "Brief description of current phase",
+  "sav_strength_analysis": {{
+    "strong_areas": ["List of strong life areas"],
+    "challenging_areas": ["List of areas needing attention"],
+    "overall_pattern": "Overall life pattern interpretation"
+  }},
+  "transit_predictions": {{
+    "saturn_influence": "Saturn's current impact",
+    "jupiter_influence": "Jupiter's current impact",
+    "timing_recommendations": ["Specific timing advice"]
+  }},
+  "dasha_analysis": {{
+    "current_period_strength": "Strength of current dasha lord",
+    "expected_results": "What to expect in current dasha",
+    "recommendations": ["Specific recommendations"]
+  }},
+  "life_predictions": {{
+    "next_6_months": "Predictions for next 6 months",
+    "next_year": "Predictions for next year",
+    "major_themes": ["Key life themes to focus on"]
+  }},
+  "remedial_measures": ["Specific remedies based on weak Ashtakavarga areas"]
+}}
+"""
+            
+            # Generate predictions with error logging
+            print(f"🔮 Calling Gemini API for life predictions...")
+            print(f"📊 Prompt length: {len(prompt)} characters")
+            print(f"🎯 Model: gemini-2.5-flash")
+            print(f"📤 REQUEST PROMPT:\n{prompt[:1000]}...")
+            
+            response = model.generate_content(prompt)
+            
+            print(f"✅ Gemini API call successful")
+            print(f"📝 Response length: {len(response.text) if response and response.text else 0} characters")
+            print(f"📥 RESPONSE TEXT:\n{response.text[:1000] if response and response.text else 'No response'}...")
+            
+            # Parse JSON response
+            try:
+                # Extract JSON from response
+                response_text = response.text
+                # Find JSON block in response
+                start_idx = response_text.find('{')
+                end_idx = response_text.rfind('}') + 1
+                
+                if start_idx != -1 and end_idx != -1:
+                    json_str = response_text[start_idx:end_idx]
+                    predictions = json.loads(json_str)
+                else:
+                    print(f"⚠️ JSON parsing failed - no valid JSON block found")
+                    print(f"📄 Full response: {response_text}")
+                    predictions = {
+                        "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
+                        "raw_response": response_text,
+                        "note": "AI response received but JSON parsing failed"
+                    }
+            except json.JSONDecodeError as je:
+                print(f"⚠️ JSON decode error: {str(je)}")
+                print(f"📄 JSON string attempted: {json_str[:500] if 'json_str' in locals() else 'N/A'}...")
+                predictions = {
+                    "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
+                    "raw_response": response.text,
+                    "note": "AI response received but JSON parsing failed"
+                }
+            
+            return predictions
+            
+        except Exception as e:
+            print(f"❌ Gemini API error: {type(e).__name__}: {str(e)}")
+            import traceback
+            print(f"🔍 Full traceback: {traceback.format_exc()}")
+            
+            # Specific error handling
+            if "quota" in str(e).lower() or "rate limit" in str(e).lower():
+                error_msg = "API quota exceeded. Please try again later."
+            elif "api key" in str(e).lower() or "authentication" in str(e).lower():
+                error_msg = "API authentication failed. Please check configuration."
+            elif "model" in str(e).lower() or "not found" in str(e).lower():
+                error_msg = f"Model gemini-2.5-flash not available: {str(e)}"
+            else:
+                error_msg = f"Gemini prediction generation failed: {str(e)}"
+            
+            return {
+                "error": error_msg,
+                "methodology": "Based on Vinay Aditya's 'Dots of Destiny: Applications of Ashtakavarga' and K.N. Rao's teachings",
+                "error_type": type(e).__name__
+            }
+    
+    def _get_current_date(self):
+        """Get current date for analysis"""
+        from datetime import datetime
+        return datetime.now().strftime('%Y-%m-%d')

@@ -22,6 +22,7 @@ import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
 import MuhuratHubScreen from './src/components/MuhuratHubScreen';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
+import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -46,8 +47,14 @@ export default function App() {
           const response = await chartAPI.getExistingCharts();
           
           if (response.data && response.data.charts && response.data.charts.length > 0) {
-            // User has charts, go to Home with greeting
-            setInitialRoute('Home');
+            // User has charts, check if one is selected in local storage
+            const localBirthData = await storage.getBirthDetails();
+            if (localBirthData) {
+              setInitialRoute('Home');
+            } else {
+              // Charts exist but none selected, go to SelectNative
+              setInitialRoute('SelectNative');
+            }
           } else {
             // User has no charts, go to BirthForm
             setInitialRoute('BirthForm');
@@ -184,6 +191,11 @@ export default function App() {
           <Stack.Screen 
             name="EventScreen" 
             component={EventScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AshtakvargaOracle" 
+            component={AshtakvargaOracle}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

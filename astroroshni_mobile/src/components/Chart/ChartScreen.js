@@ -120,6 +120,16 @@ export default function ChartScreen({ navigation, route }) {
     startAnimations();
   }, []);
   
+  // Add focus effect to reload data when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('📊 ChartScreen focused - reloading birth data');
+      loadBirthData();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
+  
   const startAnimations = () => {
     Animated.loop(
       Animated.timing(rotateAnim, {
@@ -139,20 +149,29 @@ export default function ChartScreen({ navigation, route }) {
     try {
       setLoading(true);
       
-      // Use navigation params if provided, otherwise use storage
-      const paramsBirthData = route?.params?.birthData;
-      let data;
-      
-      if (paramsBirthData && paramsBirthData.name) {
-        data = paramsBirthData;
-      } else {
-        data = await storage.getBirthDetails();
-      }
+      // Get fresh data from storage
+      const data = await storage.getBirthDetails();
+      console.log('📊 ChartScreen loading data for:', data?.name, 'ID:', data?.id);
       
       if (data && data.name) {
         setBirthData(data);
-        await preloadAllCharts(data);
+        
+        // Calculate fresh chart directly without any caching
+        const formattedData = {
+          name: data.name,
+          date: typeof data.date === 'string' ? data.date.split('T')[0] : data.date,
+          time: typeof data.time === 'string' ? data.time.split('T')[1]?.slice(0, 5) || data.time : data.time,
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
+          timezone: data.timezone || 'Asia/Kolkata'
+        };
+        
+        console.log('🚀 Calculating chart for ID:', data.id, 'Name:', data.name);
+        const response = await chartAPI.calculateChartOnly(formattedData);
+        setChartData(response.data);
+        console.log('✅ Chart calculated - Ascendant:', response.data.ascendant);
       } else {
+        console.log('⚠️ No birth data found in storage');
       }
     } catch (error) {
       console.error('ChartScreen - Error loading birth data:', error);

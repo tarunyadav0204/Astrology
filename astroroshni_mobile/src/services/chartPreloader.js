@@ -89,7 +89,7 @@ class ChartPreloader {
   }
 
   _getCacheKey(birthData) {
-    return `${birthData.name}_${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+    return `${birthData.id || birthData.name}_${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
   }
 
   async _waitForLoading(cacheKey) {
