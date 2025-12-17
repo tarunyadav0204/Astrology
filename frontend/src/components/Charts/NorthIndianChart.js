@@ -625,6 +625,22 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
               {rashiIndex + 1}
             </text>
             
+            {/* Ascendant marker for house 1 */}
+            {houseNumber === 1 && (
+              <g>
+                <text x={houseData.center.x + 25} y={houseData.center.y + 45} 
+                      fontSize="12" fill="#e91e63" fontWeight="900" textAnchor="middle">
+                  ASC
+                </text>
+                {chartData.ascendant && (
+                  <text x={houseData.center.x + 25} y={houseData.center.y + 60} 
+                        fontSize="8" fill="#666" fontWeight="500" textAnchor="middle">
+                    {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                  </text>
+                )}
+              </g>
+            )}
+            
 
             {/* Planets */}
             {planetsInHouse.map((planet, pIndex) => {

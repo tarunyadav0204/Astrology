@@ -14,7 +14,7 @@ import HouseAnalysisTab from '../HouseAnalysisTab/HouseAnalysisTab';
 import MarriageAnalysisTab from '../MarriageAnalysis/MarriageAnalysisTab';
 import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
 import NadiTab from '../Nadi/NadiTab';
-
+import DashaBrowser from '../DashaBrowser/DashaBrowser';
 
 import ClassicalPrediction from '../ClassicalPrediction/ClassicalPrediction';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
@@ -364,6 +364,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
       }}>
         {[
           { id: 'dashboard', label: '🕉️ Parashara', icon: '🕉️' },
+          { id: 'dashas', label: '⏰ Dasha Browser', icon: '⏰' },
           { id: 'nadi', label: '🔍 Nadi', icon: '🔍' },
           { id: 'marriage', label: '💍 Marriage', icon: '💍' },
           { id: 'health', label: '🏥 Health', icon: '🏥' },
@@ -775,8 +776,8 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
             boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
           }}>
             {activeTab === 'classical' && <ClassicalPrediction birthData={birthData} />}
+            {activeTab === 'dashas' && <DashaBrowser birthData={birthData} chartData={chartData} />}
             {activeTab === 'nadi' && <NadiTab birthData={birthData} transitDate={transitDate} onTransitDateChange={handleTransitDateChange} selectedDashas={selectedDashas} onDashaSelection={handleDashaSelection} />}
-
             {activeTab === 'marriage' && <MarriageAnalysisTab chartData={chartData} birthDetails={birthData} />}
             {activeTab === 'health' && <CompleteHealthAnalysisTab chartData={chartData} birthDetails={birthData} />}
             {activeTab === 'nakshatras' && <NakshatrasTab chartData={chartData} birthData={birthData} />}

@@ -173,7 +173,7 @@ const ChartSelector = ({ onSelectChart, onCreateNew, onLogout, onAdminClick, use
   const selectChart = async (chart) => {
     try {
       setLoading(true);
-      const chartData = await apiService.calculateChart({
+      const chartData = await apiService.calculateChartOnly({
         name: chart.name,
         date: chart.date,
         time: chart.time,

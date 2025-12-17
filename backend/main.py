@@ -3970,13 +3970,19 @@ async def calculate_kalchakra_dasha(request: dict):
             'timezone_offset': timezone_offset
         }
         
+        # Parse target date if provided
+        target_date = None
+        if request.get('target_date'):
+            from datetime import datetime as dt
+            target_date = dt.strptime(request['target_date'], '%Y-%m-%d')
+        
         # Initialize Swiss Ephemeris first
         import swisseph as swe
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         
         # Initialize calculator and compute
         calculator = BPHSKalachakraCalculator()
-        kalchakra_data = calculator.calculate_kalchakra_dasha(birth_dict)
+        kalchakra_data = calculator.calculate_kalchakra_dasha(birth_dict, target_date)
         
         if 'error' in kalchakra_data:
             return kalchakra_data

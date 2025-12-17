@@ -1,0 +1,818 @@
+.dasha-browser {
+  padding: 2rem;
+  max-width: 95vw;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dasha-browser-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* Integrated Header */
+.integrated-header {
+  display: flex;
+  background: linear-gradient(135deg, #ffffff 0%, #fef7f0 100%);
+  border: 2px solid #f97316;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 0 auto 2rem auto;
+  box-shadow: 0 12px 48px rgba(249, 115, 22, 0.2);
+  width: 90vw;
+  min-height: 100px;
+  flex-wrap: nowrap;
+}
+
+.nav-section {
+  flex: 0 0 35%;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-right: 1px solid rgba(249, 115, 22, 0.2);
+  background: rgba(249, 115, 22, 0.02);
+}
+
+.dasha-section {
+  flex: 0 0 45%;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.tabs-section {
+  flex: 0 0 20%;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-left: 1px solid rgba(249, 115, 22, 0.2);
+  background: rgba(249, 115, 22, 0.02);
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.nav-btn {
+  padding: 0.6rem 0.8rem;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid #f97316;
+  border-radius: 0;
+  color: #f97316;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.85rem;
+  min-width: 45px;
+}
+
+.nav-btn:hover {
+  background: #f97316;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.date-display {
+  display: flex;
+  justify-content: center;
+}
+
+.today-btn {
+  padding: 0.6rem 0.8rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  border: none;
+  border-radius: 0;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+  white-space: nowrap;
+}
+
+.today-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+}
+
+/* Dasha Tabs */
+.dasha-tabs {
+  display: flex;
+  background: linear-gradient(135deg, #ffffff 0%, #fef7f0 100%);
+  border-radius: 16px;
+  padding: 1rem;
+  margin: 0 auto 2rem auto;
+  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.15);
+  border: 2px solid #f97316;
+  width: 100%;
+  max-width: 800px;
+  gap: 1rem;
+}
+
+.dasha-tab {
+  padding: 0.8rem 1rem;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 0;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #6b7280;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.dasha-tab.active {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  border-color: #ea580c;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
+.dasha-tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dasha-tab:not(:disabled):hover {
+  background: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+  transform: translateY(-1px);
+}
+
+.dasha-tab.active:hover {
+  background: #ea580c;
+  color: white;
+}
+
+/* Tab Content */
+.dasha-content {
+  min-height: 500px;
+  width: 100%;
+  max-width: 90vw;
+  display: flex;
+  justify-content: center;
+}
+
+/* Vimshottari Tab */
+.vimshottari-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+  width: 100%;
+  max-width: 90vw;
+}
+
+.vimshottari-loading, .vimshottari-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #fef7f0;
+  border-top: 4px solid #f97316;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.retry-btn {
+  padding: 0.8rem 1.5rem;
+  background: #f97316;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retry-btn:hover {
+  background: #ea580c;
+}
+
+/* Current Status Card */
+.current-status-card {
+  background: linear-gradient(135deg, #fef7f0 0%, #fed7d7 100%);
+  border-radius: 20px;
+  padding: 2rem;
+  border: 2px solid #f97316;
+  box-shadow: 0 12px 40px rgba(249, 115, 22, 0.2);
+  margin: 0 auto 2rem auto;
+  width: 100%;
+  max-width: 90vw;
+}
+
+.status-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #f97316;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.status-subtitle {
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-dates {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin: 0.8rem 0;
+}
+
+.progress-container {
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  height: 12px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f97316, #ea580c);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-align: center;
+}
+
+.current-dasha-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.current-dasha-chain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.current-dasha-planet {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+  white-space: nowrap;
+  margin: 0.3rem;
+}
+
+.dasha-arrow {
+  font-size: 1.2rem;
+  color: #f97316;
+  font-weight: 700;
+}
+
+/* Dasha Levels */
+.dasha-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.dasha-level {
+  background: linear-gradient(135deg, #ffffff 0%, #fefcfb 100%);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.1);
+  border: 2px solid #fed7d7;
+  width: 100%;
+  max-width: 90vw;
+  margin: 0 auto;
+}
+
+.dasha-level-title {
+  margin: 0 0 1rem 0;
+  color: #1a1a1a;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #fef7f0;
+}
+
+.dasha-cards {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: #f97316 #fef7f0;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+.dasha-cards::-webkit-scrollbar {
+  height: 6px;
+}
+
+.dasha-cards::-webkit-scrollbar-track {
+  background: #fef7f0;
+  border-radius: 3px;
+}
+
+.dasha-cards::-webkit-scrollbar-thumb {
+  background: #f97316;
+  border-radius: 3px;
+}
+
+.dasha-card {
+  min-width: 160px;
+  width: 160px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #fefcfb 0%, #fef7f0 100%);
+  border: 2px solid #fed7d7;
+  border-radius: 14px;
+  padding: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.08);
+}
+
+.dasha-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.25);
+  border-color: #f97316;
+}
+
+.dasha-card.selected {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border-color: #ea580c;
+  color: white;
+  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.4);
+}
+
+.dasha-card.current {
+  background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+  border-color: #dc2626;
+  color: white;
+  box-shadow: 0 8px 32px rgba(234, 88, 12, 0.5);
+}
+
+.dasha-planet {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.3rem;
+}
+
+.dasha-period {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  opacity: 0.9;
+}
+
+.dasha-dates {
+  font-size: 0.65rem;
+  opacity: 0.8;
+  line-height: 1.1;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.dasha-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 0 0 10px 10px;
+}
+
+.dasha-progress-fill {
+  height: 100%;
+  background: #fbbf24;
+  border-radius: 0 0 10px 10px;
+  transition: width 0.3s ease;
+}
+
+/* Kalachakra Specific Styles */
+.kalachakra-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+  width: 100%;
+  max-width: 90vw;
+}
+
+.system-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  justify-content: center;
+}
+
+.toggle-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid #9c27b0;
+  background: transparent;
+  color: #9c27b0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.toggle-btn.active {
+  background: #9c27b0;
+  color: white;
+}
+
+.kalachakra-pillars {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.pillar {
+  text-align: center;
+  flex: 1;
+  padding: 0.5rem;
+}
+
+.pillar-center {
+  text-align: center;
+  flex: 1;
+  border-left: 1px solid #9c27b0;
+  border-right: 1px solid #9c27b0;
+  padding: 0.5rem 1.5rem;
+}
+
+.pillar-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.pillar-value {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #9c27b0;
+  margin-top: 0.25rem;
+}
+
+.direction {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #9c27b0;
+}
+
+.cycle {
+  display: block;
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.system-badge {
+  background: #9c27b0;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.gati-indicator {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.gati-badge {
+  background: #673ab7;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.gati-icon {
+  font-size: 1.2rem;
+  margin-left: 0.25rem;
+}
+
+.lord {
+  font-size: 0.75rem;
+  color: #666;
+  margin-left: 0.5rem;
+}
+
+.kalachakra-loading,
+.kalachakra-error {
+  text-align: center;
+  padding: 2rem;
+}
+
+.kalachakra-error p {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.current-dasha-inline .kalachakra-pillars {
+  margin: 0;
+  padding: 1rem;
+  font-size: 0.8rem;
+  gap: 0.8rem;
+}
+
+.current-dasha-inline .pillar-value {
+  font-size: 0.9rem;
+}
+
+.current-dasha-inline .gati-indicator {
+  margin: 0;
+}
+
+.section {
+  background: linear-gradient(135deg, #ffffff 0%, #fefcfb 100%);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.1);
+  border: 2px solid #fed7d7;
+  width: 100%;
+  max-width: 90vw;
+  margin: 0 auto;
+}
+
+.section h4 {
+  margin: 0 0 1rem 0;
+  color: #1a1a1a;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #fef7f0;
+}
+
+.maha-scroll,
+.antar-scroll {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: #9c27b0 #f3e5f5;
+}
+
+.maha-scroll::-webkit-scrollbar,
+.antar-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.maha-scroll::-webkit-scrollbar-track,
+.antar-scroll::-webkit-scrollbar-track {
+  background: #f3e5f5;
+  border-radius: 3px;
+}
+
+.maha-scroll::-webkit-scrollbar-thumb,
+.antar-scroll::-webkit-scrollbar-thumb {
+  background: #9c27b0;
+  border-radius: 3px;
+}
+
+.maha-chip,
+.antar-chip {
+  min-width: 120px;
+  background: linear-gradient(135deg, #fefcfb 0%, #f3e5f5 100%);
+  border: 2px solid #e1bee7;
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(156, 39, 176, 0.08);
+}
+
+.maha-chip:hover,
+.antar-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(156, 39, 176, 0.2);
+  border-color: #9c27b0;
+}
+
+.maha-chip.selected {
+  background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
+  border-color: #7b1fa2;
+  color: white;
+}
+
+.maha-chip.current,
+.antar-chip.current {
+  background: linear-gradient(135deg, #673ab7 0%, #512da8 100%);
+  border-color: #512da8;
+  color: white;
+}
+
+.chip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.sign-name,
+.antar-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.chip-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.years,
+.antar-duration {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.chip-dates,
+.antar-dates {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* Yogini Specific Styles */
+.yogini-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+  width: 100%;
+  max-width: 90vw;
+}
+
+.yogini-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.yogini-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -1.2rem -1.2rem 0.8rem -1.2rem;
+  border-radius: 14px 14px 0 0;
+}
+
+.yogini-icon {
+  font-size: 1.2rem;
+  color: white;
+}
+
+.yogini-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0.3rem 0;
+}
+
+.yogini-loading,
+.yogini-error {
+  text-align: center;
+  padding: 2rem;
+}
+
+.yogini-error p {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.dasha-level-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.scroll-arrows {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.scroll-arrow {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #8E2DE2;
+  background: white;
+  color: #8E2DE2;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.scroll-arrow:hover {
+  background: #8E2DE2;
+  color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .integrated-header {
+    flex-direction: column;
+  }
+  
+  .nav-section, .dasha-section, .tabs-section {
+    flex: none;
+    border: none;
+    border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+  }
+  
+  .tabs-section {
+    border-bottom: none;
+  }
+  
+  .dasha-browser {
+    padding: 0.5rem;
+  }
+  
+  .dasha-cards {
+    gap: 0.5rem;
+  }
+  
+  .dasha-card {
+    min-width: 100px;
+    padding: 0.6rem;
+  }
+  
+  .kalachakra-pillars {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .pillar-center {
+    border: none;
+    border-top: 1px solid #9c27b0;
+    border-bottom: 1px solid #9c27b0;
+    padding: 0.5rem 0;
+  }
+}

@@ -158,6 +158,11 @@ export const apiService = {
     return response.data;
   },
   
+  calculateChartOnly: async (birthData, nodeType = 'mean') => {
+    const response = await apiClient.post(`${getEndpoint('/calculate-chart-only')}?node_type=${nodeType}`, birthData);
+    return response.data;
+  },
+  
   calculateTransits: async (transitRequest) => {
     const response = await apiClient.post(getEndpoint('/calculate-transits'), transitRequest);
     return response.data;

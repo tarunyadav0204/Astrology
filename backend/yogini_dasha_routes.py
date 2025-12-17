@@ -13,6 +13,7 @@ class YoginiDashaRequest(BaseModel):
     longitude: float
     timezone: str
     years: Optional[int] = 5
+    target_date: Optional[str] = None
 
 @router.post("/yogini-dasha")
 async def get_yogini_dasha(request: YoginiDashaRequest):
@@ -44,7 +45,12 @@ async def get_yogini_dasha(request: YoginiDashaRequest):
             'timezone': request.timezone
         }
         
-        current_yogini = yogini_calc.calculate_current_yogini(birth_data, moon_lon)
+        # Parse target date if provided
+        target_date = None
+        if request.target_date:
+            target_date = datetime.strptime(request.target_date, '%Y-%m-%d')
+        
+        current_yogini = yogini_calc.calculate_current_yogini(birth_data, moon_lon, target_date)
         
         # Get full lifetime timeline (120 years default)
         timeline = yogini_calc.get_full_timeline(birth_data, moon_lon)
@@ -70,7 +76,7 @@ async def get_yogini_dasha(request: YoginiDashaRequest):
         # Calculate progress percentage for current Antardasha
         ad_start = datetime.strptime(current_yogini['antardasha']['start'], '%Y-%m-%d')
         ad_end = datetime.strptime(current_yogini['antardasha']['end'], '%Y-%m-%d')
-        now = datetime.now()
+        now = target_date if target_date else datetime.now()
         
         total_days = (ad_end - ad_start).days
         elapsed_days = (now - ad_start).days

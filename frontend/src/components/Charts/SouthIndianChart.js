@@ -532,6 +532,22 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                   {houseNumber}
                 </text>
                 
+                {/* Ascendant marker for house 1 */}
+                {houseNumber === 1 && (
+                  <g>
+                    <text x={pos.x + pos.width - 8} y={pos.y + pos.height - 20} 
+                          fontSize="9" fill="#e91e63" fontWeight="900" textAnchor="end">
+                      ASC
+                    </text>
+                    {chartData.ascendant && (
+                      <text x={pos.x + pos.width - 8} y={pos.y + pos.height - 8} 
+                            fontSize="7" fill="#666" fontWeight="500" textAnchor="end">
+                        {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                      </text>
+                    )}
+                  </g>
+                )}
+                
                 {/* Sign name */}
                 <text x={pos.x + pos.width - 8} y={pos.y + 18} 
                       fontSize="10" fill="#666"
