@@ -10,13 +10,15 @@ import { useCredits } from '../../context/CreditContext';
 import { showToast } from '../../utils/toast';
 import CreditsModal from '../Credits/CreditsModal';
 import ContextModal from './ContextModal';
+import PartnerChartModal from './PartnerChartModal';
+import ChatPartnerSelector from './ChatPartnerSelector';
 import { apiService } from '../../services/apiService';
 
 import './ChatModal.css';
 
 const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: parentChartRefClick }) => {
     const { birthData, setBirthData } = useAstrology();
-    const { credits, chatCost, fetchBalance } = useCredits();
+    const { credits, chatCost, partnershipCost, fetchBalance } = useCredits();
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +34,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [isPremiumMode, setIsPremiumMode] = useState(false);
     const [pendingMessages, setPendingMessages] = useState(new Set());
     const [currentPersonId, setCurrentPersonId] = useState(null);
+    const [isPartnershipMode, setIsPartnershipMode] = useState(false);
+    const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
+    const [showPartnerModal, setShowPartnerModal] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [showChatPartnerSelector, setShowChatPartnerSelector] = useState(false);
     
     // Check admin status
     useEffect(() => {
@@ -411,12 +418,17 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const createSession = async () => {
         try {
             const token = localStorage.getItem('token');
+            const birth_chart_id = birthData?.id;
+            
             const response = await fetch('/api/chat-v2/session', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({
+                    birth_chart_id: birth_chart_id || null
+                })
             });
             
             if (response.ok) {
@@ -476,6 +488,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 language,
                 response_style: responseStyle,
                 premium_analysis: options.premium_analysis || false,
+                partnership_mode: isPartnershipMode,
                 birth_details: {
                     name: birthData.name,
                     date: birthData.date,
@@ -487,6 +500,17 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     gender: birthData.gender || ''
                 }
             };
+            
+            if (isPartnershipMode && selectedPartnerChart) {
+                requestData.partner_name = selectedPartnerChart.name;
+                requestData.partner_date = typeof selectedPartnerChart.date === 'string' ? selectedPartnerChart.date.split('T')[0] : selectedPartnerChart.date;
+                requestData.partner_time = typeof selectedPartnerChart.time === 'string' ? selectedPartnerChart.time.split('T')[1]?.slice(0, 5) || selectedPartnerChart.time : selectedPartnerChart.time;
+                requestData.partner_place = selectedPartnerChart.place || '';
+                requestData.partner_latitude = parseFloat(selectedPartnerChart.latitude);
+                requestData.partner_longitude = parseFloat(selectedPartnerChart.longitude);
+                requestData.partner_timezone = selectedPartnerChart.timezone || 'Asia/Kolkata';
+                requestData.partner_gender = selectedPartnerChart.gender || '';
+            }
             
             // console.log('Chat request data:', requestData);
             // console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
@@ -671,7 +695,25 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
 
     const handleBirthFormSubmit = () => {
         setShowBirthForm(false);
-        // Note: birthData change will be handled by useEffect above
+    };
+
+    const handlePartnershipToggle = () => {
+        if (!isPartnershipMode) {
+            setShowChatPartnerSelector(true);
+        } else {
+            setIsPartnershipMode(false);
+            setSelectedPartnerChart(null);
+        }
+    };
+
+    const handlePartnerSelect = (chart) => {
+        setSelectedPartnerChart(chart);
+        setIsPartnershipMode(true);
+    };
+
+    const handleSelectPartner = (chart) => {
+        setSelectedPartnerChart(chart);
+        setIsPartnershipMode(true);
     };
 
     // Cleanup speech when modal closes
@@ -742,7 +784,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [showCreditsModal, setShowCreditsModal] = useState(false);
     const [showContextModal, setShowContextModal] = useState(false);
     const [contextData, setContextData] = useState(null);
-    const [isAdmin, setIsAdmin] = useState(false);
     const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
     
     const handleFollowUpClick = (question) => {
@@ -788,7 +829,29 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             <div className={`chat-modal ${isPremiumMode ? 'premium-theme' : ''}`} onClick={(e) => e.stopPropagation()}>
                 <div className="chat-modal-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', marginRight: '100px' }}>
-                        <h2 style={{ margin: 0, flex: 1 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : '- Your Personal Astrologer'}</h2>
+                        <h2 style={{ margin: 0, flex: 1 }}>
+                            AstroRoshni {isPartnershipMode && selectedPartnerChart 
+                                ? `${birthData?.name} & ${selectedPartnerChart.name}` 
+                                : birthData?.name ? `with ${birthData.name}` : '- Your Personal Astrologer'
+                            }
+                        </h2>
+                        <button 
+                            onClick={handlePartnershipToggle}
+                            style={{
+                                background: isPartnershipMode ? 'linear-gradient(45deg, #ff6b35, #f7931e)' : 'rgba(255,255,255,0.2)',
+                                padding: '6px 10px',
+                                borderRadius: '15px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                border: `1px solid ${isPartnershipMode ? '#ff6b35' : 'rgba(255,255,255,0.3)'}`,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                marginRight: '8px'
+                            }}
+                        >
+                            💕 {isPartnershipMode ? 'Exit Partnership' : 'Partnership'}
+                        </button>
                         <div style={{
                             background: 'rgba(255,255,255,0.2)',
                             padding: '4px 12px',
@@ -798,9 +861,11 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                             fontWeight: 'bold',
                             whiteSpace: 'nowrap'
                         }}>
-                            💳 {credits} credits
+                            💳 {credits} | {isPartnershipMode ? partnershipCost : chatCost}/q
                         </div>
                     </div>
+                    
+
                     
                     {/* Desktop buttons */}
                     <div className="desktop-buttons">
@@ -825,8 +890,13 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                             📊 View Chart
                         </button>
                         <button onClick={() => setShowBirthForm(true)}>
-                            👤 Change Person
+                            👤 {birthData?.name || 'Change Person'}
                         </button>
+                        {isPartnershipMode && (
+                            <button onClick={() => setShowChatPartnerSelector(true)}>
+                                💕 {selectedPartnerChart ? selectedPartnerChart.name : 'Select Partner'}
+                            </button>
+                        )}
                         {isAdmin && (
                             <button 
                                 onClick={() => {
@@ -843,6 +913,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                             </button>
                         )}
                     </div>
+                    
+
                     
                     {/* Mobile menu */}
                     <div className="mobile-menu">
@@ -987,6 +1059,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                         onOpenCreditsModal={() => setShowCreditsModal(true)}
                                         onPremiumModeChange={setIsPremiumMode}
                                         onShowEnhancedPopup={() => setShowEnhancedPopup(true)}
+                                        isPartnershipMode={isPartnershipMode}
                                     />
                                 </>
                             )}
@@ -1313,6 +1386,20 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 </div>
             </div>
         )}
+        
+        {/* Partner Chart Selection Modal */}
+        <PartnerChartModal 
+            isOpen={showPartnerModal}
+            onClose={() => setShowPartnerModal(false)}
+            onSelectPartner={handleSelectPartner}
+        />
+        
+        {/* Chat Partner Selector */}
+        <ChatPartnerSelector 
+            isOpen={showChatPartnerSelector}
+            onClose={() => setShowChatPartnerSelector(false)}
+            onSelectPartner={handlePartnerSelect}
+        />
         </>
     );
 };

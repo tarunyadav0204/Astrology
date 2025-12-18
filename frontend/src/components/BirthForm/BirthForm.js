@@ -121,7 +121,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       };
       
       const [chartData, yogiData] = await Promise.all([
-        apiService.calculateChart(birthData),
+        apiService.calculateChartOnly(birthData),
         apiService.calculateYogi(birthData)
       ]);
       
@@ -144,8 +144,10 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       setChartData(enhancedChartData);
       toast.success('Chart loaded successfully!');
       
-      // Close modal directly without triggering onSubmit callback
-      if (onClose) {
+      // Call onSubmit to trigger parent component logic
+      if (onSubmit) {
+        onSubmit();
+      } else if (onClose) {
         onClose();
       }
     } catch (error) {

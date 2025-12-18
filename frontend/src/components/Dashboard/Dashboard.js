@@ -27,11 +27,14 @@ import { DashboardContainer, Header, BackButton, Title, GridContainer, GridItem 
 
 
 const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefHighlight }) => {
-  const [selectedChart, setSelectedChart] = useState('navamsa');
+  const [selectedChart, setSelectedChart] = useState('hora');
   const [showDropdown, setShowDropdown] = useState(false);
   const isMobile = window.innerWidth <= 768;
   
   const divisionalCharts = [
+    { value: 'hora', label: 'Hora (D2)', division: 2 },
+    { value: 'drekkana', label: 'Drekkana (D3)', division: 3 },
+    { value: 'chaturthamsa', label: 'Chaturthamsa (D4)', division: 4 },
     { value: 'navamsa', label: 'Navamsa (D9)', division: 9 },
     { value: 'dasamsa', label: 'Dasamsa (D10)', division: 10 },
     { value: 'dwadasamsa', label: 'Dwadasamsa (D12)', division: 12 },

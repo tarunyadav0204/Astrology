@@ -7,6 +7,7 @@ import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
 import CreditsModal from '../Credits/CreditsModal';
 import ContextModal from './ContextModal';
+import PartnerChartModal from './PartnerChartModal';
 import { authService } from '../../services/authService';
 import './ChatPage.css';
 
@@ -16,7 +17,7 @@ import './ChatPage.css';
 const ChatPage = () => {
     const location = useLocation();
     const { birthData } = useAstrology();
-    const { credits, chatCost, fetchBalance } = useCredits();
+    const { credits, chatCost, partnershipCost, fetchBalance } = useCredits();
     const { birthData: initialBirthData } = location.state || {};
     const [showBirthForm, setShowBirthForm] = useState(!birthData && !initialBirthData);
     const [messages, setMessages] = useState([]);
@@ -25,6 +26,9 @@ const ChatPage = () => {
     const [showContextModal, setShowContextModal] = useState(false);
     const [contextData, setContextData] = useState(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isPartnershipMode, setIsPartnershipMode] = useState(false);
+    const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
+    const [showPartnerModal, setShowPartnerModal] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -117,7 +121,7 @@ const ChatPage = () => {
         }
     };
 
-    const handleSendMessage = async (message) => {
+    const handleSendMessage = async (message, options = {}) => {
         if (!birthData) return;
 
         const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
@@ -134,6 +138,20 @@ const ChatPage = () => {
             const requestBody = { ...birthData, question: message };
             if (isAdmin) {
                 requestBody.include_context = true;
+            }
+            if (options.premium_analysis) {
+                requestBody.premium_analysis = true;
+            }
+            if (isPartnershipMode && selectedPartnerChart) {
+                requestBody.partnership_mode = true;
+                requestBody.partner_data = {
+                    name: selectedPartnerChart.name,
+                    date: selectedPartnerChart.date,
+                    time: selectedPartnerChart.time,
+                    latitude: selectedPartnerChart.latitude,
+                    longitude: selectedPartnerChart.longitude,
+                    timezone: selectedPartnerChart.timezone
+                };
             }
             
             const response = await fetch('/api/chat/ask', {
@@ -319,6 +337,20 @@ const ChatPage = () => {
         }
     };
 
+    const handlePartnershipToggle = () => {
+        if (!isPartnershipMode) {
+            setShowPartnerModal(true);
+        } else {
+            setIsPartnershipMode(false);
+            setSelectedPartnerChart(null);
+        }
+    };
+
+    const handleSelectPartner = (chart) => {
+        setSelectedPartnerChart(chart);
+        setIsPartnershipMode(true);
+    };
+
     const handleBirthFormSubmit = () => {
         setShowBirthForm(false);
     };
@@ -339,10 +371,38 @@ const ChatPage = () => {
             <div className="chat-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
-                        <h1 style={{ margin: 0 }}>AstroRoshni {birthData?.name ? `with ${birthData.name}` : 'Consultation'}</h1>
-                        <div style={{ fontSize: '10px', color: '#999' }}>Admin: {isAdmin ? 'Yes' : 'No'}</div>
+                        <h1 style={{ margin: 0 }}>
+                            AstroRoshni {isPartnershipMode && selectedPartnerChart 
+                                ? `${birthData?.name} & ${selectedPartnerChart.name}` 
+                                : birthData?.name ? `with ${birthData.name}` : 'Consultation'
+                            }
+                        </h1>
+                        <div style={{ fontSize: '10px', color: '#999' }}>
+                            {isPartnershipMode ? '💕 Partnership Mode' : 'Individual Mode'} | Admin: {isAdmin ? 'Yes' : 'No'}
+                        </div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button 
+                            onClick={() => {
+                                console.log('Partnership button clicked!');
+                                handlePartnershipToggle();
+                            }}
+                            style={{
+                                background: isPartnershipMode ? 'linear-gradient(45deg, #ff6b35, #f7931e)' : 'red',
+                                padding: '8px 12px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                border: `2px solid ${isPartnershipMode ? '#ff6b35' : 'black'}`,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                zIndex: 9999,
+                                position: 'relative'
+                            }}
+                        >
+                            💕 {isPartnershipMode ? 'Exit Partnership' : 'Partnership Mode'}
+                        </button>
                         <button 
                             onClick={() => setShowContextModal(true)}
                             style={{
@@ -369,12 +429,12 @@ const ChatPage = () => {
                             border: '1px solid rgba(255,107,53,0.3)',
                             whiteSpace: 'nowrap'
                         }}>
-                            <span className="credits-full">💳 {credits} | {chatCost} per question</span>
+                            <span className="credits-full">💳 {credits} | {isPartnershipMode ? partnershipCost : chatCost} per question</span>
                             <span className="credits-short">💳 {credits} Credits</span>
                         </div>
                     </div>
                 </div>
-                <p>Ask me anything about your birth chart and life guidance</p>
+                <p>{isPartnershipMode ? 'Ask about your compatibility and relationship guidance' : 'Ask me anything about your birth chart and life guidance'}</p>
             </div>
             <div className="chat-container">
                 <MessageList messages={messages} />
@@ -384,6 +444,7 @@ const ChatPage = () => {
                 onSendMessage={handleSendMessage} 
                 isLoading={isLoading} 
                 onOpenCreditsModal={() => setShowCreditsModal(true)}
+                isPartnershipMode={isPartnershipMode}
             />
             
             {/* Credits Modal */}
@@ -397,6 +458,13 @@ const ChatPage = () => {
                 isOpen={showContextModal}
                 onClose={() => setShowContextModal(false)}
                 contextData={contextData}
+            />
+            
+            {/* Partner Chart Selection Modal */}
+            <PartnerChartModal 
+                isOpen={showPartnerModal}
+                onClose={() => setShowPartnerModal(false)}
+                onSelectPartner={handleSelectPartner}
             />
         </div>
     );

@@ -36,6 +36,9 @@ export default function ChartScreen({ navigation, route }) {
   
   const chartTypes = [
     { id: 'lagna', name: 'Lagna (D1)', icon: '🏠', description: 'Main Birth Chart' },
+    { id: 'hora', name: 'Hora (D2)', icon: '💰', description: 'Wealth & Family' },
+    { id: 'drekkana', name: 'Drekkana (D3)', icon: '👫', description: 'Siblings & Happiness' },
+    { id: 'chaturthamsa', name: 'Chaturthamsa (D4)', icon: '🏡', description: 'Destiny & Assets' },
     { id: 'navamsa', name: 'Navamsa (D9)', icon: '💎', description: 'Marriage & Spirituality' },
     { id: 'dashamsa', name: 'Dashamsa (D10)', icon: '💼', description: 'Career & Profession' },
     { id: 'dwadashamsa', name: 'Dwadashamsa (D12)', icon: '👨👩👧👦', description: 'Parents & Ancestry' },
@@ -267,7 +270,10 @@ export default function ChartScreen({ navigation, route }) {
                         scrollToActiveTab(transitIndex);
                       }
                     }}
-                    division={chartTypes[currentChartIndex].id === 'navamsa' ? 9 : 
+                    division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
+                             chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
+                             chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
+                             chartTypes[currentChartIndex].id === 'navamsa' ? 9 : 
                              chartTypes[currentChartIndex].id === 'dashamsa' ? 10 :
                              chartTypes[currentChartIndex].id === 'dwadashamsa' ? 12 :
                              chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :

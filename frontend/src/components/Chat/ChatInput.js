@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useCredits } from '../../context/CreditContext';
 
-const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {}, onOpenCreditsModal, onShowEnhancedPopup }) => {
-    const { credits, chatCost, premiumChatCost, loading: creditsLoading } = useCredits();
+const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUpUsed = () => {}, onOpenCreditsModal, onShowEnhancedPopup, isPartnershipMode = false }) => {
+    const { credits, chatCost, premiumChatCost, partnershipCost, loading: creditsLoading } = useCredits();
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
     
@@ -13,7 +13,7 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
         }
     }, [followUpQuestion, onFollowUpUsed]);
 
-    const currentCost = isPremiumAnalysis ? premiumChatCost : chatCost;
+    const currentCost = isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost);
     
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -23,7 +23,14 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
         }
     };
 
-    const suggestions = [
+    const suggestions = isPartnershipMode ? [
+        "Are we compatible for marriage?",
+        "What are our relationship strengths?",
+        "What challenges might we face together?",
+        "When is a good time for us to get married?",
+        "How do our personalities complement each other?",
+        "What does our composite chart reveal?"
+    ] : [
         "What does my birth chart say about my career?",
         "When is a good time for marriage?",
         "What are my health vulnerabilities?",
@@ -49,7 +56,7 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
             )}
             {!creditsLoading && credits < currentCost && (
                 <div className="credit-warning">
-                    <span>Insufficient credits ({credits}/{currentCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : 'Standard Analysis'})</span>
+                    <span>Insufficient credits ({credits}/{currentCost} required for {isPremiumAnalysis ? 'Premium Deep Analysis' : isPartnershipMode ? 'Partnership Analysis' : 'Standard Analysis'})</span>
                     <button onClick={onOpenCreditsModal} className="get-credits-btn">
                         Get Credits
                     </button>
@@ -83,7 +90,7 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
                     fontWeight: 'bold',
                     boxShadow: isPremiumAnalysis ? '0 2px 8px rgba(255, 107, 53, 0.3)' : 'none'
                 }}>
-                    {isPremiumAnalysis ? premiumChatCost : chatCost} credits
+                    {isPremiumAnalysis ? premiumChatCost : (isPartnershipMode ? partnershipCost : chatCost)} credits
                 </span>
                 {isPremiumAnalysis && (
                     <span 
@@ -100,7 +107,7 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder={isLoading ? "Analyzing your chart..." : credits < currentCost ? "Insufficient credits" : "Ask me about your birth chart..."}
+                    placeholder={isLoading ? "Analyzing your chart..." : credits < currentCost ? "Insufficient credits" : isPartnershipMode ? "Ask about your compatibility..." : "Ask me about your birth chart..."}
                     disabled={isLoading || credits < currentCost}
                     className="chat-input"
                 />
@@ -113,12 +120,12 @@ const ChatInput = ({ onSendMessage, isLoading, followUpQuestion = '', onFollowUp
                         boxShadow: isPremiumAnalysis ? '0 2px 12px rgba(255, 107, 53, 0.4)' : undefined
                     }}
                 >
-                    {isLoading ? '...' : credits < currentCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : 'Send'}
+                    {isLoading ? '...' : credits < currentCost ? 'No Credits' : isPremiumAnalysis ? '🚀 Send Premium' : isPartnershipMode ? '💕 Send Partnership' : 'Send'}
                 </button>
             </form>
             {!creditsLoading && (
                 <div className="credit-info">
-                    Credits: {credits} | {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : `Standard: ${chatCost}`} credits per question
+                    Credits: {credits} | {isPremiumAnalysis ? `Premium: ${premiumChatCost}` : isPartnershipMode ? `Partnership: ${partnershipCost}` : `Standard: ${chatCost}`} credits per question
                 </div>
             )}
         </div>

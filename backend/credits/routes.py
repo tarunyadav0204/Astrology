@@ -264,6 +264,11 @@ async def get_premium_chat_cost():
     cost = credit_service.get_credit_setting('premium_chat_cost')
     return {"cost": cost}
 
+@router.get("/settings/partnership-cost")
+async def get_partnership_cost():
+    cost = credit_service.get_credit_setting('partnership_analysis_cost')
+    return {"cost": cost}
+
 @router.get("/settings/childbirth-cost")
 async def get_childbirth_cost():
     cost = credit_service.get_credit_setting('childbirth_planner_cost')

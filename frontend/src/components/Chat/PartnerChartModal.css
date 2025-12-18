@@ -1,0 +1,114 @@
+.partner-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+}
+
+.partner-modal {
+    background: white;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.partner-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    background: linear-gradient(45deg, #ff6b35, #f7931e);
+    color: white;
+}
+
+.partner-modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.partner-modal-content {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.partner-search-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ff6b35;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+}
+
+.partner-loading, .partner-no-charts {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.partner-charts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.partner-chart-item {
+    padding: 15px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.partner-chart-item:hover {
+    border-color: #ff6b35;
+    background: rgba(255, 107, 53, 0.05);
+    transform: translateY(-2px);
+}
+
+.partner-chart-name {
+    font-weight: bold;
+    font-size: 16px;
+    color: #ff6b35;
+    margin-bottom: 8px;
+}
+
+.partner-chart-details {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}

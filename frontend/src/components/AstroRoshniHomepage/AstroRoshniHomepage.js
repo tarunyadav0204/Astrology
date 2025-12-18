@@ -48,13 +48,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     { id: 3, image: '/images/banner-live-consultation.jpg', title: 'Live Consultation with Experts' }
   ];
 
-  const aiAstrologers = [
-    { id: 1, name: 'Acharya Joshi', expertise: 'Vedic, KP System', experience: '15+ Years', rate: '₹21/min', rating: 4.8, image: 'https://images.unsplash.com/photo-1566753323558-f4e0952af115?w=150&h=150&fit=crop&crop=face', status: 'online' },
-    { id: 2, name: 'Dr. Priya Sharma', expertise: 'Numerology, Tarot', experience: '12+ Years', rate: '₹18/min', rating: 4.9, image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face', status: 'online' },
-    { id: 3, name: 'Pandit Raj Kumar', expertise: 'Vedic, Palmistry', experience: '20+ Years', rate: '₹25/min', rating: 4.7, image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&h=150&fit=crop&crop=face', status: 'busy' },
-    { id: 4, name: 'Astro Ananya', expertise: 'Love, Career', experience: '8+ Years', rate: '₹15/min', rating: 4.6, image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&h=150&fit=crop&crop=face', status: 'online' },
-    { id: 5, name: 'Guru Vikash', expertise: 'Vastu, Remedies', experience: '18+ Years', rate: '₹22/min', rating: 4.8, image: 'https://images.unsplash.com/photo-1582233479366-6d38bc390a08?w=150&h=150&fit=crop&crop=face', status: 'online' }
-  ];
+
 
   const zodiacSigns = [
     { name: 'aries', symbol: '♈', displayName: 'Aries' },
@@ -74,7 +68,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const services = [
     { icon: '📊', title: 'Free Kundli', desc: 'Complete birth chart analysis' },
     { icon: '💕', title: 'Horoscope Matching', desc: 'Compatibility for marriage' },
-    { icon: '🔮', title: 'Daily Horoscope', desc: 'Your daily predictions' },
+    { icon: '🌟', title: 'Daily Horoscope', desc: 'Your daily predictions' },
     { icon: '📞', title: 'Talk to Astrologer', desc: 'Live consultation' },
     { icon: '💎', title: 'Gemstone Report', desc: 'Personalized recommendations' },
     { icon: '🏠', title: 'Vastu Consultation', desc: 'Home & office guidance' },
@@ -687,7 +681,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         <div className="container">
           <div className="life-categories-header">
             <span className="life-path-symbol life-path-symbol-1">🌟</span>
-            <span className="life-path-symbol life-path-symbol-2">🔮</span>
+            <span className="life-path-symbol life-path-symbol-2">🌙</span>
             <span className="life-path-symbol life-path-symbol-3">✨</span>
             <span className="life-path-symbol life-path-symbol-4">🌙</span>
             <span className="life-path-symbol life-path-symbol-5">⭐</span>
@@ -772,44 +766,93 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      {/* AI Astrologers Section */}
-      <section className="ai-astrologers">
+      {/* Chat Consultation Categories */}
+      <section className="chat-consultations">
         <div className="container">
           <div className="section-header">
-            <h2>AI Astrologers</h2>
-            <a href="#all-astrologers" className="view-all">View All →</a>
+            <h2>💬 Ask Your Questions</h2>
+            <p className="section-subtitle">Get instant AI-powered Vedic insights on any life topic</p>
           </div>
           
-          <div className="astrologers-scroll">
-            {aiAstrologers.map(astrologer => (
-              <div key={astrologer.id} className="astrologer-card">
-                <div className="astrologer-image">
-                  <div 
-                    className="placeholder-img" 
-                    style={{
-                      backgroundImage: `url(${astrologer.image})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                  </div>
-                  <span className={`status-dot ${astrologer.status}`}></span>
-                </div>
-                <div className="astrologer-info">
-                  <h4>{astrologer.name}</h4>
-                  <p className="expertise">{astrologer.expertise}</p>
-                  <p className="experience">{astrologer.experience}</p>
-                  <div className="rating">
-                    ⭐ {astrologer.rating}
-                  </div>
-                  <div className="rate">{astrologer.rate}</div>
-                  <div className="action-buttons">
-                    <button className="call-btn">📞 Call</button>
-                    <button className="chat-btn">💬 Chat</button>
-                  </div>
-                </div>
+          <div className="consultation-categories">
+            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="consultation-icon">💕</div>
+              <h4>Love & Relationships</h4>
+              <p>Marriage compatibility, relationship timing, soulmate analysis</p>
+              <div className="consultation-examples">
+                <span>"When will I get married?"</span>
+                <span>"Is my partner compatible?"</span>
               </div>
-            ))}
+              <button className="ask-btn">Ask Now</button>
+            </div>
+            
+            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="consultation-icon">💼</div>
+              <h4>Career & Finance</h4>
+              <p>Job changes, business success, wealth timing, investment guidance</p>
+              <div className="consultation-examples">
+                <span>"Should I change my job?"</span>
+                <span>"When will I get promotion?"</span>
+              </div>
+              <button className="ask-btn">Ask Now</button>
+            </div>
+            
+            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="consultation-icon">🏥</div>
+              <h4>Health & Wellness</h4>
+              <p>Health predictions, disease timing, remedies, lifestyle guidance</p>
+              <div className="consultation-examples">
+                <span>"What about my health?"</span>
+                <span>"Any health concerns ahead?"</span>
+              </div>
+              <button className="ask-btn">Ask Now</button>
+            </div>
+            
+            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="consultation-icon">👶</div>
+              <h4>Family & Children</h4>
+              <p>Child birth timing, family harmony, parenting guidance</p>
+              <div className="consultation-examples">
+                <span>"When will I have children?"</span>
+                <span>"Family issues solutions?"</span>
+              </div>
+              <button className="ask-btn">Ask Now</button>
+            </div>
+            
+            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="consultation-icon">🎓</div>
+              <h4>Education & Growth</h4>
+              <p>Study success, exam results, skill development, learning path</p>
+              <div className="consultation-examples">
+                <span>"Will I pass my exams?"</span>
+                <span>"Best career field for me?"</span>
+              </div>
+              <button className="ask-btn">Ask Now</button>
+            </div>
+            
+            <div className="consultation-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="consultation-icon">🌟</div>
+              <h4>General Predictions</h4>
+              <p>Life overview, upcoming events, lucky periods, general guidance</p>
+              <div className="consultation-examples">
+                <span>"What's ahead in my life?"</span>
+                <span>"Any major changes coming?"</span>
+              </div>
+              <button className="ask-btn">Ask Now</button>
+            </div>
+          </div>
+          
+          <div className="consultation-cta">
+            <div className="cta-content">
+              <h3>🌟 Unlimited Questions • Instant Answers • 24/7 Available</h3>
+              <p>Powered by advanced Vedic AI trained on classical texts</p>
+            </div>
+            <button 
+              className="start-chat-btn"
+              onClick={() => user ? setShowChatModal(true) : onLogin()}
+            >
+              💬 Start Your Consultation
+            </button>
           </div>
         </div>
       </section>
@@ -826,7 +869,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <span>✨ Swiss Ephemeris Precision</span>
                 <span>🎯 Highest Automation Level</span>
                 <span>📊 Feature Rich Charts</span>
-                <span>🔮 Advanced Dasha Systems</span>
+                <span>🌟 Advanced Dasha Systems</span>
               </div>
               <div className="astroroshni-pricing">
                 <span className="old-price">₹4,999</span>
@@ -842,7 +885,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <div className="mockup-screen">
                   <div className="chart-preview">📊</div>
                   <div className="feature-icons">
-                    <span>🌙</span><span>⭐</span><span>🪐</span><span>🔮</span>
+                    <span>🌙</span><span>⭐</span><span>🪐</span><span>🌟</span>
                   </div>
                 </div>
               </div>
@@ -851,11 +894,11 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
-      {/* Premium Services - Moved Higher */}
-      <section className="premium-services">
+      {/* AI Chat Services */}
+      <section className="ai-chat-services">
         <div className="container">
-          <div className="premium-services-header">
-            <span className="service-symbol service-symbol-1">🔮</span>
+          <div className="ai-services-header">
+            <span className="service-symbol service-symbol-1">🌟</span>
             <span className="service-symbol service-symbol-2">📊</span>
             <span className="service-symbol service-symbol-3">💎</span>
             <span className="service-symbol service-symbol-4">🌟</span>
@@ -863,47 +906,96 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <span className="service-symbol service-symbol-6">💫</span>
             <span className="service-symbol service-symbol-7">🎯</span>
             <span className="service-symbol service-symbol-8">✨</span>
-            <h2 className="premium-services-title">Astrological Services for Accurate Answers</h2>
-            <p className="premium-services-subtitle">Professional insights backed by ancient wisdom and modern precision</p>
-            <div className="premium-services-divider"></div>
+            <h2 className="ai-services-title">Astrological Services for Accurate Answers</h2>
+            <p className="ai-services-subtitle">All available through our intelligent AI chat - ask anything, get instant Vedic insights</p>
+            <div className="ai-services-divider"></div>
           </div>
-          <div className="premium-grid">
-            <div className="featured-service">
-              <div className="ribbon">33% OFF</div>
-              <div className="service-image">
-                <div className="placeholder-img">📊</div>
+          
+          <div className="ai-services-grid">
+            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="service-icon">❓</div>
+              <h4>Prashna Analysis</h4>
+              <p>Horary astrology for specific questions and timing</p>
+              <div className="service-examples">
+                <span>"When will I get married?"</span>
+                <span>"Should I invest in this business?"</span>
+                <span>"Will I get the job?"</span>
               </div>
-              <h3>AstroVishnu Software - 1 Year</h3>
-              <p>Advanced astrology software with cloud features</p>
-              <button className="buy-btn">BUY NOW</button>
+              <button className="chat-service-btn">Ask AI Chat</button>
             </div>
             
-            {premiumServices.map((service, index) => (
-              <div key={index} className="premium-card">
-                <div className="service-image">
-                  <div className="placeholder-img">{service.icon}</div>
-                </div>
-                <h4>{service.title}</h4>
-                <p>{service.desc}</p>
-                <div className="price">{service.price}</div>
-                <button 
-                  className="check-btn" 
-                  onClick={() => {
-                    if (service.title === 'Marriage Report') {
-                      navigate('/marriage-analysis');
-                    } else if (service.title === 'Career Guidance') {
-                      navigate('/career-guidance');
-                    } else if (service.title === 'Health Report') {
-                      navigate('/health-analysis');
-                    } else if (service.title === 'Finance Report') {
-                      navigate('/wealth-analysis');
-                    }
-                  }}
-                >
-                  Check Now
-                </button>
+            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="service-icon">📅</div>
+              <h4>Varshphal Analysis</h4>
+              <p>Annual predictions and yearly forecast insights</p>
+              <div className="service-examples">
+                <span>"What does 2024 hold for me?"</span>
+                <span>"Career prospects this year?"</span>
+                <span>"Health predictions for 2024?"</span>
               </div>
-            ))}
+              <button className="chat-service-btn">Ask AI Chat</button>
+            </div>
+            
+            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="service-icon">💕</div>
+              <h4>Love & Partnership</h4>
+              <p>Relationship compatibility and marriage analysis</p>
+              <div className="service-examples">
+                <span>"Are we compatible for marriage?"</span>
+                <span>"When will I find love?"</span>
+                <span>"Relationship problems solutions?"</span>
+              </div>
+              <button className="chat-service-btn">Ask AI Chat</button>
+            </div>
+            
+            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="service-icon">🏢</div>
+              <h4>Business Relationships</h4>
+              <p>Partnership analysis and business compatibility</p>
+              <div className="service-examples">
+                <span>"Should I partner with them?"</span>
+                <span>"Business venture timing?"</span>
+                <span>"Team compatibility analysis?"</span>
+              </div>
+              <button className="chat-service-btn">Ask AI Chat</button>
+            </div>
+            
+            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="service-icon">🤝</div>
+              <h4>Friendship Analysis</h4>
+              <p>Social relationships and friendship compatibility</p>
+              <div className="service-examples">
+                <span>"Why do I have friend conflicts?"</span>
+                <span>"Building better friendships?"</span>
+                <span>"Social circle analysis?"</span>
+              </div>
+              <button className="chat-service-btn">Ask AI Chat</button>
+            </div>
+            
+            <div className="ai-service-card" onClick={() => user ? setShowChatModal(true) : onLogin()}>
+              <div className="service-icon">💰</div>
+              <h4>Wealth & Finance</h4>
+              <p>Money matters and financial growth timing</p>
+              <div className="service-examples">
+                <span>"When will I become wealthy?"</span>
+                <span>"Investment timing guidance?"</span>
+                <span>"Financial stability analysis?"</span>
+              </div>
+              <button className="chat-service-btn">Ask AI Chat</button>
+            </div>
+          </div>
+          
+          <div className="ai-services-cta">
+            <div className="cta-content">
+              <h3>🤖 Powered by Advanced Vedic AI • Instant Responses • Available 24/7</h3>
+              <p>All these services and more are available through our intelligent chat interface</p>
+            </div>
+            <button 
+              className="start-ai-chat-btn"
+              onClick={() => user ? setShowChatModal(true) : onLogin()}
+            >
+              🚀 Start AI Consultation Now
+            </button>
           </div>
         </div>
       </section>
@@ -961,7 +1053,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <div className="nakshatra-features">
                   <div className="feature-item">📅 Annual Periods</div>
                   <div className="feature-item">⭐ Characteristics</div>
-                  <div className="feature-item">🔮 Predictions</div>
+                  <div className="feature-item">🌟 Predictions</div>
                   <div className="feature-item">🎯 Lucky Periods</div>
                 </div>
                 <div className="nakshatra-info">

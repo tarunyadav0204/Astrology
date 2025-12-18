@@ -7,6 +7,7 @@ const CreditContext = createContext();
 export const CreditProvider = ({ children }) => {
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [partnershipCost, setPartnershipCost] = useState(2);
 
   const fetchBalance = async () => {
     try {
@@ -79,14 +80,29 @@ export const CreditProvider = ({ children }) => {
     }
   };
 
+  const fetchPartnershipCost = async () => {
+    try {
+      const { API_BASE_URL, getEndpoint } = require('../utils/constants');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/credits/settings/partnership-cost')}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPartnershipCost(data.cost || 2);
+      }
+    } catch (error) {
+      console.error('Error fetching partnership cost:', error);
+    }
+  };
+
   useEffect(() => {
     fetchBalance();
+    fetchPartnershipCost();
   }, []);
 
   return (
     <CreditContext.Provider value={{
       credits,
       loading,
+      partnershipCost,
       fetchBalance,
       redeemCode,
       spendCredits,

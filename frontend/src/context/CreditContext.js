@@ -14,6 +14,7 @@ export const CreditProvider = ({ children }) => {
     const [credits, setCredits] = useState(0);
     const [chatCost, setChatCost] = useState(1);
     const [premiumChatCost, setPremiumChatCost] = useState(10);
+    const [partnershipCost, setPartnershipCost] = useState(2);
     const [wealthCost, setWealthCost] = useState(5);
     const [marriageCost, setMarriageCost] = useState(3);
     const [healthCost, setHealthCost] = useState(3);
@@ -117,6 +118,16 @@ export const CreditProvider = ({ children }) => {
         } catch (error) {
             console.error('Error fetching premium chat cost:', error);
         }
+        
+        try {
+            const response = await fetch('/api/credits/settings/partnership-cost');
+            if (response.ok) {
+                const data = await response.json();
+                setPartnershipCost(data.cost || 2);
+            }
+        } catch (error) {
+            console.error('Error fetching partnership cost:', error);
+        }
     };
 
     useEffect(() => {
@@ -156,6 +167,7 @@ export const CreditProvider = ({ children }) => {
             credits,
             chatCost,
             premiumChatCost,
+            partnershipCost,
             wealthCost,
             marriageCost,
             healthCost,

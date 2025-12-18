@@ -9,106 +9,109 @@ class DivisionalChartCalculator(BaseCalculator):
         """Calculate divisional chart - extracted from main.py"""
         
         def get_divisional_sign(sign, degree_in_sign, division):
-            """Calculate divisional sign using proper Vedic formulas - extracted from main.py"""
+            """Calculate divisional sign using proper Vedic formulas"""
+            # Basic partition calculation
             part = int(degree_in_sign / (30/division))
             
-            if division == 9:  # Navamsa (D9)
-                # Movable signs (0,3,6,9): Start from same sign
-                # Fixed signs (1,4,7,10): Start from 9th sign
-                # Dual signs (2,5,8,11): Start from 5th sign
-                if sign in [0, 3, 6, 9]:  # Movable signs
-                    navamsa_start = sign
-                elif sign in [1, 4, 7, 10]:  # Fixed signs
-                    navamsa_start = (sign + 8) % 12  # 9th from sign
-                else:  # Dual signs [2, 5, 8, 11]
-                    navamsa_start = (sign + 4) % 12  # 5th from sign
-                return (navamsa_start + part) % 12
+            # --- MISSING CHARTS ADDED ---
             
+            if division == 2:  # Hora (D2) - Parashara Hora
+                # Odd Signs: 0-15 Sun(Leo), 15-30 Moon(Cancer)
+                # Even Signs: 0-15 Moon(Cancer), 15-30 Sun(Leo)
+                is_first_half = degree_in_sign < 15
+                if sign % 2 == 0:  # Odd Sign (Aries=0)
+                    return 4 if is_first_half else 3  # Leo(4) else Cancer(3)
+                else:  # Even Sign
+                    return 3 if is_first_half else 4  # Cancer(3) else Leo(4)
+
+            elif division == 3:  # Drekkana (D3) - Parashara
+                # 0-10: Self, 10-20: 5th, 20-30: 9th
+                if part == 0: return sign
+                elif part == 1: return (sign + 4) % 12
+                else: return (sign + 8) % 12
+
+            elif division == 4:  # Chaturthamsa (D4)
+                # 1st part: Self, 2nd: 4th, 3rd: 7th, 4th: 10th
+                return (sign + (part * 3)) % 12
+
+            # --- EXISTING CHARTS ---
+
             elif division == 7:  # Saptamsa (D7)
-                # Rule: Odd signs start from self; Even signs start from 7th house
-                if sign % 2 == 0:  # Odd Signs (0=Aries, 2=Gemini, etc.)
-                    d7_start = sign
-                else:  # Even Signs (1=Taurus, 3=Cancer, etc.)
-                    d7_start = (sign + 6) % 12
-                return (d7_start + part) % 12
-            
-            elif division == 10:  # Dasamsa (D10)
-                return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
-            
-            elif division == 12:  # Dwadasamsa (D12)
-                return (sign + part) % 12
-            
-            elif division == 16:  # Shodasamsa (D16)
-                if sign in [0, 3, 6, 9]:  # Movable signs
-                    d16_start = 0  # Aries
-                elif sign in [1, 4, 7, 10]:  # Fixed signs
-                    d16_start = 4  # Leo
-                else:  # Dual signs
-                    d16_start = 8  # Sagittarius
-                return (d16_start + part) % 12
-            
-            elif division == 20:  # Vimsamsa (D20)
-                if sign in [0, 3, 6, 9]:  # Movable signs
-                    d20_start = 0  # Aries
-                elif sign in [1, 4, 7, 10]:  # Fixed signs
-                    d20_start = 8  # Sagittarius
-                else:  # Dual signs
-                    d20_start = 4  # Leo
-                return (d20_start + part) % 12
-            
-            elif division == 24:  # Chaturvimsamsa (D24)
-                if sign % 2 == 0:  # Odd Signs
-                    start = 4  # Leo
-                else:  # Even Signs
-                    start = 3  # Cancer
+                if sign % 2 == 0: return (sign + part) % 12      # Odd: Start from self
+                else: return ((sign + 6) + part) % 12            # Even: Start from 7th
+
+            elif division == 9:  # Navamsa (D9)
+                if sign in [0, 3, 6, 9]: start = sign            # Movable: Self
+                elif sign in [1, 4, 7, 10]: start = (sign + 8)   # Fixed: 9th
+                else: start = (sign + 4)                         # Dual: 5th
                 return (start + part) % 12
-            
+
+            elif division == 10:  # Dasamsa (D10)
+                if sign % 2 == 0: return (sign + part) % 12      # Odd: Self
+                else: return ((sign + 8) + part) % 12            # Even: 9th
+
+            elif division == 12:  # Dwadasamsa (D12)
+                return (sign + part) % 12                        # Start from self
+
+            elif division == 16:  # Shodasamsa (D16)
+                if sign in [0, 3, 6, 9]: start = 0               # Movable: Aries
+                elif sign in [1, 4, 7, 10]: start = 4            # Fixed: Leo
+                else: start = 8                                  # Dual: Sag
+                return (start + part) % 12
+
+            elif division == 20:  # Vimsamsa (D20)
+                if sign in [0, 3, 6, 9]: start = 0               # Movable: Aries
+                elif sign in [1, 4, 7, 10]: start = 8            # Fixed: Sag
+                else: start = 4                                  # Dual: Leo
+                return (start + part) % 12
+
+            elif division == 24:  # Chaturvimsamsa (D24)
+                start = 4 if sign % 2 == 0 else 3                # Odd: Leo, Even: Cancer
+                return (start + part) % 12
+
             elif division == 27:  # Saptavimsamsa (D27)
-                if sign in [0, 4, 8]:  # Fire signs
-                    d27_start = 0  # Aries
-                elif sign in [1, 5, 9]:  # Earth signs
-                    d27_start = 3  # Cancer
-                elif sign in [2, 6, 10]:  # Air signs
-                    d27_start = 6  # Libra
-                else:  # Water signs [3, 7, 11]
-                    d27_start = 9  # Capricorn
-                return (d27_start + part) % 12
-            
+                if sign in [0, 4, 8]: start = 0      # Fire: Aries
+                elif sign in [1, 5, 9]: start = 3    # Earth: Cancer
+                elif sign in [2, 6, 10]: start = 6   # Air: Libra
+                else: start = 9                      # Water: Capricorn
+                return (start + part) % 12
+
             elif division == 30:  # Trimsamsa (D30)
                 # Use degree_in_sign directly for unequal parts
-                if sign % 2 == 0:  # Odd Signs
-                    if degree_in_sign < 5: return 0    # Aries (Mars)
-                    elif degree_in_sign < 10: return 10 # Aquarius (Saturn)
-                    elif degree_in_sign < 18: return 8  # Sagittarius (Jupiter)
-                    elif degree_in_sign < 25: return 2  # Gemini (Mercury)
-                    else: return 6                      # Libra (Venus)
-                else:  # Even Signs
-                    if degree_in_sign < 5: return 1     # Taurus (Venus)
-                    elif degree_in_sign < 12: return 5  # Virgo (Mercury)
-                    elif degree_in_sign < 20: return 11 # Pisces (Jupiter)
-                    elif degree_in_sign < 25: return 9  # Capricorn (Saturn)
-                    else: return 7                      # Scorpio (Mars)
-            
+                if sign % 2 == 0:  # Odd
+                    if degree_in_sign < 5: return 0
+                    elif degree_in_sign < 10: return 10
+                    elif degree_in_sign < 18: return 8
+                    elif degree_in_sign < 25: return 2
+                    else: return 6
+                else:  # Even
+                    if degree_in_sign < 5: return 1
+                    elif degree_in_sign < 12: return 5
+                    elif degree_in_sign < 20: return 11
+                    elif degree_in_sign < 25: return 9
+                    else: return 7
+
+            # --- CORRECTIONS ---
+
             elif division == 40:  # Khavedamsa (D40)
-                if sign in [0, 3, 6, 9]:  # Movable signs
-                    d40_start = 0  # Aries
-                elif sign in [1, 4, 7, 10]:  # Fixed signs
-                    d40_start = 4  # Leo
-                else:  # Dual signs
-                    d40_start = 8  # Sagittarius
-                return (d40_start + part) % 12
-            
+                # RULE: Odd Signs start from Aries(0), Even Signs start from Libra(6)
+                if sign % 2 == 0: start = 0  # Odd Sign (Aries is 0)
+                else: start = 6              # Even Sign
+                return (start + part) % 12
+
+            elif division == 45:  # Akshavedamsa (D45)
+                if sign in [0, 3, 6, 9]: start = 0      # Movable: Aries
+                elif sign in [1, 4, 7, 10]: start = 4   # Fixed: Leo
+                else: start = 8                         # Dual: Sag
+                return (start + part) % 12
+
             elif division == 60:  # Shashtyamsa (D60)
-                if sign in [0, 3, 6, 9]:  # Movable signs
-                    d60_start = 0  # Aries
-                elif sign in [1, 4, 7, 10]:  # Fixed signs
-                    d60_start = 4  # Leo
-                else:  # Dual signs
-                    d60_start = 8  # Sagittarius
-                return (d60_start + part) % 12
-            
+                # RULE: Start from the sign itself (Standard/BPHS Chart Calculation)
+                # Note: D60 deities are ignored here, this is for chart placement only
+                return (sign + part) % 12
+
             else:
-                # Default calculation for other divisions
+                # Default for D5, D6, D8, D11 etc if ever passed
                 return (sign + part) % 12
         
         # Calculate divisional chart
@@ -184,7 +187,8 @@ class DivisionalChartCalculator(BaseCalculator):
     def get_chart_name(self, division_number):
         """Get traditional name for divisional chart"""
         chart_names = {
-            1: 'Rasi (D1)', 7: 'Saptamsa (D7)', 9: 'Navamsa (D9)', 10: 'Dasamsa (D10)',
+            1: 'Rasi (D1)', 2: 'Hora (D2)', 3: 'Drekkana (D3)', 4: 'Chaturthamsa (D4)',
+            7: 'Saptamsa (D7)', 9: 'Navamsa (D9)', 10: 'Dasamsa (D10)',
             12: 'Dwadasamsa (D12)', 16: 'Shodasamsa (D16)', 20: 'Vimsamsa (D20)',
             24: 'Chaturvimsamsa (D24)', 27: 'Saptavimsamsa (D27)', 30: 'Trimsamsa (D30)',
             40: 'Khavedamsa (D40)', 45: 'Akshavedamsa (D45)', 60: 'Shashtyamsa (D60)'
@@ -195,6 +199,9 @@ class DivisionalChartCalculator(BaseCalculator):
         """Get significance of divisional chart"""
         significances = {
             1: 'Overall life, personality, general indications',
+            2: 'Wealth, family, material resources',
+            3: 'Siblings, happiness, courage, short journeys',
+            4: 'Destiny, assets, residence, property',
             7: 'Children, progeny, creativity, grandchildren',
             9: 'Marriage, dharma, fortune, spiritual inclinations',
             10: 'Career, profession, status, reputation',

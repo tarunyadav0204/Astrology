@@ -396,6 +396,17 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         birth_data = birth_details
         
+        # Validate partnership mode data
+        if partnership_mode and partner_birth_details:
+            required_fields = ['name', 'date', 'time', 'latitude', 'longitude']
+            for field in required_fields:
+                if not partner_birth_details.get(field):
+                    raise Exception(f"Partner {field} is required for partnership analysis")
+            
+            # Ensure time is not None
+            if partner_birth_details.get('time') is None:
+                raise Exception("Partner birth time cannot be empty for partnership analysis")
+        
         # Build context
         context_builder = ChatContextBuilder()
         

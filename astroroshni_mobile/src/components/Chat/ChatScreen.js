@@ -40,7 +40,7 @@ const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
 export default function ChatScreen({ navigation, route }) {
-  const { credits, fetchBalance } = useCredits();
+  const { credits, partnershipCost, fetchBalance } = useCredits();
   const [chatCost, setChatCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
@@ -1441,10 +1441,10 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)) && styles.modernSendButtonDisabled
+                  (loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost)) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => sendMessage()}
-                disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : chatCost)}
+                disabled={loading || !inputText.trim() || credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost)}
               >
                 <LinearGradient
                   colors={isPremiumAnalysis ? ['#ffd700', '#ff6b35'] : ['#ff6b35', '#ff8c5a']}
@@ -1452,7 +1452,7 @@ export default function ChatScreen({ navigation, route }) {
                 >
                   {loading ? (
                     <Text style={styles.modernSendText}>⏳</Text>
-                  ) : credits < (isPremiumAnalysis ? premiumChatCost : chatCost) ? (
+                  ) : credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost) ? (
                     <Text style={styles.modernSendText}>💳</Text>
                   ) : (
                     <Ionicons name="send" size={20} color={COLORS.white} />
@@ -1461,7 +1461,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             </LinearGradient>
             
-            {credits < (isPremiumAnalysis ? premiumChatCost : chatCost) && (
+            {credits < (isPremiumAnalysis ? premiumChatCost : partnershipMode ? partnershipCost : chatCost) && (
               <TouchableOpacity 
                 style={styles.lowCreditBanner}
                 onPress={() => navigation.navigate('Credits')}
@@ -1913,7 +1913,7 @@ export default function ChatScreen({ navigation, route }) {
                       if (!partnershipMode) {
                         Alert.alert(
                           'Partnership Mode',
-                          'Partnership mode uses 2 credits per question for comprehensive compatibility analysis. Continue?',
+                          `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
                           [
                             { text: 'Cancel', style: 'cancel' },
                             { 

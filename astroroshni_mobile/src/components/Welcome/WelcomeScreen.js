@@ -140,6 +140,8 @@ const WelcomeScreen = ({ navigation }) => {
     { icon: '🔮', title: 'Life Analysis Suite', description: 'Wealth, Health, Marriage & Education insights' },
     { icon: '⏰', title: 'Real-Time Transits', description: 'Current planetary positions affecting you now' },
     { icon: '💬', title: 'Chat with Cosmos', description: 'Ask anything, get instant astrological guidance' },
+    { icon: '⊞', title: 'Ashtakvarga Oracle', description: 'Unlock planetary strength secrets for precise predictions' },
+    { icon: '🌀', title: 'Multi-Dasha System', description: 'Vimshottari, Yogini, Char & Kalachakra timing mastery' },
   ];
 
   useEffect(() => {
@@ -396,7 +398,7 @@ const WelcomeScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
             
-            <TouchableOpacity 
+            {/* <TouchableOpacity 
               onPress={() => navigation.navigate('AnalysisHub')} 
               activeOpacity={0.8}
               style={styles.secondaryButton}
@@ -407,7 +409,7 @@ const WelcomeScreen = ({ navigation }) => {
               >
                 <Text style={styles.secondaryButtonText}>🔮 Explore Life Analysis</Text>
               </LinearGradient>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
             
             <View style={styles.ctaSubtext}>
               <Text style={styles.ctaSubtextMain}>Trusted by 10,000+ Users</Text>
@@ -602,6 +604,7 @@ const styles = StyleSheet.create({
   featuresSection: {
     paddingHorizontal: 20,
     paddingVertical: 40,
+    paddingBottom: 20,
   },
   featuresGrid: {
     flexDirection: 'row',
@@ -653,7 +656,7 @@ const styles = StyleSheet.create({
   },
   securitySection: {
     paddingHorizontal: 20,
-    paddingVertical: 40,
+    paddingVertical: 20,
   },
   securityCard: {
     borderRadius: 24,
