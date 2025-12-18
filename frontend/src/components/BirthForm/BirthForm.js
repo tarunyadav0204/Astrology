@@ -359,7 +359,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     }
   };
 
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState('saved');
 
   return (
     <TabContainer key="fixed-tabs-v2">

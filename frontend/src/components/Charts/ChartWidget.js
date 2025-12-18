@@ -320,7 +320,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
       {showSpecialPoints && createPortal(
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 20000,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setShowSpecialPoints(false)}>
           <div style={{
@@ -468,7 +468,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
       {showCharaKarakas && createPortal(
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 20000,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setShowCharaKarakas(false)}>
           <div style={{
@@ -588,7 +588,7 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
       {showPlanetaryDignities && createPortal(
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 20000,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100002,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }} onClick={() => setShowPlanetaryDignities(false)}>
           <div style={{

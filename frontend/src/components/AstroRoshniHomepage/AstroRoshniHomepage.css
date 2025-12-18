@@ -3693,3 +3693,33 @@
     font-size: 0.7rem;
   }
 }
+
+/* Generate Chart Button Styling */
+.chart-btn {
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  margin-top: 15px;
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+}
+
+.chart-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 15px 0 20px 0;
+}
+
+.chart-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(233, 30, 99, 0.4);
+}
