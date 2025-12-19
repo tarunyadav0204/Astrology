@@ -187,34 +187,64 @@
   text-align: center;
 }
 
-.strengths-grid {
+
+
+.patterns-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.arrow-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.7rem;
+.pattern-item {
+  background: rgba(233, 30, 99, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.pattern-name {
+  font-size: 0.8rem;
   font-weight: bold;
+  color: #e91e63;
+  margin-bottom: 4px;
 }
 
-.arrow-badge.strength {
-  background: linear-gradient(45deg, #e91e63, #ff4081);
-  color: white;
+.pattern-details summary {
+  cursor: pointer;
+  color: #e91e63;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 2px 0;
 }
 
-.arrow-badge.weakness {
-  background: linear-gradient(45deg, #ff9800, #ffa726);
-  color: white;
+.pattern-details summary:hover {
+  color: #c2185b;
 }
 
-.no-strengths {
+.pattern-explanation {
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(233, 30, 99, 0.05);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #555;
+  text-align: left;
+}
+
+.pattern-explanation p {
+  margin: 0 0 6px 0;
+}
+
+.pattern-explanation p:last-child {
+  margin-bottom: 0;
+}
+
+.no-patterns {
   color: #666;
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-align: center;
+  padding: 10px;
 }
 
 .lessons-grid {
@@ -257,6 +287,125 @@
 .lesson-text {
   color: #666;
   line-height: 1.2;
+}
+
+/* Detailed explanations styles */
+.number-details {
+  margin-top: 8px;
+}
+
+.number-details summary {
+  cursor: pointer;
+  color: #e91e63;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 2px 0;
+}
+
+.number-details summary:hover {
+  color: #c2185b;
+}
+
+.detailed-meaning {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(233, 30, 99, 0.05);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #555;
+}
+
+.detailed-meaning p {
+  margin: 0 0 8px 0;
+}
+
+.detailed-meaning p:last-child {
+  margin-bottom: 0;
+}
+
+.combination-analysis {
+  margin-top: 15px;
+  border-top: 1px dashed rgba(233, 30, 99, 0.3);
+  padding-top: 10px;
+}
+
+.combination-summary {
+  cursor: pointer;
+  color: #e91e63;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 5px 0;
+  text-align: center;
+}
+
+.combination-summary:hover {
+  color: #c2185b;
+}
+
+.combination-content {
+  margin-top: 10px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(233, 30, 99, 0.05), rgba(156, 39, 176, 0.05));
+  border-radius: 8px;
+  border: 1px solid rgba(233, 30, 99, 0.2);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #555;
+}
+
+.combination-content p {
+  margin: 0 0 8px 0;
+}
+
+.combination-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Grid explanation styles */
+.grid-explanation {
+  font-size: 0.8rem;
+  color: #666;
+  text-align: center;
+  margin-bottom: 15px;
+  font-style: italic;
+}
+
+.grid-analysis {
+  margin-top: 15px;
+  border-top: 1px dashed rgba(233, 30, 99, 0.3);
+  padding-top: 10px;
+}
+
+.grid-analysis summary {
+  cursor: pointer;
+  color: #e91e63;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 5px 0;
+  text-align: center;
+}
+
+.grid-analysis summary:hover {
+  color: #c2185b;
+}
+
+.grid-analysis-content {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(233, 30, 99, 0.05);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #555;
+}
+
+.grid-analysis-content p {
+  margin: 0 0 6px 0;
+}
+
+.grid-analysis-content p:last-child {
+  margin-bottom: 0;
 }
 
 /* Responsive adjustments */

@@ -4,10 +4,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const getVerdictClass = (compound) => {
+  const lucky = [1, 3, 5, 6, 10, 14, 15, 19, 21, 23, 24, 27, 32, 37, 41, 45, 46, 50];
+  const unlucky = [12, 16, 18, 22, 26, 28, 29, 35, 38, 43, 44, 48];
+  
+  if (lucky.includes(compound)) return 'lucky';
+  if (unlucky.includes(compound)) return 'unlucky';
+  return 'neutral';
+};
+
 export default function NameAlchemist({ data, birthData }) {
   const [customName, setCustomName] = useState('');
   const [nameAnalysis, setNameAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [system, setSystem] = useState('chaldean');
+  const [showExplanation, setShowExplanation] = useState(false);
 
   const analyzeName = async () => {
     if (!customName.trim()) {
@@ -26,7 +37,7 @@ export default function NameAlchemist({ data, birthData }) {
         },
         body: JSON.stringify({
           name: customName.trim(),
-          system: 'chaldean'
+          system: system
         })
       });
 
@@ -73,10 +84,46 @@ export default function NameAlchemist({ data, birthData }) {
 
       {/* Name Optimizer */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🔮 Name Optimizer</Text>
+        <Text style={styles.sectionTitle}>🎯 Name Impact Score</Text>
         <Text style={styles.description}>
-          Enter any name to discover its numerological vibrations and compatibility
+          See how your name affects first impressions & opportunities
         </Text>
+        
+        {/* System Toggle */}
+        <View style={styles.systemToggle}>
+          <TouchableOpacity 
+            style={[styles.toggleBtn, system === 'chaldean' && styles.activeToggle]}
+            onPress={() => setSystem('chaldean')}
+          >
+            <Text style={[styles.toggleText, system === 'chaldean' && styles.activeToggleText]}>Chaldean</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.toggleBtn, system === 'pythagorean' && styles.activeToggle]}
+            onPress={() => setSystem('pythagorean')}
+          >
+            <Text style={[styles.toggleText, system === 'pythagorean' && styles.activeToggleText]}>Pythagorean</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.explanationToggle}
+          onPress={() => setShowExplanation(!showExplanation)}
+        >
+          <Text style={styles.explanationToggleText}>🤔 Why do systems differ?</Text>
+        </TouchableOpacity>
+        
+        {showExplanation && (
+          <View style={styles.explanationBox}>
+            <Text style={styles.explanationTitle}>Two Different Methods:</Text>
+            <Text style={styles.explanationText}>
+              • <Text style={styles.bold}>Chaldean:</Text> Ancient system, more spiritual{"\n"}
+              • <Text style={styles.bold}>Pythagorean:</Text> Modern system, better for business{"\n"}{"\n"}
+              <Text style={styles.bold}>Which to trust?</Text>{"\n"}
+              Personal guidance: Chaldean{"\n"}
+              Business names: Pythagorean
+            </Text>
+          </View>
+        )}
         
         <View style={styles.inputContainer}>
           <TextInput
@@ -122,18 +169,30 @@ export default function NameAlchemist({ data, birthData }) {
                   </View>
                 )}
 
-                {nameAnalysis.compound_verdict && (
+                {nameAnalysis.compound_number && (
                   <View style={styles.verdictSection}>
-                    <Text style={styles.verdictTitle}>Verdict</Text>
-                    <View style={[styles.verdictBadge, 
-                      nameAnalysis.compound_verdict.status === 'excellent' && styles.excellentBadge,
-                      nameAnalysis.compound_verdict.status === 'good' && styles.goodBadge,
-                      nameAnalysis.compound_verdict.status === 'average' && styles.averageBadge,
-                      nameAnalysis.compound_verdict.status === 'challenging' && styles.challengingBadge
-                    ]}>
-                      <Text style={styles.verdictStatus}>{nameAnalysis.compound_verdict.title}</Text>
+                    <View style={styles.compoundDisplay}>
+                      <Text style={styles.compoundNumber}>{nameAnalysis.compound_number}</Text>
+                      <Text style={styles.compoundLabel}>Compound</Text>
                     </View>
-                    <Text style={styles.verdictReason}>{nameAnalysis.compound_verdict.reason}</Text>
+                    <View style={[styles.verdictBadge, 
+                      getVerdictClass(nameAnalysis.compound_number) === 'lucky' && styles.luckyBadge,
+                      getVerdictClass(nameAnalysis.compound_number) === 'unlucky' && styles.unluckyBadge,
+                      getVerdictClass(nameAnalysis.compound_number) === 'neutral' && styles.neutralBadge
+                    ]}>
+                      <Text style={styles.verdictStatus}>
+                        {getVerdictClass(nameAnalysis.compound_number) === 'lucky' ? '✅ Strong Energy' :
+                         getVerdictClass(nameAnalysis.compound_number) === 'unlucky' ? '❌ Challenging' :
+                         '⚠️ Neutral Energy'}
+                      </Text>
+                    </View>
+                    <Text style={styles.verdictReason}>
+                      {getVerdictClass(nameAnalysis.compound_number) === 'lucky' ? 
+                        'Creates positive first impressions and attracts opportunities.' :
+                        getVerdictClass(nameAnalysis.compound_number) === 'unlucky' ?
+                        'May create obstacles. Consider variations for better energy.' :
+                        'Balanced energy. Can be enhanced with modifications.'}
+                    </Text>
                   </View>
                 )}
               </LinearGradient>
@@ -320,5 +379,85 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     lineHeight: 16,
+  },
+  systemToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 4,
+    marginBottom: 16,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  activeToggle: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  toggleText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+  },
+  activeToggleText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  explanationToggle: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  explanationToggleText: {
+    fontSize: 12,
+    color: '#4facfe',
+    fontWeight: '500',
+  },
+  explanationBox: {
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4facfe',
+  },
+  explanationTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 6,
+  },
+  explanationText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 14,
+  },
+  bold: {
+    fontWeight: '600',
+  },
+  compoundDisplay: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  compoundNumber: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  compoundLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+  },
+  luckyBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  unluckyBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  neutralBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
   },
 });

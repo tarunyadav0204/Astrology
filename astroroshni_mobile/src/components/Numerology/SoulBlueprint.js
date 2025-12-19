@@ -1,8 +1,25 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../utils/constants';
 
+const getCoreNumberExplanation = (type, number) => {
+  const explanations = {
+    life_path: {
+      6: "Life Path 6 - Your life's main journey and lessons\n\nWhat it means: You're here to nurture, heal, and create harmony\n\nCareer direction: Teaching, healthcare, counseling, family business\n\nLife theme: Service to others, responsibility, creating stable homes/communities"
+    },
+    expression: {
+      4: "Expression 4 - Your natural talents and how you approach tasks\n\nWhat it means: You're naturally organized, practical, and hardworking\n\nStrengths: Building systems, managing details, creating lasting results\n\nWork style: Methodical, reliable, prefers structure over chaos"
+    },
+    soul_urge: {
+      9: "Soul Urge 9 - Your inner desires and what motivates you\n\nWhat it means: Deep down, you want to make the world better\n\nMotivation: Helping humanity, leaving a positive legacy\n\nFulfillment: Comes from serving causes bigger than yourself"
+    }
+  };
+  return explanations[type]?.[number] || `${type.replace('_', ' ')} ${number} - Personal growth and development`;
+};
+
 export default function SoulBlueprint({ data }) {
+  const [expandedNumber, setExpandedNumber] = useState(null);
+  
   if (!data) {
     return (
       <View style={styles.container}>
@@ -20,7 +37,8 @@ export default function SoulBlueprint({ data }) {
         <Text style={styles.sectionTitle}>Core Numbers</Text>
         <View style={styles.numbersGrid}>
           {core_numbers && Object.entries(core_numbers).map(([key, numberObj]) => {
-            const displayValue = typeof numberObj === 'object' ? numberObj?.number : numberObj;
+            const displayValue = typeof numberObj === 'object' ? 
+              (numberObj?.number || numberObj?.life_path_number) : numberObj;
             const colors = {
               life_path: '#6366f1',
               expression: '#10b981', 
@@ -29,10 +47,21 @@ export default function SoulBlueprint({ data }) {
             };
             return (
               <View key={key} style={styles.numberCard}>
-                <View style={[styles.numberContent, { backgroundColor: colors[key] || '#6b7280' }]}>
+                <TouchableOpacity 
+                  style={[styles.numberContent, { backgroundColor: colors[key] || '#6b7280' }]}
+                  onPress={() => setExpandedNumber(expandedNumber === key ? null : key)}
+                >
                   <Text style={styles.numberValue}>{displayValue}</Text>
                   <Text style={styles.numberLabel}>{key.replace(/_/g, ' ')}</Text>
-                </View>
+                  <Text style={styles.expandHint}>💡 Tap for details</Text>
+                </TouchableOpacity>
+                {expandedNumber === key && (
+                  <View style={styles.explanationBox}>
+                    <Text style={styles.explanationText}>
+                      {getCoreNumberExplanation(key, displayValue)}
+                    </Text>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -130,6 +159,23 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     fontWeight: '500',
   },
+  expandHint: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  explanationBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  explanationText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 16,
+  },
 
   grid: {
     flexDirection: 'row',
@@ -147,16 +193,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(253, 255, 255, 0.28)',
     marginBottom: 14,
   },
   filledCell: {
-    backgroundColor: 'rgba(17, 231, 243, 0.68)',
+    backgroundColor: 'rgba(91, 180, 121, 0.75)',
   },
   gridNumber: {
     fontSize: 18,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(243, 238, 238, 0.6)',
   },
   activeGridNumber: {
     color: '#ffffff',

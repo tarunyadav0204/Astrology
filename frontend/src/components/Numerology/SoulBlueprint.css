@@ -1,0 +1,175 @@
+/* SoulBlueprint.css */
+.soul-blueprint-container {
+  font-family: 'Segoe UI', sans-serif;
+  margin-top: 30px;
+}
+
+.core-numbers-section {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(233, 30, 99, 0.1);
+}
+
+.section-header {
+  color: #e91e63;
+  margin: 0 0 10px 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.section-intro {
+  color: #666;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.core-numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.core-number-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(233, 30, 99, 0.1);
+}
+
+.number-display {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.number {
+  background: linear-gradient(135deg, #e91e63, #f06292);
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.brief-meaning {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0 0 10px 0;
+  font-style: italic;
+}
+
+.detailed-explanation {
+  margin-top: 10px;
+}
+
+.detailed-explanation summary {
+  cursor: pointer;
+  color: #e91e63;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 5px 0;
+}
+
+.detailed-explanation summary:hover {
+  color: #c2185b;
+}
+
+.explanation-content {
+  margin-top: 10px;
+  padding: 15px;
+  background: rgba(233, 30, 99, 0.05);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #555;
+  white-space: pre-line;
+}
+
+.combination-analysis {
+  border-top: 1px dashed rgba(233, 30, 99, 0.3);
+  padding-top: 20px;
+}
+
+.combination-summary {
+  cursor: pointer;
+  color: #e91e63;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.combination-summary:hover {
+  color: #c2185b;
+}
+
+.combination-content {
+  margin-top: 15px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(233, 30, 99, 0.05), rgba(156, 39, 176, 0.05));
+  border-radius: 12px;
+  border: 1px solid rgba(233, 30, 99, 0.2);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #555;
+  white-space: pre-line;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .core-numbers-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .core-number-card {
+    padding: 15px;
+  }
+  
+  .number-display {
+    gap: 12px;
+  }
+  
+  .number {
+    width: 45px;
+    height: 45px;
+    font-size: 1.3rem;
+  }
+  
+  .label {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .core-numbers-section {
+    padding: 20px;
+  }
+  
+  .section-header {
+    font-size: 1.2rem;
+  }
+  
+  .combination-content {
+    padding: 15px;
+    font-size: 0.85rem;
+  }
+}

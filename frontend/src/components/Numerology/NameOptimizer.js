@@ -3,9 +3,9 @@ import './NameOptimizer.css';
 
 const NameOptimizer = ({ initialName, onOptimize }) => {
   const [name, setName] = useState(initialName || '');
-  const [system, setSystem] = useState('chaldean'); // 'chaldean' or 'pythagorean'
+  const [system, setSystem] = useState('chaldean');
   const [result, setResult] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   // Debounce API call to avoid spamming while typing
   useEffect(() => {
@@ -39,8 +39,8 @@ const NameOptimizer = ({ initialName, onOptimize }) => {
   return (
     <div className="optimizer-card">
       <div className="optimizer-header">
-        <h3>Name Alchemist</h3>
-        <p>Test the vibration of your name spelling</p>
+        <h3>🎯 Name Impact Score</h3>
+        <p>See how your name affects first impressions & opportunities</p>
       </div>
 
       <div className="system-toggle">
@@ -57,6 +57,24 @@ const NameOptimizer = ({ initialName, onOptimize }) => {
           Pythagorean (Modern)
         </button>
       </div>
+      
+      <details className="system-explanation">
+        <summary>🤔 Why do the systems give different results?</summary>
+        <div className="system-comparison">
+          <p><strong>Two Different Calculation Methods:</strong></p>
+          
+          <p><strong>Chaldean (Ancient):</strong> Uses numbers 1-8, excludes 9 as sacred. Based on sound vibrations. More accurate for spiritual/personal analysis.</p>
+          
+          <p><strong>Pythagorean (Modern):</strong> Uses numbers 1-9, based on alphabetical order. Better for Western names and business purposes.</p>
+          
+          <p><strong>Which should you trust?</strong></p>
+          <p>• For personal/spiritual guidance: <strong>Chaldean</strong> (more ancient wisdom)</p>
+          <p>• For business/professional names: <strong>Pythagorean</strong> (modern context)</p>
+          <p>• If results conflict: Go with the system that feels more accurate to your experience</p>
+          
+          <p><strong>Remember:</strong> Your name is just one factor. Your actions and intentions matter more than numerology scores.</p>
+        </div>
+      </details>
 
       <div className="name-input-container">
         <input 
@@ -69,36 +87,72 @@ const NameOptimizer = ({ initialName, onOptimize }) => {
       </div>
 
       {result && (
-        <div className={`verdict-box ${getVerdictClass(result.compound_number)}`}>
-          <div className="verdict-number">
-            {result.compound_number}
+        <div className="name-analysis">
+          <div className={`impact-score ${getVerdictClass(result.compound_number)}`}>
+            <div className="score-circle">
+              <span className="score">{result.compound_number}</span>
+              <span className="label">Compound</span>
+            </div>
+            <div className="score-meaning">
+              <h4>{getVerdictClass(result.compound_number) === 'lucky' ? '✅ Strong Name Energy' : 
+                   getVerdictClass(result.compound_number) === 'unlucky' ? '❌ Challenging Energy' : 
+                   '⚠️ Neutral Energy'}</h4>
+              <p>{getVerdictClass(result.compound_number) === 'lucky' ? 
+                'Your name creates positive first impressions and attracts opportunities.' : 
+                getVerdictClass(result.compound_number) === 'unlucky' ?
+                'Your name may create obstacles. Consider the variations below for better energy.' :
+                'Your name has balanced energy. You can enhance it with the suggestions below.'}
+              </p>
+            </div>
           </div>
-          <div className="verdict-text">
-            <h4>{typeof result.verdict === 'object' ? result.verdict.title : result.verdict}</h4>
-            <span>Reduced to Single Digit: {result.single_number}</span>
-            {typeof result.verdict === 'object' && result.verdict.reason && (
-              <small style={{display: 'block', marginTop: '5px', color: 'white'}}>{result.verdict.reason}</small>
-            )}
-          </div>
+          
+          <button 
+            className="details-toggle"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? 'Hide' : 'Show'} Technical Details
+          </button>
+          
+          {showDetails && (
+            <div className="technical-details">
+              <p><strong>Compound Number:</strong> {result.compound_number}</p>
+              <p><strong>Root Number:</strong> {result.single_number}</p>
+              {typeof result.verdict === 'object' && result.verdict.description && (
+                <p><strong>Traditional Meaning:</strong> {result.verdict.description}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Show suggestions only if current name is NOT lucky */}
-      {result && !result.is_lucky && result.remedial_suggestions && (
-        <div className="suggestions-list">
-          <h5 style={{color: '#4caf50', margin: '0 0 10px 0'}}>✨ Lucky Variations found:</h5>
-          {result.remedial_suggestions.map((sug, i) => (
+      {result && getVerdictClass(result.compound_number) !== 'lucky' && result.remedial_suggestions && (
+        <div className="name-suggestions">
+          <h4>🚀 Stronger Name Variations</h4>
+          <p className="suggestion-intro">These variations could improve your name's impact:</p>
+          {result.remedial_suggestions.slice(0, 3).map((sug, i) => (
             <div 
               key={i} 
-              className="suggestion-chip"
+              className="suggestion-card"
               onClick={() => setName(sug.original)}
             >
-              <span style={{fontWeight: 'bold', letterSpacing: '1px'}}>{sug.original}</span>
-              <span style={{color: '#4caf50', fontWeight: 'bold'}}>
-                {sug.compound} ({typeof sug.verdict === 'object' ? sug.verdict.title : sug.verdict.split('(')[0]})
-              </span>
+              <div className="suggestion-name">{sug.original}</div>
+              <div className="suggestion-benefit">
+                <span className="new-score">{sug.compound}</span>
+                <span className="improvement">{getVerdictClass(sug.compound) === 'lucky' ? 'Lucky' : getVerdictClass(sug.compound) === 'neutral' ? 'Neutral' : 'Challenging'}</span>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+      
+      {result && getVerdictClass(result.compound_number) === 'lucky' && (
+        <div className="name-strengths">
+          <h4>💪 Your Name's Strengths</h4>
+          <div className="strength-tags">
+            <span className="strength-tag">Creates Trust</span>
+            <span className="strength-tag">Memorable</span>
+            <span className="strength-tag">Professional Appeal</span>
+          </div>
         </div>
       )}
     </div>
