@@ -535,6 +535,14 @@ const loadHomeData = async (nativeData = null) => {
       description: 'Auspicious timing for all events',
       gradient: ['#9C27B0', '#7B1FA2'],
       cost: 0
+    },
+    { 
+      id: 'numerology', 
+      title: 'Numerology', 
+      icon: '🔢', 
+      description: 'Numbers reveal your destiny',
+      gradient: ['#667eea', '#764ba2'],
+      cost: 0
     }
   ];
 
@@ -1156,6 +1164,8 @@ function AnalysisCard({ option, index, onOptionSelect }) {
         onPress={() => {
           if (option.id === 'muhurat') {
             onOptionSelect({ action: 'muhurat' });
+          } else if (option.id === 'numerology') {
+            onOptionSelect({ action: 'numerology' });
           } else {
             onOptionSelect({ action: 'analysis', type: option.id });
           }

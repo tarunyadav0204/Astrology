@@ -52,6 +52,7 @@ from trading_routes import router as trading_router
 from yogini_dasha_routes import router as yogini_dasha_router
 from physical_scan_routes import router as physical_scan_router
 from physical_feedback_routes import router as physical_feedback_router
+from numerology_routes import router as numerology_router
 import math
 from datetime import timedelta
 import signal
@@ -214,6 +215,9 @@ app.include_router(trading_router, prefix="/api")
 app.include_router(yogini_dasha_router, prefix="/api")
 app.include_router(physical_scan_router, prefix="/api")
 app.include_router(physical_feedback_router, prefix="/api")
+app.include_router(numerology_router, prefix="/api")
+
+
 
 
 # Root endpoint for health check
@@ -359,6 +363,15 @@ class VerifyResetCode(BaseModel):
 class ResetPasswordWithToken(BaseModel):
     token: str
     new_password: str
+
+class NumerologyRequest(BaseModel):
+    name: str
+    dob: str  # Format: YYYY-MM-DD
+    target_date: Optional[str] = None  # For forecast
+
+class NameOptimizationRequest(BaseModel):
+    name: str
+    system: str = 'chaldean'  # 'chaldean' or 'pythagorean'
 
 class MarriageAnalysisRequest(BaseModel):
     chart_data: dict

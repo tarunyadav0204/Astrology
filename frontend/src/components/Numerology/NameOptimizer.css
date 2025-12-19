@@ -1,0 +1,159 @@
+/* NameOptimizer.css */
+.optimizer-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(233, 30, 99, 0.1);
+  margin-top: 30px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.optimizer-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.optimizer-header h3 {
+  color: #e91e63;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.optimizer-header p {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 5px;
+}
+
+/* The Input Field Area */
+.name-input-container {
+  position: relative;
+  margin-bottom: 30px;
+}
+
+.name-input {
+  width: 100%;
+  padding: 15px 20px;
+  font-size: 1.2rem;
+  border: 2px solid rgba(233, 30, 99, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-sizing: border-box;
+}
+
+.name-input:focus {
+  outline: none;
+  border-color: #e91e63;
+  box-shadow: 0 0 0 4px rgba(233, 30, 99, 0.1);
+}
+
+/* The Verdict Display (The Traffic Light) */
+.verdict-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-radius: 16px;
+  color: white;
+  margin-bottom: 20px;
+  transition: all 0.5s ease;
+}
+
+.verdict-box.lucky {
+  background: linear-gradient(135deg, #43a047, #66bb6a); /* Green */
+  box-shadow: 0 4px 15px rgba(67, 160, 71, 0.3);
+}
+
+.verdict-box.neutral {
+  background: linear-gradient(135deg, #fb8c00, #ffa726); /* Orange */
+  box-shadow: 0 4px 15px rgba(251, 140, 0, 0.3);
+}
+
+.verdict-box.unlucky {
+  background: linear-gradient(135deg, #e53935, #ef5350); /* Red */
+  box-shadow: 0 4px 15px rgba(229, 57, 53, 0.3);
+}
+
+.verdict-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.verdict-text {
+  text-align: right;
+}
+
+.verdict-text h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.verdict-text span {
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* System Toggle Switch */
+.system-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: rgba(233, 30, 99, 0.1);
+  padding: 5px;
+  border-radius: 30px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.toggle-btn {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.3s;
+}
+
+.toggle-btn.active {
+  background: white;
+  color: #e91e63;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Suggestions List */
+.suggestions-list {
+  margin-top: 20px;
+  border-top: 1px dashed rgba(0,0,0,0.1);
+  padding-top: 20px;
+}
+
+.suggestion-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 10px 15px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  border-left: 3px solid #4caf50;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.suggestion-chip:hover {
+  transform: translateX(5px);
+}

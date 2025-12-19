@@ -23,6 +23,7 @@ import MuhuratHubScreen from './src/components/MuhuratHubScreen';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
+import NumerologyScreen from './src/components/Numerology/NumerologyScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -196,6 +197,11 @@ export default function App() {
           <Stack.Screen 
             name="AshtakvargaOracle" 
             component={AshtakvargaOracle}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="Numerology" 
+            component={NumerologyScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

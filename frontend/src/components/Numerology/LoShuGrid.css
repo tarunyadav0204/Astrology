@@ -1,0 +1,272 @@
+.loshu-container-compact {
+  padding: 15px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.blueprint-top-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  flex: 1;
+}
+
+.core-numbers-panel {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 15px;
+  padding: 20px;
+  border: 2px solid rgba(233, 30, 99, 0.1);
+}
+
+.panel-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #e91e63;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.core-number-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+}
+
+.number-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+.number-badge.life-path {
+  background: linear-gradient(135deg, #e91e63, #f06292);
+}
+
+.number-badge.expression {
+  background: linear-gradient(135deg, #ff9800, #ffa726);
+}
+
+.number-badge.soul {
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
+}
+
+.number-info {
+  flex: 1;
+}
+
+.number-info strong {
+  display: block;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.number-info small {
+  font-size: 0.75rem;
+  color: #666;
+  line-height: 1.2;
+}
+
+.loshu-grid-panel {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 15px;
+  padding: 20px;
+  border: 2px solid rgba(233, 30, 99, 0.1);
+  position: relative;
+}
+
+.loshu-card-compact {
+  position: relative;
+  height: 200px;
+}
+
+.arrows-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  overflow: visible;
+}
+
+.arrow-path {
+  opacity: 0.6;
+  animation: arrowGlow 2s ease-in-out infinite;
+}
+
+@keyframes arrowGlow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+.grid-layout-compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  height: 100%;
+}
+
+.grid-cell-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  position: relative;
+  transition: all 0.3s ease;
+  font-weight: bold;
+}
+
+.grid-cell-compact.active {
+  background: linear-gradient(135deg, #e91e63, #f06292);
+  color: white;
+  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+}
+
+.grid-cell-compact.inactive {
+  background: rgba(0, 0, 0, 0.05);
+  color: #999;
+  border: 1px dashed #ddd;
+}
+
+.grid-cell-compact .cell-number {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.grid-cell-compact .count-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ff4081;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: bold;
+}
+
+.blueprint-bottom-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-height: 120px;
+}
+
+.strengths-panel, .lessons-panel {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 15px;
+  border: 1px solid rgba(233, 30, 99, 0.1);
+}
+
+.section-title {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.strengths-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.arrow-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.arrow-badge.strength {
+  background: linear-gradient(45deg, #e91e63, #ff4081);
+  color: white;
+}
+
+.arrow-badge.weakness {
+  background: linear-gradient(45deg, #ff9800, #ffa726);
+  color: white;
+}
+
+.no-strengths {
+  color: #666;
+  font-style: italic;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.lessons-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lesson-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.missing-number {
+  width: 24px;
+  height: 24px;
+  background: rgba(233, 30, 99, 0.1);
+  color: #e91e63;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.missing-arrow {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.lesson-text {
+  color: #666;
+  line-height: 1.2;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .blueprint-top-section,
+  .blueprint-bottom-section {
+    grid-template-columns: 1fr;
+  }
+  
+  .loshu-container-compact {
+    padding: 10px;
+  }
+}

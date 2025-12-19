@@ -1,0 +1,119 @@
+/* CosmicForecast.css */
+.forecast-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  font-family: 'Segoe UI', sans-serif;
+  margin-top: 30px;
+}
+
+/* 1. Daily Dashboard Card */
+.weather-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fff3e0 100%);
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  border: 1px solid rgba(255, 204, 128, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.weather-header h4 {
+  color: #ff9800; /* Orange for Energy */
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+}
+
+.current-cycle {
+  margin: 20px 0;
+}
+
+.cycle-badge {
+  width: 80px;
+  height: 80px;
+  background: #ff9800;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  box-shadow: 0 8px 16px rgba(255, 152, 0, 0.3);
+  margin: 0 auto 10px;
+}
+
+.cycle-label {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.advice-section {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 15px;
+  width: 100%;
+  border-left: 4px solid #ff9800;
+}
+
+/* 2. Timeline / Pinnacles Card */
+.timeline-card {
+  background: white;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.timeline-header {
+  color: #e91e63;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.phase-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.phase-row:last-child {
+  border-bottom: none;
+}
+
+.phase-age {
+  background: #fce4ec; /* Light Pink */
+  color: #e91e63;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.phase-info strong {
+  display: block;
+  color: #333;
+}
+
+.phase-info small {
+  color: #666;
+}
+
+.phase-number {
+  font-size: 1.5rem;
+  color: #e91e63;
+  font-weight: bold;
+}
+
+/* Responsive Grid for larger screens */
+@media (min-width: 768px) {
+  .forecast-container {
+    grid-template-columns: 1fr 1fr;
+  }
+}

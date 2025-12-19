@@ -3723,3 +3723,355 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(233, 30, 99, 0.4);
 }
+
+/* Numerology Section Styles */
+.numerology-section {
+  padding: 80px 0;
+  background: linear-gradient(135deg, 
+    rgba(255, 193, 7, 0.05) 0%, 
+    rgba(255, 152, 0, 0.05) 25%,
+    rgba(233, 30, 99, 0.05) 50%,
+    rgba(156, 39, 176, 0.05) 75%,
+    rgba(63, 81, 181, 0.05) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.numerology-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="numerology-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="%23ff9800" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23numerology-pattern)"/></svg>') repeat;
+  pointer-events: none;
+}
+
+.numerology-header {
+  text-align: center;
+  margin-bottom: 60px;
+  position: relative;
+}
+
+.numerology-symbol {
+  position: absolute;
+  font-size: 24px;
+  opacity: 0.3;
+  animation: float 3s ease-in-out infinite;
+}
+
+.numerology-symbol-1 {
+  top: -20px;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.numerology-symbol-2 {
+  top: -30px;
+  right: 15%;
+  animation-delay: 0.5s;
+}
+
+.numerology-symbol-3 {
+  top: 20px;
+  left: 5%;
+  animation-delay: 1s;
+}
+
+.numerology-symbol-4 {
+  top: 10px;
+  right: 8%;
+  animation-delay: 1.5s;
+}
+
+.numerology-title {
+  font-size: 42px;
+  font-weight: bold;
+  background: linear-gradient(135deg, #ff9800, #f57c00, #e65100);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 15px;
+  text-shadow: 0 2px 4px rgba(255, 152, 0, 0.3);
+}
+
+.numerology-subtitle {
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.numerology-divider {
+  width: 100px;
+  height: 3px;
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  margin: 0 auto;
+  border-radius: 2px;
+}
+
+.numerology-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 30px;
+  margin-bottom: 50px;
+}
+
+.numerology-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+  border: 2px solid rgba(255, 152, 0, 0.2);
+  border-radius: 20px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  backdrop-filter: blur(15px);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(255, 152, 0, 0.1);
+}
+
+.numerology-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 152, 0, 0.1), transparent);
+  transition: left 0.6s ease;
+}
+
+.numerology-card:hover::before {
+  left: 100%;
+}
+
+.numerology-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: #ff9800;
+  box-shadow: 0 15px 40px rgba(255, 152, 0, 0.3);
+}
+
+.numerology-icon {
+  font-size: 56px;
+  margin-bottom: 20px;
+  display: block;
+  filter: drop-shadow(0 4px 8px rgba(255, 152, 0, 0.3));
+}
+
+.numerology-card h4 {
+  color: #f57c00;
+  margin-bottom: 15px;
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.numerology-card p {
+  color: #555;
+  margin-bottom: 20px;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.numerology-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.numerology-features span {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 193, 7, 0.1));
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #f57c00;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  font-weight: 500;
+}
+
+.numerology-btn {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+}
+
+.numerology-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(255, 152, 0, 0.4);
+  background: linear-gradient(135deg, #f57c00, #e65100);
+}
+
+.numerology-cta {
+  text-align: center;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 193, 7, 0.1));
+  border-radius: 25px;
+  padding: 40px;
+  border: 2px solid rgba(255, 152, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.numerology-cta .cta-content h3 {
+  color: #f57c00;
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+
+.numerology-cta .cta-content p {
+  color: #666;
+  margin-bottom: 25px;
+  font-size: 16px;
+}
+
+.start-numerology-btn {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+  border: none;
+  padding: 16px 40px;
+  border-radius: 35px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.3);
+}
+
+.start-numerology-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(255, 152, 0, 0.4);
+  background: linear-gradient(135deg, #f57c00, #e65100);
+}
+
+/* Special styling for Lo Shu Grid card */
+.lo-shu-card {
+  border-color: rgba(233, 30, 99, 0.3);
+}
+
+.lo-shu-card:hover {
+  border-color: #e91e63;
+  box-shadow: 0 15px 40px rgba(233, 30, 99, 0.3);
+}
+
+.lo-shu-card .numerology-btn {
+  background: linear-gradient(135deg, #e91e63, #f06292);
+}
+
+.lo-shu-card .numerology-btn:hover {
+  background: linear-gradient(135deg, #c2185b, #e91e63);
+  box-shadow: 0 8px 25px rgba(233, 30, 99, 0.4);
+}
+
+.lo-shu-card h4 {
+  color: #e91e63;
+}
+
+.lo-shu-card .numerology-features span {
+  background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(240, 98, 146, 0.1));
+  color: #e91e63;
+  border-color: rgba(233, 30, 99, 0.3);
+}
+
+/* Numerology Widget Styling */
+.numerology-widget {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 18px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  height: 550px;
+  display: flex;
+  flex-direction: column;
+}
+
+.numerology-widget::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #e91e63, #f06292, #ff6f00, #ff8a65, #ffab91);
+}
+
+.numerology-widget h3 {
+  color: #e91e63;
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: bold;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(233, 30, 99, 0.2);
+  line-height: 1.2;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.numerology-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.numerology-content p {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 0;
+  text-align: center;
+}
+
+.numerology-info {
+  background: rgba(233, 30, 99, 0.1);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 10px 0;
+  text-align: left;
+}
+
+.numerology-info p {
+  margin: 3px 0;
+  font-size: 0.75rem;
+  color: #333;
+}
+
+.numerology-info strong {
+  color: #e91e63;
+}
+
+@media (max-width: 768px) {
+  .numerology-section {
+    padding: 60px 0;
+  }
+  
+  .numerology-title {
+    font-size: 32px;
+  }
+  
+  .numerology-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .numerology-card {
+    padding: 25px;
+  }
+  
+  .numerology-cta {
+    padding: 30px 20px;
+  }
+}

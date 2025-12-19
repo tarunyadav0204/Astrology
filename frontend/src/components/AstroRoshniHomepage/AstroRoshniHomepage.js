@@ -12,6 +12,9 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import ChatModal from '../Chat/ChatModal';
 import CreditsModal from '../Credits/CreditsModal';
 import PanchangWidget from '../PanchangWidget/HomePanchangWidget';
+import LoShuGrid from '../Numerology/LoShuGrid';
+import NameOptimizer from '../Numerology/NameOptimizer';
+import CosmicForecast from '../Numerology/CosmicForecast';
 
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
@@ -109,6 +112,10 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [planetaryLoading, setPlanetaryLoading] = useState(false);
   const [muhuratData, setMuhuratData] = useState(null);
   const [muhuratLoading, setMuhuratLoading] = useState(false);
+  const [numerologyData, setNumerologyData] = useState(null);
+  const [showNumerologyModal, setShowNumerologyModal] = useState(false);
+  const [numerologyTab, setNumerologyTab] = useState('blueprint');
+  const [birthFormContext, setBirthFormContext] = useState('chart');
 
   const generateTodaysData = useCallback(() => {
     const today = new Date();
@@ -282,13 +289,18 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           fetchPlanetaryPositions(),
           fetchMuhuratTimes()
         ]);
+        
+        // Fetch numerology data if user and birth data available
+        if (user && birthData) {
+          fetchNumerologyData();
+        }
       } catch (error) {
         console.error('Error initializing data:', error);
       }
     };
     
     initializeData();
-  }, []);
+  }, [user, birthData]);
 
   // Listen for chart modal open event from chat
   useEffect(() => {
@@ -519,6 +531,64 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       console.error('Error fetching horoscopes:', error);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchNumerologyData = useCallback(async () => {
+    if (!user || !birthData) return;
+    
+    try {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      
+      const response = await fetch(`${API_BASE_URL}/api/numerology/full-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          name: birthData.name,
+          dob: birthData.date
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setNumerologyData(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching numerology data:', error);
+    }
+  }, [user, birthData]);
+
+  const handleNameOptimization = useCallback(async (name, system) => {
+    try {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      
+      const response = await fetch(`${API_BASE_URL}/api/numerology/optimize-name`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          name: name,
+          system: system
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error optimizing name:', error);
+      return null;
     }
   }, []);
 
@@ -1151,6 +1221,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                       setShowChartModal(true);
                     } else {
                       // No chart data, show birth form modal
+                      setBirthFormContext('chart');
                       setShowBirthFormModal(true);
                     }
                   }}
@@ -1162,24 +1233,24 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
 
             {/* Column 3 - Nakshatra Widget (20%) */}
             <div className="form-card nakshatra-widget">
-              <h3>Nakshatra Guide</h3>
+              <h3>⭐ Nakshatra Guide</h3>
               <div className="nakshatra-content">
-                <p>Discover the 27 lunar mansions and their influence</p>
+                <p>Discover your birth star and its profound influence on your life</p>
                 <div className="nakshatra-features">
-                  <div className="feature-item">📅 Annual Periods</div>
-                  <div className="feature-item">⭐ Characteristics</div>
-                  <div className="feature-item">🌟 Predictions</div>
-                  <div className="feature-item">🎯 Lucky Periods</div>
+                  <div className="feature-item">🌟 Birth Star</div>
+                  <div className="feature-item">🔮 Personality Traits</div>
+                  <div className="feature-item">🎯 Life Purpose</div>
+                  <div className="feature-item">🌈 Compatibility</div>
                 </div>
                 <div className="nakshatra-info">
-                  <p><strong>Total:</strong> 27 Nakshatras</p>
-                  <p><strong>Year:</strong> 2025 Calendar</p>
+                  <p><strong>System:</strong> 27 Vedic Nakshatras</p>
+                  <p><strong>Analysis:</strong> Complete Star Map</p>
                 </div>
                 <button 
                   className="nakshatra-btn"
                   onClick={() => navigate('/nakshatras')}
                 >
-                  Explore Now
+                  Explore Nakshatras
                 </button>
               </div>
             </div>
@@ -1463,6 +1534,152 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Numerology Section */}
+      <section className="numerology-section">
+        <div className="container">
+          <div className="numerology-header">
+            <span className="numerology-symbol numerology-symbol-1">🔢</span>
+            <span className="numerology-symbol numerology-symbol-2">🌟</span>
+            <span className="numerology-symbol numerology-symbol-3">🔮</span>
+            <span className="numerology-symbol numerology-symbol-4">✨</span>
+            <h2 className="numerology-title">🔢 Numerology Insights</h2>
+            <p className="numerology-subtitle">Discover your life path through the power of numbers</p>
+            <div className="numerology-divider"></div>
+          </div>
+          
+          <div className="numerology-grid">
+            <div className="numerology-card lo-shu-card">
+              <div className="numerology-icon">🔮</div>
+              <h4>Lo Shu Grid Analysis</h4>
+              <p>Ancient Chinese numerology grid revealing your personality traits and life patterns</p>
+              <div className="numerology-features">
+                <span>🎯 Personality Analysis</span>
+                <span>💪 Strength & Weakness</span>
+                <span>🌟 Life Path Guidance</span>
+              </div>
+              <button 
+                className="numerology-btn"
+                onClick={() => {
+                  if (!user) {
+                    onLogin();
+                    return;
+                  }
+                  setNumerologyTab('blueprint');
+                  if (numerologyData) {
+                    setShowNumerologyModal(true);
+                  } else {
+                    fetchNumerologyData();
+                    setShowNumerologyModal(true);
+                  }
+                }}
+              >
+                {numerologyData ? 'View Grid' : 'Generate Grid'}
+              </button>
+            </div>
+            
+            <div className="numerology-card life-path-card">
+              <div className="numerology-icon">🌟</div>
+              <h4>Life Path Number</h4>
+              <p>Your core life purpose and the path you're meant to walk in this lifetime</p>
+              <div className="numerology-features">
+                <span>🎯 Life Purpose</span>
+                <span>💫 Destiny Number</span>
+                <span>🌈 Soul Mission</span>
+              </div>
+              <button 
+                className="numerology-btn"
+                onClick={() => {
+                  if (!user) {
+                    onLogin();
+                    return;
+                  }
+                  setNumerologyTab('blueprint');
+                  if (numerologyData) {
+                    setShowNumerologyModal(true);
+                  } else {
+                    fetchNumerologyData();
+                    setShowNumerologyModal(true);
+                  }
+                }}
+              >
+                View Life Path
+              </button>
+            </div>
+            
+            <div className="numerology-card name-analysis-card">
+              <div className="numerology-icon">📝</div>
+              <h4>Name Analysis</h4>
+              <p>Discover how your name influences your personality and life experiences</p>
+              <div className="numerology-features">
+                <span>🎭 Personality Traits</span>
+                <span>🔤 Letter Vibrations</span>
+                <span>✨ Name Optimization</span>
+              </div>
+              <button 
+                className="numerology-btn"
+                onClick={() => {
+                  if (!user) {
+                    onLogin();
+                    return;
+                  }
+                  setNumerologyTab('names');
+                  if (numerologyData) {
+                    setShowNumerologyModal(true);
+                  } else {
+                    fetchNumerologyData();
+                    setShowNumerologyModal(true);
+                  }
+                }}
+              >
+                Analyze Name
+              </button>
+            </div>
+            
+            <div className="numerology-card lucky-numbers-card">
+              <div className="numerology-icon">🍀</div>
+              <h4>Lucky Numbers</h4>
+              <p>Personal lucky numbers based on your birth date and name vibrations</p>
+              <div className="numerology-features">
+                <span>🎲 Personal Numbers</span>
+                <span>📅 Date Selection</span>
+                <span>💰 Financial Timing</span>
+              </div>
+              <button 
+                className="numerology-btn"
+                onClick={() => {
+                  if (!user) {
+                    onLogin();
+                    return;
+                  }
+                  setNumerologyTab('forecast');
+                  if (numerologyData) {
+                    setShowNumerologyModal(true);
+                  } else {
+                    fetchNumerologyData();
+                    setShowNumerologyModal(true);
+                  }
+                }}
+              >
+                View Lucky Numbers
+              </button>
+            </div>
+          </div>
+          
+          <div className="numerology-cta">
+            <div className="cta-content">
+              <h3>🔢 Complete Numerology Analysis • Ancient Wisdom • Modern Insights</h3>
+              <p>Unlock the secrets hidden in your numbers with Tara's guidance</p>
+            </div>
+            <button 
+              className="start-numerology-btn"
+              onClick={() => user ? setShowChatModal(true) : onLogin()}
+            >
+              🌟 Explore Numerology with Tara
+            </button>
           </div>
         </div>
       </section>
@@ -1799,11 +2016,183 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onClose={() => setShowBirthFormModal(false)}
         onSubmit={() => {
           setShowBirthFormModal(false);
-          setShowChartModal(true);
+          if (birthFormContext === 'numerology') {
+            fetchNumerologyData();
+            setShowNumerologyModal(true);
+          } else {
+            setShowChartModal(true);
+          }
         }}
-        title="Birth Chart - Enter Details"
-        description="Please provide your birth information to generate your Vedic birth chart"
+        title={birthFormContext === 'numerology' ? 'Numerology - Enter Details' : 'Birth Chart - Enter Details'}
+        description={birthFormContext === 'numerology' ? 'Please provide birth information for numerology analysis' : 'Please provide your birth information to generate your Vedic birth chart'}
       />
+      
+      {showNumerologyModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100001
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '15px',
+            padding: '20px',
+            maxWidth: '900px',
+            width: '95%',
+            maxHeight: '85vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowNumerologyModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+            >
+              ×
+            </button>
+            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+              <h2 style={{ color: '#e91e63', marginBottom: '10px' }}>Life Optimization Suite</h2>
+              {birthData && (
+                <div style={{ 
+                  background: 'rgba(233, 30, 99, 0.1)', 
+                  padding: '8px 16px', 
+                  borderRadius: '20px', 
+                  display: 'inline-block',
+                  fontSize: '14px',
+                  color: '#e91e63',
+                  border: '1px solid rgba(233, 30, 99, 0.2)',
+                  marginBottom: '15px'
+                }}>
+                  👤 <strong>{birthData.name}</strong> • 📅 {birthData.date}
+                </div>
+              )}
+              
+              {/* Change Native Option */}
+              <div style={{ marginTop: '10px' }}>
+                <button 
+                  onClick={() => {
+                    setShowNumerologyModal(false);
+                    setBirthFormContext('numerology');
+                    setShowBirthFormModal(true);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #e91e63',
+                    color: '#e91e63',
+                    padding: '6px 12px',
+                    borderRadius: '15px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  👤 Change Native
+                </button>
+              </div>
+            </div>
+            
+            {/* Tab Navigation */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '10px',
+              marginBottom: '30px',
+              borderBottom: '2px solid #f0f0f0',
+              paddingBottom: '15px'
+            }}>
+              <button 
+                onClick={() => setNumerologyTab('blueprint')}
+                style={{
+                  padding: '10px 20px',
+                  border: 'none',
+                  borderRadius: '25px',
+                  background: numerologyTab === 'blueprint' ? 'linear-gradient(135deg, #e91e63, #f06292)' : 'rgba(233, 30, 99, 0.1)',
+                  color: numerologyTab === 'blueprint' ? 'white' : '#e91e63',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                🔮 Soul Blueprint
+              </button>
+              <button 
+                onClick={() => setNumerologyTab('forecast')}
+                style={{
+                  padding: '10px 20px',
+                  border: 'none',
+                  borderRadius: '25px',
+                  background: numerologyTab === 'forecast' ? 'linear-gradient(135deg, #ff9800, #ffa726)' : 'rgba(255, 152, 0, 0.1)',
+                  color: numerologyTab === 'forecast' ? 'white' : '#ff9800',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                🌟 Cosmic Weather
+              </button>
+              <button 
+                onClick={() => setNumerologyTab('names')}
+                style={{
+                  padding: '10px 20px',
+                  border: 'none',
+                  borderRadius: '25px',
+                  background: numerologyTab === 'names' ? 'linear-gradient(135deg, #4caf50, #66bb6a)' : 'rgba(76, 175, 80, 0.1)',
+                  color: numerologyTab === 'names' ? 'white' : '#4caf50',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✨ Name Alchemist
+              </button>
+            </div>
+            
+            {/* Tab Content */}
+            {numerologyTab === 'blueprint' && (
+              numerologyData ? (
+                <LoShuGrid numerologyData={numerologyData} />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                  🔢 Loading Soul Blueprint...<br/>
+                  <small>Calculating your life path numbers and Lo Shu grid</small>
+                </div>
+              )
+            )}
+            
+            {numerologyTab === 'forecast' && (
+              numerologyData && numerologyData.forecast ? (
+                <CosmicForecast forecastData={numerologyData.forecast} />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                  🌟 Loading Cosmic Weather...<br/>
+                  <small>Analyzing your personal year, month, and day cycles</small>
+                </div>
+              )
+            )}
+            
+            {numerologyTab === 'names' && (
+              <NameOptimizer 
+                initialName={birthData?.name || ''} 
+                onOptimize={handleNameOptimization}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

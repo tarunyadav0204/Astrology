@@ -595,6 +595,8 @@ export default function ChatScreen({ navigation, route }) {
       navigation.navigate('AshtakvargaOracle');
     } else if (option.action === 'muhurat') {
       navigation.navigate('MuhuratHub');
+    } else if (option.action === 'numerology') {
+      navigation.navigate('Numerology');
     } else if (option.action === 'analysis') {
       if (option.type === 'trading') {
         navigation.navigate('TradingDashboard');
@@ -1873,6 +1875,36 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={styles.menuText}>Chat History</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('Numerology');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#667eea', '#764ba2']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🔢</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Numerology</Text>
                       <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
                     </LinearGradient>
                   </TouchableOpacity>
