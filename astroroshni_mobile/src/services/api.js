@@ -119,6 +119,8 @@ export const chartAPI = {
   updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),
   deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`),
   setChartAsSelf: (id) => api.put(`${getEndpoint('/birth-charts')}/${id}/set-as-self`),
+  searchUsers: (query) => api.get(`${getEndpoint('/users/search')}?query=${encodeURIComponent(query)}`),
+  shareChart: (chartId, targetUserId) => api.post(getEndpoint('/charts/share'), { chart_id: chartId, target_user_id: targetUserId }),
 };
 
 export const creditAPI = {

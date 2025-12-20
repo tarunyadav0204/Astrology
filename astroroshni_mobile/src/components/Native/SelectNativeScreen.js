@@ -9,6 +9,9 @@ import {
   Alert,
   Animated,
   PanResponder,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -18,7 +21,7 @@ import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 
-const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDelete, onConnectToProfile, getZodiacSign }) => {
+const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMore, getZodiacSign }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const [isRevealed, setIsRevealed] = useState(false);
 
@@ -34,7 +37,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
     onPanResponderRelease: (evt, gestureState) => {
       if (gestureState.dx < -60) {
         Animated.spring(translateX, {
-          toValue: -120,
+          toValue: -80,
           useNativeDriver: true,
         }).start();
         setIsRevealed(true);
@@ -64,7 +67,6 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
             style={[styles.actionButton, styles.editButton]}
             activeOpacity={0.7}
             onPress={() => { 
-              console.log('✏️ Edit button tapped');
               closeSwipe(); 
               onEdit(profile); 
             }}
@@ -72,18 +74,11 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
             <Ionicons name="pencil" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.actionButton, styles.connectButton]}
+            style={[styles.actionButton, styles.moreButton]}
             activeOpacity={0.7}
-            onPress={() => { closeSwipe(); onConnectToProfile(profile); }}
+            onPress={() => { closeSwipe(); onMore(profile); }}
           >
-            <Ionicons name="person" size={20} color={COLORS.white} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton]}
-            activeOpacity={0.7}
-            onPress={() => { closeSwipe(); onDelete(profile); }}
-          >
-            <Ionicons name="trash" size={20} color={COLORS.white} />
+            <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       )}
@@ -157,6 +152,13 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [profileCharts, setProfileCharts] = useState({});
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [selectedProfileForMenu, setSelectedProfileForMenu] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const fromProfile = route.params?.fromProfile;
   const returnTo = route.params?.returnTo;
 
@@ -316,36 +318,87 @@ export default function SelectNativeScreen({ navigation, route }) {
     );
   };
 
-  const handleConnectToProfile = (profile) => {
-    Alert.alert(
-      'Connect to Profile',
-      `Connect ${profile.name}'s chart to your profile?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Connect', 
-          onPress: async () => {
-            try {
-              await chartAPI.setChartAsSelf(profile.id);
-              Alert.alert('Success', '✅ Chart connected to your profile!');
-              loadProfiles();
-            } catch (error) {
-              let errorMessage = '❌ Something went wrong. Please try again.';
-              
-              if (error.message?.includes('Network Error') || error.code === 'NETWORK_ERROR') {
-                errorMessage = '❌ Connection failed. Please check your internet.';
-              } else if (error.response?.status >= 500) {
-                errorMessage = '❌ Server error. Please try again later.';
-              } else if (error.response?.data?.detail) {
-                errorMessage = `❌ ${error.response.data.detail}`;
-              }
-              
-              Alert.alert('Error', errorMessage);
-            }
-          }
-        }
-      ]
-    );
+  const handleConnectToProfile = async (profile) => {
+    try {
+      await chartAPI.setChartAsSelf(profile.id);
+      Alert.alert('Success', '✅ Chart connected to your profile!');
+      loadProfiles();
+    } catch (error) {
+      let errorMessage = '❌ Something went wrong. Please try again.';
+      
+      if (error.message?.includes('Network Error') || error.code === 'NETWORK_ERROR') {
+        errorMessage = '❌ Connection failed. Please check your internet.';
+      } else if (error.response?.status >= 500) {
+        errorMessage = '❌ Server error. Please try again later.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = `❌ ${error.response.data.detail}`;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  const handleShare = async (profile) => {
+    console.log('Opening share modal for profile:', profile);
+    setShowShareModal(true);
+  };
+
+  const searchUsers = async (query) => {
+    if (query.length < 4) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setSearching(true);
+    try {
+      console.log('Searching for:', query);
+      const response = await chartAPI.searchUsers(query);
+      console.log('Search response:', response);
+      console.log('Search data:', response.data);
+      const users = response.data?.users || [];
+      console.log('Users found:', users);
+      setSearchResults(users);
+    } catch (error) {
+      console.log('Search error:', error);
+      console.log('Error response:', error.response);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleShareWithUser = async (targetUser) => {
+    if (!selectedProfileForMenu) {
+      console.log('No profile selected for sharing');
+      return;
+    }
+    
+    console.log('Sharing chart:', selectedProfileForMenu.id, 'with user:', targetUser.userid);
+    setSharing(true);
+    try {
+      const response = await chartAPI.shareChart(selectedProfileForMenu.id, targetUser.userid);
+      console.log('Share response:', response);
+      Alert.alert('Success', `Chart shared with ${targetUser.name}`);
+      setShowShareModal(false);
+      setSearchQuery('');
+      setSearchResults([]);
+    } catch (error) {
+      console.log('Share error:', error);
+      console.log('Error response:', error.response);
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to share chart. Please try again.');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleMore = (profile) => {
+    setSelectedProfileForMenu(profile);
+    setShowBottomSheet(true);
+  };
+
+  const closeBottomSheet = () => {
+    setShowBottomSheet(false);
+    // Don't clear selectedProfileForMenu here - keep it for share modal
   };
 
   const getSignIcon = (signNumber) => {
@@ -403,8 +456,7 @@ export default function SelectNativeScreen({ navigation, route }) {
                 selectedProfile={selectedProfile}
                 onSelect={selectProfile}
                 onEdit={handleEdit}
-                onDelete={handleDelete}
-                onConnectToProfile={handleConnectToProfile}
+                onMore={handleMore}
                 getZodiacSign={getZodiacSign}
               />
             ))}
@@ -430,6 +482,148 @@ export default function SelectNativeScreen({ navigation, route }) {
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
+
+      <Modal
+        visible={showBottomSheet}
+        transparent
+        animationType="fade"
+        onRequestClose={closeBottomSheet}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={closeBottomSheet}
+        >
+          <View style={styles.bottomSheet}>
+            <View style={styles.bottomSheetHandle} />
+            <Text style={styles.bottomSheetTitle}>Options</Text>
+            
+            <TouchableOpacity 
+              style={styles.bottomSheetItem}
+              onPress={() => {
+                closeBottomSheet();
+                if (selectedProfileForMenu) {
+                  handleConnectToProfile(selectedProfileForMenu);
+                }
+              }}
+            >
+              <Ionicons name="person" size={22} color="#2196F3" />
+              <Text style={styles.bottomSheetItemText}>Connect to My Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.bottomSheetItem}
+              onPress={() => {
+                closeBottomSheet();
+                if (selectedProfileForMenu) {
+                  handleShare(selectedProfileForMenu);
+                }
+              }}
+            >
+              <Ionicons name="share-social" size={22} color="#4CAF50" />
+              <Text style={styles.bottomSheetItemText}>Share</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.bottomSheetItem}
+              onPress={() => {
+                closeBottomSheet();
+                if (selectedProfileForMenu) {
+                  handleDelete(selectedProfileForMenu);
+                }
+              }}
+            >
+              <Ionicons name="trash" size={22} color="#f44336" />
+              <Text style={styles.bottomSheetItemText}>Delete</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.bottomSheetCancel}
+              onPress={closeBottomSheet}
+            >
+              <Text style={styles.bottomSheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showShareModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowShareModal(false);
+          setSearchQuery('');
+          setSearchResults([]);
+        }}
+      >
+        <View style={styles.shareModalOverlay}>
+          <View style={styles.shareModalContent}>
+            <View style={styles.shareModalHeader}>
+              <Text style={styles.shareModalTitle}>Share Chart</Text>
+              <TouchableOpacity onPress={() => {
+                setShowShareModal(false);
+                setSearchQuery('');
+                setSearchResults([]);
+                setSelectedProfileForMenu(null);
+              }}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.shareModalSubtitle}>Search user by name or phone (min 4 characters)</Text>
+
+            <View style={styles.searchInputContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Type name or phone number..."
+                value={searchQuery}
+                onChangeText={(text) => {
+                  setSearchQuery(text);
+                  searchUsers(text);
+                }}
+                autoFocus
+              />
+              {searching && <ActivityIndicator size="small" color="#ff6b35" />}
+            </View>
+
+            <View style={styles.searchResultsContainer}>
+              {searchQuery.length < 4 && (
+                <Text style={styles.searchHint}>Type at least 4 characters to search</Text>
+              )}
+              
+              {searchQuery.length >= 4 && searchResults.length === 0 && !searching && (
+                <Text style={styles.noResults}>No users found</Text>
+              )}
+
+              {searchResults.length > 0 && searchResults.map((user) => (
+                <TouchableOpacity
+                  key={user.userid}
+                  style={styles.userResultItem}
+                  onPress={() => handleShareWithUser(user)}
+                  disabled={sharing}
+                >
+                  <View style={styles.userResultLeft}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.userResultName}>{user.name}</Text>
+                      <Text style={styles.userResultPhone}>****{user.phone}</Text>
+                    </View>
+                  </View>
+                  {sharing ? (
+                    <ActivityIndicator size="small" color="#ff6b35" />
+                  ) : (
+                    <Ionicons name="arrow-forward" size={20} color="#999" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -513,11 +707,162 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: '#4CAF50',
   },
-  connectButton: {
-    backgroundColor: '#2196F3',
+  moreButton: {
+    backgroundColor: '#9c27b0',
   },
-  deleteButton: {
-    backgroundColor: '#f44336',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 12,
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  bottomSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    marginBottom: 12,
+  },
+  bottomSheetItemText: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    marginLeft: 16,
+    fontWeight: '600',
+  },
+  bottomSheetCancel: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  bottomSheetCancelText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+  },
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  shareModalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 20,
+    maxHeight: '80%',
+  },
+  shareModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  shareModalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  searchResultsContainer: {
+    minHeight: 200,
+  },
+  searchHint: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 14,
+    marginTop: 20,
+  },
+  noResults: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 14,
+    marginTop: 20,
+  },
+  userResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  userResultLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ff6b35',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  userAvatarText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  userResultName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  userResultPhone: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   selectedCard: {
     shadowColor: '#ff6b35',
