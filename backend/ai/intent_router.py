@@ -5,7 +5,7 @@ from typing import Dict
 
 class IntentRouter:
     """
-    Classifies user queries into 'Birth Chart' vs 'Prashna' (Horary) analysis.
+    Classifies user queries into 'Birth Chart' vs 'Annual' analysis.
     Uses Gemini Flash for ultra-fast (<1s) classification.
     """
     
@@ -16,7 +16,7 @@ class IntentRouter:
         
     async def classify_intent(self, user_question: str) -> Dict[str, str]:
         """
-        Returns: {'mode': 'prashna' | 'birth' | 'annual', 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}}
+        Returns: {'mode': 'birth' | 'annual', 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}}
         """
         import time
         from datetime import datetime
@@ -33,9 +33,8 @@ class IntentRouter:
         Classify this astrology question and determine if transit data is needed:
 
         MODES:
-        1. "prashna": IMMEDIATE outcomes, lost objects, YES/NO questions (e.g. "Will I get this job?", "Where is my wallet?")
-        2. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
-        3. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
 
         TRANSIT DETECTION:
         - "When will..." questions → needs_transits: true
@@ -43,7 +42,6 @@ class IntentRouter:
         - "How is 2025/next year..." → needs_transits: true
         - "Marriage timing" → needs_transits: true
         - Personality/yoga/general questions → needs_transits: false
-        - Prashna questions → needs_transits: false
 
         Question: "{user_question}"
 
@@ -56,7 +54,7 @@ class IntentRouter:
 
         Return ONLY a JSON object:
         {{
-            "mode": "prashna" or "annual" or "birth",
+            "mode": "annual" or "birth",
             "category": "category_name",
             "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
             "needs_transits": true or false,
@@ -76,7 +74,7 @@ class IntentRouter:
         - "What are my strengths?" → needs_transits: false
         - "When will I get married?" → startYear: {current_year}, endYear: {current_year + 2} (general timing)
         
-        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, lost_item, court_case, enemy, competition, general
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
         """
         
         print(f"\n📤 INTENT ROUTER REQUEST:")
