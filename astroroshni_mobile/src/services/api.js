@@ -118,6 +118,7 @@ export const chartAPI = {
   },
   updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data),
   deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`),
+  setChartAsSelf: (id) => api.put(`${getEndpoint('/birth-charts')}/${id}/set-as-self`),
 };
 
 export const creditAPI = {

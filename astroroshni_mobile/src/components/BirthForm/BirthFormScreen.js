@@ -48,6 +48,13 @@ export default function BirthFormScreen({ navigation, route }) {
     gender: editProfile?.gender?.trim() || '',
   });
   
+  // Log edit mode for debugging
+  useEffect(() => {
+    if (editProfile) {
+      console.log('📝 Edit mode activated with profile:', editProfile.name);
+    }
+  }, []);
+  
   const getPickerDate = () => {
     const d = new Date();
     d.setHours(formData.time.getHours(), formData.time.getMinutes(), 0, 0);
@@ -337,6 +344,7 @@ export default function BirthFormScreen({ navigation, route }) {
         longitude: formData.longitude,
         timezone: formData.timezone,
         gender: formData.gender,
+        relation: editProfile?.relation || 'other',
       };
 
       // 1. Calculate chart for validation
@@ -346,17 +354,22 @@ export default function BirthFormScreen({ navigation, route }) {
       ]);
 
       // 2. Save to database FIRST to get real ID
-      let birthChartId = null;
+      let birthChartId = editProfile?.id || null;
       const token = await storage.getAuthToken();
       if (token) {
-        // For new profiles: clear_existing=true (mark this as 'self', others as 'other')
-        // For updates: clear_existing=false (don't change other profiles)
-        const shouldClearExisting = !updateGender && !editProfile;
-        const response = await authAPI.updateSelfBirthChart(birthData, shouldClearExisting);
-        birthChartId = response.data?.birth_chart_id;
+        if (editProfile && birthChartId) {
+          // Edit mode: update existing chart by ID
+          console.log('✏️ Updating existing chart with ID:', birthChartId);
+          await chartAPI.updateChart(birthChartId, birthData);
+        } else {
+          // New profile: use updateSelfBirthChart
+          const shouldClearExisting = !updateGender;
+          const response = await authAPI.updateSelfBirthChart(birthData, shouldClearExisting);
+          birthChartId = response.data?.birth_chart_id;
+        }
       } else {
         // Generate temporary ID if no auth token
-        birthChartId = Date.now() + Math.random();
+        birthChartId = birthChartId || Date.now() + Math.random();
       }
 
       // 3. Create profile data with REAL ID from database
@@ -389,10 +402,14 @@ export default function BirthFormScreen({ navigation, route }) {
 
       triggerConfetti();
       setTimeout(() => {
-        const successMessage = updateGender ? 'Gender updated successfully!' : 'Birth chart calculated successfully!';
+        const successMessage = updateGender ? 'Gender updated successfully!' : editProfile ? 'Profile updated successfully!' : 'Birth chart calculated successfully!';
         Alert.alert('Success', successMessage, [
           { text: 'OK', onPress: () => {
-            navigation.replace('Home');
+            if (editProfile) {
+              navigation.navigate('SelectNative');
+            } else {
+              navigation.replace('Home');
+            }
           }}
         ]);
       }, 1000);

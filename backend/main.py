@@ -12,6 +12,7 @@ import bcrypt
 import jwt
 from horoscope.api import HoroscopeAPI
 from rule_engine.api import router as rule_engine_router
+from birth_charts.routes import router as birth_charts_router
 from user_settings import router as settings_router
 from daily_predictions import DailyPredictionEngine
 from house_combinations import router as house_combinations_router
@@ -183,6 +184,7 @@ app.add_middleware(
 
 # Include rule engine router with /api prefix
 app.include_router(rule_engine_router, prefix="/api")
+app.include_router(birth_charts_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(house_combinations_router, prefix="/api")
 app.include_router(nadi_router, prefix="/api")

@@ -59,21 +59,28 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onDe
   return (
     <View style={styles.profileWrapper}>
       {isRevealed && (
-        <View style={styles.swipeActions}>
+        <View style={styles.swipeActions} pointerEvents="box-none">
           <TouchableOpacity 
             style={[styles.actionButton, styles.editButton]}
-            onPress={() => { closeSwipe(); onEdit(profile); }}
+            activeOpacity={0.7}
+            onPress={() => { 
+              console.log('✏️ Edit button tapped');
+              closeSwipe(); 
+              onEdit(profile); 
+            }}
           >
             <Ionicons name="pencil" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionButton, styles.connectButton]}
+            activeOpacity={0.7}
             onPress={() => { closeSwipe(); onConnectToProfile(profile); }}
           >
             <Ionicons name="person" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton]}
+            activeOpacity={0.7}
             onPress={() => { closeSwipe(); onDelete(profile); }}
           >
             <Ionicons name="trash" size={20} color={COLORS.white} />
@@ -274,7 +281,14 @@ export default function SelectNativeScreen({ navigation, route }) {
   };
 
   const handleEdit = (profile) => {
-    navigation.navigate('BirthForm', { editProfile: profile });
+    console.log('✏️ Edit button pressed for:', profile.name);
+    const profileData = {
+      ...profile,
+      date: profile.date.includes('T') ? profile.date.split('T')[0] : profile.date,
+      time: profile.time.includes('T') ? new Date(profile.time).toTimeString().slice(0, 5) : profile.time,
+    };
+    console.log('📝 Navigating to BirthForm with data:', profileData);
+    navigation.navigate('BirthForm', { editProfile: profileData });
   };
 
   const handleDelete = (profile) => {
@@ -312,10 +326,9 @@ export default function SelectNativeScreen({ navigation, route }) {
           text: 'Connect', 
           onPress: async () => {
             try {
-              const { authAPI } = require('../../services/api');
-              await authAPI.updateSelfBirthChart(profile);
+              await chartAPI.setChartAsSelf(profile.id);
               Alert.alert('Success', '✅ Chart connected to your profile!');
-              navigation.navigate('Profile');
+              loadProfiles();
             } catch (error) {
               let errorMessage = '❌ Something went wrong. Please try again.';
               
@@ -475,6 +488,7 @@ const styles = StyleSheet.create({
   profileCard: {
     borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   cardTouchable: {
     borderRadius: 16,
@@ -487,13 +501,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    zIndex: -1,
+    borderRadius: 16,
   },
   actionButton: {
-    width: 60,
+    width: 40,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 16,
   },
   editButton: {
     backgroundColor: '#4CAF50',

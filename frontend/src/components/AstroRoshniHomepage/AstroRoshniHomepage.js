@@ -1669,7 +1669,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             </div>
           </div>
           
-          <div className="numerology-cta">
+          {/* <div className="numerology-cta">
             <div className="cta-content">
               <h3>🔢 Complete Numerology Analysis • Ancient Wisdom • Modern Insights</h3>
               <p>Unlock the secrets hidden in your numbers with Tara's guidance</p>
@@ -1680,7 +1680,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             >
               🌟 Explore Numerology with Tara
             </button>
-          </div>
+          </div> */}
         </div>
       </section>
 

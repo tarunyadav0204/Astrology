@@ -104,29 +104,22 @@ export default function NumerologyScreen({ navigation, route }) {
       id: 'soul',
       title: 'Soul Blueprint',
       subtitle: 'Core Numbers & Life Path',
-      icon: '🔮',
+      icon: '🧮',
       gradient: ['#667eea', '#764ba2'],
     },
     {
       id: 'cosmic',
       title: 'Cosmic Weather',
       subtitle: 'Daily Cycles & Timeline',
-      icon: '🌟',
+      icon: '📅',
       gradient: ['#f093fb', '#f5576c'],
     },
     {
       id: 'name',
       title: 'Name Alchemist',
-      subtitle: 'Optimize Your Identity',
-      icon: '✨',
+      subtitle: 'Discover your name\'s power & find lucky variations',
+      icon: '✍️',
       gradient: ['#4facfe', '#00f2fe'],
-    },
-    {
-      id: 'cosmic2',
-      title: 'Cosmic Weather',
-      subtitle: 'Personal Forecast',
-      icon: '🌙',
-      gradient: ['#a8edea', '#fed6e3'],
     }
   ];
 
@@ -152,7 +145,7 @@ export default function NumerologyScreen({ navigation, route }) {
                 <TouchableOpacity
                   key={card.id}
                   style={styles.cardContainer}
-                  onPress={() => openModal(card.id === 'cosmic2' ? 'cosmic' : card.id)}
+                  onPress={() => openModal(card.id)}
                   activeOpacity={0.8}
                 >
                   <LinearGradient colors={card.gradient} style={styles.card}>
@@ -191,9 +184,9 @@ export default function NumerologyScreen({ navigation, route }) {
 
                   <View style={styles.tabContainer}>
                     {[
-                      { id: 'soul', title: 'Soul Blueprint', icon: '🔮' },
-                      { id: 'cosmic', title: 'Cosmic Weather', icon: '🌟' },
-                      { id: 'name', title: 'Name Alchemist', icon: '✨' }
+                      { id: 'soul', title: 'Soul Blueprint', icon: '🧮' },
+                      { id: 'cosmic', title: 'Cosmic Weather', icon: '📅' },
+                      { id: 'name', title: 'Name Alchemist', icon: '✍️' }
                     ].map((tab) => (
                       <TouchableOpacity
                         key={tab.id}
@@ -268,13 +261,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   cardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     gap: 16,
   },
   cardContainer: {
-    width: '48%',
+    width: '100%',
     marginBottom: 16,
   },
   card: {
