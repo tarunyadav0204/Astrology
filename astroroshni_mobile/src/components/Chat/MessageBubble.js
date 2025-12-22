@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,18 @@ import {
   Animated,
   Clipboard,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
+import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -33,6 +36,18 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       }),
     ]).start();
   }, []);
+  const sharePDF = async () => {
+    try {
+      setIsGeneratingPDF(true);
+      const pdfUri = await generatePDF(message);
+      await sharePDFOnWhatsApp(pdfUri);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const copyToClipboard = async () => {
     try {
       const cleanText = message.content
@@ -704,6 +719,17 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             >
               <Text style={styles.actionIcon}>↗️</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.pdfButton]}
+              onPress={sharePDF}
+              disabled={isGeneratingPDF}
+            >
+              {isGeneratingPDF ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Text style={styles.actionIcon}>📄</Text>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
@@ -912,6 +938,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  pdfButton: {
+    backgroundColor: 'rgba(249, 115, 22, 0.15)',
+    borderColor: 'rgba(249, 115, 22, 0.3)',
   },
   actionIcon: {
     fontSize: 16,

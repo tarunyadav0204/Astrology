@@ -701,6 +701,17 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
         
         print(f"   - Total context size: {len(chart_json)} characters")
         
+        # 2.5. INJECT USER SEMANTIC MEMORY (if present)
+        user_facts = context.get('user_facts')
+        if user_facts:
+            facts_text = "KNOWN USER BACKGROUND (Long-Term Memory):\n"
+            if isinstance(user_facts, dict):
+                for category, items in user_facts.items():
+                    fact_str = ", ".join(items) if isinstance(items, list) else str(items)
+                    facts_text += f"- {category.upper()}: {fact_str}\n"
+            prompt_parts.append(facts_text)
+            print(f"   - Injected {len(user_facts)} categories of user memory")
+        
         # 3. DYNAMIC: Transit Data (if present) - This breaks cache prefix but that's OK
         if transits:
             transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=True)

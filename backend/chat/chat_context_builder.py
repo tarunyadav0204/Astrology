@@ -31,6 +31,8 @@ from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 from calculators.prashna_calculator import PrashnaCalculator
 from calculators.varshphal_calculator import VarshphalCalculator
 from calculators.chara_dasha_calculator import CharaDashaCalculator
+from calculators.jaimini_point_calculator import JaiminiPointCalculator
+from calculators.jaimini_full_analyzer import JaiminiFullAnalyzer
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -135,6 +137,15 @@ Tone: Empathetic, insightful, objective, and solution-oriented.
 Philosophy: Astrology indicates "Karma," not "Fate." Hard aspects show challenges to be managed, not doom to be feared.
 Objective: Provide accurate, actionable guidance based on the JSON data provided.
 
+## 🧠 USER MEMORY INTEGRATION
+You have access to a "KNOWN USER BACKGROUND" section containing facts extracted from previous conversations.
+- ALWAYS cross-reference these facts with the chart analysis
+- Use facts to personalize your response (e.g., "Since you work in tech..." if career=Software Engineer)
+- Prioritize relevant house analysis based on known facts (e.g., 5th house/Jupiter if user has children)
+- Do NOT ask for information already present in the user background
+- Example: If user is "Married" (Fact), focus 7th house analysis on marriage harmony, not timing
+- Example: If user has "2 kids" (Fact), analyze 5th house for children's prospects, not pregnancy timing
+
 ## CORE ANALYTICAL RULES (THE "SYNTHESIS PROTOCOL")
 You must never rely on a single chart or a single placement. You must synthesize data using the following hierarchy:
 
@@ -176,6 +187,48 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
     - **Mangala (Moon) / Siddha (Venus):** Predict Success, Auspiciousness, and Ease.
     - **Ulka (Saturn):** Predict Labor, Workload, or Sudden Changes.
 - **Synthesis:** If Vimshottari says "Career Change" and Yogini says "Sankata," predict a "Forced or stressful job change." If Yogini says "Siddha," predict a "Smooth and lucky transition."
+
+### F. Jaimini Points Logic
+- **Arudha Lagna (AL):** Use this for questions about FAME, STATUS, and REPUTATION. (e.g., "Will I be famous?" → Check AL).
+- **Upapada Lagna (UL):** Use this for questions about MARRIAGE and SPOUSE.
+- **Swamsa (Navamsa Lagna) & Karkamsa (AK in D9):**
+    - Use **Swamsa** as the reference point for spiritual path and skills.
+    - Check the connection between Atmakaraka and Swamsa.
+    - If user asks about "Talent" or "Soul Purpose", analyze planets in the Karkamsa or Swamsa.
+
+### G. Jaimini Full System (Rashi Drishti & Yogas)
+- **Rashi Drishti (Sign Aspects):** In Jaimini, SIGNS aspect SIGNS, not planets. Use `jaimini_full_analysis['sign_aspects']` to see which signs connect.
+- **Jaimini Raj Yogas:** Check `jaimini_full_analysis['jaimini_yogas']` for powerful combinations:
+    - **Jaimini Raj Yoga (AK+AmK):** Soul + Career connection = High status and authority
+    - **Atma-Putra Yoga (AK+PK):** Soul + Children connection = Creative genius
+    - **Atma-Dara Yoga (AK+DK):** Soul + Spouse connection = Wealth through partnerships
+- **When to Use:** For career questions, check if Jaimini Raj Yoga is present. For timing, cross-reference with Chara Dasha to see if the yoga is activated in current period.
+
+### H. JAIMINI SYSTEM INSTRUCTIONS (THE "SECOND OPINION")
+You have access to a full Jaimini System in `jaimini_points` and `jaimini_full_analysis`. Use this to confirm predictions or find hidden details.
+
+1. **The "Stage" (Lagnas):**
+   - **Arudha Lagna (AL):** represents "Perception & Status".
+     * Rule: If user asks about Fame, Reputation, or Promotions, prioritize planets aspecting the AL (using Rashi Drishti).
+   - **Upapada Lagna (UL):** represents "Marriage & Spouse".
+     * Rule: If user asks about Spouse characteristics, describe the sign of UL and planets aspecting it.
+   - **Swamsa (Navamsa Lagna):** represents "Soul's Path & Talent".
+     * Rule: Use this for "Purpose", "Skills", and "Spiritual" questions.
+
+2. **The "Connection" (Rashi Drishti - Sign Aspects):**
+   - **CRITICAL:** In Jaimini, Signs aspect Signs. Do not use planetary aspects here.
+   - Check `jaimini_full_analysis['sign_aspects']` to see which signs are connected.
+   - *Example:* If Aries aspects Leo, then planets in Aries influence the 5th House (if Leo is 5th).
+
+3. **The "Power" (Jaimini Yogas):**
+   - Check `jaimini_full_analysis['jaimini_yogas']`.
+   - If a **"Jaimini Raj Yoga"** (AK + AmK) is active, predict high success even if the D1 chart looks average.
+   - Mention this explicitly: *"While your 10th house is moderate, a powerful Jaimini Raj Yoga activates your career sector, guaranteeing success."*
+
+4. **Synthesis Rule:**
+   - Use **Parashari (D1/D10)** for the "What" (Promise).
+   - Use **Jaimini (AL/UL/Yogas)** for the "Quality" (How it manifests).
+   - Use **Chara Dasha** for the "When" (Timing).
 
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
@@ -518,9 +571,34 @@ For every user query, structure your response exactly as follows:
         d9_data_structure = d9_chart.get('divisional_chart', d9_chart)
         d9_planet_analyzer = PlanetAnalyzer(d9_data_structure, birth_obj)
         
+        # Calculate Chara Karakas
+        karaka_data = chara_karaka_calc.calculate_chara_karakas()
+        
+        # Calculate Jaimini Points
+        # FIX: Extract the planet name string explicitly to prevent "unhashable type: dict" error
+        atmakaraka_data = karaka_data['chara_karakas'].get('Atmakaraka', {})
+        atmakaraka_planet = atmakaraka_data.get('planet')  # e.g., "Sun"
+        
+        # Initialize with the planet name string, not the dictionary object
+        jaimini_calc = JaiminiPointCalculator(
+            chart_data, 
+            divisional_charts['d9_navamsa'], 
+            atmakaraka_planet
+        )
+        
+        # Run Full Jaimini Analysis
+        jaimini_analyzer = JaiminiFullAnalyzer(chart_data, karaka_data)
+        jaimini_report = jaimini_analyzer.get_jaimini_report()
+        
         context.update({
             # Key divisional charts
             "divisional_charts": divisional_charts,
+            
+            # Jaimini Points
+            "jaimini_points": jaimini_calc.calculate_jaimini_points(),
+            
+            # Full Jaimini Analysis
+            "jaimini_full_analysis": jaimini_report,
             
             # Planetary analysis
             "planetary_analysis": {},  # D1 (Rashi)
@@ -540,7 +618,7 @@ For every user query, structure your response exactly as follows:
             "yogas": yoga_calc.calculate_all_yogas(),
             
             # Chara Karakas
-            "chara_karakas": chara_karaka_calc.calculate_chara_karakas(),
+            "chara_karakas": karaka_data,
             
             # Advanced Analysis
             "advanced_analysis": {
