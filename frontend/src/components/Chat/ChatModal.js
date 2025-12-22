@@ -418,7 +418,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const createSession = async () => {
         try {
             const token = localStorage.getItem('token');
-            const birth_chart_id = birthData?.id;
+            const birth_chart_id = birthData?.id; // Get from birthData
+            
+            console.log('Creating session with birth_chart_id:', birth_chart_id);
             
             const response = await fetch('/api/chat-v2/session', {
                 method: 'POST',

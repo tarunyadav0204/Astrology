@@ -347,7 +347,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id
+        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type
         FROM chat_messages cm
         JOIN chat_sessions cs ON cm.session_id = cs.session_id
         WHERE cm.message_id = ?
@@ -359,13 +359,13 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     if not result:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    status, content, error_message, started_at, completed_at, user_id = result
+    status, content, error_message, started_at, completed_at, user_id, message_type = result
     
     # Verify message belongs to user
     if user_id != current_user.userid:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    response = {"status": status}
+    response = {"status": status, "message_type": message_type or "answer"}
     
     if status == "completed":
         response["content"] = content
@@ -382,14 +382,23 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     """Background task to process Gemini response"""
     import sys
     import os
+    import json
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     from ai.gemini_chat_analyzer import GeminiChatAnalyzer
     from chat.chat_context_builder import ChatContextBuilder
     from credits.credit_service import CreditService
     from ai.intent_router import IntentRouter
+    from chat.fact_extractor import FactExtractor
     
     try:
+        # Get birth_chart_id from session
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT birth_chart_id FROM chat_sessions WHERE session_id = ?", (session_id,))
+            session_data = cursor.fetchone()
+            birth_chart_id = session_data[0] if session_data else None
+        
         # Use birth data from request (required)
         if not birth_details:
             raise Exception("Birth details are required for chat analysis")
@@ -410,11 +419,35 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # Build context
         context_builder = ChatContextBuilder()
         
+        # Get conversation history for intent routing
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT sender, content FROM chat_messages 
+                WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
+                ORDER BY timestamp DESC LIMIT 6
+            ''', (session_id,))
+            
+            history_rows = cursor.fetchall()
+            history = []
+            for i in range(0, len(history_rows), 2):
+                if i + 1 < len(history_rows):
+                    history.append({
+                        "question": history_rows[i+1][1],
+                        "response": history_rows[i][1]
+                    })
+            
+            # Get conversation state
+            cursor.execute("SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = ?", (session_id,))
+            state_row = cursor.fetchone()
+            clarification_count = state_row[0] if state_row else 0
+            extracted_context = json.loads(state_row[1]) if state_row and state_row[1] else {}
+        
         # === INTENT ROUTING ===
         import time
         routing_start = time.time()
         
-        intent = {'mode': 'birth', 'category': 'general'}  # Default
+        intent = {'status': 'READY', 'mode': 'birth', 'category': 'general', 'extracted_context': {}}  # Default
         
         if not partnership_mode:
             # Use AI to classify (Fast)
@@ -422,8 +455,74 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"🛣️ ROUTING DECISION STARTED")
             print(f"{'='*80}")
             
+            # Get conversation history
+            with sqlite3.connect('astrology.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT sender, content FROM chat_messages 
+                    WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
+                    ORDER BY timestamp DESC LIMIT 6
+                ''', (session_id,))
+                
+                history_rows = cursor.fetchall()
+                history = []
+                for i in range(0, len(history_rows), 2):
+                    if i + 1 < len(history_rows):
+                        history.append({
+                            "question": history_rows[i+1][1],
+                            "response": history_rows[i][1]
+                        })
+                
+                # Get conversation state
+                cursor.execute("SELECT clarification_count FROM conversation_state WHERE session_id = ?", (session_id,))
+                state_row = cursor.fetchone()
+                clarification_count = state_row[0] if state_row else 0
+            
             intent_router = IntentRouter()
-            intent = await intent_router.classify_intent(question)
+            intent = await intent_router.classify_intent(question, history)
+            
+            print(f"🔍 CLARIFICATION CHECK:")
+            print(f"   Intent status: {intent.get('status')}")
+            print(f"   Clarification count: {clarification_count}")
+            print(f"   Will clarify: {intent.get('status') == 'CLARIFY' and clarification_count < 2}")
+            
+            # Check if clarification needed and under limit
+            if intent.get('status') == 'CLARIFY' and clarification_count < 2:
+                print(f"✅ RETURNING CLARIFICATION QUESTION")
+                # Return clarification question
+                with sqlite3.connect('astrology.db') as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        (sanitize_text(intent.get('clarification_question', 'Could you provide more details?')), "completed", "clarification", datetime.now(), message_id)
+                    )
+                    
+                    # Update conversation state
+                    cursor.execute("""
+                        INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(session_id) DO UPDATE SET 
+                            clarification_count = clarification_count + 1,
+                            extracted_context = ?,
+                            last_updated = CURRENT_TIMESTAMP
+                    """, (session_id, 1, json.dumps(intent.get('extracted_context', {})), json.dumps(intent.get('extracted_context', {}))))
+                    
+                    conn.commit()
+                print(f"✅ CLARIFICATION SAVED TO DATABASE, EXITING EARLY")
+                return  # Exit early, no chart calculation needed
+            elif intent.get('status') == 'READY':
+                # Reset clarification count when ready to answer
+                with sqlite3.connect('astrology.db') as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(session_id) DO UPDATE SET 
+                            clarification_count = 0,
+                            last_updated = CURRENT_TIMESTAMP
+                    """, (session_id, 0, json.dumps(intent.get('extracted_context', {}))))
+                    conn.commit()
+                print(f"✅ RESET CLARIFICATION COUNT TO 0 (READY status)")
             
             routing_time = time.time() - routing_start
             print(f"✅ ROUTING DECISION COMPLETE: {intent['mode'].upper()} mode")
@@ -543,6 +642,20 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         "question": history_rows[i+1][1],
                         "response": history_rows[i][1]
                     })
+            
+            # Get user facts if birth_chart_id exists
+            user_facts = {}
+            if birth_chart_id:
+                fact_extractor = FactExtractor()
+                user_facts = fact_extractor.get_facts(birth_chart_id)
+        
+        # Inject user facts into context
+        if user_facts:
+            context['user_facts'] = user_facts
+        
+        # Inject extracted context from clarifications
+        if intent.get('extracted_context'):
+            context['extracted_context'] = intent['extracted_context']
         
         # Generate response
         analyzer = GeminiChatAnalyzer()
@@ -573,8 +686,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 if success:
                     print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, status = ?, completed_at = ? WHERE message_id = ?",
-                        (sanitize_text(result['response']), "completed", datetime.now(), message_id)
+                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        (sanitize_text(result['response']), "completed", "answer", datetime.now(), message_id)
                     )
                 else:
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
@@ -590,6 +703,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 )
             
             conn.commit()
+        
+        # Extract facts AFTER transaction commits to avoid database lock
+        if result.get('success') and birth_chart_id:
+            try:
+                fact_extractor = FactExtractor()
+                await fact_extractor.extract_facts(question, result['response'], birth_chart_id)
+            except Exception as e:
+                print(f"❌ Fact extraction error: {e}")
         
     except Exception as e:
         # Handle any errors with user-friendly message

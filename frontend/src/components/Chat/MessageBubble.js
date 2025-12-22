@@ -330,7 +330,7 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
     return (
         <div 
             ref={messageRef}
-            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''}`}
+            className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''} ${message.message_type === 'clarification' ? 'clarification' : ''}`}
             onTouchStart={isMobile() ? handleLongPress : undefined}
             onClick={() => isMobile() && showActions && setShowActions(false)}
         >

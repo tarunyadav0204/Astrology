@@ -640,6 +640,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     return null;
   }
 
+  // Check if this is a clarification message
+  const isClarification = message.message_type === 'clarification';
+
   // Handle typing indicator
   if (message.isTyping) {
     return (
@@ -672,11 +675,14 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       <View style={[
         styles.bubble,
         message.role === 'user' ? styles.userBubble : styles.assistantBubble,
-        isPartnership && styles.partnershipBubble
+        isPartnership && styles.partnershipBubble,
+        isClarification && styles.clarificationBubble
       ]}>
         {message.role === 'assistant' && (
           <View style={styles.assistantHeader}>
-            <Text style={styles.assistantLabel}>🔮 AstroRoshni</Text>
+            <Text style={styles.assistantLabel}>
+              {isClarification ? '❓ Question' : '🔮 AstroRoshni'}
+            </Text>
           </View>
         )}
         
@@ -983,5 +989,17 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 10,
     fontWeight: '600',
+  },
+  clarificationBubble: {
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFA726',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 167, 38, 0.3)',
+    shadowColor: '#FFA726',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
   },
 });

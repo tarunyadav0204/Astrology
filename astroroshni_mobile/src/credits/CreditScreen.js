@@ -67,7 +67,14 @@ const CreditScreen = ({ navigation }) => {
         }),
       ])
     ).start();
-  }, []);
+    
+    // Refresh credits when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchBalance();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   const fetchHistory = async () => {
     try {
