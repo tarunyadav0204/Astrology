@@ -30,6 +30,7 @@ from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 from calculators.prashna_calculator import PrashnaCalculator
 from calculators.varshphal_calculator import VarshphalCalculator
+from calculators.chara_dasha_calculator import CharaDashaCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -153,6 +154,16 @@ NEVER predict failure or death based on D1 alone. Always check the D9 dignity of
 - Transit is the Trigger: Transits only deliver what the Dasha promises.
 
 Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g., Jupiter-Moon), predict "Stress and workload, but overall success." Do not predict "Ruin" just because of a transit.
+
+### E. The "Double Confirmation" Rule (Jaimini Chara Dasha)
+- **What it is:** A Sign-based timing system found in `context['chara_dasha']`. Unlike Vimshottari (which uses Planets), this uses Zodiac Signs as the clock.
+- **How to Use:**
+    1. Locate the **Relevant Period** in the JSON (where `is_current: true`). This flag marks the period relevant to the user's question timeframe, not necessarily today.
+    2. Check the **Sign** for that period (e.g., "Cancer").
+    3. **Synthesis:** Does this Sign activate the house related to the user's question?
+       - *Example (Career):* If the user asks about a job in 2030, and the Chara Dasha sign for 2030 is the 10th House, 1st House, or contains the Amatyakaraka (Career Planet), this is a **"Double Confirmation"** of success.
+- **Mandatory Output Rule:** If the Chara Dasha confirms the Vimshottari prediction, you MUST explicitly mention it in the **"Detailed Analysis"** section.
+    - *Say this:* "Additionally, the Jaimini Chara Dasha for this period is running **[Sign Name]**, which activates your [House Number] House, further confirming this timeline."
 
 ### C. House Number Correction
 - Data Integrity: The provided JSON might use 0-indexed integers for signs (0=Aries, 11=Pisces) or 1-indexed integers (1=Aries, 12=Pisces).
@@ -705,6 +716,49 @@ For every user query, structure your response exactly as follows:
         yogini_calc = YoginiDashaCalculator()
         moon_lon = chart_data['planets']['Moon']['longitude']
         context['yogini_dasha'] = yogini_calc.calculate_current_yogini(birth_data, moon_lon, target_date)
+        
+        # Add Chara Dasha (Jaimini) with DYNAMIC TARGETING
+        try:
+            from datetime import datetime
+            birth_hash = self._create_birth_hash(birth_data)
+            chart_data = self.static_cache[birth_hash]['d1_chart']
+            chara_calc = CharaDashaCalculator(chart_data)
+            dob_dt = datetime.strptime(birth_data['date'], '%Y-%m-%d')
+            
+            # Calculate full sequence
+            full_chara_data = chara_calc.calculate_dasha(dob_dt)
+            
+            # Determine focus date (PRIORITY ORDER)
+            focus_date = datetime.now()
+            
+            # PRIORITY 1: Intent Router (User's explicit question: "How is 2028?")
+            if intent_result and intent_result.get('transit_request'):
+                req = intent_result['transit_request']
+                year = req.get('startYear') or req.get('start_year')
+                if year:
+                    focus_date = datetime(int(year), 1, 1)
+            
+            # PRIORITY 2: Explicit Target Date (Backend override/Annual mode)
+            elif target_date:
+                focus_date = target_date
+            
+            # PRIORITY 3: Gemini Requested Period (Tool call/Drill-down)
+            elif requested_period:
+                year = requested_period.get('startYear') or requested_period.get('start_year')
+                if year:
+                    focus_date = datetime(int(year), 1, 1)
+            
+            # Update is_current flag based on focus date
+            for period in full_chara_data['periods']:
+                p_start = datetime.strptime(period['start_date'], "%Y-%m-%d")
+                p_end = datetime.strptime(period['end_date'], "%Y-%m-%d")
+                period['is_current'] = p_start <= focus_date < p_end
+                if period['is_current']:
+                    period['note'] = "ACTIVE PERIOD for User Question"
+            
+            context['chara_dasha'] = full_chara_data
+        except Exception as e:
+            print(f"Chara Dasha calculation error: {e}")
         
         # Add specific date dashas if requested
         if target_date:

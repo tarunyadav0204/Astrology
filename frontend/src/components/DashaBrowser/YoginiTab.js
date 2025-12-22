@@ -171,17 +171,68 @@ const YoginiTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentStatus
         <div className="dasha-cards">
           {yoginiData.timeline.map((dasha, index) => {
             const config = YOGINI_CONFIG[dasha.name] || YOGINI_CONFIG['Mangala'];
-            const isSelected = selectedDashas.maha === dasha.name;
-            const isCurrent = dasha.name === yoginiData.current?.mahadasha?.name;
+            const isSelected = expandedIndex === index;
+            const isCurrent = dasha.name === yoginiData.current?.mahadasha?.name &&
+                             dasha.start === yoginiData.current?.mahadasha?.start &&
+                             dasha.end === yoginiData.current?.mahadasha?.end;
             const progress = calculateProgress(dasha.start, dasha.end);
             
             return (
               <div
                 key={`${dasha.name}-${index}`}
                 className={`dasha-card yogini-card ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''}`}
-                onClick={() => {
+                onClick={async () => {
+                  setExpandedIndex(index);
                   setSelectedDashas({ maha: dasha.name });
-                  setExpandedIndex(expandedIndex === index ? null : index);
+                  
+                  if (!dasha.sub_periods) {
+                    try {
+                      const formattedBirthData = {
+                        name: birthData.name,
+                        date: birthData.date.includes('T') ? birthData.date.split('T')[0] : birthData.date,
+                        time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
+                        latitude: parseFloat(birthData.latitude),
+                        longitude: parseFloat(birthData.longitude),
+                        timezone: birthData.timezone || 'UTC+5:30',
+                        place: birthData.place || 'Unknown'
+                      };
+
+                      const startDate = new Date(dasha.start);
+                      const endDate = new Date(dasha.end);
+                      const midDate = new Date((startDate.getTime() + endDate.getTime()) / 2);
+                      const targetDate = midDate.toISOString().split('T')[0];
+
+                      const response = await fetch('/api/yogini-dasha', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          ...formattedBirthData,
+                          years: 5,
+                          target_date: targetDate
+                        })
+                      });
+
+                      if (response.ok) {
+                        const data = await response.json();
+                        const mahaWithSubPeriods = data.timeline?.find(t => 
+                          t.name === dasha.name && 
+                          t.start === dasha.start && 
+                          t.sub_periods
+                        );
+                        
+                        if (mahaWithSubPeriods?.sub_periods) {
+                          setYoginiData(prev => ({
+                            ...prev,
+                            timeline: prev.timeline.map((item, i) => 
+                              i === index ? { ...item, sub_periods: mahaWithSubPeriods.sub_periods } : item
+                            )
+                          }));
+                        }
+                      }
+                    } catch (err) {
+                      console.error('Failed to fetch sub_periods:', err);
+                    }
+                  }
                 }}
                 style={{ borderColor: config.color }}
               >
@@ -208,10 +259,13 @@ const YoginiTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentStatus
   };
 
   const renderAntardashaLevel = () => {
-    if (expandedIndex === null || !yoginiData?.timeline[expandedIndex]?.sub_periods) return null;
+    if (expandedIndex === null) return null;
     
-    const selectedMaha = yoginiData.timeline[expandedIndex];
+    const selectedMaha = yoginiData?.timeline[expandedIndex];
+    if (!selectedMaha) return null;
+    
     const antarPeriods = selectedMaha.sub_periods;
+    if (!antarPeriods || antarPeriods.length === 0) return null;
     
     return (
       <div className="dasha-level">
@@ -220,7 +274,9 @@ const YoginiTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentStatus
           {antarPeriods.map((period, index) => {
             const config = YOGINI_CONFIG[period.name] || YOGINI_CONFIG['Mangala'];
             const isSelected = selectedDashas.antar === period.name;
-            const isCurrent = period.name === yoginiData.current?.antardasha?.name;
+            const isCurrent = period.name === yoginiData.current?.antardasha?.name &&
+                             period.start === yoginiData.current?.antardasha?.start &&
+                             period.end === yoginiData.current?.antardasha?.end;
             const progress = calculateProgress(period.start, period.end);
             
             return (

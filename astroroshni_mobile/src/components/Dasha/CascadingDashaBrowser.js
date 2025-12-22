@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -17,8 +18,11 @@ import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import JaiminiKalachakraHomeRN from './JaiminiKalachakraHomeRN';
 import YoginiDashaTab from './YoginiDashaTab';
+import CharaDashaTab from './CharaDashaTab';
 import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import DateNavigator from '../Common/DateNavigator';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
@@ -699,7 +703,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   const renderDashaTypeSelector = () => (
     <View style={styles.dashaTypeSelector}>
-      <View style={styles.tabScrollView}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
         <TouchableOpacity
           style={[styles.dashaTypeTab, dashaType === 'vimshottari' && styles.activeDashaTypeTab]}
           onPress={() => {
@@ -744,11 +748,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           }}
         >
           <Text style={[styles.dashaTypeTabText, dashaType === 'yogini' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            Yogini Dasha
+            Yogini
           </Text>
         </TouchableOpacity>
-
-      </View>
+        <TouchableOpacity
+          style={[styles.dashaTypeTab, dashaType === 'chara' && styles.activeDashaTypeTab]}
+          onPress={() => {
+            setDashaType('chara');
+            setSelectedDashas({});
+          }}
+        >
+          <Text style={[styles.dashaTypeTabText, dashaType === 'chara' && styles.activeDashaTypeTabText]} numberOfLines={1}>
+            Chara
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 
@@ -2173,13 +2187,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               <React.Fragment>
                 {renderKalchakraDashaList()}
               </React.Fragment>
-            ) : dashaType === 'yogini' ? (
-              <YoginiDashaTab data={yoginiData} />
-            ) : (
-              <React.Fragment>
-                {renderJaiminiTabs()}
-              </React.Fragment>
-            )}
+            ) : dashaType === 'chara' ? (
+              <CharaDashaTab birthData={birthData} />
+            ) : null}
           </View>
         </ScrollView>
         
@@ -2476,15 +2486,13 @@ const styles = StyleSheet.create({
   },
   tabScrollView: {
     flexDirection: 'row',
-    flex: 1,
   },
   dashaTypeTab: {
-    flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginRight: 4,
+    marginRight: 8,
   },
   tabContent: {
     flexDirection: 'row',

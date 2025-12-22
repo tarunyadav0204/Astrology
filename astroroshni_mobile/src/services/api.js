@@ -104,6 +104,10 @@ export const chartAPI = {
   calculateDasha: (birthData) => api.post(getEndpoint('/calculate-dasha'), birthData),
   calculateYoginiDasha: (birthData, years = 5) => 
     api.post(getEndpoint('/yogini-dasha'), { ...birthData, years }),
+  calculateCharaDasha: (birthData) => 
+    api.post(getEndpoint('/chara-dasha/calculate'), birthData),
+  calculateCharaAntardasha: (birthData, mahaSignId) => 
+    api.post(getEndpoint('/chara-dasha/antardasha'), { ...birthData, maha_sign_id: mahaSignId }),
   scanPhysicalTraits: (birthData, birthChartId = null) => 
     api.post(getEndpoint('/scan-physical'), { birth_data: birthData, birth_chart_id: birthChartId }),
   

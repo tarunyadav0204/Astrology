@@ -170,13 +170,30 @@ const KalachakraTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentSt
 
 
 
+  const scrollCards = (level, direction) => {
+    const container = document.querySelector(`.kalachakra-tab .dasha-level:nth-child(${level}) .dasha-cards`);
+    if (container) {
+      const scrollAmount = 200;
+      container.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   const renderMahadashaLevel = () => {
     const mahadashas = kalchakraData?.mahadashas;
     if (!mahadashas || mahadashas.length === 0) return null;
     
     return (
       <div className="dasha-level">
-        <h4 className="dasha-level-title">Kalachakra Mahadasha</h4>
+        <div className="dasha-level-header">
+          <h4 className="dasha-level-title">Kalachakra Mahadasha</h4>
+          <div className="scroll-arrows">
+            <button className="scroll-arrow" onClick={() => scrollCards(1, 'left')}>‹</button>
+            <button className="scroll-arrow" onClick={() => scrollCards(1, 'right')}>›</button>
+          </div>
+        </div>
         <div className="dasha-cards">
           {mahadashas.map((dasha, index) => {
             const isSelected = selectedDashas.maha === dasha.name;
@@ -225,7 +242,13 @@ const KalachakraTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentSt
     
     return (
       <div className="dasha-level">
-        <h4 className="dasha-level-title">Kalachakra Antardasha</h4>
+        <div className="dasha-level-header">
+          <h4 className="dasha-level-title">Kalachakra Antardasha</h4>
+          <div className="scroll-arrows">
+            <button className="scroll-arrow" onClick={() => scrollCards(2, 'left')}>‹</button>
+            <button className="scroll-arrow" onClick={() => scrollCards(2, 'right')}>›</button>
+          </div>
+        </div>
         <div className="dasha-cards">
           {antarPeriods.map((period, index) => {
             const isSelected = selectedDashas.antar === period.name;

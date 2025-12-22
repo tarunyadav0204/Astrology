@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import VimshottariTab from './VimshottariTab';
 import KalachakraTab from './KalachakraTab';
 import YoginiTab from './YoginiTab';
+import CharaTab from './CharaTab';
 import './DashaBrowser.css';
 
 const DashaBrowser = ({ birthData, chartData }) => {
@@ -152,34 +153,6 @@ const DashaBrowser = ({ birthData, chartData }) => {
           </div>
         </div>
 
-        {/* Current Dasha Section */}
-        <div className="dasha-section">
-          {activeTab === 'vimshottari' && (
-            <VimshottariTab 
-              birthData={birthData} 
-              transitDate={transitDate}
-              onDateChange={setTransitDate}
-              showOnlyCurrentStatus={true}
-            />
-          )}
-          {activeTab === 'kalachakra' && (
-            <KalachakraTab 
-              birthData={birthData} 
-              transitDate={transitDate}
-              onDateChange={setTransitDate}
-              showOnlyCurrentStatus={true}
-            />
-          )}
-          {activeTab === 'yogini' && (
-            <YoginiTab 
-              birthData={birthData} 
-              transitDate={transitDate}
-              onDateChange={setTransitDate}
-              showOnlyCurrentStatus={true}
-            />
-          )}
-        </div>
-
         {/* Dasha Type Tabs Section */}
         <div className="tabs-section">
           <button
@@ -203,7 +176,48 @@ const DashaBrowser = ({ birthData, chartData }) => {
           >
             Yogini
           </button>
+          <button
+            className={`dasha-tab ${activeTab === 'chara' ? 'active' : ''}`}
+            onClick={() => setActiveTab('chara')}
+            style={{borderRadius: 0}}
+          >
+            Chara
+          </button>
         </div>
+      </div>
+
+      {/* Current Dasha Section - Below Header */}
+      <div className="current-dasha-container">
+        {activeTab === 'vimshottari' && (
+          <VimshottariTab 
+            birthData={birthData} 
+            transitDate={transitDate}
+            onDateChange={setTransitDate}
+            showOnlyCurrentStatus={true}
+          />
+        )}
+        {activeTab === 'kalachakra' && (
+          <KalachakraTab 
+            birthData={birthData} 
+            transitDate={transitDate}
+            onDateChange={setTransitDate}
+            showOnlyCurrentStatus={true}
+          />
+        )}
+        {activeTab === 'yogini' && (
+          <YoginiTab 
+            birthData={birthData} 
+            transitDate={transitDate}
+            onDateChange={setTransitDate}
+            showOnlyCurrentStatus={true}
+          />
+        )}
+        {activeTab === 'chara' && (
+          <CharaTab 
+            birthData={birthData}
+            showOnlyCurrentStatus={true}
+          />
+        )}
       </div>
 
       {/* Tab Content */}
@@ -229,6 +243,12 @@ const DashaBrowser = ({ birthData, chartData }) => {
             birthData={birthData} 
             transitDate={transitDate}
             onDateChange={setTransitDate}
+            showOnlyCurrentStatus={false}
+          />
+        )}
+        {activeTab === 'chara' && (
+          <CharaTab 
+            birthData={birthData}
             showOnlyCurrentStatus={false}
           />
         )}

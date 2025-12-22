@@ -176,7 +176,7 @@ const VimshottariTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentS
         
         <div className="current-dasha-chain">
           {currentDashas.map((planet, index) => (
-            <React.Fragment key={planet}>
+            <React.Fragment key={`current-${index}`}>
               <span className="current-dasha-planet">{planet}</span>
               {index < currentDashas.length - 1 && (
                 <span className="dasha-arrow">→</span>
@@ -188,12 +188,29 @@ const VimshottariTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentS
     );
   };
 
-  const renderDashaLevel = (title, dashaType, dashas) => {
+  const scrollCards = (level, direction) => {
+    const container = document.querySelector(`.vimshottari-tab .dasha-level:nth-child(${level}) .dasha-cards`);
+    if (container) {
+      const scrollAmount = 200;
+      container.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const renderDashaLevel = (title, dashaType, dashas, levelIndex) => {
     if (!dashas || dashas.length === 0) return null;
     
     return (
       <div className="dasha-level">
-        <h4 className="dasha-level-title">{title}</h4>
+        <div className="dasha-level-header">
+          <h4 className="dasha-level-title">{title}</h4>
+          <div className="scroll-arrows">
+            <button className="scroll-arrow" onClick={() => scrollCards(levelIndex, 'left')}>‹</button>
+            <button className="scroll-arrow" onClick={() => scrollCards(levelIndex, 'right')}>›</button>
+          </div>
+        </div>
         <div className="dasha-cards">
           {dashas.map((dasha, index) => {
             const isSelected = selectedDashas[dashaType] === dasha.planet;
@@ -255,11 +272,11 @@ const VimshottariTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentS
   return (
     <div className="vimshottari-tab">
       <div className="dasha-levels">
-        {renderDashaLevel('Maha Dasha', 'maha', cascadingData?.maha_dashas)}
-        {renderDashaLevel('Antar Dasha', 'antar', cascadingData?.antar_dashas)}
-        {renderDashaLevel('Pratyantar Dasha', 'pratyantar', cascadingData?.pratyantar_dashas)}
-        {renderDashaLevel('Sookshma Dasha', 'sookshma', cascadingData?.sookshma_dashas)}
-        {renderDashaLevel('Prana Dasha', 'prana', cascadingData?.prana_dashas)}
+        {renderDashaLevel('Maha Dasha', 'maha', cascadingData?.maha_dashas, 1)}
+        {renderDashaLevel('Antar Dasha', 'antar', cascadingData?.antar_dashas, 2)}
+        {renderDashaLevel('Pratyantar Dasha', 'pratyantar', cascadingData?.pratyantar_dashas, 3)}
+        {renderDashaLevel('Sookshma Dasha', 'sookshma', cascadingData?.sookshma_dashas, 4)}
+        {renderDashaLevel('Prana Dasha', 'prana', cascadingData?.prana_dashas, 5)}
       </div>
     </div>
   );

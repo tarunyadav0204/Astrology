@@ -54,6 +54,7 @@ from yogini_dasha_routes import router as yogini_dasha_router
 from physical_scan_routes import router as physical_scan_router
 from physical_feedback_routes import router as physical_feedback_router
 from numerology_routes import router as numerology_router
+from Dashas.routes.chara_dasha_routes import router as chara_dasha_router
 import math
 from datetime import timedelta
 import signal
@@ -218,6 +219,7 @@ app.include_router(yogini_dasha_router, prefix="/api")
 app.include_router(physical_scan_router, prefix="/api")
 app.include_router(physical_feedback_router, prefix="/api")
 app.include_router(numerology_router, prefix="/api")
+app.include_router(chara_dasha_router, prefix="/api")
 
 
 
