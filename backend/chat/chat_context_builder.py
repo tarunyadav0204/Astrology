@@ -33,6 +33,7 @@ from calculators.varshphal_calculator import VarshphalCalculator
 from calculators.chara_dasha_calculator import CharaDashaCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator
 from calculators.jaimini_full_analyzer import JaiminiFullAnalyzer
+from calculators.nadi_linkage_calculator import NadiLinkageCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -229,6 +230,70 @@ You have access to a full Jaimini System in `jaimini_points` and `jaimini_full_a
    - Use **Parashari (D1/D10)** for the "What" (Promise).
    - Use **Jaimini (AL/UL/Yogas)** for the "Quality" (How it manifests).
    - Use **Chara Dasha** for the "When" (Timing).
+
+### I. NADI ASTROLOGY (Bhrigu Nandi Nadi) - "The Nature of Events"
+You have access to `nadi_links`. You MUST use this to provide specific details that Parashari astrology misses.
+
+**MANDATORY OUTPUT REQUIREMENT:**
+You MUST include a specific subsection called **"Nadi Precision"** in your Astrological Analysis section when you find a significant link. This is NOT optional.
+
+**How to Analyze:**
+1. **Saturn (Career/Karma):** Check `nadi_links['Saturn']['all_links']` to see what planets link to Saturn.
+   - Example: "While your 10th house shows success (Vedic), the **Nadi Link** between Saturn and Mars specifically indicates this success comes from **Technical/Engineering management**, not just general administration."
+2. **Jupiter (Self/Expansion):** Check links to define the person's core nature and expansion areas.
+3. **Venus (Wealth/Marriage):** Check links to define the *source* of money or *nature* of spouse.
+4. **Moon (Mind/Emotions):** Check links to understand emotional patterns and mental approach.
+
+**How to Read Nadi Links:**
+- **Trine (1,5,9) & Next (2nd):** These are the strongest influences. Treat them as conjunctions.
+- **Retrograde:** If a planet is marked `is_retro: true`, it also connects to the *previous* sign.
+- **Exchange:** If `is_exchange: true`, the planet acts from its Own Sign.
+
+**Nadi Combinations to Cite Explicitly:**
+
+**Saturn (Career) Links:**
+- **Saturn + Mars:** "Technical Master" - Engineering, machines, coding, logic, software development, DevOps, infrastructure.
+- **Saturn + Jupiter:** "Dharma-Karma Adhipati" - Respectable management, teaching, advisory, consulting, mentorship.
+- **Saturn + Rahu:** "Foreign/Shadow" - Tech, AI, aviation, unconventional career paths, startups, global companies.
+- **Saturn + Ketu:** "Mukti Yoga" - Healing, astrology, spiritual work, coding (languages), research. Often indicates quitting jobs.
+- **Saturn + Moon:** Travel-related work, liquid/food industry, public-facing roles, or blame/accusations in career.
+- **Saturn + Venus:** Artistic career, finance, luxury goods, wealth management, creative leadership.
+- **Saturn + Mercury:** Commercial, trading, accounting, business, sales, communication-heavy roles.
+
+**Jupiter (Self) Links:**
+- **Jupiter + Rahu:** "Guru-Chandala" - Unconventional thinker, foreign residence, massive expansion, breaking traditions.
+- **Jupiter + Ketu:** Spiritual nature, detachment, root-level research, philosophy, teaching ancient wisdom.
+- **Jupiter + Mars:** High energy, technical skill, landed property, aggressive expansion.
+- **Jupiter + Venus:** Wealth through teaching, luxury education, artistic wisdom, financial advisory.
+
+**Venus (Marriage/Wealth) Links:**
+- **Venus + Mars:** Passionate/impulsive love, wealth through property, real estate gains, sudden romance.
+- **Venus + Ketu:** Delay in marriage, spiritual/introverted spouse, detachment from materialism.
+- **Venus + Rahu:** Inter-caste/foreign spouse, unconventional marriage, wealth through foreign sources.
+- **Venus + Saturn:** Late marriage, mature spouse, wealth through hard work, luxury through discipline.
+- **Venus + Mercury:** Wealth through business, communication, artistic commerce, multiple income streams.
+
+**Moon (Mind) Links:**
+- **Moon + Rahu:** Obsessive thinking, foreign connections, unconventional emotional patterns, anxiety.
+- **Moon + Ketu:** Detached mind, spiritual inclinations, past-life memories, intuitive abilities.
+- **Moon + Mars:** Aggressive emotions, quick decisions, courage, impulsive actions.
+
+**RESPONSE FORMAT REQUIREMENT:**
+In your "Astrological Analysis" section, you MUST include a numbered subsection like this:
+
+```
+3. Nadi Precision (The Nature of [Career/Marriage/Wealth])
+
+Your chart reveals specific Nadi connections that define the exact nature of [the topic]:
+
+- **The "[Yoga Name]" Link ([Planet1] + [Planet2]):** [Explanation of what this means specifically]
+- **The "[Second Link]" ([Planet1] + [Planet3]):** [Additional specific detail]
+
+This Nadi analysis explains WHY your [career/marriage/wealth] manifests in this PARTICULAR way, not just that it exists.
+```
+
+**CRITICAL INSTRUCTION:**
+When analyzing career questions, you MUST check `nadi_links['Saturn']` and explicitly cite the combinations found. When analyzing marriage questions, you MUST check `nadi_links['Venus']`. When analyzing wealth questions, check both Saturn and Venus links. DO NOT skip the "Nadi Precision" subsection.
 
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
@@ -590,6 +655,10 @@ For every user query, structure your response exactly as follows:
         jaimini_analyzer = JaiminiFullAnalyzer(chart_data, karaka_data)
         jaimini_report = jaimini_analyzer.get_jaimini_report()
         
+        # Calculate Nadi Links
+        nadi_calc = NadiLinkageCalculator(chart_data)
+        nadi_links = nadi_calc.get_nadi_links()
+        
         context.update({
             # Key divisional charts
             "divisional_charts": divisional_charts,
@@ -599,6 +668,9 @@ For every user query, structure your response exactly as follows:
             
             # Full Jaimini Analysis
             "jaimini_full_analysis": jaimini_report,
+            
+            # Nadi Links
+            "nadi_links": nadi_links,
             
             # Planetary analysis
             "planetary_analysis": {},  # D1 (Rashi)

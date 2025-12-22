@@ -112,19 +112,33 @@ class CharaDashaCalculator:
     def _resolve_dual_lordship(self, p1_name: str, p2_name: str) -> int:
         """
         Decides stronger lord for Scorpio/Aquarius.
-        Logic: More Planets > Exalted > Higher Degree
+        K.N. Rao Rules:
+        1. Exception: If one lord is in the sign itself, REJECT it. Use the other.
+        2. Association: More planets conjoined > Stronger.
+        3. Degrees: Higher longitude > Stronger.
         """
         p1_sign = self._get_planet_sign(p1_name)
         p2_sign = self._get_planet_sign(p2_name)
         
-        # 1. Association Count
+        # [NEW] RULE 1: The "Lord in Sign" Exception (K.N. Rao)
+        # If Scorpio Dasha: Mars is in Scorpio? Use Ketu.
+        # If Aquarius Dasha: Saturn is in Aquarius? Use Rahu.
+        # Mars(p1)/Ketu(p2) -> Scorpio(7). Saturn(p1)/Rahu(p2) -> Aquarius(10).
+        target_sign = 7 if p1_name == 'Mars' else 10
+        
+        if p1_sign == target_sign and p2_sign != target_sign:
+            return p2_sign
+        if p2_sign == target_sign and p1_sign != target_sign:
+            return p1_sign
+        
+        # RULE 2: Association Count (Crowd Rule)
         p1_count = self._count_planets_in_sign(p1_sign)
         p2_count = self._count_planets_in_sign(p2_sign)
         
         if p1_count > p2_count: return p1_sign
         if p2_count > p1_count: return p2_sign
         
-        # 2. Degrees (Tie-breaker)
+        # RULE 3: Degrees (Tie-breaker)
         p1_deg = self.planets.get(p1_name, {}).get('degree', 0)
         p2_deg = self.planets.get(p2_name, {}).get('degree', 0)
         
