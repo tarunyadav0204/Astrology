@@ -3792,20 +3792,37 @@ async def get_admin_charts(current_user: User = Depends(get_current_user)):
     
     charts = []
     for row in rows:
-        charts.append({
-            'id': row[0],
-            'userid': row[1],
-            'name': row[2],
-            'date': row[3],
-            'time': row[4],
-            'latitude': row[5],
-            'longitude': row[6],
-            'place': row[7],
-            'gender': row[8],
-            'created_at': row[9],
-            'user_name': row[10],
-            'user_phone': row[11]
-        })
+        if encryptor:
+            chart = {
+                'id': row[0],
+                'userid': row[1],
+                'name': encryptor.decrypt(row[2]),
+                'date': encryptor.decrypt(row[3]),
+                'time': encryptor.decrypt(row[4]),
+                'latitude': float(encryptor.decrypt(str(row[5]))),
+                'longitude': float(encryptor.decrypt(str(row[6]))),
+                'place': encryptor.decrypt(row[7] or ''),
+                'gender': row[8],
+                'created_at': row[9],
+                'user_name': row[10],
+                'user_phone': row[11]
+            }
+        else:
+            chart = {
+                'id': row[0],
+                'userid': row[1],
+                'name': row[2],
+                'date': row[3],
+                'time': row[4],
+                'latitude': row[5],
+                'longitude': row[6],
+                'place': row[7],
+                'gender': row[8],
+                'created_at': row[9],
+                'user_name': row[10],
+                'user_phone': row[11]
+            }
+        charts.append(chart)
     
     return {'charts': charts}
 
