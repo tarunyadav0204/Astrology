@@ -16,6 +16,7 @@ import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
 import ChartScreen from './src/components/Chart/ChartScreen';
+import PlanetaryPositionsScreen from './src/components/Chart/PlanetaryPositionsScreen';
 import TradingDashboardScreen from './src/components/Trading/TradingDashboardScreen';
 import TradingCalendarScreen from './src/components/Trading/TradingCalendarScreen';
 import ChildbirthPlannerScreen from './src/components/ChildbirthPlannerScreen';
@@ -202,6 +203,11 @@ export default function App() {
           <Stack.Screen 
             name="Numerology" 
             component={NumerologyScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="PlanetaryPositions" 
+            component={PlanetaryPositionsScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

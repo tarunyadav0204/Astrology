@@ -1,8 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line } from 'react-native-svg';
 
-const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
+const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscendant = null, onRotate, cosmicTheme = false, showKarakas = false, karakas = null }) => {
+  const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
+  
+  const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+  
   // Fixed sign positions in South Indian chart
   const gridPositions = [
     { x: 0, y: 0, width: 85, height: 85, sign: 11 },     // Pisces
@@ -58,8 +62,27 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
       .forEach(([name, data]) => {
         const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
         const planetIndex = planetNames.indexOf(name);
+        let symbol = planets[planetIndex] || name.substring(0, 2);
+        
+        // Add Karaka abbreviation if showKarakas is true
+        if (showKarakas && karakas && typeof karakas === 'object') {
+          const karaka = Object.entries(karakas).find(([_, karakaData]) => karakaData?.planet === name);
+          if (karaka) {
+            const karakaAbbr = {
+              'Atmakaraka': 'AK',
+              'Amatyakaraka': 'AmK',
+              'Bhratrukaraka': 'BK',
+              'Matrukaraka': 'MK',
+              'Putrakaraka': 'PK',
+              'Gnatikaraka': 'GK',
+              'Darakaraka': 'DK'
+            }[karaka[0]];
+            if (karakaAbbr) symbol += `(${karakaAbbr})`;
+          }
+        }
+        
         planetsInSign.push({
-          symbol: planets[planetIndex] || name.substring(0, 2),
+          symbol: symbol,
           name: name,
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           longitude: data.longitude || 0,
@@ -88,10 +111,14 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
   const getHouseNumber = (signIndex) => {
     if (!chartData.houses || signIndex === -1) return '';
     
-    // Find which house contains this sign
+    if (rotatedAscendant !== null) {
+      const offset = (signIndex - rotatedAscendant + 12) % 12;
+      return offset + 1;
+    }
+    
     for (let i = 0; i < chartData.houses.length; i++) {
       if (chartData.houses[i].sign === signIndex) {
-        return i + 1; // Return house number (1-12)
+        return i + 1;
       }
     }
     return '';
@@ -133,7 +160,8 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
                 y={pos.y + 18} 
                 fontSize="12" 
                 fill={houseNumber === 1 ? "#e91e63" : "#333"} 
-                fontWeight={houseNumber === 1 ? "900" : "bold"}>
+                fontWeight={houseNumber === 1 ? "900" : "bold"}
+                onPress={() => setContextMenu({ show: true, rashiIndex: pos.sign, signName: rashiNames[pos.sign] })}>
                 {houseNumber}
               </SvgText>
               
@@ -169,7 +197,7 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
                   <SvgText 
                     x={pos.x + pos.width / 2} 
                     y={pos.y + 20 + (pIndex * 20)} 
-                    fontSize="12" 
+                    fontSize={showKarakas ? "10" : "12"} 
                     fill="#333"
                     fontWeight="bold"
                     textAnchor="middle">
@@ -193,7 +221,37 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true }) => {
         })}
       </Svg>
       
-
+      {/* Context Menu Modal */}
+      <Modal
+        visible={contextMenu.show}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
+        >
+          <View style={styles.contextMenuContainer}>
+            <Text style={styles.contextMenuTitle}>{contextMenu.signName}</Text>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() => {
+                onRotate?.(contextMenu.rashiIndex);
+                setContextMenu({ show: false, rashiIndex: null, signName: null });
+              }}
+            >
+              <Text style={styles.contextMenuIcon}>🔄</Text>
+              <Text style={styles.contextMenuText}>Make Ascendant</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      
+      <Text style={[styles.instructionText, cosmicTheme && styles.instructionTextCosmic]}>
+        Touch any sign to make it ascendant
+      </Text>
     </View>
   );
 };
@@ -210,12 +268,56 @@ const styles = StyleSheet.create({
     height: '100%',
     aspectRatio: 1,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contextMenuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  contextMenuTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#e91e63',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  contextMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    gap: 12,
+  },
+  contextMenuIcon: {
+    fontSize: 20,
+  },
+  contextMenuText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
   instructionText: {
     textAlign: 'center',
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
     marginTop: 8,
+  },
+  instructionTextCosmic: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });
 

@@ -19,10 +19,13 @@ import DateNavigator from '../Common/DateNavigator';
 
 const { width } = Dimensions.get('window');
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation }, ref) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
+  const [rotatedAscendant, setRotatedAscendant] = useState(null);
+  const [showKarakas, setShowKarakas] = useState(false);
+  const [karakas, setKarakas] = useState(null);
   
   // Update chart type when prop changes
   useEffect(() => {
@@ -76,6 +79,63 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     setChartStyle(prev => prev === 'north' ? 'south' : 'north');
   }, []);
   
+  const handleRotate = useCallback((rashiIndex) => {
+    setRotatedAscendant(rashiIndex);
+  }, []);
+  
+  const handleResetRotation = useCallback(() => {
+    setRotatedAscendant(null);
+  }, []);
+  
+  const loadKarakas = useCallback(async () => {
+    if (!birthData) return;
+    try {
+      // Get D1 chart data - use getChartData for 'lagna' type
+      let d1ChartData;
+      if (currentChartType === 'lagna') {
+        d1ChartData = chartData;
+      } else {
+        // Try to get from cache first
+        d1ChartData = chartDataCache.lagna;
+        // If not in cache, calculate it
+        if (!d1ChartData) {
+          console.log('D1 chart not in cache, calculating...');
+          const formattedData = {
+            ...birthData,
+            date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+            time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+            latitude: parseFloat(birthData.latitude),
+            longitude: parseFloat(birthData.longitude),
+            timezone: birthData.timezone || 'Asia/Kolkata'
+          };
+          const response = await chartAPI.calculateChartOnly(formattedData);
+          d1ChartData = response.data;
+          // Cache it
+          setChartDataCache(prev => ({ ...prev, lagna: d1ChartData }));
+        }
+      }
+      
+      if (!d1ChartData) {
+        console.log('No D1 chart data available for Karaka calculation');
+        return;
+      }
+      
+      console.log('Loading Karakas from D1 chart...');
+      const response = await chartAPI.calculateCharaKarakas(d1ChartData, birthData);
+      console.log('Karakas loaded:', response.data.chara_karakas);
+      setKarakas(response.data.chara_karakas);
+    } catch (error) {
+      console.error('Failed to load Karakas:', error);
+    }
+  }, [chartData, birthData, chartDataCache.lagna, currentChartType]);
+  
+  const toggleKarakas = useCallback(async () => {
+    if (!karakas && !showKarakas) {
+      await loadKarakas();
+    }
+    setShowKarakas(prev => !prev);
+  }, [karakas, showKarakas, loadKarakas]);
+  
   const memoizedChartTypes = useMemo(() => chartTypes, []);
   const memoizedChartTitles = useMemo(() => chartTitles, []);
 
@@ -94,9 +154,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     // Always use chartData from props when available
     if (chartData) {
       setCurrentChartData(chartData);
+      // Cache lagna chart when it's loaded
+      if (currentChartType === 'lagna') {
+        setChartDataCache(prev => ({ ...prev, lagna: chartData }));
+        console.log('Cached D1 chart data');
+      }
       setLoading(false);
     }
-  }, [chartData]);
+  }, [chartData, currentChartType]);
   
   useEffect(() => {
     // Only load data if not provided by parent
@@ -406,6 +471,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       );
     }
     
+    console.log('Rendering chart with showKarakas:', showKarakas, 'karakas:', karakas ? 'loaded' : 'null');
+    
     return chartStyle === 'north' ? (
       <NorthIndianChart 
         chartData={data}
@@ -413,6 +480,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         birthData={birthData}
         showDegreeNakshatra={showDegreeNakshatra}
         cosmicTheme={cosmicTheme}
+        rotatedAscendant={rotatedAscendant}
+        onRotate={handleRotate}
+        showKarakas={showKarakas}
+        karakas={karakas}
       />
     ) : (
       <SouthIndianChart 
@@ -421,9 +492,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         birthData={birthData}
         showDegreeNakshatra={showDegreeNakshatra}
         cosmicTheme={cosmicTheme}
+        rotatedAscendant={rotatedAscendant}
+        onRotate={handleRotate}
+        showKarakas={showKarakas}
+        karakas={karakas}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas]);
 
   return (
     <View style={[styles.container, cosmicTheme && styles.cosmicContainer]}>
@@ -487,6 +562,17 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         />
       )}
       
+      {rotatedAscendant !== null && (
+        <View style={[styles.rotationBadge, cosmicTheme && styles.rotationBadgeCosmic]}>
+          <Text style={[styles.rotationBadgeText, cosmicTheme && styles.rotationBadgeTextCosmic]}>
+            🔄 Rotated View
+          </Text>
+          <TouchableOpacity onPress={handleResetRotation} style={styles.resetButton}>
+            <Text style={styles.resetButtonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
       <View style={[styles.chartContainer, cosmicTheme && styles.cosmicChartContainer, currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit]}>
         {cosmicTheme && (
           <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
@@ -546,6 +632,22 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
           >
             <Text style={styles.quickActionIcon}>⏰</Text>
             <Text style={styles.quickActionText}>Dasha</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.quickActionButton, showKarakas && styles.quickActionButtonActive]}
+            onPress={toggleKarakas}
+          >
+            <Text style={styles.quickActionIcon}>🎯</Text>
+            <Text style={styles.quickActionText}>Karakas</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionButton}
+            onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData() })}
+          >
+            <Text style={styles.quickActionIcon}>📋</Text>
+            <Text style={styles.quickActionText}>Positions</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -813,27 +915,69 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 8,
     paddingHorizontal: 20,
     marginTop: 16,
+    flexWrap: 'wrap',
   },
   quickActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    gap: 8,
+    gap: 6,
+    marginBottom: 8,
+  },
+  quickActionButtonActive: {
+    backgroundColor: 'rgba(255, 107, 53, 0.6)',
+    borderColor: 'rgba(255, 107, 53, 0.8)',
   },
   quickActionIcon: {
-    fontSize: 16,
+    fontSize: 14,
   },
   quickActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  rotationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginVertical: 12,
+    alignSelf: 'center',
+    gap: 12,
+  },
+  rotationBadgeCosmic: {
+    backgroundColor: 'rgba(255, 107, 53, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  rotationBadgeText: {
     fontSize: 14,
     fontWeight: '600',
+    color: COLORS.white,
+  },
+  rotationBadgeTextCosmic: {
+    color: COLORS.white,
+  },
+  resetButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  resetButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: COLORS.white,
   },
 });

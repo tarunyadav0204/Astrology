@@ -270,6 +270,7 @@ export default function ChartScreen({ navigation, route }) {
                         scrollToActiveTab(transitIndex);
                       }
                     }}
+                    navigation={navigation}
                     division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
                              chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
                              chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :

@@ -1242,6 +1242,8 @@ export default function ChatScreen({ navigation, route }) {
           <HomeScreen 
             birthData={birthData}
             onOptionSelect={handleGreetingOptionSelect}
+            navigation={navigation}
+            setShowDashaBrowser={setShowDashaBrowser}
           />
         ) : (
           <>
@@ -1270,14 +1272,14 @@ export default function ChatScreen({ navigation, route }) {
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Calibration Card */}
-            {calibrationEvent && !calibrationEvent.verified && (
+            {/* Calibration Card - COMMENTED OUT */}
+            {/* {calibrationEvent && !calibrationEvent.verified && (
               <CalibrationCard 
                 data={calibrationEvent}
                 onConfirm={() => handleCalibrationConfirm(calibrationEvent)}
                 onReject={() => handleCalibrationReject(calibrationEvent)}
               />
-            )}
+            )} */}
             
             {/* Signs Display */}
             {birthData && (

@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 
-const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false }) => {
+const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null }) => {
+  
+  console.log('NorthIndianChart - showKarakas:', showKarakas, 'karakas:', karakas ? Object.keys(karakas) : 'null');
   
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
-  const [contextMenu, setContextMenu] = useState({ show: false, houseNumber: null, signName: null });
-  const [customAscendant, setCustomAscendant] = useState(null);
+  const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const [aspectsHighlight, setAspectsHighlight] = useState({ show: false, houseNumber: null, aspectingPlanets: [] });
 
   const handlePlanetPress = (planet) => {
@@ -17,10 +18,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
 
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
   
-  const handleRashiPress = (houseNumber, rashiIndex) => {
-    setTimeout(() => {
-      setContextMenu({ show: true, houseNumber, signName: rashiNames[rashiIndex] });
-    }, 200);
+  const handleRashiPress = (rashiIndex) => {
+    setContextMenu({ show: true, rashiIndex, signName: rashiNames[rashiIndex] });
   };
 
   const getHouseData = (houseNum) => {
@@ -45,12 +44,10 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
   const getRashiForHouse = (houseIndex) => {
     if (!chartData.houses || !chartData.houses[houseIndex]) return houseIndex;
     
-    if (customAscendant !== null) {
-      // Recalculate house-rashi mapping based on custom ascendant
-      return (customAscendant + houseIndex) % 12;
+    if (rotatedAscendant !== null) {
+      return (rotatedAscendant + houseIndex) % 12;
     }
     
-    // Default: use original chart data
     return chartData.houses[houseIndex].sign;
   };
 
@@ -116,6 +113,24 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
     if (isRetrograde) symbol += '(R)';
     if (status === 'exalted') symbol += '↑';
     if (status === 'debilitated') symbol += '↓';
+    
+    // Add Karaka abbreviation if showKarakas is true
+    if (showKarakas && karakas && typeof karakas === 'object') {
+      const karaka = Object.entries(karakas).find(([_, data]) => data?.planet === planet.name);
+      if (karaka) {
+        const karakaAbbr = {
+          'Atmakaraka': 'AK',
+          'Amatyakaraka': 'AmK',
+          'Bhratrukaraka': 'BK',
+          'Matrukaraka': 'MK',
+          'Putrakaraka': 'PK',
+          'Gnatikaraka': 'GK',
+          'Darakaraka': 'DK'
+        }[karaka[0]];
+        if (karakaAbbr) symbol += `(${karakaAbbr})`;
+      }
+    }
+    
     return symbol;
   };
 
@@ -270,7 +285,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
                   (rashiIndex === chartData.houses[0].sign ? "#ff6b35" : "rgba(255, 255, 255, 0.9)") :
                   (rashiIndex === chartData.houses[0].sign ? "#e91e63" : "#333")} 
                 fontWeight={rashiIndex === chartData.houses[0].sign ? "900" : "bold"}
-                onPress={() => handleRashiPress(houseNumber, rashiIndex)}>
+                onPress={() => handleRashiPress(rashiIndex)}>
                 {rashiIndex + 1}
               </SvgText>
               
@@ -422,7 +437,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
                     <SvgText 
                       x={planetX} 
                       y={planetY - 8} 
-                      fontSize={totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14"} 
+                      fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")} 
                       fill={cosmicTheme ? "rgba(255, 255, 255, 0.95)" : getPlanetColor(planet)}
                       fontWeight="900"
                       textAnchor="middle"
@@ -456,7 +471,37 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
         </View>
       )}
       
-
+      {/* Context Menu Modal */}
+      <Modal
+        visible={contextMenu.show}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
+        >
+          <View style={styles.contextMenuContainer}>
+            <Text style={styles.contextMenuTitle}>{contextMenu.signName}</Text>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() => {
+                onRotate?.(contextMenu.rashiIndex);
+                setContextMenu({ show: false, rashiIndex: null, signName: null });
+              }}
+            >
+              <Text style={styles.contextMenuIcon}>🔄</Text>
+              <Text style={styles.contextMenuText}>Make Ascendant</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      
+      <Text style={[styles.instructionText, cosmicTheme && styles.instructionTextCosmic]}>
+        Touch any sign to make it ascendant
+      </Text>
     </View>
   );
 };
@@ -488,12 +533,56 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contextMenuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  contextMenuTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#e91e63',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  contextMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    gap: 12,
+  },
+  contextMenuIcon: {
+    fontSize: 20,
+  },
+  contextMenuText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
   instructionText: {
     textAlign: 'center',
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
     marginTop: 8,
+  },
+  instructionTextCosmic: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });
 

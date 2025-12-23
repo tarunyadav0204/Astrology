@@ -22,7 +22,7 @@ import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 
 const { width } = Dimensions.get('window');
 
-export default function HomeScreen({ birthData, onOptionSelect }) {
+export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -186,14 +186,47 @@ const loadHomeData = async (nativeData = null) => {
       
       const targetDate = new Date().toISOString().split('T')[0];
       
-      // Load transits (no birth data needed)
-      try {
-        const transitResponse = await chartAPI.calculateTransits({}, targetDate);
-        if (transitResponse?.data) {
-          setTransitData(transitResponse.data);
+      // Use provided native data or get fresh from storage
+      let currentBirthData = nativeData;
+      if (!currentBirthData) {
+        const { storage } = require('../../services/storage');
+        
+        // First try single birth details
+        currentBirthData = await storage.getBirthDetails();
+        
+        // If no single birth details, get from profiles
+        if (!currentBirthData) {
+          const profiles = await storage.getBirthProfiles();
+          if (profiles && profiles.length > 0) {
+            currentBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
+          }
         }
-      } catch (transitError) {
-        console.log('Transit error:', transitError);
+      }
+      
+      // Fallback to props if no native data
+      if (!currentBirthData) {
+        currentBirthData = birthData;
+      }
+      
+      // Load transits with birth data
+      if (currentBirthData) {
+        try {
+          const formattedBirthData = {
+            name: currentBirthData.name,
+            date: currentBirthData.date.includes('T') ? currentBirthData.date.split('T')[0] : currentBirthData.date,
+            time: currentBirthData.time.includes('T') ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : currentBirthData.time,
+            latitude: parseFloat(currentBirthData.latitude),
+            longitude: parseFloat(currentBirthData.longitude),
+            timezone: currentBirthData.timezone || 'Asia/Kolkata',
+            location: currentBirthData.place || 'Unknown'
+          };
+          const transitResponse = await chartAPI.calculateTransits(formattedBirthData, targetDate);
+          if (transitResponse?.data) {
+            setTransitData(transitResponse.data);
+          }
+        } catch (transitError) {
+          console.log('Transit error:', transitError);
+        }
       }
       
       // Load panchang for Delhi (default location)
@@ -238,27 +271,6 @@ const loadHomeData = async (nativeData = null) => {
         console.log('Panchang error:', panchangError);
       }
       
-      // Use provided native data or get fresh from storage
-      let currentBirthData = nativeData;
-      if (!currentBirthData) {
-        const { storage } = require('../../services/storage');
-        
-        // First try single birth details
-        currentBirthData = await storage.getBirthDetails();
-        
-        // If no single birth details, get from profiles
-        if (!currentBirthData) {
-          const profiles = await storage.getBirthProfiles();
-          if (profiles && profiles.length > 0) {
-            currentBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
-          }
-        }
-      }
-      
-      // Fallback to props if no native data
-      if (!currentBirthData) {
-        currentBirthData = birthData;
-      }
       
       if (currentBirthData) {
         console.log('📊 Loading chart for:', currentBirthData.name, 'ID:', currentBirthData.id);
@@ -605,14 +617,14 @@ const loadHomeData = async (nativeData = null) => {
           </Text>
         </Animated.View>
 
-        {/* Biometric Teaser Card */}
-        <BiometricTeaserCard 
+        {/* Biometric Teaser Card - COMMENTED OUT */}
+        {/* <BiometricTeaserCard 
           onPressReveal={() => {
             console.log('🔄 BiometricTeaserCard pressed');
             handlePhysicalScan();
           }}
           isLoading={scanLoading}
-        />
+        /> */}
 
         <Animated.View style={[styles.optionsContainer, { opacity: fadeAnim }]}>
           <Text style={styles.optionsTitle}>Choose Your Path</Text>
@@ -729,21 +741,77 @@ const loadHomeData = async (nativeData = null) => {
             </Animated.View>
           )}
 
+          {/* Astrology Tools Section */}
+          <View style={styles.toolsSection}>
+            <Text style={styles.toolsSectionTitle}>🔧 Astrology Tools</Text>
+            <View style={styles.toolsGrid}>
+              <TouchableOpacity 
+                style={styles.toolCard}
+                onPress={() => navigation.navigate('Chart', { birthData })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.toolGlassmorphism}>
+                  <Text style={styles.toolEmoji}>📊</Text>
+                  <Text style={styles.toolTitle}>Charts</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.toolCard}
+                onPress={() => setShowDashaBrowser(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.toolGlassmorphism}>
+                  <Text style={styles.toolEmoji}>⏰</Text>
+                  <Text style={styles.toolTitle}>Dashas</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.toolCard}
+                onPress={() => navigation.navigate('AshtakvargaOracle')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.toolGlassmorphism}>
+                  <Text style={styles.toolEmoji}>⊞</Text>
+                  <Text style={styles.toolTitle}>Ashtak-{"\n"}varga</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.toolCard}
+                onPress={() => chartData && navigation.navigate('PlanetaryPositions', { chartData })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.toolGlassmorphism}>
+                  <Text style={styles.toolEmoji}>🌌</Text>
+                  <Text style={styles.toolTitle}>Positions</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Zodiac Wheel - Vibrant Design */}
           <View style={styles.planetarySection}>
             <Text style={styles.planetarySectionTitle}>🪐 Current Planetary Transits</Text>
-            <View style={styles.planetGrid}>
-              {transitData?.planets && Object.entries(transitData.planets).map(([planet, data]) => (
-                <View key={planet} style={[
-                  styles.planetCard,
-                  { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
-                ]}>
-                  <Text style={styles.planetName}>{planet}</Text>
-                  <Text style={styles.planetSign}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
-                  <Text style={styles.planetDegree}>{data.degree.toFixed(2)}°</Text>
-                </View>
-              ))}
-            </View>
+            {!transitData ? (
+              <Text style={styles.loadingText}>Loading transits...</Text>
+            ) : !transitData.planets ? (
+              <Text style={styles.loadingText}>No transit data available</Text>
+            ) : (
+              <View style={styles.planetGrid}>
+                {Object.entries(transitData.planets).map(([planet, data]) => (
+                  <View key={planet} style={[
+                    styles.planetCard,
+                    { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
+                  ]}>
+                    <Text style={styles.planetName}>{planet}</Text>
+                    <Text style={styles.planetSign}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
+                    <Text style={styles.planetDegree}>{data.degree.toFixed(1)}°</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Panchang Timeline */}
@@ -1162,10 +1230,7 @@ function AnalysisCard({ option, index, onOptionSelect }) {
         }}
         activeOpacity={0.9}
       >
-        <LinearGradient
-          colors={option.gradient}
-          style={styles.analysisGradient}
-        >
+        <View style={styles.analysisGlassmorphism}>
           <View style={styles.analysisIconContainer}>
             <Text style={styles.analysisEmoji}>{option.icon}</Text>
           </View>
@@ -1174,7 +1239,7 @@ function AnalysisCard({ option, index, onOptionSelect }) {
             <Text style={styles.analysisDescription}>{option.description}</Text>
           </View>
           <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1371,32 +1436,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  glassmorphismContainer: {
-    position: 'relative',
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  glassmorphismOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-  analysisGradient: {
+  analysisGlassmorphism: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
     borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
@@ -1626,6 +1672,50 @@ dashaChip: {
   },
   signValue: {
     fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  
+  // Astrology Tools Section
+  toolsSection: {
+    marginBottom: 24,
+  },
+  toolsSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+    textAlign: 'center',
+  },
+  toolsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  toolCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    minWidth: 0,
+  },
+  toolGlassmorphism: {
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 100,
+    maxHeight: 100,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  toolEmoji: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  toolTitle: {
+    fontSize: 11,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',

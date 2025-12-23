@@ -427,7 +427,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => returnTo ? navigation.navigate(returnTo) : navigation.navigate('Home')} style={styles.backButton}>
+            <TouchableOpacity onPress={() => returnTo ? navigation.navigate(returnTo) : navigation.goBack()} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Select Native</Text>
