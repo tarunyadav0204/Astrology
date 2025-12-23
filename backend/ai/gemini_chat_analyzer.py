@@ -663,6 +663,40 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
 """
             system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION + "\n\n" + annual_instruction
             
+        elif analysis_type == 'mundane':
+            # === MUNDANE MODE ===
+            print(f"\n🌍 MUNDANE MODE DETECTED")
+            from calculators.mundane.mundane_context_builder import MundaneContextBuilder
+            system_instruction = MundaneContextBuilder.MUNDANE_SYSTEM_INSTRUCTION
+            
+            # Override response format for mundane
+            response_format_instruction = """
+RESPONSE FORMAT - MUNDANE MODE:
+Start with Executive Summary then provide geopolitical analysis:
+
+<div class="quick-answer-card">**Executive Summary**: [Complete risk assessment and market outlook in clear, professional language. Cover major economic, political, and market trends.]</div>
+
+### Key Risk Factors
+[Bullet points with specific risks and probabilities]
+
+### Economic & Market Analysis
+[Detailed analysis with timing and sectors]
+
+### Geopolitical Outlook
+[Political stability, conflicts, policy changes]
+
+<div class="final-thoughts-card">**Strategic Outlook**: [Balanced conclusion with actionable insights]</div>
+
+FOLLOW-UP QUESTIONS - MANDATORY:
+Generate 3-4 contextually relevant follow-up questions based on the user's query. Examples for mundane analysis:
+<div class="follow-up-questions">
+📊 Which sectors will outperform?
+⚠️ What are the major risk events?
+💱 How will currency markets react?
+🌍 What geopolitical shifts are likely?
+</div>
+"""
+            
         else:
             # Default to Birth Chart
             system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
@@ -697,7 +731,14 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
         
         # Convert ONLY static context to JSON with deterministic ordering
         chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=True)
-        prompt_parts.append(f"BIRTH CHART DATA:\n{chart_json}")
+        
+        # Use appropriate label based on analysis type
+        if analysis_type == 'mundane':
+            data_label = "MUNDANE ASTROLOGY DATA"
+        else:
+            data_label = "BIRTH CHART DATA"
+        
+        prompt_parts.append(f"{data_label}:\n{chart_json}")
         
         print(f"   - Total context size: {len(chart_json)} characters")
         

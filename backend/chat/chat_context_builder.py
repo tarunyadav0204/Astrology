@@ -34,6 +34,7 @@ from calculators.chara_dasha_calculator import CharaDashaCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator
 from calculators.jaimini_full_analyzer import JaiminiFullAnalyzer
 from calculators.nadi_linkage_calculator import NadiLinkageCalculator
+from calculators.sudarshana_chakra_calculator import SudarshanaChakraCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -294,6 +295,24 @@ This Nadi analysis explains WHY your [career/marriage/wealth] manifests in this 
 
 **CRITICAL INSTRUCTION:**
 When analyzing career questions, you MUST check `nadi_links['Saturn']` and explicitly cite the combinations found. When analyzing marriage questions, you MUST check `nadi_links['Venus']`. When analyzing wealth questions, check both Saturn and Venus links. DO NOT skip the "Nadi Precision" subsection.
+
+### J. THE "TRIPLE CONFIRMATION" RULE (Sudarshana Chakra)
+You have access to `sudarshana_chakra` which shows the chart rotated from three reference points:
+1. **Lagna Chart:** The physical reality.
+2. **Chandra Lagna (Moon):** The mental perception and comfort.
+3. **Surya Lagna (Sun):** The soul's authority and vitality.
+
+**How to Use:**
+Use this to measure the **CERTAINTY** of an event.
+* **100% Certainty:** If a yoga (good or bad) exists in ALL THREE charts (Lagna, Moon, and Sun).
+    * *Example:* If Saturn is in the 8th house from Lagna, Moon, AND Sun, predict the challenge with absolute confidence.
+* **High Probability:** If it exists in TWO charts (e.g., Lagna and Moon).
+* **Weak/Subjective:** If it exists ONLY in one chart (e.g., only from Moon).
+    * *Interpretation:* "You might *feel* (Moon) like this is happening, but physically (Lagna) it may not manifest strongly."
+
+**Application in Analysis:**
+When you see a major negative or positive indication in the main chart, **Verify it with Sudarshana**.
+* *Say this:* "While your main chart shows career pressure, the Sudarshana Chakra confirms this is a significant karmic pattern as it repeats from both the Sun and Moon."
 
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
@@ -659,6 +678,10 @@ For every user query, structure your response exactly as follows:
         nadi_calc = NadiLinkageCalculator(chart_data)
         nadi_links = nadi_calc.get_nadi_links()
         
+        # Calculate Sudarshana Chakra (Triple Perspective)
+        sudarshana_calc = SudarshanaChakraCalculator(chart_data)
+        sudarshana_data = sudarshana_calc.get_sudarshana_view()
+        
         context.update({
             # Key divisional charts
             "divisional_charts": divisional_charts,
@@ -671,6 +694,9 @@ For every user query, structure your response exactly as follows:
             
             # Nadi Links
             "nadi_links": nadi_links,
+            
+            # Sudarshana Chakra
+            "sudarshana_chakra": sudarshana_data,
             
             # Planetary analysis
             "planetary_analysis": {},  # D1 (Rashi)

@@ -29,6 +29,7 @@ import { storage } from '../../services/storage';
 import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import { useCredits } from '../../credits/CreditContext';
@@ -41,6 +42,13 @@ const smallFontSize = isSmallScreen ? 9 : 10;
 
 export default function ChatScreen({ navigation, route }) {
   const { credits, partnershipCost, fetchBalance } = useCredits();
+  
+  // Mundane mode state
+  const [isMundane, setIsMundane] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+  const [selectedYear, setSelectedYear] = useState(YEARS[0]);
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
   const [chatCost, setChatCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
@@ -416,6 +424,12 @@ export default function ChatScreen({ navigation, route }) {
       handleGreetingOptionSelect({ action: 'question' });
     }
     
+    // Handle mundane mode param
+    if (route.params?.mode === 'mundane') {
+      setIsMundane(true);
+      navigation.setParams({ mode: undefined });
+    }
+    
     // Handle back button - go to home screen if in chat mode, exit if on home screen
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!showGreeting) {
@@ -587,7 +601,17 @@ export default function ChatScreen({ navigation, route }) {
 
   const handleGreetingOptionSelect = async (option) => {
     
-    if (option.action === 'periods') {
+    if (option.action === 'mundane') {
+      setIsMundane(true);
+      setShowGreeting(false);
+      const welcomeMsg = {
+        id: Date.now().toString(),
+        content: `🌍 Welcome to Global Markets & Events Analysis!\n\nI can help you understand:\n\n• Economic trends and market movements\n• Political developments and elections\n• Natural events and their timing\n• Country-specific forecasts\n• Global financial markets\n\nSelect a country and year, then ask your question.`,
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+      };
+      setMessagesWithStorage([welcomeMsg]);
+    } else if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
       navigation.navigate('EventScreen');
@@ -714,20 +738,23 @@ export default function ChatScreen({ navigation, route }) {
   const createSession = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const birth_chart_id = birthData?.id;
       
-      if (!birth_chart_id) {
+      // Different endpoint for mundane vs personal
+      const endpoint = isMundane ? '/mundane/session' : '/chat-v2/session';
+      const body = isMundane ? {} : { birth_chart_id: birthData?.id };
+      
+      if (!isMundane && !birthData?.id) {
         console.error('❌ Cannot create session: birth_chart_id is missing from birthData');
         return null;
       }
       
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/session')}`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint(endpoint)}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ birth_chart_id })
+        body: JSON.stringify(body)
       });
       
       if (response.ok) {
@@ -735,11 +762,13 @@ export default function ChatScreen({ navigation, route }) {
         const newSessionId = data.session_id;
         setSessionId(newSessionId);
         
-        // Immediately track this session for current person
-        const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
-        const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
-        personSessions.push(newSessionId);
-        await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
+        if (!isMundane) {
+          // Track session for personal chat only
+          const currentBirthHash = `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}`;
+          const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${currentBirthHash}`) || '[]');
+          personSessions.push(newSessionId);
+          await AsyncStorage.setItem(`chatSessions_${currentBirthHash}`, JSON.stringify(personSessions));
+        }
         
         return newSessionId;
       }
@@ -983,6 +1012,49 @@ export default function ChatScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem('authToken');
       
+      // Mundane mode - async with polling
+      if (isMundane) {
+        const mundaneBody = {
+          session_id: currentSessionId,
+          country: selectedCountry.name,
+          year: selectedYear,
+          latitude: selectedCountry.lat,
+          longitude: selectedCountry.lng,
+          question: messageText
+        };
+        
+        const response = await fetch(`${API_BASE_URL}${getEndpoint('/mundane/analyze')}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(mundaneBody)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ API Error Response:', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        const messageId = result.message_id;
+        
+        if (!messageId) {
+          throw new Error('No message ID received from server');
+        }
+        
+        // Update processing message with messageId
+        setMessagesWithStorage(prev => prev.map(msg => 
+          msg.id === processingMessageId ? { ...msg, messageId } : msg
+        ));
+        
+        // Start polling
+        pollForResponse(messageId, processingMessageId, currentSessionId, loadingInterval);
+        return;
+      }
+      
       // Partnership mode validation
       if (partnershipMode && (!nativeChart || !partnerChart)) {
         Alert.alert('Error', 'Please select both charts for partnership analysis');
@@ -1159,7 +1231,10 @@ export default function ChatScreen({ navigation, route }) {
             {!showGreeting && (
               <TouchableOpacity
                 style={styles.backButton}
-                onPress={() => setShowGreeting(true)}
+                onPress={() => {
+                  setShowGreeting(true);
+                  if (isMundane) setIsMundane(false);
+                }}
               >
                 <Ionicons name="arrow-back" size={20} color={COLORS.white} />
               </TouchableOpacity>
@@ -1168,6 +1243,25 @@ export default function ChatScreen({ navigation, route }) {
             <View style={styles.headerCenter}>
               {showGreeting ? (
                 <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+              ) : isMundane ? (
+                <View style={styles.partnershipChipsContainer}>
+                  <TouchableOpacity 
+                    onPress={() => setShowCountryPicker(true)} 
+                    style={[styles.nameChip, styles.compactChip]}
+                  >
+                    <Text style={styles.compactChipText}>
+                      {selectedCountry.name}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => setShowYearPicker(true)} 
+                    style={[styles.nameChip, styles.compactChip]}
+                  >
+                    <Text style={styles.compactChipText}>
+                      {selectedYear}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               ) : !partnershipMode ? (
                 <>
                   <Text style={styles.headerTitle}>Chat</Text>
@@ -1403,7 +1497,7 @@ export default function ChatScreen({ navigation, route }) {
                 style={styles.modernTextInput}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder={loading ? "Analyzing..." : credits < chatCost ? "Insufficient credits" : "Ask me anything..."}
+                placeholder={loading ? "Analyzing..." : credits < chatCost ? "Insufficient credits" : isMundane ? "Ask about markets, politics, events..." : "Ask me anything..."}
                 placeholderTextColor="rgba(255, 255, 255, 0.5)"
                 maxLength={500}
                 editable={!loading && credits >= chatCost}
@@ -1941,59 +2035,61 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.menuOption}
-                    onPress={() => {
-                      if (!partnershipMode) {
-                        Alert.alert(
-                          'Partnership Mode',
-                          `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { 
-                              text: 'Continue', 
-                              onPress: () => {
-                                setPartnershipMode(true);
-                                Animated.timing(drawerAnim, {
-                                  toValue: 300,
-                                  duration: 250,
-                                  useNativeDriver: true,
-                                }).start(() => {
-                                  setShowMenu(false);
-                                  setShowChartPicker(true);
-                                });
+                  {!isMundane && !showGreeting && (
+                    <TouchableOpacity
+                      style={styles.menuOption}
+                      onPress={() => {
+                        if (!partnershipMode) {
+                          Alert.alert(
+                            'Partnership Mode',
+                            `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { 
+                                text: 'Continue', 
+                                onPress: () => {
+                                  setPartnershipMode(true);
+                                  Animated.timing(drawerAnim, {
+                                    toValue: 300,
+                                    duration: 250,
+                                    useNativeDriver: true,
+                                  }).start(() => {
+                                    setShowMenu(false);
+                                    setShowChartPicker(true);
+                                  });
+                                }
                               }
-                            }
-                          ]
-                        );
-                      } else {
-                        setPartnershipMode(false);
-                        setNativeChart(null);
-                        setPartnerChart(null);
-                        Animated.timing(drawerAnim, {
-                          toValue: 300,
-                          duration: 250,
-                          useNativeDriver: true,
-                        }).start(() => setShowMenu(false));
-                      }
-                    }}
-                  >
-                    <LinearGradient
-                      colors={partnershipMode ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                            ]
+                          );
+                        } else {
+                          setPartnershipMode(false);
+                          setNativeChart(null);
+                          setPartnerChart(null);
+                          Animated.timing(drawerAnim, {
+                            toValue: 300,
+                            duration: 250,
+                            useNativeDriver: true,
+                          }).start(() => setShowMenu(false));
+                        }
+                      }}
                     >
-                      <View style={styles.menuIconContainer}>
-                        <LinearGradient
-                          colors={partnershipMode ? ['#9333ea', '#a855f7'] : ['#ff6b35', '#ff8c5a']}
-                          style={styles.menuIconGradient}
-                        >
-                          <Text style={styles.menuEmoji}>👥</Text>
-                        </LinearGradient>
-                      </View>
-                      <Text style={styles.menuText}>Partnership {partnershipMode ? 'ON' : 'OFF'}</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
-                    </LinearGradient>
-                  </TouchableOpacity>
+                      <LinearGradient
+                        colors={partnershipMode ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                        style={styles.menuGradient}
+                      >
+                        <View style={styles.menuIconContainer}>
+                          <LinearGradient
+                            colors={partnershipMode ? ['#9333ea', '#a855f7'] : ['#ff6b35', '#ff8c5a']}
+                            style={styles.menuIconGradient}
+                          >
+                            <Text style={styles.menuEmoji}>👥</Text>
+                          </LinearGradient>
+                        </View>
+                        <Text style={styles.menuText}>Partnership {partnershipMode ? 'ON' : 'OFF'}</Text>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
 
                   <TouchableOpacity
                     style={[styles.menuOption, styles.menuOptionLast]}
@@ -2257,6 +2353,79 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.emptyChartSubtext}>Please save charts first</Text>
                   </View>
                 )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+        
+        {/* Country Picker Modal */}
+        <Modal
+          visible={showCountryPicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowCountryPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.chartPickerModal}>
+              <View style={styles.chartPickerHeader}>
+                <Text style={styles.chartPickerTitle}>Select Country</Text>
+                <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.chartPickerList}>
+                {COUNTRIES.map((country, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.chartPickerItem}
+                    onPress={() => {
+                      setSelectedCountry(country);
+                      setShowCountryPicker(false);
+                    }}
+                  >
+                    <View style={styles.chartPickerItemContent}>
+                      <Text style={styles.chartPickerItemName}>{country.name}</Text>
+                      <Text style={styles.chartPickerItemDetails}>{country.capital}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+        
+        {/* Year Picker Modal */}
+        <Modal
+          visible={showYearPicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowYearPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.chartPickerModal}>
+              <View style={styles.chartPickerHeader}>
+                <Text style={styles.chartPickerTitle}>Select Year</Text>
+                <TouchableOpacity onPress={() => setShowYearPicker(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.chartPickerList}>
+                {YEARS.map((year, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.chartPickerItem}
+                    onPress={() => {
+                      setSelectedYear(year);
+                      setShowYearPicker(false);
+                    }}
+                  >
+                    <View style={styles.chartPickerItemContent}>
+                      <Text style={styles.chartPickerItemName}>{year}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             </View>
           </View>

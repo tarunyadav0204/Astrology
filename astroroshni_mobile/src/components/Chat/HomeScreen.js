@@ -458,7 +458,13 @@ const loadHomeData = async (nativeData = null) => {
       description: 'Get insights about your personality, relationships, career, or any astrological topic',
       action: 'question'
     },
-
+    {
+      id: 'mundane',
+      icon: '🌍',
+      title: 'Global Markets & Events',
+      description: 'Analyze world events, stock markets, politics, and economic trends',
+      action: 'mundane'
+    },
     {
       id: 'periods',
       icon: '🎯',
