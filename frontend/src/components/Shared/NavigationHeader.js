@@ -8,6 +8,33 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+
+  const toggleDropdown = (dropdownName, event) => {
+    if (activeDropdown === dropdownName) {
+      setActiveDropdown(null);
+    } else {
+      const rect = event.currentTarget.getBoundingClientRect();
+      
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left
+      });
+      setActiveDropdown(dropdownName);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeDropdown && !event.target.closest('.dropdown') && !event.target.closest('.dropdown-content')) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [activeDropdown]);
 
 
 
@@ -56,7 +83,8 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
         <div className="container">
           <div className="logo-section">
             <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
-              🔮 AstroRoshni
+              <span className="logo-full">🔮 AstroRoshni</span>
+              <span className="logo-short">🔮 AR</span>
             </button>
           </div>
           <SearchBar user={user} onLogin={onLogin} />
@@ -90,33 +118,12 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
         <div className="container">
           <ul className="nav-menu">
             <li><button onClick={onHomeClick || (() => navigate('/'))}>Home</button></li>
-            <li className="dropdown">
-              <a href="#horoscope" className="dropdown-toggle">Horoscope</a>
-              <div className="dropdown-content">
-                <button onClick={() => {
-                  navigate('/horoscope?period=daily');
-                }}>📅 Daily Horoscope</button>
-                <button onClick={() => {
-                  navigate('/horoscope?period=weekly');
-                }}>📊 Weekly Horoscope</button>
-                <button onClick={() => {
-                  navigate('/horoscope?period=monthly');
-                }}>🗓️ Monthly Horoscope</button>
-                <button onClick={() => {
-                  navigate('/horoscope?period=yearly');
-                }}>📆 Yearly Horoscope</button>
-              </div>
+            <li className={`dropdown ${activeDropdown === 'horoscope' ? 'active' : ''}`}>
+              <a href="#horoscope" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('horoscope', e); }}>Horoscope</a>
             </li>
             <li><a href="/#astrology">Astrology</a></li>
-            <li className="dropdown">
-              <a href="#yourlife" className="dropdown-toggle">Your Life</a>
-              <div className="dropdown-content">
-                <button onClick={() => user ? navigate('/career-guidance') : onLogin()}>💼 Your Career</button>
-                <button onClick={() => user ? navigate('/marriage-analysis') : onLogin()}>💍 Your Marriage</button>
-                <button onClick={() => user ? navigate('/education') : (onLogin && onLogin())}>🎓 Your Education</button>
-                <button onClick={() => user ? navigate('/health-analysis') : onLogin()}>🏥 Your Health</button>
-                <button onClick={() => user ? navigate('/wealth-analysis') : onLogin()}>💰 Your Wealth</button>
-              </div>
+            <li className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
+              <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
             </li>
             <li><button onClick={() => navigate('/panchang')}>Panchang</button></li>
             <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
@@ -126,6 +133,38 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
           </ul>
         </div>
       </nav>
+
+      {/* Dropdown menus rendered outside navigation */}
+      {activeDropdown === 'horoscope' && (
+        <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+          <button onClick={() => {
+            navigate('/horoscope?period=daily');
+            setActiveDropdown(null);
+          }}>📅 Daily Horoscope</button>
+          <button onClick={() => {
+            navigate('/horoscope?period=weekly');
+            setActiveDropdown(null);
+          }}>📊 Weekly Horoscope</button>
+          <button onClick={() => {
+            navigate('/horoscope?period=monthly');
+            setActiveDropdown(null);
+          }}>🗓️ Monthly Horoscope</button>
+          <button onClick={() => {
+            navigate('/horoscope?period=yearly');
+            setActiveDropdown(null);
+          }}>📆 Yearly Horoscope</button>
+        </div>
+      )}
+
+      {activeDropdown === 'yourlife' && (
+        <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+          <button onClick={() => { user ? navigate('/career-guidance') : onLogin(); setActiveDropdown(null); }}>💼 Your Career</button>
+          <button onClick={() => { user ? navigate('/marriage-analysis') : onLogin(); setActiveDropdown(null); }}>💍 Your Marriage</button>
+          <button onClick={() => { user ? navigate('/education') : (onLogin && onLogin()); setActiveDropdown(null); }}>🎓 Your Education</button>
+          <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
+          <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
+        </div>
+      )}
 
       {showZodiacSelector && zodiacSigns && (
         <div className="zodiac-selector">
