@@ -742,6 +742,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onLogin={onLogin}
         showLoginButton={showLoginButton}
         onCreditsClick={() => setShowCreditsModal(true)}
+        onChangeNative={() => { setBirthFormContext('changeNative'); setShowBirthFormModal(true); }}
+        birthData={birthData}
       />
 
 
@@ -1780,7 +1782,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Live Chat Widget */}
       <div className="live-chat-widget">
         <button className="chat-widget-btn" onClick={() => user ? setShowChatModal(true) : onLogin()}>
-          ⭐ Ask Tara Now
+          <span className="chat-text-full">⭐ Ask Tara Now</span>
+          <span className="chat-text-short">⭐ Ask Tara</span>
           <span className="chat-pulse"></span>
         </button>
       </div>
@@ -2019,9 +2022,10 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           if (birthFormContext === 'numerology') {
             fetchNumerologyData();
             setShowNumerologyModal(true);
-          } else {
+          } else if (birthFormContext === 'chart') {
             setShowChartModal(true);
           }
+          // For 'changeNative' context, just close the modal and stay on homepage
         }}
         title={birthFormContext === 'numerology' ? 'Numerology - Enter Details' : 'Birth Chart - Enter Details'}
         description={birthFormContext === 'numerology' ? 'Please provide birth information for numerology analysis' : 'Please provide your birth information to generate your Vedic birth chart'}

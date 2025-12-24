@@ -18,6 +18,14 @@
   animation: chatPulse 2s infinite, colorSwitch 4s ease-in-out infinite;
 }
 
+.chat-text-full {
+  display: inline;
+}
+
+.chat-text-short {
+  display: none;
+}
+
 .chat-pulse {
   position: absolute;
   top: -5px;
@@ -50,4 +58,19 @@
 @keyframes pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.5); opacity: 0.5; }
+}
+
+@media (max-width: 768px) {
+  .floating-chat-btn {
+    padding: 10px 14px;
+    font-size: 0.75rem;
+  }
+  
+  .chat-text-full {
+    display: none;
+  }
+  
+  .chat-text-short {
+    display: inline;
+  }
 }

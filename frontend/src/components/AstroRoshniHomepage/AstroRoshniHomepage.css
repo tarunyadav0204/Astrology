@@ -2650,6 +2650,14 @@
   animation: chatPulse 2s infinite, colorSwitch 4s ease-in-out infinite;
 }
 
+.chat-text-full {
+  display: inline;
+}
+
+.chat-text-short {
+  display: none;
+}
+
 .chat-pulse {
   position: absolute;
   top: -5px;
@@ -3172,8 +3180,16 @@
   }
   
   .chat-widget-btn {
-    padding: 12px 18px;
-    font-size: 0.85rem;
+    padding: 10px 14px;
+    font-size: 0.75rem;
+  }
+  
+  .chat-text-full {
+    display: none;
+  }
+  
+  .chat-text-short {
+    display: inline;
   }
   
   .vip-card {

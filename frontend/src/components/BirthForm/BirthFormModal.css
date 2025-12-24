@@ -25,11 +25,13 @@
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
-  overflow: visible;
+  overflow-y: auto;
   position: relative;
   box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes slideUp {
@@ -93,8 +95,8 @@
 
 .birth-form-modal-body {
   padding: 0;
-  max-height: 90vh;
-  overflow-y: visible;
+  overflow-y: auto;
+  flex: 1;
   width: 100%;
   max-width: 500px;
 }
@@ -117,19 +119,27 @@
 @media (max-width: 768px) {
   .birth-form-modal-overlay {
     padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
   }
   
   .birth-form-modal-content {
-    max-height: 95vh;
+    max-height: 90vh;
     border-radius: 20px;
   }
   
   .birth-form-modal-header {
     padding: 20px 20px 16px;
+    flex-shrink: 0;
   }
   
   .birth-form-modal-close {
     top: 16px;
     right: 16px;
+  }
+  
+  .birth-form-modal-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }

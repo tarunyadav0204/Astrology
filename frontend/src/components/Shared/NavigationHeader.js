@@ -4,12 +4,13 @@ import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick }) => {
+const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const toggleDropdown = (dropdownName, event) => {
     if (activeDropdown === dropdownName) {
@@ -47,9 +48,6 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             <a href="#kundli">Kundli</a>
             <a href="#horoscope">Horoscope 2025</a>
             <a href="#calendar">Calendar 2025</a>
-            <a href="#chat" className="chat-btn">
-              💬 Chat with Astrologer <span className="online-dot"></span>
-            </a>
             <a href="/astroroshni" target="_blank" className="astroroshni-link">
               ⭐ AstroVishnu Pro
             </a>
@@ -60,6 +58,11 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
                 {!creditsLoading && onCreditsClick && (
                   <button className="credits-btn" onClick={onCreditsClick}>
                     💳 {credits}
+                  </button>
+                )}
+                {birthData && birthData.name && onChangeNative && (
+                  <button className="change-native-btn" onClick={onChangeNative}>
+                    👤 {birthData.name} ▼
                   </button>
                 )}
                 <button className="profile-btn" onClick={() => navigate('/profile')}>
@@ -88,28 +91,18 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             </button>
           </div>
           <SearchBar user={user} onLogin={onLogin} />
-          <button className="mobile-search-btn" onClick={() => setShowMobileSearch(true)}>
-            🔍
-          </button>
-          <div className="mobile-auth">
-            {user ? (
-              <div className="user-menu">
-                {!creditsLoading && onCreditsClick && (
-                  <button className="credits-btn mobile" onClick={onCreditsClick}>
-                    💳 {credits}
-                  </button>
-                )}
-                <button className="profile-btn" onClick={() => navigate('/profile')}>
-                  👤 {user.name || user.phone}
-                </button>
-                {user.role === 'admin' && (
-                  <button className="admin-btn mobile-admin" onClick={onAdminClick}></button>
-                )}
-                <button className="auth-btn" onClick={onLogout}>Logout</button>
-              </div>
-            ) : (
-              showLoginButton && <button className="auth-btn" onClick={onLogin}>Sign In</button>
+          <div className="mobile-actions-group">
+            <button className="mobile-search-btn" onClick={() => setShowMobileSearch(true)}>
+              🔍
+            </button>
+            {user && birthData && birthData.name && onChangeNative && (
+              <button className="mobile-change-native-btn" onClick={onChangeNative}>
+                👤
+              </button>
             )}
+            <button className="mobile-menu-btn" onClick={() => setShowMobileMenu(true)}>
+              ☰
+            </button>
           </div>
         </div>
       </div>
@@ -191,6 +184,43 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
               <button className="close-search-btn" onClick={() => setShowMobileSearch(false)}>×</button>
             </div>
             <SearchBar user={user} onLogin={onLogin} />
+          </div>
+        </div>
+      )}
+      
+      {showMobileMenu && (
+        <div className="mobile-menu-modal" onClick={() => setShowMobileMenu(false)}>
+          <div className="mobile-menu-content" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-menu-header">
+              <h3>Menu</h3>
+              <button className="close-menu-btn" onClick={() => setShowMobileMenu(false)}>×</button>
+            </div>
+            <div className="mobile-menu-items">
+              {user ? (
+                <>
+                  {!creditsLoading && onCreditsClick && (
+                    <button className="mobile-menu-item" onClick={() => { onCreditsClick(); setShowMobileMenu(false); }}>
+                      💳 Credits: {credits}
+                    </button>
+                  )}
+                  <button className="mobile-menu-item" onClick={() => { navigate('/profile'); setShowMobileMenu(false); }}>
+                    👤 Profile
+                  </button>
+                  {user.role === 'admin' && (
+                    <button className="mobile-menu-item" onClick={() => { onAdminClick(); setShowMobileMenu(false); }}>
+                      ⚙️ Admin Panel
+                    </button>
+                  )}
+                  <button className="mobile-menu-item logout" onClick={() => { onLogout(); setShowMobileMenu(false); }}>
+                    🚪 Logout
+                  </button>
+                </>
+              ) : (
+                <button className="mobile-menu-item" onClick={() => { onLogin(); setShowMobileMenu(false); }}>
+                  🔑 Sign In / Sign Up
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

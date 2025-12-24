@@ -144,6 +144,33 @@
   padding: 5px 10px;
 }
 
+.change-native-btn,
+.change-native-btn.mobile {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%) !important;
+  color: white !important;
+  border: none !important;
+  padding: 6px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.change-native-btn:hover,
+.change-native-btn.mobile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(255, 107, 53, 0.3) !important;
+  background: linear-gradient(135deg, #f7931e 0%, #ff6b35 100%) !important;
+}
+
+.change-native-btn.mobile {
+  font-size: 16px;
+  padding: 6px 10px;
+  min-width: 36px;
+}
+
 .user-name {
   color: white;
   font-weight: bold;
@@ -531,6 +558,22 @@
     flex-shrink: 0;
   }
   
+  .mobile-actions-group {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .mobile-menu-btn {
+    display: flex !important;
+    flex-shrink: 0;
+  }
+  
+  .mobile-change-native-btn {
+    display: flex !important;
+    flex-shrink: 0;
+  }
+  
   .main-nav .container {
     gap: 8px;
   }
@@ -680,8 +723,55 @@
   transition: all 0.3s;
 }
 
-.mobile-search-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+.mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
+  border: 1px solid rgba(255, 215, 0, 0.5) !important;
+  color: #1a1a2e !important;
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3) !important;
+}
+
+.mobile-change-native-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #9c27b0, #673ab7) !important;
+  border: 1px solid rgba(156, 39, 176, 0.5) !important;
+  color: white !important;
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.3) !important;
+}
+
+.mobile-search-btn:hover,
+.mobile-menu-btn:hover {
+  background: linear-gradient(135deg, #ffed4e, #ffd700);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+}
+
+.mobile-change-native-btn:hover {
+  background: linear-gradient(135deg, #673ab7, #9c27b0) !important;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.5) !important;
+}
+
+.mobile-actions-group {
+  display: none;
+  align-items: center;
+  gap: 8px;
 }
 
 .mobile-search-modal {
@@ -728,4 +818,87 @@
   cursor: pointer;
   padding: 0;
   line-height: 1;
+}
+
+.mobile-menu-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+}
+
+.mobile-menu-content {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.mobile-menu-header h3 {
+  margin: 0;
+  color: #e91e63;
+  font-size: 20px;
+}
+
+.close-menu-btn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.mobile-menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-menu-item {
+  background: rgba(233, 30, 99, 0.05);
+  border: 1px solid rgba(233, 30, 99, 0.2);
+  color: #333;
+  padding: 15px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  transition: all 0.3s;
+  width: 100%;
+}
+
+.mobile-menu-item:hover {
+  background: rgba(233, 30, 99, 0.1);
+  transform: translateX(5px);
+}
+
+.mobile-menu-item.logout {
+  background: rgba(244, 67, 54, 0.05);
+  border-color: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.mobile-menu-item.logout:hover {
+  background: rgba(244, 67, 54, 0.1);
 }
