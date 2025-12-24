@@ -25,6 +25,9 @@ import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
 import NumerologyScreen from './src/components/Numerology/NumerologyScreen';
+import FinancialDashboard from './src/components/Financial/FinancialDashboard';
+import SectorDetailScreen from './src/components/Financial/SectorDetailScreen';
+import AllOpportunitiesScreen from './src/components/Financial/AllOpportunitiesScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { storage } from './src/services/storage';
 
@@ -208,6 +211,21 @@ export default function App() {
           <Stack.Screen 
             name="PlanetaryPositions" 
             component={PlanetaryPositionsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="FinancialDashboard" 
+            component={FinancialDashboard}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="SectorDetail" 
+            component={SectorDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AllOpportunities" 
+            component={AllOpportunitiesScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

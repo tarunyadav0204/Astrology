@@ -51,6 +51,7 @@ from marriage.marriage_routes import router as marriage_router
 from progeny.progeny_routes import router as progeny_router
 from routes.mundane_routes import router as mundane_router
 from trading_routes import router as trading_router
+from routes.financial_routes import router as financial_router
 from yogini_dasha_routes import router as yogini_dasha_router
 from physical_scan_routes import router as physical_scan_router
 from physical_feedback_routes import router as physical_feedback_router
@@ -222,6 +223,7 @@ app.include_router(physical_feedback_router, prefix="/api")
 app.include_router(numerology_router, prefix="/api")
 app.include_router(chara_dasha_router, prefix="/api")
 app.include_router(mundane_router)
+app.include_router(financial_router)
 
 
 

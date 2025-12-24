@@ -645,6 +645,7 @@ export default function BirthFormScreen({ navigation, route }) {
                     if (selectedDate) handleInputChange('date', selectedDate);
                   }}
                   maximumDate={new Date()}
+                  minimumDate={new Date(1900, 0, 1)}
                 />
               )
             )}

@@ -539,6 +539,14 @@ const loadHomeData = async (nativeData = null) => {
       cost: 5
     },
     { 
+      id: 'financial', 
+      title: 'Market Astrology', 
+      icon: '💹', 
+      description: 'Sector forecasts & investment timing',
+      gradient: ['#10b981', '#059669'],
+      cost: 0
+    },
+    { 
       id: 'childbirth', 
       title: 'Childbirth Planner', 
       icon: '🤱', 

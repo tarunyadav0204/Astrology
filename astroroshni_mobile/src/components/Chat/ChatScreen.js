@@ -430,17 +430,14 @@ export default function ChatScreen({ navigation, route }) {
       navigation.setParams({ mode: undefined });
     }
     
-    // Handle back button - go to home screen if in chat mode, exit if on home screen
+    // Handle back button
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!showGreeting) {
-        // In chat mode, go back to home screen
+        // In chat mode, show greeting screen
         setShowGreeting(true);
-        return true; // Prevent default back behavior
-      } else {
-        // On home screen, exit app
-        BackHandler.exitApp();
         return true;
       }
+      return false;
     });
     
     return () => {
@@ -624,6 +621,8 @@ export default function ChatScreen({ navigation, route }) {
     } else if (option.action === 'analysis') {
       if (option.type === 'trading') {
         navigation.navigate('TradingDashboard');
+      } else if (option.type === 'financial') {
+        navigation.navigate('FinancialDashboard');
       } else if (option.type === 'childbirth') {
         navigation.navigate('ChildbirthPlanner');
       } else {
