@@ -124,7 +124,7 @@ const ChatPage = () => {
     const handleSendMessage = async (message, options = {}) => {
         if (!birthData) return;
 
-        const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
+        const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString(), messageId: Date.now() };
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
 
@@ -211,7 +211,7 @@ const ChatPage = () => {
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let assistantMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString() };
+            let assistantMessage = { role: 'assistant', content: '', timestamp: new Date().toISOString(), messageId: Date.now() + 1 };
             
             setMessages(prev => [...prev, assistantMessage]);
             let hasReceivedContent = false;
@@ -351,6 +351,10 @@ const ChatPage = () => {
         setIsPartnershipMode(true);
     };
 
+    const handleDeleteMessage = (messageId) => {
+        setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
+    };
+
     const handleBirthFormSubmit = () => {
         setShowBirthForm(false);
     };
@@ -437,7 +441,10 @@ const ChatPage = () => {
                 <p>{isPartnershipMode ? 'Ask about your compatibility and relationship guidance' : 'Ask me anything about your birth chart and life guidance'}</p>
             </div>
             <div className="chat-container">
-                <MessageList messages={messages} />
+                <MessageList 
+                    messages={messages} 
+                    onDeleteMessage={handleDeleteMessage}
+                />
                 <div ref={messagesEndRef} />
             </div>
             <ChatInput 

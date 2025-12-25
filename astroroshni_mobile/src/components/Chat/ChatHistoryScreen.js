@@ -189,8 +189,17 @@ export default function ChatHistoryScreen({ navigation }) {
       
       if (response.ok) {
         const sessionData = await response.json();
+        // Map API response fields to expected message format
+        const mappedMessages = (sessionData.messages || []).map(msg => ({
+          messageId: msg.message_id,
+          role: msg.sender,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          id: `${msg.message_id}_${msg.timestamp}` // Fallback ID
+        }));
+        
         navigation.navigate('ChatView', { 
-          session: { ...session, messages: sessionData.messages || [] }
+          session: { ...session, messages: mappedMessages }
         });
       } else {
         Alert.alert('Error', 'Failed to load chat messages');
@@ -198,23 +207,6 @@ export default function ChatHistoryScreen({ navigation }) {
     } catch (error) {
       Alert.alert('Error', 'Failed to load chat messages');
     }
-  };
-
-  const deleteSession = (sessionId) => {
-    Alert.alert(
-      'Delete Chat',
-      'Are you sure you want to delete this conversation?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setChatSessions(prev => prev.filter(s => s.session_id !== sessionId));
-          }
-        }
-      ]
-    );
   };
 
   const toggleFavorite = async (sessionId) => {
@@ -331,12 +323,6 @@ export default function ChatHistoryScreen({ navigation }) {
                     size={20}
                     color={isFavorite ? '#ffd700' : 'rgba(255, 255, 255, 0.6)'}
                   />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => deleteSession(item.session_id)}
-                >
-                  <Icon name="trash-outline" size={20} color="rgba(255, 107, 96, 0.8)" />
                 </TouchableOpacity>
               </View>
             </View>

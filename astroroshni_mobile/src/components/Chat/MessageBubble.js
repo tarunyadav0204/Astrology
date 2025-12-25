@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../../utils/constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
@@ -45,6 +46,45 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       Alert.alert('Error', 'Failed to generate PDF. Please try again.');
     } finally {
       setIsGeneratingPDF(false);
+    }
+  };
+
+  const deleteMessage = async () => {
+    console.log('🗑️ Delete attempt for message:', {
+      messageId: message.messageId,
+      messageRole: message.role,
+      messageContent: message.content?.substring(0, 50) + '...'
+    });
+    
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const deleteUrl = `${API_BASE_URL}${getEndpoint(`/chat-v2/message/${message.messageId}`)}`;
+      
+      console.log('🔗 Delete URL:', deleteUrl);
+      
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('📊 Delete response status:', response.status);
+      
+      if (response.ok) {
+        console.log('✅ Delete successful');
+        Alert.alert('✅ Deleted', 'Message deleted successfully');
+        if (onDelete) {
+          onDelete(message.messageId);
+        }
+      } else {
+        const errorText = await response.text();
+        console.log('❌ Delete failed:', errorText);
+        Alert.alert('❌ Error', 'Failed to delete message');
+      }
+    } catch (error) {
+      console.log('❌ Delete error:', error);
+      Alert.alert('❌ Error', 'Failed to delete message');
     }
   };
 
@@ -705,8 +745,13 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           {renderedElements}
         </View>
 
-        {!message.isTyping && (
+        {!message.isTyping && message.messageId && (
           <View style={styles.actionButtons}>
+            {console.log('🔍 Action buttons rendered for message:', {
+              messageId: message.messageId,
+              role: message.role,
+              hasMessageId: !!message.messageId
+            })}
             <TouchableOpacity
               style={styles.actionButton}
               onPress={copyToClipboard}
@@ -729,6 +774,21 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               ) : (
                 <Text style={styles.actionIcon}>📄</Text>
               )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Message',
+                  'Are you sure you want to delete this message?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: deleteMessage }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.actionIcon}>🗑️</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -942,6 +1002,10 @@ const styles = StyleSheet.create({
   pdfButton: {
     backgroundColor: 'rgba(249, 115, 22, 0.15)',
     borderColor: 'rgba(249, 115, 22, 0.3)',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   actionIcon: {
     fontSize: 16,

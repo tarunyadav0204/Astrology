@@ -2532,3 +2532,57 @@
         min-height: 90px;
     }
 }
+
+/* Message Action Buttons - Professional Style */
+.message-action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.message-action-buttons:hover {
+    opacity: 1;
+}
+
+.message-action-buttons .action-btn {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.message-action-buttons .copy-btn {
+    color: #3b82f6;
+}
+
+.message-action-buttons .copy-btn:hover {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.message-action-buttons .delete-btn {
+    color: #ef4444;
+}
+
+.message-action-buttons .delete-btn:hover {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+}

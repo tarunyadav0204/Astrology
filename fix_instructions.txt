@@ -1,0 +1,45 @@
+Backend changes needed in routes.py:
+
+1. Line ~264: Change "message_id = cursor.lastrowid" to "user_message_id = cursor.lastrowid"
+
+2. Add after the user message insert:
+    # Create processing assistant message
+    cursor.execute(
+        "INSERT INTO chat_messages (session_id, sender, content, status, started_at) VALUES (?, ?, ?, ?, ?)",
+        (session_id, "assistant", "", "processing", datetime.now())
+    )
+    
+    assistant_message_id = cursor.lastrowid
+
+3. Change the return statement to:
+    return {
+        "user_message_id": user_message_id,
+        "message_id": assistant_message_id,
+        "status": "processing",
+        "message": "Analyzing your chart..."
+    }
+
+4. Update the background_tasks.add_task call to use assistant_message_id instead of message_id
+
+Frontend changes needed in ChatScreen.js:
+
+1. In the sendMessage function, update the response handling:
+    const result = await response.json();
+    const { user_message_id, message_id: assistantMessageId } = result;
+
+    // Update user message with real DB ID
+    if (user_message_id) {
+      setMessagesWithStorage(prev => prev.map(msg => 
+        msg.id === userMessageId ? { ...msg, messageId: user_message_id } : msg
+      ));
+    }
+
+    // Update processing message with messageId
+    setMessagesWithStorage(prev => prev.map(msg => 
+      msg.id === processingMessageId ? { ...msg, messageId: assistantMessageId } : msg
+    ));
+
+    // Start polling
+    pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval);
+
+2. Remove the temporary messageId assignments from user message creation since real DB IDs will be used.

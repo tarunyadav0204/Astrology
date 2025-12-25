@@ -320,7 +320,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
     
     user_message_id = cursor.lastrowid
-    print(f"💾 User message saved with ID: {user_message_id}")
     
     # Create processing assistant message
     cursor.execute(
@@ -329,7 +328,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
     
     assistant_message_id = cursor.lastrowid
-    print(f"💾 Assistant message saved with ID: {assistant_message_id}")
     conn.commit()
     conn.close()
     
@@ -345,7 +343,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "status": "processing",
         "message": "Analyzing your chart..."
     }
-    print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
 
 @router.get("/status/{message_id}")
 async def check_message_status(message_id: int, current_user = Depends(get_current_user)):
@@ -700,7 +697,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
                     cursor.execute(
                         "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                        ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
+                        (("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
                     )
             else:
                 error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
@@ -737,99 +734,36 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 @router.delete("/message/{message_id}")
 async def delete_message(message_id: int, current_user = Depends(get_current_user)):
     """Hard delete a specific message"""
-    print(f"🗑️ DELETE STEP 1: Request received for message ID: {message_id} by user: {current_user.userid}")
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
     
-    try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        print(f"🗑️ DELETE STEP 2: Database connection established")
-        
-        # First, let's see what messages exist for this user
-        cursor.execute('''
-            SELECT cm.message_id, cm.sender, cm.message_type, SUBSTR(cm.content, 1, 50)
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cm.session_id = cs.session_id
-            WHERE cs.user_id = ?
-            ORDER BY cm.message_id DESC LIMIT 10
-        ''', (current_user.userid,))
-        
-        user_messages = cursor.fetchall()
-        print(f"🔍 Recent messages for user {current_user.userid}:")
-        for msg in user_messages:
-            print(f"   ID: {msg[0]}, Sender: {msg[1]}, Type: {msg[2]}, Content: {msg[3]}...")
-        
-        print(f"🗑️ DELETE STEP 3: Verifying message ownership")
-        # Verify message belongs to user
-        cursor.execute('''
-            SELECT cm.session_id, cs.user_id, cm.message_type, cm.sender
-            FROM chat_messages cm
-            JOIN chat_sessions cs ON cm.session_id = cs.session_id
-            WHERE cm.message_id = ?
-        ''', (message_id,))
-        
-        result = cursor.fetchone()
-        print(f"🔍 Database lookup result for ID {message_id}: {result}")
-        
-        if not result:
-            print(f"❌ Message {message_id} not found in database")
-            conn.close()
-            raise HTTPException(status_code=404, detail=f"Message {message_id} not found in database")
-        
-        session_id, user_id, message_type, sender = result
-        print(f"🔍 Message details - User: {user_id}, Type: {message_type}, Sender: {sender}")
-        print(f"🔍 Requesting user: {current_user.userid}")
-        
-        if user_id != current_user.userid:
-            print(f"❌ Access denied: message belongs to user {user_id}, not {current_user.userid}")
-            conn.close()
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        print(f"🗑️ DELETE STEP 4: Getting message details for audit")
-        # Get message details for audit log
-        cursor.execute("SELECT content, message_type, sender FROM chat_messages WHERE message_id = ?", (message_id,))
-        msg_details = cursor.fetchone()
-        print(f"🗑️ DELETE STEP 5: Message details retrieved: {msg_details is not None}")
-        
-        if msg_details:
-            content, msg_type, sender = msg_details
-            print(f"🗑️ DELETE STEP 6: Inserting audit record")
-            # Insert audit record
-            try:
-                cursor.execute("""
-                    INSERT INTO message_deletion_audit 
-                    (message_id, user_id, session_id, message_content, message_type, sender) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (message_id, current_user.userid, session_id, None, msg_type, sender))
-                print(f"🗑️ DELETE STEP 7: Audit record inserted successfully")
-            except Exception as audit_error:
-                print(f"❌ DELETE STEP 7 ERROR: Audit insert failed: {audit_error}")
-                # Continue with deletion even if audit fails
-        
-        print(f"🗑️ DELETE STEP 8: Performing actual deletion")
-        # Hard delete the message
-        cursor.execute("DELETE FROM chat_messages WHERE message_id = ?", (message_id,))
-        deleted_rows = cursor.rowcount
-        print(f"🗑️ DELETE STEP 9: Deleted {deleted_rows} rows for message ID {message_id}")
-        
-        print(f"🗑️ DELETE STEP 10: Committing transaction")
-        conn.commit()
-        print(f"🗑️ DELETE STEP 11: Transaction committed successfully")
-        
+    # Verify message belongs to user
+    cursor.execute('''
+        SELECT cm.session_id, cs.user_id
+        FROM chat_messages cm
+        JOIN chat_sessions cs ON cm.session_id = cs.session_id
+        WHERE cm.message_id = ?
+    ''', (message_id,))
+    
+    result = cursor.fetchone()
+    
+    if not result:
         conn.close()
-        print(f"🗑️ DELETE STEP 12: Database connection closed")
-        
-        print(f"✅ DELETE COMPLETE: Message {message_id} deleted successfully")
-        return {"message": "Message deleted successfully"}
-        
-    except HTTPException as he:
-        print(f"❌ DELETE HTTP ERROR: {he.detail}")
-        raise he
-    except Exception as e:
-        print(f"❌ DELETE UNEXPECTED ERROR: {str(e)}")
-        print(f"❌ ERROR TYPE: {type(e).__name__}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    session_id, user_id = result
+    
+    if user_id != current_user.userid:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Hard delete the message
+    cursor.execute("DELETE FROM chat_messages WHERE message_id = ?", (message_id,))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Message deleted successfully"}
 
 @router.delete("/cleanup")
 async def cleanup_old_chats():

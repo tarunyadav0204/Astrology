@@ -946,8 +946,9 @@ export default function ChatScreen({ navigation, route }) {
     // Remove test message code
 
     // Add user message immediately
+    const userMessageId = Date.now().toString();
     const userMessage = {
-      id: Date.now().toString(),
+      id: userMessageId,
       content: messageText,
       role: 'user',
       timestamp: new Date().toISOString(),
@@ -1115,20 +1116,55 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       const result = await response.json();
-      
-      const messageId = result.message_id;
+      const { user_message_id, message_id: assistantMessageId } = result;
 
-      if (!messageId) {
+      console.log('🔍 API Response Debug:', {
+        user_message_id,
+        assistantMessageId,
+        userMessageId,
+        processingMessageId
+      });
+
+      if (!assistantMessageId) {
         throw new Error('No message ID received from server');
       }
 
+      // Update user message with real DB ID
+      if (user_message_id) {
+        console.log('✅ Updating user message with DB ID:', user_message_id);
+        setMessagesWithStorage(prev => {
+          const updated = prev.map(msg => {
+            if (msg.id === userMessageId) {
+              console.log('📝 User message before update:', { id: msg.id, messageId: msg.messageId });
+              const updatedMsg = { ...msg, messageId: user_message_id };
+              console.log('📝 User message after update:', { id: updatedMsg.id, messageId: updatedMsg.messageId });
+              return updatedMsg;
+            }
+            return msg;
+          });
+          return updated;
+        });
+      } else {
+        console.log('❌ No user_message_id received from server');
+      }
+
       // Update processing message with messageId
-      setMessagesWithStorage(prev => prev.map(msg => 
-        msg.id === processingMessageId ? { ...msg, messageId } : msg
-      ));
+      console.log('✅ Updating assistant message with DB ID:', assistantMessageId);
+      setMessagesWithStorage(prev => {
+        const updated = prev.map(msg => {
+          if (msg.id === processingMessageId) {
+            console.log('📝 Assistant message before update:', { id: msg.id, messageId: msg.messageId });
+            const updatedMsg = { ...msg, messageId: assistantMessageId };
+            console.log('📝 Assistant message after update:', { id: updatedMsg.id, messageId: updatedMsg.messageId });
+            return updatedMsg;
+          }
+          return msg;
+        });
+        return updated;
+      });
 
       // Start polling
-      pollForResponse(messageId, processingMessageId, currentSessionId, loadingInterval);
+      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval);
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
@@ -1196,6 +1232,43 @@ export default function ChatScreen({ navigation, route }) {
         },
       ]
     );
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    // Find the message to determine if it's a user message or assistant message
+    const message = messages.find(msg => msg.messageId === messageId);
+    
+    if (!message) {
+      console.error('Message not found:', messageId);
+      return;
+    }
+    
+    // If it's a user message (role === 'user'), just remove from local state
+    if (message.role === 'user') {
+      setMessagesWithStorage(prev => prev.filter(msg => msg.messageId !== messageId));
+      return;
+    }
+    
+    // If it's an assistant message, call the API to delete from server
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/message/${messageId}`)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        // Remove from local state after successful server deletion
+        setMessagesWithStorage(prev => prev.filter(msg => msg.messageId !== messageId));
+      } else {
+        Alert.alert('❌ Error', 'Failed to delete message from server');
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      Alert.alert('❌ Error', 'Failed to delete message');
+    }
   };
 
   const renderMessage = ({ item }) => (
@@ -1448,7 +1521,7 @@ export default function ChatScreen({ navigation, route }) {
             
             {messages.map((item) => {
               return (
-                <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} />
+                <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} />
               );
             })}
           </ScrollView>

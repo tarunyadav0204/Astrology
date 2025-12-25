@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
 
-const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick, onRestartPolling }) => {
+const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [hasError, setHasError] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState(null);
@@ -96,6 +96,27 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
         window.open(whatsappUrl, '_blank');
         showToast('Opening WhatsApp...', 'success');
+        setShowActions(false);
+    };
+    
+    const handleDeleteMessage = async () => {
+        console.log('🔍 MESSAGE BUBBLE DELETE CLICKED:', {
+            messageId: message.messageId,
+            timestamp: new Date().toISOString(),
+            stackTrace: new Error().stack
+        });
+        
+        if (!message.messageId) {
+            showToast('Cannot delete message - no ID found', 'error');
+            return;
+        }
+        
+        if (window.confirm('Are you sure you want to delete this message?')) {
+            console.log('🔍 USER CONFIRMED DELETE for message:', message.messageId);
+            onDeleteMessage && onDeleteMessage(message.messageId);
+        } else {
+            console.log('🔍 USER CANCELLED DELETE for message:', message.messageId);
+        }
         setShowActions(false);
     };
     
@@ -346,8 +367,19 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"/>
                         </svg>
                     </button>
+                    {message.messageId && message.isFromDatabase && (
+                        <button 
+                            className="action-btn delete-btn"
+                            onClick={handleDeleteMessage}
+                            title="Delete Message"
+                        >
+                            🗑️
+                        </button>
+                    )}
                 </div>
             )}
+            
+
             
             <div className="message-content">
                 {message.role === 'assistant' && !message.isTyping && !message.isProcessing && textToSpeech.isSupported && message.content && (
@@ -403,6 +435,56 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                         }
                     }}
                 />
+                
+                {/* Action buttons positioned like mobile */}
+                {!message.isTyping && !message.isProcessing && message.messageId && message.isFromDatabase && (
+                    <div className="message-action-buttons">
+                        <button 
+                            className="action-btn copy-btn"
+                            style={{
+                                width: '20px',
+                                height: '20px',
+                                minWidth: '20px',
+                                padding: '0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                            onClick={async () => {
+                                try {
+                                    const cleanText = cleanTextForCopy(message.content);
+                                    await navigator.clipboard.writeText(cleanText);
+                                    showToast('Message copied!', 'success');
+                                } catch (err) {
+                                    showToast('Copy failed', 'error');
+                                }
+                            }}
+                            title="Copy Message"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                            </svg>
+                        </button>
+                        <button 
+                            className="action-btn delete-btn"
+                            style={{
+                                width: '20px',
+                                height: '20px',
+                                minWidth: '20px',
+                                padding: '0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                            onClick={handleDeleteMessage}
+                            title="Delete Message"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                        </button>
+                    </div>
+                )}
                 {message.showRestartButton && (
                     <button 
                         onClick={() => onRestartPolling && onRestartPolling(message.messageId)}

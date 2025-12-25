@@ -380,8 +380,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                             const formatted = {
                                 role: msg.sender === 'user' ? 'user' : 'assistant',
                                 content: msg.content || '🔮 Analyzing your birth chart...',
-                                timestamp: msg.timestamp
+                                timestamp: msg.timestamp,
+                                messageId: msg.message_id, // Add messageId from database
+                                isFromDatabase: true // Mark as from database
                             };
+                            
+                            console.log('📜 Loaded message:', { id: msg.message_id, sender: msg.sender, hasContent: !!msg.content });
                             
                             // Check if this is a pending message for this person
                             const pendingIds = JSON.parse(localStorage.getItem(`pendingChatMessages_${personId}`) || '[]');
@@ -466,7 +470,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             if (!currentSessionId) return;
         }
 
-        const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
+        const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString(), messageId: null };
         setMessages(prev => [...prev, userMessage]);
         
         // Add processing message
@@ -540,15 +544,32 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
             }
             
             const result = await response.json();
-            const messageId = result.message_id;
+            const assistantMessageId = result.message_id;
+            const userMessageId = result.user_message_id;
+            
+            console.log('💬 Backend response IDs:', { assistantMessageId, userMessageId });
+
+            // Update user message with messageId from backend
+            setMessages(prev => prev.map((msg, index) => {
+                // Find the user message (second to last message)
+                if (index === prev.length - 2 && msg.role === 'user' && !msg.messageId) {
+                    console.log('👤 Updating user message with ID:', userMessageId);
+                    return { ...msg, messageId: userMessageId, isFromDatabase: true };
+                }
+                return msg;
+            }));
 
             // Update processing message with messageId
-            setMessages(prev => prev.map(msg => 
-                msg.isProcessing ? { ...msg, messageId } : msg
-            ));
+            setMessages(prev => prev.map(msg => {
+                if (msg.isProcessing) {
+                    console.log('🤖 Updating assistant message with ID:', assistantMessageId);
+                    return { ...msg, messageId: assistantMessageId, isFromDatabase: true };
+                }
+                return msg;
+            }));
 
             // Start polling
-            pollForResponse(messageId);
+            pollForResponse(assistantMessageId);
 
         } catch (error) {
             console.error('Error starting chat:', error);
@@ -693,6 +714,51 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         
         // Restart polling (resume mode)
         pollForResponse(messageId, true);
+    };
+
+    const [deletingMessages, setDeletingMessages] = useState(new Set());
+    
+    const handleDeleteMessage = async (messageId) => {
+        console.log('🔍 DELETE HANDLER CALLED:', {
+            messageId,
+            timestamp: new Date().toISOString(),
+            stackTrace: new Error().stack
+        });
+        
+        // Prevent duplicate delete requests
+        if (deletingMessages.has(messageId)) {
+            console.log('❌ Delete already in progress for message:', messageId);
+            return;
+        }
+        
+        try {
+            setDeletingMessages(prev => new Set([...prev, messageId]));
+            console.log('🗑️ Attempting to delete message ID:', messageId);
+            
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/chat-v2/message/${messageId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (response.ok) {
+                showToast('Message deleted successfully', 'success');
+                setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
+            } else {
+                const errorText = await response.text();
+                console.error('Delete failed:', response.status, errorText);
+                showToast('Failed to delete message', 'error');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            showToast('Error deleting message', 'error');
+        } finally {
+            setDeletingMessages(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(messageId);
+                return newSet;
+            });
+        }
     };
 
     const handleBirthFormSubmit = () => {
@@ -1025,33 +1091,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                             onFollowUpClick={handleFollowUpClick}
                                             onChartRefClick={handleChartRefClick}
                                             onRestartPolling={restartPolling}
+                                            onDeleteMessage={handleDeleteMessage}
                                         />
-                                        {hoveredMessage && !showMobileMenu && (
-                                            <button 
-                                                className="floating-copy-btn"
-                                                onClick={handleCopyMessage}
-                                                onMouseEnter={() => setHoveredMessage(hoveredMessage)}
-                                                title="Copy message"
-                                                style={{
-                                                    position: 'fixed',
-                                                    top: `${buttonPosition.top}px`,
-                                                    left: `${buttonPosition.left}px`,
-                                                    zIndex: 10001,
-                                                    background: '#e91e63',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    padding: '6px 12px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '600',
-                                                    cursor: 'pointer',
-                                                    width: 'auto',
-                                                    height: 'auto'
-                                                }}
-                                            >
-                                                {copySuccess ? 'Copied!' : 'Copy'}
-                                            </button>
-                                        )}
                                     </div>
                                     <ChatInput 
                                         onSendMessage={handleSendMessage} 

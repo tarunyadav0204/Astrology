@@ -21,7 +21,11 @@ const { width } = Dimensions.get('window');
 
 export default function ChatViewScreen({ route, navigation }) {
   const { session } = route.params;
-  const [messages] = useState(session.messages || []);
+  const [messages, setMessages] = useState(session.messages || []);
+  
+  const handleDeleteMessage = (messageId) => {
+    setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
+  };
   
   // Debug logging
   useEffect(() => {
@@ -290,6 +294,7 @@ export default function ChatViewScreen({ route, navigation }) {
                       <MessageBubble 
                         message={message} 
                         language="english"
+                        onDelete={handleDeleteMessage}
                       />
                     </Animated.View>
                   );
