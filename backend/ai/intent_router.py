@@ -48,6 +48,34 @@ class IntentRouter:
         - Return status: "READY" with the extracted category
         - Combine the original question context with the user's clarification response
         
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
         CRITICAL RULES FOR CLARIFICATION:
         
         1. ALWAYS return status: "CLARIFY" for these types of questions:
@@ -104,6 +132,7 @@ class IntentRouter:
             "category": "category_name",
             "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
             "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
             "transit_request": {{
                 "startYear": SPECIFIC_YEAR_FROM_QUESTION,
                 "endYear": SPECIFIC_YEAR_FROM_QUESTION,
@@ -122,7 +151,13 @@ class IntentRouter:
         Response: {{"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": {current_year + 1}}}
         
         Question: "How is my health in 2026?"
-        Response: {{"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true}}
+        Response: {{"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}}
+        
+        Question: "When will I get married?"
+        Response: {{"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}}
+        
+        Question: "Tell me about my siblings"
+        Response: {{"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}}
         
         - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {{"2026": [all 12 months]}}
         - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {{"2026": ["January", "February", "March"]}}
@@ -151,10 +186,11 @@ class IntentRouter:
             result = json.loads(cleaned)
             
             total_time = time.time() - intent_start
-            # print(f"\n✅ INTENT CLASSIFICATION COMPLETE")
-            # print(f"Result: {result}")
-            # print(f"Total time: {total_time:.3f}s")
-            # print(f"{'='*80}\n")
+            print(f"\n✅ INTENT CLASSIFICATION COMPLETE")
+            print(f"Result: {result}")
+            print(f"📊 Divisional Charts Requested: {result.get('divisional_charts', [])}")
+            print(f"Total time: {total_time:.3f}s")
+            print(f"{'='*80}\n")
             
             # Add fallback values if missing
             if 'status' not in result:
@@ -163,6 +199,10 @@ class IntentRouter:
                 result['extracted_context'] = {}
             if 'needs_transits' not in result:
                 result['needs_transits'] = result['mode'] in ['birth', 'annual'] and any(word in user_question.lower() for word in ['when', 'timing', 'period', 'year', '2025', '2026', '2027'])
+            if 'divisional_charts' not in result:
+                # Default divisional charts based on category
+                category = result.get('category', 'general')
+                result['divisional_charts'] = self._get_default_divisional_charts(category)
             
             if result.get('needs_transits') and 'transit_request' not in result:
                 result['transit_request'] = {
@@ -194,6 +234,7 @@ class IntentRouter:
                     "mode": "birth",
                     "category": "timing",
                     "needs_transits": True,
+                    "divisional_charts": ["D1", "D9"],
                     "transit_request": {
                         "startYear": current_year,
                         "endYear": current_year + 2,
@@ -212,5 +253,44 @@ class IntentRouter:
                     "extracted_context": {},
                     "mode": "birth", 
                     "category": "general",
-                    "needs_transits": False
+                    "needs_transits": False,
+                    "divisional_charts": ["D1", "D9"]
                 }
+    
+    def _get_default_divisional_charts(self, category: str) -> list:
+        """Get default divisional charts based on question category"""
+        chart_mapping = {
+            'marriage': ['D1', 'D9', 'D7'],
+            'career': ['D1', 'D9', 'D10'],
+            'job': ['D1', 'D9', 'D10'],
+            'promotion': ['D1', 'D9', 'D10'],
+            'business': ['D1', 'D9', 'D10'],
+            'health': ['D1', 'D9', 'D30'],
+            'disease': ['D1', 'D9', 'D30'],
+            'children': ['D1', 'D7', 'D9'],
+            'child': ['D1', 'D7', 'D9'],
+            'pregnancy': ['D1', 'D7', 'D9'],
+            'siblings': ['D1', 'D3', 'D9'],
+            'property': ['D1', 'D4', 'D9', 'D12'],
+            'home': ['D1', 'D4', 'D9'],
+            'mother': ['D1', 'D4', 'D9', 'D12'],
+            'father': ['D1', 'D9', 'D10', 'D12'],
+            'education': ['D1', 'D9', 'D24'],
+            'learning': ['D1', 'D9', 'D24'],
+            'spirituality': ['D1', 'D9', 'D20'],
+            'religion': ['D1', 'D9', 'D20'],
+            'vehicles': ['D1', 'D4', 'D16'],
+            'travel': ['D1', 'D3', 'D9'],
+            'foreign': ['D1', 'D9', 'D12'],
+            'visa': ['D1', 'D9', 'D12'],
+            'wealth': ['D1', 'D9', 'D10'],
+            'money': ['D1', 'D9', 'D10'],
+            'finance': ['D1', 'D9', 'D10'],
+            'love': ['D1', 'D7', 'D9'],
+            'relationship': ['D1', 'D7', 'D9'],
+            'partner': ['D1', 'D7', 'D9'],
+            'timing': ['D1', 'D9'],
+            'general': ['D1', 'D9']
+        }
+        
+        return chart_mapping.get(category.lower(), ['D1', 'D9'])

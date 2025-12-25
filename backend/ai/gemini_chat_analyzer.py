@@ -172,14 +172,26 @@ class GeminiChatAnalyzer:
             )
             
             # LOG COMPLETE RESPONSE
-            # print(f"\n{'='*80}")
-            # print(f"📥 GEMINI RESPONSE #{call_type}")
-            # print(f"{'='*80}")
-            # if response and hasattr(response, 'text'):
-            #     print(f"\nCOMPLETE RESPONSE:\n{response.text}")
-            # else:
-            #     print(f"No response or empty response")
-            # print(f"{'='*80}\n")
+            print(f"\n{'='*80}")
+            print(f"📥 GEMINI RESPONSE #{call_type}")
+            print(f"{'='*80}")
+            if response and hasattr(response, 'text'):
+                response_text_preview = response.text[:1000] + "..." if len(response.text) > 1000 else response.text
+                print(f"\nGEMINI RESPONSE (first 1000 chars):\n{response_text_preview}")
+                
+                # Log divisional chart mentions
+                divisional_mentions = []
+                for d_chart in ['D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60']:
+                    if d_chart in response.text:
+                        divisional_mentions.append(d_chart)
+                
+                if divisional_mentions:
+                    print(f"\n📊 DIVISIONAL CHARTS MENTIONED: {', '.join(divisional_mentions)}")
+                else:
+                    print(f"\n📊 NO DIVISIONAL CHARTS MENTIONED in response")
+            else:
+                print(f"No response or empty response")
+            print(f"{'='*80}\n")
             
             gemini_total_time = time.time() - gemini_start_time
             print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
@@ -426,9 +438,10 @@ class GeminiChatAnalyzer:
                     # Fix B: 'bhinnashtakavarga' is at the chart root
                     chart_data.pop('bhinnashtakavarga', None)
 
-        # 2. Prune Bhav Chalit Redundancy
-        if 'd1_chart' in clean and 'bhav_chalit' in clean['d1_chart']:
-            clean['d1_chart'].pop('bhav_chalit', None)
+        # 2. Prune Bhav Chalit Redundancy - REMOVED FOR ACCURACY
+        # Bhava Chalit is CRITICAL for house predictions - planets can be in different houses than signs
+        # if 'd1_chart' in clean and 'bhav_chalit' in clean['d1_chart']:
+        #     clean['d1_chart'].pop('bhav_chalit', None)
 
         # 3. Prune Methodologies
         if 'transit_data_availability' in clean:

@@ -38,6 +38,12 @@ class JaiminiPointCalculator:
         swamsa_degree = self.d9_chart.get('ascendant', 0)
         swamsa_sign = int(swamsa_degree / 30)
         
+        # 5. Hora Lagna (HL) - Wealth indicator
+        hl_sign = self._calculate_hora_lagna()
+        
+        # 6. Ghatika Lagna (GL) - Power/Authority indicator
+        gl_sign = self._calculate_ghatika_lagna()
+        
         return {
             "arudha_lagna": {
                 "sign_id": al_sign,
@@ -58,6 +64,16 @@ class JaiminiPointCalculator:
                 "sign_id": swamsa_sign,
                 "sign_name": self._get_sign_name(swamsa_sign),
                 "description": "The Ascendant of the Navamsa (Soul's Path)."
+            },
+            "hora_lagna": {
+                "sign_id": hl_sign,
+                "sign_name": self._get_sign_name(hl_sign),
+                "description": "Wealth and financial status indicator."
+            },
+            "ghatika_lagna": {
+                "sign_id": gl_sign,
+                "sign_name": self._get_sign_name(gl_sign),
+                "description": "Power, authority, and political influence."
             }
         }
 
@@ -112,6 +128,24 @@ class JaiminiPointCalculator:
         
         ak_data = self.planets_d9.get(self.atmakaraka, {})
         return ak_data.get('sign', 0)
+    
+    def _calculate_hora_lagna(self) -> int:
+        """Calculate Hora Lagna - Wealth indicator based on Sun and Moon"""
+        sun_long = self.planets_d1.get('Sun', {}).get('longitude', 0)
+        moon_long = self.planets_d1.get('Moon', {}).get('longitude', 0)
+        
+        # Hora Lagna = (Sun + Moon - Ascendant) mod 360
+        hl_longitude = (sun_long + moon_long - self.asc_degree_d1) % 360
+        return int(hl_longitude / 30)
+    
+    def _calculate_ghatika_lagna(self) -> int:
+        """Calculate Ghatika Lagna - Power/Authority indicator"""
+        # Simplified calculation: Ascendant + (5 * Sun's longitude / 12)
+        sun_long = self.planets_d1.get('Sun', {}).get('longitude', 0)
+        
+        # Ghatika Lagna calculation based on sunrise time approximation
+        gl_longitude = (self.asc_degree_d1 + (5 * sun_long / 12)) % 360
+        return int(gl_longitude / 30)
 
     # -------------------------------------------------------------------------
     # UTILITIES

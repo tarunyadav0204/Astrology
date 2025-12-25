@@ -138,6 +138,10 @@ class JaiminiFullAnalyzer:
         """Checks if two planets are connected via Jaimini rules."""
         if not p1 or not p2: return False
         
+        # Check if planets exist in chart data
+        if p1 not in self.planet_positions or p2 not in self.planet_positions:
+            return False
+        
         s1 = self.planet_positions[p1]
         s2 = self.planet_positions[p2]
         
@@ -156,18 +160,23 @@ class JaiminiFullAnalyzer:
         ak = self.karaka_map.get('Atmakaraka')
         amk = self.karaka_map.get('Amatyakaraka')
         
-        return {
-            "atmakaraka_placement": {
+        result = {}
+        
+        if ak and ak in self.planet_positions:
+            result["atmakaraka_placement"] = {
                 "planet": ak,
                 "sign": self._get_sign_name(self.planet_positions[ak]),
                 "description": "The King of the chart."
-            },
-            "amatyakaraka_placement": {
+            }
+        
+        if amk and amk in self.planet_positions:
+            result["amatyakaraka_placement"] = {
                 "planet": amk,
                 "sign": self._get_sign_name(self.planet_positions[amk]),
                 "description": "The Minister/Executer of the chart."
             }
-        }
+        
+        return result
 
     def _get_sign_name(self, idx: int) -> str:
         signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 

@@ -625,6 +625,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 }
                 print(f"Transit period: {tr['startYear']}-{tr['endYear']}")
             
+            # Log divisional charts being requested
+            if intent.get('divisional_charts'):
+                print(f"Divisional charts requested: {intent['divisional_charts']}")
+            
             context = context_builder.build_complete_context(
                 birth_data, question, None, requested_period, intent
             )

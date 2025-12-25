@@ -747,11 +747,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 
         {!message.isTyping && message.messageId && (
           <View style={styles.actionButtons}>
-            {console.log('🔍 Action buttons rendered for message:', {
-              messageId: message.messageId,
-              role: message.role,
-              hasMessageId: !!message.messageId
-            })}
             <TouchableOpacity
               style={styles.actionButton}
               onPress={copyToClipboard}

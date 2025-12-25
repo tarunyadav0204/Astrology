@@ -121,6 +121,7 @@ export default function ChatScreen({ navigation, route }) {
   const [loadingChart, setLoadingChart] = useState(false);
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
+  const lastMessageRef = useRef(null);
   
   // Calibration state
   const [calibrationEvent, setCalibrationEvent] = useState(null);
@@ -495,6 +496,19 @@ export default function ChatScreen({ navigation, route }) {
               setShowGreeting(false);
             }
             
+            // Set flag to auto-scroll when content renders
+            setTimeout(() => {
+              if (messages.length > 0) {
+                lastMessageRef.current?.measureLayout(
+                  scrollViewRef.current,
+                  (x, y) => {
+                    scrollViewRef.current?.scrollTo({ y: y, animated: false });
+                  },
+                  () => {}
+                );
+              }
+            }, 50);
+            
             // Check for processing messages and resume polling
             const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
             if (processingMessage) {
@@ -573,10 +587,26 @@ export default function ChatScreen({ navigation, route }) {
         loadMessagesFromStorage(currentPersonId).then(storedMessages => {
           if (storedMessages.length > 0) {
             // Only update messages if we don't have any current messages to avoid overwriting
+            const prevLength = messages.length;
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
             // Don't auto-switch if app startup or we already have messages loaded
             if (!isAppStartup && messages.length === 0) {
               setShowGreeting(false);
+            }
+            
+            // Set flag to scroll if we loaded new messages and not showing greeting
+            if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
+              setTimeout(() => {
+                if (storedMessages.length > 0) {
+                  lastMessageRef.current?.measureLayout(
+                    scrollViewRef.current,
+                    (x, y) => {
+                      scrollViewRef.current?.scrollTo({ y: y, animated: false });
+                    },
+                    () => {}
+                  );
+                }
+              }, 50);
             }
             
             // Only resume polling if not already polling
@@ -594,7 +624,7 @@ export default function ChatScreen({ navigation, route }) {
     });
     
     return unsubscribe;
-  }, [currentPersonId, loading, isTyping]);
+  }, [currentPersonId, loading, isTyping, showGreeting]);
 
   const handleGreetingOptionSelect = async (option) => {
     
@@ -639,6 +669,19 @@ export default function ChatScreen({ navigation, route }) {
       
       // Switch to chat mode immediately
       setShowGreeting(false);
+      
+      // Set flag to scroll when content renders
+      setTimeout(() => {
+        if (messages.length > 0) {
+          lastMessageRef.current?.measureLayout(
+            scrollViewRef.current,
+            (x, y) => {
+              scrollViewRef.current?.scrollTo({ y: y, animated: false });
+            },
+            () => {}
+          );
+        }
+      }, 50);
       
       // Check if we need to show welcome message
       setTimeout(async () => {
@@ -1236,23 +1279,34 @@ export default function ChatScreen({ navigation, route }) {
 
   const handleDeleteMessage = async (messageId) => {
     // Find the message to determine if it's a user message or assistant message
-    const message = messages.find(msg => msg.messageId === messageId);
+    const message = messages.find(msg => msg.messageId === messageId || msg.message_id === messageId);
     
     if (!message) {
       console.error('Message not found:', messageId);
       return;
     }
     
+    // Get the actual messageId (handle both camelCase and snake_case)
+    const actualMessageId = message.messageId || message.message_id;
+    
+    if (!actualMessageId) {
+      // If no messageId, it's a local-only message, just remove from local state
+      setMessagesWithStorage(prev => prev.filter(msg => msg.id !== message.id));
+      return;
+    }
+    
     // If it's a user message (role === 'user'), just remove from local state
-    if (message.role === 'user') {
-      setMessagesWithStorage(prev => prev.filter(msg => msg.messageId !== messageId));
+    if (message.role === 'user' || message.sender === 'user') {
+      setMessagesWithStorage(prev => prev.filter(msg => 
+        (msg.messageId !== actualMessageId && msg.message_id !== actualMessageId)
+      ));
       return;
     }
     
     // If it's an assistant message, call the API to delete from server
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/message/${messageId}`)}`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/message/${actualMessageId}`)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1261,7 +1315,14 @@ export default function ChatScreen({ navigation, route }) {
       
       if (response.ok) {
         // Remove from local state after successful server deletion
-        setMessagesWithStorage(prev => prev.filter(msg => msg.messageId !== messageId));
+        setMessagesWithStorage(prev => prev.filter(msg => 
+          (msg.messageId !== actualMessageId && msg.message_id !== actualMessageId)
+        ));
+      } else if (response.status === 404) {
+        // Message not found in database, remove from local state anyway
+        setMessagesWithStorage(prev => prev.filter(msg => 
+          (msg.messageId !== actualMessageId && msg.message_id !== actualMessageId)
+        ));
       } else {
         Alert.alert('❌ Error', 'Failed to delete message from server');
       }
@@ -1519,9 +1580,12 @@ export default function ChatScreen({ navigation, route }) {
             
 
             
-            {messages.map((item) => {
+            {messages.map((item, index) => {
+              const isLastMessage = index === messages.length - 1;
               return (
-                <MessageBubble key={item.id} message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} />
+                <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                  <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} />
+                </View>
               );
             })}
           </ScrollView>

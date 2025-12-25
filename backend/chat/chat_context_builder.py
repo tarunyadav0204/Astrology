@@ -193,6 +193,8 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
 ### F. Jaimini Points Logic
 - **Arudha Lagna (AL):** Use this for questions about FAME, STATUS, and REPUTATION. (e.g., "Will I be famous?" → Check AL).
 - **Upapada Lagna (UL):** Use this for questions about MARRIAGE and SPOUSE.
+- **Hora Lagna (HL):** Use this for questions about WEALTH and FINANCIAL STATUS. Check planets aspecting HL for money sources.
+- **Ghatika Lagna (GL):** Use this for questions about POWER, AUTHORITY, and POLITICAL INFLUENCE.
 - **Swamsa (Navamsa Lagna) & Karkamsa (AK in D9):**
     - Use **Swamsa** as the reference point for spiritual path and skills.
     - Check the connection between Atmakaraka and Swamsa.
@@ -298,37 +300,102 @@ When analyzing career questions, you MUST check `nadi_links['Saturn']` and expli
 
 ### J. THE "TRIPLE CONFIRMATION" RULE (Sudarshana Chakra)
 You have access to `sudarshana_chakra` which shows the chart rotated from three reference points:
-1. **Lagna Chart:** The physical reality.
-2. **Chandra Lagna (Moon):** The mental perception and comfort.
-3. **Surya Lagna (Sun):** The soul's authority and vitality.
+1. **Lagna Chart:** The physical reality (Body).
+2. **Chandra Lagna (Moon):** The mental perception (Mind).
+3. **Surya Lagna (Sun):** The soul's authority (Soul).
 
-**How to Use:**
-Use this to measure the **CERTAINTY** of an event.
-* **100% Certainty:** If a yoga (good or bad) exists in ALL THREE charts (Lagna, Moon, and Sun).
-    * *Example:* If Saturn is in the 8th house from Lagna, Moon, AND Sun, predict the challenge with absolute confidence.
-* **High Probability:** If it exists in TWO charts (e.g., Lagna and Moon).
-* **Weak/Subjective:** If it exists ONLY in one chart (e.g., only from Moon).
-    * *Interpretation:* "You might *feel* (Moon) like this is happening, but physically (Lagna) it may not manifest strongly."
-
-**Application in Analysis:**
-When you see a major negative or positive indication in the main chart, **Verify it with Sudarshana**.
-* *Say this:* "While your main chart shows career pressure, the Sudarshana Chakra confirms this is a significant karmic pattern as it repeats from both the Sun and Moon."
+**MANDATORY OUTPUT RULE:**
+In your "Astrological Analysis" section, you MUST include a specific paragraph titled **"The Triple Perspective (Sudarshana)"**.
+- Compare the specific house related to the question from all three points.
+- *Example for Career:* "Your 10th house is strong from the Ascendant (giving skills), but the 10th from Moon contains Ketu (causing mental detachment from work). However, 10th from Sun is excellent (promising eventual authority)."
+- **Verdict:** Use this to give a "Confidence Score" (e.g., "Since this yoga repeats from both Moon and Sun, the result is 100% certain.").
 
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
 - Check the Lagna Lord and Sun first.
 - Check 6th/8th/12th lords.
+- **CRITICAL: Check Gulika position** - if Gulika is on Lagna or aspecting Lagna Lord, predict hidden health issues or chronic conditions.
 - Synthesis: If Lagna Lord is weak in D1 but Vargottama or Strong in D9, predict "Health vulnerability requiring lifestyle changes," NOT "Terminal illness."
 
 ### If the user asks about MARRIAGE/RELATIONSHIPS:
 - Analyze 7th House, 7th Lord, and Venus (for men) / Jupiter (for women).
 - Crucial: Check the D9 Navamsa 7th house and Lagna.
+- **Check Upapada Lagna (UL)** for marriage timing and spouse characteristics.
 - Mangal Dosha: If the JSON flags Mangal Dosha, check for cancellations (e.g., Mars in own sign, aspected by Jupiter). Do not bluntly say "Marriage will fail." Say "Marriage requires patience and conscious effort."
 
 ### If the user asks about CAREER:
 - Analyze 10th House, Saturn, and the Amatyakaraka.
 - Check the D10 Dasamsa chart (if provided in JSON) for professional details.
+- **Check Ghatika Lagna (GL)** for authority and power positions.
 - Synthesis: A connection between 10th Lord and 5th/9th Lords (Dharma Karmadhipati Yoga) is the strongest career indicator.
+
+### If the user asks about WEALTH:
+- Analyze 2nd House, 11th House, and Venus/Jupiter.
+- **CRITICAL: Check Hora Lagna (HL)** - planets aspecting HL show wealth sources.
+- Check Indu Lagna for liquid wealth and cash flow.
+- **Check Mandi position** - if Mandi is in 2nd/11th house, predict wealth through hard work or obstacles in earning.
+
+### K. DIVISIONAL CHARTS (VARGA) - MASTER ANALYSIS PROTOCOL
+You have access to specific Divisional Charts (D-Charts) in the `divisional_charts` object. You must use them as the "Final Verdict" for their specific domains.
+
+**Hierarchy Rule:**
+- **D1 (Rashi):** Shows the "Root" (Physical potential/Body).
+- **D-Chart:** Shows the "Fruit" (Actual outcome/Soul).
+- *Synthesis:* If D1 is good but D-Chart is bad, the event happens but brings dissatisfaction. If D1 is bad but D-Chart is strong, the struggle leads to great success.
+
+**Specific Analysis Rules (Use these definitions):**
+
+1.  **D3 (Drekkana - Siblings/Courage):**
+    - Analyze the 3rd House and Mars.
+    - Use for questions about: Siblings, courage, initiatives, and teammates.
+
+2.  **D4 (Chaturthamsa - Assets/Home):**
+    - Analyze the 4th House and Mars (Property).
+    - Use for: Real estate, home buying, moving, and mother's fortune.
+
+3.  **D7 (Saptamsa - Progeny/Creation):**
+    - Analyze the 5th House and Jupiter.
+    - Use for: Children, pregnancy, creative projects, and legacy.
+
+4.  **D9 (Navamsa - Marriage/Dharma):**
+    - **CRITICAL:** Use this for EVERYTHING as a strength check.
+    - Specifically for Marriage: Analyze 7th House and Venus.
+    - *Note:* A planet Debilitated in D1 but Exalted in D9 (Neecha Bhanga) is extremely powerful.
+
+5.  **D10 (Dasamsa - Career/Power):**
+    - Analyze the 10th House, Sun, and Saturn.
+    - Use for: Promotions, authority, government favor, and professional rise.
+    - *Key Yoga:* If the D1 10th Lord is strong in D10, career success is destined.
+
+6.  **D12 (Dwadasamsa - Parents/Ancestry):**
+    - Analyze Sun (Father) and Moon (Mother).
+    - Use for: Parental health, inheritance, and ancestral karma.
+
+7.  **D16 (Shodasamsa - Vehicles/Happiness):**
+    - Analyze 4th House and Venus.
+    - Use for: Car accidents, buying luxury vehicles, and general mental happiness.
+
+8.  **D20 (Vimsamsa - Spirituality):**
+    - Analyze Jupiter and the 5th/9th Houses.
+    - Use for: Meditation progress, mantra siddhi, and religious inclinations.
+
+9.  **D24 (Chaturvimsamsa - Knowledge):**
+    - Analyze Mercury and Jupiter.
+    - Use for: Higher education, Ph.D., specialized skills, and academic distinction.
+
+10. **D27 (Nakshatramsa - Strengths/Weakness):**
+    - Analyze the Lagna and Moon.
+    - Use for: General physical and mental resilience.
+
+11. **D30 (Trimsamsa - Misfortunes):**
+    - Analyze the 6th/8th/12th Houses and Saturn/Mars/Rahu.
+    - Use for: "Hidden dangers," chronic diseases, and subconscious fears.
+
+12. **D40 / D45 (Khavedamsa / Akshavedamsa):**
+    - Use for: Auspicious/Inauspicious events and character strength.
+
+13. **D60 (Shashtiamsa - Past Life Karma):**
+    - **FINAL ARBITER:** If a planet is strong in D60, it can override almost any affliction in other charts. Use this to explain "miraculous" saves or "fated" falls.
 
 ## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
 - NO DEATH PREDICTIONS: Never predict the exact date of death or use words like "Fatal end." Use phrases like "Critical health period," "End of a cycle," or "Period of high physical vulnerability."
@@ -339,19 +406,33 @@ When you see a major negative or positive indication in the main chart, **Verify
 ## RESPONSE FORMAT STRUCTURE
 For every user query, structure your response exactly as follows:
 
-**Quick Answer**: A 3-4 sentence summary using the "Sandwich Method":
-1. **The Context**: Acknowledge the current period (e.g., "The current time indicates a focus on health...")
-2. **The Challenge**: Briefly mention the pressure (e.g., "...which may bring some physical sensitivity...")
-3. **The Protection (CRITICAL)**: IMMEDIATELY mention the D9/Inner Strength (e.g., "...however, your chart shows immense inner resilience and recovery power.")
-4. **The Action**: End with a constructive focus
-*Constraint:* NEVER predict "danger to longevity" in the Quick Answer. Use terms like "Health Transformation" or "Vitality Cycle."
+**Quick Answer**: MANDATORY FORMAT - You MUST follow this exact template:
+"[CONTEXT SENTENCE about current period]. [HEADLINE PREDICTION with specific dates/events]. [PROTECTION SENTENCE mentioning D9/inner strength]. [ACTION SENTENCE with immediate step]."
+
+**CRITICAL INSTRUCTION (THE "BUBBLE-UP" RULE):**
+If your detailed analysis reveals ANY specific date, event, or warning, it MUST appear in the Quick Answer.
+- ❌ FORBIDDEN: "You will have career changes soon." 
+- ✅ REQUIRED: "You will see a major career shift between **March 15-April 20, 2025** due to Jupiter-Mars alignment."
+
+**TEMPLATE ENFORCEMENT:**
+Sentence 1 (Context): "The current [time period] indicates..."
+Sentence 2 (Headline): "Specifically, expect [exact event] between [exact dates]..."
+Sentence 3 (Protection): "However, your D9 Navamsa shows [strength/resilience]..."
+Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
+
+**VALIDATION CHECKLIST - Your Quick Answer FAILS if it lacks:**
+□ Specific dates (month-year minimum)
+□ Specific events (not vague terms like "changes")
+□ D9/Navamsa strength mention
+□ Actionable step
 
 **Key Insights**: 3-4 bullet points highlighting the Strength (D9) and the Challenge (D1).
 
 **Detailed Analysis**:
 - **The Promise (Chart Analysis):** Planetary positions and Yogas.
+- **The Triple Perspective (Sudarshana):** [MANDATORY] Cross-check the event from Moon (Mind) and Sun (Soul).
 - **The Master Clock (Vimshottari):** What the main Dasha indicates.
-- **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction using the current Yogini period (e.g., "While Vimshottari shows growth, Yogini Ulka suggests high workload").
+- **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction.
 - **The Synthesis:** How D9 modifies the final outcome.
 
 **Practical Guidance**: Actionable advice or cautions.
@@ -552,6 +633,40 @@ For every user query, structure your response exactly as follows:
             **dynamic_context
         }
         
+        # Filter divisional charts based on intent router recommendations
+        if intent_result and intent_result.get('divisional_charts'):
+            requested_chart_codes = intent_result['divisional_charts']
+            print(f"🎯 Filtering divisional charts for Gemini: {requested_chart_codes}")
+            
+            # Map codes to chart names
+            chart_name_mapping = {
+                'D3': 'd3_drekkana', 'D4': 'd4_chaturthamsa', 'D7': 'd7_saptamsa',
+                'D9': 'd9_navamsa', 'D10': 'd10_dasamsa', 'D12': 'd12_dwadasamsa',
+                'D16': 'd16_shodasamsa', 'D20': 'd20_vimsamsa', 'D24': 'd24_chaturvimsamsa',
+                'D27': 'd27_nakshatramsa', 'D30': 'd30_trimsamsa', 'D40': 'd40_khavedamsa',
+                'D45': 'd45_akshavedamsa', 'D60': 'd60_shashtiamsa'
+            }
+            
+            # Filter to only requested charts
+            filtered_divisional_charts = {}
+            all_charts = full_context.get('divisional_charts', {})
+            
+            for code in requested_chart_codes:
+                chart_name = chart_name_mapping.get(code)
+                if chart_name and chart_name in all_charts:
+                    filtered_divisional_charts[chart_name] = all_charts[chart_name]
+                    print(f"   ✅ Including {code} ({chart_name})")
+            
+            # Always ensure D9 is included (required for analysis)
+            if 'd9_navamsa' not in filtered_divisional_charts and 'd9_navamsa' in all_charts:
+                filtered_divisional_charts['d9_navamsa'] = all_charts['d9_navamsa']
+                print(f"   ✅ Added mandatory D9 Navamsa")
+            
+            full_context['divisional_charts'] = filtered_divisional_charts
+            print(f"📊 Sending {len(filtered_divisional_charts)} divisional charts to Gemini")
+        else:
+            print(f"📊 No filtering - sending all {len(full_context.get('divisional_charts', {}))} divisional charts")
+        
         # Apply minification before returning
         return self._minify_data(full_context)
     
@@ -632,28 +747,62 @@ For every user query, structure your response exactly as follows:
         }
         
         # Calculate divisional charts with dignity analysis
-        d9_chart = divisional_calc.calculate_divisional_chart(9)
-        d10_chart = divisional_calc.calculate_divisional_chart(10)
-        d12_chart = divisional_calc.calculate_divisional_chart(12)
+        # Cache ALL standard charts to prevent stale cache issues when topics change
+        requested_charts = [
+            'D1', 'D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 
+            'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60'
+        ]
+        print(f"📊 Calculating ALL Divisional Charts for Cache (prevents topic-switch bugs)...")
         
-        # Add sign names to divisional charts to prevent indexing confusion
-        d9_chart = self._add_sign_names_to_divisional_chart(d9_chart)
-        d10_chart = self._add_sign_names_to_divisional_chart(d10_chart)
-        d12_chart = self._add_sign_names_to_divisional_chart(d12_chart)
+        divisional_charts = {}
         
-        divisional_charts = {
-            "d9_navamsa": d9_chart,
-            "d10_dasamsa": d10_chart,
-            "d12_dwadasamsa": d12_chart
-        }
+        # Calculate all divisional charts for robust caching
+        for chart_code in requested_charts:
+            if chart_code == 'D1':
+                continue  # Already included as d1_chart
+            
+            try:
+                chart_number = int(chart_code[1:])  # Extract number from D9, D10, etc.
+                chart_data = divisional_calc.calculate_divisional_chart(chart_number)
+                chart_data = self._add_sign_names_to_divisional_chart(chart_data)
+                
+                # Map to standard names
+                chart_name_mapping = {
+                    3: 'd3_drekkana',
+                    4: 'd4_chaturthamsa', 
+                    7: 'd7_saptamsa',
+                    9: 'd9_navamsa',
+                    10: 'd10_dasamsa',
+                    12: 'd12_dwadasamsa',
+                    16: 'd16_shodasamsa',
+                    20: 'd20_vimsamsa',
+                    24: 'd24_chaturvimsamsa',
+                    27: 'd27_nakshatramsa',
+                    30: 'd30_trimsamsa',
+                    40: 'd40_khavedamsa',
+                    45: 'd45_akshavedamsa',
+                    60: 'd60_shashtiamsa'
+                }
+                
+                chart_name = chart_name_mapping.get(chart_number, f'd{chart_number}')
+                divisional_charts[chart_name] = chart_data
+                print(f"   ✅ Calculated {chart_code} ({chart_name})")
+                
+            except Exception as e:
+                print(f"   ❌ Failed to calculate {chart_code}: {e}")
+                continue
         
         # Update advanced calculators with divisional charts
         vargottama_calc = VargottamaCalculator(chart_data, divisional_charts)
         neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, divisional_charts)
         
-        # Initialize D9 analyzer for separate analysis
-        d9_data_structure = d9_chart.get('divisional_chart', d9_chart)
-        d9_planet_analyzer = PlanetAnalyzer(d9_data_structure, birth_obj)
+        # Initialize D9 analyzer for separate analysis (use D9 from divisional_charts)
+        d9_chart_for_analysis = divisional_charts.get('d9_navamsa')
+        if d9_chart_for_analysis:
+            d9_data_structure = d9_chart_for_analysis.get('divisional_chart', d9_chart_for_analysis)
+            d9_planet_analyzer = PlanetAnalyzer(d9_data_structure, birth_obj)
+        else:
+            d9_planet_analyzer = None
         
         # Calculate Chara Karakas
         karaka_data = chara_karaka_calc.calculate_chara_karakas()
@@ -704,7 +853,7 @@ For every user query, structure your response exactly as follows:
             
             # Special points
             "special_points": {
-                "badhaka_lord": badhaka_calc.get_badhaka_lord(int(chart_data['ascendant'] / 30))
+                "badhaka_lord": badhaka_calc.get_badhaka_lord(int(chart_data.get('ascendant', 0) / 30))
             },
             
             # Relationships
@@ -736,7 +885,7 @@ For every user query, structure your response exactly as follows:
                     },
                     "lagna_analysis": ashtakavarga_calc.get_ashtakavarga_analysis('lagna')
                 },
-                "d9_navamsa": self._calculate_d9_ashtakavarga(d9_chart, birth_data)
+                "d9_navamsa": self._calculate_d9_ashtakavarga(divisional_charts.get('d9_navamsa'), birth_data) if 'd9_navamsa' in divisional_charts else {}
             },
             
             # Birth Panchang
@@ -765,11 +914,12 @@ For every user query, structure your response exactly as follows:
                 continue
             
             # D9 Analysis (new)
-            try:
-                d9_full = d9_planet_analyzer.analyze_planet(planet)
-                context["d9_planetary_analysis"][planet] = self._filter_planetary_analysis(d9_full, chart_calc)
-            except Exception as e:
-                continue
+            if d9_planet_analyzer:
+                try:
+                    d9_full = d9_planet_analyzer.analyze_planet(planet)
+                    context["d9_planetary_analysis"][planet] = self._filter_planetary_analysis(d9_full, chart_calc)
+                except Exception as e:
+                    continue
         
         return context
     
