@@ -1,0 +1,83 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-26T13:44:50.258623
+Question: Finance
+Processing Time: 2.197s
+Response Length: 773 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "timeframe": "next year",
+        "aspect": "finance"
+    },
+    "mode": "annual",
+    "category": "finance",
+    "year": 2025,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ],
+    "transit_request": {
+        "startYear": 2025,
+        "endYear": 2025,
+        "yearMonthMap": {
+            "2025": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "timeframe": "next year",
+    "aspect": "finance"
+  },
+  "mode": "annual",
+  "category": "finance",
+  "year": 2025,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "transit_request": {
+    "startYear": 2025,
+    "endYear": 2025,
+    "yearMonthMap": {
+      "2025": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

@@ -1,0 +1,37 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-26T14:03:10.048413
+Question: When will I be able to repay my home loan.
+Processing Time: 1.846s
+Response Length: 457 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I'd be happy to look into that. Are you looking for the earliest possible time, or a period with minimal challenges? And are there any specific concerns about repaying it, such as interest rates or financial stability?",
+    "mode": "birth",
+    "category": "finance",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D4",
+        "D9",
+        "D16"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I'd be happy to look into that. Are you looking for the earliest possible time, or a period with minimal challenges? And are there any specific concerns about repaying it, such as interest rates or financial stability?",
+  "mode": "birth",
+  "category": "finance",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D4",
+    "D9",
+    "D16"
+  ]
+}

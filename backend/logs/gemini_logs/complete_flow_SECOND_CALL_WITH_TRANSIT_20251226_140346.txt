@@ -1,0 +1,15 @@
+COMPLETE GEMINI FLOW SUMMARY - SECOND_CALL_WITH_TRANSIT
+Timestamp: 2025-12-26T14:04:38.224000
+Question: My expenses are too much and I end up losing in speculation a lot.
+Processing Time: 51.599s
+Total Request Time: 51.61s
+Context Size: 186715 characters
+Has Transit Data: Yes
+Response Length: 6216 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.014s
+- Gemini Processing: 51.599s
+- Total Time: 51.613s
+- Transit Activations: 56
+- Dasha Periods: 41

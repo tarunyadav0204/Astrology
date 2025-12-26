@@ -1,0 +1,15 @@
+COMPLETE GEMINI FLOW SUMMARY - SECOND_CALL_WITH_TRANSIT
+Timestamp: 2025-12-26T13:09:09.380205
+Question: Tell me about my husband's health in 2026
+Processing Time: 46.460s
+Total Request Time: 46.47s
+Context Size: 135813 characters
+Has Transit Data: Yes
+Response Length: 6054 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.011s
+- Gemini Processing: 46.460s
+- Total Time: 46.470s
+- Transit Activations: 27
+- Dasha Periods: 14

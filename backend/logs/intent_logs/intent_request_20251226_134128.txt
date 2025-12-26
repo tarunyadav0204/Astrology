@@ -1,0 +1,277 @@
+INTENT ROUTER REQUEST
+Timestamp: 2025-12-26T13:41:28.067633
+Question: Tell me about my next year.
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 21469 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: Tell me about my sibling.
+A: Tell me about my next year.
+Q: I already said health
+A: Based on your birth chart and the D3 Drekkana (specific chart for siblings), here is the detailed analysis of your relationship and the prospects of your siblings.
+
+<div class="quick-answer-card">**Quick Answer**: 
+The current **Saturn-Ketu period** combined with the active **Aquarius Chara Dasha** highlights a time of "Transformation and Distance" regarding your siblings. 
+
+Specifically, while your 3rd Lord Venus is Exalted (showing a talented or prosperous sibling), it is hidden in the 8th House and Combust. This indicates that a sibling (likely a sister or the one closest to you) may face **health sensitivities or hidden personal struggles** specifically between **April 2025 and March 2026**. 
+
+**Protection:** Your Jaimini Bhratrukaraka (Jupiter) is aspecting the 8th house, providing spiritual protection, but you must avoid financial entanglements or property disputes with them during this phase.
+
+**Action:** Reach out to check on their well-being, but maintain healthy boundaries regarding money.</div>
+
+### Key Insights
+*   **Talent vs. Struggle (The Paradox):** Your 3rd Lord (Venus) is **Exalted** in Pisces, indicating a sibling who is naturally gifted, artistic, or spiritually inclined. However, because Venus is in the **8th House** and **Combust** (burnt by the Sun), they often feel "unseen" or face sudden ups and downs in life.
+*   **The Mars Factor (Weakness):** Mars, the natural significator of siblings, is **Combust** in D1 and **Debilitated** in the D3 Drekkana chart. This confirms that one sibling (likely a brother) may lack physical vitality or career stability, requiring your support.
+*   **The Yogini Warning:** The incoming **Sankata (Rahu)** Yogini period (starting April 2025) activates your 12th house of loss/distance, suggesting a need to be careful about their health or a potential relocation away from you.
+
+---
+
+### Astrological Analysis
+
+#### 1. The Promise (D1 & D3 Analysis)
+*   **D1 (Rashi - The Root):** You have **Leo Ascendant**, making Venus the Lord of the 3rd House (Siblings). Venus is placed in the **8th House** (Pisces) conjoined with Mars and Sun.
+    *   *Interpretation:* The 3rd Lord in the 8th House creates a **Sarala Yoga**, meaning your sibling is resilient and can survive crises. However, the conjunction with the 8th Lord (Jupiter's sign) and Mars indicates that your relationship is karmic—intense, sometimes distant, and subject to sudden changes.
+*   **D3 (Drekkana - The Fruit):** This is the specific divisional chart for siblings.
+    *   **Mars (The Karaka)** is **Debilitated in Cancer** in the D3 chart.
+    *   *Verdict:* This is a significant finding. While the D1 shows strength via Venus, the D3 shows the internal reality is fragile. A brother figure may struggle with decision-making, emotional volatility, or blood-related health issues.
+
+#### 2. The Master Clock (Vimshottari Dasha)
+You are currently in **Saturn Mahadasha / Ketu Antardasha** (until Sept 2026).
+*   **Saturn** is in your 2nd House (Virgo), which is the **12th from the 3rd House**. This position implies "expenditure on siblings" or "loss of communication."
+*   **Ketu** is in the 6th House (Capricorn). The 6th house represents disputes. This period often brings misunderstandings or a need to resolve past grievances with siblings.
+
+#### 3. Timing Synthesis (Multi-System)
+The timing for sibling-related events is double-confirmed by the Jaimini and Yogini systems:
+*   **Chara Dasha Confirmation:** You are in the **Aquarius** period (2021-2028).
+    *   Your **Bhratrukaraka (BK)** is **Jupiter**.
+    *   From Aquarius, the BK (Jupiter) falls in the **8th House** (Virgo). This is a classic Jaimini signal for "concern regarding the sibling's longevity or status."
+*   **Yogini Confirmation:** You are entering **Sankata (Rahu)** in April 2025. Rahu is in your 12th house (Pisces/Cancer axis influence).
+    *   *Synthesis:* The convergence of Saturn (12th from 3rd) and Rahu (active Yogini) confirms 2025-2026 as a period where a sibling may move to a foreign land or require hospitalization/medical care.
+
+#### 4. The Triple Perspective (Sudarshana)
+*   **From Lagna (Leo):** 3rd Lord Venus is Exalted but in 8th (Hidden Success).
+*   **From Moon (Virgo):** 3rd House is Scorpio, ruled by Mars. Mars is in 7th (Pisces) with Sun. This indicates a sibling who is authoritative or possibly aggressive.
+*   **From Sun (Pisces):** 3rd House is Taurus. Ketu aspects it from Capricorn. This shows detachment or spiritual separation.
+*   *Verdict:* **2 out of 3** perspectives show the sibling is powerful but "troubled" or "distant." The confidence level is **80%** that the relationship is psychologically complex rather than simple and friendly.
+
+#### 5. Nadi Precision (The Nature of the Relationship)
+Your chart reveals specific Nadi connections regarding Mars (Sibling):
+
+*   **The "Mars + Saturn" Link (Opposition):** Mars (Pisces) is directly opposite Saturn (Virgo).
+    *   *Effect:* This is a "Karma-Dharma" lock. It indicates that you have a heavy responsibility toward your sibling. They may feel you are too critical (Saturn looking at Mars), while you feel they are too impulsive. It often indicates a sibling in a **technical, medical, or service-oriented profession**.
+*   **The "Mars + Rahu" Link (Trine):** Mars (Pisces) is trine to Rahu (Cancer).
+    *   *Effect:* This indicates "Unconventional" or "Foreign" elements. A sibling may live far away, marry outside the community, or have an unconventional lifestyle that causes occasional friction with the family.
+
+---
+
+### Nakshatra Insights
+*   **Mars (Sibling Significator) in Uttara Bhadrapada:** This star is ruled by Saturn and symbolized by the "Back Legs of a Funeral Cot." It signifies deep wisdom gained through suffering. Your sibling is likely very mature, possibly introverted, or deals with managing long-term burdens.
+*   **3rd Lord Venus in Uttara Bhadrapada:** This confirms the theme. Your sibling has a "hermit-like" quality or hides their true talents from the world.
+
+### Practical Guidance
+1.  **Avoid Joint Ventures:** With Mars combust and Saturn aspecting Mars in the Nadi sense, business partnerships with siblings will lead to friction. Keep finances separate.
+2.  **Health Watch:** Specifically regarding the **stomach/digestion (Mars in Pisces)** or **blood pressure**. If a sibling complains of vague symptoms in late 2025, encourage a check-up.
+3.  **Remedy:** Since Mars is the key afflicted planet for siblings:
+    *   Offer red flowers or lentil sweets (Masoor Dal) to a deity or charity on Tuesdays.
+    *   Maintain patience during the **Ketu Antardasha**; do not react to provocations, as Ketu creates "foggy" communication.
+
+<div class="final-thoughts-card">**Final Thoughts**: Your siblings are a source of hidden strength (Venus Exalted) but also karmic responsibility (Mars in 8th). The year 2026 is a critical checkpoint for their stability—be the stable rock they need, even if they are distant.</div>
+
+<div class="follow-up-questions">
+📅 When is the most critical month for their health?
+🔮 What remedy pacifies the Mars-Saturn opposition?
+💼 Will my sibling move abroad soon?
+🌟 How can I improve communication during Ketu dasha?
+</div>
+Q: How is my health next year?
+A: You asked for a completion of the analysis regarding your husband's health in 2026, as the previous response was incomplete. Based on your birth chart and the **Bhavat Bhavam** (derived house) technique, here is the full detailed forecast.
+
+<div class="quick-answer-card">**Quick Answer**: 
+The year 2026 indicates a **"Sensitive Diagnostic Phase"** for your husband, particularly between **January 14 and July 8, 2026**. Specifically, expect health concerns related to **digestion, gut health, or foot/leg circulation** driven by the Saturn-Ketu alignment. However, your D9 Navamsa shows Jupiter strong in the 12th, indicating excellent recovery through **medical isolation or dietary detox**. Immediate Action: Schedule a full preventive checkup for him in **February 2026** to catch any lingering inflammation early.</div>
+
+### Key Insights
+*   **The Husband's Lagna (Aquarius):** Since your 7th house is Aquarius, we analyze his health from this perspective. His "Health House" (6th from 7th) is **Cancer**, containing **Rahu**. This signals potential for "undiagnosed" or stress-related stomach/chest sensitivity.
+*   **The Critical Zone (Virgo):** Your chart has a heavy concentration of planets (Saturn, Jupiter, Moon) in Virgo. For your husband, this is the **8th House of Chronic Issues**. This cluster suggests he may deal with "recurring" conditions rather than sudden new ones.
+*   **Jaimini Confirmation:** The Chara Dasha of **Aquarius (2021-2028)** activates the 7th house directly, making his well-being a central theme of this entire multi-year period.
+
+---
+
+### Astrological Analysis (Bhavat Bhavam)
+
+**1. The Health Timeline (Vimshottari Dasha)**
+You are currently in **Saturn Mahadasha**, and Saturn sits in your 2nd house (Virgo).
+*   **From Husband's Perspective (Bhavat Bhavam):** Your 2nd house is the **8th House** from your husband's sign (Aquarius).
+*   **The Implication:** The entire Saturn Mahadasha (2019–2038) brings a focus on your husband's longevity and chronic health management.
+
+**Specific 2026 Breakdown:**
+*   **Saturn-Ketu Period (Jan 14 – July 8, 2026):**
+    *   *The Logic:* Ketu sits in Capricorn, which is your husband's **12th House** (Hospitalization/Isolation).
+    *   *Prediction:* This is the most sensitive window. It often manifests as weakness, fatigue, or conditions that are hard to pinpoint medically. He may require a period of rest, detox, or minor hospitalization.
+*   **Saturn-Venus Period (July 9 – Dec 31, 2026):**
+    *   *The Logic:* Venus sits in Pisces, your husband's **2nd House** (Food/Throat/Face).
+    *   *Prediction:* A recovery phase. However, Venus in the 2nd often brings issues related to diet, blood sugar, or throat/eye sensitivity.
+
+**2. The Triple Perspective (Sudarshana)**
+*   **From Lagna (Leo):** The 7th Lord Saturn is in the 2nd house with the Moon (fluctuating health).
+*   **From Moon (Virgo):** The 7th house from Moon is Pisces, containing Mars and Sun. This indicates **inflammatory/heat-related** issues for the spouse (e.g., fevers, acidity).
+*   **From Sun (Pisces):** The 7th house from Sun is Virgo, again highlighting the Saturn/Jupiter connection.
+*   **Verdict:** Since 3 out of 3 reference points highlight Virgo/Pisces axis, confidence is **95%** that his health will revolve around **digestive/metabolic balance**.
+
+**3. Nadi Precision (The Nature of the Issue)**
+Your chart reveals specific Nadi connections regarding the spouse (Venus/7th Lord context):
+*   **The "Rahu-Moon" Link:** In the Bhavat Bhavam context, Rahu is in the husband's 6th house (Cancer/Stomach). This specifically indicates **gastric sensitivity, acidity, or food intolerance**.
+*   **The "Saturn-Moon" Link:** Saturn (Chronic) conjunct Moon (Fluids) in his 8th house suggests **water retention or lymphatic sluggishness**.
+
+**4. Timing Synthesis (Multi-System)**
+*   **Chara Dasha:** You are in the **Aquarius** period (Husband's Lagna). This emphasizes his physical body.
+*   **Yogini Dasha:** You will run **Bhramari-Sankata** (Mars-Rahu) until March 2026. Sankata represents "Crisis" and Rahu is in his health house. This confirms the **Jan-March** window as the peak sensitivity point.
+
+---
+
+### Practical Guidance for 2026
+
+1.  **Dietary Detox (Jan-July):** Since Ketu activates his 12th house (isolation/detox), he will respond beautifully to intermittent fasting or a strict elimination diet during the first half of the year.
+2.  **Gut Focus:** With Rahu in his derived 6th house (Cancer), avoid spicy/acidic foods. Probiotics and gut-healing protocols are essential remedies.
+3.  **Remedy:**
+    *   **For Saturn-Ketu:** He (or you on his behalf) should donate a blanket or warm clothes to a homeless person on a Saturday. This appeases the 8th/12th house energy.
+    *   **For Mars-Rahu (Yogini):** Offering water to birds helps calm the heat/drying effect of Rahu.
+
+<div class="final-thoughts-card">**Final Thoughts**: While the charts show sensitivity in the first half of 2026, the presence of **Jupiter** with Saturn in his 8th house acts as a "Grace Factor." It means that while he may face a scare or a confusing diagnosis, the right medical advice (Jupiter) will be found, leading to a strong recovery in the second half of the year.</div>
+
+<div class="follow-up-questions">
+📅 Which month is best for his medical checkup?
+🔮 What specific remedies can I do for his protection?
+💼 Will this impact his work schedule?
+</div>
+
+        
+        Current question: "Tell me about my next year."
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2026, endYear: 2026
+        - For general timing questions without specific year, use startYear: 2025, endYear: 2027
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2025, endYear: 2027 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

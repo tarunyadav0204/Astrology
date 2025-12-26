@@ -133,6 +133,8 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
     
     # Comprehensive System Instruction for Vedic Astrology Engine
     VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION = """
+STRICT COMPLIANCE WARNING: Your response will be considered INCORRECT and mathematically incomplete if you fail to synthesize the Chara Dasha sign and Yogini Dasha lord. If chara_sequence or yogini_sequence are in the JSON, they are NOT optional background info—they are the primary timing triggers.
+
 You are an expert Vedic Astrologer (Jyotish Acharya) with deep technical mastery of Parashari, Jaimini, and Nadi systems.
 
 Tone: Empathetic, insightful, objective, and solution-oriented.
@@ -308,7 +310,13 @@ You have access to `sudarshana_chakra` which shows the chart rotated from three 
 In your "Astrological Analysis" section, you MUST include a specific paragraph titled **"The Triple Perspective (Sudarshana)"**.
 - Compare the specific house related to the question from all three points.
 - *Example for Career:* "Your 10th house is strong from the Ascendant (giving skills), but the 10th from Moon contains Ketu (causing mental detachment from work). However, 10th from Sun is excellent (promising eventual authority)."
-- **Verdict:** Use this to give a "Confidence Score" (e.g., "Since this yoga repeats from both Moon and Sun, the result is 100% certain.").
+
+**THE "RULE OF TWO" - CONFIDENCE SCORING:**
+- **Three out of three agree:** "Major Life Milestone" - 95% confidence
+- **Two out of three agree:** "High Probability Event" - 80% confidence  
+- **One out of three:** "Subjective Experience" - 40% confidence
+
+**Verdict Template:** "Since this [yoga/event] appears in [X] out of 3 charts (Lagna/Moon/Sun), the confidence level is [percentage] - expect [outcome certainty]."
 
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
@@ -334,6 +342,12 @@ In your "Astrological Analysis" section, you MUST include a specific paragraph t
 - **CRITICAL: Check Hora Lagna (HL)** - planets aspecting HL show wealth sources.
 - Check Indu Lagna for liquid wealth and cash flow.
 - **Check Mandi position** - if Mandi is in 2nd/11th house, predict wealth through hard work or obstacles in earning.
+
+### R. MANDATORY TIMING SYNTHESIS
+If chara_sequence or yogini_sequence is present in the requested_dasha_summary or comprehensive_dashas, you MUST include a subsection in your 'Astrological Analysis' titled **'Timing Synthesis (Multi-System)'**.
+
+**Citations Required:** You must cite the Chara Sign and the Yogini Lord active during the event month.
+**Template:** "This timing is confirmed by [Chara Sign] Chara Dasha and [Yogini Lord] Yogini, creating [specific outcome]."
 
 ### K. DIVISIONAL CHARTS (VARGA) - MASTER ANALYSIS PROTOCOL
 You have access to specific Divisional Charts (D-Charts) in the `divisional_charts` object. You must use them as the "Final Verdict" for their specific domains.
@@ -397,11 +411,127 @@ You have access to specific Divisional Charts (D-Charts) in the `divisional_char
 13. **D60 (Shashtiamsa - Past Life Karma):**
     - **FINAL ARBITER:** If a planet is strong in D60, it can override almost any affliction in other charts. Use this to explain "miraculous" saves or "fated" falls.
 
+### L. THE "RAGS TO RICHES" RULE (Neecha Bhanga Raja Yoga)
+You have access to `advanced_analysis['neecha_bhanga']` which contains detailed Neecha Bhanga analysis including cancellation sources.
+
+**CRITICAL NARRATIVE TRANSFORMATION:**
+When you find a planet with Neecha Bhanga (debilitation cancellation), you MUST reframe it as a "Rags to Riches" story:
+
+**Instead of saying:** "Your Sun is weak in Libra."
+**You MUST say:** "Your Sun in Libra creates a powerful Neecha Bhanga Raja Yoga - you will face massive initial setbacks in career/authority, but this very failure becomes the platform for a legendary rise to exceptional status."
+
+**MANDATORY SOURCE ANALYSIS:**
+You MUST identify and explain the cancellation source for specific guidance:
+- **Cancelled by Exalted Moon:** "Success comes through mother figures, property, or emotional intelligence"
+- **Cancelled by Own Lord:** "Self-reliance and personal effort create the turnaround"
+- **Cancelled by Exalted Jupiter:** "Wisdom, teaching, or spiritual guidance leads to recovery"
+- **Cancelled by Conjunction:** "Partnership or collaboration becomes the key to transformation"
+
+**Template:** "Your [Planet] debilitation is cancelled by [Source], meaning your rise comes specifically through [Source's domain]. The deeper the initial fall, the higher the eventual rise."
+
+### M. THE "ASHTAKAVARGA GATEKEEPER" RULE (Transit Filtering)
+You have access to `ashtakavarga_filter` data in each transit activation which shows house strength.
+
+**CRITICAL PREDICTION FILTER:**
+A planet transiting a traditionally good house (e.g., Jupiter in 11th) can FAIL to deliver if that house has low Ashtakavarga points.
+
+**Mandatory Ashtakavarga Cross-Check:**
+- **28+ points:** "Exceptional results - transit delivers outstanding benefits"
+- **25-27 points:** "Good results - transit delivers as promised"
+- **22-24 points:** "Moderate results - some benefits but also obstacles"
+- **19-21 points:** "Weak results - transit struggles to deliver"
+- **Below 19 points:** "Disappointing results - despite good planetary position, house lacks strength to manifest benefits"
+
+**Template for Weak Ashtakavarga:**
+"While [Planet] transits your [House]th house (traditionally beneficial), the Ashtakavarga shows only [X] points, indicating the house lacks strength to fully manifest the promised benefits. Expect [modified prediction] rather than [traditional expectation]."
+
+**This prevents the #1 complaint: Promising a 'Great Year' that becomes mediocre.**
+
+### N. THE "KARMIC TRIGGER" RULE (Progressive Nadi Transits)
+You have access to `karmic_triggers` in transit activations which identifies exact conjunctions by slow-moving planets.
+
+**CRITICAL TIMING PRECISION:**
+When Saturn/Rahu/Jupiter transits within 0-3° of a natal planet, it "triggers" that planet's karma for 2.5 years (Saturn) or 1 year (Jupiter).
+
+**Karmic Trigger Identification:**
+- **Saturn Trigger:** Life-changing transformation, karmic lessons, permanent changes
+- **Rahu Trigger:** Sudden elevation, foreign connections, unconventional breakthroughs  
+- **Jupiter Trigger:** Dharmic expansion, wisdom gains, spiritual/educational milestones
+
+**Mandatory Karmic Trigger Analysis:**
+When you find a karmic trigger, you MUST predict the EXACT MONTH of the life-changing event:
+
+**Template:** "[Transit Planet] will trigger your natal [Natal Planet] in [Exact Month Year], creating a [specific karmic event]. This is not just a transit - it's a karmic activation that will permanently alter your [life area] for the next [duration]."
+
+**This enables month-level precision instead of general yearly windows.**
+
+### O. THE "BHAVAT BHAVAM" RULE (House from House Analysis)
+You have access to `bhavat_bhavam` data when questions involve relatives' fortunes.
+
+**CRITICAL PERSPECTIVE SHIFT:**
+When analyzing relatives' matters, you MUST shift the lagna perspective using Bhavat Bhavam principle.
+
+**Relative House Mapping:**
+- **Spouse (7th house):** Husband/Wife questions
+- **Father (9th house):** Father-related questions  
+- **Mother (4th house):** Mother-related questions
+- **Children (5th house):** Son/Daughter questions
+- **Siblings (3rd house):** Brother/Sister questions
+
+**Topic Analysis from Relative's Perspective:**
+- **Career/Business:** 10th house from relative's house
+- **Health:** 6th house from relative's house
+- **Wealth:** 2nd house from relative's house
+- **Marriage:** 7th house from relative's house
+
+**Mandatory Bhavat Bhavam Template:**
+"For your [relative]'s [topic], I analyze the [calculated house]th house, which represents the [topic] from your [relative]'s perspective (the [offset]th house from the [relative house]th house)."
+
+**Example:** "How is my husband's business?" → Analyze 4th house (10th from 7th)
+
+### P. THE "DASHA CONFLICT" RULE (Vimshottari vs Yogini Nuances)
+You have access to `dasha_conflicts` which identifies disagreements between Vimshottari and Yogini systems.
+
+**CRITICAL NUANCE DETECTION:**
+The most stunning predictions happen when Vimshottari and Yogini dashas disagree - this creates complex, nuanced outcomes.
+
+**Conflict Types:**
+- **Benefic Planet + Difficult Yogini:** Good results through stress/unconventional means
+- **Malefic Planet + Auspicious Yogini:** Challenges lead to unexpected positive outcomes
+
+**Mandatory Conflict Analysis:**
+When dasha conflicts are detected, you MUST explain the nuanced prediction:
+
+**Template:** "While your Vimshottari [Planet] dasha promises [expected result], the current [Yogini] Yogini indicates [contrasting influence]. This means [nuanced prediction combining both influences]."
+
+**Examples:**
+- Venus Dasha + Sankata Yogini: "Marriage/relationship through stressful circumstances or cultural gaps"
+- Saturn Dasha + Siddha Yogini: "Hard work leads to unexpected recognition and success"
+
+**This prevents generic predictions and adds sophisticated astrological depth.**
+
+### Q. THE "PREDICTION MATRIX" RULE (High-Impact Convergences)
+You have access to `prediction_matrix` which identifies exceptional periods where multiple rules intersect.
+
+**CRITICAL CONVERGENCE DETECTION:**
+When multiple astrological factors align, predictions become "stunning" in accuracy:
+
+**Life Pivot Points:** Karmic Trigger + High Ashtakavarga + Maximum Dasha Significance
+**Rags to Riches Activation:** Neecha Bhanga Planet + Current Dasha Alignment
+
+**Mandatory Matrix Analysis:**
+When high-impact convergences are detected, you MUST highlight them prominently:
+
+**Template:** "EXCEPTIONAL CONVERGENCE DETECTED: [Type] with [Confidence Level] - [Specific Reason]. This is not ordinary astrology - multiple systems confirm a [life-changing outcome]."
+
+## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
+
 ## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
 - NO DEATH PREDICTIONS: Never predict the exact date of death or use words like "Fatal end." Use phrases like "Critical health period," "End of a cycle," or "Period of high physical vulnerability."
 - NO MEDICAL DIAGNOSIS: Do not name specific diseases (e.g., "Cancer," "Diabetes") unless the user mentions them. Use astrological body parts (e.g., "Sensitive stomach," "blood-related issues").
 - FEAR REDUCTION RULE: In the "Quick Answer" section, if D1 is negative but D9 is positive, you are FORBIDDEN from using words like "Critical," "Severe," "Danger," or "Crisis." Instead, use "Significant," "Important," "Sensitive," or "Transformative." Save the detailed risk analysis for the "Astrological Analysis" section only.
 - EMPOWERMENT: Always end with a "Path Forward" or "Remedy" (e.g., meditation, charitable acts related to the afflicted planet).
+- SIMPLE LANGUAGE IN QUICK ANSWER: Start with "Based on your birth chart and upcoming planetary movements:" Use everyday language like 'career opportunities', 'family matters', 'health concerns', 'financial gains'. Avoid astrological jargon, planet names without context, or technical terms.
 
 ## RESPONSE FORMAT STRUCTURE
 For every user query, structure your response exactly as follows:
@@ -427,15 +557,19 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
 □ Actionable step
 
 **Key Insights**: 3-4 bullet points highlighting the Strength (D9) and the Challenge (D1).
+- **The Jaimini/Yogini Confirmation:** [MANDATORY bullet using specific terms like 'Aquarius Period' or 'Sankata Vibe' from the data]
 
 **Detailed Analysis**:
 - **The Promise (Chart Analysis):** Planetary positions and Yogas.
-- **The Triple Perspective (Sudarshana):** [MANDATORY] Cross-check the event from Moon (Mind) and Sun (Soul).
 - **The Master Clock (Vimshottari):** What the main Dasha indicates.
+- **Timing Synthesis (Multi-System):** [MANDATORY] You MUST cite the Chara Sign and Yogini Lord from the JSON here. Format: "This is confirmed by [Sign] Chara Dasha and [Lord] Yogini."
+- **The Triple Perspective (Sudarshana):** [MANDATORY] Cross-check the event from Moon (Mind) and Sun (Soul).
 - **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction.
 - **The Synthesis:** How D9 modifies the final outcome.
 
 **Practical Guidance**: Actionable advice or cautions.
+
+**Final Thoughts**: Summary and outlook.
 """
     
     # Class-level constants
@@ -1043,6 +1177,12 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         moon_lon = chart_data['planets']['Moon']['longitude']
         context['yogini_dasha'] = yogini_calc.calculate_current_yogini(birth_data, moon_lon, target_date)
         
+        # Add Dasha Conflict Analysis
+        context['dasha_conflicts'] = self._analyze_dasha_conflicts(
+            context['current_dashas'], 
+            context['yogini_dasha']
+        )
+        
         # Add Chara Dasha (Jaimini) with DYNAMIC TARGETING
         try:
             from datetime import datetime
@@ -1104,8 +1244,8 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             "current_period": f"{current_year}-{current_year + 2} (2 years)",
             "available_range": "1900-2100",
             "can_request": True,
-            "request_format": "Include JSON in your response: {\"requestType\": \"transitRequest\", \"startYear\": 2027, \"endYear\": 2028, \"specificMonths\": [\"January\", \"February\", \"March\"]}",
-            "note": "You can request specific periods for detailed timing analysis using JSON format",
+            "request_format": "Include JSON in your response: {\"requestType\": \"transitRequest\", \"startYear\": 2027, \"endYear\": 2028, \"specificMonths\": [\"January\", \"February\", \"March\"], \"detailed_dashas\": true}",
+            "note": "You can request specific periods for detailed timing analysis using JSON format. Set detailed_dashas: true for Sookshma/Prana levels in short-term analysis",
             "comprehensive_analysis_methodology": {
                 "principle": "Events manifest when dasha planets recreate natal relationships through transits, activating ALL connected house significations",
                 "mandatory_analysis_steps": [
@@ -1151,7 +1291,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                     },
 
                 },
-                "instruction": "MANDATORY: For ALL timing questions, request transit data using JSON format. After receiving transit data, provide comprehensive analysis using ALL house significations. RESPONSE MUST HAVE EXACTLY 6 SECTIONS IN THIS ORDER: 1) Quick Answer paragraph 2) ## Key Insights 3) ## Astrological Analysis 4) ## Nakshatra Insights 5) ## Timing & Guidance 6) ## Final Thoughts. Use standard markdown formatting only.",
+                "instruction": "MANDATORY: For ALL timing questions, request transit data using JSON format. After receiving transit data, provide comprehensive analysis using ALL house significations. RESPONSE MUST HAVE EXACTLY 6 MAIN SECTIONS IN THIS ORDER: 1) Quick Answer paragraph 2) ## Key Insights 3) ## Astrological Analysis (with sub-sections) 4) ## Nakshatra Insights 5) ## Timing & Guidance 6) ## Final Thoughts. Use standard markdown formatting only.",
 
             }
         }
@@ -1190,6 +1330,10 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             year_range = end_year - start_year
             print(f"\n🎯 TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
             print(f"⏱️ TRANSIT CALCULATION STARTED")
+            
+            # Get static context for ashtakavarga data
+            birth_hash = self._create_birth_hash(birth_data)
+            static_context = self.static_cache.get(birth_hash, {})
             
             try:
                 init_start = time.time()
@@ -1234,37 +1378,87 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                             start_date_obj = datetime.strptime(period['start_date'], '%Y-%m-%d')
                             end_date_obj = datetime.strptime(period['end_date'], '%Y-%m-%d')
                             
-                            # print(f"       Calculating dashas for {start_date_obj.strftime('%Y-%m-%d')} to {end_date_obj.strftime('%Y-%m-%d')}")
+                            # Get all 5 Vimshottari dasha levels for this period
                             dasha_periods = dasha_calc.get_dasha_periods_for_range(
                                 birth_data, start_date_obj, end_date_obj
                             )
-                            # print(f"       Dasha periods found: {len(dasha_periods)}")
                             
-                            for k, dasha_period in enumerate(dasha_periods):
-                                # print(f"         Dasha {k+1}: {dasha_period['start_date']} to {dasha_period['end_date']}")
-                                # print(f"           Maha: {dasha_period['mahadasha']}, Antar: {dasha_period['antardasha']}, Pratyantar: {dasha_period['pratyantardasha']}")
-                                # print(f"           Sookshma: {dasha_period['sookshma']}, Prana: {dasha_period['prana']}")
-                                pass
+                            # Get Chara Dasha periods for this range - use existing context data
+                            chara_periods_for_range = []
+                            try:
+                                # Use the Chara Dasha data already calculated in the context
+                                existing_chara = context.get('chara_dasha', {}).get('periods', [])
+                                for chara_period in existing_chara:
+                                    p_start = datetime.strptime(chara_period['start_date'], "%Y-%m-%d")
+                                    p_end = datetime.strptime(chara_period['end_date'], "%Y-%m-%d")
+                                    
+                                    # Check if chara period overlaps with transit period
+                                    if (p_start <= end_date_obj and p_end >= start_date_obj):
+                                        chara_periods_for_range.append({
+                                            'mahadasha_sign': chara_period.get('sign_name', chara_period.get('sign', 'Unknown')),
+                                            'antardasha_sign': chara_period.get('sign', 'Unknown'),  # Use 'sign' key for antardasha
+                                            'start_date': chara_period['start_date'],
+                                            'end_date': chara_period['end_date'],
+                                            'is_active': chara_period.get('is_current', False)
+                                        })
+                            except Exception as e:
+                                print(f"DEBUG: Chara transit loop error: {e}")
+                            
+                            # Get Yogini Dasha periods for this range - calculate for specific transit period
+                            yogini_periods_for_range = []
+                            try:
+                                yogini_calc = YoginiDashaCalculator()
+                                moon_lon = chart_data['planets']['Moon']['longitude']
+                                
+                                # Calculate Yogini dasha for the specific transit start date
+                                transit_yogini = yogini_calc.calculate_current_yogini(birth_data, moon_lon, start_date_obj)
+                                if transit_yogini and 'antardasha' in transit_yogini:
+                                    y_info = {
+                                        'mahadasha': transit_yogini['mahadasha'].get('name', 'Unknown'),
+                                        'antardasha': transit_yogini['antardasha'].get('name', 'Unknown'),
+                                        'vibe': transit_yogini['antardasha'].get('vibe', 'Neutral'),
+                                        'start_date': transit_yogini['antardasha'].get('start', ''),
+                                        'end_date': transit_yogini['antardasha'].get('end', '')
+                                    }
+                                    yogini_periods_for_range.append(y_info)
+                            except Exception as e:
+                                print(f"DEBUG: Yogini transit loop error: {e}")
                             
                             # Analyze dasha significance
                             significance = self._analyze_dasha_transit_significance(
                                 aspect['transit_planet'], aspect['natal_planet'], dasha_periods
                             )
-                            # print(f"       Dasha significance: {significance}")
                             
-                            # Convert heavy dasha objects to lightweight strings
-                            lightweight_dasha_periods = [
-                                f"{d.get('mahadasha', '')}-{d.get('antardasha', '')}-{d.get('pratyantardasha', '')}"
-                                for d in dasha_periods
-                            ]
+                            # Determine dasha levels based on intent or period length
+                            dasha_levels = self._get_required_dasha_levels(intent_result, year_range)
+                            
+                            # Create comprehensive dasha data for this transit period
+                            comprehensive_dasha_data = {
+                                'vimshottari_periods': [
+                                    self._filter_dasha_levels(d, dasha_levels) for d in dasha_periods
+                                ],
+                                'chara_periods': chara_periods_for_range,
+                                'yogini_periods': yogini_periods_for_range,
+                                'dasha_levels_included': dasha_levels
+                            }
                             
                             transit_activations.append({
                                 **period,
                                 'transit_planet': aspect['transit_planet'],
                                 'natal_planet': aspect['natal_planet'],
                                 'aspect_number': aspect['aspect_number'],
-                                'dasha_periods': lightweight_dasha_periods,
-                                'dasha_significance': significance
+                                'comprehensive_dashas': comprehensive_dasha_data,
+                                'dasha_significance': significance,
+                                'ashtakavarga_filter': self._apply_ashtakavarga_filter(
+                                    period.get('transit_house'), 
+                                    aspect['transit_planet'], 
+                                    static_context.get('ashtakavarga', {})
+                                ),
+                                'karmic_triggers': self._detect_karmic_triggers(
+                                    aspect['transit_planet'],
+                                    period,
+                                    chart_data
+                                )
                             })
                     except Exception as aspect_error:
                         # print(f"     ❌ Error calculating timeline: {aspect_error}")
@@ -1274,6 +1468,11 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                         continue
                 
                 context['transit_activations'] = transit_activations
+                
+                # Add standalone dasha summary for entire period (covers quiet periods)
+                context['requested_dasha_summary'] = self._build_standalone_dasha_summary(
+                    birth_data, start_year, end_year, chart_data, context, intent_result, year_range
+                )
                 
                 # Add logging to measure data size impact
                 import json
@@ -1286,7 +1485,21 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                     sample = transit_activations[0]
                     sample_json = json.dumps(sample)
                     print(f"🔍 SAMPLE TRANSIT SIZE: {len(sample_json)} characters")
-                    print(f"🔍 SAMPLE DASHA FORMAT: {sample.get('dasha_periods', [])[:2]}")
+                    
+                    # Log comprehensive dasha structure
+                    comp_dashas = sample.get('comprehensive_dashas', {})
+                    vims_count = len(comp_dashas.get('vimshottari_periods', []))
+                    chara_count = len(comp_dashas.get('chara_periods', []))
+                    yogini_count = len(comp_dashas.get('yogini_periods', []))
+                    
+                    print(f"🔍 COMPREHENSIVE DASHA DATA:")
+                    print(f"   Vimshottari periods: {vims_count}")
+                    print(f"   Chara periods: {chara_count}")
+                    print(f"   Yogini periods: {yogini_count}")
+                    
+                    if vims_count > 0:
+                        sample_vims = comp_dashas['vimshottari_periods'][0]
+                        print(f"   Sample Vimshottari: {sample_vims['mahadasha']}-{sample_vims['antardasha']}-{sample_vims['pratyantardasha']}")
                 
                 # Validate transit data integrity
                 self._validate_transit_data(transit_activations)
@@ -1296,8 +1509,11 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 print(f"📊 TRANSIT DATA SENT TO GEMINI:")
                 print(f"   Period: {start_year}-{end_year}")
                 print(f"   Total activations: {len(transit_activations)}")
+                print(f"   Enhanced with: All 5 Vimshottari levels + Chara Dasha + Yogini Dasha")
                 for i, activation in enumerate(transit_activations[:3]):
-                    print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']})")
+                    comp_dashas = activation.get('comprehensive_dashas', {})
+                    vims_count = len(comp_dashas.get('vimshottari_periods', []))
+                    print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']}) - {vims_count} dasha periods")
                 if len(transit_activations) > 3:
                     print(f"     ... and {len(transit_activations) - 3} more")
                 
@@ -1313,79 +1529,12 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                         "6. Apply planetary natures (benefic/malefic) for outcome polarity",
                         "7. Predict MINIMUM 3-5 specific events per transit activation, not just 1-2"
                     ],
-                    "example_comprehensive_analysis": {
-                        "scenario": "Saturn (natal 8th house, lord 9th,10th) transits 6th house aspecting natal Mars (2nd house, lord 5th,12th)",
-                        "houses_involved": "2nd,5th,6th,8th,9th,10th,12th",
-                        "significations": "wealth,children,health,transformation,father,career,expenses",
-                        "predicted_events": [
-                            "Career transformation requiring health attention",
-                            "Father's health issues affecting family finances", 
-                            "Children's education expenses through career changes",
-                            "Property matters involving legal/health complications"
-                        ]
-                    },
-                    "quick_answer_enhancement": {
-                        "current_problem": "Quick answers are too high-level and philosophical",
-                        "required_improvement": "Must synthesize ALL house significations to predict specific life events",
-                        "format_requirement": "Date range: Specific event prediction based on house synthesis",
-                        "examples": [
-                            "Jan 15-Mar 20: Property purchase opportunity through career advancement (2nd+10th houses)",
-                            "Feb 5-25: Father's travel for health treatment, family expenses (6th+9th+12th houses)",
-                            "Apr 10-May 5: Children's achievement bringing recognition, celebration costs (5th+11th+12th houses)"
-                        ]
-                    },
                     "forbidden_approaches": [
                         "Generic philosophical statements about planetary influences",
                         "Vague terms like 'challenges', 'growth', 'good period'",
                         "Single house analysis ignoring lordships and connections",
                         "Theoretical discussions without specific event predictions"
                     ]
-                }
-                
-                context["response_format_for_period_predictions"] = {
-                    "structure": "When user asks for specific period predictions, use this EXACT format:",
-                    "template": {
-                        "quick_answer": "LAYMEN-FRIENDLY summary with 2-3 specific events and exact dates - NO astrological jargon",
-                        "event_predictions": {
-                            "high_probability_events": [
-                                {
-                                    "event_type": "Career/Finance/Relationship/Health/Property/Education",
-                                    "description": "Specific event description",
-                                    "dates": "YYYY-MM-DD to YYYY-MM-DD",
-                                    "probability": "High/Medium percentage",
-                                    "astrological_basis": "Brief reasoning"
-                                }
-                            ],
-                            "best_action_days": [
-                                {
-                                    "date": "YYYY-MM-DD",
-                                    "action": "Specific recommended action"
-                                }
-                            ]
-                        },
-                        "period_analysis": "Brief analysis of the selected period's astrological significance",
-                        "precautions": "Any warnings or things to avoid during this period"
-                    },
-                    "mandatory_sections": [
-                        "Quick Answer with specific events and dates (LAYMEN-FRIENDLY)",
-                        "Event Predictions with probabilities",
-                        "Best Action Days",
-                        "Period Analysis",
-                        "Precautions if any"
-                    ],
-                    "skip_sections": [
-                        "General personality analysis",
-                        "Full chart overview",
-                        "Divisional chart detailed analysis",
-                        "Complete yoga descriptions"
-                    ],
-                    "quick_answer_mandatory_format": {
-                        "opening": "Based on your birth chart and upcoming planetary movements:",
-                        "content": "2-3 specific life events with exact date ranges in simple language",
-                        "closing": "These predictions are based on the detailed astrological analysis below.",
-                        "language_requirement": "Use everyday language that anyone can understand, avoid all astrological terminology",
-                        "example": "Based on your birth chart and upcoming planetary movements: Between Jan 15-Mar 20, 2025, you're likely to have a property purchase opportunity through career advancement. From Feb 5-25, 2025, expect father's health to need attention with possible travel for treatment. These predictions are based on the detailed astrological analysis below."
-                    }
                 }
                 
                 # Log transit data being sent
@@ -1426,12 +1575,22 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 "instruction": "Focus ONLY on specific event predictions for the selected period. Use the response_format_for_period_predictions template. Skip general chart analysis sections."
             }
         
+        # Add Bhavat Bhavam analysis if question involves relatives
+        bhavat_bhavam_analysis = self._detect_and_analyze_bhavat_bhavam(user_question, context)
+        if bhavat_bhavam_analysis:
+            context['bhavat_bhavam'] = bhavat_bhavam_analysis
+        
+        # Add Prediction Matrix for high-impact overlaps
+        context['prediction_matrix'] = self._build_prediction_matrix(context)
+        
         # ESSENTIAL STRUCTURE ONLY
         context['RESPONSE_STRUCTURE_REQUIRED'] = {
             "sections_in_order": [
                 "Quick Answer (paragraph)",
-                "## Key Insights",
-                "## Astrological Analysis", 
+                "## Key Insights (with 'Jaimini/Yogini Confirmation' bullet)",
+                "## Astrological Analysis",
+                "   ### The Promise (Natal/Divisional)",
+                "   ### Timing Synthesis (Vimshottari + Chara + Yogini) [MANDATORY: Cite the JSON signs/lords here]",
                 "## Nakshatra Insights",
                 "## Timing & Guidance",
                 "## Final Thoughts"
@@ -1858,6 +2017,465 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             return round(data, 2)
         return data
     
+    def _apply_ashtakavarga_filter(self, transit_house: int, transit_planet: str, ashtakavarga_data: Dict) -> Dict:
+        """Apply Ashtakavarga filter to transit predictions"""
+        if not transit_house or not ashtakavarga_data:
+            return {'status': 'no_data', 'strength': 'unknown'}
+        
+        # Get Bhinnashtakavarga for the transiting planet
+        d1_ashtakavarga = ashtakavarga_data.get('d1_rashi', {})
+        bhinnashtakavarga = d1_ashtakavarga.get('bhinnashtakavarga', {})
+        planet_ashtakavarga = bhinnashtakavarga.get(transit_planet, {})
+        
+        if not planet_ashtakavarga:
+            return {'status': 'no_planet_data', 'strength': 'unknown'}
+        
+        # Get points for the transit house (convert 1-12 to 0-11 indexing)
+        house_index = (transit_house - 1) % 12
+        house_points = planet_ashtakavarga.get('house_points', [])
+        
+        if len(house_points) <= house_index:
+            return {'status': 'no_house_data', 'strength': 'unknown'}
+        
+        points = house_points[house_index]
+        
+        # Ashtakavarga strength classification (Classical thresholds)
+        if points >= 28:
+            strength = 'excellent'
+            prediction_modifier = 'exceptional_results'
+        elif points >= 25:
+            strength = 'good'
+            prediction_modifier = 'good_results'
+        elif points >= 22:
+            strength = 'moderate'
+            prediction_modifier = 'mixed_results'
+        elif points >= 19:
+            strength = 'weak'
+            prediction_modifier = 'limited_results'
+        else:
+            strength = 'very_weak'
+            prediction_modifier = 'disappointing_results'
+        
+        # Special handling for malefic transits with high points
+        malefic_planets = ['Saturn', 'Mars', 'Rahu', 'Ketu']
+        if transit_planet in malefic_planets and points >= 28:
+            prediction_modifier = 'challenging_but_manageable'
+            strength = f'{strength}_with_support'
+        
+        return {
+            'status': 'calculated',
+            'points': points,
+            'strength': strength,
+            'prediction_modifier': prediction_modifier,
+            'house': transit_house,
+            'planet': transit_planet,
+            'interpretation': self._get_ashtakavarga_interpretation(points, transit_planet, transit_house)
+        }
+    
+    def _get_ashtakavarga_interpretation(self, points: int, planet: str, house: int) -> str:
+        """Get interpretation based on Ashtakavarga points"""
+        if points >= 28:
+            return f"{planet} transit through {house}th house has exceptional Ashtakavarga support ({points} points) - expect outstanding results"
+        elif points >= 25:
+            return f"{planet} transit through {house}th house has good Ashtakavarga support ({points} points) - expect positive outcomes"
+        elif points >= 22:
+            return f"{planet} transit through {house}th house has moderate Ashtakavarga support ({points} points) - expect mixed results"
+        elif points >= 19:
+            return f"{planet} transit through {house}th house has weak Ashtakavarga support ({points} points) - results may be limited"
+        else:
+            return f"{planet} transit through {house}th house has very weak Ashtakavarga support ({points} points) - expect disappointing results despite good planetary position"
+    
+    def _detect_karmic_triggers(self, transit_planet: str, period: Dict, natal_chart: Dict) -> Dict:
+        """Detect karmic triggers when slow planets conjunct natal planets within 3 degrees"""
+        if transit_planet not in ['Saturn', 'Rahu', 'Jupiter']:
+            return {'status': 'not_applicable', 'triggers': []}
+        
+        if not natal_chart.get('planets'):
+            return {'status': 'no_natal_data', 'triggers': []}
+        
+        triggers = []
+        conjunct_planets = period.get('conjunct_natal_planets', [])
+        
+        # For each conjunct planet, check if it's a precise karmic trigger
+        for natal_planet in conjunct_planets:
+            if natal_planet not in natal_chart['planets']:
+                continue
+            
+            # Get natal planet longitude
+            natal_longitude = natal_chart['planets'][natal_planet].get('longitude', 0)
+            
+            # Calculate trigger details
+            trigger_type = self._get_karmic_trigger_type(transit_planet, natal_planet)
+            duration = self._get_karmic_duration(transit_planet)
+            
+            triggers.append({
+                'transit_planet': transit_planet,
+                'natal_planet': natal_planet,
+                'natal_longitude': natal_longitude,
+                'trigger_type': trigger_type,
+                'duration': duration,
+                'karmic_theme': self._get_karmic_theme(transit_planet, natal_planet),
+                'life_area': self._get_karmic_life_area(natal_planet),
+                'intensity': 'maximum',  # Exact conjunctions are always maximum intensity
+                'prediction_template': f"{transit_planet} triggers natal {natal_planet} - {trigger_type}"
+            })
+        
+        return {
+            'status': 'calculated' if triggers else 'no_triggers',
+            'total_triggers': len(triggers),
+            'triggers': triggers,
+            'interpretation': self._get_karmic_trigger_interpretation(triggers, period)
+        }
+    
+    def _get_karmic_trigger_type(self, transit_planet: str, natal_planet: str) -> str:
+        """Get karmic trigger type based on planet combination"""
+        combinations = {
+            ('Saturn', 'Sun'): 'Authority Transformation',
+            ('Saturn', 'Moon'): 'Emotional Maturation', 
+            ('Saturn', 'Mars'): 'Disciplined Action',
+            ('Saturn', 'Mercury'): 'Communication Mastery',
+            ('Saturn', 'Jupiter'): 'Wisdom Through Hardship',
+            ('Saturn', 'Venus'): 'Relationship Restructuring',
+            ('Rahu', 'Sun'): 'Sudden Fame/Recognition',
+            ('Rahu', 'Moon'): 'Mental Breakthrough',
+            ('Rahu', 'Mars'): 'Explosive Action',
+            ('Rahu', 'Mercury'): 'Innovative Communication',
+            ('Rahu', 'Jupiter'): 'Unconventional Wisdom',
+            ('Rahu', 'Venus'): 'Unusual Relationships',
+            ('Jupiter', 'Sun'): 'Leadership Expansion',
+            ('Jupiter', 'Moon'): 'Emotional Wisdom',
+            ('Jupiter', 'Mars'): 'Righteous Action',
+            ('Jupiter', 'Mercury'): 'Teaching/Learning',
+            ('Jupiter', 'Venus'): 'Dharmic Relationships',
+            ('Jupiter', 'Saturn'): 'Structured Growth'
+        }
+        return combinations.get((transit_planet, natal_planet), f'{transit_planet}-{natal_planet} Activation')
+    
+    def _get_karmic_duration(self, transit_planet: str) -> str:
+        """Get karmic effect duration"""
+        durations = {
+            'Saturn': '2.5 years',
+            'Rahu': '1.5 years', 
+            'Jupiter': '1 year'
+        }
+        return durations.get(transit_planet, '1 year')
+    
+    def _get_karmic_theme(self, transit_planet: str, natal_planet: str) -> str:
+        """Get karmic theme for the trigger"""
+        themes = {
+            'Saturn': 'Discipline, Responsibility, Permanent Change',
+            'Rahu': 'Innovation, Foreign Elements, Sudden Elevation',
+            'Jupiter': 'Expansion, Wisdom, Dharmic Growth'
+        }
+        return themes.get(transit_planet, 'Transformation')
+    
+    def _get_karmic_life_area(self, natal_planet: str) -> str:
+        """Get life area affected by natal planet"""
+        areas = {
+            'Sun': 'Authority, Career, Father, Government',
+            'Moon': 'Mind, Emotions, Mother, Public',
+            'Mars': 'Energy, Property, Siblings, Competition',
+            'Mercury': 'Communication, Business, Learning, Travel',
+            'Jupiter': 'Wisdom, Children, Spirituality, Teaching',
+            'Venus': 'Relationships, Wealth, Arts, Luxury',
+            'Saturn': 'Service, Discipline, Longevity, Karma'
+        }
+        return areas.get(natal_planet, 'General Life')
+    
+    def _get_karmic_trigger_interpretation(self, triggers: List[Dict], period: Dict) -> str:
+        """Get interpretation for karmic triggers"""
+        if not triggers:
+            return 'No karmic triggers detected in this period'
+        
+        if len(triggers) == 1:
+            trigger = triggers[0]
+            return f"KARMIC TRIGGER: {trigger['transit_planet']} activates your natal {trigger['natal_planet']}, creating {trigger['trigger_type']} lasting {trigger['duration']}"
+        else:
+            return f"MULTIPLE KARMIC TRIGGERS: {len(triggers)} planetary activations create a major life transformation period lasting up to 2.5 years"
+    
+    def _detect_and_analyze_bhavat_bhavam(self, user_question: str, base_context: Dict) -> Optional[Dict]:
+        """Detect if question involves relatives and apply Bhavat Bhavam analysis"""
+        if not user_question:
+            return None
+        
+        question_lower = user_question.lower()
+        
+        # Relative detection patterns
+        relative_patterns = {
+            'spouse': {'keywords': ['husband', 'wife', 'spouse', 'partner'], 'house': 7},
+            'father': {'keywords': ['father', 'dad', 'papa'], 'house': 9},
+            'mother': {'keywords': ['mother', 'mom', 'mama'], 'house': 4},
+            'children': {'keywords': ['child', 'son', 'daughter', 'kids'], 'house': 5},
+            'siblings': {'keywords': ['brother', 'sister', 'sibling'], 'house': 3},
+            'elder_sibling': {'keywords': ['elder brother', 'elder sister'], 'house': 11}
+        }
+        
+        # Topic detection patterns
+        topic_patterns = {
+            'career': {'keywords': ['job', 'career', 'business', 'work', 'profession'], 'house_offset': 9},  # 10th from relative
+            'health': {'keywords': ['health', 'illness', 'disease', 'medical'], 'house_offset': 5},  # 6th from relative
+            'wealth': {'keywords': ['money', 'wealth', 'income', 'finance'], 'house_offset': 1},  # 2nd from relative
+            'marriage': {'keywords': ['marriage', 'wedding', 'relationship'], 'house_offset': 6},  # 7th from relative
+            'children': {'keywords': ['children', 'pregnancy', 'kids'], 'house_offset': 4}  # 5th from relative
+        }
+        
+        detected_relative = None
+        detected_topic = None
+        
+        # Detect relative
+        for relative, data in relative_patterns.items():
+            if any(keyword in question_lower for keyword in data['keywords']):
+                detected_relative = {'name': relative, 'house': data['house']}
+                break
+        
+        # Detect topic
+        for topic, data in topic_patterns.items():
+            if any(keyword in question_lower for keyword in data['keywords']):
+                detected_topic = {'name': topic, 'house_offset': data['house_offset']}
+                break
+        
+        if not detected_relative or not detected_topic:
+            return None
+        
+        # Calculate Bhavat Bhavam house
+        relative_house = detected_relative['house']
+        topic_offset = detected_topic['house_offset']
+        bhavat_bhavam_house = ((relative_house + topic_offset - 2) % 12) + 1
+        
+        return {
+            'detected': True,
+            'relative': detected_relative['name'],
+            'relative_house': relative_house,
+            'topic': detected_topic['name'],
+            'topic_offset': topic_offset,
+            'bhavat_bhavam_house': bhavat_bhavam_house,
+            'analysis_instruction': f"Analyze {detected_topic['name']} of {detected_relative['name']} by examining the {bhavat_bhavam_house}th house (which is the {topic_offset}th house from the {relative_house}th house)",
+            'example': f"Question about {detected_relative['name']}'s {detected_topic['name']} → Look at {bhavat_bhavam_house}th house"
+        }
+    
+    def _analyze_dasha_conflicts(self, vimshottari_dasha: Dict, yogini_dasha: Dict) -> Dict:
+        """Analyze conflicts between Vimshottari and Yogini dasha systems"""
+        if not vimshottari_dasha or not yogini_dasha:
+            return {'status': 'insufficient_data', 'conflicts': []}
+        
+        # Get current periods
+        vims_maha = vimshottari_dasha.get('mahadasha', {}).get('planet')
+        vims_antar = vimshottari_dasha.get('antardasha', {}).get('planet')
+        yogini_period = yogini_dasha.get('current_yogini', {}).get('yogini')
+        
+        if not vims_maha or not yogini_period:
+            return {'status': 'missing_periods', 'conflicts': []}
+        
+        conflicts = []
+        
+        # Analyze Mahadasha vs Yogini conflict
+        maha_conflict = self._detect_planet_yogini_conflict(vims_maha, yogini_period)
+        if maha_conflict:
+            conflicts.append({
+                'type': 'mahadasha_yogini',
+                'vimshottari_planet': vims_maha,
+                'yogini_period': yogini_period,
+                'conflict_nature': maha_conflict,
+                'prediction_impact': self._get_conflict_prediction_impact(vims_maha, yogini_period, maha_conflict)
+            })
+        
+        # Analyze Antardasha vs Yogini conflict
+        if vims_antar:
+            antar_conflict = self._detect_planet_yogini_conflict(vims_antar, yogini_period)
+            if antar_conflict:
+                conflicts.append({
+                    'type': 'antardasha_yogini',
+                    'vimshottari_planet': vims_antar,
+                    'yogini_period': yogini_period,
+                    'conflict_nature': antar_conflict,
+                    'prediction_impact': self._get_conflict_prediction_impact(vims_antar, yogini_period, antar_conflict)
+                })
+        
+        return {
+            'status': 'analyzed',
+            'total_conflicts': len(conflicts),
+            'conflicts': conflicts,
+            'interpretation': self._get_dasha_conflict_interpretation(conflicts)
+        }
+    
+    def _detect_planet_yogini_conflict(self, planet: str, yogini: str) -> Optional[str]:
+        """Detect conflict between planet nature and yogini nature"""
+        # Planet natures
+        benefic_planets = ['Jupiter', 'Venus', 'Moon', 'Mercury']
+        malefic_planets = ['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun']
+        
+        # Yogini natures
+        auspicious_yoginis = ['Siddha', 'Mangala', 'Pingala']
+        inauspicious_yoginis = ['Sankata', 'Ulka', 'Dhanya']
+        
+        planet_nature = 'benefic' if planet in benefic_planets else 'malefic'
+        yogini_nature = 'auspicious' if yogini in auspicious_yoginis else 'inauspicious'
+        
+        # Detect conflicts
+        if planet_nature == 'benefic' and yogini_nature == 'inauspicious':
+            return 'benefic_planet_difficult_yogini'
+        elif planet_nature == 'malefic' and yogini_nature == 'auspicious':
+            return 'malefic_planet_auspicious_yogini'
+        
+        return None
+    
+    def _get_conflict_prediction_impact(self, planet: str, yogini: str, conflict_type: str) -> str:
+        """Get prediction impact based on dasha conflict"""
+        impacts = {
+            'benefic_planet_difficult_yogini': f"{planet} promises positive results, but {yogini} Yogini indicates stress, delays, or unconventional circumstances",
+            'malefic_planet_auspicious_yogini': f"{planet} indicates challenges, but {yogini} Yogini suggests unexpected support or positive outcomes through difficulties"
+        }
+        return impacts.get(conflict_type, f"Complex interaction between {planet} and {yogini}")
+    
+    def _get_dasha_conflict_interpretation(self, conflicts: List[Dict]) -> str:
+        """Get overall interpretation of dasha conflicts"""
+        if not conflicts:
+            return "Vimshottari and Yogini dashas are aligned - expect straightforward manifestation of planetary results"
+        
+        if len(conflicts) == 1:
+            conflict = conflicts[0]
+            return f"DASHA CONFLICT DETECTED: {conflict['prediction_impact']} - expect nuanced results with mixed outcomes"
+        else:
+            return f"MULTIPLE DASHA CONFLICTS: {len(conflicts)} conflicting influences create a complex period requiring careful navigation"
+    
+    def _build_prediction_matrix(self, context: Dict) -> Dict:
+        """Flags moments where multiple rules intersect for 'Stunning' accuracy"""
+        triggers = []
+        
+        # Logic: If Karmic Trigger AND High Ashtakavarga AND Dasha Alignment
+        for activation in context.get('transit_activations', []):
+            karmic_status = activation.get('karmic_triggers', {}).get('status')
+            ashtaka_points = activation.get('ashtakavarga_filter', {}).get('points', 0)
+            dasha_significance = activation.get('dasha_significance')
+            
+            if (karmic_status == 'calculated' and 
+                ashtaka_points > 28 and
+                dasha_significance == 'maximum'):
+                
+                triggers.append({
+                    "type": "LIFE_PIVOT_POINT",
+                    "period": f"{activation['start_date']} to {activation['end_date']}",
+                    "reason": "Karmic trigger aligned with powerful dasha and house strength",
+                    "planets": f"{activation['transit_planet']} -> {activation['natal_planet']}",
+                    "confidence": "95%_certainty"
+                })
+        
+        # Check for Neecha Bhanga + Dasha alignment
+        neecha_data = context.get('advanced_analysis', {}).get('neecha_bhanga', {})
+        current_dasha = context.get('current_dashas', {})
+        
+        if neecha_data.get('neecha_bhanga_planets'):
+            maha_planet = current_dasha.get('mahadasha', {}).get('planet')
+            for nb_planet in neecha_data['neecha_bhanga_planets']:
+                if nb_planet['planet'] == maha_planet and nb_planet['strength'] in ['Complete Cancellation', 'Strong Cancellation']:
+                    triggers.append({
+                        "type": "RAGS_TO_RICHES_ACTIVATION",
+                        "period": "Current Mahadasha Period",
+                        "reason": f"Neecha Bhanga {nb_planet['planet']} dasha creates legendary transformation",
+                        "confidence": "90%_certainty"
+                    })
+        
+        return {
+            'total_triggers': len(triggers),
+            'high_impact_periods': triggers,
+            'interpretation': self._get_matrix_interpretation(triggers)
+        }
+    
+    def _get_matrix_interpretation(self, triggers: List[Dict]) -> str:
+        """Get interpretation for prediction matrix"""
+        if not triggers:
+            return "Standard astrological influences - no exceptional convergences detected"
+        
+        if len(triggers) == 1:
+            trigger = triggers[0]
+            return f"EXCEPTIONAL PERIOD DETECTED: {trigger['type']} with {trigger['confidence']} - {trigger['reason']}"
+        else:
+            return f"MULTIPLE LIFE-CHANGING CONVERGENCES: {len(triggers)} exceptional periods create a transformational phase"
+    
+    def _get_required_dasha_levels(self, intent_result: Optional[Dict], year_range: int) -> List[str]:
+        """Determine required dasha levels based on intent and time period"""
+        # Check if intent router specifically requests detailed dashas
+        if intent_result and intent_result.get('detailed_dashas'):
+            return ['mahadasha', 'antardasha', 'pratyantardasha', 'sookshma', 'prana']
+        
+        # Smart selection based on time period
+        if year_range <= 1:  # 1 year or less - include all levels
+            return ['mahadasha', 'antardasha', 'pratyantardasha', 'sookshma', 'prana']
+        elif year_range <= 3:  # 2-3 years - first 4 levels
+            return ['mahadasha', 'antardasha', 'pratyantardasha', 'sookshma']
+        else:  # 4+ years - first 3 levels only
+            return ['mahadasha', 'antardasha', 'pratyantardasha']
+    
+    def _filter_dasha_levels(self, dasha_period: Dict, required_levels: List[str]) -> Dict:
+        """Filter dasha period to include only required levels"""
+        filtered = {
+            'start_date': dasha_period.get('start_date', ''),
+            'end_date': dasha_period.get('end_date', '')
+        }
+        
+        for level in required_levels:
+            filtered[level] = dasha_period.get(level, '')
+        
+        return filtered
+    
+    def _build_standalone_dasha_summary(self, birth_data: Dict, start_year: int, end_year: int, chart_data: Dict, context: Dict, intent_result: Optional[Dict] = None, year_range: int = 1) -> Dict:
+        """Build complete dasha summary for entire period to cover quiet periods"""
+        from datetime import datetime, timedelta
+        
+        start_date = datetime(start_year, 1, 1)
+        end_date = datetime(end_year, 12, 31)
+        
+        dasha_calc = DashaCalculator()
+        
+        # Get all Vimshottari periods for the range
+        vimshottari_periods = dasha_calc.get_dasha_periods_for_range(birth_data, start_date, end_date)
+        
+        # Determine required dasha levels
+        dasha_levels = self._get_required_dasha_levels(intent_result, year_range)
+        
+        # DIRECT EXTRACTION - Chara Dasha
+        chara_periods = []
+        all_chara = context.get('chara_dasha', {}).get('periods', [])
+        for p in all_chara:
+            p_start = datetime.strptime(p['start_date'], "%Y-%m-%d")
+            p_end = datetime.strptime(p['end_date'], "%Y-%m-%d")
+            if p_start <= end_date and p_end >= start_date:
+                chara_periods.append({
+                    'mahadasha_sign': p.get('sign_name', p.get('sign', 'Unknown')),
+                    'antardasha_sign': p.get('sign', 'Unknown'),  # Use 'sign' key for antardasha
+                    'start_date': p['start_date'],
+                    'end_date': p['end_date'],
+                    'is_active': p.get('is_current', False)
+                })
+        
+        # DIRECT CALCULATION - Yogini Dasha for requested period start
+        yogini_periods = []
+        try:
+            yogini_calc = YoginiDashaCalculator()
+            moon_lon = chart_data.get('planets', {}).get('Moon', {}).get('longitude', 0)
+            y_data = yogini_calc.calculate_current_yogini(birth_data, moon_lon, start_date)
+            if y_data and 'antardasha' in y_data:
+                yogini_periods.append({
+                    'mahadasha': y_data['mahadasha'].get('name', 'Unknown'),
+                    'antardasha': y_data['antardasha'].get('name', 'Unknown'),
+                    'vibe': y_data['antardasha'].get('vibe', 'Neutral'),
+                    'start_date': y_data['antardasha'].get('start', ''),
+                    'end_date': y_data['antardasha'].get('end', '')
+                })
+        except Exception as e:
+            print(f"DEBUG: Yogini summary calculation error: {e}")
+        
+        return {
+            'period_coverage': f"{start_year}-{end_year}",
+            'vimshottari_sequence': [
+                self._filter_dasha_levels(d, dasha_levels) for d in vimshottari_periods
+            ],
+            'chara_sequence': chara_periods,
+            'yogini_sequence': yogini_periods,
+            'dasha_levels_included': dasha_levels,
+            'note': f'Dasha coverage with {len(dasha_levels)} levels for {year_range}-year period'
+        }
+    
     def _validate_transit_data(self, transit_activations: List[Dict]) -> None:
         """Ensure essential data is preserved after optimization"""
         for activation in transit_activations:
@@ -1866,13 +2484,20 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             assert 'natal_planet' in activation, "Missing natal_planet"
             assert 'start_date' in activation, "Missing start_date"
             assert 'end_date' in activation, "Missing end_date"
-            assert 'dasha_periods' in activation, "Missing dasha_periods"
+            assert 'comprehensive_dashas' in activation, "Missing comprehensive_dashas"
             
-            # Check dasha_periods is list of strings (not objects)
-            assert isinstance(activation['dasha_periods'], list), "dasha_periods should be list"
-            if activation['dasha_periods']:
-                assert isinstance(activation['dasha_periods'][0], str), "dasha_periods should contain strings"
-                assert '-' in activation['dasha_periods'][0], "dasha_periods should be in format 'Planet-Planet-Planet'"
+            # Check comprehensive_dashas structure
+            dashas = activation['comprehensive_dashas']
+            assert isinstance(dashas, dict), "comprehensive_dashas should be dict"
+            assert 'vimshottari_periods' in dashas, "Missing vimshottari_periods"
+            assert 'chara_periods' in dashas, "Missing chara_periods"
+            assert 'yogini_periods' in dashas, "Missing yogini_periods"
+            
+            # Validate Vimshottari structure
+            if dashas['vimshottari_periods']:
+                vims_period = dashas['vimshottari_periods'][0]
+                assert 'mahadasha' in vims_period, "Missing mahadasha in vimshottari_periods"
+                assert 'antardasha' in vims_period, "Missing antardasha in vimshottari_periods"
         
         print(f"✅ Transit data validation passed for {len(transit_activations)} transits")
         return None

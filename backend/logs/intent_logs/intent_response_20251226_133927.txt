@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-26T13:39:30.324788
+Question: Tell me about my sibling.
+Processing Time: 2.513s
+Response Length: 190 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "siblings",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D3",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "siblings",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D3",
+    "D9"
+  ]
+}

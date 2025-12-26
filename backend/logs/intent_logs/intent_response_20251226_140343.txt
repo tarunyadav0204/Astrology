@@ -1,0 +1,88 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-26T14:03:45.884523
+Question: My expenses are too much and I end up losing in speculation a lot.
+Processing Time: 2.248s
+Response Length: 705 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "category": "finance",
+  "mode": "birth",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+    "transit_request": {
+        "startYear": 2025,
+        "endYear": 2027,
+        "yearMonthMap": {
+            "2025": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+            "2026": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+            "2027": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "finance",
+  "mode": "birth",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2025,
+    "endYear": 2027,
+    "yearMonthMap": {
+      "2025": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}
