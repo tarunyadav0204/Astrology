@@ -137,6 +137,16 @@ export const CreditProvider = ({ children }) => {
             setLoading(false);
         };
         loadData();
+        
+        // Set up periodic balance refresh every 30 seconds
+        const intervalId = setInterval(() => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                fetchBalance();
+            }
+        }, 30000); // 30 seconds
+        
+        return () => clearInterval(intervalId);
     }, []);
 
     const spendCredits = async (amount, feature, description) => {
@@ -162,6 +172,34 @@ export const CreditProvider = ({ children }) => {
         }
     };
 
+    // Add refresh mechanism
+    const refreshBalance = () => {
+        fetchBalance();
+    };
+
+    // Listen for credit updates from other parts of the app
+    useEffect(() => {
+        const handleCreditUpdate = () => {
+            fetchBalance();
+        };
+        
+        const handleFocus = () => {
+            // Refresh balance when user returns to tab
+            const token = localStorage.getItem('token');
+            if (token) {
+                fetchBalance();
+            }
+        };
+        
+        window.addEventListener('creditUpdated', handleCreditUpdate);
+        window.addEventListener('focus', handleFocus);
+        
+        return () => {
+            window.removeEventListener('creditUpdated', handleCreditUpdate);
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, []);
+
     return (
         <CreditContext.Provider value={{
             credits,
@@ -174,6 +212,7 @@ export const CreditProvider = ({ children }) => {
             educationCost,
             loading,
             fetchBalance,
+            refreshBalance,
             spendCredits
         }}>
             {children}

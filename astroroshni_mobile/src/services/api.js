@@ -139,6 +139,9 @@ export const creditAPI = {
   spendCredits: (amount, feature, description) => 
     api.post(getEndpoint('/credits/spend'), { amount, feature, description }),
   getEventTimelineCost: () => api.get(getEndpoint('/credits/settings/event-timeline-cost')),
+  requestCredits: (amount, reason) => 
+    api.post(getEndpoint('/credits/request'), { amount, reason }),
+  getMyRequests: () => api.get(getEndpoint('/credits/requests/my')),
 };
 
 export const panchangAPI = {

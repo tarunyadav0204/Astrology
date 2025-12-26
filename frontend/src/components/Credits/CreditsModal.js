@@ -6,6 +6,12 @@ const CreditsModal = ({ isOpen, onClose }) => {
     const [promoCode, setPromoCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    
+    // Credit request state
+    const [requestAmount, setRequestAmount] = useState('');
+    const [requestReason, setRequestReason] = useState('');
+    const [requestLoading, setRequestLoading] = useState(false);
+    const [requestMessage, setRequestMessage] = useState('');
 
     const handleRedeemPromo = async (e) => {
         e.preventDefault();
@@ -31,6 +37,9 @@ const CreditsModal = ({ isOpen, onClose }) => {
                 setMessage(`✅ ${data.message}`);
                 setPromoCode('');
                 fetchBalance();
+                
+                // Trigger credit update event
+                window.dispatchEvent(new CustomEvent('creditUpdated'));
             } else {
                 // Handle FastAPI HTTPException format
                 const errorMessage = data.detail || data.message || 'Invalid promo code';
@@ -40,6 +49,57 @@ const CreditsModal = ({ isOpen, onClose }) => {
             setMessage('❌ Error redeeming promo code');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const validateReason = (reason) => {
+        return reason
+            .replace(/<[^>]*>/g, '')
+            .replace(/[<>'"]/g, '')
+            .trim()
+            .substring(0, 500);
+    };
+
+    const handleCreditRequest = async (e) => {
+        e.preventDefault();
+        if (!requestAmount || !requestReason.trim()) return;
+
+        const sanitizedReason = validateReason(requestReason);
+        if (sanitizedReason.length < 10) {
+            setRequestMessage('❌ Reason must be at least 10 characters');
+            return;
+        }
+
+        setRequestLoading(true);
+        setRequestMessage('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/credits/request', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                },
+                body: JSON.stringify({ 
+                    amount: parseInt(requestAmount),
+                    reason: sanitizedReason
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                setRequestMessage(`✅ ${data.message}`);
+                setRequestAmount('');
+                setRequestReason('');
+            } else {
+                setRequestMessage(`❌ ${data.message}`);
+            }
+        } catch (error) {
+            setRequestMessage('❌ Error submitting request');
+        } finally {
+            setRequestLoading(false);
         }
     };
 
@@ -144,6 +204,75 @@ const CreditsModal = ({ isOpen, onClose }) => {
                             border: `1px solid ${message.includes('✅') ? '#c3e6cb' : '#f5c6cb'}`
                         }}>
                             {message}
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                    <h3 style={{ color: '#333', marginBottom: '15px', fontSize: '18px' }}>🙋♂️ Request Credits</h3>
+                    <form onSubmit={handleCreditRequest} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                        <input
+                            type="number"
+                            value={requestAmount}
+                            onChange={(e) => setRequestAmount(e.target.value)}
+                            placeholder="Credits needed (1-100)"
+                            min="1"
+                            max="100"
+                            style={{
+                                padding: '12px',
+                                border: '2px solid #ddd',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                outline: 'none'
+                            }}
+                            disabled={requestLoading}
+                        />
+                        <textarea
+                            value={requestReason}
+                            onChange={(e) => setRequestReason(e.target.value)}
+                            placeholder="Reason for request (e.g., student discount, financial hardship)"
+                            rows="3"
+                            style={{
+                                padding: '12px',
+                                border: '2px solid #ddd',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                outline: 'none',
+                                resize: 'vertical',
+                                minHeight: '80px'
+                            }}
+                            disabled={requestLoading}
+                            maxLength="500"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={requestLoading || !requestAmount || !requestReason.trim()}
+                            style={{
+                                background: '#28a745',
+                                color: 'white',
+                                border: 'none',
+                                padding: '12px 20px',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                opacity: (requestLoading || !requestAmount || !requestReason.trim()) ? 0.6 : 1
+                            }}
+                        >
+                            {requestLoading ? 'Submitting...' : 'Submit Request'}
+                        </button>
+                    </form>
+                    {requestMessage && (
+                        <div style={{
+                            padding: '10px',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            background: requestMessage.includes('✅') ? '#d4edda' : '#f8d7da',
+                            color: requestMessage.includes('✅') ? '#155724' : '#721c24',
+                            border: `1px solid ${requestMessage.includes('✅') ? '#c3e6cb' : '#f5c6cb'}`
+                        }}>
+                            {requestMessage}
                         </div>
                     )}
                 </div>

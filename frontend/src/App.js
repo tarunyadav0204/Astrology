@@ -39,6 +39,7 @@ import FestivalsPage from './components/Festivals/FestivalsPage';
 import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import EducationAnalysisPage from './components/EducationAnalysis/EducationAnalysisPage';
+import CreditsPage from './components/Credits/CreditsPage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import ChatModal from './components/Chat/ChatModal';
 import { AstrologyProvider } from './context/AstrologyContext';
@@ -856,6 +857,7 @@ function App() {
             />
           } />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/credits" element={<CreditsPage />} />
           <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />

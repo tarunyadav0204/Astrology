@@ -220,3 +220,97 @@
         align-items: flex-start;
     }
 }
+.request-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.request-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.request-input, .request-textarea {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.request-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.request-btn {
+    background: #28a745;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.request-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.my-requests-section {
+    margin-bottom: 20px;
+}
+
+.requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.request-item {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.request-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.request-amount {
+    font-weight: bold;
+    color: #333;
+}
+
+.request-status {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.1);
+}
+
+.request-reason {
+    margin: 5px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.admin-notes {
+    margin: 5px 0;
+    color: #007bff;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.request-date {
+    font-size: 12px;
+    color: #999;
+}

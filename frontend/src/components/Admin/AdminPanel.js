@@ -31,6 +31,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [editingPromoCode, setEditingPromoCode] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [creditRequests, setCreditRequests] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [approvingRequest, setApprovingRequest] = useState(null);
+  const [approvalData, setApprovalData] = useState({ amount: 0, notes: '' });
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -42,6 +48,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       fetchPromoCodes();
       fetchCreditStats();
       fetchCreditSettings();
+    } else if (activeTab === 'requests') {
+      fetchCreditRequests();
     }
   }, [activeTab]);
 
@@ -316,6 +324,78 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setDeleteConfirmation(null);
   };
 
+  const fetchCreditRequests = async () => {
+    try {
+      const response = await fetch('/api/credits/requests/all', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setCreditRequests(data.requests || []);
+    } catch (error) {
+      console.error('Error fetching credit requests:', error);
+    }
+  };
+
+  const handleApproveRequest = async (requestId, amount, notes) => {
+    try {
+      const response = await fetch('/api/credits/requests/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          request_id: requestId,
+          approved_amount: amount,
+          admin_notes: notes
+        })
+      });
+      
+      if (response.ok) {
+        fetchCreditRequests();
+        setShowApprovalModal(false);
+        setSelectedRequest(null);
+        setApprovalData({ amount: 0, notes: '' });
+        
+        // Trigger credit update event for the user whose credits were approved
+        window.dispatchEvent(new CustomEvent('creditUpdated'));
+        
+        alert('Request approved successfully');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+    }
+  };
+
+  const openApprovalModal = (request) => {
+    setSelectedRequest(request);
+    setApprovalData({ amount: request.requested_amount, notes: '' });
+    setShowApprovalModal(true);
+  };
+
+  const handleRejectRequest = async (requestId, notes) => {
+    try {
+      const response = await fetch('/api/credits/requests/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          request_id: requestId,
+          admin_notes: notes
+        })
+      });
+      
+      if (response.ok) {
+        fetchCreditRequests();
+        alert('Request rejected');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+    }
+  };
+
   return (
     <div className="admin-panel">
       <NavigationHeader 
@@ -363,6 +443,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('ledger')}
         >
           Credit Ledger
+        </button>
+        <button 
+          className={`tab ${activeTab === 'requests' ? 'active' : ''}`}
+          onClick={() => setActiveTab('requests')}
+        >
+          Credit Requests
         </button>
       </div>
 
@@ -769,8 +855,194 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
           </div>
         )}
+
+        {activeTab === 'requests' && (
+          <div className="credit-requests-management">
+            <h2>Credit Requests</h2>
+            
+            {/* Status Filter */}
+            <div className="filter-section">
+              <label htmlFor="statusFilter">Filter by Status:</label>
+              <select 
+                id="statusFilter"
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="status-filter"
+              >
+                <option value="all">All Requests</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            
+            {creditRequests.filter(request => 
+              statusFilter === 'all' || request.status === statusFilter
+            ).length === 0 ? (
+              <p>No {statusFilter === 'all' ? '' : statusFilter} credit requests</p>
+            ) : (
+              <div className="requests-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Requested Amount</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      <th>Approved Amount</th>
+                      <th>Admin Notes</th>
+                      <th>Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditRequests
+                      .filter(request => statusFilter === 'all' || request.status === statusFilter)
+                      .map(request => (
+                      <tr key={request.id}>
+                        <td>{request.user_name}</td>
+                        <td>{request.requested_amount} credits</td>
+                        <td>{request.reason}</td>
+                        <td>
+                          <span className={`status-badge status-${request.status}`}>
+                            {request.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>{request.approved_amount || '-'}</td>
+                        <td>{request.admin_notes || '-'}</td>
+                        <td>{new Date(request.created_at).toLocaleDateString()}</td>
+                        <td>
+                          {request.status === 'pending' ? (
+                            <div className="request-actions">
+                              <button 
+                                onClick={() => openApprovalModal(request)}
+                                className="approve-btn"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  const notes = prompt('Rejection reason (optional):');
+                                  if (notes !== null) {
+                                    handleRejectRequest(request.id, notes);
+                                  }
+                                }}
+                                className="reject-btn"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="processed-status">{request.status}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       </div>
+      
+      {showApprovalModal && selectedRequest && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '10px',
+            minWidth: '400px',
+            maxWidth: '500px'
+          }}>
+            <h3 style={{ marginTop: 0, color: '#e91e63' }}>Approve Credit Request</h3>
+            <div style={{ marginBottom: '15px' }}>
+              <strong>User:</strong> {selectedRequest.user_name}<br/>
+              <strong>Requested:</strong> {selectedRequest.requested_amount} credits<br/>
+              <strong>Reason:</strong> {selectedRequest.reason}
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Amount to Approve:</label>
+              <input
+                type="number"
+                value={approvalData.amount}
+                onChange={(e) => setApprovalData({...approvalData, amount: parseInt(e.target.value) || 0})}
+                min="0"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Admin Notes (optional):</label>
+              <textarea
+                value={approvalData.notes}
+                onChange={(e) => setApprovalData({...approvalData, notes: e.target.value})}
+                rows="3"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  setSelectedRequest(null);
+                  setApprovalData({ amount: 0, notes: '' });
+                }}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#ccc',
+                  color: 'black',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleApproveRequest(selectedRequest.id, approvalData.amount, approvalData.notes)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Approve {approvalData.amount} Credits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {deleteConfirmation && (
         <div style={{
