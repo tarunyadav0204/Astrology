@@ -208,26 +208,54 @@
 
 .admin-tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e91e63;
 }
 
 .tab {
-  background: rgba(233, 30, 99, 0.1);
-  border: 2px solid rgba(233, 30, 99, 0.2);
-  padding: 12px 24px;
-  border-radius: 25px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 15px 25px;
   cursor: pointer;
   transition: all 0.3s;
-  color: #e91e63;
-  font-weight: bold;
+  color: #666;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .tab.active,
 .tab:hover {
-  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
-  color: white;
-  border-color: #e91e63;
+  color: #e91e63;
+  border-bottom-color: #e91e63;
+  background: rgba(233, 30, 99, 0.05);
+}
+
+.admin-subtabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+  margin-left: 20px;
+}
+
+.subtab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #999;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.subtab.active,
+.subtab:hover {
+  color: #e91e63;
+  border-bottom-color: #e91e63;
 }
 
 .admin-content {

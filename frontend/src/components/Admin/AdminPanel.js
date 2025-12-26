@@ -17,6 +17,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
   const [activeTab, setActiveTab] = useState('users');
+  const [activeSubTab, setActiveSubTab] = useState('management');
   const [users, setUsers] = useState([]);
   const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,13 +46,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } else if (activeTab === 'charts') {
       fetchCharts();
     } else if (activeTab === 'credits') {
-      fetchPromoCodes();
-      fetchCreditStats();
-      fetchCreditSettings();
-    } else if (activeTab === 'requests') {
-      fetchCreditRequests();
+      if (activeSubTab === 'management') {
+        fetchPromoCodes();
+        fetchCreditStats();
+        fetchCreditSettings();
+      } else if (activeSubTab === 'requests') {
+        fetchCreditRequests();
+      }
+    } else if (activeTab === 'chat') {
+      // Chat history will be loaded by AdminChatHistory component
+    } else if (activeTab === 'ledger') {
+      // Credit ledger will be loaded by AdminCreditLedger component
     }
-  }, [activeTab]);
+  }, [activeTab, activeSubTab]);
 
   const fetchSubscriptionPlans = async () => {
     try {
@@ -418,13 +425,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           className={`tab ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
-          User Management
+          Users
         </button>
         <button 
           className={`tab ${activeTab === 'charts' ? 'active' : ''}`}
           onClick={() => setActiveTab('charts')}
         >
-          Birth Charts Management
+          Charts
         </button>
         <button 
           className={`tab ${activeTab === 'chat' ? 'active' : ''}`}
@@ -434,23 +441,38 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         </button>
         <button 
           className={`tab ${activeTab === 'credits' ? 'active' : ''}`}
-          onClick={() => setActiveTab('credits')}
+          onClick={() => {
+            setActiveTab('credits');
+            setActiveSubTab('management');
+          }}
         >
-          Credit Management
-        </button>
-        <button 
-          className={`tab ${activeTab === 'ledger' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ledger')}
-        >
-          Credit Ledger
-        </button>
-        <button 
-          className={`tab ${activeTab === 'requests' ? 'active' : ''}`}
-          onClick={() => setActiveTab('requests')}
-        >
-          Credit Requests
+          Credits
         </button>
       </div>
+
+      {/* Credit Sub-tabs */}
+      {activeTab === 'credits' && (
+        <div className="admin-subtabs">
+          <button 
+            className={`subtab ${activeSubTab === 'management' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('management')}
+          >
+            Management
+          </button>
+          <button 
+            className={`subtab ${activeSubTab === 'ledger' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('ledger')}
+          >
+            Ledger
+          </button>
+          <button 
+            className={`subtab ${activeSubTab === 'requests' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('requests')}
+          >
+            Requests
+          </button>
+        </div>
+      )}
 
       <div className="admin-content">
         {activeTab === 'users' && (
@@ -642,7 +664,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <AdminCreditLedger />
         )}
 
-        {activeTab === 'credits' && (
+        {activeTab === 'credits' && activeSubTab === 'management' && (
           <div className="credits-management">
             <h2>Credit Management</h2>
             
@@ -856,7 +878,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         )}
 
-        {activeTab === 'requests' && (
+        {activeTab === 'credits' && activeSubTab === 'ledger' && (
+          <AdminCreditLedger />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'requests' && (
           <div className="credit-requests-management">
             <h2>Credit Requests</h2>
             
