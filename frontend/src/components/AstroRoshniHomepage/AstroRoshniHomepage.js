@@ -21,6 +21,7 @@ import PartnerForm from '../MarriageAnalysis/PartnerForm';
 import LoginForm from '../Auth/LoginForm';
 import RegisterForm from '../Auth/RegisterForm';
 import { showToast } from '../../utils/toast';
+import TrustBanner from '../TrustBanner/TrustBanner';
 import './AstroRoshniHomepage.css';
 import './search-section.css';
 
@@ -498,12 +499,12 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           { name: 'Shubh', time: '09:00-10:30', type: 'good' }
         ],
         hora: [
-          { planet: 'API Error', time: 'Check console', favorable: false },
-          { planet: 'Backend Issue', time: '400 Bad Request', favorable: false }
+          { planet: 'Recalculating...', time: 'Fetching cosmic data...', favorable: true },
+          { planet: 'Please wait', time: 'Loading...', favorable: true }
         ],
         special: [
-          { name: 'API Error', time: 'Backend 400', purpose: 'Check backend logs' },
-          { name: 'Server Issue', time: 'Bad Request', purpose: 'Fix backend first' }
+          { name: 'Abhijit', time: '11:47-12:35', purpose: 'All auspicious works' },
+          { name: 'Brahma', time: '04:24-05:12', purpose: 'Spiritual activities' }
         ]
       });
     } finally {
@@ -1900,6 +1901,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
+      {/* Trust & Transparency Banner */}
+      <TrustBanner />
+
       {/* VIP Membership */}
       <section className="vip-section">
         <div className="container">
@@ -2033,7 +2037,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 <a href="/festivals">Festivals</a>
               </div>
               <div className="footer-links-row">
-                <a href="#about">About Us</a>
+                <a href="#about" onClick={(e) => { e.preventDefault(); navigate('/about'); }}>About Us</a>
                 <a href="#contact" onClick={(e) => { e.preventDefault(); navigate('/contact'); }}>Contact Us</a>
                 <a href="#privacy" onClick={(e) => { e.preventDefault(); navigate('/policy'); }}>Privacy Policy</a>
               </div>

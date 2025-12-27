@@ -42,6 +42,7 @@ import EducationAnalysisPage from './components/EducationAnalysis/EducationAnaly
 import CreditsPage from './components/Credits/CreditsPage';
 import PolicyPage from './components/Policy/PolicyPage';
 import ContactPage from './components/Contact/ContactPage';
+import AboutUs from './components/About/AboutUs';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import ChatModal from './components/Chat/ChatModal';
 import { AstrologyProvider } from './context/AstrologyContext';
@@ -798,6 +799,7 @@ function App() {
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/policy" element={<PolicyPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/about" element={<AboutUs />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
@@ -889,6 +891,7 @@ function App() {
               onAdminClick={handleAdminClick} 
             />
           } />
+          <Route path="/about" element={<AboutUs user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
 
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={

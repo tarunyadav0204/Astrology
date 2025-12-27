@@ -1,0 +1,101 @@
+.trust-banner {
+  padding: 80px 0;
+  background: #0a0a1a;
+  border-top: 1px solid rgba(233, 30, 99, 0.2);
+  border-bottom: 1px solid rgba(233, 30, 99, 0.2);
+}
+
+.trust-header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.main-shield {
+  font-size: 50px;
+  color: #e91e63;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.trust-header h2 {
+  font-size: 2.2rem;
+  color: #fff;
+}
+
+.trust-header p {
+  color: #b0b0b0;
+  font-style: italic;
+}
+
+.logic-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.logic-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 30px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.logic-card:hover {
+  border-color: #e91e63;
+  background: rgba(233, 30, 99, 0.05);
+}
+
+.logic-icon-wrapper {
+  color: #e91e63;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+.logic-card h3 {
+  color: #fff;
+  margin-bottom: 15px;
+}
+
+.logic-card p {
+  color: #b0b0b0;
+  line-height: 1.6;
+}
+
+.logic-connector {
+  font-size: 2rem;
+  color: #333;
+  font-weight: bold;
+}
+
+.trust-disclaimer {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+  background: rgba(233, 30, 99, 0.1);
+  padding: 20px;
+  border-radius: 10px;
+  border-left: 4px solid #e91e63;
+}
+
+.trust-disclaimer p {
+  font-size: 0.95rem;
+  color: #fff;
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .logic-grid {
+    flex-direction: column;
+  }
+  .logic-connector {
+    transform: rotate(90deg);
+    margin: 10px 0;
+  }
+}
