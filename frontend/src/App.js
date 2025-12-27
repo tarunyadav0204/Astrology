@@ -40,6 +40,8 @@ import MonthlyFestivalsPage from './components/Festivals/MonthlyFestivalsPage';
 import ProfilePage from './components/Profile/ProfilePage';
 import EducationAnalysisPage from './components/EducationAnalysis/EducationAnalysisPage';
 import CreditsPage from './components/Credits/CreditsPage';
+import PolicyPage from './components/Policy/PolicyPage';
+import ContactPage from './components/Contact/ContactPage';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import ChatModal from './components/Chat/ChatModal';
 import { AstrologyProvider } from './context/AstrologyContext';
@@ -794,6 +796,8 @@ function App() {
           } />
           <Route path="/festivals" element={<FestivalsPage />} />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
+          <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/contact" element={<ContactPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
@@ -876,6 +880,8 @@ function App() {
             />
           } />
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
+          <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/education" element={
             <EducationAnalysisPage 
               user={user} 

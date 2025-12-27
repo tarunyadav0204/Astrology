@@ -2022,14 +2022,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         <div className="container">
           <div className="footer-content">
             <div className="footer-links">
-              <a href="#shop">Shop</a>
-              <a href="#astrologers">Astrologers</a>
-              <a href="#kundli">Free Kundli</a>
-              <a href="#matching">Horoscope Matching</a>
-              <a href="#zodiac">Zodiac Signs</a>
+              <a href="/panchang">Birth Charts</a>
+              <a href="/panchang">Panchang</a>
+              <a href="/muhurat-finder">Muhurat Finder</a>
+              <a href="/nakshatras">Nakshatras</a>
+              <a href="/festivals">Festivals</a>
               <a href="#about">About Us</a>
-              <a href="#contact">Contact Us</a>
-              <a href="#privacy">Privacy Policy</a>
+              <a href="#contact" onClick={(e) => { e.preventDefault(); navigate('/contact'); }}>Contact Us</a>
+              <a href="#privacy" onClick={(e) => { e.preventDefault(); navigate('/policy'); }}>Privacy Policy</a>
             </div>
             <div className="footer-bottom">
               <p>© 2025 AstroRoshni.com. All rights reserved.</p>

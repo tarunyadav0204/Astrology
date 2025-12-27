@@ -44,10 +44,6 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
       <div className="top-bar">
         <div className="container">
           <div className="top-links">
-            <a href="#rashifal">Rashifal</a>
-            <a href="#kundli">Kundli</a>
-            <a href="#horoscope">Horoscope 2025</a>
-            <a href="#calendar">Calendar 2025</a>
             <a href="/astroroshni" target="_blank" className="astroroshni-link">
               ⭐ AstroVishnu Pro
             </a>

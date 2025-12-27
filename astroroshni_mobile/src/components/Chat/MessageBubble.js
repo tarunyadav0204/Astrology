@@ -759,17 +759,19 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             >
               <Text style={styles.actionIcon}>↗️</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pdfButton]}
-              onPress={sharePDF}
-              disabled={isGeneratingPDF}
-            >
-              {isGeneratingPDF ? (
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              ) : (
-                <Text style={styles.actionIcon}>📄</Text>
-              )}
-            </TouchableOpacity>
+            {message.role === 'assistant' && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.pdfButton]}
+                onPress={sharePDF}
+                disabled={isGeneratingPDF}
+              >
+                {isGeneratingPDF ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <Text style={styles.actionIcon}>📄</Text>
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.actionButton, styles.deleteButton]}
               onPress={() => {

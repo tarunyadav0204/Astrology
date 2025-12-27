@@ -445,10 +445,8 @@ export default function AshtakvargaOracle({ navigation }) {
         const predictions = await response.json();
         // console.log('Life predictions received:', predictions);
         setLoadingProgress(100);
-        setTimeout(() => {
-          setLifePredictions(predictions);
-          setShowLifePredictions(true);
-        }, 500);
+        setLifePredictions(predictions);
+        setShowLifePredictions(true);
       } else {
         console.error('Failed to generate life predictions:', response.status);
       }
