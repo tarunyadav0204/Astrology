@@ -2696,15 +2696,24 @@
 
 .footer-links {
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  flex-direction: column;
+  gap: 15px;
   margin-bottom: 20px;
+}
+
+.footer-links-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .footer-links a {
   color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   transition: all 0.3s;
+  flex-shrink: 0;
+  font-size: 14px;
 }
 
 .footer-links a:hover {

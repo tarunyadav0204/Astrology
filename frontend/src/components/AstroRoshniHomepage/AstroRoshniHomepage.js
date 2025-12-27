@@ -92,9 +92,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   ];
 
   const testimonials = [
-    { name: 'Priya Sharma', location: 'Mumbai', rating: 5, text: 'Accurate predictions helped me find my soulmate!', image: 'https://images.unsplash.com/photo-1494790108755-2616c9c0e8e0?w=80&h=80&fit=crop&crop=face' },
-    { name: 'Rajesh Kumar', location: 'Delhi', rating: 5, text: 'Career guidance was spot on. Got promotion within 3 months!', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face' },
-    { name: 'Anita Patel', location: 'Ahmedabad', rating: 5, text: 'Marriage compatibility report saved my relationship.', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face' }
+    { name: 'Priya Sharma', location: 'Mumbai', rating: 5, text: 'I haven\'t seen any Astrology product like AstroRoshni.com. Most predictions are so accurate that its unbelievable.', image: 'https://images.unsplash.com/photo-1494790108755-2616c9c0e8e0?w=80&h=80&fit=crop&crop=face' },
+    { name: 'Rajesh Kumar', location: 'Delhi', rating: 5, text: 'Being an astrologer I love AstroRoshni because it predicts using multi-layered prediction engine which uses all divisional charts, Vimshottari dasha with Char, Yogini confirmation. This is humanly not possible.', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face' },
+    { name: 'Anita Patel', location: 'Ahmedabad', rating: 5, text: 'The AI-powered Tara gives instant answers with Swiss Ephemeris precision. Real-time transit analysis and Nakshatra predictions are incredibly detailed. This combines ancient Vedic wisdom with modern technology perfectly.', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face' }
   ];
 
   const vipTiers = [
@@ -1140,7 +1140,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                   color: '#666',
                   marginBottom: '20px',
                   lineHeight: '1.6'
-                }}>Named after the Sanskrit word for "star" and the Hindu goddess of guidance, Tara is your personal AI astrologer trained on thousands of years of Vedic wisdom. She combines ancient knowledge with modern AI to provide accurate, personalized insights about your life's journey.</p>
+                }}>Tara is the world's most advanced Digital Astrologer because she processes over 50+ astrological calculation systems simultaneously including Swiss Ephemeris precision, all 16 Divisional Charts (D1-D60), complete Ashtakavarga analysis, 5-level Vimshottari Dasha system, Jaimini Chara Dasha, Yogini Dasha, Nadi Astrology links, Sudarshana Chakra analysis, comprehensive yoga detection, planetary war calculations, Neecha Bhanga analysis, and real-time transit activations with karmic trigger detection - delivering unmatched accuracy through multi-layered synthesis.</p>
                 <div className="tara-features" style={{
                   display: 'flex',
                   gap: '15px',
@@ -1153,7 +1153,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                     fontSize: '12px',
                     color: '#e91e63',
                     border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>🌟 Trained on Classical Vedic Texts</span>
+                  }}>🌟 50+ Calculation Systems</span>
                   <span style={{
                     background: 'rgba(233, 30, 99, 0.1)',
                     padding: '6px 12px',
@@ -1161,7 +1161,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                     fontSize: '12px',
                     color: '#e91e63',
                     border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>⚡ Instant Accurate Responses</span>
+                  }}>⚡ Swiss Ephemeris Precision</span>
                   <span style={{
                     background: 'rgba(233, 30, 99, 0.1)',
                     padding: '6px 12px',
@@ -1169,7 +1169,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                     fontSize: '12px',
                     color: '#e91e63',
                     border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>🎯 Personalized Predictions</span>
+                  }}>🎯 Multi-Dasha Synthesis</span>
                   <span style={{
                     background: 'rgba(233, 30, 99, 0.1)',
                     padding: '6px 12px',
@@ -1177,7 +1177,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                     fontSize: '12px',
                     color: '#e91e63',
                     border: '1px solid rgba(233, 30, 99, 0.3)'
-                  }}>🕉️ Traditional Wisdom</span>
+                  }}>🕉️ Nadi Astrology Links</span>
                 </div>
               </div>
             </div>
@@ -1205,12 +1205,15 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="astroroshni-content">
               <div className="astroroshni-badge">🌟 WORLD'S #1 ASTROLOGY SOFTWARE</div>
               <h2>AstroVishnu Professional</h2>
-              <p className="astroroshni-tagline">The Most Advanced Vedic Astrology Software Globally</p>
+              <p className="astroroshni-tagline">Advanced Ashtakvarga, Shadbala & Multi-Dasha System with Unique Transit Analysis</p>
               <div className="astroroshni-features">
-                <span>✨ Swiss Ephemeris Precision</span>
-                <span>🎯 Highest Automation Level</span>
-                <span>📊 Feature Rich Charts</span>
-                <span>🌟 Advanced Dasha Systems</span>
+                <span>📊 Complete Ashtakvarga (Natal & Transit)</span>
+                <span>⚖️ Sarvashtakvarga & Bhinnashtakvarga</span>
+                <span>💪 Comprehensive Shadbala Analysis</span>
+                <span>🔄 Vimshottari, Char, Yogini & Kalchakra Dasha</span>
+                <span>🎯 Auto Transit Activation Detection</span>
+                <span>🌟 World's Only Dasha-Transit Integration</span>
+                <span>🌐 Available on Web, iOS & Android</span>
               </div>
               <div className="astroroshni-pricing">
                 <span className="old-price">₹4,999</span>
@@ -1883,7 +1886,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             {testimonials.map((testimonial, index) => (
               <div key={index} className="testimonial-card">
                 <div className="testimonial-header">
-                  <img src={testimonial.image} alt={testimonial.name} className="testimonial-avatar" />
+                  <div className="testimonial-avatar">👤</div>
                   <div className="testimonial-info">
                     <h4>{testimonial.name}</h4>
                     <p>{testimonial.location}</p>
@@ -2022,14 +2025,18 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         <div className="container">
           <div className="footer-content">
             <div className="footer-links">
-              <a href="/panchang">Birth Charts</a>
-              <a href="/panchang">Panchang</a>
-              <a href="/muhurat-finder">Muhurat Finder</a>
-              <a href="/nakshatras">Nakshatras</a>
-              <a href="/festivals">Festivals</a>
-              <a href="#about">About Us</a>
-              <a href="#contact" onClick={(e) => { e.preventDefault(); navigate('/contact'); }}>Contact Us</a>
-              <a href="#privacy" onClick={(e) => { e.preventDefault(); navigate('/policy'); }}>Privacy Policy</a>
+              <div className="footer-links-row">
+                <a href="https://astrovishnu.com" target="_blank" rel="noopener noreferrer">World's best astrology software</a>
+                <a href="/panchang">Panchang</a>
+                <a href="/muhurat-finder">Muhurat Finder</a>
+                <a href="/nakshatras">Nakshatras</a>
+                <a href="/festivals">Festivals</a>
+              </div>
+              <div className="footer-links-row">
+                <a href="#about">About Us</a>
+                <a href="#contact" onClick={(e) => { e.preventDefault(); navigate('/contact'); }}>Contact Us</a>
+                <a href="#privacy" onClick={(e) => { e.preventDefault(); navigate('/policy'); }}>Privacy Policy</a>
+              </div>
             </div>
             <div className="footer-bottom">
               <p>© 2025 AstroRoshni.com. All rights reserved.</p>
