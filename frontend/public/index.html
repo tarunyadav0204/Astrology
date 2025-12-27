@@ -24,20 +24,14 @@
   <link rel="manifest" href="/manifest.json" />
   <title>Vedic Astrology</title>
   
-  <!-- Google Analytics 4 -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=%REACT_APP_GA_MEASUREMENT_ID%"></script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-M0C9B8LGMR"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    
-    // Only initialize if measurement ID is set
-    const measurementId = '%REACT_APP_GA_MEASUREMENT_ID%';
-    if (measurementId && measurementId !== '%REACT_APP_GA_MEASUREMENT_ID%') {
-      gtag('config', measurementId, {
-        send_page_view: false // We'll handle page views manually
-      });
-    }
+
+    gtag('config', 'G-M0C9B8LGMR');
   </script>
   
   <script>

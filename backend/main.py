@@ -47,6 +47,7 @@ from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
 from credits.routes import router as credits_router
 from credits.credit_request_routes import router as credit_request_router
+from blank_chart.routes import router as blank_chart_router
 from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
 from progeny.progeny_routes import router as progeny_router
@@ -215,6 +216,7 @@ app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
 app.include_router(credits_router, prefix="/api/credits")
 app.include_router(credit_request_router, prefix="/api")
+app.include_router(blank_chart_router, prefix="/api")
 app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")
@@ -266,22 +268,31 @@ async def test_gemini_connectivity():
     import os
     import requests
     
+    print(f"🧪 Testing Gemini connectivity...")
+    
     # Check API key
     api_key = os.getenv('GEMINI_API_KEY')
+    print(f"🔑 API key present: {bool(api_key)}")
+    print(f"🔑 API key length: {len(api_key) if api_key else 0}")
+    
     if not api_key:
         return {"success": False, "error": "GEMINI_API_KEY not set"}
     
     # Test network connectivity
     try:
+        print(f"🌐 Testing network connectivity...")
         response = requests.get('https://generativelanguage.googleapis.com', timeout=10)
         network_ok = True
         network_status = response.status_code
+        print(f"✅ Network connectivity: {network_status}")
     except Exception as e:
         network_ok = False
         network_status = str(e)
+        print(f"❌ Network connectivity failed: {e}")
     
     # Test Gemini API
     try:
+        print(f"🤖 Testing Gemini API...")
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-pro')
@@ -290,9 +301,11 @@ async def test_gemini_connectivity():
         response = model.generate_content("Hello, just testing connectivity")
         gemini_ok = True
         gemini_response = response.text[:100] if response.text else "No response text"
+        print(f"✅ Gemini API test successful: {gemini_response}")
     except Exception as e:
         gemini_ok = False
         gemini_response = str(e)
+        print(f"❌ Gemini API test failed: {e}")
     
     return {
         "success": network_ok and gemini_ok,
@@ -308,8 +321,82 @@ async def test_gemini_connectivity():
         }
     }
 
+@app.get("/api/test-blank-chart-predictor")
+async def test_blank_chart_predictor():
+    """Test blank chart predictor initialization and connection"""
+    try:
+        print(f"🧪 Testing blank chart predictor...")
+        
+        # Test predictor initialization
+        from calculators.blank_chart_gemini_predictor import BlankChartGeminiPredictor
+        predictor = BlankChartGeminiPredictor()
+        
+        # Test connection
+        connection_test = predictor.test_gemini_connection()
+        
+        return {
+            "predictor_initialized": True,
+            "connection_test": connection_test
+        }
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Blank chart predictor test failed: {str(e)}")
+        print(f"❌ Stack trace: {error_trace}")
+        
+        return {
+            "predictor_initialized": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "stack_trace": error_trace
+        }
+
 # Remove custom /docs override - let FastAPI handle it automatically
 # GCP health checks will use the default FastAPI /docs endpoint
+
+@app.get("/api/debug-environment")
+async def debug_environment():
+    """Debug environment variables and configuration"""
+    import os
+    
+    env_vars = {
+        'GEMINI_API_KEY': bool(os.getenv('GEMINI_API_KEY')),
+        'GEMINI_API_KEY_LENGTH': len(os.getenv('GEMINI_API_KEY', '')),
+        'ENVIRONMENT': os.getenv('ENVIRONMENT', 'not_set'),
+        'PORT': os.getenv('PORT', 'not_set'),
+        'JWT_SECRET': bool(os.getenv('JWT_SECRET')),
+        'TWILIO_ACCOUNT_SID': bool(os.getenv('TWILIO_ACCOUNT_SID')),
+        'PYTHON_PATH': os.getenv('PYTHONPATH', 'not_set'),
+        'CURRENT_WORKING_DIR': os.getcwd()
+    }
+    
+    # Test imports
+    import_tests = {}
+    
+    try:
+        import google.generativeai as genai
+        import_tests['google.generativeai'] = 'SUCCESS'
+    except Exception as e:
+        import_tests['google.generativeai'] = f'FAILED: {str(e)}'
+    
+    try:
+        from calculators.blank_chart_context_builder import BlankChartContextBuilder
+        import_tests['BlankChartContextBuilder'] = 'SUCCESS'
+    except Exception as e:
+        import_tests['BlankChartContextBuilder'] = f'FAILED: {str(e)}'
+    
+    try:
+        from calculators.blank_chart_gemini_predictor import BlankChartGeminiPredictor
+        import_tests['BlankChartGeminiPredictor'] = 'SUCCESS'
+    except Exception as e:
+        import_tests['BlankChartGeminiPredictor'] = f'FAILED: {str(e)}'
+    
+    return {
+        'environment_variables': env_vars,
+        'import_tests': import_tests,
+        'timestamp': datetime.now().isoformat()
+    }
 
 @app.get("/api/status")
 async def api_status():

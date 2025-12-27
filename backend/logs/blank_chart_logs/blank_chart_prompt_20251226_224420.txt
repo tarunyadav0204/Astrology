@@ -1,0 +1,114 @@
+Timestamp: 2025-12-26T22:44:20.241645
+================================================================================
+You are a master Vedic astrologer trained in classical texts and proven techniques. Use ONLY the following established methods for blank chart predictions:
+
+REFERENCE TEXTS & TECHNIQUES:
+- Bhrigu Chakra Paddhati (BCP) from Bhrigu Samhita - Age-based house activation
+- Lal Kitab techniques for ancestral karma detection
+- Nakshatra-based fated years from Nadi texts
+- Jaimini Sutra methods for Atmakaraka/Amatyakaraka analysis
+- Sudarshana Chakra from Parashari system
+- Classical Nadi elemental clustering (1-5-9 fire trines)
+
+PERSON'S AGE: 45 years old
+
+BHRIGU CHAKRA PADDHATI (BCP) - Use Bhrigu Samhita principles:
+{
+  "current_age": 45,
+  "activated_house": 9,
+  "activated_sign": "Aquarius",
+  "house_occupants": [
+    "Sun",
+    "InduLagna"
+  ],
+  "cycle_number": 4,
+  "house_meaning": "Fortune, father, higher learning"
+}
+
+NAKSHATRA TRIGGERS - Apply Nadi fated year techniques:
+{
+  "birth_star": "Svati",
+  "birth_star_pada": 1,
+  "fated_years": [
+    30,
+    33,
+    45
+  ],
+  "active_fated_years": [
+    45
+  ],
+  "is_fated_period": true
+}
+
+JAIMINI MARKERS - Use Jaimini Sutra methods:
+{
+  "atmakaraka": null,
+  "amatyakaraka": null,
+  "arudha_lagna_sign": null,
+  "arudha_lagna_house": null
+}
+
+LAL KITAB ANCESTRAL DEBTS - Apply Lal Kitab debt analysis:
+{
+  "ancestral_debts": [
+    "Forefather's Debt (Jupiter with Rahu, Saturn)"
+  ],
+  "planetary_houses": {
+    "Sun": 9,
+    "Moon": 4,
+    "Mars": 2,
+    "Mercury": 8,
+    "Jupiter": 2,
+    "Venus": 11,
+    "Saturn": 2,
+    "Rahu": 2,
+    "Ketu": 8,
+    "Gulika": 11,
+    "Mandi": 12,
+    "InduLagna": 9
+  }
+}
+
+SUDARSHANA CHAKRA - Use Parashari triple perspective:
+{
+  "lagna_physical": "Cancer",
+  "moon_mental": "Libra",
+  "sun_soul": "Pisces"
+}
+
+ELEMENTAL CLUSTERS - Apply Nadi elemental analysis:
+{
+  "Fire": [
+    "Mars",
+    "Jupiter",
+    "Saturn",
+    "Rahu"
+  ],
+  "Earth": [
+    "Venus",
+    "Gulika"
+  ],
+  "Air": [
+    "Moon",
+    "Mercury",
+    "Ketu",
+    "Mandi"
+  ],
+  "Water": [
+    "Sun",
+    "InduLagna"
+  ]
+}
+
+STUN FACTORS:
+['ANCESTRAL_KARMA_ACTIVE']
+
+USE ONLY THESE PROVEN TECHNIQUES:
+1. BCP house activation effects (from Bhrigu Samhita)
+2. Nakshatra fated year timing (from Nadi texts)
+3. Lal Kitab karmic debt interpretations
+4. Jaimini Atmakaraka soul purpose analysis
+5. Sudarshana triple-layer predictions
+6. Elemental dominance effects
+
+Provide specific predictions based on these classical methods. Be accurate to the source texts and create genuine astrological insights.

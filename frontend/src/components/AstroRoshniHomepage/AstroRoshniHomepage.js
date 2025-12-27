@@ -116,6 +116,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   const [showNumerologyModal, setShowNumerologyModal] = useState(false);
   const [numerologyTab, setNumerologyTab] = useState('blueprint');
   const [birthFormContext, setBirthFormContext] = useState('chart');
+  const [showDestinyModal, setShowDestinyModal] = useState(false);
+  const [destinyReading, setDestinyReading] = useState(null);
 
   const generateTodaysData = useCallback(() => {
     const today = new Date();
@@ -806,17 +808,72 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           </div>
           
           {/* Full-width Ask Astrologer Banner */}
-          <div className="ask-astrologer-banner" onClick={() => user ? setShowChatModal(true) : onLogin()}>
-            <div className="banner-content">
-              <div className="banner-icon">💬</div>
-              <div className="banner-text">
-                <h3>Deep Vedic Analysis</h3>
-                <p>Get profound insights from ancient wisdom • Expert guidance • Personalized predictions</p>
+          <div className="ask-astrologer-banner">
+            <div className="banner-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="banner-icon">💬</div>
+                <div className="banner-text">
+                  <h3>Deep Vedic Analysis</h3>
+                  <p>Get profound insights from ancient wisdom • Expert guidance • Personalized predictions</p>
+                </div>
               </div>
-              <div className="banner-cta">
-                <span>Ask Tara →</span>
-              </div>
+              <button 
+                className="ask-tara-prominent-btn"
+                onClick={() => user ? setShowChatModal(true) : onLogin()}
+                style={{
+                  background: 'white',
+                  color: '#e91e63',
+                  border: '0px solid transparent !important',
+                  outline: 'none !important',
+                  boxSizing: 'border-box',
+                  padding: '12px 24px',
+                  borderRadius: '25px',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(233, 30, 99, 0.3)',
+                  animation: 'bounce 2s infinite',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#e91e63';
+                  e.target.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'white';
+                  e.target.style.color = '#e91e63';
+                }}
+              >
+                ⭐ Ask Tara Now
+              </button>
             </div>
+            <style>
+              {`
+                .ask-tara-prominent-btn {
+                  border: none !important;
+                  outline: none !important;
+                }
+                .ask-tara-prominent-btn:focus {
+                  border: none !important;
+                  outline: none !important;
+                }
+                .ask-tara-prominent-btn:active {
+                  border: none !important;
+                  outline: none !important;
+                }
+                @keyframes bounce {
+                  0%, 20%, 50%, 80%, 100% {
+                    transform: translateY(0);
+                  }
+                  40% {
+                    transform: translateY(-10px);
+                  }
+                  60% {
+                    transform: translateY(-5px);
+                  }
+                }
+              `}
+            </style>
           </div>
         </div>
       </section>
@@ -837,6 +894,138 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           ))}
         </div>
       </section>
+
+      {/* Instant Destiny Reading Section - COMMENTED OUT */}
+      {/*
+      <section className="instant-destiny-section">
+        <div className="container">
+          <div className="destiny-header">
+            <span className="destiny-symbol destiny-symbol-1">🔮</span>
+            <span className="destiny-symbol destiny-symbol-2">⭐</span>
+            <span className="destiny-symbol destiny-symbol-3">✨</span>
+            <span className="destiny-symbol destiny-symbol-4">🌟</span>
+            <h2 className="destiny-title">🔮 Instant Destiny Reading</h2>
+            <p className="destiny-subtitle">Discover your life's hidden patterns using classical Vedic techniques</p>
+            <div className="destiny-divider"></div>
+          </div>
+          
+          <div className="destiny-content">
+            <div className="destiny-card">
+              <div className="destiny-icon">🎯</div>
+              <h3>AI-Powered Vedic Analysis</h3>
+              <p>Get stunning predictions using authentic classical texts like Bhrigu Samhita, Lal Kitab, and Nadi astrology</p>
+              
+              <div className="destiny-features">
+                <div className="feature-item">
+                  <span className="feature-icon">📚</span>
+                  <span>Bhrigu Chakra Paddhati</span>
+                </div>
+                <div className="feature-item">
+                  <span className="feature-icon">⚖️</span>
+                  <span>Lal Kitab Karmic Analysis</span>
+                </div>
+                <div className="feature-item">
+                  <span className="feature-icon">⭐</span>
+                  <span>Nakshatra Fated Years</span>
+                </div>
+                <div className="feature-item">
+                  <span className="feature-icon">🎭</span>
+                  <span>Jaimini Sutra Methods</span>
+                </div>
+              </div>
+              
+              {birthData && birthData.name ? (
+                <div className="selected-native">
+                  <div className="native-info">
+                    <span className="native-name">👤 {birthData.name}</span>
+                    <button 
+                      className="change-native-btn"
+                      onClick={() => { setBirthFormContext('changeNative'); setShowBirthFormModal(true); }}
+                    >
+                      Change Native
+                    </button>
+                  </div>
+                  <p className="native-subtitle">Using your selected birth details for instant analysis</p>
+                </div>
+              ) : (
+                <div className="no-native">
+                  <p>Please select your birth details first</p>
+                  <button 
+                    className="select-native-btn"
+                    onClick={() => { setBirthFormContext('destiny'); setShowBirthFormModal(true); }}
+                  >
+                    Select Native
+                  </button>
+                </div>
+              )}
+              
+              <button 
+                className="destiny-btn"
+                onClick={async () => {
+                  if (!user) {
+                    onLogin();
+                    return;
+                  }
+                  
+                  if (!birthData) {
+                    setBirthFormContext('destiny');
+                    setShowBirthFormModal(true);
+                    return;
+                  }
+                  
+                  try {
+                    setLoading(true);
+                    const API_BASE_URL = process.env.NODE_ENV === 'production' 
+                      ? APP_CONFIG.api.prod 
+                      : APP_CONFIG.api.dev;
+                    
+                    const response = await fetch(`${API_BASE_URL}/api/blank-chart/stunning-prediction`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                      },
+                      body: JSON.stringify({
+                        date: birthData.date,
+                        time: birthData.time,
+                        latitude: birthData.latitude,
+                        longitude: birthData.longitude,
+                        timezone: birthData.timezone
+                      })
+                    });
+                    
+                    const data = await response.json();
+                    console.log('Destiny API Response:', data); // Debug log
+                    
+                    if (data.success) {
+                      // Show results in new destiny popup modal
+                      setDestinyReading(data);
+                      setShowDestinyModal(true);
+                    } else {
+                      showToast('Failed to get destiny reading. Please try again.', 'error');
+                    }
+                  } catch (error) {
+                    console.error('Destiny reading error:', error);
+                    showToast('Error getting destiny reading. Please try again.', 'error');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+              >
+                {loading ? '🔮 Analyzing Destiny...' : '🚀 REVEAL MY DESTINY NOW'}
+              </button>
+              
+              <div className="destiny-guarantee">
+                <span>✨ Powered by Classical Vedic Texts</span>
+                <span>🎯 Instant AI Analysis</span>
+                <span>📚 Authentic Techniques</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      */}
 
       {/* Chat Consultation Categories */}
       <section className="chat-consultations">
@@ -2194,6 +2383,206 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                 onOptimize={handleNameOptimization}
               />
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* Destiny Reading Modal */}
+      {showDestinyModal && destinyReading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100002
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+            borderRadius: '20px',
+            padding: '30px',
+            maxWidth: '800px',
+            width: '95%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative',
+            border: '2px solid #e91e63',
+            boxShadow: '0 20px 60px rgba(233, 30, 99, 0.3)',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}>
+            <style>
+              {`
+                div::-webkit-scrollbar {
+                  display: none;
+                }
+              `}
+            </style>
+            <button 
+              onClick={() => {
+                setShowDestinyModal(false);
+                setDestinyReading(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'rgba(233, 30, 99, 0.2)',
+                border: '1px solid #e91e63',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                fontSize: '20px',
+                cursor: 'pointer',
+                color: '#e91e63',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              ×
+            </button>
+            
+            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+              <div style={{
+                fontSize: '60px',
+                marginBottom: '15px',
+                background: 'linear-gradient(45deg, #e91e63, #f06292, #ff9800)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                animation: 'pulse 2s infinite'
+              }}>🔮</div>
+              <h2 style={{ 
+                color: '#e91e63', 
+                marginBottom: '10px',
+                fontSize: '28px',
+                textShadow: '0 2px 10px rgba(233, 30, 99, 0.3)'
+              }}>Your Destiny Reading</h2>
+              <p style={{ 
+                color: '#b0b0b0', 
+                fontSize: '16px',
+                marginBottom: '20px'
+              }}>Revealed through Classical Vedic Techniques</p>
+              
+              {birthData && (
+                <div style={{ 
+                  background: 'rgba(233, 30, 99, 0.1)', 
+                  padding: '10px 20px', 
+                  borderRadius: '25px', 
+                  display: 'inline-block',
+                  fontSize: '14px',
+                  color: '#e91e63',
+                  border: '1px solid rgba(233, 30, 99, 0.3)',
+                  marginBottom: '20px'
+                }}>
+                  👤 <strong>{birthData.name}</strong> • 📅 {birthData.date} • 🕐 {birthData.time}
+                </div>
+              )}
+            </div>
+            
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '15px',
+              padding: '25px',
+              border: '1px solid rgba(233, 30, 99, 0.2)',
+              marginBottom: '20px'
+            }}>
+              <div style={{
+                color: '#ffffff',
+                lineHeight: '1.8',
+                fontSize: '16px',
+                whiteSpace: 'pre-wrap'
+              }}>
+                <div dangerouslySetInnerHTML={{
+                  __html: (destinyReading.ai_prediction || destinyReading.prediction || 'Loading your destiny reading...')
+                    .replace(/\*\*(.*?)\*\*/g, '<span style="font-weight: bold; color: #ffd700;">$1</span>')
+                    .replace(/^### (.*$)/gm, '<span style="font-weight: bold; color: #ffd700; font-size: 18px;">$1</span>')
+                    .replace(/\*\*\*/g, '<div style="text-align: center; margin: 20px 0; color: #e91e63; font-size: 20px;">✨ ⭐ ✨</div>')
+                }} />
+              </div>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '25px',
+              flexWrap: 'wrap',
+              gap: '15px'
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: '15px',
+                flexWrap: 'wrap'
+              }}>
+                <span style={{
+                  background: 'rgba(76, 175, 80, 0.2)',
+                  padding: '6px 12px',
+                  borderRadius: '15px',
+                  fontSize: '12px',
+                  color: '#4caf50',
+                  border: '1px solid rgba(76, 175, 80, 0.3)'
+                }}>✨ Bhrigu Samhita</span>
+                <span style={{
+                  background: 'rgba(255, 152, 0, 0.2)',
+                  padding: '6px 12px',
+                  borderRadius: '15px',
+                  fontSize: '12px',
+                  color: '#ff9800',
+                  border: '1px solid rgba(255, 152, 0, 0.3)'
+                }}>📚 Lal Kitab</span>
+                <span style={{
+                  background: 'rgba(156, 39, 176, 0.2)',
+                  padding: '6px 12px',
+                  borderRadius: '15px',
+                  fontSize: '12px',
+                  color: '#9c27b0',
+                  border: '1px solid rgba(156, 39, 176, 0.3)'
+                }}>⭐ Nadi Astrology</span>
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                gap: '10px'
+              }}>
+                <button 
+                  onClick={() => user ? setShowChatModal(true) : onLogin()}
+                  style={{
+                    background: 'linear-gradient(135deg, #e91e63, #f06292)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 20px',
+                    borderRadius: '25px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  💬 Ask Tara More
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowDestinyModal(false);
+                    setDestinyReading(null);
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: '#b0b0b0',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    padding: '12px 20px',
+                    borderRadius: '25px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

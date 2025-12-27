@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instant Destiny Reading - AstroRoshni</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .native-selector {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .native-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .native-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .change-native-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .change-native-btn:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+
+        .reading-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .get-reading-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ffa726);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .get-reading-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.3);
+        }
+
+        .get-reading-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .age-reveal {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+        }
+
+        .prediction-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .prediction-card h3 {
+            margin-bottom: 15px;
+            color: #ffa726;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .insight-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .insight-card h4 {
+            color: #ffa726;
+            margin-bottom: 10px;
+        }
+
+        .techniques-used {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .techniques-used h3 {
+            margin-bottom: 15px;
+            color: #ffa726;
+        }
+
+        .technique-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .technique-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .error {
+            background: rgba(255,0,0,0.2);
+            border: 1px solid rgba(255,0,0,0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .native-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔮 INSTANT DESTINY READING</h1>
+            <p>Discover Your Life's Hidden Patterns Using Classical Vedic Techniques</p>
+        </div>
+
+        <div class="native-selector">
+            <div class="native-info">
+                <span class="native-name" id="nativeName">Loading...</span>
+                <button class="change-native-btn" onclick="changeNative()">Change Native</button>
+            </div>
+            <p>Using your selected birth details for instant analysis</p>
+        </div>
+
+        <div class="reading-section">
+            <button class="get-reading-btn" id="getReadingBtn" onclick="getReading()">
+                🚀 REVEAL MY DESTINY NOW
+            </button>
+            
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>AI analyzing your cosmic patterns using classical texts...</p>
+            </div>
+
+            <div class="results" id="results">
+                <div class="age-reveal" id="ageReveal"></div>
+                
+                <div class="prediction-card">
+                    <h3>🤖 GEMINI AI ANALYSIS</h3>
+                    <div id="aiPrediction"></div>
+                    <p style="margin-top: 15px; opacity: 0.8; font-size: 0.9rem;">
+                        <strong>Confidence:</strong> <span id="confidence"></span> | 
+                        <strong>Based on Classical Texts</strong>
+                    </p>
+                </div>
+
+                <div class="insights-grid" id="insightsGrid"></div>
+
+                <div class="techniques-used">
+                    <h3>📚 BASED ON AUTHENTIC TEXTS</h3>
+                    <div class="technique-list">
+                        <div class="technique-item">✓ Bhrigu Samhita (BCP Method)</div>
+                        <div class="technique-item">✓ Lal Kitab Karmic Analysis</div>
+                        <div class="technique-item">✓ Nadi Nakshatra Timing</div>
+                        <div class="technique-item">✓ Jaimini Sutra Techniques</div>
+                        <div class="technique-item">✓ Parashari Sudarshana Chakra</div>
+                        <div class="technique-item">✓ Classical Elemental Analysis</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="error" id="error" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Get selected native from localStorage (like AstroRoshni homepage)
+        function loadSelectedNative() {
+            const selectedNative = localStorage.getItem('selectedNative');
+            if (selectedNative) {
+                const native = JSON.parse(selectedNative);
+                document.getElementById('nativeName').textContent = native.name || 'Selected Native';
+                return native;
+            } else {
+                document.getElementById('nativeName').textContent = 'No Native Selected';
+                return null;
+            }
+        }
+
+        function changeNative() {
+            // Redirect to native selection page (like AstroRoshni)
+            window.location.href = '/select-native.html';
+        }
+
+        async function getReading() {
+            const native = loadSelectedNative();
+            if (!native) {
+                alert('Please select a native first');
+                changeNative();
+                return;
+            }
+
+            const btn = document.getElementById('getReadingBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const error = document.getElementById('error');
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            error.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/blank-chart/stunning-prediction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        date: native.date,
+                        time: native.time,
+                        latitude: native.latitude,
+                        longitude: native.longitude,
+                        timezone: native.timezone
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    throw new Error(data.error || 'Failed to get reading');
+                }
+            } catch (err) {
+                error.textContent = 'Failed to get reading: ' + err.message;
+                error.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            const context = data.astrological_context;
+            const age = context.metadata.target_age;
+
+            // Age reveal
+            document.getElementById('ageReveal').innerHTML = `
+                🎭 YOU ARE ${age} YEARS OLD<br>
+                <span style="font-size: 1.2rem; opacity: 0.8;">Your cosmic blueprint reveals...</span>
+            `;
+
+            // AI prediction
+            document.getElementById('aiPrediction').textContent = data.ai_prediction;
+            document.getElementById('confidence').textContent = data.confidence;
+
+            // Insights grid
+            const insightsGrid = document.getElementById('insightsGrid');
+            const pillars = context.pillars;
+            
+            insightsGrid.innerHTML = `
+                <div class="insight-card">
+                    <h4>🏠 ACTIVE LIFE PHASE</h4>
+                    <p><strong>${pillars.bcp_activation.activated_house}th House Activated</strong></p>
+                    <p>${pillars.bcp_activation.house_meaning}</p>
+                </div>
+                <div class="insight-card">
+                    <h4>⭐ BIRTH STAR POWER</h4>
+                    <p><strong>${pillars.nakshatra_triggers.birth_star}</strong></p>
+                    <p>Fated Years: ${pillars.nakshatra_triggers.fated_years.join(', ')}</p>
+                </div>
+                <div class="insight-card">
+                    <h4>⚖️ KARMIC PATTERNS</h4>
+                    <p><strong>${pillars.lal_kitab_layer.ancestral_debts.length} Ancestral Debts</strong></p>
+                    <p>${pillars.lal_kitab_layer.ancestral_debts[0] || 'No major debts detected'}</p>
+                </div>
+                <div class="insight-card">
+                    <h4>🔥 ELEMENTAL DOMINANCE</h4>
+                    <p><strong>Fire:</strong> ${pillars.nadi_elemental_links.Fire.length} planets</p>
+                    <p><strong>Earth:</strong> ${pillars.nadi_elemental_links.Earth.length} planets</p>
+                </div>
+            `;
+
+            results.style.display = 'block';
+        }
+
+        // Load native on page load
+        window.onload = function() {
+            loadSelectedNative();
+        };
+    </script>
+</body>
+</html>
