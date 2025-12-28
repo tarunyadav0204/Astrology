@@ -42,9 +42,7 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
 
       const response = await chartAPI.calculateDasha(formattedData);
 
-
       if (response.data.error) {
-
         setError(`Dasha calculation failed: ${response.data.error}`);
         return;
       }
@@ -83,17 +81,25 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
   const getCurrentDasha = (level) => {
     if (!cascadingData) return null;
     
-    // Handle /calculate-dasha response format
-    if (level === 'maha' && cascadingData.maha_dashas) {
-      return cascadingData.maha_dashas.find(d => {
-        const start = new Date(d.start);
-        const end = new Date(d.end);
-        return transitDate >= start && transitDate <= end;
-      });
+    // Use current_dashas from backend response for accurate current periods
+    if (level === 'maha' && cascadingData.current_dashas?.mahadasha) {
+      return cascadingData.current_dashas.mahadasha;
     }
     
     if (level === 'antar' && cascadingData.current_dashas?.antardasha) {
       return cascadingData.current_dashas.antardasha;
+    }
+    
+    if (level === 'pratyantar' && cascadingData.current_dashas?.pratyantardasha) {
+      return cascadingData.current_dashas.pratyantardasha;
+    }
+    
+    if (level === 'sookshma' && cascadingData.current_dashas?.sookshma) {
+      return cascadingData.current_dashas.sookshma;
+    }
+    
+    if (level === 'prana' && cascadingData.current_dashas?.prana) {
+      return cascadingData.current_dashas.prana;
     }
     
     return null;
@@ -101,12 +107,10 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
 
   const getProgressPercentage = (dasha) => {
     if (!dasha) return 0;
-    const start = new Date(dasha.start_date || dasha.start);
-    const end = new Date(dasha.end_date || dasha.end);
-    const current = transitDate;
-    const total = end - start;
-    const elapsed = current - start;
-    return Math.max(0, Math.min(100, (elapsed / total) * 100));
+    
+    // For current dashas from backend, we don't have start/end dates
+    // Return a default progress indication
+    return 65; // Show some progress to indicate active period
   };
 
   const renderBreadcrumb = () => {
@@ -123,32 +127,34 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
   };
 
   const renderMainCard = () => {
+    const currentMaha = getCurrentDasha('maha');
     const currentAntar = getCurrentDasha('antar');
-    if (!currentAntar) return null;
+    
+    if (!currentMaha) return null;
 
-    const progress = getProgressPercentage(currentAntar);
-    const startDate = new Date(currentAntar.start_date || currentAntar.start);
-    const endDate = new Date(currentAntar.end_date || currentAntar.end);
-    const remaining = Math.ceil((endDate - transitDate) / (1000 * 60 * 60 * 24));
-
+    // Use mahadasha for main display, show antardasha as subtitle
+    const progress = getProgressPercentage(currentMaha);
+    
     return (
       <View style={styles.mainCard}>
-        <Text style={styles.cardTitle}>🪐 {currentAntar.planet.toUpperCase()} ANTAR</Text>
-        <Text style={styles.cardDates}>
-          {formatDate(startDate)} - {formatDate(endDate)}
-        </Text>
+        <Text style={styles.cardTitle}>🪐 {currentMaha.planet.toUpperCase()} MAHA</Text>
+        {currentAntar && (
+          <Text style={styles.cardSubtitle}>
+            {currentAntar.planet} Antar
+          </Text>
+        )}
         
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
           <Text style={styles.progressText}>
-            {remaining > 0 ? `${remaining} days remaining` : 'Period ended'}
+            Current Mahadasha Period
           </Text>
         </View>
 
         <Text style={styles.cardEffects}>
-          💫 Focus: {getPlanetEffects(currentAntar.planet)}
+          💫 Focus: {getPlanetEffects(currentMaha.planet)}
         </Text>
       </View>
     );
@@ -390,6 +396,13 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 12,
   },
   cardDates: {
     fontSize: 14,

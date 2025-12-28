@@ -142,6 +142,7 @@ HINDU_FESTIVALS = {
         "name": "Shukla Ekadashi",
         "type": "vrat",
         "lunar_day": "ekadashi",
+        "paksha": "shukla",
         "month": "all",
         "duration": 1,
         "description": "The sacred fast observed on the 11th day of the bright fortnight (Shukla Paksha) every month, dedicated to Lord Vishnu. This bi-monthly observance is considered one of the most important spiritual practices in Hinduism for achieving moksha and spiritual purification.",
@@ -152,6 +153,7 @@ HINDU_FESTIVALS = {
         "name": "Krishna Ekadashi",
         "type": "vrat",
         "lunar_day": "ekadashi",
+        "paksha": "krishna",
         "month": "all",
         "duration": 1,
         "description": "The sacred fast observed on the 11th day of the dark fortnight (Krishna Paksha) every month, dedicated to Lord Vishnu. This powerful vrat is believed to destroy sins and grant spiritual merit equal to performing elaborate yajnas and pilgrimages.",
@@ -252,7 +254,54 @@ HINDU_FESTIVALS = {
         "rituals": ["shraddha", "tarpan", "pind daan", "brahmin feeding"]
     },
     
-    # Regional Festivals
+    # Regional New Year Festivals
+    "gudi_padwa": {
+        "name": "Gudi Padwa",
+        "type": "regional_festival",
+        "lunar_day": "pratipada",
+        "month": "chaitra",
+        "duration": 1,
+        "description": "Marathi New Year celebrated with Gudi (flag) hoisting",
+        "significance": "New beginnings, prosperity, Marathi culture",
+        "rituals": ["gudi hoisting", "rangoli", "puran poli", "neem leaves"]
+    },
+    "ugadi": {
+        "name": "Ugadi",
+        "type": "regional_festival",
+        "lunar_day": "pratipada",
+        "month": "chaitra",
+        "duration": 1,
+        "description": "Telugu and Kannada New Year with pachadi preparation",
+        "significance": "New year, six tastes of life",
+        "rituals": ["ugadi pachadi", "mango leaves decoration", "panchanga reading"]
+    },
+    "vishu": {
+        "name": "Vishu",
+        "type": "regional_festival",
+        "solar_date": "april_14",
+        "duration": 1,
+        "description": "Malayalam New Year with Vishukkani arrangement",
+        "significance": "Prosperity, good fortune, Kerala culture",
+        "rituals": ["vishukkani viewing", "vishukaineetam", "sadhya feast"]
+    },
+    "pohela_boishakh": {
+        "name": "Pohela Boishakh",
+        "type": "regional_festival",
+        "solar_date": "april_14",
+        "duration": 1,
+        "description": "Bengali New Year with cultural celebrations",
+        "significance": "New year, Bengali culture, prosperity",
+        "rituals": ["mangal shobhajatra", "panta bhat", "cultural programs"]
+    },
+    "bihu": {
+        "name": "Rongali Bihu",
+        "type": "regional_festival",
+        "solar_date": "april_14",
+        "duration": 7,
+        "description": "Assamese New Year and spring festival",
+        "significance": "New year, harvest, Assamese culture",
+        "rituals": ["bihu dance", "dhol playing", "gamosa gifting", "community feast"]
+    },
     "onam": {
         "name": "Onam",
         "type": "regional_festival",

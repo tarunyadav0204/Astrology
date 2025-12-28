@@ -38,6 +38,18 @@
   transition: all 0.3s;
 }
 
+.top-link {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.top-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff !important;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
 .top-links a:hover {
   color: #fff;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);

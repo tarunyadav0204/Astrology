@@ -13,7 +13,7 @@ calculator = FestivalCalculator()
 async def get_today_festivals():
     """Get festivals for today"""
     today = datetime.now()
-    festivals = calculator.find_festival_dates(today.year, today.month)
+    festivals = calculator.find_festival_dates(today.year, today.month, 28.6139, 77.2090, "amanta", "Asia/Kolkata")
     today_str = today.strftime("%Y-%m-%d")
     
     return {
@@ -22,26 +22,45 @@ async def get_today_festivals():
     }
 
 @router.get("/month/{year}/{month}")
-async def get_monthly_festivals(year: int, month: int):
-    """Get all festivals for a specific month"""
+async def get_monthly_festivals(year: int, month: int, lat: float = 28.6139, lon: float = 77.2090, 
+                              calendar_system: str = "amanta", timezone_offset: float = 5.5):
+    """Get all festivals for a specific month with full Drik Panchang accuracy"""
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Invalid month")
     
-    festivals = calculator.find_festival_dates(year, month)
-    vrats = calculator.get_monthly_vrats(year, month)
+    if calendar_system not in ["amanta", "purnimanta"]:
+        raise HTTPException(status_code=400, detail="Invalid calendar system. Use 'amanta' or 'purnimanta'")
+    
+    # Convert timezone offset to timezone name
+    timezone_map = {
+        5.5: "Asia/Kolkata",
+        0: "UTC", 
+        -5: "America/New_York",
+        -8: "America/Los_Angeles",
+        1: "Europe/London",
+        -5: "America/Toronto"
+    }
+    timezone_name = timezone_map.get(timezone_offset, "Asia/Kolkata")
+    
+    festivals = calculator.find_festival_dates(year, month, lat, lon, calendar_system, timezone_name)
+    vrats = calculator.get_monthly_vrats(year, month, lat, lon, calendar_system, timezone_name)
     
     return {
         "year": year,
         "month": month,
+        "latitude": lat,
+        "longitude": lon,
+        "calendar_system": calendar_system,
+        "timezone_offset": timezone_offset,
         "festivals": festivals,
         "vrats": vrats,
         "total_count": len(festivals) + len(vrats)
     }
 
 @router.get("/year/{year}")
-async def get_yearly_festivals(year: int):
-    """Get all festivals for a year"""
-    festivals = calculator.find_festival_dates(year)
+async def get_yearly_festivals(year: int, lat: float = 28.6139, lon: float = 77.2090):
+    """Get all festivals for a year with geographic precision"""
+    festivals = calculator.find_festival_dates(year, None, lat, lon, "amanta", "Asia/Kolkata")
     
     # Group by month
     monthly_data = {}
@@ -53,6 +72,8 @@ async def get_yearly_festivals(year: int):
     
     return {
         "year": year,
+        "latitude": lat,
+        "longitude": lon,
         "monthly_festivals": monthly_data,
         "total_festivals": len(festivals)
     }

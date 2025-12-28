@@ -19,6 +19,7 @@ import { COLORS } from '../../utils/constants';
 import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 
 const { width } = Dimensions.get('window');
 
@@ -44,7 +45,6 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   useFocusEffect(
     React.useCallback(() => {
       const loadData = async () => {
-        console.log('🔄 HomeScreen focused - loading data');
         const nativeData = await loadCurrentNative();
         await loadHomeData(nativeData);
       };
@@ -143,25 +143,20 @@ const loadCurrentNative = async () => {
       
       // First try to get single birth details
       let selectedNative = await storage.getBirthDetails();
-      console.log('🔄 Single birth details:', selectedNative?.name, 'ID:', selectedNative?.id);
       
       // If no single birth details, get from profiles
       if (!selectedNative) {
         const profiles = await storage.getBirthProfiles();
-        console.log('📋 Found profiles:', profiles?.length || 0);
         
         if (profiles && profiles.length > 0) {
           // Use the first profile or find 'self' relation
           selectedNative = profiles.find(p => p.relation === 'self') || profiles[0];
-          console.log('📊 Using profile:', selectedNative?.name, 'ID:', selectedNative?.id);
         }
       }
       
-      console.log('🔄 Loading current native:', selectedNative?.name, 'ID:', selectedNative?.id);
       setCurrentNativeData(selectedNative);
       return selectedNative;
     } catch (error) {
-      console.log('Error loading current native:', error);
       return null;
     }
   };
@@ -181,7 +176,6 @@ const loadHomeData = async (nativeData = null) => {
           setPricing(pricingResponse.data);
         }
       } catch (pricingError) {
-        console.log('Failed to load pricing:', pricingError);
       }
       
       const targetDate = new Date().toISOString().split('T')[0];
@@ -225,7 +219,6 @@ const loadHomeData = async (nativeData = null) => {
             setTransitData(transitResponse.data);
           }
         } catch (transitError) {
-          console.log('Transit error:', transitError);
         }
       }
       
@@ -268,12 +261,10 @@ const loadHomeData = async (nativeData = null) => {
           setPanchangData(combinedPanchangData);
         }
       } catch (panchangError) {
-        console.log('Panchang error:', panchangError);
       }
       
       
       if (currentBirthData) {
-        console.log('📊 Loading chart for:', currentBirthData.name, 'ID:', currentBirthData.id);
         
         const formattedBirthData = {
           name: currentBirthData.name,
@@ -285,8 +276,6 @@ const loadHomeData = async (nativeData = null) => {
           location: currentBirthData.place || 'Unknown'
         };
         
-        console.log('🚀 Calculating fresh chart with data:', formattedBirthData);
-        
         const [dashResponse, chartResponse] = await Promise.allSettled([
           chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
           chartAPI.calculateChartOnly(formattedBirthData)
@@ -294,16 +283,13 @@ const loadHomeData = async (nativeData = null) => {
         
         if (dashResponse.status === 'fulfilled' && dashResponse.value?.data && !dashResponse.value.data.error) {
           setDashData(dashResponse.value.data);
-          console.log('✅ Dasha data loaded for:', currentBirthData.name);
         }
         
         if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
           setChartData(chartResponse.value.data);
-          console.log('✅ Chart data loaded for:', currentBirthData.name, 'Ascendant:', chartResponse.value.data.ascendant);
         }
       }
     } catch (error) {
-      console.error('❌ Error in loadHomeData:', error);
     } finally {
       setLoading(false);
     }
@@ -363,17 +349,14 @@ const loadHomeData = async (nativeData = null) => {
   const time = displayData?.time || 'Unknown time';
 
   const handlePhysicalScan = async () => {
-    console.log('🔍 Starting physical scan...');
     
     // Use current native data for scan
     const scanBirthData = currentNativeData || birthData;
     if (!scanBirthData) {
-      console.log('❌ No birth data available');
       Alert.alert('Error', 'Birth data not available for physical scan.');
       return;
     }
 
-    console.log('📊 Using current native data for scan:', scanBirthData);
     setScanLoading(true);
     try {
       const scanData = {
@@ -386,23 +369,16 @@ const loadHomeData = async (nativeData = null) => {
         place: scanBirthData.place || ''
       };
       
-      console.log('🚀 Sending scan request with data:', scanData);
       const result = await chartAPI.scanPhysicalTraits(scanData, scanBirthData.id);
-      console.log('✅ Scan result received:', result);
       
       if (result.data?.success && result.data?.traits?.length > 0) {
-        console.log('🎆 Traits found:', result.data.traits.length);
-        console.log('🔍 First trait structure:', result.data.traits[0]);
         setPhysicalTraits(result.data.traits);
         setHasFeedback(result.data.has_feedback || false);
         setShowTraitsModal(true);
       } else {
-        console.log('⚠️ No traits found in result:', result.data);
         Alert.alert('Physical Scan', 'No distinctive physical traits found in your chart.');
       }
     } catch (error) {
-      console.error('❌ Physical scan error:', error);
-      console.error('Error details:', error.response?.data || error.message);
       Alert.alert('Error', `Failed to perform physical scan: ${error.response?.data?.detail || error.message}`);
     } finally {
       setScanLoading(false);
@@ -434,7 +410,6 @@ const loadHomeData = async (nativeData = null) => {
         setHasFeedback(true); // Update state to hide buttons
       }
     } catch (error) {
-      console.error('Failed to store feedback:', error);
     }
     
     setShowTraitsModal(false);
@@ -590,6 +565,10 @@ const loadHomeData = async (nativeData = null) => {
             </Animated.View>
           );
         })}
+        
+        {/* Header with Native Selector */}
+        <View style={styles.header}>
+        </View>
         
       <ScrollView style={[styles.scrollView, { zIndex: 1 }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.greetingContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
@@ -1968,6 +1947,16 @@ dashaChip: {
   moonIllumination: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  
+  // Header Styles
+  header: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    zIndex: 10,
+    alignItems: 'flex-end',
   },
   
   // Panchang Weather Card

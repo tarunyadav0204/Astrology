@@ -187,7 +187,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       
       const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
       
-      
       if (response.data.error) {
         setError(`Vimshottari calculation failed: ${response.data.error}`);
         return;
@@ -203,8 +202,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       
       setCascadingData(response.data);
     } catch (err) {
-
-
       setError('Failed to load cascading dasha data');
     } finally {
       setLoading(false);
@@ -322,7 +319,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       setJaiminiData(jaiminiData);
       
     } catch (err) {
-
       setError('Failed to load Jaimini Kalchakra dasha data');
     } finally {
       setLoading(false);
@@ -389,7 +385,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       }
       
     } catch (err) {
-
       setError('Failed to load Kalchakra dasha data');
     } finally {
       setLoading(false);
@@ -438,37 +433,31 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       return;
     }
     
-    
     const currentSelections = {};
     
     const currentMaha = cascadingData.maha_dashas?.find(d => d.current);
     if (currentMaha) {
       currentSelections.maha = currentMaha.planet;
-    } else {
     }
     
     const currentAntar = cascadingData.antar_dashas?.find(d => d.current);
     if (currentAntar) {
       currentSelections.antar = currentAntar.planet;
-    } else {
     }
     
     const currentPratyantar = cascadingData.pratyantar_dashas?.find(d => d.current);
     if (currentPratyantar) {
       currentSelections.pratyantar = currentPratyantar.planet;
-    } else {
     }
     
     const currentSookshma = cascadingData.sookshma_dashas?.find(d => d.current);
     if (currentSookshma) {
       currentSelections.sookshma = currentSookshma.planet;
-    } else {
     }
     
     const currentPrana = cascadingData.prana_dashas?.find(d => d.current);
     if (currentPrana) {
       currentSelections.prana = currentPrana.planet;
-    } else {
     }
     
     setSelectedDashas(currentSelections);
@@ -483,10 +472,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       return;
     }
     
-    
     // Find the period marked as current by backend
     const currentPeriod = jaiminiData.periods.find(period => period.current === true);
-    
     
     if (currentPeriod) {
       setSelectedDashas({ jaimini_maha: currentPeriod.id || currentPeriod.sign || currentPeriod.planet });
@@ -649,7 +636,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   };
 
   const getDashaOptions = (dashaLevel) => {
-    
     if (dashaType === 'kalchakra') {
       if (dashaLevel === 'kalchakra_maha') {
         const options = kalchakraData?.mahadashas || [];
@@ -1409,12 +1395,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const currentAge = Math.floor((new Date() - birthDate) / (365.25 * 24 * 60 * 60 * 1000));
     
     
-    // Calculate cumulative ages for debugging
+    // Calculate cumulative ages
     let cumulativeAge = 0;
     mahadashas.forEach((maha, index) => {
       cumulativeAge += Math.round(maha.years);
     });
-    
     const getGatiForSign = (signNumber) => {
       const maha = mahadashas.find(m => m.sign === signNumber);
       return maha?.gati || 'Normal';

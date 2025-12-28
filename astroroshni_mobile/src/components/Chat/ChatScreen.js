@@ -32,6 +32,7 @@ import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/consta
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -207,22 +208,13 @@ export default function ChatScreen({ navigation, route }) {
   
   // Fetch calibration event when birth data changes
   useEffect(() => {
-    console.log('🔍 Calibration Check:', {
-      birthDataId: birthData?.id,
-      showGreeting,
-      birthDataKeys: birthData ? Object.keys(birthData) : 'no birthData'
-    });
     if (birthData?.id && !showGreeting) {
-      console.log('✅ Calling fetchCalibrationEvent');
       fetchCalibrationEvent();
-    } else {
-      console.log('❌ Not calling fetchCalibrationEvent - missing id or showing greeting');
     }
   }, [birthData?.id, showGreeting]);
   
   const fetchCalibrationEvent = async () => {
     try {
-      console.log('🚀 fetchCalibrationEvent called with birthData.id:', birthData.id);
       
       // Use the proper API service instead of direct fetch
       const { lifeEventsAPI } = require('../../services/api');
@@ -238,20 +230,10 @@ export default function ChatScreen({ navigation, route }) {
         gender: birthData.gender || ''
       }, 18, 50);
       
-      console.log('📥 Response status:', response.status);
-      console.log('📊 Life Events API Response:', {
-        events_count: response.data?.events?.length || 0,
-        birth_info: response.data?.birth_info || 'not provided'
-      });
-      
       if (response.data && response.data.events && response.data.events.length > 0) {
-        console.log('✅ Setting calibration event:', response.data.events[0]);
         setCalibrationEvent(response.data.events[0]);
-      } else {
-        console.log('❌ No events in response');
       }
     } catch (error) {
-      console.log('❌ fetchCalibrationEvent error:', error.response?.data || error.message);
     }
   };
   
@@ -362,7 +344,6 @@ export default function ChatScreen({ navigation, route }) {
     } catch (error) {
       console.error('Error loading chart data:', error);
       if (error.response?.status === 503) {
-        console.log('⚠️ Server temporarily unavailable - chart data will load when server is back');
       }
     } finally {
       setLoadingChart(false);
@@ -393,7 +374,6 @@ export default function ChatScreen({ navigation, route }) {
     } catch (error) {
       console.error('Error loading dasha data:', error);
       if (error.response?.status === 503) {
-        console.log('⚠️ Server temporarily unavailable - dasha data will load when server is back');
       }
     } finally {
       setLoadingDashas(false);
@@ -720,27 +700,18 @@ export default function ChatScreen({ navigation, route }) {
     try {
       // First try to get single birth details
       let selectedBirthData = await storage.getBirthDetails();
-      console.log('🔄 Single birth details:', selectedBirthData?.name, 'ID:', selectedBirthData?.id);
       
       // If no single birth details, get from profiles
       if (!selectedBirthData) {
         const profiles = await storage.getBirthProfiles();
-        console.log('📋 Found profiles:', profiles?.length || 0);
         
         if (profiles && profiles.length > 0) {
           // Use the first profile or find 'self' relation
           selectedBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
-          console.log('📊 Using profile:', selectedBirthData?.name, 'ID:', selectedBirthData?.id);
         }
       }
       
       if (selectedBirthData && selectedBirthData.name) {
-        console.log('✅ Using birth data:', {
-          name: selectedBirthData.name,
-          id: selectedBirthData.id,
-          date: selectedBirthData.date,
-          time: selectedBirthData.time
-        });
         setBirthData(selectedBirthData);
       } else {
         // Check if charts exist on server
@@ -748,14 +719,11 @@ export default function ChatScreen({ navigation, route }) {
           const { chartAPI } = require('../../services/api');
           const response = await chartAPI.getExistingCharts();
           if (response.data && response.data.charts && response.data.charts.length > 0) {
-            console.log('📊 Charts found on server, navigating to SelectNative');
             navigation.navigate('SelectNative');
           } else {
-            console.log('❌ No charts found, navigating to BirthForm');
             navigation.navigate('BirthForm');
           }
         } catch (apiError) {
-          console.log('❌ API error, navigating to BirthForm');
           navigation.navigate('BirthForm');
         }
         setBirthData(null);
@@ -786,7 +754,6 @@ export default function ChatScreen({ navigation, route }) {
       const body = isMundane ? {} : { birth_chart_id: birthData?.id };
       
       if (!isMundane && !birthData?.id) {
-        console.error('❌ Cannot create session: birth_chart_id is missing from birthData');
         return null;
       }
       
@@ -828,7 +795,6 @@ export default function ChatScreen({ navigation, route }) {
 
   const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval = null, isResume = false) => {
     if (!messageId) {
-      console.error('❌ No messageId provided to pollForResponse');
       return;
     }
     
@@ -859,7 +825,6 @@ export default function ChatScreen({ navigation, route }) {
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ Poll response error:', response.status, errorText);
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         
@@ -944,7 +909,6 @@ export default function ChatScreen({ navigation, route }) {
         }
         
       } catch (error) {
-        console.error('❌ Polling error for messageId:', messageId, error);
         
         if (loadingInterval) clearInterval(loadingInterval);
         setMessagesWithStorage(prev => prev.map(msg => 
@@ -1154,19 +1118,11 @@ export default function ChatScreen({ navigation, route }) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ API Error Response:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
       const { user_message_id, message_id: assistantMessageId } = result;
-
-      console.log('🔍 API Response Debug:', {
-        user_message_id,
-        assistantMessageId,
-        userMessageId,
-        processingMessageId
-      });
 
       if (!assistantMessageId) {
         throw new Error('No message ID received from server');
@@ -1174,31 +1130,23 @@ export default function ChatScreen({ navigation, route }) {
 
       // Update user message with real DB ID
       if (user_message_id) {
-        console.log('✅ Updating user message with DB ID:', user_message_id);
         setMessagesWithStorage(prev => {
           const updated = prev.map(msg => {
             if (msg.id === userMessageId) {
-              console.log('📝 User message before update:', { id: msg.id, messageId: msg.messageId });
               const updatedMsg = { ...msg, messageId: user_message_id };
-              console.log('📝 User message after update:', { id: updatedMsg.id, messageId: updatedMsg.messageId });
               return updatedMsg;
             }
             return msg;
           });
           return updated;
         });
-      } else {
-        console.log('❌ No user_message_id received from server');
       }
 
       // Update processing message with messageId
-      console.log('✅ Updating assistant message with DB ID:', assistantMessageId);
       setMessagesWithStorage(prev => {
         const updated = prev.map(msg => {
           if (msg.id === processingMessageId) {
-            console.log('📝 Assistant message before update:', { id: msg.id, messageId: msg.messageId });
             const updatedMsg = { ...msg, messageId: assistantMessageId };
-            console.log('📝 Assistant message after update:', { id: updatedMsg.id, messageId: updatedMsg.messageId });
             return updatedMsg;
           }
           return msg;
@@ -1282,7 +1230,6 @@ export default function ChatScreen({ navigation, route }) {
     const message = messages.find(msg => msg.messageId === messageId || msg.message_id === messageId);
     
     if (!message) {
-      console.error('Message not found:', messageId);
       return;
     }
     
@@ -1375,7 +1322,16 @@ export default function ChatScreen({ navigation, route }) {
             
             <View style={styles.headerCenter}>
               {showGreeting ? (
-                <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+                <>
+                  <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+                  {birthData && (
+                    <NativeSelectorChip 
+                      birthData={birthData}
+                      onPress={() => navigation.navigate('SelectNative')}
+                      maxLength={8}
+                    />
+                  )}
+                </>
               ) : isMundane ? (
                 <View style={styles.partnershipChipsContainer}>
                   <TouchableOpacity 
@@ -1399,9 +1355,11 @@ export default function ChatScreen({ navigation, route }) {
                 <>
                   <Text style={styles.headerTitle}>Chat</Text>
                   {birthData && (
-                    <TouchableOpacity onPress={() => navigation.navigate('SelectNative')} style={styles.nameChip}>
-                      <Text style={styles.nameChipText}>{birthData.name?.slice(0, 12)}{birthData.name?.length > 12 ? '...' : ''}</Text>
-                    </TouchableOpacity>
+                    <NativeSelectorChip 
+                      birthData={birthData}
+                      onPress={() => navigation.navigate('SelectNative')}
+                      maxLength={12}
+                    />
                   )}
                 </>
               ) : (

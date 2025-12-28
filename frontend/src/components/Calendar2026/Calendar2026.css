@@ -1,0 +1,361 @@
+.calendar-2026-page {
+  background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 100%);
+  min-height: 100vh;
+}
+
+.calendar-2026-container {
+  padding: 120px 20px 40px;
+  color: white;
+}
+
+.calendar-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.calendar-header h1 {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  background: linear-gradient(45deg, #fff, #e91e63, #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.highlight {
+  color: #e91e63;
+  text-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
+}
+
+.calendar-header p {
+  font-size: 1.2rem;
+  color: #b0b0b0;
+}
+
+.calendar-layout {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.calendar-main {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.month-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(233, 30, 99, 0.1);
+  padding: 20px;
+  border-bottom: 1px solid rgba(233, 30, 99, 0.3);
+}
+
+.month-navigation button {
+  background: rgba(233, 30, 99, 0.2);
+  border: 1px solid rgba(233, 30, 99, 0.5);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s;
+}
+
+.month-navigation button:hover:not(:disabled) {
+  background: rgba(233, 30, 99, 0.4);
+  transform: scale(1.1);
+}
+
+.month-navigation button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.month-navigation h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #e91e63;
+}
+
+.calendar-grid {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 0 20px 20px;
+}
+
+.days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.day-name {
+  padding: 15px;
+  text-align: center;
+  font-weight: bold;
+  color: #e91e63;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.days-container {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 100px);
+  gap: 0;
+}
+
+.calendar-day {
+  height: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px;
+  position: relative;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.calendar-day:hover {
+  background: rgba(233, 30, 99, 0.1);
+}
+
+.calendar-day.today {
+  background: rgba(233, 30, 99, 0.2);
+  border: 2px solid #e91e63;
+}
+
+.calendar-day.empty {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.date-num {
+  font-weight: bold;
+  font-size: 14px;
+  color: white;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.event-tag {
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  border-radius: 4px;
+  margin-top: 3px;
+  display: block;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.event-tag.festival {
+  background: #e91e63;
+  color: white;
+}
+
+.event-tag.holiday {
+  background: #ff6f00;
+  color: white;
+}
+
+.calendar-sidebar {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 25px;
+  border-radius: 20px;
+  height: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.calendar-sidebar h3 {
+  margin-bottom: 20px;
+  color: #e91e63;
+  font-size: 1.3rem;
+}
+
+.event-list {
+  margin-bottom: 25px;
+}
+
+.event-item {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(233, 30, 99, 0.05);
+  border-radius: 10px;
+  border-left: 3px solid #e91e63;
+}
+
+.event-date {
+  font-size: 0.9rem;
+  color: #e91e63;
+  font-weight: bold;
+}
+
+.event-item h4 {
+  margin: 5px 0;
+  color: white;
+  font-size: 1rem;
+}
+
+.event-item p {
+  margin: 0;
+  color: #b0b0b0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.reminder-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #e91e63, #ff6f00);
+  border: none;
+  color: white;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+.reminder-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(233, 30, 99, 0.3);
+}
+
+.calendar-seo-content {
+  margin-top: 60px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.calendar-seo-content h2 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 40px;
+  color: #e91e63;
+}
+
+.seo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+  margin-bottom: 40px;
+}
+
+.seo-card {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 30px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s;
+}
+
+.seo-card:hover {
+  transform: translateY(-5px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.seo-card h3 {
+  color: #e91e63;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+}
+
+.seo-card p {
+  color: #b0b0b0;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+.seo-card ul {
+  list-style: none;
+  padding: 0;
+}
+
+.seo-card li {
+  color: #d0d0d0;
+  margin-bottom: 8px;
+  padding-left: 20px;
+  position: relative;
+}
+
+.seo-card li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #e91e63;
+  font-weight: bold;
+}
+
+.calendar-cta {
+  background: linear-gradient(135deg, #e91e63, #9c27b0);
+  padding: 60px;
+  border-radius: 30px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+.cta-content h2 {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: white;
+}
+
+.cta-content p {
+  font-size: 1.2rem;
+  margin-bottom: 30px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cta-button {
+  background: white;
+  color: #e91e63;
+  padding: 15px 30px;
+  border: none;
+  border-radius: 30px;
+  font-weight: bold;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.cta-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 5px 20px rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 900px) {
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .calendar-header h1 {
+    font-size: 2.2rem;
+  }
+  
+  .calendar-day {
+    height: 80px;
+    padding: 5px;
+  }
+  
+  .event-tag {
+    font-size: 0.6rem;
+    padding: 1px 3px;
+  }
+  
+  .seo-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .calendar-cta {
+    padding: 40px 20px;
+  }
+  
+  .cta-content h2 {
+    font-size: 2rem;
+  }
+}

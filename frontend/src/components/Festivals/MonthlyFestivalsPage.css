@@ -1,7 +1,15 @@
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 .monthly-festivals-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   padding: 180px 20px 20px 20px;
+  margin-bottom: 100px;
+  flex: 1;
 }
 
 .unified-header {
@@ -13,6 +21,11 @@
   padding: 20px;
   border-radius: 15px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
 }
 
 .header-left h1 {
@@ -66,6 +79,24 @@
 .header-right {
   display: flex;
   gap: 20px;
+  align-items: center;
+}
+
+.transit-btn {
+  background: linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.transit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
 }
 
 .stat-item {
@@ -115,6 +146,84 @@
   overflow: hidden;
   padding: 20px;
   box-sizing: border-box;
+  flex-direction: column;
+}
+
+.back-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+}
+
+.transits-section {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.transits-section h2 {
+  color: #9c27b0;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.transits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.transit-card {
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+  border: 2px solid #9c27b0;
+  transition: transform 0.3s ease;
+}
+
+.transit-card:hover {
+  transform: translateY(-3px);
+}
+
+.transit-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.planet-name {
+  font-weight: 700;
+  color: #4a148c;
+  font-size: 1rem;
+}
+
+.transit-arrow {
+  color: #9c27b0;
+  font-size: 1.2rem;
+}
+
+.sign-name {
+  font-weight: 600;
+  color: #6a1b9a;
+  font-size: 1rem;
+}
+
+.transit-date {
+  font-size: 0.85rem;
+  color: #7b1fa2;
+  font-weight: 500;
+}
+
+.calendar-content {
+  display: flex;
+  gap: 20px;
 }
 
 .calendar-container {
@@ -330,6 +439,10 @@
 
 .back-button {
   text-align: center;
+  margin-top: 30px;
+  padding: 20px;
+  position: relative;
+  z-index: 10;
 }
 
 .btn-back {
@@ -375,9 +488,14 @@
     flex-direction: column;
   }
   
+  .calendar-content {
+    flex-direction: column;
+  }
+  
   .calendar-container,
   .details-panel {
-    flex: none;
+    width: 100%;
+    max-width: 100%;
   }
   
   .calendar-day {

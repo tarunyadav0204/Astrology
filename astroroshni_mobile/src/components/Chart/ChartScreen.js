@@ -20,6 +20,7 @@ import { chartAPI } from '../../services/api';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 
 const { width, height } = Dimensions.get('window');
 
@@ -223,7 +224,16 @@ export default function ChartScreen({ navigation, route }) {
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <Text style={styles.chartName}>{chartTypes[currentChartIndex]?.name}</Text>
-            <Text style={styles.nativeName}>{birthData?.name}</Text>
+            {birthData && (
+              <NativeSelectorChip 
+                birthData={birthData}
+                onPress={() => navigation.navigate('SelectNative')}
+                maxLength={15}
+                style={styles.nativeChip}
+                textStyle={styles.nativeChipText}
+                showIcon={false}
+              />
+            )}
           </View>
           <View style={styles.chartPosition}>
             <Text style={styles.positionText}>{currentChartIndex + 1}/{chartTypes.length}</Text>
@@ -367,10 +377,15 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     textAlign: 'center',
   },
-  nativeName: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
+  nativeChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  nativeChipText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   chartPosition: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',

@@ -14,10 +14,33 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [location, setLocation] = useState({ lat: 28.6139, lon: 77.2090, name: 'Delhi, India' });
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [transits, setTransits] = useState([]);
+  const [showTransits, setShowTransits] = useState(false);
 
   useEffect(() => {
     fetchTodayFestivals();
-  }, [selectedDate]);
+    fetchTransits();
+  }, [selectedDate, location]);
+
+  useEffect(() => {
+    // Try to get user's location on first load
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+            name: 'Your Location'
+          });
+        },
+        () => {
+          // Keep default Delhi location if geolocation fails
+        }
+      );
+    }
+  }, []);
 
   const fetchTodayFestivals = async () => {
     try {
@@ -26,7 +49,7 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       
-      const response = await fetch(`/api/festivals/month/${year}/${month}`, {
+      const response = await fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone_offset=5.5`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -51,6 +74,22 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       setTodayFestivals([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTransits = async () => {
+    try {
+      const date = new Date(selectedDate);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      const response = await fetch(`/api/transits/monthly/${year}/${month}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTransits(data.transits || []);
+      }
+    } catch (error) {
+      console.error('Error fetching transits:', error);
     }
   };
 
@@ -177,6 +216,18 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
           >
             🔍 Search Festivals
           </button>
+          <button 
+            className="header-btn location-btn"
+            onClick={() => setShowLocationPicker(!showLocationPicker)}
+          >
+            📍 {location.name}
+          </button>
+          <button 
+            className="header-btn transit-btn"
+            onClick={() => setShowTransits(!showTransits)}
+          >
+            🪐 Planetary Transits
+          </button>
         </div>
         <div className="header-content">
           <h1>🎊 Today's Festivals</h1>
@@ -193,6 +244,28 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       </div>
 
       <div className="festivals-content">
+        {showTransits && (
+          <div className="transits-section">
+            <h2>🪐 Current Planetary Transits</h2>
+            {transits.length > 0 ? (
+              <div className="transits-grid">
+                {transits.map((transit, index) => (
+                  <div key={index} className="transit-card">
+                    <div className="transit-header">
+                      <span className="planet-name">{transit.planet}</span>
+                      <span className="transit-arrow">→</span>
+                      <span className="sign-name">{transit.sign}</span>
+                    </div>
+                    <div className="transit-date">{new Date(transit.date).toLocaleDateString()}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>No major transits this month</p>
+            )}
+          </div>
+        )}
+
         <div className="today-section">
 
           {loading ? (
@@ -239,6 +312,27 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
                       </ul>
                     </div>
                   )}
+                  
+                  <div className="festival-timing">
+                    <h4>⏰ Timing Details</h4>
+                    <div className="timing-info">
+                      {festival.tithi_at_sunrise && (
+                        <p><strong>Tithi at Sunrise:</strong> {festival.tithi_at_sunrise}</p>
+                      )}
+                      {festival.tithi_end_time && (
+                        <p><strong>Tithi Ends:</strong> {festival.tithi_end_time}</p>
+                      )}
+                      {festival.parana_time && (
+                        <p><strong>Parana Time:</strong> {festival.parana_time}</p>
+                      )}
+                      {festival.moonrise_time && (
+                        <p><strong>Moonrise Time:</strong> {festival.moonrise_time}</p>
+                      )}
+                      {festival.paksha && (
+                        <p><strong>Paksha:</strong> {festival.paksha === 'shukla' ? 'Shukla (Bright)' : 'Krishna (Dark)'}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -266,6 +360,70 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
           </button>
         </div>
 
+      {showLocationPicker && (
+        <div className="search-modal-overlay">
+          <div className="search-modal">
+            <div className="search-header">
+              <h3>📍 Select Location</h3>
+              <button 
+                className="close-search"
+                onClick={() => setShowLocationPicker(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="location-content">
+              <button 
+                className="location-option"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        setLocation({
+                          lat: position.coords.latitude,
+                          lon: position.coords.longitude,
+                          name: 'Your Location'
+                        });
+                        setShowLocationPicker(false);
+                      },
+                      () => alert('Unable to get your location')
+                    );
+                  }
+                }}
+              >
+                📍 Use My Current Location
+              </button>
+              
+              <div className="popular-locations">
+                <h4>Popular Locations</h4>
+                {[
+                  { name: 'Delhi, India', lat: 28.6139, lon: 77.2090 },
+                  { name: 'Mumbai, India', lat: 19.0760, lon: 72.8777 },
+                  { name: 'Bangalore, India', lat: 12.9716, lon: 77.5946 },
+                  { name: 'Chennai, India', lat: 13.0827, lon: 80.2707 },
+                  { name: 'Kolkata, India', lat: 22.5726, lon: 88.3639 },
+                  { name: 'Hyderabad, India', lat: 17.3850, lon: 78.4867 },
+                  { name: 'London, UK', lat: 51.5074, lon: -0.1278 },
+                  { name: 'New York, USA', lat: 40.7128, lon: -74.0060 },
+                  { name: 'Toronto, Canada', lat: 43.6532, lon: -79.3832 }
+                ].map((loc, idx) => (
+                  <button
+                    key={idx}
+                    className="location-option"
+                    onClick={() => {
+                      setLocation(loc);
+                      setShowLocationPicker(false);
+                    }}
+                  >
+                    {loc.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {showSearch && (
         <div className="search-modal-overlay">
           <div className="search-modal">

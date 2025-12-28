@@ -15,6 +15,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 import { useCredits } from '../../credits/CreditContext';
 import { pricingAPI } from '../../services/api';
+import { storage } from '../../services/storage';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +26,7 @@ export default function AnalysisHubScreen({ navigation }) {
   const [slideAnim] = useState(new Animated.Value(50));
   const [pricing, setPricing] = useState({});
   const [loadingPricing, setLoadingPricing] = useState(true);
+  const [birthData, setBirthData] = useState(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -40,7 +43,17 @@ export default function AnalysisHubScreen({ navigation }) {
     ]).start();
     
     fetchPricing();
+    loadBirthData();
   }, []);
+  
+  const loadBirthData = async () => {
+    try {
+      const data = await storage.getBirthDetails();
+      setBirthData(data);
+    } catch (error) {
+      console.error('Error loading birth data:', error);
+    }
+  };
   
   const fetchPricing = async () => {
     try {
@@ -148,7 +161,19 @@ export default function AnalysisHubScreen({ navigation }) {
             >
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Life Analysis</Text>
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerTitle}>Life Analysis</Text>
+              {birthData && (
+                <NativeSelectorChip 
+                  birthData={birthData}
+                  onPress={() => navigation.navigate('SelectNative')}
+                  maxLength={15}
+                  style={styles.nativeChip}
+                  textStyle={styles.nativeChipText}
+                  showIcon={false}
+                />
+              )}
+            </View>
             <TouchableOpacity 
               style={styles.creditButton}
               onPress={() => navigation.navigate('Credits')}
@@ -297,10 +322,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  nativeChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  nativeChipText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   creditButton: {
     borderRadius: 18,
