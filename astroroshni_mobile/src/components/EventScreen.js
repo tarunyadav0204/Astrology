@@ -22,6 +22,7 @@ import { chatAPI, creditAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
@@ -48,6 +49,7 @@ export default function EventScreen({ route }) {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const progressIntervalRef = useRef(null);
   const [nativeName, setNativeName] = useState('');
+  const [birthData, setBirthData] = useState(null);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const yearSliderRef = useRef(null);
   const loadingIntervalRef = useRef(null);
@@ -105,15 +107,16 @@ export default function EventScreen({ route }) {
     }
   };
 
-  // Load native name on mount
+  // Load native name and birth data on mount
   useEffect(() => {
-    const loadName = async () => {
+    const loadBirthData = async () => {
       const birthData = await getBirthDetails();
       if (birthData?.name) {
         setNativeName(birthData.name.substring(0, 7));
+        setBirthData(birthData); // Store full birth data for the chip
       }
     };
-    loadName();
+    loadBirthData();
   }, []);
 
   // Fetch credit cost on component mount
@@ -170,7 +173,7 @@ export default function EventScreen({ route }) {
       console.log('👤 Birth data loaded:', { id: birthData.id, name: birthData.name?.substring(0, 5) });
       
       if (!birthData.id) {
-        Alert.alert('Error', 'Birth chart ID not found. Please re-select your birth chart.');
+        Alert.alert('Error', 'Birth chart ID not found. Please re-select your birth chart from Select Native screen.');
         setAnalysisStarted(false);
         setLoadingMonthly(false);
         if (loadingIntervalRef.current) {
@@ -528,7 +531,16 @@ export default function EventScreen({ route }) {
         <TouchableOpacity onPress={() => analysisStarted ? setAnalysisStarted(false) : navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{analysisStarted ? `${selectedYear} Predictions` : 'Select Year'}</Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>{analysisStarted ? `${selectedYear} Predictions` : 'Major Life Events'}</Text>
+          {birthData && (
+            <NativeSelectorChip 
+              birthData={birthData}
+              onPress={() => navigation.navigate('SelectNative')}
+              maxLength={12}
+            />
+          )}
+        </View>
         <View style={styles.headerRight}>
           {analysisStarted && monthlyData && (
             <TouchableOpacity onPress={() => setShowRegenerateModal(true)} style={styles.regenerateButton}>
@@ -729,7 +741,17 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 4
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: 'white', flex: 1, textAlign: 'center' },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: 'white', 
+    textAlign: 'center',
+    marginBottom: 4
+  },
   headerSpacer: { width: 32 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   regenerateButton: { 

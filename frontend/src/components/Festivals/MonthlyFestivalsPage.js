@@ -11,6 +11,13 @@ const MonthlyFestivalsPage = () => {
   const [location, setLocation] = useState({ lat: 28.6139, lon: 77.2090, name: 'Delhi, India' });
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [transits, setTransits] = useState([]);
+  const [userTimezone, setUserTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return 'Asia/Kolkata';
+    }
+  });
   const [showTransits, setShowTransits] = useState(false);
 
   useEffect(() => {
@@ -27,7 +34,7 @@ const MonthlyFestivalsPage = () => {
       
       console.log(`Fetching festivals for ${year}-${month}`);
       
-      const response = await fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone_offset=5.5`, {
+      const response = await fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${userTimezone}`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -172,7 +179,7 @@ const MonthlyFestivalsPage = () => {
     <div className="page-wrapper">
       <div className="monthly-festivals-page">
         <NavigationHeader />
-        <div className="unified-header">
+        <div className={`unified-header ${monthlyData.is_adhika_month ? 'adhika-month' : ''}`}>
           <div className="header-left">
             <h1>🎊 Monthly Festivals & Vrats</h1>
             <p>Sacred observances and celebrations</p>
@@ -184,9 +191,16 @@ const MonthlyFestivalsPage = () => {
             >
               ‹
             </button>
-            <h2>
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </h2>
+            <div className="month-title-container">
+              <h2>
+                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+              </h2>
+              {monthlyData.is_adhika_month && (
+                <div className="adhika-badge">
+                  🌙 Adhika Maas - Sacred Leap Month
+                </div>
+              )}
+            </div>
             <button 
               className="nav-btn"
               onClick={() => navigateMonth(1)}

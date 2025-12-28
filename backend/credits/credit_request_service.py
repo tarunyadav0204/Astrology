@@ -72,8 +72,8 @@ class CreditRequestService:
         recent_requests = cursor.fetchone()[0]
         conn.close()
         
-        if recent_requests >= 3:
-            return {"can_request": False, "message": "Maximum 3 requests per day allowed"}
+        if recent_requests >= 10:
+            return {"can_request": False, "message": "Maximum 10 requests per day allowed"}
         
         return {"can_request": True, "message": ""}
     
@@ -85,7 +85,7 @@ class CreditRequestService:
             return {"success": False, "message": rate_check["message"]}
         
         # Validate and sanitize inputs
-        amount = max(1, min(100, int(amount)))  # Clamp between 1-100
+        amount = max(1, min(9999, int(amount)))  # Clamp between 1-9999
         sanitized_reason = self.sanitize_reason(reason)
         
         if len(sanitized_reason.strip()) < 10:
@@ -189,7 +189,7 @@ class CreditRequestService:
             return {"success": False, "message": "Request already processed"}
         
         userid, requested_amount, status = request
-        approved_amount = max(0, min(100, int(approved_amount)))
+        approved_amount = max(0, min(9999, int(approved_amount)))
         
         # Update request status
         cursor.execute("""

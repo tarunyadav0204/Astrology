@@ -100,7 +100,9 @@ class EventPredictor:
         sav_summary = []
         house_strength = {}
         for sign_idx, score in sav_data['sarvashtakavarga'].items():
-            h = ((sign_idx - asc_sign) % 12) + 1
+            # Convert string key to integer
+            sign_idx_int = int(sign_idx) if isinstance(sign_idx, str) else sign_idx
+            h = ((sign_idx_int - asc_sign) % 12) + 1
             house_strength[h] = "STRONG" if score > 30 else "WEAK" if score < 25 else "AVG"
             sav_summary.append(f"H{h}:{score}")
         

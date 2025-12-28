@@ -10,6 +10,13 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
     return saved ? JSON.parse(saved) : { lat: 28.6139, lon: 77.2090, name: 'Delhi, India' };
   });
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [userTimezone, setUserTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return 'Asia/Kolkata';
+    }
+  });
 
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -18,7 +25,7 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
 
   useEffect(() => {
     loadCalendarData();
-  }, [currentMonth]);
+  }, [currentMonth, location]);
 
   const loadCalendarData = async () => {
     setLoading(true);
@@ -27,8 +34,8 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
       const month = currentMonth + 1;
       
       const [panchangResponse, festivalResponse, transitResponse] = await Promise.all([
-        fetch(`/api/panchang/monthly?year=${year}&month=${month}&latitude=28.6139&longitude=77.2090`),
-        fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone_offset=5.5`),
+        fetch(`/api/panchang/monthly?year=${year}&month=${month}&latitude=${location.lat}&longitude=${location.lon}`),
+        fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${userTimezone}`),
         fetch(`/api/transits/monthly/${year}/${month}`)
       ]);
       
@@ -119,7 +126,18 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
               display: 'inline-block',
               width: 'fit-content'
             }}>
-              {String(dayData.tithi).replace(/[^A-Za-z0-9\s]/g, '').trim()}
+              <div className="day-tithi">
+                {dayData.tithi}
+                {dayData.panchang.tithi_end_time && (
+                  <div className="tithi-ends-grid" style={{
+                    fontSize: '8px',
+                    color: '#666',
+                    marginTop: '1px'
+                  }}>
+                    Ends {dayData.panchang.tithi_end_time}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
@@ -137,7 +155,7 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
               display: 'inline-block',
               width: 'fit-content'
             }}>
-              {String(dayData.nakshatra).replace(/[^A-Za-z0-9\s]/g, '').trim()}
+              {dayData.nakshatra}
             </div>
           )}
           
@@ -157,9 +175,9 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
               width: 'fit-content',
               cursor: 'pointer'
             }}
-            title={`${festival.name.replace(/[{}]/g, '')}${festival.tithi_end_time ? ` - Ends: ${festival.tithi_end_time}` : ''}${festival.parana_time ? ` - Parana: ${festival.parana_time}` : ''}`}
+            title={`${festival.name}${festival.tithi_end_time ? ` - Ends: ${festival.tithi_end_time}` : ''}${festival.parana_time ? ` - Parana: ${festival.parana_time}` : ''}`}
             >
-              {festival.name.replace(/[^A-Za-z0-9\s]/g, '').trim()}
+              {festival.name}
             </div>
           ))}
           

@@ -18,10 +18,19 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [transits, setTransits] = useState([]);
   const [showTransits, setShowTransits] = useState(false);
+  const [panchangData, setPanchangData] = useState(null);
+  const [userTimezone, setUserTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return 'Asia/Kolkata';
+    }
+  });
 
   useEffect(() => {
     fetchTodayFestivals();
     fetchTransits();
+    fetchPanchangData();
   }, [selectedDate, location]);
 
   useEffect(() => {
@@ -49,7 +58,7 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       
-      const response = await fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone_offset=5.5`, {
+      const response = await fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${userTimezone}`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -74,6 +83,20 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       setTodayFestivals([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPanchangData = async () => {
+    try {
+      const date = new Date(selectedDate);
+      const response = await fetch(`/api/panchang/today?date=${selectedDate}&latitude=${location.lat}&longitude=${location.lon}&timezone=${userTimezone}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPanchangData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching panchang data:', error);
     }
   };
 
@@ -267,6 +290,37 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
         )}
 
         <div className="today-section">
+          {panchangData && (
+            <div className="panchang-card">
+              <h2>📅 Daily Panchang - {formatDate(selectedDate)}</h2>
+              <div className="panchang-grid">
+                <div className="panchang-item">
+                  <span className="panchang-label">🌅 Sunrise:</span>
+                  <span className="panchang-value">{panchangData.sunrise || 'N/A'}</span>
+                </div>
+                <div className="panchang-item">
+                  <span className="panchang-label">🌇 Sunset:</span>
+                  <span className="panchang-value">{panchangData.sunset || 'N/A'}</span>
+                </div>
+                <div className="panchang-item">
+                  <span className="panchang-label">🌙 Moonrise:</span>
+                  <span className="panchang-value">{panchangData.moonrise || 'N/A'}</span>
+                </div>
+                <div className="panchang-item">
+                  <span className="panchang-label">🌟 Tithi:</span>
+                  <span className="panchang-value">{panchangData.tithi?.name || 'N/A'}</span>
+                </div>
+                <div className="panchang-item">
+                  <span className="panchang-label">⭐ Nakshatra:</span>
+                  <span className="panchang-value">{panchangData.nakshatra?.name || 'N/A'}</span>
+                </div>
+                <div className="panchang-item">
+                  <span className="panchang-label">🕉️ Yoga:</span>
+                  <span className="panchang-value">{panchangData.yoga?.name || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="loading">
@@ -323,7 +377,16 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
                         <p><strong>Tithi Ends:</strong> {festival.tithi_end_time}</p>
                       )}
                       {festival.parana_time && (
-                        <p><strong>Parana Time:</strong> {festival.parana_time}</p>
+                        <p style={{ 
+                          background: '#e8f5e8', 
+                          padding: '8px', 
+                          borderRadius: '5px', 
+                          border: '2px solid #4caf50',
+                          fontWeight: 'bold',
+                          color: '#2e7d32'
+                        }}>
+                          <strong>🍽️ Parana (Break-fast) Time:</strong> {festival.parana_time}
+                        </p>
                       )}
                       {festival.moonrise_time && (
                         <p><strong>Moonrise Time:</strong> {festival.moonrise_time}</p>

@@ -54,11 +54,12 @@ const CreditRequestScreen = ({ navigation }) => {
       return;
     }
 
+    const amountToRequest = parseInt(requestAmount);
     setLoading(true);
 
     try {
       const response = await creditAPI.requestCredits(
-        parseInt(requestAmount),
+        amountToRequest,
         sanitizedReason
       );
 
@@ -115,7 +116,13 @@ const CreditRequestScreen = ({ navigation }) => {
                   <TextInput
                     style={styles.input}
                     value={requestAmount}
-                    onChangeText={setRequestAmount}
+                    onChangeText={(text) => {
+                      // Only allow numeric input and ensure it doesn't exceed 9999
+                      const numericValue = text.replace(/[^0-9]/g, '');
+                      if (parseInt(numericValue) <= 9999 || numericValue === '') {
+                        setRequestAmount(numericValue);
+                      }
+                    }}
                     placeholder="Enter amount (1-9999)"
                     keyboardType="numeric"
                     maxLength={4}
@@ -251,6 +258,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#f8f9fa',
+    color: '#333',
   },
   textArea: {
     height: 100,

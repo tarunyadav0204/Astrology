@@ -23,7 +23,7 @@ async def get_today_festivals():
 
 @router.get("/month/{year}/{month}")
 async def get_monthly_festivals(year: int, month: int, lat: float = 28.6139, lon: float = 77.2090, 
-                              calendar_system: str = "amanta", timezone_offset: float = 5.5):
+                              calendar_system: str = "amanta", timezone: str = "Asia/Kolkata"):
     """Get all festivals for a specific month with full Drik Panchang accuracy"""
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Invalid month")
@@ -31,19 +31,11 @@ async def get_monthly_festivals(year: int, month: int, lat: float = 28.6139, lon
     if calendar_system not in ["amanta", "purnimanta"]:
         raise HTTPException(status_code=400, detail="Invalid calendar system. Use 'amanta' or 'purnimanta'")
     
-    # Convert timezone offset to timezone name
-    timezone_map = {
-        5.5: "Asia/Kolkata",
-        0: "UTC", 
-        -5: "America/New_York",
-        -8: "America/Los_Angeles",
-        1: "Europe/London",
-        -5: "America/Toronto"
-    }
-    timezone_name = timezone_map.get(timezone_offset, "Asia/Kolkata")
+    festivals = calculator.find_festival_dates(year, month, lat, lon, calendar_system, timezone)
+    vrats = calculator.get_monthly_vrats(year, month, lat, lon, calendar_system, timezone)
     
-    festivals = calculator.find_festival_dates(year, month, lat, lon, calendar_system, timezone_name)
-    vrats = calculator.get_monthly_vrats(year, month, lat, lon, calendar_system, timezone_name)
+    # Check if this is an Adhika month
+    is_adhika_month = calculator.is_adhika_month(year, month)
     
     return {
         "year": year,
@@ -51,7 +43,8 @@ async def get_monthly_festivals(year: int, month: int, lat: float = 28.6139, lon
         "latitude": lat,
         "longitude": lon,
         "calendar_system": calendar_system,
-        "timezone_offset": timezone_offset,
+        "timezone": timezone,
+        "is_adhika_month": is_adhika_month,
         "festivals": festivals,
         "vrats": vrats,
         "total_count": len(festivals) + len(vrats)

@@ -233,6 +233,21 @@ class FestivalCalculator:
         
         return month_names[month_index]
     
+    def is_adhika_month(self, year, month):
+        """Check if given Gregorian month contains an Adhika lunar month"""
+        start_date = datetime(year, month, 1)
+        end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+        
+        current_date = start_date
+        while current_date < end_date:
+            jd = swe.julday(current_date.year, current_date.month, current_date.day, 12)
+            _, is_adhika = self.get_lunar_month_with_adhika(jd)
+            if is_adhika:
+                return True
+            current_date += timedelta(days=7)  # Check weekly
+        
+        return False
+    
     def find_festival_dates(self, year, month=None, lat=28.6139, lon=77.2090, calendar_system="amanta", timezone_name="Asia/Kolkata"):
         """Find festivals with geographic precision and Adhika Maas support"""
         festivals = []
@@ -261,7 +276,7 @@ class FestivalCalculator:
                     
                 if self._matches_pro_logic(festival, festival_id, full_tithi, lunar_day, paksha, 
                                          lunar_month, current_date, jd_sunrise, lat, lon):
-                    festivals.append({
+                    festival_data = {
                         "id": festival_id,
                         "name": festival["name"],
                         "date": current_date.strftime("%Y-%m-%d"),
@@ -274,7 +289,13 @@ class FestivalCalculator:
                         "description": festival["description"],
                         "significance": festival["significance"],
                         "rituals": festival["rituals"]
-                    })
+                    }
+                    
+                    # Add Parana time for fasting festivals
+                    if "fast" in festival.get("name", "").lower() or "vrat" in festival.get("name", "").lower() or lunar_day == 11:
+                        festival_data["parana_time"] = self.calculate_parana_time(jd_sunrise, lat, lon, timezone_name)
+                    
+                    festivals.append(festival_data)
             
             current_date += timedelta(days=1)
         
@@ -283,6 +304,13 @@ class FestivalCalculator:
     def _matches_pro_logic(self, festival, festival_id, full_tithi, lunar_day, paksha, 
                           lunar_month, date, jd_sunrise, lat, lon):
         """Professional matching with Udaya Tithi and time-window logic"""
+        # Get Adhika status for this date
+        _, is_adhika = self.get_lunar_month_with_adhika(jd_sunrise)
+        
+        # Prevent major festivals in Adhika (leap) months
+        if is_adhika and festival.get("type") == "major_festival":
+            return False
+        
         # Solar festivals
         if "solar_date" in festival:
             if festival["solar_date"] == "january_14" and date.month == 1 and date.day == 14:
@@ -344,14 +372,14 @@ class FestivalCalculator:
                 "krishna": {"name": "Krishna Ekadashi", "id": "krishna_ekadashi", "has_parana": True}
             },
             13: {
-                "shukla": {"name": "Shukla Pradosh Vrat", "id": "shukla_pradosh"},
-                "krishna": {"name": "Krishna Pradosh Vrat", "id": "krishna_pradosh"}
+                "shukla": {"name": "Shukla Pradosh Vrat", "id": "shukla_pradosh", "has_parana": True},
+                "krishna": {"name": "Krishna Pradosh Vrat", "id": "krishna_pradosh", "has_parana": True}
             },
             4: {
-                "krishna": {"name": "Sankashti Chaturthi", "id": "sankashti_chaturthi", "has_moonrise": True}
+                "krishna": {"name": "Sankashti Chaturthi", "id": "sankashti_chaturthi", "has_moonrise": True, "has_parana": True}
             },
             14: {
-                "krishna": {"name": "Masik Shivaratri", "id": "masik_shivaratri"}
+                "krishna": {"name": "Masik Shivaratri", "id": "masik_shivaratri", "has_parana": True}
             }
         }
         

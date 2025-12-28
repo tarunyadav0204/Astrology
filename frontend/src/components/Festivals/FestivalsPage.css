@@ -6,8 +6,8 @@
 }
 
 .festivals-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
   align-items: center;
   margin-bottom: 30px;
   background: rgba(255, 255, 255, 0.9);
@@ -20,8 +20,11 @@
 }
 
 .header-left {
-  display: flex;
-  gap: 10px;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
 }
 
 .header-btn {
@@ -64,7 +67,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  margin-right: 200px;
+  margin: 0 auto;
 }
 
 .header-content h1 {
@@ -202,6 +205,50 @@
 .loading {
   text-align: center;
   padding: 50px;
+}
+
+.panchang-card {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #ff6b35;
+}
+
+.panchang-card h2 {
+  color: #d84315;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.panchang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.panchang-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-radius: 8px;
+  border-left: 3px solid #ff6b35;
+}
+
+.panchang-label {
+  font-weight: 600;
+  color: #d84315;
+  font-size: 0.9rem;
+}
+
+.panchang-value {
+  font-weight: 700;
+  color: #333;
+  font-size: 0.9rem;
 }
 
 .spinner {
