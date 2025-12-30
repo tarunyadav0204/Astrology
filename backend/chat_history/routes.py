@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timedelta
 import sqlite3
 import uuid
+import json
 from auth import get_current_user
 
 def sanitize_text(text):
@@ -223,7 +224,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Session not found")
     
     cursor.execute('''
-        SELECT message_id, sender, content, timestamp
+        SELECT message_id, sender, content, timestamp, terms, glossary
         FROM chat_messages
         WHERE session_id = ?
         ORDER BY timestamp ASC
@@ -234,12 +235,31 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
     
     conversation = []
     for msg in messages:
-        conversation.append({
+        message_data = {
             "message_id": msg[0],
             "sender": msg[1],
             "content": msg[2],
             "timestamp": msg[3]
-        })
+        }
+        
+        # Add terms and glossary if they exist
+        if msg[4]:  # terms
+            try:
+                message_data["terms"] = json.loads(msg[4])
+            except:
+                message_data["terms"] = []
+        else:
+            message_data["terms"] = []
+            
+        if msg[5]:  # glossary
+            try:
+                message_data["glossary"] = json.loads(msg[5])
+            except:
+                message_data["glossary"] = []
+        else:
+            message_data["glossary"] = []
+            
+        conversation.append(message_data)
     
     return {"session_id": session_id, "messages": conversation}
 
@@ -354,7 +374,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type
+        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary
         FROM chat_messages cm
         JOIN chat_sessions cs ON cm.session_id = cs.session_id
         WHERE cm.message_id = ?
@@ -366,7 +386,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     if not result:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    status, content, error_message, started_at, completed_at, user_id, message_type = result
+    status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary = result
     
     # Verify message belongs to user
     if user_id != current_user.userid:
@@ -377,6 +397,24 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     if status == "completed":
         response["content"] = content
         response["completed_at"] = completed_at
+        
+        # Add terms and glossary if they exist
+        if terms:
+            try:
+                response["terms"] = json.loads(terms)
+            except:
+                response["terms"] = []
+        else:
+            response["terms"] = []
+            
+        if glossary:
+            try:
+                response["glossary"] = json.loads(glossary)
+            except:
+                response["glossary"] = {}
+        else:
+            response["glossary"] = {}
+            
     elif status == "failed":
         response["error_message"] = error_message or "An error occurred while processing your request"
     elif status == "processing":
@@ -684,6 +722,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             cursor = conn.cursor()
             
             if result.get('success'):
+                # Use already parsed terms and glossary from GeminiChatAnalyzer
+                terms = result.get('terms', [])
+                glossary = result.get('glossary', {})
+                
                 # Deduct credits on successful response
                 credit_service = CreditService()
                 analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
@@ -697,8 +739,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 if success:
                     print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
-                        (sanitize_text(result['response']), "completed", "answer", datetime.now(), message_id)
+                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        (
+                            sanitize_text(result['response']), 
+                            json.dumps(terms),
+                            json.dumps(glossary),
+                            "completed", 
+                            "answer", 
+                            datetime.now(), 
+                            message_id
+                        )
                     )
                 else:
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")

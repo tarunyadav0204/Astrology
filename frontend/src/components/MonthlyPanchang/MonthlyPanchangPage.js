@@ -42,9 +42,10 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
     try {
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth() + 1;
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       
       const response = await fetch(
-        `/api/panchang/monthly?year=${year}&month=${month}&latitude=${location.latitude}&longitude=${location.longitude}`
+        `/api/panchang/monthly?year=${year}&month=${month}&latitude=${location.latitude}&longitude=${location.longitude}&timezone=${encodeURIComponent(userTimezone)}`
       );
       
       if (response.ok) {

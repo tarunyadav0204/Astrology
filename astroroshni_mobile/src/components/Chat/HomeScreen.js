@@ -222,16 +222,22 @@ const loadHomeData = async (nativeData = null) => {
         }
       }
       
-      // Load panchang for Delhi (default location)
+      // Load panchang for user's location or fallback to Delhi
       try {
-        const defaultLat = 28.6139;
-        const defaultLon = 77.2090;
+        let panchangLat = 28.6139; // Delhi fallback
+        let panchangLon = 77.2090; // Delhi fallback
+        
+        // Use current birth data location if available
+        if (currentBirthData && currentBirthData.latitude && currentBirthData.longitude) {
+          panchangLat = parseFloat(currentBirthData.latitude);
+          panchangLon = parseFloat(currentBirthData.longitude);
+        }
         
         const [panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
-          panchangAPI.calculateSunriseSunset(targetDate, defaultLat, defaultLon),
-          panchangAPI.calculateRahuKaal(targetDate, defaultLat, defaultLon),
-          panchangAPI.calculateInauspiciousTimes(targetDate, defaultLat, defaultLon),
-          panchangAPI.calculateDailyPanchang(targetDate, defaultLat, defaultLon)
+          panchangAPI.calculateSunriseSunset(targetDate, panchangLat, panchangLon),
+          panchangAPI.calculateRahuKaal(targetDate, panchangLat, panchangLon),
+          panchangAPI.calculateInauspiciousTimes(targetDate, panchangLat, panchangLon),
+          panchangAPI.calculateDailyPanchang(targetDate, panchangLat, panchangLon)
         ]);
         
         if (panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {

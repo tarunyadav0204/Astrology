@@ -500,7 +500,63 @@
     background: rgba(37, 211, 102, 0.2);
 }
 
+/* Term tooltip styles */
+.term-tooltip {
+    color: #e91e63;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    position: relative;
+    display: inline-block;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: rgba(233, 30, 99, 0.15);
+    transition: all 0.2s ease;
+    border: 1px solid rgba(233, 30, 99, 0.3);
+    margin: 0 1px;
+}
+
+.term-tooltip:hover {
+    color: #c2185b;
+    background: rgba(233, 30, 99, 0.25);
+    transform: scale(1.02);
+    border-color: rgba(233, 30, 99, 0.5);
+}
+
+.term-tooltip::after {
+    display: none;
+}
+
+.term-tooltip:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Arrow for tooltip */
+.term-tooltip::before {
+    display: none;
+}
+
+.term-tooltip:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
 @media (max-width: 768px) {
+    .term-tooltip::after {
+        max-width: 250px;
+        font-size: 12px;
+        padding: 6px 10px;
+        left: 0;
+        transform: none;
+    }
+    
+    .term-tooltip::before {
+        left: 20px;
+        transform: none;
+    }
+    
     .message-actions {
         position: relative;
         top: auto;

@@ -10,6 +10,7 @@ import {
   Clipboard,
   Share,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -22,6 +23,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
 
   useEffect(() => {
     Animated.parallel([
@@ -50,17 +52,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   };
 
   const deleteMessage = async () => {
-    console.log('🗑️ Delete attempt for message:', {
-      messageId: message.messageId,
-      messageRole: message.role,
-      messageContent: message.content?.substring(0, 50) + '...'
-    });
-    
     try {
       const token = await AsyncStorage.getItem('authToken');
       const deleteUrl = `${API_BASE_URL}${getEndpoint(`/chat-v2/message/${message.messageId}`)}`;
-      
-      console.log('🔗 Delete URL:', deleteUrl);
       
       const response = await fetch(deleteUrl, {
         method: 'DELETE',
@@ -69,21 +63,15 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         }
       });
       
-      console.log('📊 Delete response status:', response.status);
-      
       if (response.ok) {
-        console.log('✅ Delete successful');
         Alert.alert('✅ Deleted', 'Message deleted successfully');
         if (onDelete) {
           onDelete(message.messageId);
         }
       } else {
-        const errorText = await response.text();
-        console.log('❌ Delete failed:', errorText);
         Alert.alert('❌ Error', 'Failed to delete message');
       }
     } catch (error) {
-      console.log('❌ Delete error:', error);
       Alert.alert('❌ Error', 'Failed to delete message');
     }
   };
@@ -130,8 +118,26 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       return '';
     }
     
-    // DON'T decode HTML entities yet - preserve them for proper formatting
-    let formatted = content;
+    // First decode HTML entities
+    let formatted = content
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ');
+    
+    // Process term tooltips FIRST, after HTML entity decoding
+    if (message.terms && message.glossary) {
+      // Replace existing <term id="termname">text</term> with clickable spans
+      formatted = formatted.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
+        if (message.glossary[termId]) {
+          const definition = message.glossary[termId].replace(/"/g, '&quot;');
+          return `<tooltip data-term="${termId}" data-definition="${definition}">${termText}</tooltip>`;
+        }
+        return match;
+      });
+    }
     
     // Normalize line breaks
     formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -202,8 +208,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           .replace(/&#39;/g, "'")
           .replace(/&nbsp;/g, ' ')
           .replace(/<[^>]*>/g, '')
-          .replace(/Quick Answer/g, '')
-          .replace(/^:\s*/, '')
+          .replace(/Quick Answer\s*:?/g, '')
+          .replace(/^\s*:?\s*/, '')
+          .replace(/^\n*:/, '')
+          .replace(/^\s*:\s*/, '')
           .trim();
         
         // Process markdown formatting in card content
@@ -273,7 +281,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           .replace(/&#39;/g, "'")
           .replace(/&nbsp;/g, ' ')
           .replace(/<[^>]*>/g, '')
-          .replace(/Final Thoughts/g, '')
+          .replace(/Final Thoughts\s*:?/g, '')
+          .replace(/^\s*:?\s*/, '')
+          .replace(/^\n*:/, '')
+          .replace(/^\s*:\s*/, '')
           .trim();
         
         // Process markdown formatting in card content
@@ -318,7 +329,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             colors={['#E6F3FF', '#B0E0E6']}
             style={styles.finalThoughtsCard}
           >
-            <Text style={styles.cardTitle}>◆ Final Thoughts</Text>
+            <Text style={styles.cardTitle}>💭 Final Thoughts</Text>
             <Text style={styles.cardText}>
               {renderCardContent(cardContent)}
             </Text>
@@ -400,43 +411,67 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const renderTextWithBold = (text, startIndex, role) => {
     const elements = [];
     
-    // Handle markdown bold formatting
-    const boldRegex = /\*\*(.*?)\*\*/g;
-    const parts = text.split(boldRegex);
+    // Handle tooltip tags first
+    const tooltipRegex = /<tooltip data-term="([^"]+)" data-definition="([^"]+)">([^<]+)<\/tooltip>/g;
+    const parts = text.split(tooltipRegex);
     
-    parts.forEach((part, index) => {
-      if (!part) return;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part) continue;
       
-      if (index % 2 === 1) { // Odd indices are bold text
+      if (i % 4 === 3) { // Tooltip text (every 4th element after split)
+        const termId = parts[i - 2];
+        const definition = parts[i - 1].replace(/&quot;/g, '"');
+        
         elements.push(
-          <Text key={`bold-${startIndex}-${index}`} style={styles.boldText}>
+          <Text
+            key={`tooltip-${startIndex}-${i}`}
+            onPress={() => setTooltipModal({ show: true, term: part, definition })}
+            style={styles.tooltipText}
+          >
             {part}
           </Text>
         );
-      } else if (part.trim()) {
-        // Handle italics within regular text
-        const italicRegex = /\*(.*?)\*/g;
-        const italicParts = part.split(italicRegex);
+      } else if (i % 4 === 0) { // Regular text
+        // Handle markdown bold formatting
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        const boldParts = part.split(boldRegex);
         
-        italicParts.forEach((italicPart, italicIndex) => {
-          if (!italicPart) return;
+        boldParts.forEach((boldPart, boldIndex) => {
+          if (!boldPart) return;
           
-          if (italicIndex % 2 === 1) { // Odd indices are italic text
+          if (boldIndex % 2 === 1) { // Odd indices are bold text
             elements.push(
-              <Text key={`italic-${startIndex}-${index}-${italicIndex}`} style={[styles.regularText, { fontStyle: 'italic' }]}>
-                {italicPart}
+              <Text key={`bold-${startIndex}-${i}-${boldIndex}`} style={styles.boldText}>
+                {boldPart}
               </Text>
             );
-          } else if (italicPart.trim()) {
-            elements.push(
-              <Text key={`text-${startIndex}-${index}-${italicIndex}`} style={styles.regularText}>
-                {italicPart}
-              </Text>
-            );
+          } else if (boldPart.trim()) {
+            // Handle italics within regular text
+            const italicRegex = /\*(.*?)\*/g;
+            const italicParts = boldPart.split(italicRegex);
+            
+            italicParts.forEach((italicPart, italicIndex) => {
+              if (!italicPart) return;
+              
+              if (italicIndex % 2 === 1) { // Odd indices are italic text
+                elements.push(
+                  <Text key={`italic-${startIndex}-${i}-${boldIndex}-${italicIndex}`} style={[styles.regularText, { fontStyle: 'italic' }]}>
+                    {italicPart}
+                  </Text>
+                );
+              } else if (italicPart.trim()) {
+                elements.push(
+                  <Text key={`text-${startIndex}-${i}-${boldIndex}-${italicIndex}`} style={styles.regularText}>
+                    {italicPart}
+                  </Text>
+                );
+              }
+            });
           }
         });
       }
-    });
+    }
     
     return elements.length > 0 ? [
       <Text key={`line-${startIndex}`} style={styles.regularText}>
@@ -677,6 +712,19 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               .replace(/&#39;/g, "'")
               .replace(/&nbsp;/g, ' ');
             
+            // Process tooltips after HTML entity decoding
+            if (message.terms && message.glossary) {
+              processedLine = processedLine.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
+                if (message.glossary[termId]) {
+                  return `<tooltip data-term="${termId}" data-definition="${message.glossary[termId].replace(/"/g, '&quot;')}">${termText}</tooltip>`;
+                }
+                return match;
+              });
+            }
+            
+            // Remove any remaining term tags that weren't processed
+            processedLine = processedLine.replace(/<term id="[^"]+">([^<]+)<\/term>/g, '$1');
+            
             // Regular text with bold formatting
             const textElements = renderTextWithBold(processedLine, currentIndex, message.role);
             elements.push(...textElements);
@@ -797,6 +845,27 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           })}
         </Text>
       </View>
+      
+      {/* Tooltip Modal */}
+      <Modal
+        visible={tooltipModal.show}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setTooltipModal({ show: false, term: '', definition: '' })}
+      >
+        <View style={styles.tooltipModalOverlay}>
+          <View style={styles.tooltipModalContent}>
+            <Text style={styles.tooltipModalTitle}>{tooltipModal.term}</Text>
+            <Text style={styles.tooltipModalDefinition}>{tooltipModal.definition}</Text>
+            <TouchableOpacity
+              style={styles.tooltipModalClose}
+              onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
+            >
+              <Text style={styles.tooltipModalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -1092,5 +1161,62 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 5,
+  },
+  tooltipTerm: {
+    backgroundColor: 'rgba(233, 30, 99, 0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(233, 30, 99, 0.3)',
+  },
+  tooltipText: {
+    color: '#e91e63',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'dotted',
+    backgroundColor: 'rgba(233, 30, 99, 0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+  },
+  tooltipModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  tooltipModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    maxWidth: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  tooltipModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#e91e63',
+    marginBottom: 10,
+  },
+  tooltipModalDefinition: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#333',
+    marginBottom: 15,
+  },
+  tooltipModalClose: {
+    backgroundColor: '#e91e63',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+  },
+  tooltipModalCloseText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });

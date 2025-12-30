@@ -206,6 +206,14 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
     return Math.floor(degree) + '°';
   };
 
+  const formatDegreeDMS = (degree) => {
+    const deg = Math.floor(degree);
+    const minFloat = (degree - deg) * 60;
+    const min = Math.floor(minFloat);
+    const sec = Math.floor((minFloat - min) * 60);
+    return `${deg}°${min}'${sec}"`;
+  };
+
   const handlePlanetRightClick = (e, planet) => {
     e.preventDefault();
     setContextMenu({
@@ -358,7 +366,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude),
           shortNakshatra: getShortNakshatra(data.longitude),
-          formattedDegree: formatDegree(data.degree || 0)
+          formattedDegree: formatDegreeDMS(data.degree || 0)
         });
       });
     
@@ -370,7 +378,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
         degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
         nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
-        formattedDegree: formatDegree(chartData.planets.InduLagna.degree || 0)
+        formattedDegree: formatDegreeDMS(chartData.planets.InduLagna.degree || 0)
       });
     }
     
@@ -542,7 +550,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                     {chartData.ascendant && (
                       <text x={pos.x + pos.width - 8} y={pos.y + pos.height - 8} 
                             fontSize="7" fill="#666" fontWeight="500" textAnchor="end">
-                        {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                        {formatDegreeDMS(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                       </text>
                     )}
                   </g>
@@ -606,7 +614,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                             style={{ cursor: 'pointer' }}
                           onMouseEnter={(e) => {
                             if (isTouchDevice) return;
-                            const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+                            const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
                             const isRightSide = pos.x >= 150;
                             const offsetX = isRightSide ? -120 : 10;
                             const fontSize = totalPlanets > 4 ? 7 : totalPlanets > 2 ? 9 : totalPlanets > 1 ? 10 : 13;
@@ -619,7 +627,7 @@ const SouthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                           }}
                           onTouchStart={(e) => {
                             setIsTouchDevice(true);
-                            const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+                            const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
                             const rect = e.currentTarget.closest('svg').getBoundingClientRect();
                             const isRightSide = pos.x >= 150;
                             const offsetX = isRightSide ? -120 : 10;

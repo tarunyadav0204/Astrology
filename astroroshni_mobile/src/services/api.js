@@ -155,6 +155,12 @@ export const panchangAPI = {
     api.post(getEndpoint('/panchang/calculate-inauspicious-times'), { date, latitude, longitude }),
   calculateDailyPanchang: (date, latitude, longitude) => 
     api.get(getEndpoint(`/panchang/daily-detailed?date=${date}&latitude=${latitude}&longitude=${longitude}`)),
+  calculateChoghadiya: (date, latitude, longitude) => 
+    api.post(getEndpoint('/panchang/choghadiya'), { date, latitude, longitude }),
+  calculateHora: (date, latitude, longitude) => 
+    api.post(getEndpoint('/panchang/hora'), { date, latitude, longitude }),
+  calculateSpecialMuhurtas: (date, latitude, longitude) => 
+    api.post(getEndpoint('/panchang/special-muhurtas'), { date, latitude, longitude }),
 };
 
 export const progenyAPI = {

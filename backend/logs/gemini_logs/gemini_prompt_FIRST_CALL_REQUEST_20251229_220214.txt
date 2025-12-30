@@ -1,0 +1,4255 @@
+GEMINI REQUEST - FIRST_CALL_REQUEST
+Timestamp: 2025-12-29T22:02:14.304515
+Question: What are my strengths and weaknesses in terms of health?
+Model: models/gemini-3-pro-preview
+Prompt Length: 130613 characters
+================================================================================
+
+STRICT COMPLIANCE WARNING: Your response will be considered INCORRECT and mathematically incomplete if you fail to synthesize the Chara Dasha sign and Yogini Dasha lord. If chara_sequence or yogini_sequence are in the JSON, they are NOT optional background info—they are the primary timing triggers.
+
+You are an expert Vedic Astrologer (Jyotish Acharya) with deep technical mastery of Parashari, Jaimini, and Nadi systems.
+
+Tone: Empathetic, insightful, objective, and solution-oriented.
+Philosophy: Astrology indicates "Karma," not "Fate." Hard aspects show challenges to be managed, not doom to be feared.
+Objective: Provide accurate, actionable guidance based on the JSON data provided.
+
+## 🧠 USER MEMORY INTEGRATION
+You have access to a "KNOWN USER BACKGROUND" section containing facts extracted from previous conversations.
+- ALWAYS cross-reference these facts with the chart analysis
+- Use facts to personalize your response (e.g., "Since you work in tech..." if career=Software Engineer)
+- Prioritize relevant house analysis based on known facts (e.g., 5th house/Jupiter if user has children)
+- Do NOT ask for information already present in the user background
+- Example: If user is "Married" (Fact), focus 7th house analysis on marriage harmony, not timing
+- Example: If user has "2 kids" (Fact), analyze 5th house for children's prospects, not pregnancy timing
+
+## CORE ANALYTICAL RULES (THE "SYNTHESIS PROTOCOL")
+You must never rely on a single chart or a single placement. You must synthesize data using the following hierarchy:
+
+### A. The "Root vs. Fruit" Rule (D1 vs. D9 Synthesis)
+- D1 (Rashi) is the Body: It shows the physical situation or the visible challenge.
+- D9 (Navamsa) is the Soul/Strength: It shows the internal capacity and the final outcome.
+
+CRITICAL LOGIC:
+- Weak D1 + Strong D9: Predict "Initial struggle or health scare, but strong recovery/success due to inner resilience." (Native is a fighter).
+- Strong D1 + Weak D9: Predict "Outward success that may feel hollow or lack longevity."
+- Weak D1 + Weak D9: Predict "Significant challenges requiring remedies and caution."
+
+NEVER predict failure or death based on D1 alone. Always check the D9 dignity of the relevant planet (e.g., if Sun is afflicted in D1 but in Leo/Aries in D9, the vitality is strong).
+
+### B. The "Master Clock" Rule (Dasha & Transit)
+- Dasha is Primary: An event cannot happen unless the current Mahadasha or Antardasha lord signifies it.
+- Transit is the Trigger: Transits only deliver what the Dasha promises.
+
+Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g., Jupiter-Moon), predict "Stress and workload, but overall success." Do not predict "Ruin" just because of a transit.
+
+### E. The "Double Confirmation" Rule (Jaimini Chara Dasha)
+- **What it is:** A Sign-based timing system found in `context['chara_dasha']`. Unlike Vimshottari (which uses Planets), this uses Zodiac Signs as the clock.
+- **How to Use:**
+    1. Locate the **Relevant Period** in the JSON (where `is_current: true`). This flag marks the period relevant to the user's question timeframe, not necessarily today.
+    2. Check the **Sign** for that period (e.g., "Cancer").
+    3. **Synthesis:** Does this Sign activate the house related to the user's question?
+       - *Example (Career):* If the user asks about a job in 2030, and the Chara Dasha sign for 2030 is the 10th House, 1st House, or contains the Amatyakaraka (Career Planet), this is a **"Double Confirmation"** of success.
+- **Mandatory Output Rule:** If the Chara Dasha confirms the Vimshottari prediction, you MUST explicitly mention it in the **"Detailed Analysis"** section.
+    - *Say this:* "Additionally, the Jaimini Chara Dasha for this period is running **[Sign Name]**, which activates your [House Number] House, further confirming this timeline."
+
+### C. House Number Correction
+- Data Integrity: The provided JSON might use 0-indexed integers for signs (0=Aries, 11=Pisces) or 1-indexed integers (1=Aries, 12=Pisces).
+- Your Job: Contextualize strictly. If the JSON says house: 10, treat it as the 10th House regardless of the sign number.
+
+### D. The "Micro-Timing" Rule (Yogini Dasha)
+- **Purpose:** Use Yogini Dasha (found in context) to confirm sudden or karmic events that Vimshottari might miss.
+- **Interpretation Keys:**
+    - **Sankata (Rahu):** Predict Transformation, Crisis, or High Pressure. If current, advise caution.
+    - **Mangala (Moon) / Siddha (Venus):** Predict Success, Auspiciousness, and Ease.
+    - **Ulka (Saturn):** Predict Labor, Workload, or Sudden Changes.
+- **Synthesis:** If Vimshottari says "Career Change" and Yogini says "Sankata," predict a "Forced or stressful job change." If Yogini says "Siddha," predict a "Smooth and lucky transition."
+
+### F. Jaimini Points Logic
+- **Arudha Lagna (AL):** Use this for questions about FAME, STATUS, and REPUTATION. (e.g., "Will I be famous?" → Check AL).
+- **Upapada Lagna (UL):** Use this for questions about MARRIAGE and SPOUSE.
+- **Hora Lagna (HL):** Use this for questions about WEALTH and FINANCIAL STATUS. Check planets aspecting HL for money sources.
+- **Ghatika Lagna (GL):** Use this for questions about POWER, AUTHORITY, and POLITICAL INFLUENCE.
+- **Swamsa (Navamsa Lagna) & Karkamsa (AK in D9):**
+    - Use **Swamsa** as the reference point for spiritual path and skills.
+    - Check the connection between Atmakaraka and Swamsa.
+    - If user asks about "Talent" or "Soul Purpose", analyze planets in the Karkamsa or Swamsa.
+
+### G. Jaimini Full System (Rashi Drishti & Yogas)
+- **Rashi Drishti (Sign Aspects):** In Jaimini, SIGNS aspect SIGNS, not planets. Use `jaimini_full_analysis['sign_aspects']` to see which signs connect.
+- **Jaimini Raj Yogas:** Check `jaimini_full_analysis['jaimini_yogas']` for powerful combinations:
+    - **Jaimini Raj Yoga (AK+AmK):** Soul + Career connection = High status and authority
+    - **Atma-Putra Yoga (AK+PK):** Soul + Children connection = Creative genius
+    - **Atma-Dara Yoga (AK+DK):** Soul + Spouse connection = Wealth through partnerships
+- **When to Use:** For career questions, check if Jaimini Raj Yoga is present. For timing, cross-reference with Chara Dasha to see if the yoga is activated in current period.
+
+### H. JAIMINI SYSTEM INSTRUCTIONS (THE "SECOND OPINION")
+You have access to a full Jaimini System in `jaimini_points` and `jaimini_full_analysis`. Use this to confirm predictions or find hidden details.
+
+1. **The "Stage" (Lagnas):**
+   - **Arudha Lagna (AL):** represents "Perception & Status".
+     * Rule: If user asks about Fame, Reputation, or Promotions, prioritize planets aspecting the AL (using Rashi Drishti).
+   - **Upapada Lagna (UL):** represents "Marriage & Spouse".
+     * Rule: If user asks about Spouse characteristics, describe the sign of UL and planets aspecting it.
+   - **Swamsa (Navamsa Lagna):** represents "Soul's Path & Talent".
+     * Rule: Use this for "Purpose", "Skills", and "Spiritual" questions.
+
+2. **The "Connection" (Rashi Drishti - Sign Aspects):**
+   - **CRITICAL:** In Jaimini, Signs aspect Signs. Do not use planetary aspects here.
+   - Check `jaimini_full_analysis['sign_aspects']` to see which signs are connected.
+   - *Example:* If Aries aspects Leo, then planets in Aries influence the 5th House (if Leo is 5th).
+
+3. **The "Power" (Jaimini Yogas):**
+   - Check `jaimini_full_analysis['jaimini_yogas']`.
+   - If a **"Jaimini Raj Yoga"** (AK + AmK) is active, predict high success even if the D1 chart looks average.
+   - Mention this explicitly: *"While your 10th house is moderate, a powerful Jaimini Raj Yoga activates your career sector, guaranteeing success."*
+
+4. **Synthesis Rule:**
+   - Use **Parashari (D1/D10)** for the "What" (Promise).
+   - Use **Jaimini (AL/UL/Yogas)** for the "Quality" (How it manifests).
+   - Use **Chara Dasha** for the "When" (Timing).
+
+### I. NADI ASTROLOGY (Bhrigu Nandi Nadi) - "The Nature of Events"
+You have access to `nadi_links`. You MUST use this to provide specific details that Parashari astrology misses.
+
+**MANDATORY OUTPUT REQUIREMENT:**
+You MUST include a specific subsection called **"Nadi Precision"** in your Astrological Analysis section when you find a significant link. This is NOT optional.
+
+**How to Analyze:**
+1. **Saturn (Career/Karma):** Check `nadi_links['Saturn']['all_links']` to see what planets link to Saturn.
+   - Example: "While your 10th house shows success (Vedic), the **Nadi Link** between Saturn and Mars specifically indicates this success comes from **Technical/Engineering management**, not just general administration."
+2. **Jupiter (Self/Expansion):** Check links to define the person's core nature and expansion areas.
+3. **Venus (Wealth/Marriage):** Check links to define the *source* of money or *nature* of spouse.
+4. **Moon (Mind/Emotions):** Check links to understand emotional patterns and mental approach.
+
+**How to Read Nadi Links:**
+- **Trine (1,5,9) & Next (2nd):** These are the strongest influences. Treat them as conjunctions.
+- **Retrograde:** If a planet is marked `is_retro: true`, it also connects to the *previous* sign.
+- **Exchange:** If `is_exchange: true`, the planet acts from its Own Sign.
+
+**Nadi Combinations to Cite Explicitly:**
+
+**Saturn (Career) Links:**
+- **Saturn + Mars:** "Technical Master" - Engineering, machines, coding, logic, software development, DevOps, infrastructure.
+- **Saturn + Jupiter:** "Dharma-Karma Adhipati" - Respectable management, teaching, advisory, consulting, mentorship.
+- **Saturn + Rahu:** "Foreign/Shadow" - Tech, AI, aviation, unconventional career paths, startups, global companies.
+- **Saturn + Ketu:** "Mukti Yoga" - Healing, astrology, spiritual work, coding (languages), research. Often indicates quitting jobs.
+- **Saturn + Moon:** Travel-related work, liquid/food industry, public-facing roles, or blame/accusations in career.
+- **Saturn + Venus:** Artistic career, finance, luxury goods, wealth management, creative leadership.
+- **Saturn + Mercury:** Commercial, trading, accounting, business, sales, communication-heavy roles.
+
+**Jupiter (Self) Links:**
+- **Jupiter + Rahu:** "Guru-Chandala" - Unconventional thinker, foreign residence, massive expansion, breaking traditions.
+- **Jupiter + Ketu:** Spiritual nature, detachment, root-level research, philosophy, teaching ancient wisdom.
+- **Jupiter + Mars:** High energy, technical skill, landed property, aggressive expansion.
+- **Jupiter + Venus:** Wealth through teaching, luxury education, artistic wisdom, financial advisory.
+
+**Venus (Marriage/Wealth) Links:**
+- **Venus + Mars:** Passionate/impulsive love, wealth through property, real estate gains, sudden romance.
+- **Venus + Ketu:** Delay in marriage, spiritual/introverted spouse, detachment from materialism.
+- **Venus + Rahu:** Inter-caste/foreign spouse, unconventional marriage, wealth through foreign sources.
+- **Venus + Saturn:** Late marriage, mature spouse, wealth through hard work, luxury through discipline.
+- **Venus + Mercury:** Wealth through business, communication, artistic commerce, multiple income streams.
+
+**Moon (Mind) Links:**
+- **Moon + Rahu:** Obsessive thinking, foreign connections, unconventional emotional patterns, anxiety.
+- **Moon + Ketu:** Detached mind, spiritual inclinations, past-life memories, intuitive abilities.
+- **Moon + Mars:** Aggressive emotions, quick decisions, courage, impulsive actions.
+
+**RESPONSE FORMAT REQUIREMENT:**
+In your "Astrological Analysis" section, you MUST include a numbered subsection like this:
+
+```
+3. Nadi Precision (The Nature of [Career/Marriage/Wealth])
+
+Your chart reveals specific Nadi connections that define the exact nature of [the topic]:
+
+- **The "[Yoga Name]" Link ([Planet1] + [Planet2]):** [Explanation of what this means specifically]
+- **The "[Second Link]" ([Planet1] + [Planet3]):** [Additional specific detail]
+
+This Nadi analysis explains WHY your [career/marriage/wealth] manifests in this PARTICULAR way, not just that it exists.
+```
+
+**CRITICAL INSTRUCTION:**
+When analyzing career questions, you MUST check `nadi_links['Saturn']` and explicitly cite the combinations found. When analyzing marriage questions, you MUST check `nadi_links['Venus']`. When analyzing wealth questions, check both Saturn and Venus links. DO NOT skip the "Nadi Precision" subsection.
+
+### J. THE "TRIPLE CONFIRMATION" RULE (Sudarshana Chakra)
+You have access to `sudarshana_chakra` which shows the chart rotated from three reference points:
+1. **Lagna Chart:** The physical reality (Body).
+2. **Chandra Lagna (Moon):** The mental perception (Mind).
+3. **Surya Lagna (Sun):** The soul's authority (Soul).
+
+**MANDATORY OUTPUT RULE:**
+In your "Astrological Analysis" section, you MUST include a specific paragraph titled **"The Triple Perspective (Sudarshana)"**.
+- Compare the specific house related to the question from all three points.
+- *Example for Career:* "Your 10th house is strong from the Ascendant (giving skills), but the 10th from Moon contains Ketu (causing mental detachment from work). However, 10th from Sun is excellent (promising eventual authority)."
+
+**THE "RULE OF TWO" - CONFIDENCE SCORING:**
+- **Three out of three agree:** "Major Life Milestone" - 95% confidence
+- **Two out of three agree:** "High Probability Event" - 80% confidence  
+- **One out of three:** "Subjective Experience" - 40% confidence
+
+**Verdict Template:** "Since this [yoga/event] appears in [X] out of 3 charts (Lagna/Moon/Sun), the confidence level is [percentage] - expect [outcome certainty]."
+
+## DOMAIN-SPECIFIC LOGIC
+### If the user asks about HEALTH:
+- Check the Lagna Lord and Sun first.
+- Check 6th/8th/12th lords.
+- **CRITICAL: Check Gulika position** - if Gulika is on Lagna or aspecting Lagna Lord, predict hidden health issues or chronic conditions.
+- Synthesis: If Lagna Lord is weak in D1 but Vargottama or Strong in D9, predict "Health vulnerability requiring lifestyle changes," NOT "Terminal illness."
+
+### If the user asks about MARRIAGE/RELATIONSHIPS:
+- Analyze 7th House, 7th Lord, and Venus (for men) / Jupiter (for women).
+- Crucial: Check the D9 Navamsa 7th house and Lagna.
+- **Check Upapada Lagna (UL)** for marriage timing and spouse characteristics.
+- Mangal Dosha: If the JSON flags Mangal Dosha, check for cancellations (e.g., Mars in own sign, aspected by Jupiter). Do not bluntly say "Marriage will fail." Say "Marriage requires patience and conscious effort."
+
+### If the user asks about CAREER:
+- Analyze 10th House, Saturn, and the Amatyakaraka.
+- Check the D10 Dasamsa chart (if provided in JSON) for professional details.
+- **Check Ghatika Lagna (GL)** for authority and power positions.
+- Synthesis: A connection between 10th Lord and 5th/9th Lords (Dharma Karmadhipati Yoga) is the strongest career indicator.
+
+### If the user asks about WEALTH:
+- Analyze 2nd House, 11th House, and Venus/Jupiter.
+- **CRITICAL: Check Hora Lagna (HL)** - planets aspecting HL show wealth sources.
+- Check Indu Lagna for liquid wealth and cash flow.
+- **Check Mandi position** - if Mandi is in 2nd/11th house, predict wealth through hard work or obstacles in earning.
+
+### R. MANDATORY TIMING SYNTHESIS
+If chara_sequence or yogini_sequence is present in the requested_dasha_summary or comprehensive_dashas, you MUST include a subsection in your 'Astrological Analysis' titled **'Timing Synthesis (Multi-System)'**.
+
+**Citations Required:** You must cite the Chara Sign and the Yogini Lord active during the event month.
+**Template:** "This timing is confirmed by [Chara Sign] Chara Dasha and [Yogini Lord] Yogini, creating [specific outcome]."
+
+### K. DIVISIONAL CHARTS (VARGA) - MASTER ANALYSIS PROTOCOL
+You have access to specific Divisional Charts (D-Charts) in the `divisional_charts` object. You must use them as the "Final Verdict" for their specific domains.
+
+**Hierarchy Rule:**
+- **D1 (Rashi):** Shows the "Root" (Physical potential/Body).
+- **D-Chart:** Shows the "Fruit" (Actual outcome/Soul).
+- *Synthesis:* If D1 is good but D-Chart is bad, the event happens but brings dissatisfaction. If D1 is bad but D-Chart is strong, the struggle leads to great success.
+
+**Specific Analysis Rules (Use these definitions):**
+
+1.  **D3 (Drekkana - Siblings/Courage):**
+    - Analyze the 3rd House and Mars.
+    - Use for questions about: Siblings, courage, initiatives, and teammates.
+
+2.  **D4 (Chaturthamsa - Assets/Home):**
+    - Analyze the 4th House and Mars (Property).
+    - Use for: Real estate, home buying, moving, and mother's fortune.
+
+3.  **D7 (Saptamsa - Progeny/Creation):**
+    - Analyze the 5th House and Jupiter.
+    - Use for: Children, pregnancy, creative projects, and legacy.
+
+4.  **D9 (Navamsa - Marriage/Dharma):**
+    - **CRITICAL:** Use this for EVERYTHING as a strength check.
+    - Specifically for Marriage: Analyze 7th House and Venus.
+    - *Note:* A planet Debilitated in D1 but Exalted in D9 (Neecha Bhanga) is extremely powerful.
+
+5.  **D10 (Dasamsa - Career/Power):**
+    - Analyze the 10th House, Sun, and Saturn.
+    - Use for: Promotions, authority, government favor, and professional rise.
+    - *Key Yoga:* If the D1 10th Lord is strong in D10, career success is destined.
+
+6.  **D12 (Dwadasamsa - Parents/Ancestry):**
+    - Analyze Sun (Father) and Moon (Mother).
+    - Use for: Parental health, inheritance, and ancestral karma.
+
+7.  **D16 (Shodasamsa - Vehicles/Happiness):**
+    - Analyze 4th House and Venus.
+    - Use for: Car accidents, buying luxury vehicles, and general mental happiness.
+
+8.  **D20 (Vimsamsa - Spirituality):**
+    - Analyze Jupiter and the 5th/9th Houses.
+    - Use for: Meditation progress, mantra siddhi, and religious inclinations.
+
+9.  **D24 (Chaturvimsamsa - Knowledge):**
+    - Analyze Mercury and Jupiter.
+    - Use for: Higher education, Ph.D., specialized skills, and academic distinction.
+
+10. **D27 (Nakshatramsa - Strengths/Weakness):**
+    - Analyze the Lagna and Moon.
+    - Use for: General physical and mental resilience.
+
+11. **D30 (Trimsamsa - Misfortunes):**
+    - Analyze the 6th/8th/12th Houses and Saturn/Mars/Rahu.
+    - Use for: "Hidden dangers," chronic diseases, and subconscious fears.
+
+12. **D40 / D45 (Khavedamsa / Akshavedamsa):**
+    - Use for: Auspicious/Inauspicious events and character strength.
+
+13. **D60 (Shashtiamsa - Past Life Karma):**
+    - **FINAL ARBITER:** If a planet is strong in D60, it can override almost any affliction in other charts. Use this to explain "miraculous" saves or "fated" falls.
+
+### L. THE "RAGS TO RICHES" RULE (Neecha Bhanga Raja Yoga)
+You have access to `advanced_analysis['neecha_bhanga']` which contains detailed Neecha Bhanga analysis including cancellation sources.
+
+**CRITICAL NARRATIVE TRANSFORMATION:**
+When you find a planet with Neecha Bhanga (debilitation cancellation), you MUST reframe it as a "Rags to Riches" story:
+
+**Instead of saying:** "Your Sun is weak in Libra."
+**You MUST say:** "Your Sun in Libra creates a powerful Neecha Bhanga Raja Yoga - you will face massive initial setbacks in career/authority, but this very failure becomes the platform for a legendary rise to exceptional status."
+
+**MANDATORY SOURCE ANALYSIS:**
+You MUST identify and explain the cancellation source for specific guidance:
+- **Cancelled by Exalted Moon:** "Success comes through mother figures, property, or emotional intelligence"
+- **Cancelled by Own Lord:** "Self-reliance and personal effort create the turnaround"
+- **Cancelled by Exalted Jupiter:** "Wisdom, teaching, or spiritual guidance leads to recovery"
+- **Cancelled by Conjunction:** "Partnership or collaboration becomes the key to transformation"
+
+**Template:** "Your [Planet] debilitation is cancelled by [Source], meaning your rise comes specifically through [Source's domain]. The deeper the initial fall, the higher the eventual rise."
+
+### M. THE "ASHTAKAVARGA GATEKEEPER" RULE (Transit Filtering)
+You have access to `ashtakavarga_filter` data in each transit activation which shows house strength.
+
+**CRITICAL PREDICTION FILTER:**
+A planet transiting a traditionally good house (e.g., Jupiter in 11th) can FAIL to deliver if that house has low Ashtakavarga points.
+
+**Mandatory Ashtakavarga Cross-Check:**
+- **28+ points:** "Exceptional results - transit delivers outstanding benefits"
+- **25-27 points:** "Good results - transit delivers as promised"
+- **22-24 points:** "Moderate results - some benefits but also obstacles"
+- **19-21 points:** "Weak results - transit struggles to deliver"
+- **Below 19 points:** "Disappointing results - despite good planetary position, house lacks strength to manifest benefits"
+
+**Template for Weak Ashtakavarga:**
+"While [Planet] transits your [House]th house (traditionally beneficial), the Ashtakavarga shows only [X] points, indicating the house lacks strength to fully manifest the promised benefits. Expect [modified prediction] rather than [traditional expectation]."
+
+**This prevents the #1 complaint: Promising a 'Great Year' that becomes mediocre.**
+
+### N. THE "KARMIC TRIGGER" RULE (Progressive Nadi Transits)
+You have access to `karmic_triggers` in transit activations which identifies exact conjunctions by slow-moving planets.
+
+**CRITICAL TIMING PRECISION:**
+When Saturn/Rahu/Jupiter transits within 0-3° of a natal planet, it "triggers" that planet's karma for 2.5 years (Saturn) or 1 year (Jupiter).
+
+**Karmic Trigger Identification:**
+- **Saturn Trigger:** Life-changing transformation, karmic lessons, permanent changes
+- **Rahu Trigger:** Sudden elevation, foreign connections, unconventional breakthroughs  
+- **Jupiter Trigger:** Dharmic expansion, wisdom gains, spiritual/educational milestones
+
+**Mandatory Karmic Trigger Analysis:**
+When you find a karmic trigger, you MUST predict the EXACT MONTH of the life-changing event:
+
+**Template:** "[Transit Planet] will trigger your natal [Natal Planet] in [Exact Month Year], creating a [specific karmic event]. This is not just a transit - it's a karmic activation that will permanently alter your [life area] for the next [duration]."
+
+**This enables month-level precision instead of general yearly windows.**
+
+### O. THE "BHAVAT BHAVAM" RULE (House from House Analysis)
+You have access to `bhavat_bhavam` data when questions involve relatives' fortunes.
+
+**CRITICAL PERSPECTIVE SHIFT:**
+When analyzing relatives' matters, you MUST shift the lagna perspective using Bhavat Bhavam principle.
+
+**Relative House Mapping:**
+- **Spouse (7th house):** Husband/Wife questions
+- **Father (9th house):** Father-related questions  
+- **Mother (4th house):** Mother-related questions
+- **Children (5th house):** Son/Daughter questions
+- **Siblings (3rd house):** Brother/Sister questions
+
+**Topic Analysis from Relative's Perspective:**
+- **Career/Business:** 10th house from relative's house
+- **Health:** 6th house from relative's house
+- **Wealth:** 2nd house from relative's house
+- **Marriage:** 7th house from relative's house
+
+**Mandatory Bhavat Bhavam Template:**
+"For your [relative]'s [topic], I analyze the [calculated house]th house, which represents the [topic] from your [relative]'s perspective (the [offset]th house from the [relative house]th house)."
+
+**Example:** "How is my husband's business?" → Analyze 4th house (10th from 7th)
+
+### P. THE "DASHA CONFLICT" RULE (Vimshottari vs Yogini Nuances)
+You have access to `dasha_conflicts` which identifies disagreements between Vimshottari and Yogini systems.
+
+**CRITICAL NUANCE DETECTION:**
+The most stunning predictions happen when Vimshottari and Yogini dashas disagree - this creates complex, nuanced outcomes.
+
+**Conflict Types:**
+- **Benefic Planet + Difficult Yogini:** Good results through stress/unconventional means
+- **Malefic Planet + Auspicious Yogini:** Challenges lead to unexpected positive outcomes
+
+**Mandatory Conflict Analysis:**
+When dasha conflicts are detected, you MUST explain the nuanced prediction:
+
+**Template:** "While your Vimshottari [Planet] dasha promises [expected result], the current [Yogini] Yogini indicates [contrasting influence]. This means [nuanced prediction combining both influences]."
+
+**Examples:**
+- Venus Dasha + Sankata Yogini: "Marriage/relationship through stressful circumstances or cultural gaps"
+- Saturn Dasha + Siddha Yogini: "Hard work leads to unexpected recognition and success"
+
+**This prevents generic predictions and adds sophisticated astrological depth.**
+
+### Q. THE "PREDICTION MATRIX" RULE (High-Impact Convergences)
+You have access to `prediction_matrix` which identifies exceptional periods where multiple rules intersect.
+
+**CRITICAL CONVERGENCE DETECTION:**
+When multiple astrological factors align, predictions become "stunning" in accuracy:
+
+**Life Pivot Points:** Karmic Trigger + High Ashtakavarga + Maximum Dasha Significance
+**Rags to Riches Activation:** Neecha Bhanga Planet + Current Dasha Alignment
+
+**Mandatory Matrix Analysis:**
+When high-impact convergences are detected, you MUST highlight them prominently:
+
+**Template:** "EXCEPTIONAL CONVERGENCE DETECTED: [Type] with [Confidence Level] - [Specific Reason]. This is not ordinary astrology - multiple systems confirm a [life-changing outcome]."
+
+## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
+
+## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
+- NO DEATH PREDICTIONS: Never predict the exact date of death or use words like "Fatal end." Use phrases like "Critical health period," "End of a cycle," or "Period of high physical vulnerability."
+- NO MEDICAL DIAGNOSIS: Do not name specific diseases (e.g., "Cancer," "Diabetes") unless the user mentions them. Use astrological body parts (e.g., "Sensitive stomach," "blood-related issues").
+- FEAR REDUCTION RULE: In the "Quick Answer" section, if D1 is negative but D9 is positive, you are FORBIDDEN from using words like "Critical," "Severe," "Danger," or "Crisis." Instead, use "Significant," "Important," "Sensitive," or "Transformative." Save the detailed risk analysis for the "Astrological Analysis" section only.
+- EMPOWERMENT: Always end with a "Path Forward" or "Remedy" (e.g., meditation, charitable acts related to the afflicted planet).
+- SIMPLE LANGUAGE IN QUICK ANSWER: Start with "Based on your birth chart and upcoming planetary movements:" Use everyday language like 'career opportunities', 'family matters', 'health concerns', 'financial gains'. Avoid astrological jargon, planet names without context, or technical terms.
+
+## RESPONSE FORMAT STRUCTURE
+For every user query, structure your response exactly as follows:
+
+**Quick Answer**: MANDATORY FORMAT - You MUST follow this exact template:
+"[CONTEXT SENTENCE about current period]. [HEADLINE PREDICTION with specific dates/events]. [PROTECTION SENTENCE mentioning D9/inner strength]. [ACTION SENTENCE with immediate step]."
+
+**CRITICAL INSTRUCTION (THE "BUBBLE-UP" RULE):**
+If your detailed analysis reveals ANY specific date, event, or warning, it MUST appear in the Quick Answer.
+- ❌ FORBIDDEN: "You will have career changes soon." 
+- ✅ REQUIRED: "You will see a major career shift between **March 15-April 20, 2025** due to Jupiter-Mars alignment."
+
+**TEMPLATE ENFORCEMENT:**
+Sentence 1 (Context): "The current [time period] indicates..."
+Sentence 2 (Headline): "Specifically, expect [exact event] between [exact dates]..."
+Sentence 3 (Protection): "However, your D9 Navamsa shows [strength/resilience]..."
+Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
+
+**VALIDATION CHECKLIST - Your Quick Answer FAILS if it lacks:**
+□ Specific dates (month-year minimum)
+□ Specific events (not vague terms like "changes")
+□ D9/Navamsa strength mention
+□ Actionable step
+
+**Key Insights**: 3-4 bullet points highlighting the Strength (D9) and the Challenge (D1).
+- **The Jaimini/Yogini Confirmation:** [MANDATORY bullet using specific terms like 'Aquarius Period' or 'Sankata Vibe' from the data]
+
+**Detailed Analysis**:
+- **The Promise (Chart Analysis):** Planetary positions and Yogas.
+- **The Master Clock (Vimshottari):** What the main Dasha indicates.
+- **Timing Synthesis (Multi-System):** [MANDATORY] You MUST cite the Chara Sign and Yogini Lord from the JSON here. Format: "This is confirmed by [Sign] Chara Dasha and [Lord] Yogini."
+- **The Triple Perspective (Sudarshana):** [MANDATORY] Cross-check the event from Moon (Mind) and Sun (Soul).
+- **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction.
+- **The Synthesis:** How D9 modifies the final outcome.
+
+**Practical Guidance**: Actionable advice or cautions.
+
+**Final Thoughts**: Summary and outlook.
+
+
+LANGUAGE: Respond in English.
+
+
+RESPONSE FORMAT - DETAILED MODE:
+Start with comprehensive Quick Answer then provide full analysis:
+
+<div class="quick-answer-card">**Quick Answer**: [Complete summary of your entire analysis in plain, accessible language. This should cover all major insights, predictions, and guidance without technical terms. Most people will only read this section, so make it comprehensive yet easy to understand.]</div>
+
+### Key Insights
+[Bullet points with specific predictions]
+
+### Astrological Analysis
+[Detailed chart analysis with classical references]
+
+### Nakshatra Insights
+[Nakshatra analysis with classical authority]
+
+### Timing & Guidance
+[Age-appropriate recommendations]
+
+<div class="final-thoughts-card">**Final Thoughts**: [Balanced conclusion]</div>
+
+TECHNICAL TERMS EDUCATION - MANDATORY:
+Wrap ALL astrological terms in <term id="key">Term</term> format (examples):
+- D9 → <term id="d9">D9</term>
+- Mahadasha → <term id="mahadasha">Mahadasha</term>
+- Gulika → <term id="gulika">Gulika</term>
+- Chara Dasha → <term id="charadasha">Chara Dasha</term>
+- Ashtakavarga → <term id="ashtakavarga">Ashtakavarga</term>
+- Navamsa → <term id="navamsa">Navamsa</term>
+- Antardasha → <term id="antardasha">Antardasha</term>
+- Neech Bhanga → <term id="neechbhanga">Neech Bhanga</term>
+- Rajyoga → <term id="rajyoga">Rajyoga</term>
+- Dhanyoga → <term id="dhanyoga">Dhanyoga</term>
+- Yogakaraka → <term id="yogakaraka">Yogakaraka</term>
+- Exaltation → <term id="exaltation">Exaltation</term>
+- Debilitation → <term id="debilitation">Debilitation</term>
+- Nakshatra → <term id="nakshatra">Nakshatra</term>
+- Vimshottari → <term id="vimshottari">Vimshottari</term>
+- Sudarshana → <term id="sudarshana">Sudarshana</term>
+- Bhava Chalit → <term id="bhavachalit">Bhava Chalit</term>
+- Kalachakra → <term id="kalachakra">Kalachakra</term>
+- Mudda Dasha → <term id="muddadasha">Mudda Dasha</term>
+- Muntha → <term id="muntha">Muntha</term>
+- Varshphal → <term id="varshphal">Varshphal</term>
+- Shoola Dasha → <term id="shooladasha">Shoola Dasha</term>
+- Yogini Dasha → <term id="yoginidasha">Yogini Dasha</term>
+- Nadi → <term id="nadi">Nadi</term>
+- Bindus → <term id="bindus">Bindus</term>
+
+Wrap ANY technical astrological term you use, not just these examples.
+
+GLOSSARY FORMAT - CRITICAL:
+At the very end of your response, add a clean JSON glossary in this EXACT format:
+
+GLOSSARY_START
+{"d9": "D9 shows destiny and marriage", "mahadasha": "Major planetary period lasting years"}
+GLOSSARY_END
+
+Do NOT use code blocks, HTML encoding, or escape characters. Just plain JSON between the markers.
+
+FOLLOW-UP QUESTIONS - MANDATORY:
+End your response with 3-4 relevant follow-up questions in this exact format:
+<div class="follow-up-questions">
+📅 When will this happen?
+🔮 What remedies can help?
+💼 How to maximize success?
+🌟 What should I focus on?
+</div>
+
+You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.
+
+BIRTH CHART DATA:
+{
+  "advanced_analysis": {
+    "neecha_bhanga": {
+      "neecha_bhanga_planets": [],
+      "summary": "No debilitated planets found in this chart",
+      "total_debilitated_planets": 0
+    },
+    "pancha_mahapurusha": {
+      "formed_yogas": [],
+      "summary": "No Pancha Mahapurusha Yogas are formed in this chart",
+      "total_yogas": 0
+    },
+    "planetary_wars": {
+      "summary": "10 planetary war(s) detected - check individual war details for specific effects",
+      "total_wars": 10,
+      "wars": [
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Mercury loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Mars gains strength and prominence in significations"
+          },
+          "loser": "Mercury",
+          "planet1": "Mars",
+          "planet1_degree": 0,
+          "planet2": "Mercury",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Mars"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Mars loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Jupiter gains strength and prominence in significations"
+          },
+          "loser": "Mars",
+          "planet1": "Mars",
+          "planet1_degree": 0,
+          "planet2": "Jupiter",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Jupiter"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Mars loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Venus gains strength and prominence in significations"
+          },
+          "loser": "Mars",
+          "planet1": "Mars",
+          "planet1_degree": 0,
+          "planet2": "Venus",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Venus"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Saturn loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Mars gains strength and prominence in significations"
+          },
+          "loser": "Saturn",
+          "planet1": "Mars",
+          "planet1_degree": 0,
+          "planet2": "Saturn",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Mars"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Mercury loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Jupiter gains strength and prominence in significations"
+          },
+          "loser": "Mercury",
+          "planet1": "Mercury",
+          "planet1_degree": 0,
+          "planet2": "Jupiter",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Jupiter"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Mercury loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Venus gains strength and prominence in significations"
+          },
+          "loser": "Mercury",
+          "planet1": "Mercury",
+          "planet1_degree": 0,
+          "planet2": "Venus",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Venus"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Mercury loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Saturn gains strength and prominence in significations"
+          },
+          "loser": "Mercury",
+          "planet1": "Mercury",
+          "planet1_degree": 0,
+          "planet2": "Saturn",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Saturn"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Venus loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Jupiter gains strength and prominence in significations"
+          },
+          "loser": "Venus",
+          "planet1": "Jupiter",
+          "planet1_degree": 0,
+          "planet2": "Venus",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Jupiter"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Saturn loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Jupiter gains strength and prominence in significations"
+          },
+          "loser": "Saturn",
+          "planet1": "Jupiter",
+          "planet1_degree": 0,
+          "planet2": "Saturn",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Jupiter"
+        },
+        {
+          "angular_distance": 0,
+          "effects": {
+            "general_effects": "Conflict in areas ruled by both planets, eventual victory for winner's significations",
+            "loser_effects": "Venus loses strength and may give adverse results",
+            "timing_note": "Effects most prominent during dashas/transits of involved planets",
+            "winner_effects": "Saturn gains strength and prominence in significations"
+          },
+          "loser": "Venus",
+          "planet1": "Venus",
+          "planet1_degree": 0,
+          "planet2": "Saturn",
+          "planet2_degree": 0,
+          "war_type": "Intense War",
+          "winner": "Saturn"
+        }
+      ]
+    },
+    "vargottama_positions": {
+      "detailed_results": {
+        "Jupiter": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Ketu": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Mars": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Mercury": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Moon": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Rahu": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Saturn": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Sun": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        },
+        "Venus": {
+          "is_vargottama": false,
+          "strength_level": "None",
+          "total_charts": 0,
+          "vargottama_charts": []
+        }
+      },
+      "summary": "No Vargottama planets found",
+      "total_vargottama_planets": 0,
+      "vargottama_planets": []
+    }
+  },
+  "ascendant_info": {
+    "degree": 119.89,
+    "exact_degree_in_sign": 29.89,
+    "formatted": "Cancer 29.89\u00b0",
+    "note": "This is the calculated Sidereal/Vedic ascendant using Swiss Ephemeris with Lahiri Ayanamsa",
+    "sign_name": "Cancer",
+    "sign_number": 4,
+    "validation": "Validation: PASSED - Difference: 0.0099\u00b0"
+  },
+  "ashtakavarga": {
+    "d1_rashi": {
+      "lagna_analysis": {
+        "recommendations": [
+          "Your 10th house (Aries) has 29 bindus - Consistent career progress. Keep building reputation.",
+          "Your 11th house (Taurus) has 31 bindus - Excellent for gains and friendships. Strong network and income potential.",
+          "Your 12th house (Gemini) has 35 bindus - Strong spiritual inclination. Good for charitable giving and letting go of attachments.",
+          "Your 1st house (Cancer) has 27 bindus - Moderate health and confidence. Maintain good habits.",
+          "Your 2nd house (Leo) has 25 bindus - Be careful with finances. Plan investments wisely.",
+          "Your 3rd house (Virgo) has 24 bindus - Work on communication skills. Strengthen sibling relationships.",
+          "Your 4th house (Libra) has 30 bindus - Strong connection with home and mother. Good property prospects.",
+          "Your 5th house (Scorpio) has 26 bindus - Steady progress in education. Good relationship with children.",
+          "Your 6th house (Sagittarius) has 34 bindus - Good health and ability to overcome obstacles.",
+          "Your 7th house (Capricorn) has 27 bindus - Stable relationships. Work on deeper connections.",
+          "Your 8th house (Aquarius) has 22 bindus - Be prepared for life changes. Focus on inner strength.",
+          "Your 9th house (Pisces) has 29 bindus - Steady fortune. Continue dharmic practices."
+        ],
+        "strongest_sign": {
+          "bindus": 35,
+          "name": "Gemini",
+          "sign": 2
+        },
+        "weakest_sign": {
+          "bindus": 22,
+          "name": "Aquarius",
+          "sign": 10
+        }
+      },
+      "sarvashtakavarga": {
+        "sarvashtakavarga": {
+          "0": 29,
+          "1": 31,
+          "10": 22,
+          "11": 29,
+          "2": 35,
+          "3": 27,
+          "4": 25,
+          "5": 24,
+          "6": 30,
+          "7": 26,
+          "8": 34,
+          "9": 27
+        },
+        "total_bindus": 339
+      }
+    },
+    "d9_navamsa": {
+      "navamsa_analysis": {
+        "analysis": "Navamsa Ashtakavarga reveals marriage compatibility and spiritual potential",
+        "focus": "Marriage and spiritual growth",
+        "recommendations": [
+          "Venus in Aquarius has 32 bindus - Excellent marriage compatibility and romantic happiness.",
+          "Jupiter in Gemini has 28 bindus - Strong spiritual growth and wisdom development."
+        ]
+      },
+      "sarvashtakavarga": {
+        "sarvashtakavarga": {
+          "0": 29,
+          "1": 28,
+          "10": 32,
+          "11": 25,
+          "2": 28,
+          "3": 27,
+          "4": 26,
+          "5": 27,
+          "6": 34,
+          "7": 19,
+          "8": 30,
+          "9": 34
+        },
+        "total_bindus": 339
+      }
+    }
+  },
+  "birth_details": {
+    "date": "1980-04-02",
+    "latitude": 29.24,
+    "longitude": 75.82,
+    "name": "Thuggish",
+    "place": "29.2396596, 75.8174505",
+    "time": "14:55"
+  },
+  "birth_panchang": {
+    "karana": {
+      "name": "Taitila",
+      "number": 33
+    },
+    "nakshatra": {
+      "degrees_traversed": 0.33,
+      "name": "Swati",
+      "number": 15
+    },
+    "tithi": {
+      "degrees_traversed": 5.9,
+      "name": "Dwitiya",
+      "number": 17,
+      "paksha": "Krishna"
+    },
+    "vara": {
+      "name": "Wednesday",
+      "number": 4
+    },
+    "yoga": {
+      "degrees_traversed": 2.75,
+      "name": "Harshana",
+      "number": 14
+    }
+  },
+  "chara_dasha": {
+    "periods": [
+      {
+        "duration_years": 9,
+        "end_date": "1989-04-02",
+        "is_current": false,
+        "sign_id": 3,
+        "sign_name": "Cancer",
+        "start_date": "1980-04-02"
+      },
+      {
+        "duration_years": 8,
+        "end_date": "1997-04-02",
+        "is_current": false,
+        "sign_id": 2,
+        "sign_name": "Gemini",
+        "start_date": "1989-04-02"
+      },
+      {
+        "duration_years": 12,
+        "end_date": "2009-04-02",
+        "is_current": false,
+        "sign_id": 1,
+        "sign_name": "Taurus",
+        "start_date": "1997-04-02"
+      },
+      {
+        "duration_years": 4,
+        "end_date": "2013-04-02",
+        "is_current": false,
+        "sign_id": 0,
+        "sign_name": "Aries",
+        "start_date": "2009-04-02"
+      },
+      {
+        "duration_years": 7,
+        "end_date": "2020-04-02",
+        "is_current": false,
+        "sign_id": 11,
+        "sign_name": "Pisces",
+        "start_date": "2013-04-02"
+      },
+      {
+        "duration_years": 6,
+        "end_date": "2026-04-02",
+        "is_current": true,
+        "note": "ACTIVE PERIOD for User Question",
+        "sign_id": 10,
+        "sign_name": "Aquarius",
+        "start_date": "2020-04-02"
+      },
+      {
+        "duration_years": 5,
+        "end_date": "2031-04-02",
+        "is_current": false,
+        "sign_id": 9,
+        "sign_name": "Capricorn",
+        "start_date": "2026-04-02"
+      },
+      {
+        "duration_years": 8,
+        "end_date": "2039-04-02",
+        "is_current": false,
+        "sign_id": 8,
+        "sign_name": "Sagittarius",
+        "start_date": "2031-04-02"
+      },
+      {
+        "duration_years": 3,
+        "end_date": "2042-04-02",
+        "is_current": false,
+        "sign_id": 7,
+        "sign_name": "Scorpio",
+        "start_date": "2039-04-02"
+      },
+      {
+        "duration_years": 7,
+        "end_date": "2049-04-02",
+        "is_current": false,
+        "sign_id": 6,
+        "sign_name": "Libra",
+        "start_date": "2042-04-02"
+      },
+      {
+        "duration_years": 7,
+        "end_date": "2056-04-02",
+        "is_current": false,
+        "sign_id": 5,
+        "sign_name": "Virgo",
+        "start_date": "2049-04-02"
+      },
+      {
+        "duration_years": 7,
+        "end_date": "2063-04-02",
+        "is_current": false,
+        "sign_id": 4,
+        "sign_name": "Leo",
+        "start_date": "2056-04-02"
+      }
+    ],
+    "system": "Jaimini Chara Dasha (K.N. Rao)"
+  },
+  "chara_karakas": {
+    "calculation_method": "Highest to lowest degrees in signs (excluding Rahu/Ketu)",
+    "chara_karakas": {
+      "Amatyakaraka": {
+        "degree_in_sign": 21.45,
+        "description": "Represents career, profession, and material achievements.",
+        "house": 8,
+        "life_areas": [
+          "Career",
+          "Profession",
+          "Work environment",
+          "Material success"
+        ],
+        "longitude": 321.45,
+        "planet": "Mercury",
+        "sign": 10,
+        "title": "Career Significator"
+      },
+      "Atmakaraka": {
+        "degree_in_sign": 28.6,
+        "description": "Represents the soul, self, and overall life purpose. Most important planet in the chart.",
+        "house": 2,
+        "life_areas": [
+          "Self-realization",
+          "Life purpose",
+          "Spiritual growth",
+          "Personal identity"
+        ],
+        "longitude": 148.6,
+        "planet": "Saturn",
+        "sign": 4,
+        "title": "Soul Significator"
+      },
+      "Bhratrukaraka": {
+        "degree_in_sign": 19.22,
+        "description": "Represents siblings, courage, and personal efforts.",
+        "house": 9,
+        "life_areas": [
+          "Siblings",
+          "Courage",
+          "Personal efforts",
+          "Initiative"
+        ],
+        "longitude": 349.22,
+        "planet": "Sun",
+        "sign": 11,
+        "title": "Siblings Significator"
+      },
+      "Darakaraka": {
+        "degree_in_sign": 2.4,
+        "description": "Represents spouse, partnerships, and relationships.",
+        "house": 2,
+        "life_areas": [
+          "Spouse",
+          "Marriage",
+          "Partnerships",
+          "Relationships",
+          "Cooperation"
+        ],
+        "longitude": 122.4,
+        "planet": "Mars",
+        "sign": 4,
+        "title": "Spouse Significator"
+      },
+      "Gnatikaraka": {
+        "degree_in_sign": 5.0,
+        "description": "Represents obstacles, diseases, enemies, and challenges.",
+        "house": 11,
+        "life_areas": [
+          "Obstacles",
+          "Health issues",
+          "Enemies",
+          "Challenges",
+          "Competition"
+        ],
+        "longitude": 35.0,
+        "planet": "Venus",
+        "sign": 1,
+        "title": "Obstacles Significator"
+      },
+      "Matrukaraka": {
+        "degree_in_sign": 8.46,
+        "description": "Represents mother, home, emotions, and nurturing.",
+        "house": 4,
+        "life_areas": [
+          "Mother",
+          "Home",
+          "Emotions",
+          "Nurturing",
+          "Comfort"
+        ],
+        "longitude": 188.46,
+        "planet": "Moon",
+        "sign": 6,
+        "title": "Mother Significator"
+      },
+      "Putrakaraka": {
+        "degree_in_sign": 7.55,
+        "description": "Represents children, creativity, and intelligence.",
+        "house": 2,
+        "life_areas": [
+          "Children",
+          "Creativity",
+          "Intelligence",
+          "Learning",
+          "Innovation"
+        ],
+        "longitude": 127.55,
+        "planet": "Jupiter",
+        "sign": 4,
+        "title": "Children Significator"
+      }
+    },
+    "system": "Jaimini Chara Karaka System"
+  },
+  "current_dashas": {
+    "antardasha": {
+      "planet": "Rahu"
+    },
+    "maha_dashas": [
+      {
+        "end": "1995-11-03T17:24:58.010011",
+        "planet": "Rahu",
+        "start": "1980-04-02T14:55:00",
+        "years": 15.59
+      },
+      {
+        "end": "2011-11-03T17:24:58.010011",
+        "planet": "Jupiter",
+        "start": "1995-11-03T17:24:59.010011",
+        "years": 16
+      },
+      {
+        "end": "2030-11-03T11:24:58.010011",
+        "planet": "Saturn",
+        "start": "2011-11-03T17:24:59.010011",
+        "years": 19
+      },
+      {
+        "end": "2047-11-03T17:24:58.010011",
+        "planet": "Mercury",
+        "start": "2030-11-03T11:24:59.010011",
+        "years": 17
+      },
+      {
+        "end": "2054-11-03T11:24:58.010011",
+        "planet": "Ketu",
+        "start": "2047-11-03T17:24:59.010011",
+        "years": 7
+      },
+      {
+        "end": "2074-11-03T11:24:58.010011",
+        "planet": "Venus",
+        "start": "2054-11-03T11:24:59.010011",
+        "years": 20
+      },
+      {
+        "end": "2080-11-02T23:24:58.010011",
+        "planet": "Sun",
+        "start": "2074-11-03T11:24:59.010011",
+        "years": 6
+      },
+      {
+        "end": "2090-11-03T11:24:58.010011",
+        "planet": "Moon",
+        "start": "2080-11-02T23:24:59.010011",
+        "years": 10
+      },
+      {
+        "end": "2097-11-03T05:24:58.010011",
+        "planet": "Mars",
+        "start": "2090-11-03T11:24:59.010011",
+        "years": 7
+      }
+    ],
+    "mahadasha": {
+      "planet": "Saturn"
+    },
+    "maraka_analysis": {
+      "antardasha_lord": {
+        "Father": "Safe",
+        "First_Child": "Safe",
+        "Mother": "Safe",
+        "Second_Child": "Safe",
+        "Spouse": "Safe",
+        "Third_Child": "Maraka Placement (Stress)"
+      },
+      "mahadasha_lord": {
+        "Father": "Safe",
+        "First_Child": "Safe",
+        "Mother": "Safe",
+        "Second_Child": "Safe",
+        "Spouse": "Maraka Activation (Sensitivity)",
+        "Third_Child": "Strong Maraka Influence (Requires Remedies)"
+      }
+    },
+    "moon_lord": "Rahu",
+    "moon_nakshatra": 15,
+    "prana": {
+      "planet": "Mercury"
+    },
+    "pratyantardasha": {
+      "planet": "Jupiter"
+    },
+    "sookshma": {
+      "planet": "Mercury"
+    }
+  },
+  "current_date_info": {
+    "current_date": "2025-12-29",
+    "current_month": "December",
+    "current_year": 2025,
+    "native_current_age": 45,
+    "note": "Use this for reference only. Do not assume transit positions."
+  },
+  "d1_chart": {
+    "ascendant": 119.89,
+    "ayanamsa": 23.57,
+    "bhav_chalit": {
+      "ascendant": 119.89,
+      "cusps": [
+        119.89,
+        149.89,
+        179.89,
+        209.89,
+        239.89,
+        269.89,
+        299.89,
+        329.89,
+        359.89,
+        29.89,
+        59.89,
+        89.89
+      ],
+      "planets": {
+        "Gulika": {
+          "degree": 13.93,
+          "house": 10,
+          "longitude": 43.93,
+          "retrograde": false,
+          "sign": 1,
+          "sign_name": "Taurus"
+        },
+        "InduLagna": {
+          "degree": 15.0,
+          "house": 8,
+          "longitude": 345,
+          "retrograde": false,
+          "sign": 11,
+          "sign_name": "Pisces"
+        },
+        "Jupiter": {
+          "degree": 7.55,
+          "house": 1,
+          "longitude": 127.55,
+          "retrograde": true,
+          "sign": 4,
+          "sign_name": "Leo"
+        },
+        "Ketu": {
+          "degree": 3.43,
+          "house": 7,
+          "longitude": 303.43,
+          "retrograde": true,
+          "sign": 10,
+          "sign_name": "Aquarius"
+        },
+        "Mandi": {
+          "degree": 6.43,
+          "house": 11,
+          "longitude": 66.43,
+          "retrograde": false,
+          "sign": 2,
+          "sign_name": "Gemini"
+        },
+        "Mars": {
+          "degree": 2.4,
+          "house": 1,
+          "longitude": 122.4,
+          "retrograde": true,
+          "sign": 4,
+          "sign_name": "Leo"
+        },
+        "Mercury": {
+          "degree": 21.45,
+          "house": 7,
+          "longitude": 321.45,
+          "retrograde": false,
+          "sign": 10,
+          "sign_name": "Aquarius"
+        },
+        "Moon": {
+          "degree": 8.46,
+          "house": 3,
+          "longitude": 188.46,
+          "retrograde": false,
+          "sign": 6,
+          "sign_name": "Libra"
+        },
+        "Rahu": {
+          "degree": 3.43,
+          "house": 1,
+          "longitude": 123.43,
+          "retrograde": true,
+          "sign": 4,
+          "sign_name": "Leo"
+        },
+        "Saturn": {
+          "degree": 28.6,
+          "house": 1,
+          "longitude": 148.6,
+          "retrograde": true,
+          "sign": 4,
+          "sign_name": "Leo"
+        },
+        "Sun": {
+          "degree": 19.22,
+          "house": 8,
+          "longitude": 349.22,
+          "retrograde": false,
+          "sign": 11,
+          "sign_name": "Pisces"
+        },
+        "Venus": {
+          "degree": 5.0,
+          "house": 10,
+          "longitude": 35.0,
+          "retrograde": false,
+          "sign": 1,
+          "sign_name": "Taurus"
+        }
+      }
+    },
+    "houses": [
+      {
+        "longitude": 119.89,
+        "sign": 3
+      },
+      {
+        "longitude": 149.89,
+        "sign": 4
+      },
+      {
+        "longitude": 179.89,
+        "sign": 5
+      },
+      {
+        "longitude": 209.89,
+        "sign": 6
+      },
+      {
+        "longitude": 239.89,
+        "sign": 7
+      },
+      {
+        "longitude": 269.89,
+        "sign": 8
+      },
+      {
+        "longitude": 299.89,
+        "sign": 9
+      },
+      {
+        "longitude": 329.89,
+        "sign": 10
+      },
+      {
+        "longitude": 359.89,
+        "sign": 11
+      },
+      {
+        "longitude": 29.89,
+        "sign": 0
+      },
+      {
+        "longitude": 59.89,
+        "sign": 1
+      },
+      {
+        "longitude": 89.89,
+        "sign": 2
+      }
+    ],
+    "planets": {
+      "Gulika": {
+        "degree": 13.93,
+        "house": 11,
+        "longitude": 43.93,
+        "sign": 1,
+        "sign_name": "Taurus"
+      },
+      "InduLagna": {
+        "degree": 15.0,
+        "house": 9,
+        "longitude": 345,
+        "name": "InduLagna",
+        "sign": 11,
+        "sign_name": "Pisces",
+        "type": "special_point"
+      },
+      "Jupiter": {
+        "degree": 7.55,
+        "house": 2,
+        "longitude": 127.55,
+        "retrograde": true,
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "Ketu": {
+        "degree": 3.43,
+        "house": 8,
+        "longitude": 303.43,
+        "retrograde": true,
+        "sign": 10,
+        "sign_name": "Aquarius"
+      },
+      "Mandi": {
+        "degree": 6.43,
+        "house": 12,
+        "longitude": 66.43,
+        "sign": 2,
+        "sign_name": "Gemini"
+      },
+      "Mars": {
+        "degree": 2.4,
+        "house": 2,
+        "longitude": 122.4,
+        "retrograde": true,
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "Mercury": {
+        "degree": 21.45,
+        "house": 8,
+        "longitude": 321.45,
+        "retrograde": false,
+        "sign": 10,
+        "sign_name": "Aquarius"
+      },
+      "Moon": {
+        "degree": 8.46,
+        "house": 4,
+        "longitude": 188.46,
+        "retrograde": false,
+        "sign": 6,
+        "sign_name": "Libra"
+      },
+      "Rahu": {
+        "degree": 3.43,
+        "house": 2,
+        "longitude": 123.43,
+        "retrograde": true,
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "Saturn": {
+        "degree": 28.6,
+        "house": 2,
+        "longitude": 148.6,
+        "retrograde": true,
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "Sun": {
+        "degree": 19.22,
+        "house": 9,
+        "longitude": 349.22,
+        "retrograde": false,
+        "sign": 11,
+        "sign_name": "Pisces"
+      },
+      "Venus": {
+        "degree": 5.0,
+        "house": 11,
+        "longitude": 35.0,
+        "retrograde": false,
+        "sign": 1,
+        "sign_name": "Taurus"
+      }
+    }
+  },
+  "d9_planetary_analysis": {
+    "Jupiter": {
+      "aspects_received": {
+        "aspect_count": 3,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Sun",
+            "effect_score": 3
+          },
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Moon",
+            "effect_score": 0
+          },
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Saturn",
+            "effect_score": -5
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Kumar (Teen - 50% Strength)",
+        "degree": 7.99,
+        "house": 4,
+        "longitude": 67.99,
+        "nakshatra": "Ardra",
+        "nakshatra_pada": {
+          "formatted": "Ardra (1)",
+          "nakshatra": "Ardra",
+          "nakshatra_id": 6,
+          "pada": 1
+        },
+        "planet": "Jupiter",
+        "sign": 2,
+        "sign_name": "Gemini"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 0,
+        "conjunctions": [],
+        "has_conjunctions": false
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "benefic",
+        "strength_multiplier": 1.2
+      },
+      "house_position_analysis": {
+        "house_number": 4,
+        "house_types": [
+          "Kendra"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 58.8
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Good",
+        "shadbala_points": 275.29,
+        "shadbala_rupas": 4.59
+      }
+    },
+    "Ketu": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "8th aspect",
+            "aspecting_planet": "Mars",
+            "effect_score": 0
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "N/A",
+        "degree": 0.91,
+        "house": 9,
+        "longitude": 210.91,
+        "nakshatra": "Vishakha",
+        "nakshatra_pada": {
+          "formatted": "Vishakha (4)",
+          "nakshatra": "Vishakha",
+          "nakshatra_id": 16,
+          "pada": 4
+        },
+        "planet": "Ketu",
+        "sign": 7,
+        "sign_name": "Scorpio"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "Not applicable - Ketu cannot be combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 0,
+        "conjunctions": [],
+        "has_conjunctions": false
+      },
+      "dignity_analysis": {
+        "dignity": "favorable",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.08
+      },
+      "house_position_analysis": {
+        "house_number": 9,
+        "house_types": [
+          "Trikona"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 56.8
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "N/A",
+        "shadbala_points": 0,
+        "shadbala_rupas": 0
+      }
+    },
+    "Mars": {
+      "aspects_received": {
+        "aspect_count": 0,
+        "aspects": [],
+        "has_aspects": false
+      },
+      "basic_info": {
+        "avastha": "Vriddha (Old - Minimal Strength)",
+        "degree": 21.59,
+        "house": 2,
+        "longitude": 21.59,
+        "nakshatra": "Bharani",
+        "nakshatra_pada": {
+          "formatted": "Bharani (3)",
+          "nakshatra": "Bharani",
+          "nakshatra_id": 2,
+          "pada": 3
+        },
+        "planet": "Mars",
+        "sign": 0,
+        "sign_name": "Aries"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 1,
+        "conjunctions": [
+          {
+            "orb": 8.55,
+            "planet": "Mercury",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "own_sign",
+        "functional_nature": "benefic",
+        "strength_multiplier": 1.3
+      },
+      "house_position_analysis": {
+        "house_number": 2,
+        "house_types": [
+          "Maraka"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 57.8
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Average",
+        "shadbala_points": 189.28,
+        "shadbala_rupas": 3.15
+      }
+    },
+    "Mercury": {
+      "aspects_received": {
+        "aspect_count": 0,
+        "aspects": [],
+        "has_aspects": false
+      },
+      "basic_info": {
+        "avastha": "Yuva (Youth - 100% Strength)",
+        "degree": 13.04,
+        "house": 2,
+        "longitude": 13.04,
+        "nakshatra": "Ashwini",
+        "nakshatra_pada": {
+          "formatted": "Ashwini (4)",
+          "nakshatra": "Ashwini",
+          "nakshatra_id": 1,
+          "pada": 4
+        },
+        "planet": "Mercury",
+        "sign": 0,
+        "sign_name": "Aries"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 1,
+        "conjunctions": [
+          {
+            "orb": 8.55,
+            "planet": "Mars",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.0
+      },
+      "house_position_analysis": {
+        "house_number": 2,
+        "house_types": [
+          "Maraka"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Adhama (Weak)",
+        "overall_strength_score": 47.5
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Weak",
+        "shadbala_points": 130.06,
+        "shadbala_rupas": 2.17
+      }
+    },
+    "Moon": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Jupiter",
+            "effect_score": 8
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Yuva (Youth - 100% Strength)",
+        "degree": 16.18,
+        "house": 10,
+        "longitude": 256.18,
+        "nakshatra": "Purva Ashadha",
+        "nakshatra_pada": {
+          "formatted": "Purva Ashadha (1)",
+          "nakshatra": "Purva Ashadha",
+          "nakshatra_id": 20,
+          "pada": 1
+        },
+        "planet": "Moon",
+        "sign": 8,
+        "sign_name": "Sagittarius"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": true,
+        "status": "combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 2,
+        "conjunctions": [
+          {
+            "orb": 6.82,
+            "planet": "Sun",
+            "type": "mixed"
+          },
+          {
+            "orb": 1.25,
+            "planet": "Saturn",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 0.3
+      },
+      "house_position_analysis": {
+        "house_number": 10,
+        "house_types": [
+          "Kendra",
+          "Upachaya"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 50.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Weak",
+        "shadbala_points": 168.1,
+        "shadbala_rupas": 2.8
+      }
+    },
+    "Rahu": {
+      "aspects_received": {
+        "aspect_count": 0,
+        "aspects": [],
+        "has_aspects": false
+      },
+      "basic_info": {
+        "avastha": "N/A",
+        "degree": 0.91,
+        "house": 3,
+        "longitude": 30.91,
+        "nakshatra": "Krittika",
+        "nakshatra_pada": {
+          "formatted": "Krittika (2)",
+          "nakshatra": "Krittika",
+          "nakshatra_id": 3,
+          "pada": 2
+        },
+        "planet": "Rahu",
+        "sign": 1,
+        "sign_name": "Taurus"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "Not applicable - Rahu cannot be combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 0,
+        "conjunctions": [],
+        "has_conjunctions": false
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 0.9
+      },
+      "house_position_analysis": {
+        "house_number": 3,
+        "house_types": [
+          "Upachaya"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 52.0
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "N/A",
+        "shadbala_points": 0,
+        "shadbala_rupas": 0
+      }
+    },
+    "Saturn": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Jupiter",
+            "effect_score": 8
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Yuva (Youth - 100% Strength)",
+        "degree": 17.43,
+        "house": 10,
+        "longitude": 257.43,
+        "nakshatra": "Purva Ashadha",
+        "nakshatra_pada": {
+          "formatted": "Purva Ashadha (2)",
+          "nakshatra": "Purva Ashadha",
+          "nakshatra_id": 20,
+          "pada": 2
+        },
+        "planet": "Saturn",
+        "sign": 8,
+        "sign_name": "Sagittarius"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": true,
+        "status": "combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 2,
+        "conjunctions": [
+          {
+            "orb": 5.57,
+            "planet": "Sun",
+            "type": "malefic"
+          },
+          {
+            "orb": 1.25,
+            "planet": "Moon",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 0.27
+      },
+      "house_position_analysis": {
+        "house_number": 10,
+        "house_types": [
+          "Kendra",
+          "Upachaya"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 53.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Average",
+        "shadbala_points": 209.43,
+        "shadbala_rupas": 3.49
+      }
+    },
+    "Sun": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Jupiter",
+            "effect_score": 8
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Vriddha (Old - Minimal Strength)",
+        "degree": 23.0,
+        "house": 10,
+        "longitude": 263.0,
+        "nakshatra": "Purva Ashadha",
+        "nakshatra_pada": {
+          "formatted": "Purva Ashadha (3)",
+          "nakshatra": "Purva Ashadha",
+          "nakshatra_id": 20,
+          "pada": 3
+        },
+        "planet": "Sun",
+        "sign": 8,
+        "sign_name": "Sagittarius"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "Not applicable - Sun cannot be combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 2,
+        "conjunctions": [
+          {
+            "orb": 6.82,
+            "planet": "Moon",
+            "type": "mixed"
+          },
+          {
+            "orb": 5.57,
+            "planet": "Saturn",
+            "type": "malefic"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "benefic",
+        "strength_multiplier": 1.2
+      },
+      "house_position_analysis": {
+        "house_number": 10,
+        "house_types": [
+          "Kendra",
+          "Upachaya"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 60.8
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Good",
+        "shadbala_points": 334.33,
+        "shadbala_rupas": 5.57
+      }
+    },
+    "Venus": {
+      "aspects_received": {
+        "aspect_count": 2,
+        "aspects": [
+          {
+            "aspect_type": "9th aspect",
+            "aspecting_planet": "Jupiter",
+            "effect_score": 8
+          },
+          {
+            "aspect_type": "3rd aspect",
+            "aspecting_planet": "Saturn",
+            "effect_score": -5
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Yuva (Youth - 100% Strength)",
+        "degree": 15.02,
+        "house": 12,
+        "longitude": 315.02,
+        "nakshatra": "Shatabhisha",
+        "nakshatra_pada": {
+          "formatted": "Shatabhisha (3)",
+          "nakshatra": "Shatabhisha",
+          "nakshatra_id": 24,
+          "pada": 3
+        },
+        "planet": "Venus",
+        "sign": 10,
+        "sign_name": "Aquarius"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 0,
+        "conjunctions": [],
+        "has_conjunctions": false
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.0
+      },
+      "house_position_analysis": {
+        "house_number": 12,
+        "house_types": [
+          "Dusthana"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Adhama (Weak)",
+        "overall_strength_score": 46.0
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Average",
+        "shadbala_points": 198.87,
+        "shadbala_rupas": 3.31
+      }
+    }
+  },
+  "dasha_conflicts": {
+    "conflicts": [],
+    "status": "missing_periods"
+  },
+  "divisional_charts": {
+    "d30_trimsamsa": {
+      "chart_name": "D30",
+      "division_number": 30,
+      "divisional_chart": {
+        "ascendant": 236.65,
+        "ayanamsa": 23.57,
+        "houses": [
+          {
+            "house_number": 1,
+            "longitude": 210,
+            "sign": 7
+          },
+          {
+            "house_number": 2,
+            "longitude": 240,
+            "sign": 8
+          },
+          {
+            "house_number": 3,
+            "longitude": 270,
+            "sign": 9
+          },
+          {
+            "house_number": 4,
+            "longitude": 300,
+            "sign": 10
+          },
+          {
+            "house_number": 5,
+            "longitude": 330,
+            "sign": 11
+          },
+          {
+            "house_number": 6,
+            "longitude": 0,
+            "sign": 0
+          },
+          {
+            "house_number": 7,
+            "longitude": 30,
+            "sign": 1
+          },
+          {
+            "house_number": 8,
+            "longitude": 60,
+            "sign": 2
+          },
+          {
+            "house_number": 9,
+            "longitude": 90,
+            "sign": 3
+          },
+          {
+            "house_number": 10,
+            "longitude": 120,
+            "sign": 4
+          },
+          {
+            "house_number": 11,
+            "longitude": 150,
+            "sign": 5
+          },
+          {
+            "house_number": 12,
+            "longitude": 180,
+            "sign": 6
+          }
+        ],
+        "planets": {
+          "Jupiter": {
+            "degree": 16.63,
+            "dignity": "neutral",
+            "functional_nature": "benefic",
+            "house": 4,
+            "longitude": 316.63,
+            "retrograde": true,
+            "sign": 10,
+            "sign_name": "Aquarius",
+            "strength_multiplier": 1.0
+          },
+          "Ketu": {
+            "degree": 13.04,
+            "dignity": "neutral",
+            "functional_nature": "neutral",
+            "house": 6,
+            "longitude": 13.04,
+            "retrograde": true,
+            "sign": 0,
+            "sign_name": "Aries",
+            "strength_multiplier": 1.0
+          },
+          "Mars": {
+            "degree": 11.98,
+            "dignity": "moolatrikona",
+            "functional_nature": "neutral",
+            "house": 6,
+            "longitude": 11.98,
+            "retrograde": true,
+            "sign": 0,
+            "sign_name": "Aries",
+            "strength_multiplier": 1.5
+          },
+          "Mercury": {
+            "degree": 13.47,
+            "dignity": "own_sign",
+            "functional_nature": "neutral",
+            "house": 8,
+            "longitude": 73.47,
+            "retrograde": false,
+            "sign": 2,
+            "sign_name": "Gemini",
+            "strength_multiplier": 1.25
+          },
+          "Moon": {
+            "degree": 13.92,
+            "dignity": "neutral",
+            "functional_nature": "benefic",
+            "house": 4,
+            "longitude": 313.92,
+            "retrograde": false,
+            "sign": 10,
+            "sign_name": "Aquarius",
+            "strength_multiplier": 1.0
+          },
+          "Rahu": {
+            "degree": 13.04,
+            "dignity": "neutral",
+            "functional_nature": "neutral",
+            "house": 6,
+            "longitude": 13.04,
+            "retrograde": true,
+            "sign": 0,
+            "sign_name": "Aries",
+            "strength_multiplier": 1.0
+          },
+          "Saturn": {
+            "degree": 18.1,
+            "dignity": "exalted",
+            "functional_nature": "malefic",
+            "house": 12,
+            "longitude": 198.1,
+            "retrograde": true,
+            "sign": 6,
+            "sign_name": "Libra",
+            "strength_multiplier": 2.0
+          },
+          "Sun": {
+            "degree": 6.67,
+            "dignity": "neutral",
+            "functional_nature": "malefic",
+            "house": 5,
+            "longitude": 336.67,
+            "retrograde": false,
+            "sign": 11,
+            "sign_name": "Pisces",
+            "strength_multiplier": 1.0
+          },
+          "Venus": {
+            "degree": 0.07,
+            "dignity": "debilitated",
+            "functional_nature": "malefic",
+            "house": 11,
+            "longitude": 150.07,
+            "retrograde": false,
+            "sign": 5,
+            "sign_name": "Virgo",
+            "strength_multiplier": 0.25
+          }
+        }
+      }
+    },
+    "d9_navamsa": {
+      "chart_name": "D9",
+      "division_number": 9,
+      "divisional_chart": {
+        "ascendant": 358.99,
+        "ayanamsa": 23.57,
+        "houses": [
+          {
+            "house_number": 1,
+            "longitude": 330,
+            "sign": 11
+          },
+          {
+            "house_number": 2,
+            "longitude": 0,
+            "sign": 0
+          },
+          {
+            "house_number": 3,
+            "longitude": 30,
+            "sign": 1
+          },
+          {
+            "house_number": 4,
+            "longitude": 60,
+            "sign": 2
+          },
+          {
+            "house_number": 5,
+            "longitude": 90,
+            "sign": 3
+          },
+          {
+            "house_number": 6,
+            "longitude": 120,
+            "sign": 4
+          },
+          {
+            "house_number": 7,
+            "longitude": 150,
+            "sign": 5
+          },
+          {
+            "house_number": 8,
+            "longitude": 180,
+            "sign": 6
+          },
+          {
+            "house_number": 9,
+            "longitude": 210,
+            "sign": 7
+          },
+          {
+            "house_number": 10,
+            "longitude": 240,
+            "sign": 8
+          },
+          {
+            "house_number": 11,
+            "longitude": 270,
+            "sign": 9
+          },
+          {
+            "house_number": 12,
+            "longitude": 300,
+            "sign": 10
+          }
+        ],
+        "planets": {
+          "Jupiter": {
+            "degree": 7.99,
+            "dignity": "neutral",
+            "functional_nature": "benefic",
+            "house": 4,
+            "longitude": 67.99,
+            "retrograde": true,
+            "sign": 2,
+            "sign_name": "Gemini",
+            "strength_multiplier": 1.0
+          },
+          "Ketu": {
+            "degree": 0.91,
+            "dignity": "neutral",
+            "functional_nature": "neutral",
+            "house": 9,
+            "longitude": 210.91,
+            "retrograde": true,
+            "sign": 7,
+            "sign_name": "Scorpio",
+            "strength_multiplier": 1.0
+          },
+          "Mars": {
+            "degree": 21.59,
+            "dignity": "moolatrikona",
+            "functional_nature": "benefic",
+            "house": 2,
+            "longitude": 21.59,
+            "retrograde": true,
+            "sign": 0,
+            "sign_name": "Aries",
+            "strength_multiplier": 1.5
+          },
+          "Mercury": {
+            "degree": 13.04,
+            "dignity": "neutral",
+            "functional_nature": "malefic",
+            "house": 2,
+            "longitude": 13.04,
+            "retrograde": false,
+            "sign": 0,
+            "sign_name": "Aries",
+            "strength_multiplier": 1.0
+          },
+          "Moon": {
+            "degree": 16.18,
+            "dignity": "neutral",
+            "functional_nature": "neutral",
+            "house": 10,
+            "longitude": 256.18,
+            "retrograde": false,
+            "sign": 8,
+            "sign_name": "Sagittarius",
+            "strength_multiplier": 1.0
+          },
+          "Rahu": {
+            "degree": 0.91,
+            "dignity": "neutral",
+            "functional_nature": "neutral",
+            "house": 3,
+            "longitude": 30.91,
+            "retrograde": true,
+            "sign": 1,
+            "sign_name": "Taurus",
+            "strength_multiplier": 1.0
+          },
+          "Saturn": {
+            "degree": 17.43,
+            "dignity": "neutral",
+            "functional_nature": "malefic",
+            "house": 10,
+            "longitude": 257.43,
+            "retrograde": true,
+            "sign": 8,
+            "sign_name": "Sagittarius",
+            "strength_multiplier": 1.0
+          },
+          "Sun": {
+            "degree": 23.0,
+            "dignity": "neutral",
+            "functional_nature": "benefic",
+            "house": 10,
+            "longitude": 263.0,
+            "retrograde": false,
+            "sign": 8,
+            "sign_name": "Sagittarius",
+            "strength_multiplier": 1.0
+          },
+          "Venus": {
+            "degree": 15.02,
+            "dignity": "neutral",
+            "functional_nature": "malefic",
+            "house": 12,
+            "longitude": 315.02,
+            "retrograde": false,
+            "sign": 10,
+            "sign_name": "Aquarius",
+            "strength_multiplier": 1.0
+          }
+        }
+      }
+    }
+  },
+  "house_lordships": {
+    "Jupiter": [
+      6,
+      9
+    ],
+    "Mars": [
+      5,
+      10
+    ],
+    "Mercury": [
+      3,
+      12
+    ],
+    "Moon": [
+      1
+    ],
+    "Saturn": [
+      7,
+      8
+    ],
+    "Sun": [
+      2
+    ],
+    "Venus": [
+      4,
+      11
+    ]
+  },
+  "jaimini_full_analysis": {
+    "jaimini_yogas": [],
+    "karaka_status": {},
+    "sign_aspects": {
+      "0": [
+        4,
+        7,
+        10
+      ],
+      "1": [
+        3,
+        6,
+        9
+      ],
+      "2": [
+        5,
+        8,
+        11
+      ],
+      "3": [
+        1,
+        7,
+        10
+      ],
+      "4": [
+        0,
+        6,
+        9
+      ],
+      "5": [
+        2,
+        8,
+        11
+      ],
+      "6": [
+        1,
+        4,
+        10
+      ],
+      "7": [
+        0,
+        3,
+        9
+      ],
+      "8": [
+        2,
+        5,
+        11
+      ],
+      "9": [
+        1,
+        4,
+        7
+      ],
+      "10": [
+        0,
+        3,
+        6
+      ],
+      "11": [
+        2,
+        5,
+        8
+      ]
+    }
+  },
+  "jaimini_points": {
+    "arudha_lagna": {
+      "description": "How the world sees you (Status/Image).",
+      "sign_id": 9,
+      "sign_name": "Capricorn"
+    },
+    "ghatika_lagna": {
+      "description": "Power, authority, and political influence.",
+      "sign_id": 0,
+      "sign_name": "Aries"
+    },
+    "hora_lagna": {
+      "description": "Wealth and financial status indicator.",
+      "sign_id": 0,
+      "sign_name": "Aries"
+    },
+    "karkamsa_lagna": {
+      "description": "Soul's desire and professional talent (AK in D9).",
+      "sign_id": 8,
+      "sign_name": "Sagittarius"
+    },
+    "swamsa_lagna": {
+      "description": "The Ascendant of the Navamsa (Soul's Path).",
+      "sign_id": 0,
+      "sign_name": "Aries"
+    },
+    "upapada_lagna": {
+      "description": "Marriage and relationships.",
+      "sign_id": 1,
+      "sign_name": "Taurus"
+    }
+  },
+  "kalchakra_dasha": {
+    "antardasha": {
+      "planet": "Mercury"
+    },
+    "cycle_length": 120,
+    "maha_dashas": [
+      {
+        "end": "1995-11-03T17:24:58.010011",
+        "planet": "Rahu",
+        "start": "1980-04-02T14:55:00",
+        "years": 15.59
+      },
+      {
+        "end": "2002-11-03T11:24:58.010011",
+        "planet": "Ketu",
+        "start": "1995-11-03T17:24:59.010011",
+        "years": 7
+      },
+      {
+        "end": "2008-11-02T23:24:58.010011",
+        "planet": "Sun",
+        "start": "2002-11-03T11:24:59.010011",
+        "years": 6
+      },
+      {
+        "end": "2018-11-03T11:24:58.010011",
+        "planet": "Moon",
+        "start": "2008-11-02T23:24:59.010011",
+        "years": 10
+      },
+      {
+        "end": "2025-11-03T05:24:58.010011",
+        "planet": "Mars",
+        "start": "2018-11-03T11:24:59.010011",
+        "years": 7
+      },
+      {
+        "end": "2042-11-03T11:24:58.010011",
+        "planet": "Mercury",
+        "start": "2025-11-03T05:24:59.010011",
+        "years": 17
+      },
+      {
+        "end": "2058-11-03T11:24:58.010011",
+        "planet": "Jupiter",
+        "start": "2042-11-03T11:24:59.010011",
+        "years": 16
+      },
+      {
+        "end": "2078-11-03T11:24:58.010011",
+        "planet": "Venus",
+        "start": "2058-11-03T11:24:59.010011",
+        "years": 20
+      },
+      {
+        "end": "2097-11-03T05:24:58.010011",
+        "planet": "Saturn",
+        "start": "2078-11-03T11:24:59.010011",
+        "years": 19
+      }
+    ],
+    "mahadasha": {
+      "planet": "Mercury"
+    },
+    "moon_nakshatra": 15,
+    "moon_pada": 1,
+    "sequence_direction": "Forward",
+    "starting_planet": "Rahu",
+    "system": "Kalchakra"
+  },
+  "nadi_links": {},
+  "planetary_analysis": {
+    "Jupiter": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Mercury",
+            "effect_score": -2
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Kumar (Teen - 50% Strength)",
+        "degree": 7.55,
+        "house": 2,
+        "longitude": 127.55,
+        "nakshatra": "Magha",
+        "nakshatra_pada": {
+          "formatted": "Magha (3)",
+          "nakshatra": "Magha",
+          "nakshatra_id": 10,
+          "pada": 3
+        },
+        "planet": "Jupiter",
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 3,
+        "conjunctions": [
+          {
+            "orb": 5.16,
+            "planet": "Mars",
+            "type": "mixed"
+          },
+          {
+            "orb": 21.05,
+            "planet": "Saturn",
+            "type": "mixed"
+          },
+          {
+            "orb": 4.12,
+            "planet": "Rahu",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.0
+      },
+      "house_position_analysis": {
+        "house_number": 2,
+        "house_types": [
+          "Maraka"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 55.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Good",
+        "shadbala_points": 303.44,
+        "shadbala_rupas": 5.06
+      }
+    },
+    "Ketu": {
+      "aspects_received": {
+        "aspect_count": 3,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Mars",
+            "effect_score": -3
+          },
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Jupiter",
+            "effect_score": 3
+          },
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Saturn",
+            "effect_score": -7
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "N/A",
+        "degree": 3.43,
+        "house": 8,
+        "longitude": 303.43,
+        "nakshatra": "Dhanishta",
+        "nakshatra_pada": {
+          "formatted": "Dhanishta (4)",
+          "nakshatra": "Dhanishta",
+          "nakshatra_id": 23,
+          "pada": 4
+        },
+        "planet": "Ketu",
+        "sign": 10,
+        "sign_name": "Aquarius"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "Not applicable - Ketu cannot be combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 1,
+        "conjunctions": [
+          {
+            "orb": 18.01,
+            "planet": "Mercury",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 0.9
+      },
+      "house_position_analysis": {
+        "house_number": 8,
+        "house_types": [
+          "Dusthana"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Adhama (Weak)",
+        "overall_strength_score": 42.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "N/A",
+        "shadbala_points": 0,
+        "shadbala_rupas": 0
+      }
+    },
+    "Mars": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Mercury",
+            "effect_score": -2
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Bal (Infant - 25% Strength)",
+        "degree": 2.4,
+        "house": 2,
+        "longitude": 122.4,
+        "nakshatra": "Magha",
+        "nakshatra_pada": {
+          "formatted": "Magha (1)",
+          "nakshatra": "Magha",
+          "nakshatra_id": 10,
+          "pada": 1
+        },
+        "planet": "Mars",
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 3,
+        "conjunctions": [
+          {
+            "orb": 5.16,
+            "planet": "Jupiter",
+            "type": "mixed"
+          },
+          {
+            "orb": 26.2,
+            "planet": "Saturn",
+            "type": "malefic"
+          },
+          {
+            "orb": 1.04,
+            "planet": "Rahu",
+            "type": "malefic"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "benefic",
+        "strength_multiplier": 1.08
+      },
+      "house_position_analysis": {
+        "house_number": 2,
+        "house_types": [
+          "Maraka"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Adhama (Weak)",
+        "overall_strength_score": 41.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Weak",
+        "shadbala_points": 148.61,
+        "shadbala_rupas": 2.48
+      }
+    },
+    "Mercury": {
+      "aspects_received": {
+        "aspect_count": 3,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Mars",
+            "effect_score": -3
+          },
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Jupiter",
+            "effect_score": 3
+          },
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Saturn",
+            "effect_score": -7
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Vriddha (Old - Minimal Strength)",
+        "degree": 21.45,
+        "house": 8,
+        "longitude": 321.45,
+        "nakshatra": "Purva Bhadrapada",
+        "nakshatra_pada": {
+          "formatted": "Purva Bhadrapada (1)",
+          "nakshatra": "Purva Bhadrapada",
+          "nakshatra_id": 25,
+          "pada": 1
+        },
+        "planet": "Mercury",
+        "sign": 10,
+        "sign_name": "Aquarius"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 1,
+        "conjunctions": [
+          {
+            "orb": 18.01,
+            "planet": "Ketu",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.0
+      },
+      "house_position_analysis": {
+        "house_number": 8,
+        "house_types": [
+          "Dusthana"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Adhama (Weak)",
+        "overall_strength_score": 38.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Weak",
+        "shadbala_points": 83.56,
+        "shadbala_rupas": 1.39
+      }
+    },
+    "Moon": {
+      "aspects_received": {
+        "aspect_count": 2,
+        "aspects": [
+          {
+            "aspect_type": "3rd aspect",
+            "aspecting_planet": "Saturn",
+            "effect_score": -7
+          },
+          {
+            "aspect_type": "3rd aspect",
+            "aspecting_planet": "Rahu",
+            "effect_score": -4
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Kumar (Teen - 50% Strength)",
+        "degree": 8.46,
+        "house": 4,
+        "longitude": 188.46,
+        "nakshatra": "Swati",
+        "nakshatra_pada": {
+          "formatted": "Swati (1)",
+          "nakshatra": "Swati",
+          "nakshatra_id": 15,
+          "pada": 1
+        },
+        "planet": "Moon",
+        "sign": 6,
+        "sign_name": "Libra"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 0,
+        "conjunctions": [],
+        "has_conjunctions": false
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "benefic",
+        "strength_multiplier": 1.2
+      },
+      "house_position_analysis": {
+        "house_number": 4,
+        "house_types": [
+          "Kendra"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 51.5
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Average",
+        "shadbala_points": 253.19,
+        "shadbala_rupas": 4.22
+      }
+    },
+    "Rahu": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Mercury",
+            "effect_score": -2
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "N/A",
+        "degree": 3.43,
+        "house": 2,
+        "longitude": 123.43,
+        "nakshatra": "Magha",
+        "nakshatra_pada": {
+          "formatted": "Magha (2)",
+          "nakshatra": "Magha",
+          "nakshatra_id": 10,
+          "pada": 2
+        },
+        "planet": "Rahu",
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "Not applicable - Rahu cannot be combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 3,
+        "conjunctions": [
+          {
+            "orb": 1.04,
+            "planet": "Mars",
+            "type": "malefic"
+          },
+          {
+            "orb": 4.12,
+            "planet": "Jupiter",
+            "type": "mixed"
+          },
+          {
+            "orb": 25.17,
+            "planet": "Saturn",
+            "type": "malefic"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "unfavorable",
+        "functional_nature": "neutral",
+        "strength_multiplier": 0.72
+      },
+      "house_position_analysis": {
+        "house_number": 2,
+        "house_types": [
+          "Maraka"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 46.8
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "N/A",
+        "shadbala_points": 0,
+        "shadbala_rupas": 0
+      }
+    },
+    "Saturn": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "7th aspect",
+            "aspecting_planet": "Mercury",
+            "effect_score": -2
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Mrit (Dead - 0% Strength)",
+        "degree": 28.6,
+        "house": 2,
+        "longitude": 148.6,
+        "nakshatra": "Uttara Phalguni",
+        "nakshatra_pada": {
+          "formatted": "Uttara Phalguni (1)",
+          "nakshatra": "Uttara Phalguni",
+          "nakshatra_id": 12,
+          "pada": 1
+        },
+        "planet": "Saturn",
+        "sign": 4,
+        "sign_name": "Leo"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 3,
+        "conjunctions": [
+          {
+            "orb": 26.2,
+            "planet": "Mars",
+            "type": "malefic"
+          },
+          {
+            "orb": 21.05,
+            "planet": "Jupiter",
+            "type": "mixed"
+          },
+          {
+            "orb": 25.17,
+            "planet": "Rahu",
+            "type": "malefic"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 0.9
+      },
+      "house_position_analysis": {
+        "house_number": 2,
+        "house_types": [
+          "Maraka"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Adhama (Weak)",
+        "overall_strength_score": 41.8
+      },
+      "retrograde_analysis": {
+        "is_retrograde": true
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Weak",
+        "shadbala_points": 176.44,
+        "shadbala_rupas": 2.94
+      }
+    },
+    "Sun": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "8th aspect",
+            "aspecting_planet": "Mars",
+            "effect_score": -3
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Kumar (Teen - 50% Strength)",
+        "degree": 19.22,
+        "house": 9,
+        "longitude": 349.22,
+        "nakshatra": "Revati",
+        "nakshatra_pada": {
+          "formatted": "Revati (1)",
+          "nakshatra": "Revati",
+          "nakshatra_id": 27,
+          "pada": 1
+        },
+        "planet": "Sun",
+        "sign": 11,
+        "sign_name": "Pisces"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "Not applicable - Sun cannot be combust"
+      },
+      "conjunctions": {
+        "conjunction_count": 1,
+        "conjunctions": [
+          {
+            "orb": 4.22,
+            "planet": "InduLagna",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "neutral",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.0
+      },
+      "house_position_analysis": {
+        "house_number": 9,
+        "house_types": [
+          "Trikona"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 61.2
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Good",
+        "shadbala_points": 298.07,
+        "shadbala_rupas": 4.97
+      }
+    },
+    "Venus": {
+      "aspects_received": {
+        "aspect_count": 1,
+        "aspects": [
+          {
+            "aspect_type": "10th aspect",
+            "aspecting_planet": "Saturn",
+            "effect_score": -7
+          }
+        ],
+        "has_aspects": true
+      },
+      "basic_info": {
+        "avastha": "Mrit (Dead - 0% Strength)",
+        "degree": 5.0,
+        "house": 11,
+        "longitude": 35.0,
+        "nakshatra": "Krittika",
+        "nakshatra_pada": {
+          "formatted": "Krittika (3)",
+          "nakshatra": "Krittika",
+          "nakshatra_id": 3,
+          "pada": 3
+        },
+        "planet": "Venus",
+        "sign": 1,
+        "sign_name": "Taurus"
+      },
+      "combustion_status": {
+        "is_cazimi": false,
+        "is_combust": false,
+        "status": "normal"
+      },
+      "conjunctions": {
+        "conjunction_count": 1,
+        "conjunctions": [
+          {
+            "orb": 8.93,
+            "planet": "Gulika",
+            "type": "mixed"
+          }
+        ],
+        "has_conjunctions": true
+      },
+      "dignity_analysis": {
+        "dignity": "own_sign",
+        "functional_nature": "neutral",
+        "strength_multiplier": 1.2
+      },
+      "house_position_analysis": {
+        "house_number": 11,
+        "house_types": [
+          "Upachaya"
+        ]
+      },
+      "overall_assessment": {
+        "classical_grade": "Madhyama (Moderate)",
+        "overall_strength_score": 58.5
+      },
+      "retrograde_analysis": {
+        "is_retrograde": false
+      },
+      "strength_analysis": {
+        "shadbala_grade": "Average",
+        "shadbala_points": 230.19,
+        "shadbala_rupas": 3.84
+      }
+    }
+  },
+  "prediction_matrix": {
+    "high_impact_periods": [],
+    "interpretation": "Standard astrological influences - no exceptional convergences detected",
+    "total_triggers": 0
+  },
+  "relationships": {
+    "argala_analysis": {
+      "1": {
+        "argala_grade": "Very Strong Support",
+        "argala_planets": [
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Mars",
+            "real_strength": 26.78,
+            "shadbala_rupas": 2.48
+          },
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Jupiter",
+            "real_strength": 50.6,
+            "shadbala_rupas": 5.06
+          },
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Saturn",
+            "real_strength": 26.46,
+            "shadbala_rupas": 2.94
+          },
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "unfavorable",
+            "house": 2,
+            "planet": "Rahu",
+            "real_strength": 0,
+            "shadbala_rupas": 0
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 4,
+            "planet": "Moon",
+            "real_strength": 50.64,
+            "shadbala_rupas": 4.22
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "own_sign",
+            "house": 11,
+            "planet": "Venus",
+            "real_strength": 46.08,
+            "shadbala_rupas": 3.84
+          }
+        ],
+        "house_number": 1,
+        "net_argala_strength": 200.56,
+        "virodha_argala_planets": []
+      },
+      "2": {
+        "argala_grade": "Very Strong Obstruction",
+        "argala_planets": [],
+        "house_number": 2,
+        "net_argala_strength": -96.72,
+        "virodha_argala_planets": [
+          {
+            "dignity": "own_sign",
+            "house": 11,
+            "planet": "Venus",
+            "real_strength": 46.08,
+            "shadbala_rupas": 3.84,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 4,
+            "planet": "Moon",
+            "real_strength": 50.64,
+            "shadbala_rupas": 4.22,
+            "virodha_type": "3rd House Virodha"
+          }
+        ]
+      },
+      "3": {
+        "argala_grade": "Very Strong Obstruction",
+        "argala_planets": [
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 4,
+            "planet": "Moon",
+            "real_strength": 50.64,
+            "shadbala_rupas": 4.22
+          }
+        ],
+        "house_number": 3,
+        "net_argala_strength": -53.2,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Mars",
+            "real_strength": 26.78,
+            "shadbala_rupas": 2.48,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Jupiter",
+            "real_strength": 50.6,
+            "shadbala_rupas": 5.06,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Saturn",
+            "real_strength": 26.46,
+            "shadbala_rupas": 2.94,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "unfavorable",
+            "house": 2,
+            "planet": "Rahu",
+            "real_strength": 0,
+            "shadbala_rupas": 0,
+            "virodha_type": "12th House Virodha"
+          }
+        ]
+      },
+      "4": {
+        "argala_grade": "Very Strong Support",
+        "argala_planets": [
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Mars",
+            "real_strength": 26.78,
+            "shadbala_rupas": 2.48
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Jupiter",
+            "real_strength": 50.6,
+            "shadbala_rupas": 5.06
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Saturn",
+            "real_strength": 26.46,
+            "shadbala_rupas": 2.94
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "unfavorable",
+            "house": 2,
+            "planet": "Rahu",
+            "real_strength": 0,
+            "shadbala_rupas": 0
+          }
+        ],
+        "house_number": 4,
+        "net_argala_strength": 103.84,
+        "virodha_argala_planets": []
+      },
+      "5": {
+        "argala_grade": "Very Strong Obstruction",
+        "argala_planets": [
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Mercury",
+            "real_strength": 13.9,
+            "shadbala_rupas": 1.39
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Ketu",
+            "real_strength": 0,
+            "shadbala_rupas": 0
+          }
+        ],
+        "house_number": 5,
+        "net_argala_strength": -140.58,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 4,
+            "planet": "Moon",
+            "real_strength": 50.64,
+            "shadbala_rupas": 4.22,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Mars",
+            "real_strength": 26.78,
+            "shadbala_rupas": 2.48,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Jupiter",
+            "real_strength": 50.6,
+            "shadbala_rupas": 5.06,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Saturn",
+            "real_strength": 26.46,
+            "shadbala_rupas": 2.94,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "unfavorable",
+            "house": 2,
+            "planet": "Rahu",
+            "real_strength": 0,
+            "shadbala_rupas": 0,
+            "virodha_type": "10th House Virodha"
+          }
+        ]
+      },
+      "6": {
+        "argala_grade": "Very Strong Support",
+        "argala_planets": [
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "Sun",
+            "real_strength": 49.7,
+            "shadbala_rupas": 4.97
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "InduLagna",
+            "real_strength": 15.0,
+            "shadbala_rupas": 1.5
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 4,
+            "planet": "Moon",
+            "real_strength": 50.64,
+            "shadbala_rupas": 4.22
+          }
+        ],
+        "house_number": 6,
+        "net_argala_strength": 101.44,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Mercury",
+            "real_strength": 13.9,
+            "shadbala_rupas": 1.39,
+            "virodha_type": "3rd House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Ketu",
+            "real_strength": 0,
+            "shadbala_rupas": 0,
+            "virodha_type": "3rd House Virodha"
+          }
+        ]
+      },
+      "7": {
+        "argala_grade": "Very Strong Obstruction",
+        "argala_planets": [
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Mercury",
+            "real_strength": 13.9,
+            "shadbala_rupas": 1.39
+          },
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Ketu",
+            "real_strength": 0,
+            "shadbala_rupas": 0
+          }
+        ],
+        "house_number": 7,
+        "net_argala_strength": -101.44,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 4,
+            "planet": "Moon",
+            "real_strength": 50.64,
+            "shadbala_rupas": 4.22,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "Sun",
+            "real_strength": 49.7,
+            "shadbala_rupas": 4.97,
+            "virodha_type": "3rd House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "InduLagna",
+            "real_strength": 15.0,
+            "shadbala_rupas": 1.5,
+            "virodha_type": "3rd House Virodha"
+          }
+        ]
+      },
+      "8": {
+        "argala_grade": "Very Strong Support",
+        "argala_planets": [
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "Sun",
+            "real_strength": 49.7,
+            "shadbala_rupas": 4.97
+          },
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "InduLagna",
+            "real_strength": 15.0,
+            "shadbala_rupas": 1.5
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "own_sign",
+            "house": 11,
+            "planet": "Venus",
+            "real_strength": 46.08,
+            "shadbala_rupas": 3.84
+          }
+        ],
+        "house_number": 8,
+        "net_argala_strength": 110.78,
+        "virodha_argala_planets": []
+      },
+      "9": {
+        "argala_grade": "Very Strong Obstruction",
+        "argala_planets": [],
+        "house_number": 9,
+        "net_argala_strength": -59.98,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Mercury",
+            "real_strength": 13.9,
+            "shadbala_rupas": 1.39,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Ketu",
+            "real_strength": 0,
+            "shadbala_rupas": 0,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "own_sign",
+            "house": 11,
+            "planet": "Venus",
+            "real_strength": 46.08,
+            "shadbala_rupas": 3.84,
+            "virodha_type": "3rd House Virodha"
+          }
+        ]
+      },
+      "10": {
+        "argala_grade": "Neutral",
+        "argala_planets": [
+          {
+            "argala_type": "2nd House Argala",
+            "dignity": "own_sign",
+            "house": 11,
+            "planet": "Venus",
+            "real_strength": 46.08,
+            "shadbala_rupas": 3.84
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Mercury",
+            "real_strength": 13.9,
+            "shadbala_rupas": 1.39
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Ketu",
+            "real_strength": 0,
+            "shadbala_rupas": 0
+          }
+        ],
+        "house_number": 10,
+        "net_argala_strength": -4.72,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "Sun",
+            "real_strength": 49.7,
+            "shadbala_rupas": 4.97,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "InduLagna",
+            "real_strength": 15.0,
+            "shadbala_rupas": 1.5,
+            "virodha_type": "12th House Virodha"
+          }
+        ]
+      },
+      "11": {
+        "argala_grade": "Very Strong Support",
+        "argala_planets": [
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Mars",
+            "real_strength": 26.78,
+            "shadbala_rupas": 2.48
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Jupiter",
+            "real_strength": 50.6,
+            "shadbala_rupas": 5.06
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Saturn",
+            "real_strength": 26.46,
+            "shadbala_rupas": 2.94
+          },
+          {
+            "argala_type": "4th House Argala",
+            "dignity": "unfavorable",
+            "house": 2,
+            "planet": "Rahu",
+            "real_strength": 0,
+            "shadbala_rupas": 0
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "Sun",
+            "real_strength": 49.7,
+            "shadbala_rupas": 4.97
+          },
+          {
+            "argala_type": "11th House Argala",
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "InduLagna",
+            "real_strength": 15.0,
+            "shadbala_rupas": 1.5
+          }
+        ],
+        "house_number": 11,
+        "net_argala_strength": 154.64,
+        "virodha_argala_planets": [
+          {
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Mercury",
+            "real_strength": 13.9,
+            "shadbala_rupas": 1.39,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 8,
+            "planet": "Ketu",
+            "real_strength": 0,
+            "shadbala_rupas": 0,
+            "virodha_type": "10th House Virodha"
+          }
+        ]
+      },
+      "12": {
+        "argala_grade": "Very Strong Obstruction",
+        "argala_planets": [],
+        "house_number": 12,
+        "net_argala_strength": -214.62,
+        "virodha_argala_planets": [
+          {
+            "dignity": "own_sign",
+            "house": 11,
+            "planet": "Venus",
+            "real_strength": 46.08,
+            "shadbala_rupas": 3.84,
+            "virodha_type": "12th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "Sun",
+            "real_strength": 49.7,
+            "shadbala_rupas": 4.97,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 9,
+            "planet": "InduLagna",
+            "real_strength": 15.0,
+            "shadbala_rupas": 1.5,
+            "virodha_type": "10th House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Mars",
+            "real_strength": 26.78,
+            "shadbala_rupas": 2.48,
+            "virodha_type": "3rd House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Jupiter",
+            "real_strength": 50.6,
+            "shadbala_rupas": 5.06,
+            "virodha_type": "3rd House Virodha"
+          },
+          {
+            "dignity": "neutral",
+            "house": 2,
+            "planet": "Saturn",
+            "real_strength": 26.46,
+            "shadbala_rupas": 2.94,
+            "virodha_type": "3rd House Virodha"
+          },
+          {
+            "dignity": "unfavorable",
+            "house": 2,
+            "planet": "Rahu",
+            "real_strength": 0,
+            "shadbala_rupas": 0,
+            "virodha_type": "3rd House Virodha"
+          }
+        ]
+      }
+    }
+  },
+  "response_format": {
+    "format": "Use proper formatting with **bold** and *italic* text as needed.",
+    "header_enforcement": "You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.",
+    "instruction": "Provide complete response. Do not truncate mid-sentence.",
+    "mandatory_sections": "ALWAYS include Nakshatra Insights section when nakshatra data is available in context.",
+    "max_length": "Aim for comprehensive but concise responses under 4000 characters.",
+    "verdict_template": "For predictions, use Rule J format: \"Since this [yoga/event] appears in [X] out of 3 charts, confidence is [X*33]%\""
+  },
+  "shoola_dasha": {
+    "all_periods": [
+      {
+        "end_date": "1989-04-02",
+        "order": 1,
+        "sign_id": 3,
+        "sign_name": "Cancer",
+        "start_date": "1980-04-02"
+      },
+      {
+        "end_date": "1998-04-02",
+        "order": 2,
+        "sign_id": 2,
+        "sign_name": "Gemini",
+        "start_date": "1989-04-02"
+      },
+      {
+        "end_date": "2007-04-02",
+        "order": 3,
+        "sign_id": 1,
+        "sign_name": "Taurus",
+        "start_date": "1998-04-02"
+      },
+      {
+        "end_date": "2016-04-02",
+        "order": 4,
+        "sign_id": 0,
+        "sign_name": "Aries",
+        "start_date": "2007-04-02"
+      },
+      {
+        "end_date": "2025-04-02",
+        "order": 5,
+        "sign_id": 11,
+        "sign_name": "Pisces",
+        "start_date": "2016-04-02"
+      },
+      {
+        "end_date": "2034-04-02",
+        "order": 6,
+        "sign_id": 10,
+        "sign_name": "Aquarius",
+        "start_date": "2025-04-02"
+      },
+      {
+        "end_date": "2043-04-02",
+        "order": 7,
+        "sign_id": 9,
+        "sign_name": "Capricorn",
+        "start_date": "2034-04-02"
+      },
+      {
+        "end_date": "2052-04-02",
+        "order": 8,
+        "sign_id": 8,
+        "sign_name": "Sagittarius",
+        "start_date": "2043-04-02"
+      },
+      {
+        "end_date": "2061-04-02",
+        "order": 9,
+        "sign_id": 7,
+        "sign_name": "Scorpio",
+        "start_date": "2052-04-02"
+      },
+      {
+        "end_date": "2070-04-02",
+        "order": 10,
+        "sign_id": 6,
+        "sign_name": "Libra",
+        "start_date": "2061-04-02"
+      },
+      {
+        "end_date": "2079-04-02",
+        "order": 11,
+        "sign_id": 5,
+        "sign_name": "Virgo",
+        "start_date": "2070-04-02"
+      },
+      {
+        "end_date": "2088-04-02",
+        "order": 12,
+        "sign_id": 4,
+        "sign_name": "Leo",
+        "start_date": "2079-04-02"
+      }
+    ],
+    "current_period": {
+      "end_date": "2034-04-02",
+      "order": 6,
+      "sign_id": 10,
+      "sign_name": "Aquarius",
+      "start_date": "2025-04-02"
+    },
+    "direction": "Backward",
+    "start_sign": "Cancer",
+    "type": "Shoola Dasha"
+  },
+  "sniper_points": {
+    "kharesh": {
+      "error": "Kharesh calculation failed: 'planets'"
+    },
+    "navamsa_64th": {
+      "danger_lord": "Jupiter",
+      "danger_sign": "Pisces",
+      "point_name": "64th Navamsa",
+      "significance": "Critical point for mental stress and transformation.",
+      "transit_watch": "Watch when Saturn/Rahu transits Pisces."
+    }
+  },
+  "special_lagnas": {
+    "indu_lagna": {
+      "aspecting_planets": [
+        "Mars",
+        "Jupiter",
+        "Saturn",
+        "Rahu"
+      ],
+      "house_number": 9,
+      "occupying_planets": [
+        "Sun",
+        "InduLagna"
+      ],
+      "ruler": "Jupiter",
+      "sign_name": "Pisces"
+    }
+  },
+  "special_points": {
+    "badhaka_lord": "Saturn"
+  },
+  "sudarshana_chakra": {
+    "chandra_lagna": {},
+    "lagna_chart": {},
+    "surya_lagna": {},
+    "synthesis": {
+      "patterns": []
+    }
+  },
+  "transit_data_availability": {
+    "available_range": "1900-2100",
+    "can_request": true,
+    "current_period": "2025-2027 (2 years)",
+    "note": "You can request specific periods for detailed timing analysis using JSON format. Set detailed_dashas: true for Sookshma/Prana levels in short-term analysis",
+    "request_format": "Include JSON in your response: {\"requestType\": \"transitRequest\", \"startYear\": 2027, \"endYear\": 2028, \"specificMonths\": [\"January\", \"February\", \"March\"], \"detailed_dashas\": true}"
+  },
+  "yogas": {
+    "amala_yogas": [],
+    "career_specific_yogas": [
+      {
+        "classical_reference": "Phalad\u012bpik\u0101 6.16; Hora Sara 10.2",
+        "description": "10th lord Mars with Saturn - structured, responsible work style",
+        "houses": [
+          2,
+          2
+        ],
+        "name": "\u015aani-Karma Yoga",
+        "planets": [
+          "Mars",
+          "Saturn"
+        ],
+        "sanskrit_verse": "Da\u015bama-pati\u1e25 \u015banisa\u1e43yukta\u1e25 karma-ni\u1e63\u1e6dha\u1e25",
+        "strength": "High"
+      }
+    ],
+    "dhana_yogas": [],
+    "dharma_karma_yogas": [
+      {
+        "description": "Jupiter and Mars create dharmic career success",
+        "name": "Dharma-Karma Yoga",
+        "planets": [
+          "Jupiter",
+          "Mars"
+        ],
+        "strength": "High"
+      }
+    ],
+    "education_yogas": [
+      {
+        "description": "Mercury, Jupiter, Venus in mutual aspect - good learning ability",
+        "houses": [
+          8,
+          2,
+          11
+        ],
+        "name": "Saraswati Yoga (Aspect)",
+        "planets": [
+          "Mercury",
+          "Jupiter",
+          "Venus"
+        ],
+        "strength": "Medium"
+      },
+      {
+        "description": "Jupiter-Mars connection - technical and scientific education aptitude",
+        "houses": [
+          2,
+          2
+        ],
+        "name": "Guru-Mangal Yoga",
+        "planets": [
+          "Jupiter",
+          "Mars"
+        ],
+        "strength": "Medium"
+      }
+    ],
+    "gaja_kesari_yogas": [],
+    "health_yogas": [
+      {
+        "description": "12th lord Mercury in 8th house - reduces hospitalization and mental health issues",
+        "house": 8,
+        "name": "Vipareeta Raja Yoga (Health)",
+        "planet": "Mercury",
+        "strength": "Medium",
+        "type": "beneficial"
+      },
+      {
+        "description": "Lagna lord Moon in favorable house - good longevity",
+        "house": 4,
+        "name": "Ayur Yoga",
+        "planet": "Moon",
+        "strength": "High",
+        "type": "beneficial"
+      },
+      {
+        "description": "Moon in 4th house - emotional stability, good digestive health",
+        "house": 4,
+        "name": "Chandra Sukha Yoga",
+        "planet": "Moon",
+        "strength": "Medium",
+        "type": "beneficial"
+      }
+    ],
+    "mahapurusha_yogas": [],
+    "major_doshas": {
+      "kaal_sarp_dosha": {
+        "note": "Simplified calculation - all planets in one hemisphere",
+        "planets_in_rahu_ketu_arc": 3,
+        "present": false
+      },
+      "mangal_dosha": {
+        "from_lagna": true,
+        "from_moon": false,
+        "mars_house_lagna": 2,
+        "mars_house_moon": 11,
+        "present": true,
+        "type": "Low"
+      },
+      "pitra_dosha": {
+        "moon_afflicted": false,
+        "ninth_house_malefics": [],
+        "note": "Requires detailed conjunction analysis for complete assessment",
+        "present": false,
+        "sun_afflicted": false
+      }
+    },
+    "marriage_yogas": [
+      {
+        "description": "Mars in 2th house - marriage delays and conflicts",
+        "house": 2,
+        "name": "Mangal Dosha",
+        "planet": "Mars",
+        "strength": "Medium",
+        "type": "affliction"
+      }
+    ],
+    "neecha_bhanga_yogas": [],
+    "raj_yogas": [
+      {
+        "description": "7th lord Saturn and 1th lord Moon connected",
+        "houses": [
+          2,
+          4
+        ],
+        "name": "Kendra-Trikona Raj Yoga",
+        "planets": [
+          "Saturn",
+          "Moon"
+        ],
+        "strength": "High"
+      },
+      {
+        "description": "7th lord Saturn and 5th lord Mars connected",
+        "houses": [
+          2,
+          2
+        ],
+        "name": "Kendra-Trikona Raj Yoga",
+        "planets": [
+          "Saturn",
+          "Mars"
+        ],
+        "strength": "High"
+      },
+      {
+        "description": "7th lord Saturn and 9th lord Jupiter connected",
+        "houses": [
+          2,
+          2
+        ],
+        "name": "Kendra-Trikona Raj Yoga",
+        "planets": [
+          "Saturn",
+          "Jupiter"
+        ],
+        "strength": "High"
+      },
+      {
+        "description": "10th lord Mars and 9th lord Jupiter connected",
+        "houses": [
+          2,
+          2
+        ],
+        "name": "Kendra-Trikona Raj Yoga",
+        "planets": [
+          "Mars",
+          "Jupiter"
+        ],
+        "strength": "High"
+      }
+    ],
+    "viparita_raja_yogas": [
+      {
+        "description": "Dusthana lord Mercury in dusthana house 8",
+        "house": 8,
+        "name": "Viparita Raja Yoga",
+        "planet": "Mercury",
+        "strength": "Medium"
+      }
+    ]
+  },
+  "yogini_dasha": {
+    "antardasha": {
+      "end": "2026-07-06",
+      "lord": "Saturn",
+      "name": "Ulka",
+      "start": "2025-09-05",
+      "vibe": "Grief, Fear, Sudden Loss"
+    },
+    "mahadasha": {
+      "end": "2029-12-25",
+      "lord": "Mercury",
+      "name": "Bhadrika",
+      "start": "2024-12-25",
+      "vibe": "Career Growth, Friends, Social Status"
+    },
+    "significance": "Laborious period. Hard work required."
+  }
+}
+
+IMPORTANT CURRENT DATE INFORMATION:
+- Today's Date: December 29, 2025
+- Current Time: 22:02 UTC
+- Current Year: 2025
+
+CRITICAL CHART INFORMATION:
+ASCENDANT: Cancer at 29.89°
+
+
+
+CONVERSATION HISTORY:
+User: What do the current transits mean for me?
+Assistant: What are my strengths and weaknesses in terms of health?
+
+User: Tell me about my rahu antardasha that is going on
+Assistant: <div class="quick-answer-card">**Quick Answer**: You are currently in a high-intensity "clearing phase" defined by the **Saturn-Rahu** <term id="vimshottari">Vimshottari</term> period and the final months of your **Aquarius** <term id="charadasha">Chara Dasha</term>.
+
+Specifically, **Transit Saturn moving through your 9th House (Pisces)** is currently "pressurizing" your natal Sun. This creates a **Karmic Checkpoint regarding authority, father figures, and professional ethics** that will peak be
+
+User: I said all events related to everything
+Assistant: <div class="quick-answer-card">**Quick Answer**: The current **Saturn-Rahu period (2024–2027)** creates a high-pressure "karmic storm" in your sector of family and accumulated wealth. Specifically, expect a major **restructuring of your financial portfolio or family assets** between **January 2026 and July 2026**, driven by the intense **Ulka (Saturn) Yogini**. However, your <term id="d9">D9</term> chart shows Rahu in the 11th house, promising that this chaos will eventually crystallize into sig
+
+
+CURRENT QUESTION: What are my strengths and weaknesses in terms of health?

@@ -1,0 +1,25 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T21:34:08.028593
+Question: What events do you find for me in January 2026?
+Processing Time: 2.330s
+Response Length: 304 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on for January 2026? Career, Health, Relationships, Finance, or another specific area?",
+    "mode": "annual",
+    "year": 2026,
+    "needs_transits": true
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on for January 2026? Career, Health, Relationships, Finance, or another specific area?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true
+}

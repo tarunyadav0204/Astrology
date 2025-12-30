@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 import swisseph as swe
 import math
-from .panchang_calculator import PanchangCalculator
+from calculators.panchang_calculator import PanchangCalculator
 from .monthly_panchang_calculator import MonthlyPanchangCalculator
 
 router = APIRouter()
@@ -31,6 +31,8 @@ class InauspiciousTimesRequest(BaseModel):
 @router.post("/calculate-panchang")
 async def calculate_panchang(request: PanchangRequest):
     try:
+        print(f"[DEBUG] Panchang request: transit_date={request.transit_date}, birth_data={request.birth_data}")
+        
         birth_data = request.birth_data
         
         # Handle different request formats
@@ -43,6 +45,8 @@ async def calculate_panchang(request: PanchangRequest):
             latitude = getattr(birth_data, 'latitude', None)
             longitude = getattr(birth_data, 'longitude', None)
             timezone = getattr(birth_data, 'timezone', 'UTC+5:30')
+        
+        print(f"[DEBUG] Extracted: lat={latitude}, lon={longitude}, tz={timezone}")
         
         # Convert numeric timezone to string format
         if isinstance(timezone, (int, float)):
@@ -62,105 +66,112 @@ async def calculate_panchang(request: PanchangRequest):
         if not isinstance(timezone, str):
             timezone = 'UTC+5:30'  # Default fallback
         
-        panchang_data = panchang_calc.calculate_panchang(
+        # Calculate basic panchang data
+        basic_panchang = panchang_calc.calculate_panchang(
+            request.transit_date,
+            "12:00:00",
+            float(latitude),
+            float(longitude),
+            str(timezone)
+        )
+        
+        # Get sunrise/sunset data
+        sunrise_sunset_data = panchang_calc.get_local_sunrise_sunset(
             request.transit_date,
             float(latitude),
             float(longitude),
             str(timezone)
         )
-        return panchang_data
+        
+        # Transform to frontend-expected format
+        panchang_data = {
+            'tithi': {
+                'number': basic_panchang['tithi']['number'],
+                'name': basic_panchang['tithi']['name'],
+                'paksha': basic_panchang['tithi']['paksha'],
+                'lord': 'Moon',  # Tithi lord is always Moon
+                'start_time': sunrise_sunset_data.get('sunrise'),
+                'end_time': sunrise_sunset_data.get('sunset'),
+                'elapsed': basic_panchang['tithi']['degrees_traversed'],
+                'duration': 12.0  # Tithi duration in degrees
+            },
+            'vara': {
+                'number': basic_panchang['vara']['number'],
+                'name': basic_panchang['vara']['name'],
+                'deity': 'Surya',  # Default deity
+                'favorable_activities': ['General activities'],
+                'lucky_color': '#FFD700'  # Default golden color
+            },
+            'nakshatra': {
+                'number': basic_panchang['nakshatra']['number'],
+                'name': basic_panchang['nakshatra']['name'],
+                'lord': 'Various',  # Simplified
+                'deity': 'Various',
+                'nature': 'Balanced',
+                'pada': 1,  # Simplified
+                'career_focus': 'General',
+                'symbol': '⭐',
+                'guna': 'Sattva',
+                'compatible_nakshatras': [],
+                'start_time': sunrise_sunset_data.get('sunrise'),
+                'end_time': sunrise_sunset_data.get('sunset')
+            },
+            'yoga': {
+                'number': basic_panchang['yoga']['number'],
+                'name': basic_panchang['yoga']['name'],
+                'effect': 'Balanced',
+                'quality': 'Good',
+                'recommended_activities': ['Spiritual practices'],
+                'spiritual_practice': 'Meditation',
+                'start_time': sunrise_sunset_data.get('sunrise'),
+                'end_time': sunrise_sunset_data.get('sunset')
+            },
+            'karana': {
+                'number': basic_panchang['karana']['number'],
+                'name': basic_panchang['karana']['name'],
+                'nature': 'Balanced',
+                'effect': 'Neutral',
+                'duration': 6.0,  # Karana duration in hours
+                'suitable_activities': ['General work'],
+                'business_suitable': True
+            }
+        }
+        
+        # Merge with sunrise/sunset data
+        result = {**panchang_data, **sunrise_sunset_data}
+        
+        print(f"[DEBUG] Final panchang result keys: {list(result.keys())}")
+        
+        return result
+        
     except ValueError as e:
+        print(f"[ERROR] ValueError in panchang calculation: {str(e)}")
         raise HTTPException(status_code=422, detail=f"Invalid data format: {str(e)}")
     except Exception as e:
+        print(f"[ERROR] Exception in panchang calculation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/calculate-sunrise-sunset")
 async def calculate_sunrise_sunset(request: SunriseSunsetRequest):
     try:
-        date_obj = datetime.strptime(request.date, '%Y-%m-%d')
-        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 0.0)
+        print(f"[DEBUG] Sunrise/Sunset request: date={request.date}, lat={request.latitude}, lon={request.longitude}")
         
-        # Calculate sunrise and sunset using calc_ut instead of rise_trans
-        sun_data = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)
+        # Use professional PanchangCalculator instead of amateur math
+        result = panchang_calc.get_local_sunrise_sunset(
+            request.date, 
+            request.latitude, 
+            request.longitude
+        )
         
-        # Approximate sunrise/sunset calculation
-        import math
-        lat_rad = math.radians(request.latitude)
-        sun_decl = math.radians(23.45 * math.sin(math.radians(360 * (284 + date_obj.timetuple().tm_yday) / 365)))
-        hour_angle = math.acos(-math.tan(lat_rad) * math.tan(sun_decl))
-        sunrise_hour = 12 - hour_angle * 12 / math.pi
-        sunset_hour = 12 + hour_angle * 12 / math.pi
-        
-        sunrise_time = datetime.combine(date_obj.date(), datetime.min.time()) + timedelta(hours=sunrise_hour)
-        sunset_time = datetime.combine(date_obj.date(), datetime.min.time()) + timedelta(hours=sunset_hour)
-        
-        # Moon calculations
-        moon_data = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)
-        moonrise_time = sunrise_time + timedelta(hours=1)  # Approximate
-        moonset_time = sunset_time + timedelta(hours=1)    # Approximate
-        
-        if not sunrise_time or not sunset_time:
-            raise HTTPException(status_code=500, detail="Could not calculate sunrise/sunset for this location and date")
-        
-        # Calculate day duration
-        day_duration = (sunset_time - sunrise_time).total_seconds() / 3600
-        night_duration = 24 - day_duration
-        
-        # Calculate twilight times (approximate)
-        civil_twilight_begin = sunrise_time - timedelta(minutes=30)
-        civil_twilight_end = sunset_time + timedelta(minutes=30)
-        nautical_twilight_begin = sunrise_time - timedelta(minutes=60)
-        nautical_twilight_end = sunset_time + timedelta(minutes=60)
-        astronomical_twilight_begin = sunrise_time - timedelta(minutes=90)
-        astronomical_twilight_end = sunset_time + timedelta(minutes=90)
-        
-        # Calculate special muhurtas
-        brahma_muhurta_start = sunrise_time - timedelta(hours=2, minutes=24)
-        brahma_muhurta_end = sunrise_time - timedelta(minutes=48)
-        
-        # Abhijit muhurta (midday)
-        midday = sunrise_time + timedelta(hours=day_duration/2)
-        abhijit_muhurta_start = midday - timedelta(minutes=24)
-        abhijit_muhurta_end = midday + timedelta(minutes=24)
-        
-        # Godhuli muhurta (evening)
-        godhuli_muhurta_start = sunset_time - timedelta(minutes=24)
-        godhuli_muhurta_end = sunset_time + timedelta(minutes=24)
-        
-        # Calculate moon phase
-        moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-        sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
-        phase_angle = (moon_pos - sun_pos) % 360
-        illumination = (1 - math.cos(math.radians(phase_angle))) / 2 * 100
-        
-        phase_names = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
-                      'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent']
-        phase_index = int((phase_angle + 22.5) / 45) % 8
-        
-        return {
-            'sunrise': sunrise_time.isoformat() if sunrise_time else None,
-            'sunset': sunset_time.isoformat() if sunset_time else None,
-            'moonrise': moonrise_time.isoformat() if moonrise_time else None,
-            'moonset': moonset_time.isoformat() if moonset_time else None,
-            'day_duration': day_duration,
-            'night_duration': night_duration,
-            'civil_twilight_begin': civil_twilight_begin.isoformat(),
-            'civil_twilight_end': civil_twilight_end.isoformat(),
-            'nautical_twilight_begin': nautical_twilight_begin.isoformat(),
-            'nautical_twilight_end': nautical_twilight_end.isoformat(),
-            'astronomical_twilight_begin': astronomical_twilight_begin.isoformat(),
-            'astronomical_twilight_end': astronomical_twilight_end.isoformat(),
-            'brahma_muhurta_start': brahma_muhurta_start.isoformat(),
-            'brahma_muhurta_end': brahma_muhurta_end.isoformat(),
-            'abhijit_muhurta_start': abhijit_muhurta_start.isoformat(),
-            'abhijit_muhurta_end': abhijit_muhurta_end.isoformat(),
-            'godhuli_muhurta_start': godhuli_muhurta_start.isoformat(),
-            'godhuli_muhurta_end': godhuli_muhurta_end.isoformat(),
-            'moon_phase': phase_names[phase_index],
-            'moon_illumination': round(illumination, 1)
-        }
+        print(f"[DEBUG] Sunrise/Sunset result: {result}")
+        return result
         
     except Exception as e:
+        print(f"[ERROR] Sunrise/Sunset calculation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/calculate-moon-phase")
@@ -273,86 +284,78 @@ async def calculate_moon_phase(request: MoonPhaseRequest):
 @router.post("/calculate-inauspicious-times")
 async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
     try:
-        date_obj = datetime.strptime(request.date, '%Y-%m-%d')
-        weekday = date_obj.weekday()  # 0 = Monday, 6 = Sunday
+        # Use professional MonthlyPanchangCalculator instead of amateur calculations
+        daily_panchang = monthly_panchang_calc.calculate_daily_panchang(
+            request.date,
+            request.latitude,
+            request.longitude,
+            "UTC+5:30"  # Default timezone for inauspicious times
+        )
         
-        # Convert to Sunday = 0 format
-        sunday_weekday = (weekday + 1) % 7
+        special_times = daily_panchang.get('special_times', {})
         
-        # Calculate sunrise for the location (simplified)
-        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 0.0)
-        # Calculate sunrise using approximate method
-        import math
-        lat_rad = math.radians(request.latitude)
-        sun_decl = math.radians(23.45 * math.sin(math.radians(360 * (284 + date_obj.timetuple().tm_yday) / 365)))
-        hour_angle = math.acos(-math.tan(lat_rad) * math.tan(sun_decl))
-        sunrise_hour = 12 - hour_angle * 12 / math.pi
-        
-        sunrise_time = datetime.combine(date_obj.date(), datetime.min.time()) + timedelta(hours=sunrise_hour)
-        
-        # Dur Muhurta periods (simplified - there are specific calculations for these)
+        # Convert format to match frontend expectations
         dur_muhurta = []
+        for dm in special_times.get('dur_muhurtam', []):
+            if dm.get('start') and dm.get('end'):
+                # Convert 12-hour format to ISO datetime for frontend
+                start_dt = datetime.strptime(f"{request.date} {dm.get('start')}", '%Y-%m-%d %I:%M %p')
+                end_dt = datetime.strptime(f"{request.date} {dm.get('end')}", '%Y-%m-%d %I:%M %p')
+                dur_muhurta.append({
+                    'start_time': start_dt.isoformat(),
+                    'end_time': end_dt.isoformat(),
+                    'avoid_activities': ['General activities', 'New ventures', 'Important decisions']
+                })
         
-        if not sunrise_time:
-            raise HTTPException(status_code=500, detail="Could not calculate sunrise for this location and date")
-            
-        # Add some sample dur muhurta periods
-        dur_muhurta.append({
-            'start_time': (sunrise_time + timedelta(hours=3)).isoformat(),
-            'end_time': (sunrise_time + timedelta(hours=3, minutes=48)).isoformat(),
-            'avoid_activities': ['Important meetings', 'New ventures', 'Travel']
-        })
-        
-        # Varjyam periods (simplified)
         varjyam = []
-        varjyam.append({
-            'start_time': (sunrise_time + timedelta(hours=8)).isoformat(),
-            'end_time': (sunrise_time + timedelta(hours=8, minutes=24)).isoformat(),
-            'specific_activities': ['Marriage ceremonies', 'House warming', 'Vehicle purchase']
-        })
+        varjyam_data = special_times.get('varjyam', {})
+        if varjyam_data.get('start') and varjyam_data.get('end'):
+            start_dt = datetime.strptime(f"{request.date} {varjyam_data.get('start')}", '%Y-%m-%d %I:%M %p')
+            end_dt = datetime.strptime(f"{request.date} {varjyam_data.get('end')}", '%Y-%m-%d %I:%M %p')
+            varjyam.append({
+                'start_time': start_dt.isoformat(),
+                'end_time': end_dt.isoformat(),
+                'specific_activities': ['Specific ceremonies', 'Religious activities', 'Auspicious events']
+            })
         
         return {
             'dur_muhurta': dur_muhurta,
             'varjyam': varjyam,
-            'sunrise_time': sunrise_time.isoformat(),
-            'weekday': sunday_weekday
+            'sunrise_time': daily_panchang['sunrise_sunset']['sunrise'],
+            'weekday': datetime.strptime(request.date, '%Y-%m-%d').weekday()
         }
         
     except Exception as e:
+        print(f"[ERROR] Inauspicious times calculation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/calculate-rahu-kaal")
 async def calculate_rahu_kaal(request: SunriseSunsetRequest):
     try:
-        date_obj = datetime.strptime(request.date, '%Y-%m-%d')
-        weekday = date_obj.weekday()
+        # Use professional MonthlyPanchangCalculator instead of amateur math
+        daily_panchang = monthly_panchang_calc.calculate_daily_panchang(
+            request.date,
+            request.latitude,
+            request.longitude,
+            "UTC+5:30"  # Default timezone for Rahu Kaal
+        )
         
-        # Calculate approximate sunrise
-        lat_rad = math.radians(request.latitude)
-        sun_decl = math.radians(23.45 * math.sin(math.radians(360 * (284 + date_obj.timetuple().tm_yday) / 365)))
-        hour_angle = math.acos(-math.tan(lat_rad) * math.tan(sun_decl))
-        sunrise_hour = 12 - hour_angle * 12 / math.pi
-        sunset_hour = 12 + hour_angle * 12 / math.pi
-        
-        day_duration = sunset_hour - sunrise_hour
-        rahu_duration = day_duration / 8
-        
-        # Rahu Kaal timing based on weekday
-        rahu_periods = [7.5, 1, 6, 4.5, 3, 6, 4.5]  # Sunday to Saturday (in 8th parts)
-        rahu_start_period = rahu_periods[weekday]
-        
-        sunrise_time = datetime.combine(date_obj.date(), datetime.min.time()) + timedelta(hours=sunrise_hour)
-        rahu_start = sunrise_time + timedelta(hours=rahu_start_period * rahu_duration)
-        rahu_end = rahu_start + timedelta(hours=rahu_duration)
+        special_times = daily_panchang.get('special_times', {})
+        rahu_kalam = special_times.get('rahu_kalam', {})
         
         return {
-            'rahu_kaal_start': rahu_start.isoformat(),
-            'rahu_kaal_end': rahu_end.isoformat(),
-            'duration_minutes': int(rahu_duration * 60),
+            'rahu_kaal_start': rahu_kalam.get('start'),
+            'rahu_kaal_end': rahu_kalam.get('end'),
+            'duration_minutes': int(daily_panchang['sunrise_sunset']['day_duration'] * 60 / 8) if daily_panchang['sunrise_sunset']['day_duration'] else 90,
             'avoid_activities': ['New ventures', 'Important meetings', 'Travel', 'Ceremonies']
         }
         
     except Exception as e:
+        print(f"[ERROR] Rahu Kaal calculation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -369,39 +372,82 @@ async def get_festivals(date: str):
 async def get_choghadiya(
     date: str,
     latitude: float,
-    longitude: float
+    longitude: float,
+    timezone: str
 ):
     """Get Choghadiya periods using Swiss Ephemeris calculations"""
     try:
-        result = panchang_calc.calculate_choghadiya(date, float(latitude), float(longitude))
+        print(f"[DEBUG] Choghadiya request: date={date}, lat={latitude}, lon={longitude}, tz={timezone}")
+        result = panchang_calc.calculate_choghadiya(date, float(latitude), float(longitude), timezone)
+        print(f"[DEBUG] Choghadiya result: {result}")
         return result
     except Exception as e:
+        print(f"[ERROR] Choghadiya calculation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/hora")
 async def get_hora(
     date: str,
     latitude: float,
-    longitude: float
+    longitude: float,
+    timezone: str
 ):
     """Get Hora (planetary hours) using Swiss Ephemeris calculations"""
     try:
-        result = panchang_calc.calculate_hora(date, float(latitude), float(longitude))
+        print(f"[DEBUG] Hora request: date={date}, lat={latitude}, lon={longitude}, tz={timezone}")
+        result = panchang_calc.calculate_hora(date, float(latitude), float(longitude), timezone)
+        print(f"[DEBUG] Hora result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+        if isinstance(result, dict) and 'error' in result:
+            print(f"[ERROR] Hora calculation returned error: {result['error']}")
         return result
     except Exception as e:
+        print(f"[ERROR] Hora calculation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/special-muhurtas")
 async def get_special_muhurtas(
     date: str,
     latitude: float,
-    longitude: float
+    longitude: float,
+    timezone: str
 ):
     """Get special muhurtas like Abhijit, Brahma Muhurta using Swiss Ephemeris calculations"""
     try:
-        result = panchang_calc.calculate_special_muhurtas(date, float(latitude), float(longitude))
+        print(f"[DEBUG] Special muhurtas request: date={date}, lat={latitude}, lon={longitude}, tz={timezone}")
+        result = panchang_calc.calculate_special_muhurtas(date, float(latitude), float(longitude), timezone)
+        print(f"[DEBUG] Special muhurtas raw result: {result}")
+        
+        # Format the result to match frontend expectations
+        if 'error' not in result:
+            muhurtas = []
+            if 'brahma_muhurta' in result:
+                muhurtas.append({
+                    'name': 'Brahma Muhurta',
+                    'start_time': result['brahma_muhurta']['start_time'],
+                    'end_time': result['brahma_muhurta']['end_time'],
+                    'purpose': result['brahma_muhurta']['description']
+                })
+            if 'abhijit_muhurta' in result:
+                muhurtas.append({
+                    'name': 'Abhijit Muhurta',
+                    'start_time': result['abhijit_muhurta']['start_time'],
+                    'end_time': result['abhijit_muhurta']['end_time'],
+                    'purpose': result['abhijit_muhurta']['description']
+                })
+            
+            formatted_result = {'muhurtas': muhurtas}
+            print(f"[DEBUG] Special muhurtas formatted result: {formatted_result}")
+            return formatted_result
+        
         return result
     except Exception as e:
+        print(f"[ERROR] Special muhurtas calculation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/monthly")
@@ -409,12 +455,13 @@ async def get_monthly_panchang(
     year: int,
     month: int,
     latitude: float,
-    longitude: float
+    longitude: float,
+    timezone: str = "Asia/Kolkata"
 ):
     """Get complete monthly panchang with daily details"""
     try:
         result = monthly_panchang_calc.calculate_monthly_panchang(
-            year, month, float(latitude), float(longitude)
+            year, month, float(latitude), float(longitude), timezone
         )
         return result
     except Exception as e:
@@ -424,12 +471,13 @@ async def get_monthly_panchang(
 async def get_daily_detailed_panchang(
     date: str,
     latitude: float,
-    longitude: float
+    longitude: float,
+    timezone: str
 ):
-    """Get detailed panchang for a single day with all elements"""
+    """Get detailed panchang for a single day with all elements and timezone support"""
     try:
         result = monthly_panchang_calc.calculate_daily_panchang(
-            date, float(latitude), float(longitude)
+            date, float(latitude), float(longitude), timezone
         )
         return result
     except Exception as e:

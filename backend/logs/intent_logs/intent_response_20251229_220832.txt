@@ -1,0 +1,23 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T22:08:35.729924
+Question: What are my strengths and weaknesses?
+Processing Time: 3.163s
+Response Length: 280 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I can help you identify your strengths and weaknesses! Which area are you interested in? Career, relationships, finances, personal growth, or something else?",
+    "mode": "birth",
+    "needs_transits": false
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can help you identify your strengths and weaknesses! Which area are you interested in? Career, relationships, finances, personal growth, or something else?",
+  "mode": "birth",
+  "needs_transits": false
+}

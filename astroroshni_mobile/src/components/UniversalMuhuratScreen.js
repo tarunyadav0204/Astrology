@@ -131,18 +131,17 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
     setLoading(true);
     try {
       const token = await storage.getAuthToken();
+      
       const payload = {
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
         latitude: parseFloat(location.latitude),
         longitude: parseFloat(location.longitude),
-        timezone: userProfile.timezone || "UTC+5:30",
         
         user_dob: userProfile.date,
         user_time: userProfile.time,
         user_lat: parseFloat(userProfile.latitude),
-        user_lon: parseFloat(userProfile.longitude),
-        user_timezone: userProfile.timezone || "UTC+5:30"
+        user_lon: parseFloat(userProfile.longitude)
       };
 
       const response = await fetch(`${API_BASE_URL}${getEndpoint(config.endpoint)}`, {

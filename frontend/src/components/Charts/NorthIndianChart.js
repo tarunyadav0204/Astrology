@@ -406,6 +406,14 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
     return degree.toFixed(2) + '°';
   };
 
+  const formatDegreeDMS = (degree) => {
+    const deg = Math.floor(degree);
+    const minFloat = (degree - deg) * 60;
+    const min = Math.floor(minFloat);
+    const sec = Math.floor((minFloat - min) * 60);
+    return `${deg}°${min}'${sec}"`;
+  };
+
   const getPlanetsInHouse = (houseIndex) => {
     if (!chartData.planets) return [];
     
@@ -426,7 +434,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           nakshatra: getNakshatra(data.longitude),
           shortNakshatra: getShortNakshatra(data.longitude),
-          formattedDegree: formatDegree(data.degree || 0)
+          formattedDegree: formatDegreeDMS(data.degree || 0)
         });
       });
     
@@ -438,7 +446,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
         degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
         nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
-        formattedDegree: formatDegree(chartData.planets.InduLagna.degree || 0)
+        formattedDegree: formatDegreeDMS(chartData.planets.InduLagna.degree || 0)
       });
     }
     
@@ -635,7 +643,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                 {chartData.ascendant && (
                   <text x={houseData.center.x + 25} y={houseData.center.y + 60} 
                         fontSize="8" fill="#666" fontWeight="500" textAnchor="middle">
-                    {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                    {formatDegreeDMS(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                   </text>
                 )}
               </g>
@@ -756,7 +764,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, ch
                   planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                 }
               }
-              const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
+              const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
               const aspectingPlanet = aspectsHighlight.show && aspectsHighlight.aspectingPlanets?.find(p => p.name === planet.name);
               
               return (

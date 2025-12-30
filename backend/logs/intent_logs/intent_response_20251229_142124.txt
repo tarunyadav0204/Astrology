@@ -1,0 +1,83 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T14:21:28.193907
+Question: He is a high BP and diabetic. So want to know how will be his 2026
+Processing Time: 3.234s
+Response Length: 766 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "timeframe": "2026",
+        "aspect": "health"
+    },
+    "mode": "annual",
+    "category": "health",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "timeframe": "2026",
+    "aspect": "health"
+  },
+  "mode": "annual",
+  "category": "health",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

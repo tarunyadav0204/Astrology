@@ -1,0 +1,15 @@
+COMPLETE GEMINI FLOW SUMMARY - SECOND_CALL_WITH_TRANSIT
+Timestamp: 2025-12-29T14:27:15.930600
+Question: He is a high BP and diabetic.
+Processing Time: 53.747s
+Total Request Time: 53.76s
+Context Size: 117218 characters
+Has Transit Data: Yes
+Response Length: 7361 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.016s
+- Gemini Processing: 53.747s
+- Total Time: 53.763s
+- Transit Activations: 24
+- Dasha Periods: 14

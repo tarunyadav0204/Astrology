@@ -1,0 +1,222 @@
+INTENT ROUTER REQUEST
+Timestamp: 2025-12-29T22:08:47.033829
+Question: Career
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 16054 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: What are my strengths and weaknesses?
+A: Career
+Q: What are my health vulnerabilities?
+A: I can help you identify your strengths and weaknesses! Which area are you interested in? Career, relationships, finances, personal growth, or something else?
+Q: What are my strengths and weaknesses in terms of health?
+A: <div class="quick-answer-card">**Quick Answer**: Based on your chart, you are currently navigating a sensitive health period defined by the **Saturn-Rahu** <term id="vimshottari">Vimshottari</term> cycle and the **Aquarius** <term id="charadasha">Chara Dasha</term> (your 8th house of chronic vulnerability).
+
+Specifically, expect vulnerabilities related to **Pitta (Heat/Inflammation)** affecting the **stomach, throat/teeth, and blood pressure** between **September 2025 and July 2026**, triggered by the active **Ulka (Saturn)** Yogini period.
+
+However, your <term id="d9">D9</term> Navamsa Mars is in its own sign (Aries), indicating **exceptional recuperative power**. While you may experience acute flare-ups (fevers/inflammation), your body has a "fighter's constitution" that recovers quickly if you manage your diet strictly.
+
+**Action:** Implement an anti-inflammatory diet immediately to cool the massive planetary cluster in your Leo (fire) sector.</div>
+
+### Key Insights
+
+*   **The Lagna "Sandhi" Challenge:** Your Ascendant is at **29.89° Cancer**, a "Gandanta" point. This acts like a flickering lightbulb—your physical vitality fluctuates. You are highly sensitive to environmental changes and stress, requiring more rest than the average person.
+*   **The Leo Cluster (2nd House):** You have a massive conjunction of **Jupiter, Mars, Saturn, and Rahu** all in Leo. This creates a "pressure cooker" in the sign ruling the **heart, spine, and stomach**.
+*   **The Jaimini Confirmation:** You are currently in the **Aquarius** <term id="charadasha">Chara Dasha</term> (2020–2026). Since Aquarius is your **8th House** (longevity/chronic issues) and contains Ketu, this double-confirms the current period as the most physically sensitive cycle of the decade.
+*   **Strength Factor:** The 6th Lord (Jupiter) is Vargottama? No, but **Mars is strong in D9**. This cancels "weakness" and replaces it with "resilience." You get sick suddenly, but heal largely through willpower.
+
+---
+
+### Astrological Analysis
+
+#### 1. The Promise (Root vs. Fruit)
+*   **D1 (The Symptom):** Your Lagna Lord, **Moon**, is in Libra, which is generally balanced. However, the **6th Lord (Jupiter)**—representing disease—is Retrograde in the 2nd House (Leo) and joined by **Mars, Saturn, and Rahu**. This indicates that health issues likely originate from **dietary habits (2nd House)** and manifest as **heat/inflammation (Mars/Leo)** or **toxic accumulation (Rahu)**.
+*   **D9 (The Outcome):** In the Navamsa, **Mars (vitality)** shifts to **Aries (Own Sign)**. This is a massive boon. It implies that while the D1 shows complex symptoms, the D9 shows the internal heat to burn off infection. You are a survivor.
+
+#### 2. The Master Clock (Vimshottari & Transits)
+You are in the **Saturn Mahadasha / Rahu Antardasha**.
+*   **Saturn** rules your 7th and **8th House** (Chronic Health).
+*   **Rahu** is situated in the 2nd House (Maraka/Death-inflicting house) within that volatile Leo cluster.
+*   **The Trigger:** This combination specifically targets the "mouth to stomach" channel. Rahu in 2nd can cause obscure allergies or issues with teeth/gums that are hard to diagnose.
+
+#### 3. Nadi Precision (The Nature of Health)
+Your chart reveals specific Nadi connections that define the exact nature of your vulnerabilities:
+
+*   **The "Guru-Mangal-Rahu" Link (Jupiter + Mars + Rahu):** In Nadi, Jupiter is the *Jiva* (Life Force). It is conjoined with Mars (Injury/Heat) and Rahu (Poison/Foreign bodies). This specific combo indicates a susceptibility to **blood impurities, high blood pressure, or acid reflux**.
+*   **The "Shani-Rahu" Link (Saturn + Rahu):** Saturn is the karaka for longevity. Its proximity to Rahu in a fire sign (Leo) often creates **"Vata-Pitta" imbalances**—specifically anxiety manifesting as digestive burning or stiffness in the upper spine/neck.
+
+#### 4. The Triple Perspective (Sudarshana)
+Comparing the **6th House (Health)** from three vantage points:
+*   **From Lagna (Cancer):** 6th House is Sagittarius. Lord Jupiter is heavily afflicted in Leo. (Indicates digestive/liver stress).
+*   **From Moon (Libra):** 6th House is Pisces. Contains Sun (Vitality). (Indicates sensitivity to eyes or heart rhythm).
+*   **From Sun (Pisces):** 6th House is Leo. Contains the **Four-Planet Cluster**.
+*   **Verdict:** Since the **Leo Cluster** is the 6th from the Sun (Body/Soul), this is the "Triple Confirmation." The primary vulnerability is **Cardiovascular or Digestive Heat**.
+
+#### 5. Timing Synthesis (Multi-System)
+The current health sensitivity is not random; it is structurally timed:
+*   **Vimshottari:** Saturn-Rahu (Maraka activation).
+*   **Chara Dasha:** Running **Aquarius** (8th House sign), which aspects the Leo cluster via Rashi Drishti.
+*   **Yogini Dasha:** The **Ulka (Saturn)** period is active from **Sept 2025 to July 2026**. Ulka is associated with labor and physical strain.
+*   **Synthesis:** The convergence of Saturn-Rahu (Vimshottari), Aquarius (Chara), and Ulka (Yogini) makes **late 2025 to mid-2026** the critical window for management.
+
+---
+
+### Nakshatra Insights
+*   **Moon in Swati (Libra):** Swati rules "Prana" or wind. You are susceptible to gas, bloating, and nervous exhaustion when stressed.
+*   **Saturn in Purva Ashadha:** This Nakshatra is related to fluids. Saturn here can cause "drying up" of necessary fluids (synovial fluid in joints) or issues with the bladder.
+*   **Sun in Revati:** Revati rules the feet and lymphatic system. With Sun here in the 8th from Moon (roughly), be careful of foot injuries or water retention.
+
+---
+
+### Timing & Guidance
+
+**Critical Window:** **September 2025 – July 2026**
+*   **Why:** Yogini **Ulka** (Saturn) aligns with Vimshottari **Saturn-Rahu**.
+*   **Event:** High probability of a dental issue, throat infection, or acidity flare-up that requires attention.
+
+**Actionable Advice:**
+1.  **Dietary Cooling:** Your 2nd house (food) is on fire (Leo + Mars/Rahu). Avoid spicy foods, alcohol, and excessive caffeine. Alkaline diets are your best astrological remedy.
+2.  **Spine/Neck Care:** The Leo cluster affects the upper back. Yoga focusing on the spine is essential to prevent stiffness caused by Saturn.
+3.  **Remedy:** Since Saturn and Rahu are the culprits, charitable acts involving feeding the hungry (calming the 2nd house) on Saturdays are effective.
+
+<div class="final-thoughts-card">**Final Thoughts**: Your chart is not "weak," but it is "hot" and "pressurized." Your 29° Ascendant gives you a delicate sensitivity, but your Exalted/Own-Sign D9 Mars gives you the engine of a warrior. Treat your body like a high-performance sports car—it needs premium fuel (diet) and careful maintenance, or it overheats. 2026 is a maintenance year; handle it with discipline, and you will emerge stronger.</div>
+
+
+
+<div class="follow-up-questions">
+📅 Which months in 2026 are most critical for my health?
+🔮 What specific remedies can cool down the Leo cluster?
+🥗 What foods should I strictly avoid based on the 2nd house affliction?
+</div>
+
+        
+        Current question: "Career"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2026, endYear: 2026
+        - For general timing questions without specific year, use startYear: 2025, endYear: 2027
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2025, endYear: 2027 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

@@ -541,7 +541,7 @@ const InvestorHomepage = () => {
                 {todaysData.planetaryPositions.map((planet, index) => (
                   <div key={index} className="planet-item">
                     <span className="planet-name">{planet.planet}</span>
-                    <span className="planet-sign">{planet.sign} {planet.degree}</span>
+                    <span className="planet-sign">{planetary_signs && planetary_signs[planet.planet] ? `${planetary_signs[planet.planet].sign} ${planetary_signs[planet.planet].degree}°` : `${planet.sign} ${planet.degree}`}</span>
                   </div>
                 ))}
               </div>

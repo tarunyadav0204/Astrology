@@ -1,0 +1,269 @@
+INTENT ROUTER REQUEST
+Timestamp: 2025-12-29T20:00:25.038943
+Question: What are my strengths and weaknesses?
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 23574 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: What are my strengths and weaknesses?
+A: What are my strengths and weaknesses?
+Q: What do the current transits mean for me?
+A: <div class="quick-answer-card">**Quick Answer**: Your chart reveals you are a **"Crisis Manager"** and a **"Resilient Builder"** by nature. Your greatest strength lies in the **2nd House Cluster (Leo)**, giving you immense capacity to handle high-pressure technical or managerial challenges that would break others. However, your primary weakness is **"Emotional Burnout"** linked to your Ascendant being on the sheer edge of Cancer (29.89°).
+
+**The Core Dynamic:** You possess a powerful "War Engine" in your chart (Saturn+Mars+Jupiter) that drives you to achieve, but it often sacrifices your peace of mind.
+**The Current Phase:** The **Saturn-Rahu** period (until late 2025) combined with the **Aquarius Chara Dasha** is forcing a transformation in how you use your resources. You are moving from "working hard" to "working smart."
+**Actionable Advice:** Your speech and energy reserves are your bank account. Do not spend them on petty conflicts. Practice **"Strategic Silence"** to conserve your vitality.</div>
+
+### Key Insights
+- **The "Ashlesha" Edge (Strength & Weakness):** Your Ascendant is at **29.89° Cancer** (Ashlesha Nakshatra, Gandanta).
+  - *Strength:* You have X-ray vision for secrets, psychology, and hidden motives. You "feel" the truth before you hear it.
+  - *Weakness:* You are hypersensitive to your environment and can easily become emotionally flooded or paranoid if ungrounded.
+- **The "Techno-Managerial" Powerhouse:** The conjunction of **Saturn, Mars, Jupiter, and Rahu** in your 2nd House (Leo) is rare.
+  - *Strength:* You have the drive of Mars, the discipline of Saturn, and the wisdom of Jupiter all focused on **Resource Accumulation**. You are a natural fixer of broken systems.
+  - *Weakness:* This energy is combustible. It can manifest as harsh speech, family friction, or a feeling that "everything is a battle."
+- **Jaimini/Yogini Confirmation:** The current **Aquarius Chara Dasha** (activating your 8th House of transformation) coupled with **Ulka (Saturn) Yogini** confirms that your strength is currently being tested through high workload and pressure. This is a "forging" period, not a breaking one.
+
+---
+
+### Astrological Analysis
+
+#### 1. The Promise (Chart Analysis)
+Your chart is defined by the **"Planetary War" in the 2nd House (Leo)**.
+- **The Strength (Technical Mastery):** The combination of **Mars** (Energy) and **Saturn** (Structure) creates a **<term id="technical_yoga">Karma-Nishtha Yoga</term>**. You don't just dream; you execute. The addition of **Rahu** suggests you use unconventional or cutting-edge methods to solve problems.
+- **The Weakness (The "Gandanta" Lagna):** With your Ascendant at the very end of Cancer (29.89°), you lack a "protective shell." The world affects you deeply. This position (Gandanta) suggests a karmic knot related to emotional security—you often feel you must "fight" to be safe.
+- **The Hidden Gem (D9 Navamsa):** While your D1 2nd house is stressed, your **D9 Mars is in Aries (Own Sign)** and **D9 Moon is in Sagittarius**. This confirms that internally, you are a warrior. The stress you feel is external; your soul is unbreakable.
+
+#### 2. Nadi Precision (The Nature of Your Capability)
+Nadi astrology defines *how* your strengths manifest through planetary links:
+
+- **The "Technical Master" Link (Saturn + Mars):** Your Saturn (Career) is conjoined Mars. This is the signature of engineers, surgeons, or technical architects. Your strength is **logic applied to mechanics/systems**.
+- **The "Expansion via Disruption" Link (Jupiter + Rahu):** Jupiter (You) is with Rahu. This creates a <term id="guru_chandala">Guru-Chandala</term> dynamic. While traditionalists call this a weakness, in the modern world, it is a **Superpower**. It allows you to think outside the box, challenge authority constructively, and expand into foreign or tech-heavy domains.
+- **The "Diplomatic Asset" Link (Moon in Libra):** While the rest of your chart is fiery (Leo), your Mind (Moon) is in Libra. This gives you the **Diplomatic Strength** to smooth over the disruption your Mars/Saturn energy creates.
+
+#### 3. The Triple Perspective (Sudarshana)
+We validate these traits from three reference points:
+- **From Lagna (Body):** The 2nd House (Leo) is a war zone. *Result:* You physically feel the stress of family/financial responsibilities.
+- **From Moon (Mind):** The Leo cluster falls in the **11th House** (Gains). *Result:* Mentally, you perceive these challenges as opportunities for profit and networking. This is a **massive psychological strength**—you are profit-oriented even in crisis.
+- **From Sun (Soul):** The Leo cluster falls in the **6th House** (Service/Enemies). *Result:* Your soul thrives on solving problems and defeating obstacles.
+- **Verdict:** Since 2 out of 3 views (Moon & Sun) show this cluster as beneficial (Gains/Victory), your "Stress" is actually the engine of your success. **Confidence: 90%.**
+
+#### 4. Timing Synthesis (Multi-System)
+- **Vimshottari:** You are in **Saturn-Rahu**. Both planets are in the intense 2nd House cluster. This highlights "Restructuring of Assets" as your current arena.
+- **Chara Dasha:** You are in the **Aquarius Period** (2020-2026). Aquarius contains Mercury (Intellect) and Ketu (Detachment). This confirms a period of **"Deep Research"** or **"Data Analysis"** as a key strength right now.
+- **Yogini Dasha:** The **Ulka (Saturn)** period indicates heavy lifting. You are carrying a load right now, but Saturn's strength in your chart ensures you can bear it.
+
+---
+
+### Practical Guidance
+
+1.  **Leverage Your "Ashlesha" Insight:**
+    *   *Strength:* Trust your gut about people. Your first impression is rarely wrong.
+    *   *Remedy:* Do not absorb their energy. Use the "Grey Rock" method when dealing with toxic people—be uninteresting and detached.
+
+2.  **Manage the "Fire in the Throat" (2nd House):**
+    *   *Weakness:* With Mars/Rahu in the house of speech, you may accidentally say things that burn bridges.
+    *   *Action:* Adopt a "24-Hour Rule" before responding to provocative emails or comments. Your silence is more intimidating than your anger.
+
+3.  **Optimize the Saturn-Mars Energy:**
+    *   *Action:* Physical exercise is non-negotiable for you. The excess heat (Pitta) in your system must be burned off through weights or high-intensity training, or it will manifest as inflammation or irritability.
+
+<div class="final-thoughts-card">**Final Thoughts**: You are a "Warrior in a Garden." Your chart shows a sensitive, intuitive core (Cancer/Moon) surrounded by a fortress of steel (Saturn/Mars/Leo). Do not wish for an easier life; you were built for the difficult one. Your weakness is only that you sometimes forget to take off the armor when you come home.</div>
+
+<div class="follow-up-questions">
+📅 How will the upcoming Saturn transit (2025) impact my career?
+💼 Which specific career path suits my Mars-Saturn combination best?
+🔮 Are there remedies for the "Ashlesha" sensitivity?
+🌟 How can I use the "Guru-Chandala" yoga for financial gain?
+</div>
+
+```json
+{"glossary": {"technical_yoga": "A combination showing skill in hands-on or technical work", "guru_chandala": "A combination of Jupiter and Rahu, indicating unconventional wisdom or breaking traditions", "gandanta": "A karmic knot at the junction of water and fire signs, indicating deep transformation", "ashlesha": "A Nakshatra associated with serpents, insight, and psychological depth"}}
+```
+Q: health
+A: <div class="quick-answer-card">**Quick Answer**: The current period represents a pivotal **"Structural Redesign"** of your life path. With **Saturn** transiting your 9th house (destiny) and crossing your natal Sun, while **Rahu** activates your 8th house (transformation), you are being pushed to fundamentally redefine your values and career direction. Specifically, expect the period between **September 2025 and July 2026** to bring intense but productive pressure, driven by the active **Aquarius** <term id="charadasha">Chara Dasha</term>. However, your <term id="navamsa">Navamsa (D9)</term> reveals a powerful Mars in Aries, indicating that while the outer situation feels restrictive, your inner capacity for action and resilience is at its peak. **Action:** Prioritize clearing debts (karmic and financial) and avoid conflicts with authority figures during this cycle.</div>
+
+### Key Insights
+- **The 8th House Activation:** You are currently in the **Aquarius** Chara Dasha (2020-2026), which activates your 8th house. This guarantees a period of deep change, research, or handling unexpected events.
+- **The Planetary War Zone:** Your 2nd house (Leo) contains four planets (Saturn, Mars, Jupiter, Rahu). The current Saturn-Rahu <term id="vimshottari">Vimshottari</term> dasha triggers this specific cluster, focusing energy on family resources, speech, and financial accumulation.
+- **The Hidden Strength:** While your D1 Saturn is in an enemy sign (Leo), your <term id="d9">D9</term> shows Rahu (current sub-period lord) in **Taurus (Exalted/Friendly)** and Mars in **Aries (Own Sign)**. This confirms that current struggles will resolve into material stability and personal strength.
+
+### Astrological Analysis
+
+**1. The Promise (Chart Analysis)**
+Your chart is dominated by a massive concentration of energy in Leo (2nd House), creating a "Planetary War" scenario involving Saturn, Mars, Jupiter, and Rahu. This creates a <term id="dhanyoga">Dhan Yoga</term> (wealth combination) but one that comes through immense struggle and friction due to the <term id="shrapit">Shrapit Yoga</term> (Saturn+Rahu). The current activation of this sector suggests you are fighting for stability and will eventually win, but the battle is currently intense.
+
+**2. The Master Clock (Vimshottari & Transits)**
+You are currently running the **Saturn Mahadasha - Rahu Antardasha** (approx. mid-2025 to 2028).
+- **The Dasha:** Saturn and Rahu are conjunct in your birth chart. This activates the "Storm" in your 2nd house. It demands strict discipline with finances and diet.
+- **The Transit Trigger:** Currently, **Transit Saturn is in Pisces** (your 9th House), moving directly over your **Natal Sun**. This is a classic "Karmic Trigger" indicating a check on your ego, relationship with father/authority, or a restructuring of your belief systems.
+
+**3. Timing Synthesis (Multi-System)**
+This intense timeline is doubly confirmed by the Jaimini system.
+- The **Chara Dasha** is running **Aquarius** (containing your <term id="amatyakaraka">Amatyakaraka</term> Mercury). Since Aquarius is the 8th house, this indicates a transformation in career—likely shifting towards research, backend operations, or managing others' resources.
+- The **Yogini Dasha** is running **Bhadrika (Mercury)** MD and **Ulka (Saturn)** AD (Sep 2025 - July 2026). The **Ulka** period is ruled by Saturn, perfectly syncing with the Vimshottari Saturn period. This synchronization confirms that late 2025 to mid-2026 is the **peak intensity window** for these changes.
+
+**4. The Triple Perspective (Sudarshana)**
+Comparing the transit of Saturn (the taskmaster) from three reference points:
+- **From Lagna (Cancer):** Saturn is in the 9th House. This can delay luck but stabilizes dharma and higher learning.
+- **From Moon (Libra):** Saturn is in the 6th House. This is **excellent** (<term id="upachaya">Upachaya</term>). It gives you the power to defeat enemies, clear debts, and outwork your competition.
+- **From Sun (Pisces):** Saturn is in the 1st House (conjoining Sun). This creates mental pressure and heaviness regarding your identity and vitality.
+- **Verdict:** Since the transit is favorable from the Moon (Mind) but heavy from the Sun (Soul), you will *feel* stressed (Sun) but will actually *perform* effectively and succeed (Moon).
+
+**5. Nadi Precision (The Nature of Karma)**
+Your chart reveals specific Nadi connections that define the nature of this transit:
+- **The "Saturn + Rahu" Link:** Natal Saturn is conjunct Rahu. This indicates your career success is tied to "foreign" or "shadow" elements—technology, non-traditional paths, or dealing with large-scale unseen networks (like internet/infrastructure).
+- **The "Saturn + Mars" Link:** This is the "Technical Master" combination. The current stress is not emotional; it is mechanical/technical. The friction you feel is the friction of "building" something substantial.
+- **Trigger Event:** With Transit Rahu entering Aquarius (your 8th House) and crossing your natal Mercury (Career planet), expect a sudden shift in job description or a pivot to a more technical/specialized role around **late 2025**.
+
+### Nakshatra Insights
+Your **Moon is in Swati Nakshatra** (ruled by Rahu). This is crucial because you are currently in the Rahu Antardasha. Swati is symbolized by the "Sword" or "Shoot of a plant" bending with the wind. The energy of this period requires flexibility. Like Swati, you must be independent and adaptable. The current Rahu influence suggests that "diplomacy" and "adjustment" (Swati traits) will be your tools for survival during this Saturnian pressure.
+
+### Timing & Guidance
+- **Critical Window:** **September 2025 to July 2026**. This is when Saturn (Vimshottari), Saturn (Yogini), and Aquarius (Chara Dasha) all align.
+- **Focus Area:** **Resource Consolidation**. Do not expand aggressively. Secure your 2nd house matters (savings, family harmony, health).
+- **Remedy:** Since Saturn is transiting your Sun (9th House), offer respect to father figures and maintain strict ethical adherence. The 8th house activation suggests exploring meditation or hidden knowledge can turn anxiety into power.
+
+<div class="final-thoughts-card">**Final Thoughts**: You are in a "Chrysalis Phase." The pressure of the 8th house and Saturn-Rahu is not meant to break you, but to strip away what is unnecessary so your <term id="d9">D9</term> Mars (Warrior) potential can emerge. Trust the process of elimination occurring now; it is clearing the space for the next cycle of stability.</div>
+
+<div class="follow-up-questions">
+📅 When will the financial pressure ease?
+🔮 What specific remedies suit Saturn-Rahu?
+💼 Should I change jobs during the Aquarius period?
+🌟 How does the 8th house affect my relationships?
+</div>
+
+```json
+{"glossary": {"d9": "Divisional chart showing inner strength and potential", "vimshottari": "Main planetary time-cycle system", "charadasha": "Sign-based timing system used in Jaimini astrology", "shrapit": "A combination of Saturn and Rahu indicating karmic burden", "amatyakaraka": "The planet holding the second highest degree, signifying career", "upachaya": "Houses of growth (3, 6, 10, 11) where planets improve over time", "dhanyoga": "Wealth-producing combination"}}
+```
+
+        
+        Current question: "What are my strengths and weaknesses?"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2026, endYear: 2026
+        - For general timing questions without specific year, use startYear: 2025, endYear: 2027
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2025, endYear: 2027 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

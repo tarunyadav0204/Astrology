@@ -1,0 +1,39 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-30T09:14:03.700117
+Question: In general
+Processing Time: 2.013s
+Response Length: 217 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "extracted_context": {
+    "area": "general"
+  },
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "area": "general"
+  },
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

@@ -382,7 +382,9 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 content: msg.content || '🔮 Analyzing your birth chart...',
                                 timestamp: msg.timestamp,
                                 messageId: msg.message_id, // Add messageId from database
-                                isFromDatabase: true // Mark as from database
+                                isFromDatabase: true, // Mark as from database
+                                terms: msg.terms || [],
+                                glossary: msg.glossary || {}
                             };
                             
                             console.log('📜 Loaded message:', { id: msg.message_id, sender: msg.sender, hasContent: !!msg.content });
@@ -634,10 +636,16 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         return;
                     }
                     
-                    // Replace processing message with actual response
+                    // Replace processing message with actual response including terms and glossary
                     setMessages(prev => prev.map(msg => 
                         msg.messageId === messageId 
-                            ? { ...msg, content: status.content, isProcessing: false }
+                            ? { 
+                                ...msg, 
+                                content: status.content, 
+                                isProcessing: false,
+                                terms: status.terms || [],
+                                glossary: status.glossary || {}
+                            }
                             : msg
                     ));
                     setIsLoading(false);

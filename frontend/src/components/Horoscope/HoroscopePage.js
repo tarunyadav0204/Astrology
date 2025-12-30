@@ -447,7 +447,7 @@ const HoroscopePage = () => {
                           <span className="strength">{planet.strength}%</span>
                         </div>
                         <p className="influence-desc">{planet.influence}</p>
-                        {planet.sign && <p className="sign-info"><strong>Sign:</strong> {planet.sign} | <strong>Aspect:</strong> {planet.aspect}</p>}
+                        {planetary_signs && planetary_signs[planet.planet] ? <p className="sign-info"><strong>Sign:</strong> {planetary_signs[planet.planet].sign} | <strong>Aspect:</strong> {planet.aspect}</p> : planet.sign && <p className="sign-info"><strong>Sign:</strong> {planet.sign} | <strong>Aspect:</strong> {planet.aspect}</p>}
                         {planet.orb && <p className="orb-info"><strong>Orb:</strong> {planet.orb}</p>}
                         {planet.effect && <p className="effect-info"><strong>Effect:</strong> {planet.effect}</p>}
                         <div className="strength-bar">

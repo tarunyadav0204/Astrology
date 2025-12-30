@@ -102,17 +102,20 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
         panchangService.calculateChoghadiya(
           dateString,
           location.latitude,
-          location.longitude
+          location.longitude,
+          location.timezone
         ).catch(() => null),
         panchangService.calculateHora(
           dateString,
           location.latitude,
-          location.longitude
+          location.longitude,
+          location.timezone
         ).catch(() => null),
         panchangService.calculateSpecialMuhurtas(
           dateString,
           location.latitude,
-          location.longitude
+          location.longitude,
+          location.timezone
         ).catch(() => null),
         panchangService.getFestivals(dateString).catch(() => [])
       ]);

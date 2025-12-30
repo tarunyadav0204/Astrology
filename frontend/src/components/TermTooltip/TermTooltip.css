@@ -1,0 +1,38 @@
+.term-tooltip-trigger {
+  color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.1);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  cursor: help;
+  position: relative;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.term-tooltip-trigger:hover {
+  color: #f59e0b;
+  background-color: rgba(251, 191, 36, 0.2);
+}
+
+.term-tooltip {
+  background: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+.term-tooltip-content {
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .term-tooltip {
+    max-width: 250px;
+    font-size: 13px;
+  }
+}

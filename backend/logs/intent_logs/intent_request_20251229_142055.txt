@@ -1,0 +1,203 @@
+INTENT ROUTER REQUEST
+Timestamp: 2025-12-29T14:20:55.905069
+Question: Tell me about my father's health in next year.
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 15025 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: I am looking for long term
+A: Tell me about my father's health in next year.
+Q: That's what my question is which area of investment is good for me.
+A: <div class="quick-answer-card">**Quick Answer**: With the current Saturn-Rahu period activating your 2nd House of accumulated wealth, this is a **critical accumulation phase** for you. Specifically, your chart favors **Real Estate (Land/Property)** and **Large-Cap Technology** investments between **June 2025 and July 2026** when Jupiter exalts in your Ascendant. However, your D9 shows Mars as your strongest asset—meaning tangible, physical assets (brick and mortar) will outperform paper assets long-term. **Action:** Focus on acquiring landed property or long-term infrastructure funds now; avoid high-risk speculative trading as Rahu can create illusions of quick wealth.</div>
+
+### Key Insights
+*   **The "Wealth Cluster" (2nd House):** You have a massive concentration of energy (Mars, Jupiter, Saturn, Rahu) in Leo, your house of savings. This indicates wealth comes through distinct phases: struggle (Saturn), explosion (Rahu), and wisdom (Jupiter).
+*   **The "Cash Flow" King:** Venus is in its own sign (Taurus) in the 11th House of Gains. This is a classic *Dhana Yoga* ensuring consistent liquid cash flow, likely allowing you to fund these long-term investments.
+*   **The Asset Class:** Moon in the 4th House (Real Estate) and Mars (Land) strong in the Navamsa confirms property is your "Golden Goose."
+*   **Jaimini Confirmation:** The Chara Dasha of **Aquarius** (active now) activates your 8th house of unearned/sudden gains, but since it contains Mercury (AmK), long-term strategy in financial instruments is favored over gambling.
+
+### Astrological Analysis
+
+**1. The Promise of Wealth (Dhana Yoga Analysis)**
+Your chart features a rare and powerful **4-Planet Conjunction** in the 2nd House (Leo):
+*   **Mars (5th Lord of Speculation):** brings aggressive growth potential.
+*   **Jupiter (9th Lord of Luck):** expands wealth through wisdom and ethical investments.
+*   **Saturn (8th Lord of Longevity):** ensures the wealth sticks but requires patience (Long Term).
+*   **Rahu:** acts as an amplifier, suggesting wealth through foreign markets or modern technology (AI/Crypto).
+*   *Synthesis:* This combination is volatile short-term but massive long-term. Saturn stabilizes Rahu's chaotic energy, making "SIP" (Systematic Investment Plans) or long-term holding strategies highly effective for you.
+
+**2. The Master Clock (Vimshottari Dasha)**
+You are currently in **Saturn Mahadasha / Rahu Antardasha** (until mid-2028).
+*   **The Event:** Saturn and Rahu are both sitting in your 2nd House of Money.
+*   **The Prediction:** This is the *peak accumulation phase* of your life. Rahu creates the hunger and opportunity for massive expansion, while Saturn ensures you are looking at a 10-20 year horizon.
+*   **Caution:** Rahu in the 2nd house can bring "get rich quick" schemes. Since Saturn is the boss (Mahadasha lord), any shortcut will be punished. Stick to the long game.
+
+**3. Nadi Precision (The Nature of Wealth)**
+Your chart reveals specific Nadi connections that define the exact nature of your investment success:
+*   **The "Land & Tech" Link (Saturn + Mars + Rahu):** This specific combination points to wealth from **Engineering, Real Estate, and Digital Infrastructure**. Investing in companies that *build* things (infrastructure) or *power* things (energy/tech) aligns with your karmic path.
+*   **The "Luxury" Link (Venus in Taurus):** Since Venus is unconnected to malefics in the 11th, investments in **Luxury Goods, Automotive, or Blue-Chip Financials** will provide the steady dividends (cash flow) you desire.
+
+**4. The Triple Perspective (Sudarshana)**
+*   **From Lagna (Cancer):** The 2nd house (Leo) is packed, showing heavy focus on accumulation.
+*   **From Moon (Libra):** The 11th house (Leo) contains the same 4-planet cluster. This creates a "Chandra-Mangala" wealth influence, confirming that what you *save* (2nd from Lagna) also fulfills your *desires* (11th from Moon).
+*   **Verdict:** Since this wealth yoga repeats from both Body (Lagna) and Mind (Moon), the confidence level is **95%** that disciplined long-term investing will lead to substantial affluence.
+
+**5. Timing Synthesis (Multi-System)**
+*   **Vimshottari:** Saturn-Rahu drives the urge to invest now.
+*   **Transits:** Jupiter will transit into **Cancer (Exalted)** around mid-2025. This will aspect your 5th House (Speculation) and 9th House (Fortune).
+*   **Confirmation:** The **Aquarius** Chara Dasha (containing Mercury, your Career planet) and the **Bhadrika** Yogini (ruled by Mercury) confirm that intelligent, calculated financial decisions made in **2025-2026** will yield results for the next decade.
+
+### Practical Guidance
+
+**Where to Invest (Long Term):**
+1.  **Physical Real Estate:** With Moon in 4th and strong Mars, land or rental properties are your safest and highest-yield bet.
+2.  **Infrastructure & Energy Funds:** Look for mutual funds or stocks focusing on construction, power, or defense (Mars/Saturn influence).
+3.  **Gold/Sovereign Bonds:** With Jupiter in the 2nd house, gold is a lucky asset class for you.
+4.  **Avoid:** Intraday trading or options (Rahu in 2nd can cause illusions/losses here).
+
+**Action Plan:**
+*   **Immediate:** Maximize savings during the Rahu Antardasha. The inflow will be high—don't let it leak out on expenses.
+*   **Mid-2025:** When Jupiter exalts, make your biggest capital deployment (e.g., down payment on property or lump sum investment).
+
+<div class="final-thoughts-card">**Final Thoughts**: Your chart is designed for "The Compound Effect." You have the planetary capacity to build a fortress of wealth, but it requires the discipline of Saturn to tame the hunger of Rahu. Think in decades, not days.</div>
+
+<div class="follow-up-questions">
+📅 When is the best month to buy property in 2025?
+🔮 What specific remedies pacify Rahu in the 2nd house?
+💼 Should I invest in foreign markets or strictly domestic?
+🌟 Is gold or silver better for my chart?
+</div>
+Q: Where should I invest in?
+A: I can help with that! Are you looking for short-term gains, long-term investments, or a specific type of investment like stocks, real estate, or mutual funds?
+
+        
+        Current question: "Tell me about my father's health in next year."
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2026, endYear: 2026
+        - For general timing questions without specific year, use startYear: 2025, endYear: 2027
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2025, endYear: 2027 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

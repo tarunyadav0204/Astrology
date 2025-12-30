@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T17:55:55.612804
+Question: Tell me about my friends in general. Do I make friends, how many friends I make
+Processing Time: 2.889s
+Response Length: 489 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "I'd love to help you understand your friendships better! To give you the most relevant insights, could you tell me what specifically you're curious about? Are you wondering about the nature of your friendships, the timing of making new friends, potential challenges in friendships, or something else?",
+  "mode": "birth",
+  "category": "friends",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I'd love to help you understand your friendships better! To give you the most relevant insights, could you tell me what specifically you're curious about? Are you wondering about the nature of your friendships, the timing of making new friends, potential challenges in friendships, or something else?",
+  "mode": "birth",
+  "category": "friends",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

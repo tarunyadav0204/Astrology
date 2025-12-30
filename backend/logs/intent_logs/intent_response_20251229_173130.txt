@@ -1,0 +1,23 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T17:31:33.513161
+Question: Tell me about my mother's health in 2026
+Processing Time: 3.116s
+Response Length: 332 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To provide the most accurate guidance regarding your mother's health in 2026, which specific area would you like me to focus on? Potential new health issues, management of existing conditions, or her overall well-being?",
+    "mode": "annual",
+    "year": 2026
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide the most accurate guidance regarding your mother's health in 2026, which specific area would you like me to focus on? Potential new health issues, management of existing conditions, or her overall well-being?",
+  "mode": "annual",
+  "year": 2026
+}

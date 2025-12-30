@@ -1,0 +1,60 @@
+{
+  "timestamp": "2025-12-29T13:22:28.395731",
+  "current_date": "2025-12-29",
+  "planets": {
+    "Sun": {
+      "longitude": 253.79974533796755,
+      "sign": 8,
+      "degree": 13.79974533796755,
+      "retrograde": false
+    },
+    "Moon": {
+      "longitude": 5.804736685458058,
+      "sign": 0,
+      "degree": 5.804736685458058,
+      "retrograde": false
+    },
+    "Mars": {
+      "longitude": 256.5527322898102,
+      "sign": 8,
+      "degree": 16.552732289810194,
+      "retrograde": false
+    },
+    "Mercury": {
+      "longitude": 240.63510280082917,
+      "sign": 8,
+      "degree": 0.6351028008291735,
+      "retrograde": false
+    },
+    "Jupiter": {
+      "longitude": 87.45937664842933,
+      "sign": 2,
+      "degree": 27.459376648429327,
+      "retrograde": true
+    },
+    "Venus": {
+      "longitude": 251.838894667415,
+      "sign": 8,
+      "degree": 11.83889466741499,
+      "retrograde": false
+    },
+    "Saturn": {
+      "longitude": 331.80472958996023,
+      "sign": 11,
+      "degree": 1.8047295899602318,
+      "retrograde": false
+    },
+    "Rahu": {
+      "longitude": 318.08138680601337,
+      "sign": 10,
+      "degree": 18.08138680601337,
+      "retrograde": false
+    },
+    "Ketu": {
+      "longitude": 138.08138680601337,
+      "sign": 4,
+      "degree": 18.08138680601337,
+      "retrograde": false
+    }
+  }
+}

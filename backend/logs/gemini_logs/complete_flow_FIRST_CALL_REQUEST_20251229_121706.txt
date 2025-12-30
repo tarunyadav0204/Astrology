@@ -1,0 +1,101 @@
+COMPLETE GEMINI FLOW SUMMARY - FIRST_CALL_REQUEST
+Timestamp: 2025-12-29T12:17:52.965681
+Question: 
+As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided.
+
+IMPORTANT: Be completely honest and realistic in your analysis. Do not give false hope or exaggerated promises. If the chart shows challenges or limitations, mention them clearly. Provide balanced insights that include both positive potential and realistic challenges.
+
+SPECIAL FOCUS ON WEALTH INDICATORS:
+- InduLagna (Wealth Ascendant): Analyze the InduLagna position, sign, house placement, and aspects for wealth potential
+- 2nd House (Wealth): Primary wealth house analysis with lord placement and aspects
+- 11th House (Gains): Income and gains analysis with planetary influences
+- 9th House (Fortune): Luck and fortune factors affecting wealth accumulation
+- Jupiter (Karaka for Wealth): Natural significator analysis for financial wisdom
+- Venus (Luxury): Material comforts and luxury potential
+- Dhana Yogas: Classical wealth combinations from BPHS and other texts
+- Dasha Periods: Current and upcoming periods affecting financial growth
+
+MANDATORY INDU LAGNA ANALYSIS:
+In the Wealth Analysis section, specifically analyze the Indu Lagna provided in the special_lagnas data.
+Assess the financial magnitude based on the planets occupying or aspecting the Indu Lagna sign.
+Cross-reference this with the 2nd and 11th house strength to determine if the wealth is 'Stable' (2nd/11th) or 'Sudden/Speculative' (Indu Lagna).
+Mention the Indu Lagna explicitly in your final verdict on financial volume.
+
+CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. Use markdown formatting for emphasis within JSON strings.
+
+STRICT MANDATORY FORMAT - Validate your JSON before responding:
+
+{
+  "quick_answer": "Brief summary with <strong>bold text</strong> and <br> for line breaks",
+  "detailed_analysis": [
+    {
+      "question": "What is my overall wealth potential according to my birth chart?",
+      "answer": "Detailed answer with <strong>bold</strong>, <br> for line breaks, and <p> for paragraphs"
+    },
+    {
+      "question": "Will I be wealthy or face financial struggles in life?", 
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "Should I do business or job for better financial success?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "What are my best sources of income and earning methods?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "Can I do stock trading and speculation successfully?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "When will I see significant financial growth in my life?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "At what age will I achieve financial stability?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "What types of investments and financial strategies suit me best?",
+      "answer": "Detailed answer with HTML markup"
+    },
+    {
+      "question": "Should I invest in property, stocks, or other assets?",
+      "answer": "Detailed answer with HTML markup"
+    }
+  ],
+  "final_thoughts": "Summary with <strong>bold</strong> and <br> line breaks",
+  "follow_up_questions": [
+    "📅 When will this happen?",
+    "🔮 What remedies can help?",
+    "💼 How to maximize success?",
+    "🌟 What should I focus on?"
+  ]
+}
+
+MANDATORY RULES:
+1. Response must start with { and end with }
+2. All strings must be properly escaped
+3. No markdown code blocks (```)
+4. No additional text outside JSON
+5. Validate JSON syntax before responding
+
+HTML markup for content formatting:
+- <strong>text</strong> for bold
+- <br> for line breaks  
+- <p>text</p> for paragraphs
+- <em>text</em> for emphasis
+
+Provide detailed astrological analysis using the birth chart data and planetary periods.
+
+Processing Time: 46.850s
+Total Request Time: 46.86s
+Context Size: 94829 characters
+Has Transit Data: No
+Response Length: 13624 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.007s
+- Gemini Processing: 46.850s
+- Total Time: 46.857s

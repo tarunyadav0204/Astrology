@@ -1,0 +1,15 @@
+COMPLETE GEMINI FLOW SUMMARY - SECOND_CALL_WITH_TRANSIT
+Timestamp: 2025-12-29T12:34:09.981516
+Question: I am looking for long term
+Processing Time: 50.877s
+Total Request Time: 50.90s
+Context Size: 186680 characters
+Has Transit Data: Yes
+Response Length: 5939 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.018s
+- Gemini Processing: 50.877s
+- Total Time: 50.895s
+- Transit Activations: 56
+- Dasha Periods: 41

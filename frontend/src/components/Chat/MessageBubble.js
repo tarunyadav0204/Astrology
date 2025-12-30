@@ -1,6 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import textToSpeech from '../../utils/textToSpeech';
 import { showToast } from '../../utils/toast';
+import ResponseRenderer from '../TermTooltip/ResponseRenderer';
 
 const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChartRefClick, onRestartPolling, onDeleteMessage }) => {
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -10,6 +12,7 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
     const [currentChunk, setCurrentChunk] = useState(0);
     const [totalChunks, setTotalChunks] = useState(0);
     const [showActions, setShowActions] = useState(false);
+    const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
     const messageRef = useRef(null);
     
     React.useEffect(() => {
@@ -163,7 +166,7 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             messageElement.removeEventListener('mouseleave', handleMouseLeave);
         };
     }, []);
-    const formatContent = (content) => {
+    const formatContent = (content, message = {}) => {
         if (!content || content.trim() === '') {
             return '';
         }
@@ -177,6 +180,12 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             .replace(/&#39;/g, "'")
             .replace(/&nbsp;/g, ' ');
         
+        // Clean up section headers with HTML formatting immediately after decoding
+        formatted = formatted.replace(/<div class="section-header"><em class="chat-italic">([^<]*)<\/em><\/div>/g, 
+            '<div class="section-header">$1</div>');
+        formatted = formatted.replace(/<div class="section-header"><strong class="chat-bold">([^<]*)<\/strong><\/div>/g, 
+            '<div class="section-header">$1</div>');
+        
         // Then normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         
@@ -189,18 +198,38 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             return `<div class="follow-up-questions">${questionList}</div>`;
         });
         
-        // Handle Final Thoughts section specially
+        // Handle Final Thoughts section specially - close any open section first
         formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
             const cleanContent = finalThoughts
                 .replace(/### Final Thoughts\n?/, '')
                 .replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>')
                 .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>')
                 .trim();
-            return `<div class="final-thoughts-card"><strong>Final Thoughts</strong><br><br>${cleanContent}</div>`;
+            return `</div></div><div class="final-thoughts-card"><strong class="chat-bold">Final Thoughts</strong>: ${cleanContent}</div>`;
         });
         
-        // Process headers - handle both ### and standalone # symbols
-        formatted = formatted.replace(/### (.*?)\n/g, '<h3 class="chat-header">◆ $1 ◆</h3>\n\n');
+        // Process headers - convert to section cards
+        formatted = formatted.replace(/### (.*?)\n/g, (match, header) => {
+            const cleanHeader = header.replace(/<[^>]*>/g, '').trim();
+            return `<div class="section-card"><div class="section-header">${cleanHeader}</div><div class="section-content">`;
+        });
+        
+        // Specifically handle "Nakshatra Insights" if it appears as bold or italic text
+        formatted = formatted.replace(/\*\*?(Nakshatra Insights)\*\*?/g, '<div class="section-card"><div class="section-header">$1</div><div class="section-content">');
+        formatted = formatted.replace(/<strong class="chat-bold">(Nakshatra Insights)<\/strong>/g, '<div class="section-card"><div class="section-header">$1</div><div class="section-content">');
+        formatted = formatted.replace(/<em class="chat-italic">(Nakshatra Insights)<\/em>/g, '<div class="section-card"><div class="section-header">$1</div><div class="section-content">');
+        
+        // Close section cards before next header or at end
+        formatted = formatted.replace(/<div class="section-card"><div class="section-header">(.*?)<\/div><div class="section-content">(.*?)(?=<div class="section-card">|<div class="final-thoughts-card">|$)/gs, 
+            (match, header, content) => {
+                const cleanHeader = header.replace(/<[^>]*>/g, '').trim();
+                return `<div class="section-card"><div class="section-header">${cleanHeader}</div><div class="section-content">${content}</div></div>`;
+            });
+        
+        // Handle the last section if it doesn't have a closing
+        if (formatted.includes('<div class="section-content">') && !formatted.includes('</div></div>')) {
+            formatted = formatted.replace(/<div class="section-content">([^<]*(?:<(?!\/div>)[^<]*)*[^<]*)$/, '<div class="section-content">$1</div></div>');
+        }
         
 
         
@@ -210,20 +239,39 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         // Clean up any remaining # symbols at start of lines
         formatted = formatted.replace(/^\s*#+\s*/gm, '');
         
+        // Process term tooltips FIRST, before any other formatting
+        if (message.terms && message.glossary) {
+            // Replace existing <term id="termname">text</term> with clickable spans
+            formatted = formatted.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
+                if (message.glossary[termId]) {
+                    const definition = message.glossary[termId].replace(/"/g, '&quot;');
+                    return `<span class="tooltip-wrapper" data-term="${termId}" data-definition="${definition}" style="display: inline-block; padding: 4px; margin: -4px; cursor: pointer;"><span class="term-tooltip" data-term="${termId}" title="${definition}">${termText}</span></span>`;
+                }
+                return match;
+            });
+        }
+        
         // Process bold text
         formatted = formatted.replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>');
         
-        // Process italics (single asterisks not part of bold)
-        formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
+        // Process italics (single asterisks not part of bold) - but preserve tooltip spans
+        formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, (match, content) => {
+            // Don't italicize if content contains tooltip spans
+            if (content.includes('term-tooltip')) {
+                return match.replace(/\*/g, ''); // Just remove the asterisks
+            }
+            return `<em class="chat-italic">${content}</em>`;
+        });
         
 
         // Clean up multiple line breaks and split into paragraphs
         formatted = formatted.replace(/\n\s*\n\s*\n+/g, '\n\n');
         formatted = formatted.replace(/^\s*\n+/, ''); // Remove leading whitespace and newlines
         formatted = formatted.trim(); // Remove trailing whitespace
+        
         const paragraphs = formatted.split(/\n\s*\n/).filter(p => p.trim());
         
-        return paragraphs.map((paragraph, index) => {
+        let result = paragraphs.map((paragraph, index) => {
             paragraph = paragraph.trim();
             if (!paragraph) return '';
             
@@ -267,6 +315,14 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             // Regular paragraph - replace single line breaks with spaces
             return `<p class="chat-paragraph">${paragraph.replace(/\n/g, ' ')}</p>`;
         }).join('').replace(/^<p class="chat-paragraph">\s*<\/p>/, ''); // Remove first empty paragraph
+        
+        // Final cleanup: remove HTML formatting from section headers in already processed content
+        result = result.replace(/<div class="section-header"><em class="chat-italic">([^<]*)<\/em><\/div>/g, 
+            '<div class="section-header">$1</div>');
+        result = result.replace(/<div class="section-header"><strong class="chat-bold">([^<]*)<\/strong><\/div>/g, 
+            '<div class="section-header">$1</div>');
+        
+        return result;
     };
 
     const handleSpeak = () => {
@@ -348,12 +404,28 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         }
     };
 
+    // Handle tooltip clicks with event delegation
+    useEffect(() => {
+        // Create global function for tooltip clicks
+        window.openTooltip = (termId, term, definition) => {
+            setTooltipModal({ show: true, term, definition });
+        };
+        
+        return () => {
+            delete window.openTooltip;
+        };
+    }, []);
+
     return (
         <div 
             ref={messageRef}
             className={`message-bubble ${message.role} ${message.isTyping ? 'typing' : ''} ${message.isProcessing ? 'processing' : ''} ${message.message_type === 'clarification' ? 'clarification' : ''}`}
             onTouchStart={isMobile() ? handleLongPress : undefined}
-            onClick={() => isMobile() && showActions && setShowActions(false)}
+            onClick={(e) => {
+                if (isMobile() && showActions) {
+                    setShowActions(false);
+                }
+            }}
         >
             {/* Action buttons */}
             {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
@@ -422,19 +494,34 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                 )}
                 <div 
                     className="message-text enhanced-formatting"
-                    dangerouslySetInnerHTML={{ __html: formatContent(message.content) }}
                     onClick={(e) => {
-                        if (e.target.classList.contains('follow-up-btn')) {
-                            const question = e.target.textContent.replace(/^[\u{1F300}-\u{1F9FF}\s]+/u, '').trim();
-                            onFollowUpClick && onFollowUpClick(question);
-                        } else if (e.target.classList.contains('chart-ref')) {
-                            const type = e.target.dataset.planet ? 'planet' : 
-                                        e.target.dataset.house ? 'house' : 'sign';
-                            const value = e.target.dataset.planet || e.target.dataset.house || e.target.dataset.sign;
-                            onChartRefClick && onChartRefClick({ type, value });
+                        // Check for tooltip wrapper clicks
+                        if (e.target.classList.contains('tooltip-wrapper')) {
+                            const term = e.target.querySelector('.term-tooltip').textContent;
+                            const definition = e.target.getAttribute('data-definition');
+                            setTooltipModal({ show: true, term, definition });
+                            return;
                         }
+                        
+                        // Check if clicked inside tooltip wrapper
+                        const wrapper = e.target.closest('.tooltip-wrapper');
+                        if (wrapper) {
+                            const term = wrapper.querySelector('.term-tooltip').textContent;
+                            const definition = wrapper.getAttribute('data-definition');
+                            setTooltipModal({ show: true, term, definition });
+                            return;
+                        }
+                        
+                        console.log('No tooltip found');
                     }}
-                />
+                >
+                    {/* Always use ResponseRenderer for assistant messages */}
+                    {message.role === 'assistant' ? (
+                        <div dangerouslySetInnerHTML={{ __html: formatContent(message.content, message) }} />
+                    ) : (
+                        <div dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
+                    )}
+                </div>
                 
                 {/* Action buttons positioned like mobile */}
                 {!message.isTyping && !message.isProcessing && message.messageId && message.isFromDatabase && (
@@ -514,6 +601,55 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
                     {new Date(message.timestamp).toLocaleTimeString()}
                 </div>
             </div>
+            
+            {/* Tooltip Modal using Portal */}
+            {tooltipModal.show && createPortal(
+                <div 
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000
+                    }}
+                    onClick={() => setTooltipModal({ show: false, term: '', definition: '' })}
+                >
+                    <div 
+                        style={{
+                            backgroundColor: 'white',
+                            padding: '20px',
+                            borderRadius: '10px',
+                            maxWidth: '400px',
+                            margin: '20px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 style={{ margin: '0 0 10px 0', color: '#e91e63' }}>{tooltipModal.term}</h3>
+                        <p style={{ margin: '0', lineHeight: '1.5', color: '#333' }}>{tooltipModal.definition}</p>
+                        <button 
+                            onClick={() => setTooltipModal({ show: false, term: '', definition: '' })}
+                            style={{
+                                marginTop: '15px',
+                                padding: '8px 16px',
+                                backgroundColor: '#e91e63',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

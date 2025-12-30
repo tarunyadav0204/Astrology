@@ -44,7 +44,6 @@ export default function BirthFormScreen({ navigation, route }) {
     place: editProfile?.place || '',
     latitude: editProfile?.latitude || null,
     longitude: editProfile?.longitude || null,
-    timezone: editProfile?.timezone || 'UTC+5:30',
     gender: editProfile?.gender?.trim() || '',
   });
   
@@ -226,24 +225,6 @@ export default function BirthFormScreen({ navigation, route }) {
     }
   };
 
-  const getTimezoneFromCoordinates = (lat, lng) => {
-    // Special handling for India (IST)
-    if (lat >= 6.0 && lat <= 37.0 && lng >= 68.0 && lng <= 97.0) {
-      return 'UTC+5:30';
-    }
-    
-    // Calculate timezone for other regions
-    const offset = lng / 15.0;
-    const hours = Math.floor(Math.abs(offset));
-    const minutes = Math.round((Math.abs(offset) - hours) * 60);
-    
-    if (minutes === 30) {
-      return `UTC${offset >= 0 ? '+' : '-'}${hours}:30`;
-    } else {
-      return `UTC${offset >= 0 ? '+' : '-'}${hours}`;
-    }
-  };
-
   const searchPlaces = async (query) => {
     try {
       const response = await fetch(
@@ -258,8 +239,7 @@ export default function BirthFormScreen({ navigation, route }) {
           id: item.place_id,
           name: item.display_name,
           latitude: lat,
-          longitude: lng,
-          timezone: getTimezoneFromCoordinates(lat, lng)
+          longitude: lng
         };
       });
       setSuggestions(places);
@@ -272,8 +252,7 @@ export default function BirthFormScreen({ navigation, route }) {
       ...prev,
       place: place.name,
       latitude: place.latitude,
-      longitude: place.longitude,
-      timezone: place.timezone
+      longitude: place.longitude
     }));
     setShowSuggestions(false);
     setSuggestions([]);
@@ -342,7 +321,6 @@ export default function BirthFormScreen({ navigation, route }) {
         place: formData.place,
         latitude: formData.latitude,
         longitude: formData.longitude,
-        timezone: formData.timezone,
         gender: formData.gender,
         relation: editProfile?.relation || 'other',
       };

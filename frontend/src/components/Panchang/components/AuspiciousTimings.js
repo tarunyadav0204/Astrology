@@ -2,18 +2,28 @@ import React from 'react';
 
 const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate }) => {
   if (!choghadiyaData || !horaData || !muhurtaData) {
-    throw new Error('Choghadiya, Hora, and Muhurta data are required');
+    return (
+      <div className="auspicious-timings">
+        <div className="loading-message">
+          <p>Loading auspicious timings...</p>
+        </div>
+      </div>
+    );
   }
 
   const formatTime = (timeString) => {
     if (!timeString) {
-      throw new Error('Time string is required');
+      return 'N/A';
     }
-    return new Date(timeString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    try {
+      return new Date(timeString).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   const isCurrentlyActive = (startTime, endTime) => {
@@ -24,18 +34,27 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
   };
 
   const getCurrentChoghadiya = () => {
+    if (!choghadiyaData || !choghadiyaData.day_choghadiya || !choghadiyaData.night_choghadiya) {
+      return null;
+    }
     const now = new Date();
     const allChoghadiya = [...choghadiyaData.day_choghadiya, ...choghadiyaData.night_choghadiya];
     return allChoghadiya.find(period => isCurrentlyActive(period.start_time, period.end_time));
   };
 
   const getCurrentHora = () => {
+    if (!horaData || !horaData.day_horas || !horaData.night_horas) {
+      return null;
+    }
     const now = new Date();
     const allHoras = [...horaData.day_horas, ...horaData.night_horas];
     return allHoras.find(hora => isCurrentlyActive(hora.start_time, hora.end_time));
   };
 
   const getActiveMuhurtas = () => {
+    if (!muhurtaData || !muhurtaData.muhurtas) {
+      return [];
+    }
     return muhurtaData.muhurtas.filter(muhurta => 
       isCurrentlyActive(muhurta.start_time, muhurta.end_time)
     );
@@ -91,7 +110,7 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
       <div className="timing-section">
         <h4>🕉️ Special Muhurtas</h4>
         <div className="timing-list">
-          {muhurtaData.muhurtas.map((muhurta, index) => {
+          {muhurtaData && muhurtaData.muhurtas && muhurtaData.muhurtas.map((muhurta, index) => {
             const isActive = isCurrentlyActive(muhurta.start_time, muhurta.end_time);
             
             return (
@@ -106,7 +125,7 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
                 <div className="muhurta-details">
                   <div className="significance">{muhurta.significance}</div>
                   <div className="activities">
-                    <strong>Best for:</strong> {muhurta.activities.join(', ')}
+                    <strong>Best for:</strong> {muhurta.activities ? muhurta.activities.join(', ') : muhurta.purpose || 'General auspicious activities'}
                   </div>
                 </div>
               </div>
@@ -123,7 +142,7 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
           <div className="day-choghadiya">
             <h5>Day Choghadiya</h5>
             <div className="choghadiya-list">
-              {choghadiyaData.day_choghadiya.map((period, index) => {
+              {choghadiyaData && choghadiyaData.day_choghadiya && choghadiyaData.day_choghadiya.map((period, index) => {
                 const isActive = isCurrentlyActive(period.start_time, period.end_time);
                 
                 return (
@@ -145,7 +164,7 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
           <div className="night-choghadiya">
             <h5>Night Choghadiya</h5>
             <div className="choghadiya-list">
-              {choghadiyaData.night_choghadiya.map((period, index) => {
+              {choghadiyaData && choghadiyaData.night_choghadiya && choghadiyaData.night_choghadiya.map((period, index) => {
                 const isActive = isCurrentlyActive(period.start_time, period.end_time);
                 
                 return (
@@ -174,7 +193,7 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
           <div className="day-hora">
             <h5>Day Horas</h5>
             <div className="hora-list">
-              {horaData.day_horas.map((hora, index) => {
+              {horaData && horaData.day_horas && horaData.day_horas.map((hora, index) => {
                 const isActive = isCurrentlyActive(hora.start_time, hora.end_time);
                 
                 return (
@@ -195,7 +214,7 @@ const AuspiciousTimings = ({ choghadiyaData, horaData, muhurtaData, selectedDate
           <div className="night-hora">
             <h5>Night Horas</h5>
             <div className="hora-list">
-              {horaData.night_horas.map((hora, index) => {
+              {horaData && horaData.night_horas && horaData.night_horas.map((hora, index) => {
                 const isActive = isCurrentlyActive(hora.start_time, hora.end_time);
                 
                 return (

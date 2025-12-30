@@ -197,7 +197,7 @@ export const apiService = {
   },
   
   calculatePanchang: async (birthData) => {
-    const response = await apiClient.post(getEndpoint('/calculate-panchang'), birthData);
+    const response = await apiClient.post(getEndpoint('/panchang/calculate-panchang'), birthData);
     return response.data;
   },
   
@@ -443,39 +443,44 @@ export const apiService = {
     return response.data;
   },
   
-  calculateChoghadiya: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/panchang/choghadiya')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  calculateChoghadiya: async (date, latitude, longitude, timezone) => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/choghadiya')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
     return response.data;
   },
   
-  calculateHora: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/panchang/hora')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  calculateHora: async (date, latitude, longitude, timezone) => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/hora')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
     return response.data;
   },
   
-  calculateSpecialMuhurtas: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/panchang/special-muhurtas')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  calculateSpecialMuhurtas: async (date, latitude, longitude, timezone) => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/special-muhurtas')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
+    return response.data;
+  },
+  
+  calculatePlanetaryPositions: async (transitRequest) => {
+    const response = await apiClient.post(getEndpoint('/calculate-transits'), transitRequest);
     return response.data;
   },
   
   // Muhurat APIs
-  getVivahMuhurat: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/vivah-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  getVivahMuhurat: async (date, latitude, longitude, timezone = 'Asia/Kolkata') => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/vivah-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
     return response.data;
   },
   
-  getPropertyMuhurat: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/property-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  getPropertyMuhurat: async (date, latitude, longitude, timezone = 'Asia/Kolkata') => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/property-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
     return response.data;
   },
   
-  getVehicleMuhurat: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/vehicle-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  getVehicleMuhurat: async (date, latitude, longitude, timezone = 'Asia/Kolkata') => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/vehicle-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
     return response.data;
   },
   
-  getGrihaPraveshMuhurat: async (date, latitude, longitude) => {
-    const response = await apiClient.get(`${getEndpoint('/griha-pravesh-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}`);
+  getGrihaPraveshMuhurat: async (date, latitude, longitude, timezone = 'Asia/Kolkata') => {
+    const response = await apiClient.get(`${getEndpoint('/panchang/griha-pravesh-muhurat')}?date=${date}&latitude=${latitude}&longitude=${longitude}&timezone=${encodeURIComponent(timezone)}`);
     return response.data;
   }
 };

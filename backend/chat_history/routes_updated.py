@@ -223,7 +223,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Session not found")
     
     cursor.execute('''
-        SELECT message_id, sender, content, timestamp
+        SELECT message_id, sender, content, timestamp, terms, glossary
         FROM chat_messages
         WHERE session_id = ?
         ORDER BY timestamp ASC
@@ -232,14 +232,26 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
     messages = cursor.fetchall()
     conn.close()
     
+    import json
     conversation = []
     for msg in messages:
-        conversation.append({
+        message_data = {
             "message_id": msg[0],
             "sender": msg[1],
             "content": msg[2],
             "timestamp": msg[3]
-        })
+        }
+        
+        # Add terms and glossary for assistant messages
+        if msg[1] == 'assistant' and len(msg) > 4:
+            try:
+                message_data["terms"] = json.loads(msg[4]) if msg[4] else []
+                message_data["glossary"] = json.loads(msg[5]) if msg[5] else {}
+            except (json.JSONDecodeError, TypeError):
+                message_data["terms"] = []
+                message_data["glossary"] = {}
+        
+        conversation.append(message_data)
     
     return {"session_id": session_id, "messages": conversation}
 
@@ -677,6 +689,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             cursor = conn.cursor()
             
             if result.get('success'):
+                # Parse terms and glossary from response
+                from ai.response_parser import ResponseParser
+                parsed_response = ResponseParser.parse_response(result['response'])
+                
                 # Deduct credits on successful response
                 credit_service = CreditService()
                 analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
@@ -690,14 +706,22 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 if success:
                     print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
-                        (sanitize_text(result['response']), "completed", "answer", datetime.now(), message_id)
+                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        (
+                            sanitize_text(parsed_response['content']), 
+                            json.dumps(parsed_response['terms']),
+                            json.dumps(parsed_response['glossary']),
+                            "completed", 
+                            "answer", 
+                            datetime.now(), 
+                            message_id
+                        )
                     )
                 else:
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
                     cursor.execute(
                         "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
-                        (("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
+                        ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
                     )
             else:
                 error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')

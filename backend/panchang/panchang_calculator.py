@@ -705,8 +705,8 @@ class PanchangCalculator:
         """Convert Julian Day to IST datetime"""
         year, month, day, hour, minute, second = swe.jdut1_to_utc(jd, 1)
         dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        # Convert UTC to IST (UTC+5:30) with 1-minute adjustment
-        dt_ist = dt + timedelta(hours=5, minutes=29)
+        # Convert UTC to IST (UTC+5:30) - FIXED: was 5:29, now correct 5:30
+        dt_ist = dt + timedelta(hours=5, minutes=30)
         return dt_ist
     
     def _jd_to_iso(self, jd):

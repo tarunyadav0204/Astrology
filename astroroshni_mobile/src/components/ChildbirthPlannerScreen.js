@@ -139,18 +139,17 @@ export default function ChildbirthPlannerScreen({ navigation }) {
   const performCalculation = async () => {
     try {
       const token = await storage.getAuthToken();
+      
       const payload = {
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
         delivery_latitude: parseFloat(deliveryLocation.latitude),
         delivery_longitude: parseFloat(deliveryLocation.longitude),
-        delivery_timezone: motherProfile.timezone || "UTC+5:30",
         
         mother_dob: motherProfile.date,
         mother_time: motherProfile.time,
         mother_lat: parseFloat(motherProfile.latitude),
-        mother_lon: parseFloat(motherProfile.longitude),
-        mother_timezone: motherProfile.timezone || "UTC+5:30"
+        mother_lon: parseFloat(motherProfile.longitude)
       };
 
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/muhurat/childbirth-planner')}`, {

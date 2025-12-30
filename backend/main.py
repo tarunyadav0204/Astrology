@@ -1,18 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException, APIRouter
+from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, ValidationError
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import swisseph as swe
 import sqlite3
 import os
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+from utils.timezone_service import get_timezone_from_coordinates
 import bcrypt
 import jwt
 from horoscope.api import HoroscopeAPI
 from rule_engine.api import router as rule_engine_router
-from birth_charts.routes import router as birth_charts_router
 from user_settings import router as settings_router
 from daily_predictions import DailyPredictionEngine
 from house_combinations import router as house_combinations_router
@@ -31,7 +33,7 @@ from planetary_dignities import router as planetary_dignities_router
 from chara_karakas import router as chara_karakas_router
 from shadbala import router as shadbala_router
 from classical_shadbala import router as classical_shadbala_router
-from auth import get_current_user as auth_get_current_user
+from auth import get_current_user, User
 from app.kp.routes.kp_routes import router as kp_router
 from career_analysis.career_router import router as career_router
 from career_analysis.career_ai_router import router as career_ai_router
@@ -60,6 +62,8 @@ from physical_feedback_routes import router as physical_feedback_router
 from numerology_routes import router as numerology_router
 from transits.routes import router as transits_router
 from Dashas.routes.chara_dasha_routes import router as chara_dasha_router
+from charts.routes import router as charts_router
+from birth_charts.routes import router as birth_charts_router
 import math
 from datetime import timedelta
 import signal
@@ -124,6 +128,16 @@ except ImportError:
 
 app = FastAPI()
 horoscope_api = HoroscopeAPI()
+
+# Add validation error handler
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print(f"❌ VALIDATION ERROR on {request.method} {request.url.path}:")
+    print(f"🔍 Validation errors: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
 
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)
 from fastapi import Request
@@ -190,7 +204,6 @@ app.add_middleware(
 
 # Include rule engine router with /api prefix
 app.include_router(rule_engine_router, prefix="/api")
-app.include_router(birth_charts_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(house_combinations_router, prefix="/api")
 app.include_router(nadi_router, prefix="/api")
@@ -205,10 +218,12 @@ app.include_router(kp_router, prefix="/api")
 app.include_router(career_router, prefix="/api")
 app.include_router(career_ai_router, prefix="/api")
 app.include_router(panchang_router, prefix="/api/panchang")
-app.include_router(muhurat_router, prefix="/api")
+app.include_router(muhurat_router, prefix="/api/panchang")
 app.include_router(childbirth_router, prefix="/api")
 # Note: childbirth_router already includes vehicle and griha pravesh endpoints
 app.include_router(health_router, prefix="/api")
+app.include_router(charts_router, prefix="/api")
+app.include_router(birth_charts_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(nakshatra_router, prefix="/api")
@@ -233,32 +248,6 @@ app.include_router(financial_router)
 
 
 
-
-# Root endpoint for health check
-@app.get("/")
-async def root():
-    return {"message": "Astrology API", "docs": "/api/docs", "version": "1.0.0"}
-
-# Dedicated health check endpoint for GCP
-@app.get("/health")
-async def root_health():
-    return {"status": "healthy", "message": "Astrology API is running"}
-
-@app.get("/healthz")
-async def kubernetes_health():
-    return {"status": "ok"}
-
-@app.get("/readiness")
-async def readiness_check():
-    try:
-        # Quick database check
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        conn.close()
-        return {"status": "ready"}
-    except:
-        return {"status": "not ready"}, 503
 
 @app.get("/api/test")
 async def test_endpoint():
@@ -415,10 +404,27 @@ class BirthData(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: str
+    timezone: Optional[str] = None  # Will be auto-detected if not provided
     place: str = ""
     gender: str = ""
     relation: Optional[str] = "other"
+    
+    @validator('time')
+    def normalize_time_format(cls, v):
+        """Normalize time to HH:MM format for consistent calculations"""
+        if v and ':' in v:
+            parts = v.split(':')
+            if len(parts) == 3:  # HH:MM:SS -> HH:MM
+                return f"{parts[0]}:{parts[1]}"
+        return v
+    
+    @validator('timezone', always=True)
+    def set_timezone(cls, v, values):
+        if v is None and 'latitude' in values and 'longitude' in values:
+            # Auto-detect timezone from coordinates
+            detected_tz = get_timezone_from_coordinates(values['latitude'], values['longitude'])
+            return detected_tz or "UTC+5:30"  # Fallback to IST if detection fails
+        return v or "UTC+5:30"
     
     class Config:
         # Allow string coercion for timezone field
@@ -715,7 +721,6 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # Use the auth module function
-get_current_user = auth_get_current_user
 
 # Helper function to check user access
 def has_platform_access(userid: int, platform: str, feature: str = None) -> bool:
@@ -1632,831 +1637,20 @@ async def health_detailed():
             "timestamp": datetime.now().isoformat()
         }
 
-@app.post("/api/calculate-chart-only")
-async def calculate_chart_only(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
-    # Calculate chart without saving to database
-    return await _calculate_chart_data(birth_data, node_type)
+# Import chart routes
+from charts.routes import router as chart_router
+app.include_router(chart_router, prefix="/api")
 
-@app.post("/api/calculate-all-charts")
-async def calculate_all_charts(birth_data: BirthData, current_user: User = Depends(get_current_user)):
-    """Calculate all charts at once for instant switching"""
-    try:
-        # Calculate base chart
-        base_chart = await _calculate_chart_data(birth_data, 'mean')
-        
-        # Calculate all divisional charts
-        divisions = [9, 10, 12, 16, 20, 24, 30, 40, 45, 60]
-        divisional_charts = {}
-        
-        for division in divisions:
-            try:
-                div_result = await calculate_divisional_chart({
-                    'birth_data': birth_data.model_dump(),
-                    'division': division
-                }, current_user)
-                divisional_charts[f'd{division}'] = div_result['divisional_chart']
-            except Exception as e:
-                print(f"Error calculating D{division}: {e}")
-                continue
-        
-        # Calculate transit chart
-        try:
-            transit_request = TransitRequest(
-                birth_data=birth_data,
-                transit_date=datetime.now().strftime('%Y-%m-%d')
-            )
-            transit_chart = await calculate_transits(transit_request)
-            divisional_charts['transit'] = transit_chart
-        except Exception as e:
-            print(f"Error calculating transit: {e}")
-        
-        return {
-            'lagna': base_chart,
-            'divisional_charts': divisional_charts,
-            'calculated_at': datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Batch calculation failed: {str(e)}")
+# Backward compatibility wrapper for calculate_chart
+async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = None):
+    """Backward compatibility wrapper for calculate_chart function"""
+    from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    return calculator.calculate_chart(birth_data, node_type)
 
-@app.post("/api/calculate-chart")
-async def calculate_chart(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):
-    # CRITICAL: Validate coordinates before saving
-    if not birth_data.latitude or not birth_data.longitude:
-        raise HTTPException(status_code=400, detail="Valid coordinates required. Please select location from suggestions.")
-    
-    # Store birth data in database (update if exists for current user only)
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    if encryptor:
-        enc_name = encryptor.encrypt(birth_data.name)
-        enc_date = encryptor.encrypt(birth_data.date)
-        enc_time = encryptor.encrypt(birth_data.time)
-        enc_lat = encryptor.encrypt(str(birth_data.latitude))
-        enc_lon = encryptor.encrypt(str(birth_data.longitude))
-        enc_place = encryptor.encrypt(birth_data.place)
-    else:
-        enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
-        enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
-
-    # Check if chart exists for this user with same details
-    cursor.execute('''
-        SELECT id FROM birth_charts 
-        WHERE userid = ? AND name = ? AND date = ? AND time = ? AND latitude = ? AND longitude = ?
-    ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon))
-    
-    existing_chart = cursor.fetchone()
-    
-    if existing_chart:
-        # Update existing chart for this user
-        cursor.execute('''
-            UPDATE birth_charts 
-            SET timezone=?, place=?, gender=?, relation=?
-            WHERE id=?
-        ''', (birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other', existing_chart[0]))
-    else:
-        # Insert new chart for this user
-        cursor.execute('''
-            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-            birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
-
-    conn.commit()
-    conn.close()
-    
-    # Calculate and return chart data
-    return await _calculate_chart_data(birth_data, node_type)
-
-async def _calculate_chart_data(birth_data: BirthData, node_type: str = 'mean'):
-    print(f"🔍 CHART CALCULATION DEBUG for {birth_data.name}:")
-    print(f"📅 Date: {birth_data.date}")
-    print(f"🕐 Time: {birth_data.time}")
-    print(f"🌍 Location: {birth_data.latitude}, {birth_data.longitude}")
-    print(f"⏰ Original Timezone: {birth_data.timezone}")
-    # Calculate Julian Day with proper timezone handling
-    time_parts = birth_data.time.split(':')
-    hour = float(time_parts[0]) + float(time_parts[1])/60
-    print(f"🕐 Parsed hour: {hour}")
-    
-    # Parse timezone offset (e.g., "UTC+5:30" -> 5.5, "UTC+5" -> 5.0)
-    tz_offset = 0
-    if birth_data.timezone.startswith('UTC'):
-        tz_str = birth_data.timezone[3:]  # Remove 'UTC'
-        print(f"⏰ Timezone string after UTC removal: '{tz_str}'")
-        if tz_str:
-            if ':' in tz_str:
-                # Handle UTC+5:30 format
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
-                print(f"⏰ Parsed timezone offset (with minutes): {tz_offset}")
-            else:
-                # Handle UTC+5 format
-                tz_offset = float(tz_str)
-                print(f"⏰ Parsed timezone offset (hours only): {tz_offset}")
-    else:
-        # Default to IST for Indian coordinates
-        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-            tz_offset = 5.5
-            print(f"⏰ Using default IST offset: {tz_offset}")
-        else:
-            print(f"⏰ Non-Indian coordinates, using offset: {tz_offset}")
-    
-    # Convert local time to UTC
-    utc_hour = hour - tz_offset
-    print(f"🌍 UTC hour calculated: {utc_hour} (local {hour} - offset {tz_offset})")
-    
-    jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
-    
-    # Calculate planetary positions
-    planets = {}
-    planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
-    
-    for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
-        if planet <= 6:  # Regular planets
-            # Try with speed flag to get accurate velocity data
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED)
-        else:  # Lunar nodes
-            node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
-            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL | swe.FLG_SPEED)
-        
-        # pos is a tuple: (position_array, return_flag)
-        pos_array = pos[0]
-        longitude = pos_array[0]
-        
-        # Speed is at index 3 (daily motion in longitude)
-        speed = pos_array[3] if len(pos_array) > 3 else 0.0
-        
-        if planet == 12:  # Ketu - add 180 degrees to Rahu
-            longitude = (longitude + 180) % 360
-        
-        is_retrograde = speed < 0 if planet <= 6 else False
-        
-        planets[planet_names[i]] = {
-            'longitude': longitude,
-            'sign': int(longitude / 30),
-            'degree': longitude % 30,
-            'retrograde': is_retrograde
-        }
-
-    # Calculate ascendant and houses
-    houses_data = swe.houses(jd, birth_data.latitude, birth_data.longitude, b'P')
-    ayanamsa = swe.get_ayanamsa_ut(jd)
-    
-    # Get sidereal ascendant (houses_data[1][0] is the ascendant)
-    ascendant_tropical = houses_data[1][0]  # Tropical ascendant
-    ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
-    
-    # For Vedic astrology, use Whole Sign houses based on sidereal ascendant
-    ascendant_sign = int(ascendant_sidereal / 30)
-    houses = []
-    for i in range(12):
-        house_sign = (ascendant_sign + i) % 12
-        house_longitude = (house_sign * 30) + (ascendant_sidereal % 30)
-        houses.append({
-            'longitude': house_longitude % 360,
-            'sign': house_sign
-        })
-    
-    # Calculate Gulika and Mandi using proper Vedic method
-    # Get day of week (0=Sunday, 1=Monday, etc.)
-    weekday = int((jd + 1.5) % 7)
-    
-    # Gulika calculation - Saturn's portion during day
-    # Saturn's portion for each weekday (in hours from sunrise)
-    gulika_portions = [10.5, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0]  # Sun-Sat
-    gulika_time = gulika_portions[weekday]
-    
-    # Calculate Gulika longitude based on time from sunrise
-    # Each hour = 15 degrees (360/24)
-    gulika_longitude = (gulika_time * 15) % 360
-    
-    # Mandi calculation - Mars' portion during day (different from Gulika)
-    # Mars portions for each weekday (in hours from sunrise)
-    mandi_portions = [7.5, 15.0, 22.5, 6.0, 13.5, 21.0, 4.5]  # Sun-Sat
-    mandi_time = mandi_portions[weekday]
-    
-    # Calculate Mandi longitude
-    mandi_longitude = (mandi_time * 15) % 360
-    
-    # Apply ayanamsa correction
-    gulika_longitude = (gulika_longitude - ayanamsa) % 360
-    mandi_longitude = (mandi_longitude - ayanamsa) % 360
-    
-    # Ensure positive longitudes
-    if gulika_longitude < 0:
-        gulika_longitude += 360
-    if mandi_longitude < 0:
-        mandi_longitude += 360
-    
-    # Add Gulika and Mandi to planets with house positions
-    gulika_house = 1
-    for house_num in range(12):
-        house_start = houses[house_num]['longitude']
-        house_end = (house_start + 30) % 360
-        if house_start <= house_end:
-            if house_start <= gulika_longitude < house_end:
-                gulika_house = house_num + 1
-                break
-        else:
-            if gulika_longitude >= house_start or gulika_longitude < house_end:
-                gulika_house = house_num + 1
-                break
-    
-    mandi_house = 1
-    for house_num in range(12):
-        house_start = houses[house_num]['longitude']
-        house_end = (house_start + 30) % 360
-        if house_start <= house_end:
-            if house_start <= mandi_longitude < house_end:
-                mandi_house = house_num + 1
-                break
-        else:
-            if mandi_longitude >= house_start or mandi_longitude < house_end:
-                mandi_house = house_num + 1
-                break
-    
-    planets['Gulika'] = {
-        'longitude': gulika_longitude,
-        'sign': int(gulika_longitude / 30),
-        'degree': gulika_longitude % 30,
-        'house': gulika_house
-    }
-    
-    planets['Mandi'] = {
-        'longitude': mandi_longitude,
-        'sign': int(mandi_longitude / 30),
-        'degree': mandi_longitude % 30,
-        'house': mandi_house
-    }
-    
-    # Add InduLagna
-    from calculators.indu_lagna_calculator import InduLagnaCalculator
-    indu_calc = InduLagnaCalculator({
-        'ascendant': ascendant_sidereal,
-        'planets': planets
-    })
-    indu_data = indu_calc.get_indu_lagna_data()
-    planets['InduLagna'] = indu_data
-    
-    # Calculate house positions for all planets using Whole Sign system
-    # In Whole Sign houses, each house is exactly 30 degrees starting from ascendant sign
-    for planet_name in planets:
-        planet_longitude = planets[planet_name]['longitude']
-        planet_sign = int(planet_longitude / 30)
-        
-        # Calculate house number using Whole Sign system
-        # House 1 starts from ascendant sign
-        house_number = ((planet_sign - ascendant_sign) % 12) + 1
-        planets[planet_name]['house'] = house_number
-    
-    print(f"✅ Chart calculation completed for {birth_data.name}")
-    print(f"📊 Final Moon data: Sign {planets['Moon']['sign']} ({['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][planets['Moon']['sign']]})")
-    
-    return {
-        "planets": planets,
-        "houses": houses,
-        "ayanamsa": ayanamsa,
-        "ascendant": ascendant_sidereal
-    }
-
-@app.post("/api/calculate-transits")
-async def calculate_transits(request: TransitRequest):
-    jd = swe.julday(
-        int(request.transit_date.split('-')[0]),
-        int(request.transit_date.split('-')[1]),
-        int(request.transit_date.split('-')[2]),
-        12.0
-    )
-    
-    # Calculate transit planetary positions
-    planets = {}
-    planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
-    
-    for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
-        if planet <= 6:  # Regular planets
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED)
-        else:  # Lunar nodes - always use mean for transits
-            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED)
-        
-        pos_array = pos[0]
-        longitude = pos_array[0]
-        
-        # Use index 3 for speed (standard Swiss Ephemeris)
-        speed = pos_array[3] if len(pos_array) > 3 else 0.0
-        
-        if planet == 12:  # Ketu - add 180 degrees to Rahu
-            longitude = (longitude + 180) % 360
-        
-        is_retrograde = speed < 0 if planet <= 6 else False
-        
-        planets[planet_names[i]] = {
-            'longitude': longitude,
-            'sign': int(longitude / 30),
-            'degree': longitude % 30,
-            'retrograde': is_retrograde
-        }
-    
-    # Calculate birth chart houses for transit display
-    birth_data = request.birth_data
-    time_parts = birth_data.time.split(':')
-    hour = float(time_parts[0]) + float(time_parts[1])/60
-    
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
-    
-    utc_hour = hour - tz_offset
-    birth_jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
-    
-    birth_houses_data = swe.houses(birth_jd, birth_data.latitude, birth_data.longitude, b'P')
-    birth_ayanamsa = swe.get_ayanamsa_ut(birth_jd)
-    birth_ascendant_tropical = birth_houses_data[1][0]
-    birth_ascendant_sidereal = (birth_ascendant_tropical - birth_ayanamsa) % 360
-    
-    ascendant_sign = int(birth_ascendant_sidereal / 30)
-    houses = []
-    for i in range(12):
-        house_sign = (ascendant_sign + i) % 12
-        house_longitude = (house_sign * 30) + (birth_ascendant_sidereal % 30)
-        houses.append({
-            'longitude': house_longitude % 360,
-            'sign': house_sign
-        })
-    
-    return {
-        "planets": planets,
-        "houses": houses,
-        "ayanamsa": birth_ayanamsa,
-        "ascendant": birth_ascendant_sidereal
-    }
-
-@app.get("/api/birth-charts")
-async def get_birth_charts(search: str = "", limit: int = 50, current_user: User = Depends(get_current_user)):
-    print(f"Search query: '{search}', Limit: {limit}")
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    
-    if search.strip():
-        search_pattern = f'%{search.strip()}%'
-        print(f"Using search pattern: {search_pattern}")
-        cursor.execute('''
-            SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation FROM birth_charts 
-            WHERE userid = ? AND name LIKE ? 
-            ORDER BY created_at DESC 
-            LIMIT ?
-        ''', (current_user.userid, search_pattern, limit))
-    else:
-        print("No search query, returning all charts")
-        cursor.execute('SELECT id, userid, name, date, time, latitude, longitude, timezone, created_at, place, gender, relation FROM birth_charts WHERE userid = ? ORDER BY created_at DESC LIMIT ?', (current_user.userid, limit,))
-    
-    rows = cursor.fetchall()
-    conn.close()
-
-    charts = []
-    for row in rows:
-        if encryptor:
-            chart = {
-                'id': row[0],
-                'userid': row[1],
-                'name': encryptor.decrypt(row[2]),
-                'date': encryptor.decrypt(row[3]),
-                'time': encryptor.decrypt(row[4]),
-                'latitude': float(encryptor.decrypt(str(row[5]))),
-                'longitude': float(encryptor.decrypt(str(row[6]))),
-                'timezone': row[7],
-                'created_at': row[8],
-                'place': encryptor.decrypt(row[9] if row[9] else ''),
-                'gender': row[10] if row[10] else '',
-                'relation': row[11] if len(row) > 11 and row[11] else 'other'
-            }
-        else:
-            chart = {
-                'id': row[0],
-                'userid': row[1],
-                'name': row[2],
-                'date': row[3],
-                'time': row[4],
-                'latitude': row[5],
-                'longitude': row[6],
-                'timezone': row[7],
-                'created_at': row[8],
-                'place': row[9] if row[9] else '',
-                'gender': row[10] if row[10] else '',
-                'relation': row[11] if len(row) > 11 and row[11] else 'other'
-            }
-        charts.append(chart)
-
-    return {"charts": charts}
-
-
-@app.put("/api/birth-charts/{chart_id}")
-async def update_birth_chart(chart_id: int, birth_data: BirthData):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    # cursor.execute('''
-    #     UPDATE birth_charts 
-    #     SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation=?
-    #     WHERE id=?
-    # ''', (birth_data.name, birth_data.date, birth_data.time, 
-    #       birth_data.latitude, birth_data.longitude, birth_data.timezone, birth_data.place, birth_data.gender, birth_data.relation or 'other', chart_id))
-    # AFTER:
-    if encryptor:
-        enc_name = encryptor.encrypt(birth_data.name)
-        enc_date = encryptor.encrypt(birth_data.date)
-        enc_time = encryptor.encrypt(birth_data.time)
-        enc_lat = encryptor.encrypt(str(birth_data.latitude))
-        enc_lon = encryptor.encrypt(str(birth_data.longitude))
-        enc_place = encryptor.encrypt(birth_data.place)
-    else:
-        enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
-        enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
-
-    cursor.execute('''
-        UPDATE birth_charts 
-        SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation=?
-        WHERE id=?
-    ''', (enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-        birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other', chart_id))
-
-    conn.commit()
-    conn.close()
-    return {"message": "Chart updated successfully"}
-
-@app.delete("/api/birth-charts/{chart_id}")
-async def delete_birth_chart(chart_id: int):
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM birth_charts WHERE id=?', (chart_id,))
-    conn.commit()
-    conn.close()
-    return {"message": "Chart deleted successfully"}
-
-@app.post("/api/calculate-yogi")
-async def calculate_yogi(birth_data: BirthData):
-    time_parts = birth_data.time.split(':')
-    hour = float(time_parts[0]) + float(time_parts[1])/60
-    
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
-    
-    utc_hour = hour - tz_offset
-    jd = swe.julday(
-        int(birth_data.date.split('-')[0]),
-        int(birth_data.date.split('-')[1]),
-        int(birth_data.date.split('-')[2]),
-        utc_hour
-    )
-    
-    sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    
-    yogi_point = (sun_pos + moon_pos) % 360
-    yogi_sign = int(yogi_point / 30)
-    yogi_degree = yogi_point % 30
-    
-    avayogi_point = (yogi_point + 186.666667) % 360
-    avayogi_sign = int(avayogi_point / 30)
-    avayogi_degree = avayogi_point % 30
-    
-    dagdha_point = (avayogi_point + 12) % 360
-    dagdha_sign = int(dagdha_point / 30)
-    dagdha_degree = dagdha_point % 30
-    
-    # Calculate Tithi Shunya Rashi
-    tithi_deg = (moon_pos - sun_pos) % 360
-    tithi_num = int(tithi_deg / 12) + 1
-    
-    # Tithi Shunya Rashi calculation based on Tithi
-    tithi_shunya_signs = {
-        1: 11, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9, 7: 10, 8: 11,
-        9: 0, 10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6
-    }
-    
-    tithi_shunya_sign = tithi_shunya_signs.get(tithi_num, 0)
-    tithi_shunya_point = tithi_shunya_sign * 30 + 15  # Middle of the sign
-    tithi_shunya_degree = 15.0
-    
-    from event_prediction.config import SIGN_NAMES
-    
-    return {
-        "yogi": {
-            "longitude": yogi_point,
-            "sign": yogi_sign,
-            "sign_name": SIGN_NAMES[yogi_sign],
-            "degree": round(yogi_degree, 2)
-        },
-        "avayogi": {
-            "longitude": avayogi_point,
-            "sign": avayogi_sign,
-            "sign_name": SIGN_NAMES[avayogi_sign],
-            "degree": round(avayogi_degree, 2)
-        },
-        "dagdha_rashi": {
-            "longitude": dagdha_point,
-            "sign": dagdha_sign,
-            "sign_name": SIGN_NAMES[dagdha_sign],
-            "degree": round(dagdha_degree, 2)
-        },
-        "tithi_shunya_rashi": {
-            "longitude": tithi_shunya_point,
-            "sign": tithi_shunya_sign,
-            "sign_name": SIGN_NAMES[tithi_shunya_sign],
-            "degree": round(tithi_shunya_degree, 2)
-        }
-    }
-
-
-
-@app.post("/api/calculate-dasha")
-async def calculate_dasha(birth_data: BirthData):
-    return await calculate_accurate_dasha(birth_data)
-
-@app.post("/api/dasha")
-async def get_dasha(birth_data: BirthData):
-    """Get current dasha data for classical engine"""
-    return await calculate_accurate_dasha(birth_data)
-
-@app.post("/api/calculate-panchang")
-async def calculate_panchang(request: TransitRequest):
-    try:
-        from panchang.panchang_calculator import PanchangCalculator
-        
-        birth_data = request.birth_data
-        panchang_calc = PanchangCalculator()
-        
-        # Validate required fields
-        if not hasattr(birth_data, 'latitude') or not hasattr(birth_data, 'longitude'):
-            raise HTTPException(status_code=422, detail="Missing latitude or longitude in birth_data")
-        
-        # Handle timezone conversion
-        timezone = birth_data.timezone if birth_data.timezone else 'UTC+5:30'
-        if isinstance(timezone, (int, float)):
-            if timezone >= 0:
-                hours = int(timezone)
-                minutes = int((timezone - hours) * 60)
-                timezone = f'UTC+{hours}:{minutes:02d}'
-            else:
-                hours = int(abs(timezone))
-                minutes = int((abs(timezone) - hours) * 60)
-                timezone = f'UTC-{hours}:{minutes:02d}'
-        
-        # Use comprehensive panchang calculation
-        panchang_data = panchang_calc.calculate_panchang(
-            request.transit_date,
-            float(birth_data.latitude),
-            float(birth_data.longitude),
-            str(timezone)
-        )
-        
-        return panchang_data
-        
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid data format: {str(e)}")
-    except AttributeError as e:
-        raise HTTPException(status_code=422, detail=f"Missing required field: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calculating panchang: {str(e)}")
-
-@app.post("/api/calculate-birth-panchang")
-async def calculate_birth_panchang(birth_data: BirthData):
-    try:
-        # Use existing calculate_panchang with birth date as transit date
-        request = TransitRequest(
-            birth_data=birth_data,
-            transit_date=birth_data.date
-        )
-        return await calculate_panchang(request)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calculating birth panchang: {str(e)}")
-
-
-
-@app.post("/api/calculate-divisional-chart")
-async def calculate_divisional_chart(request: dict, current_user: User = Depends(get_current_user)):
-    """Calculate accurate divisional charts using proper Vedic formulas"""
-    birth_data = BirthData(**request['birth_data'])
-    division_number = request.get('division', 9)
-    
-
-    
-    # First get the basic chart without saving to database
-    chart_data = await _calculate_chart_data(birth_data, 'mean')
-    
-    def get_divisional_sign(sign, degree_in_sign, division):
-        """Calculate divisional sign using proper Vedic formulas"""
-        part = int(degree_in_sign / (30/division))
-        
-        if division == 9:  # Navamsa (D9)
-            # Movable signs (0,3,6,9): Start from same sign
-            # Fixed signs (1,4,7,10): Start from 9th sign
-            # Dual signs (2,5,8,11): Start from 5th sign
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                navamsa_start = sign
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                navamsa_start = (sign + 8) % 12  # 9th from sign
-            else:  # Dual signs [2, 5, 8, 11]
-                navamsa_start = (sign + 4) % 12  # 5th from sign
-            return (navamsa_start + part) % 12
-        
-        elif division == 10:  # Dasamsa (D10)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 8) + part) % 12
-        
-        elif division == 12:  # Dwadasamsa (D12)
-            return (sign + part) % 12
-        
-        elif division == 16:  # Shodasamsa (D16)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Leo  
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs (Aries, Cancer, Libra, Capricorn)
-                d16_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs (Taurus, Leo, Scorpio, Aquarius)
-                d16_start = 4  # Leo
-            else:  # Dual signs (Gemini, Virgo, Sagittarius, Pisces)
-                d16_start = 8  # Sagittarius
-            return (d16_start + part) % 12
-        
-        elif division == 20:  # Vimsamsa (D20)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Sagittarius
-            # For dual signs: start from Leo
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d20_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d20_start = 8  # Sagittarius
-            else:  # Dual signs
-                d20_start = 4  # Leo
-            return (d20_start + part) % 12
-        
-        elif division == 24:  # Chaturvimsamsa (D24)
-            # All signs start from Cancer
-            return (3 + part) % 12  # Cancer
-        
-        elif division == 27:  # Saptavimsamsa (D27)
-            # Fire signs (Aries, Leo, Sagittarius): start from Aries
-            # Earth signs (Taurus, Virgo, Capricorn): start from Cancer  
-            # Air signs (Gemini, Libra, Aquarius): start from Libra
-            # Water signs (Cancer, Scorpio, Pisces): start from Capricorn
-            if sign in [0, 4, 8]:  # Fire signs
-                d27_start = 0  # Aries
-            elif sign in [1, 5, 9]:  # Earth signs
-                d27_start = 3  # Cancer
-            elif sign in [2, 6, 10]:  # Air signs
-                d27_start = 6  # Libra
-            else:  # Water signs [3, 7, 11]
-                d27_start = 9  # Capricorn
-            return (d27_start + part) % 12
-        
-        elif division == 30:  # Trimsamsa (D30)
-            # Special calculation for D30 based on planetary rulership within each sign
-            if sign % 2 == 1:  # Odd signs
-                if part < 5: return 3  # Mars (0-5 degrees)
-                elif part < 10: return 6  # Saturn (5-10 degrees)
-                elif part < 18: return 4  # Jupiter (10-18 degrees)
-                elif part < 25: return 1  # Mercury (18-25 degrees)
-                else: return 2  # Venus (25-30 degrees)
-            else:  # Even signs
-                if part < 5: return 2  # Venus (0-5 degrees)
-                elif part < 12: return 1  # Mercury (5-12 degrees)
-                elif part < 20: return 4  # Jupiter (12-20 degrees)
-                elif part < 25: return 6  # Saturn (20-25 degrees)
-                else: return 3  # Mars (25-30 degrees)
-        
-        elif division == 40:  # Khavedamsa (D40)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Leo
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d40_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d40_start = 4  # Leo
-            else:  # Dual signs
-                d40_start = 8  # Sagittarius
-            return (d40_start + part) % 12
-        
-        elif division == 45:  # Akshavedamsa (D45)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Leo
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d45_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d45_start = 4  # Leo
-            else:  # Dual signs
-                d45_start = 8  # Sagittarius
-            return (d45_start + part) % 12
-        
-        elif division == 60:  # Shashtyamsa (D60)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Leo
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d60_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d60_start = 4  # Leo
-            else:  # Dual signs
-                d60_start = 8  # Sagittarius
-            return (d60_start + part) % 12
-        
-        else:
-            # Default calculation for other divisions
-            return (sign + part) % 12
-    
-    # Calculate divisional chart
-    divisional_data = {
-        'planets': {},
-        'houses': [],
-        'ayanamsa': chart_data['ayanamsa']
-    }
-    
-    # Calculate divisional ascendant
-    asc_sign = int(chart_data['ascendant'] / 30)
-    asc_degree = chart_data['ascendant'] % 30
-    divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
-    divisional_data['ascendant'] = divisional_asc_sign * 30 + 15  # Middle of sign
-    
-    # Calculate divisional houses
-    for i in range(12):
-        house_sign = (divisional_asc_sign + i) % 12
-        divisional_data['houses'].append({
-            'longitude': house_sign * 30,
-            'sign': house_sign
-        })
-    
-    # Calculate divisional positions for planets
-    # Include Gulika/Mandi in all charts
-    planets_to_process = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi']
-    
-    for planet in planets_to_process:
-        if planet in chart_data['planets']:
-            planet_data = chart_data['planets'][planet]
-            
-            # For Gulika and Mandi, keep original positions (don't apply divisional transformation)
-            if planet in ['Gulika', 'Mandi']:
-                divisional_data['planets'][planet] = {
-                    'longitude': planet_data['longitude'],
-                    'sign': planet_data['sign'],
-                    'degree': planet_data['degree']
-                }
-            else:
-                # Regular planetary divisional calculation
-                planet_sign = int(planet_data['longitude'] / 30)
-                planet_degree = planet_data['longitude'] % 30
-                
-                divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
-                
-                # Calculate the actual degree within the divisional sign
-                # Each division part represents 30/division_number degrees
-                part_size = 30.0 / division_number
-                part_index = int(planet_degree / part_size)
-                degree_within_part = planet_degree % part_size
-                # Scale the degree within part to full sign (0-30 degrees)
-                actual_degree = (degree_within_part / part_size) * 30.0
-                
-                divisional_longitude = divisional_sign * 30 + actual_degree
-                
-                divisional_data['planets'][planet] = {
-                    'longitude': divisional_longitude,
-                    'sign': divisional_sign,
-                    'degree': actual_degree,
-                    'retrograde': planet_data.get('retrograde', False)
-                }
-    
-
-    
-    return {
-        'divisional_chart': divisional_data,
-        'division_number': division_number,
-        'chart_name': f'D{division_number}'
-    }
+# Import utils routes
+from utils.routes import router as utils_router
+app.include_router(utils_router)
 
 @app.post("/api/calculate-friendship")
 async def calculate_friendship(birth_data: BirthData):
@@ -2651,6 +1845,173 @@ async def analyze_transits(request: TransitRequest):
         "activations": activations
     }
 
+@app.post("/api/calculate-transits")
+async def calculate_transits(request: TransitRequest, current_user: User = Depends(get_current_user)):
+    jd = swe.julday(
+        int(request.transit_date.split('-')[0]),
+        int(request.transit_date.split('-')[1]),
+        int(request.transit_date.split('-')[2]),
+        12.0
+    )
+    
+    # Calculate transit planetary positions
+    planets = {}
+    planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
+    
+    for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
+        if planet <= 6:  # Regular planets
+            # CRITICAL: Add FLG_SWIEPH for high-precision Swiss Ephemeris (not Moshier)
+            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
+        else:  # Lunar nodes - always use mean for transits
+            pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
+        
+        pos_array = pos[0]
+        longitude = pos_array[0]
+        
+        # Use index 3 for speed (standard Swiss Ephemeris)
+        speed = pos_array[3] if len(pos_array) > 3 else 0.0
+        
+        if planet == 12:  # Ketu - add 180 degrees to Rahu
+            longitude = (longitude + 180) % 360
+        
+        is_retrograde = speed < 0 if planet <= 6 else False
+        
+        planets[planet_names[i]] = {
+            'longitude': longitude,
+            'sign': int(longitude / 30),
+            'degree': longitude % 30,
+            'retrograde': is_retrograde
+        }
+    
+    # Calculate birth chart houses for transit display
+    birth_data = request.birth_data
+    time_parts = birth_data.time.split(':')
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+    
+    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+        tz_offset = 5.5
+    else:
+        tz_offset = 0
+        if birth_data.timezone.startswith('UTC'):
+            tz_str = birth_data.timezone[3:]
+            if tz_str and ':' in tz_str:
+                sign = 1 if tz_str[0] == '+' else -1
+                parts = tz_str[1:].split(':')
+                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    
+    utc_hour = hour - tz_offset
+    birth_jd = swe.julday(
+        int(birth_data.date.split('-')[0]),
+        int(birth_data.date.split('-')[1]),
+        int(birth_data.date.split('-')[2]),
+        utc_hour
+    )
+    
+    birth_houses_data = swe.houses(birth_jd, birth_data.latitude, birth_data.longitude, b'P')
+    birth_ayanamsa = swe.get_ayanamsa_ut(birth_jd)
+    birth_ascendant_tropical = birth_houses_data[1][0]
+    birth_ascendant_sidereal = (birth_ascendant_tropical - birth_ayanamsa) % 360
+    
+    ascendant_sign = int(birth_ascendant_sidereal / 30)
+    houses = []
+    for i in range(12):
+        house_sign = (ascendant_sign + i) % 12
+        house_longitude = (house_sign * 30) + (birth_ascendant_sidereal % 30)
+        houses.append({
+            'longitude': house_longitude % 360,
+            'sign': house_sign
+        })
+    
+    return {
+        "planets": planets,
+        "houses": houses,
+        "ayanamsa": birth_ayanamsa,
+        "ascendant": birth_ascendant_sidereal
+    }
+
+@app.post("/api/calculate-yogi")
+async def calculate_yogi(birth_data: BirthData):
+    time_parts = birth_data.time.split(':')
+    hour = float(time_parts[0]) + float(time_parts[1])/60
+    
+    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
+        tz_offset = 5.5
+    else:
+        tz_offset = 0
+        if birth_data.timezone.startswith('UTC'):
+            tz_str = birth_data.timezone[3:]
+            if tz_str and ':' in tz_str:
+                sign = 1 if tz_str[0] == '+' else -1
+                parts = tz_str[1:].split(':')
+                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    
+    utc_hour = hour - tz_offset
+    jd = swe.julday(
+        int(birth_data.date.split('-')[0]),
+        int(birth_data.date.split('-')[1]),
+        int(birth_data.date.split('-')[2]),
+        utc_hour
+    )
+    
+    sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
+    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+    
+    yogi_point = (sun_pos + moon_pos) % 360
+    yogi_sign = int(yogi_point / 30)
+    yogi_degree = yogi_point % 30
+    
+    avayogi_point = (yogi_point + 186.666667) % 360
+    avayogi_sign = int(avayogi_point / 30)
+    avayogi_degree = avayogi_point % 30
+    
+    dagdha_point = (avayogi_point + 12) % 360
+    dagdha_sign = int(dagdha_point / 30)
+    dagdha_degree = dagdha_point % 30
+    
+    # Calculate Tithi Shunya Rashi
+    tithi_deg = (moon_pos - sun_pos) % 360
+    tithi_num = int(tithi_deg / 12) + 1
+    
+    # Tithi Shunya Rashi calculation based on Tithi
+    tithi_shunya_signs = {
+        1: 11, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9, 7: 10, 8: 11,
+        9: 0, 10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6
+    }
+    
+    tithi_shunya_sign = tithi_shunya_signs.get(tithi_num, 0)
+    tithi_shunya_point = tithi_shunya_sign * 30 + 15  # Middle of the sign
+    tithi_shunya_degree = 15.0
+    
+    SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+    
+    return {
+        "yogi": {
+            "longitude": yogi_point,
+            "sign": yogi_sign,
+            "sign_name": SIGN_NAMES[yogi_sign],
+            "degree": round(yogi_degree, 2)
+        },
+        "avayogi": {
+            "longitude": avayogi_point,
+            "sign": avayogi_sign,
+            "sign_name": SIGN_NAMES[avayogi_sign],
+            "degree": round(avayogi_degree, 2)
+        },
+        "dagdha_rashi": {
+            "longitude": dagdha_point,
+            "sign": dagdha_sign,
+            "sign_name": SIGN_NAMES[dagdha_sign],
+            "degree": round(dagdha_degree, 2)
+        },
+        "tithi_shunya_rashi": {
+            "longitude": tithi_shunya_point,
+            "sign": tithi_shunya_sign,
+            "sign_name": SIGN_NAMES[tithi_shunya_sign],
+            "degree": round(tithi_shunya_degree, 2)
+        }
+    }
+
 @app.post("/api/calculate-yogi-impact")
 async def calculate_yogi_impact(birth_data: BirthData):
     from event_prediction.yogi_analyzer import YogiAnalyzer
@@ -2784,13 +2145,14 @@ async def calculate_accurate_dasha(birth_data: BirthData):
     try:
         from shared.dasha_calculator import DashaCalculator
         
-        print(f"🔍 Dasha calculation for: {birth_data.name}, timezone: {birth_data.timezone}")
+        print(f"🔍 [DASHA_DEBUG] Dasha calculation for: {birth_data.name}, timezone: {birth_data.timezone}")
+        print(f"🕐 [DASHA_DEBUG] Time received: '{birth_data.time}' (type: {type(birth_data.time)})")
         
-        # Convert BirthData to dict
+        # Convert BirthData to dict with proper time normalization
         birth_dict = {
             'name': birth_data.name,
             'date': birth_data.date,
-            'time': birth_data.time,
+            'time': birth_data.time,  # This is already normalized by the BirthData validator
             'latitude': birth_data.latitude,
             'longitude': birth_data.longitude,
             'timezone': birth_data.timezone
@@ -2799,7 +2161,7 @@ async def calculate_accurate_dasha(birth_data: BirthData):
         calculator = DashaCalculator()
         dasha_data = calculator.calculate_current_dashas(birth_dict)
         
-        print(f"✅ Dasha calculation successful, got {len(dasha_data.get('maha_dashas', []))} maha dashas")
+        print(f"✅ [DASHA_DEBUG] Dasha calculation successful, got {len(dasha_data.get('maha_dashas', []))} maha dashas")
         
         # Format maha_dashas for API response
         maha_dashas = []
@@ -2824,13 +2186,13 @@ async def calculate_accurate_dasha(birth_data: BirthData):
             "moon_lord": dasha_data.get('moon_lord', 'Sun')
         }
         
-        print(f"📤 Returning dasha result with {len(result['maha_dashas'])} periods")
+        print(f"📤 [DASHA_DEBUG] Returning dasha result with {len(result['maha_dashas'])} periods")
         return result
         
     except Exception as e:
-        print(f"❌ Dasha calculation error: {str(e)}")
+        print(f"❌ [DASHA_DEBUG] Dasha calculation error: {str(e)}")
         import traceback
-        print(f"📍 Traceback: {traceback.format_exc()}")
+        print(f"📍 [DASHA_DEBUG] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Dasha calculation failed: {str(e)}")
 
 @app.post("/api/calculate-cascading-dashas")
@@ -3121,7 +2483,9 @@ async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get
         chart_data = await calculate_transits(transit_request)
     else:
         # For birth charts (lagna, navamsa), use birth positions - DON'T SAVE TO DATABASE
-        chart_data = await _calculate_chart_data(birth_data, 'mean')
+        from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    chart_data = calculator.calculate_chart(birth_data, 'mean')
     
     calculator = AshtakavargaCalculator(birth_data, chart_data)
     
@@ -3157,7 +2521,9 @@ async def get_transit_ashtakavarga(request: dict, current_user: User = Depends(g
     birth_data = BirthData(**request['birth_data'])
     transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
     
-    chart_data = await _calculate_chart_data(birth_data, 'mean')
+    from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    chart_data = calculator.calculate_chart(birth_data, 'mean')
     calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
     
     transit_av = calculator.calculate_transit_ashtakavarga(transit_date)
@@ -3179,7 +2545,9 @@ async def get_monthly_ashtakavarga_forecast(request: dict, current_user: User = 
     birth_data = BirthData(**request['birth_data'])
     start_date = datetime.strptime(request.get('start_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
     
-    chart_data = await _calculate_chart_data(birth_data, 'mean')
+    from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    chart_data = calculator.calculate_chart(birth_data, 'mean')
     calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
     
     forecast = []
@@ -3207,7 +2575,9 @@ async def predict_ashtakavarga_events(request: dict, current_user: User = Depend
     birth_data = BirthData(**request['birth_data'])
     year = request.get('year', datetime.now().year)
     
-    chart_data = await _calculate_chart_data(birth_data, 'mean')
+    from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    chart_data = calculator.calculate_chart(birth_data, 'mean')
     predictor = AshtakavargaEventPredictor(birth_data, chart_data)
     
     events = predictor.predict_events_for_year(year)
@@ -3228,7 +2598,9 @@ async def predict_specific_event(request: dict, current_user: User = Depends(get
     start_year = request.get('start_year', datetime.now().year)
     end_year = request.get('end_year', start_year + 5)
     
-    chart_data = await _calculate_chart_data(birth_data, 'mean')
+    from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    chart_data = calculator.calculate_chart(birth_data, 'mean')
     predictor = AshtakavargaEventPredictor(birth_data, chart_data)
     
     predictions = predictor.predict_specific_event_timing(event_type, start_year, end_year)
@@ -3247,7 +2619,9 @@ async def get_daily_ashtakavarga_strength(request: dict, current_user: User = De
     birth_data = BirthData(**request['birth_data'])
     date = request.get('date', datetime.now().strftime('%Y-%m-%d'))
     
-    chart_data = await _calculate_chart_data(birth_data, 'mean')
+    from calculators.chart_calculator import ChartCalculator
+    calculator = ChartCalculator({})
+    chart_data = calculator.calculate_chart(birth_data, 'mean')
     predictor = AshtakavargaEventPredictor(birth_data, chart_data)
     
     daily_analysis = predictor.get_daily_ashtakavarga_strength(date)
@@ -5118,7 +4492,9 @@ async def generate_ashtakavarga_life_predictions(request: dict, current_user: Us
         birth_data = BirthData(**request['birth_data'])
         
         # Calculate chart data
-        chart_data = await _calculate_chart_data(birth_data, 'mean')
+        from calculators.chart_calculator import ChartCalculator
+        calculator = ChartCalculator({})
+        chart_data = calculator.calculate_chart(birth_data, 'mean')
         
         # Calculate dasha data
         dasha_data = await calculate_accurate_dasha(birth_data)

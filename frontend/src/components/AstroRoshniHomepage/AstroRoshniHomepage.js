@@ -377,12 +377,15 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
     const latitude = 28.6139;
     const longitude = 77.2090;
     
+    // Detect user's timezone automatically
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
     try {
       
       const [choghadiya, hora, specialMuhurtas] = await Promise.all([
-        apiService.calculateChoghadiya(today, latitude, longitude),
-        apiService.calculateHora(today, latitude, longitude),
-        apiService.calculateSpecialMuhurtas(today, latitude, longitude)
+        apiService.calculateChoghadiya(today, latitude, longitude, userTimezone),
+        apiService.calculateHora(today, latitude, longitude, userTimezone),
+        apiService.calculateSpecialMuhurtas(today, latitude, longitude, userTimezone)
       ]);
       
       // console.log('API Responses:', { choghadiya, hora, specialMuhurtas });
@@ -416,56 +419,127 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       // Parse choghadiya data (combine day and night)
       const allChoghadiya = [...(choghadiya.day_choghadiya || []), ...(choghadiya.night_choghadiya || [])];
       const parsedChoghadiya = allChoghadiya.slice(0, 3).map(item => {
-        const startTime = item.start_time.split('T')[1].substring(0, 5);
-        const endTime = item.end_time.split('T')[1].substring(0, 5);
+        if (!item || !item.start_time || !item.end_time) {
+          return {
+            name: item?.name || 'Unknown',
+            time: 'Loading...',
+            type: 'good'
+          };
+        }
+        
+        let startTime, endTime;
+        try {
+          startTime = item.start_time.includes('T') ? item.start_time.split('T')[1].substring(0, 5) : item.start_time;
+          endTime = item.end_time.includes('T') ? item.end_time.split('T')[1].substring(0, 5) : item.end_time;
+        } catch (timeError) {
+          console.error('Error parsing choghadiya time:', timeError, item);
+          return {
+            name: item.name,
+            time: 'Error',
+            type: item.quality === 'Good' ? 'good' : 'bad'
+          };
+        }
+        
         return {
           name: item.name,
           time: `${startTime}-${endTime}`,
-          type: item.nature === 'Auspicious' ? 'good' : 'bad'
+          type: item.quality === 'Good' ? 'good' : 'bad'
         };
       });
       
       // Parse hora data - find current and next hora
-      const allHoras = [...(hora.day_horas || []), ...(hora.night_horas || [])];
-      const now = new Date();
-      
-      const getPlanetaryFavorability = (planet) => {
-        const planetQualities = {
-          'Sun': true, 'Moon': true, 'Mars': false, 'Mercury': true,
-          'Jupiter': true, 'Venus': true, 'Saturn': false
+      let parsedHora = [];
+      try {
+        const allHoras = [...(hora.day_horas || []), ...(hora.night_horas || [])];
+        const now = new Date();
+        
+        console.log('Raw hora response:', hora);
+        console.log('All horas:', allHoras);
+        
+        const getPlanetaryFavorability = (planet) => {
+          const planetQualities = {
+            'Sun': true, 'Moon': true, 'Mars': false, 'Mercury': true,
+            'Jupiter': true, 'Venus': true, 'Saturn': false
+          };
+          return planetQualities[planet] || false;
         };
-        return planetQualities[planet] || false;
-      };
-      
-      // Find current hora
-      let currentHoraIndex = 0;
-      for (let i = 0; i < allHoras.length; i++) {
-        const horaStart = new Date(allHoras[i].start_time);
-        const horaEnd = new Date(allHoras[i].end_time);
-        if (now >= horaStart && now <= horaEnd) {
-          currentHoraIndex = i;
-          break;
+        
+        // Find current hora
+        let currentHoraIndex = 0;
+        for (let i = 0; i < allHoras.length; i++) {
+          const horaStart = new Date(allHoras[i].start_time);
+          const horaEnd = new Date(allHoras[i].end_time);
+          if (now >= horaStart && now <= horaEnd) {
+            currentHoraIndex = i;
+            break;
+          }
         }
+        
+        // Get current and next hora
+        const currentHoras = allHoras.slice(currentHoraIndex, currentHoraIndex + 2);
+        console.log('Current horas:', currentHoras);
+        
+        parsedHora = currentHoras.map(item => {
+          if (!item || !item.start_time || !item.end_time || !item.planet) {
+            return {
+              planet: item?.planet || 'Unknown',
+              time: 'Loading...',
+              favorable: getPlanetaryFavorability(item?.planet || '')
+            };
+          }
+          
+          let startTime, endTime;
+          try {
+            startTime = item.start_time.includes('T') ? item.start_time.split('T')[1].substring(0, 5) : item.start_time;
+            endTime = item.end_time.includes('T') ? item.end_time.split('T')[1].substring(0, 5) : item.end_time;
+          } catch (timeError) {
+            console.error('Error parsing time:', timeError, item);
+            return {
+              planet: item.planet,
+              time: 'Error',
+              favorable: getPlanetaryFavorability(item.planet)
+            };
+          }
+          
+          return {
+            planet: item.planet,
+            time: `${startTime}-${endTime}`,
+            favorable: getPlanetaryFavorability(item.planet)
+          };
+        });
+        
+        console.log('Parsed Hora:', parsedHora);
+      } catch (horaError) {
+        console.error('Error parsing hora data:', horaError);
+        parsedHora = [
+          { planet: 'Error', time: 'Failed to load', favorable: true },
+          { planet: 'Retry', time: 'Please refresh', favorable: true }
+        ];
       }
-      
-      // Get current and next hora
-      const currentHoras = allHoras.slice(currentHoraIndex, currentHoraIndex + 2);
-      const parsedHora = currentHoras.map(item => {
-        const startTime = item.start_time.split('T')[1].substring(0, 5);
-        const endTime = item.end_time.split('T')[1].substring(0, 5);
-        return {
-          planet: item.planet,
-          time: `${startTime}-${endTime}`,
-          favorable: getPlanetaryFavorability(item.planet)
-        };
-      });
-      
-      console.log('Parsed Hora:', parsedHora);
       
       // Parse muhurtas data
       const parsedMuhurtas = specialMuhurtas.muhurtas?.slice(0, 2).map(muhurat => {
-        const startTime = muhurat.start_time.split('T')[1].substring(0, 5);
-        const endTime = muhurat.end_time.split('T')[1].substring(0, 5);
+        if (!muhurat || !muhurat.start_time || !muhurat.end_time) {
+          return {
+            name: muhurat?.name || 'Unknown',
+            time: 'Loading...',
+            purpose: muhurat?.purpose || 'Auspicious activities'
+          };
+        }
+        
+        let startTime, endTime;
+        try {
+          startTime = muhurat.start_time.includes('T') ? muhurat.start_time.split('T')[1].substring(0, 5) : muhurat.start_time;
+          endTime = muhurat.end_time.includes('T') ? muhurat.end_time.split('T')[1].substring(0, 5) : muhurat.end_time;
+        } catch (timeError) {
+          console.error('Error parsing muhurat time:', timeError, muhurat);
+          return {
+            name: muhurat.name,
+            time: 'Error',
+            purpose: muhurat.purpose || 'Auspicious activities'
+          };
+        }
+        
         return {
           name: muhurat.name,
           time: `${startTime}-${endTime}`,

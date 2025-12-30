@@ -1,0 +1,15 @@
+COMPLETE GEMINI FLOW SUMMARY - SECOND_CALL_WITH_TRANSIT
+Timestamp: 2025-12-29T14:30:45.131409
+Question: He has bigh BP and is diebetic,
+Processing Time: 60.853s
+Total Request Time: 60.86s
+Context Size: 117277 characters
+Has Transit Data: Yes
+Response Length: 6634 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.012s
+- Gemini Processing: 60.853s
+- Total Time: 60.865s
+- Transit Activations: 24
+- Dasha Periods: 14

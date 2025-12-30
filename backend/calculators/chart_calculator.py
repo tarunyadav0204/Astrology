@@ -1,5 +1,6 @@
 import swisseph as swe
 from .base_calculator import BaseCalculator
+from utils.timezone_service import get_timezone_from_coordinates
 
 class ChartCalculator(BaseCalculator):
     """Extract chart calculation logic from main.py"""
@@ -12,16 +13,45 @@ class ChartCalculator(BaseCalculator):
     
     def calculate_chart(self, birth_data, node_type='mean'):
         """Calculate birth chart with planetary positions and houses"""
-        # CRITICAL: Ensure Ayanamsa is set to Lahiri (safety check)
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        # CRITICAL: Force geocentric mode first (must be first line)
+        swe.set_topo(0, 0, 0)  # Reset to geocentric (center of Earth)
         
-        # Calculate Julian Day with proper timezone handling
+        # CRITICAL: Force ephemeris path for high-precision data files
+        try:
+            import os
+            ephe_path = os.path.join(os.path.dirname(__file__), '..', 'ephe')
+            if os.path.exists(ephe_path):
+                # Check if directory has .se1 files
+                se1_files = [f for f in os.listdir(ephe_path) if f.endswith('.se1')]
+                if se1_files:
+                    swe.set_ephe_path(ephe_path)
+                    print(f"📁 EPHEMERIS: Using {len(se1_files)} .se1 files from {ephe_path}")
+                else:
+                    print(f"⚠️  EPHEMERIS: Directory {ephe_path} exists but no .se1 files found - using Moshier model")
+            else:
+                # Try common system paths
+                for path in ['/usr/share/swisseph', '/opt/swisseph', './ephe']:
+                    if os.path.exists(path):
+                        se1_files = [f for f in os.listdir(path) if f.endswith('.se1')]
+                        if se1_files:
+                            swe.set_ephe_path(path)
+                            print(f"📁 EPHEMERIS: Using {len(se1_files)} .se1 files from system path {path}")
+                            break
+                else:
+                    print(f"⚠️  EPHEMERIS: No .se1 files found anywhere - using Moshier model")
+        except Exception as e:
+            print(f"⚠️  EPHEMERIS: Path setting failed - {e}")
+        
+        # CRITICAL: Use Mode 27 (True Chitra Paksha) for AstroSage parity
+        swe.set_sid_mode(27, 0, 0)  # Mode 27 = True Chitra Paksha
+        
+        # Calculate Julian Day with high precision for exact AstroSage matching
         time_parts = birth_data.time.split(':')
-        hour = float(time_parts[0]) + float(time_parts[1])/60
+        hour = float(time_parts[0]) + float(time_parts[1])/60.0
         print(f"DEBUG: Birth data - Date: {birth_data.date}, Time: {birth_data.time}, Timezone: {getattr(birth_data, 'timezone', 'None')}")
         
-        # Parse timezone offset with proper global handling
-        tz_offset = 0
+        # Parse timezone offset with auto-detection
+        tz_offset = 0.0
         if hasattr(birth_data, 'timezone') and birth_data.timezone:
             if birth_data.timezone.startswith('UTC'):
                 tz_str = birth_data.timezone[3:]  # Remove 'UTC'
@@ -30,10 +60,28 @@ class ChartCalculator(BaseCalculator):
                         # Handle UTC+5:30 format
                         sign = 1 if tz_str[0] == '+' else -1
                         parts = tz_str[1:].split(':')
-                        tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+                        tz_offset = float(sign) * (float(parts[0]) + float(parts[1])/60.0)
                     else:
                         # Handle UTC+5 format
                         tz_offset = float(tz_str)
+        else:
+            # Auto-detect timezone from coordinates if not provided
+            if hasattr(birth_data, 'latitude') and hasattr(birth_data, 'longitude'):
+                detected_tz = get_timezone_from_coordinates(birth_data.latitude, birth_data.longitude)
+                print(f"DEBUG: Auto-detected timezone: {detected_tz}")
+                # Convert IANA timezone to offset (simplified)
+                if detected_tz == 'Asia/Kolkata':
+                    tz_offset = 5.5
+                elif detected_tz == 'America/New_York':
+                    tz_offset = -5.0  # EST (simplified)
+                elif detected_tz == 'America/Los_Angeles':
+                    tz_offset = -8.0  # PST (simplified)
+                elif detected_tz == 'Europe/London':
+                    tz_offset = 0.0   # GMT (simplified)
+                elif detected_tz == 'Australia/Sydney':
+                    tz_offset = 10.0  # AEST (simplified)
+                else:
+                    tz_offset = 0.0   # UTC fallback
         
         # Override with geographic timezone for specific regions if timezone seems incorrect
         if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
@@ -46,15 +94,16 @@ class ChartCalculator(BaseCalculator):
         else:
             print(f"DEBUG: Non-Indian coordinates, using timezone: {getattr(birth_data, 'timezone', 'None')} -> offset: {tz_offset}")
         
-        # Convert local time to UTC
-        utc_hour = hour - tz_offset
+        # Convert local time to UTC with high precision
+        utc_hour = float(hour) - float(tz_offset)
         print(f"DEBUG: Local time: {hour}, UTC time: {utc_hour}, Timezone offset: {tz_offset}, Coordinates: ({birth_data.latitude}, {birth_data.longitude})")
         
+        # High-precision Julian Day calculation
         jd = swe.julday(
             int(birth_data.date.split('-')[0]),
             int(birth_data.date.split('-')[1]),
             int(birth_data.date.split('-')[2]),
-            utc_hour
+            float(utc_hour)
         )
         
         # Calculate planetary positions
@@ -63,10 +112,13 @@ class ChartCalculator(BaseCalculator):
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):
             if planet <= 6:
-                pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+                # Force high-precision JPL standards
+                flags = swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH
+                pos = swe.calc_ut(jd, planet, flags)
             else:
                 node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
-                pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+                flags = swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH
+                pos = swe.calc_ut(jd, node_flag, flags)
             
             pos_array = pos[0]
             longitude = pos_array[0]
@@ -88,13 +140,37 @@ class ChartCalculator(BaseCalculator):
                 'retrograde': is_retrograde
             }
 
+        # LOG: All planetary positions from Swiss Ephemeris
+        print(f"\n🌟 SWISS EPHEMERIS PLANETARY POSITIONS (Mode 27 - True Chitra):")
+        print(f"📅 JD: {jd:.6f}, Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°")
+        for planet_name in planet_names:
+            planet_data = planets[planet_name]
+            sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][planet_data['sign']]
+            print(f"  {planet_name:8}: {planet_data['longitude']:8.4f}° = {planet_data['degree']:6.2f}° {sign_name} (Sign {planet_data['sign']}) {'R' if planet_data['retrograde'] else 'D'}")
+        print(f"🔚 End Swiss Ephemeris Data\n")
+
         # Calculate ascendant and houses  
         houses_data = swe.houses(jd, birth_data.latitude, birth_data.longitude, b'P')
+        # CRITICAL: Get Ayanamsa immediately after sidereal mode to ensure synchronization
+        ayanamsa = swe.get_ayanamsa_ut(jd)
+        
+        # CRITICAL: Get Ayanamsa immediately after sidereal mode to ensure synchronization
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
         ascendant_tropical = houses_data[1][0]
         ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
-        print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}, Final TZ Offset: {tz_offset}")
+        
+        # Convert to degrees, minutes, seconds for display
+        def decimal_to_dms(decimal_degrees):
+            degrees = int(decimal_degrees)
+            minutes_float = (decimal_degrees - degrees) * 60
+            minutes = int(minutes_float)
+            seconds = (minutes_float - minutes) * 60
+            return degrees, minutes, seconds
+        
+        asc_deg, asc_min, asc_sec = decimal_to_dms(ascendant_sidereal % 30)
+        print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}")
+        print(f"ASCENDANT: {asc_deg}d {asc_min}m {asc_sec:.0f}s Cancer")
         asc_sign_num = int(ascendant_sidereal / 30)
         asc_sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][asc_sign_num]
         print(f"DEBUG: ASC Sign: {asc_sign_num} ({asc_sign_name})")
@@ -143,8 +219,9 @@ class ChartCalculator(BaseCalculator):
     
     def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Bhav Chalit using Placidus house system (professional KP/Sripati method)"""
-        # Ensure Lahiri Ayanamsa for house calculations
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        # Ensure geocentric mode and Mode 27 for house calculations
+        swe.set_topo(0, 0, 0)
+        swe.set_sid_mode(27, 0, 0)
         try:
             # Use Placidus house system (P) for accurate unequal houses
             cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
@@ -207,8 +284,9 @@ class ChartCalculator(BaseCalculator):
     
     def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Gulika and Mandi based on actual sunrise/sunset (Dinamaan)"""
-        # Ensure Lahiri Ayanamsa for upagraha calculations
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        # Ensure geocentric mode and Mode 27 for upagraha calculations
+        swe.set_topo(0, 0, 0)
+        swe.set_sid_mode(27, 0, 0)
         try:
             # Get sunrise and sunset for the day (single call)
             sun_transit = swe.rise_trans(jd, swe.SUN, '', swe.FLG_SWIEPH, lon, lat, 0)

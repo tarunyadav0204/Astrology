@@ -1,6 +1,8 @@
 import swisseph as swe
 from datetime import datetime, timedelta
+import pytz
 from .panchang_calculator import PanchangCalculator
+from utils.timezone_service import get_timezone_from_coordinates
 
 class MuhuratCalculator:
     def __init__(self):
@@ -17,31 +19,76 @@ class MuhuratCalculator:
         self.AVOID_YOGAS = [1, 6, 9, 10, 13, 15, 17, 19, 27]
         
         self.GOOD_CHOGHADIYA = ['Amrita', 'Shubh', 'Labh', 'Char']
+    
+    def _parse_timezone(self, tz_str):
+        """Helper to parse timezone string like 'UTC+5:30' into float offset"""
+        offset = 5.5 # Default IST
+        if isinstance(tz_str, (int, float)):
+            return float(tz_str)
+        if isinstance(tz_str, str) and 'UTC' in tz_str:
+            try:
+                tz_part = tz_str.replace('UTC', '')
+                sign = -1 if '-' in tz_part else 1
+                tz_part = tz_part.replace('+', '').replace('-', '')
+                
+                if ':' in tz_part:
+                    hours, minutes = tz_part.split(':')
+                    offset = sign * (float(hours) + float(minutes)/60.0)
+                else:
+                    offset = sign * float(tz_part)
+            except: pass
+        return offset
 
-    @staticmethod
-    def _jd_to_local_hour(jd_val, tz_offset):
-        utc = (jd_val + 0.5 - int(jd_val + 0.5)) * 24.0
-        return (utc + tz_offset) % 24
+    def _jd_to_local_time(self, jd_val, timezone_str):
+        """Convert Julian Day to local time with proper timezone handling"""
+        if not jd_val: return None
+        year, month, day, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
+        dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second), tzinfo=pytz.UTC)
+        
+        # Parse timezone
+        if timezone_str.startswith('UTC'):
+            tz_offset = self._parse_timezone(timezone_str)
+            dt_local = dt_utc + timedelta(hours=tz_offset)
+        else:
+            try:
+                tz = pytz.timezone(timezone_str)
+                dt_local = dt_utc.astimezone(tz)
+            except:
+                tz_offset = self._parse_timezone(timezone_str)
+                dt_local = dt_utc + timedelta(hours=tz_offset)
+        
+        return dt_local.strftime('%I:%M %p')
 
-    def calculate_childbirth_muhurat(self, start_date, end_date, lat, lon, user_nak, tz="UTC+5:30"):
+    def calculate_childbirth_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
+        if tz is None:
+            tz = get_timezone_from_coordinates(lat, lon)
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.CHILDBIRTH_NAKSHATRAS, [1, 2, 3, 4, 5, 6, 8, 11], [], "Childbirth")
 
-    def calculate_vehicle_muhurat(self, start_date, end_date, lat, lon, user_nak, tz="UTC+5:30"):
+    def calculate_vehicle_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
+        # Auto-detect timezone if not provided
+        if tz is None:
+            tz = get_timezone_from_coordinates(lat, lon)
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.VEHICLE_NAKSHATRAS, [0, 3, 6, 9], [1], "Vehicle Purchase",
             check_4th_house=True, karaka_planet=swe.VENUS)
 
-    def calculate_griha_pravesh_muhurat(self, start_date, end_date, lat, lon, user_nak, tz="UTC+5:30"):
+    def calculate_griha_pravesh_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
+        if tz is None:
+            tz = get_timezone_from_coordinates(lat, lon)
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.HOME_NAKSHATRAS, [1, 4, 7, 10], [1, 6], "Griha Pravesh",
             check_4th_house=True, karaka_planet=swe.MARS)
 
-    def calculate_gold_muhurat(self, start_date, end_date, lat, lon, user_nak, tz="UTC+5:30"):
+    def calculate_gold_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
+        if tz is None:
+            tz = get_timezone_from_coordinates(lat, lon)
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.GOLD_NAKSHATRAS, [1, 2, 3, 4, 5, 6, 8, 11], [1], "Gold Purchase")
 
-    def calculate_business_muhurat(self, start_date, end_date, lat, lon, user_nak, tz="UTC+5:30"):
+    def calculate_business_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
+        if tz is None:
+            tz = get_timezone_from_coordinates(lat, lon)
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.BUSINESS_NAKSHATRAS, [1, 4, 7, 10], [1, 6], "Business Opening",
             check_4th_house=True)
@@ -61,17 +108,8 @@ class MuhuratCalculator:
         current_date = start_date
         days_scanned = 0
         
-        # Parse Timezone
-        tz_offset = 5.5
-        if 'UTC' in tz_str:
-            try:
-                parts = tz_str.replace('UTC', '').split(':')
-                sign = -1 if '-' in tz_str else 1
-                if len(parts) > 1:
-                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
-                else:
-                    tz_offset = float(parts[0])
-            except: pass
+        # Use timezone string directly for proper DST handling
+        timezone_str = tz_str
 
         while current_date <= end_date and days_scanned < 60:
             date_str = current_date.strftime('%Y-%m-%d')
@@ -83,10 +121,10 @@ class MuhuratCalculator:
                 # 2. Panchang Check (Pass all args)
                 panchang = self.panchang_calc.calculate_panchang(
                     date_str, 
-                    time_str="12:00:00", 
-                    latitude=float(lat), 
-                    longitude=float(lon), 
-                    timezone=tz_str
+                    "12:00:00", 
+                    float(lat), 
+                    float(lon), 
+                    tz_str
                 )
             except Exception as e:
                 print(f"Panchang Error for {date_str}: {e}")
@@ -115,7 +153,8 @@ class MuhuratCalculator:
             # 4. Planetary Positions
             planet_positions = {}
             if check_4th_house or karaka_planet:
-                jd_noon = swe.julday(current_date.year, current_date.month, current_date.day, 12.0 - tz_offset)
+                # Calculate JD for noon in UTC (no timezone offset needed for planetary positions)
+                jd_noon = swe.julday(current_date.year, current_date.month, current_date.day, 12.0)
                 
                 if karaka_planet:
                     karaka_pos = swe.calc_ut(jd_noon, karaka_planet, swe.FLG_SIDEREAL)[0][0]
@@ -137,9 +176,9 @@ class MuhuratCalculator:
             except:
                 choghadiya_data = None
 
-            # 6. Fine-Grained Search
+            # 6. Fine-Grained Search with timezone
             day_slots = self._find_lagnas_detailed(
-                current_date, float(lat), float(lon), tz_offset, 
+                current_date, float(lat), float(lon), timezone_str, 
                 good_lagnas, planet_positions if check_4th_house else None,
                 choghadiya_data
             )
@@ -163,15 +202,15 @@ class MuhuratCalculator:
             "recommendations": valid_slots
         }
 
-    def _find_lagnas_detailed(self, date_obj, lat, lon, tz_offset, good_lagnas, planet_positions, choghadiya_data):
+    def _find_lagnas_detailed(self, date_obj, lat, lon, timezone_str, good_lagnas, planet_positions, choghadiya_data):
         jd = swe.julday(int(date_obj.year), int(date_obj.month), int(date_obj.day), 12.0)
         geopos = (float(lon), float(lat), 0.0)
         
         rise = swe.rise_trans(jd, swe.SUN, swe.CALC_RISE, geopos)[1][0]
         setting = swe.rise_trans(jd, swe.SUN, swe.CALC_SET, geopos)[1][0]
         
-        sunrise_hour = self._jd_to_local_hour(rise, tz_offset)
-        sunset_hour = self._jd_to_local_hour(setting, tz_offset)
+        sunrise_hour = self._jd_to_local_hour(rise, timezone_str)
+        sunset_hour = self._jd_to_local_hour(setting, timezone_str)
         
         day_duration = sunset_hour - sunrise_hour
         if day_duration < 0: day_duration += 24 
@@ -197,75 +236,57 @@ class MuhuratCalculator:
             def in_range(val, r): return r[0] <= val < r[1]
             return in_range(t, rahu) or in_range(t, yama) or in_range(t, gulika)
         
-        def get_choghadiya(time_dec):
-            if not choghadiya_data: return "Unknown"
-            
-            # Simple check Day vs Night logic
-            # (In production, use the start/end times from choghadiya_data directly)
-            for slot in choghadiya_data.get('day_choghadiya', []):
-                s_h, s_m = map(int, slot['start_time'].split(':'))
-                e_h, e_m = map(int, slot['end_time'].split(':'))
-                start = s_h + s_m/60.0
-                end = e_h + e_m/60.0
-                if start <= time_dec < end: return slot['name']
-            
-            for slot in choghadiya_data.get('night_choghadiya', []):
-                s_h, s_m = map(int, slot['start_time'].split(':'))
-                e_h, e_m = map(int, slot['end_time'].split(':'))
-                start = s_h + s_m/60.0
-                end = e_h + e_m/60.0
-                # Handle midnight wrap for night slots if needed
-                if start > end: # Wraps over 24h
-                     if time_dec >= start or time_dec < end: return slot['name']
-                else:
-                     if start <= time_dec < end: return slot['name']
-            return "Unknown"
-
+        # Find good time slots
         slots = []
-        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
-                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        for hour in range(int(sunrise_hour), int(sunset_hour) + 1):
+            if is_forbidden(hour): continue
+            
+            # Calculate lagna for this hour
+            tz_offset = self._parse_timezone(timezone_str)
+            jd_hour = swe.julday(date_obj.year, date_obj.month, date_obj.day, hour - tz_offset)
+            asc = swe.houses(jd_hour, lat, lon, b'P')[1][0]  # Placidus houses
+            lagna_sign = int(asc / 30)
+            
+            if lagna_sign not in good_lagnas: continue
+            
+            # Check 4th house if required
+            if planet_positions and 3 in planet_positions.get('malefics_in', set()):
+                continue
+            
+            # Check choghadiya if available
+            if choghadiya_data:
+                hour_str = f"{hour:02d}:00"
+                is_good_chog = any(
+                    slot['name'] in self.GOOD_CHOGHADIYA and 
+                    slot['start_time'] <= hour_str < slot['end_time']
+                    for slot in choghadiya_data.get('day_choghadiya', [])
+                )
+                if not is_good_chog: continue
+            
+            slots.append({
+                'time': self._jd_to_local_time(jd_hour + tz_offset/24, timezone_str),
+                'lagna': ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                         'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][lagna_sign],
+                'quality': 'Excellent'
+            })
         
-        start_hour = 8
-        end_hour = 20 
-        
-        current_time = date_obj.replace(hour=start_hour, minute=0, second=0)
-        end_time = date_obj.replace(hour=end_hour, minute=0, second=0)
-        
-        while current_time < end_time:
-            curr_dec = current_time.hour + current_time.minute/60.0
-            
-            if is_forbidden(curr_dec):
-                current_time += timedelta(minutes=15); continue
-            
-            chog_name = get_choghadiya(curr_dec)
-            if chog_name not in self.GOOD_CHOGHADIYA:
-                current_time += timedelta(minutes=15); continue
-
-            local_hour = current_time.hour + current_time.minute/60.0
-            utc_hour = local_hour - tz_offset
-            
-            jd_now = swe.julday(int(current_time.year), int(current_time.month), int(current_time.day), float(utc_hour))
-            houses = swe.houses(jd_now, float(lat), float(lon), b'P')
-            asc_sign = int(((houses[1][0] - swe.get_ayanamsa_ut(jd_now)) % 360) / 30)
-            
-            if asc_sign in good_lagnas:
-                is_safe = True
-                if planet_positions:
-                    fourth_house_sign = (asc_sign + 3) % 12
-                    if fourth_house_sign in planet_positions['malefics_in']:
-                        is_safe = False
-                
-                if is_safe:
-                    slots.append({
-                        "time": current_time.strftime("%H:%M"),
-                        "lagna": sign_names[asc_sign],
-                        "choghadiya": chog_name,
-                        "quality": "Best"
-                    })
-                    current_time += timedelta(minutes=60)
-                else:
-                    current_time += timedelta(minutes=15)
-            else:
-                current_time += timedelta(minutes=15)
-                
         return slots
+    
+    def _jd_to_local_hour(self, jd_val, timezone_str):
+        """Convert JD to local hour with timezone handling"""
+        if not jd_val: return 0
+        year, month, day, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
+        dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second), tzinfo=pytz.UTC)
+        
+        if timezone_str.startswith('UTC'):
+            tz_offset = self._parse_timezone(timezone_str)
+            dt_local = dt_utc + timedelta(hours=tz_offset)
+        else:
+            try:
+                tz = pytz.timezone(timezone_str)
+                dt_local = dt_utc.astimezone(tz)
+            except:
+                tz_offset = self._parse_timezone(timezone_str)
+                dt_local = dt_utc + timedelta(hours=tz_offset)
+        
+        return dt_local.hour + dt_local.minute/60.0

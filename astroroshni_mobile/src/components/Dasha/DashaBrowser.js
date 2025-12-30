@@ -27,32 +27,46 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
   const loadDashaData = async (date) => {
     setLoading(true);
     try {
+      console.log('🔍 [DASHA_MOBILE_DEBUG] Original birthData received:', JSON.stringify(birthData, null, 2));
+      console.log('🔍 [DASHA_MOBILE_DEBUG] Date parameter:', date);
+      console.log('🔍 [DASHA_MOBILE_DEBUG] birthData.date type:', typeof birthData.date);
+      console.log('🔍 [DASHA_MOBILE_DEBUG] birthData.time type:', typeof birthData.time);
+      
       // Format birth data properly for API
       const formattedData = {
         ...birthData,
-        date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
-        time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+        date: typeof birthData.date === 'string' ? 
+          (birthData.date.includes('T') ? birthData.date.split('T')[0] : birthData.date) : 
+          birthData.date,
+        time: typeof birthData.time === 'string' ? 
+          (birthData.time.includes('T') ? birthData.time.split('T')[1]?.slice(0, 8) || birthData.time : birthData.time) : 
+          birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
         timezone: birthData.timezone || 'Asia/Kolkata'
       };
-
-
-
+      
+      console.log('🔍 [DASHA_MOBILE_DEBUG] Formatted data being sent to API:', JSON.stringify(formattedData, null, 2));
+      console.log('🔍 [DASHA_MOBILE_DEBUG] About to call chartAPI.calculateDasha');
 
       const response = await chartAPI.calculateDasha(formattedData);
+      
+      console.log('🔍 [DASHA_MOBILE_DEBUG] API response received:', JSON.stringify(response.data, null, 2));
 
       if (response.data.error) {
+        console.log('❌ [DASHA_MOBILE_DEBUG] API returned error:', response.data.error);
         setError(`Dasha calculation failed: ${response.data.error}`);
         return;
       }
       
+      console.log('✅ [DASHA_MOBILE_DEBUG] Setting cascading data');
       setCascadingData(response.data);
     } catch (error) {
-
-
+      console.log('❌ [DASHA_MOBILE_DEBUG] Exception in loadDashaData:', error);
+      console.log('❌ [DASHA_MOBILE_DEBUG] Error details:', JSON.stringify(error, null, 2));
     } finally {
       setLoading(false);
+      console.log('🔍 [DASHA_MOBILE_DEBUG] loadDashaData completed');
     }
   };
 

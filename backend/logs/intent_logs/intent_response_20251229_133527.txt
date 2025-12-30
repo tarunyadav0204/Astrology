@@ -1,0 +1,51 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T13:35:30.970008
+Question: Tell me more about the period from 1/1/2025 to 4/1/2025 when Saturn activates Mars. What specific events should I expect?
+Processing Time: 3.128s
+Response Length: 612 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I can help with that! What area of your life are you most curious about regarding this transit? For example, are you interested in career, relationships, finances, or something else?",
+    "mode": "annual",
+    "year": 2025,
+    "needs_transits": true,
+    "divisional_charts": [],
+    "transit_request": {
+        "startYear": 2025,
+        "endYear": 2025,
+        "yearMonthMap": {
+            "2025": [
+                "January",
+                "February",
+                "March",
+                "April"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can help with that! What area of your life are you most curious about regarding this transit? For example, are you interested in career, relationships, finances, or something else?",
+  "mode": "annual",
+  "year": 2025,
+  "needs_transits": true,
+  "divisional_charts": [],
+  "transit_request": {
+    "startYear": 2025,
+    "endYear": 2025,
+    "yearMonthMap": {
+      "2025": [
+        "January",
+        "February",
+        "March",
+        "April"
+      ]
+    }
+  }
+}

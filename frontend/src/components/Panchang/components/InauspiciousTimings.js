@@ -3,18 +3,28 @@ import { RAHU_KAAL_TIMINGS, YAMAGANDA_TIMINGS, GULIKA_TIMINGS } from '../config/
 
 const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate }) => {
   if (!inauspiciousData || !sunriseSunsetData) {
-    throw new Error('Inauspicious timings data and sunrise/sunset data are required');
+    return (
+      <div className="inauspicious-timings">
+        <div className="loading-message">
+          <p>Loading inauspicious timings...</p>
+        </div>
+      </div>
+    );
   }
 
   const formatTime = (timeString) => {
     if (!timeString) {
-      throw new Error('Time string is required');
+      return 'N/A';
     }
-    return new Date(timeString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    try {
+      return new Date(timeString).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   const calculateTimingFromSunrise = (sunriseTime, startHour, duration) => {
@@ -91,23 +101,23 @@ const InauspiciousTimings = ({ inauspiciousData, sunriseSunsetData, selectedDate
       icon: '🪐',
       color: '#34495e'
     },
-    ...inauspiciousData.dur_muhurta.map(timing => ({
+    ...(inauspiciousData.dur_muhurta || []).map(timing => ({
       name: 'Dur Muhurta',
       description: 'General inauspicious period',
       start_time: timing.start_time,
       end_time: timing.end_time,
       severity: 'Low',
-      avoid_activities: timing.avoid_activities,
+      avoid_activities: timing.avoid_activities || ['General activities'],
       icon: '⚠️',
       color: '#f39c12'
     })),
-    ...inauspiciousData.varjyam.map(timing => ({
+    ...(inauspiciousData.varjyam || []).map(timing => ({
       name: 'Varjyam',
       description: 'Time to avoid specific activities',
       start_time: timing.start_time,
       end_time: timing.end_time,
       severity: 'Medium',
-      avoid_activities: timing.specific_activities,
+      avoid_activities: timing.specific_activities || ['Specific activities'],
       icon: '🚫',
       color: '#e67e22'
     }))

@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T19:32:00.907880
+Question: Tell me about my second child.
+Processing Time: 3.615s
+Response Length: 387 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I'd love to help! Is there a specific aspect you're interested in, such as their health, education, or future prospects? Also, is this child currently in your life?",
+    "mode": "birth",
+    "category": "child",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D7",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I'd love to help! Is there a specific aspect you're interested in, such as their health, education, or future prospects? Also, is this child currently in your life?",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ]
+}

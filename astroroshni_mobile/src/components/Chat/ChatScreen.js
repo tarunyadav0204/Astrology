@@ -842,11 +842,17 @@ export default function ChatScreen({ navigation, route }) {
           
           if (loadingInterval) clearInterval(loadingInterval);
           
-          // Update message with response content
+          // Update message with response content including terms and glossary
           setMessagesWithStorage(prev => {
             const updated = prev.map(msg => 
               msg.messageId === messageId 
-                ? { ...msg, content: status.content || 'Response received but content is empty', isTyping: false }
+                ? { 
+                    ...msg, 
+                    content: status.content || 'Response received but content is empty', 
+                    isTyping: false,
+                    terms: status.terms || [],
+                    glossary: status.glossary || {}
+                  }
                 : msg
             );
             return updated;

@@ -1,0 +1,135 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T22:14:17.361912
+Question: What do the current transits mean for my health?
+Processing Time: 4.660s
+Response Length: 1416 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "area": "health"
+    },
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ],
+    "transit_request": {
+        "startYear": 2025,
+        "endYear": 2027,
+        "yearMonthMap": {
+            "2025": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2027": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "area": "health"
+  },
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": {
+    "startYear": 2025,
+    "endYear": 2027,
+    "yearMonthMap": {
+      "2025": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

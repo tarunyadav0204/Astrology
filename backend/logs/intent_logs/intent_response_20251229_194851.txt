@@ -1,0 +1,23 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T19:48:54.110785
+Question: What do the current transits mean for me?
+Processing Time: 2.731s
+Response Length: 281 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide the most accurate guidance on current transits, which area would you like me to focus on: career, health, relationships, finance, or another specific area?",
+  "mode": "annual",
+  "needs_transits": true
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide the most accurate guidance on current transits, which area would you like me to focus on: career, health, relationships, finance, or another specific area?",
+  "mode": "annual",
+  "needs_transits": true
+}

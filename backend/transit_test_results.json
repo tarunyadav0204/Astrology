@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-12-29T13:02:40.191675",
+  "planets": {
+    "Sun": {
+      "sidereal_longitude": 253.79974533796755,
+      "tropical_longitude": 278.02138795294763,
+      "sign": 8,
+      "degree": 13.79974533796755,
+      "retrograde": false,
+      "speed": 1.0188461840381269
+    },
+    "Moon": {
+      "sidereal_longitude": 5.804736685458058,
+      "tropical_longitude": 30.026379300438176,
+      "sign": 0,
+      "degree": 5.804736685458058,
+      "retrograde": false,
+      "speed": 14.27156075436536
+    },
+    "Mars": {
+      "sidereal_longitude": 256.5527322898102,
+      "tropical_longitude": 280.7743749047903,
+      "sign": 8,
+      "degree": 16.552732289810194,
+      "retrograde": false,
+      "speed": 0.7646170599421184
+    },
+    "Mercury": {
+      "sidereal_longitude": 240.63510280082917,
+      "tropical_longitude": 264.85674541580937,
+      "sign": 8,
+      "degree": 0.6351028008291735,
+      "retrograde": false,
+      "speed": 1.510322640992311
+    },
+    "Jupiter": {
+      "sidereal_longitude": 87.45937664842933,
+      "tropical_longitude": 111.68101926340945,
+      "sign": 2,
+      "degree": 27.459376648429327,
+      "retrograde": true,
+      "speed": -0.12806784971608168
+    },
+    "Venus": {
+      "sidereal_longitude": 251.838894667415,
+      "tropical_longitude": 276.0605372823951,
+      "sign": 8,
+      "degree": 11.83889466741499,
+      "retrograde": false,
+      "speed": 1.2584041730705682
+    },
+    "Saturn": {
+      "sidereal_longitude": 331.80472958996023,
+      "tropical_longitude": 356.02637220494034,
+      "sign": 11,
+      "degree": 1.8047295899602318,
+      "retrograde": false,
+      "speed": 0.054326256787387284
+    },
+    "Rahu": {
+      "sidereal_longitude": 318.08138680601337,
+      "tropical_longitude": 342.3030294209935,
+      "sign": 10,
+      "degree": 18.08138680601337,
+      "retrograde": false,
+      "speed": -0.052991995962507206
+    },
+    "Ketu": {
+      "sidereal_longitude": 138.08138680601337,
+      "tropical_longitude": 162.30302942099343,
+      "sign": 4,
+      "degree": 18.08138680601337,
+      "retrograde": false,
+      "speed": -0.052991995962507206
+    }
+  }
+}

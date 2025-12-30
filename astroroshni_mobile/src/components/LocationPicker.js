@@ -10,21 +10,6 @@ export default function LocationPicker({ onLocationSelect, onClose }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const getTimezoneFromCoordinates = (lat, lng) => {
-    if (lat >= 6.0 && lat <= 37.0 && lng >= 68.0 && lng <= 97.0) {
-      return 'UTC+5:30';
-    }
-    const offset = lng / 15.0;
-    const hours = Math.floor(Math.abs(offset));
-    const minutes = Math.round((Math.abs(offset) - hours) * 60);
-    
-    if (minutes === 30) {
-      return `UTC${offset >= 0 ? '+' : '-'}${hours}:30`;
-    } else {
-      return `UTC${offset >= 0 ? '+' : '-'}${hours}`;
-    }
-  };
-
   const searchPlaces = async (query) => {
     if (query.length < 3) {
       setSuggestions([]);
@@ -45,8 +30,7 @@ export default function LocationPicker({ onLocationSelect, onClose }) {
           id: item.place_id,
           name: item.display_name,
           latitude: lat,
-          longitude: lng,
-          timezone: getTimezoneFromCoordinates(lat, lng)
+          longitude: lng
         };
       });
       setSuggestions(places);

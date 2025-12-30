@@ -128,13 +128,13 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
             }}>
               <div className="day-tithi">
                 {dayData.tithi}
-                {dayData.panchang.tithi_end_time && (
+                {dayData.panchang?.tithi?.tithi_end_time && (
                   <div className="tithi-ends-grid" style={{
                     fontSize: '8px',
                     color: '#666',
                     marginTop: '1px'
                   }}>
-                    Ends {dayData.panchang.tithi_end_time}
+                    Ends {dayData.panchang.tithi.tithi_end_time}
                   </div>
                 )}
               </div>

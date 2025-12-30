@@ -1,0 +1,127 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T20:48:38.540991
+Question: Tell me about my current dasha period
+Processing Time: 3.278s
+Response Length: 1343 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ],
+    "transit_request": {
+        "startYear": 2025,
+        "endYear": 2027,
+        "yearMonthMap": {
+            "2025": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2027": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2025,
+    "endYear": 2027,
+    "yearMonthMap": {
+      "2025": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

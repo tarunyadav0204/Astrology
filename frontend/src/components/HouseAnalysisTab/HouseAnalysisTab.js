@@ -695,7 +695,7 @@ const HouseAnalysisTab = ({ chartData, birthData }) => {
                         )}
                       </div>
                       <div style={{ fontSize: window.innerWidth <= 768 ? '0.65rem' : '0.7rem', color: '#666' }}>
-                        Degree: {planet.degree?.toFixed(2)}° in {getSignName(planet.sign)}
+                        Degree: {planetary_signs && planetary_signs[planet.name] ? `${planetary_signs[planet.name].degree}° in ${getSignName(planetary_signs[planet.name].sign_number || planet.sign)}` : `${planet.degree?.toFixed(2)}° in ${getSignName(planet.sign)}`}
                       </div>
                     </div>
                   );

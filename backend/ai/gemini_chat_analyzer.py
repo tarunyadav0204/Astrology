@@ -6,6 +6,7 @@ import asyncio
 from typing import Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
+from ai.response_parser import ResponseParser
 
 # Load environment variables
 env_paths = [
@@ -186,54 +187,54 @@ class GeminiChatAnalyzer:
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start
             
-            # LOG COMPLETE RESPONSE
-            response_log_file = os.path.join(log_dir, f"gemini_response_{call_type}_{timestamp}.txt")
-            with open(response_log_file, 'w', encoding='utf-8') as f:
-                f.write(f"GEMINI RESPONSE - {call_type}\n")
-                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                f.write(f"Question: {user_question}\n")
-                f.write(f"Processing Time: {gemini_total_time:.3f}s\n")
-                f.write(f"Response Length: {len(response.text) if response and hasattr(response, 'text') else 0} characters\n")
-                f.write(f"{'='*80}\n")
-                if response and hasattr(response, 'text'):
-                    f.write(response.text)
-                else:
-                    f.write("No response or empty response")
+            # # LOG COMPLETE RESPONSE
+            # response_log_file = os.path.join(log_dir, f"gemini_response_{call_type}_{timestamp}.txt")
+            # with open(response_log_file, 'w', encoding='utf-8') as f:
+            #     f.write(f"GEMINI RESPONSE - {call_type}\n")
+            #     f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            #     f.write(f"Question: {user_question}\n")
+            #     f.write(f"Processing Time: {gemini_total_time:.3f}s\n")
+            #     f.write(f"Response Length: {len(response.text) if response and hasattr(response, 'text') else 0} characters\n")
+            #     f.write(f"{'='*80}\n")
+            #     if response and hasattr(response, 'text'):
+            #         f.write(response.text)
+            #     else:
+            #         f.write("No response or empty response")
             
-            print(f"📝 RESPONSE LOGGED: {response_log_file}")
+            # print(f"📝 RESPONSE LOGGED: {response_log_file}")
             
-            # LOG COMPLETE FLOW SUMMARY
-            flow_log_file = os.path.join(log_dir, f"complete_flow_{call_type}_{timestamp}.txt")
-            with open(flow_log_file, 'w', encoding='utf-8') as f:
-                f.write(f"COMPLETE GEMINI FLOW SUMMARY - {call_type}\n")
-                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                f.write(f"Question: {user_question}\n")
-                f.write(f"Processing Time: {gemini_total_time:.3f}s\n")
-                f.write(f"Total Request Time: {total_request_time:.2f}s\n")
-                f.write(f"Context Size: {len(json.dumps(pruned_context, default=str))} characters\n")
-                f.write(f"Has Transit Data: {'Yes' if 'transit_activations' in enhanced_context else 'No'}\n")
-                f.write(f"Response Length: {len(response.text) if response and hasattr(response, 'text') else 0} characters\n")
-                f.write(f"{'='*80}\n")
-                f.write(f"PERFORMANCE METRICS:\n")
-                f.write(f"- Prompt Creation: {prompt_time:.3f}s\n")
-                f.write(f"- Gemini Processing: {gemini_total_time:.3f}s\n")
-                f.write(f"- Total Time: {total_request_time:.3f}s\n")
-                if 'transit_activations' in enhanced_context:
-                    transit_count = len(enhanced_context.get('transit_activations', []))
-                    f.write(f"- Transit Activations: {transit_count}\n")
-                    dasha_summary = enhanced_context.get('requested_dasha_summary', {})
-                    if dasha_summary:
-                        vims_count = len(dasha_summary.get('vimshottari_sequence', []))
-                        f.write(f"- Dasha Periods: {vims_count}\n")
+            # # LOG COMPLETE FLOW SUMMARY
+            # flow_log_file = os.path.join(log_dir, f"complete_flow_{call_type}_{timestamp}.txt")
+            # with open(flow_log_file, 'w', encoding='utf-8') as f:
+            #     f.write(f"COMPLETE GEMINI FLOW SUMMARY - {call_type}\n")
+            #     f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            #     f.write(f"Question: {user_question}\n")
+            #     f.write(f"Processing Time: {gemini_total_time:.3f}s\n")
+            #     f.write(f"Total Request Time: {total_request_time:.2f}s\n")
+            #     f.write(f"Context Size: {len(json.dumps(pruned_context, default=str))} characters\n")
+            #     f.write(f"Has Transit Data: {'Yes' if 'transit_activations' in enhanced_context else 'No'}\n")
+            #     f.write(f"Response Length: {len(response.text) if response and hasattr(response, 'text') else 0} characters\n")
+            #     f.write(f"{'='*80}\n")
+            #     f.write(f"PERFORMANCE METRICS:\n")
+            #     f.write(f"- Prompt Creation: {prompt_time:.3f}s\n")
+            #     f.write(f"- Gemini Processing: {gemini_total_time:.3f}s\n")
+            #     f.write(f"- Total Time: {total_request_time:.3f}s\n")
+            #     if 'transit_activations' in enhanced_context:
+            #         transit_count = len(enhanced_context.get('transit_activations', []))
+            #         f.write(f"- Transit Activations: {transit_count}\n")
+            #         dasha_summary = enhanced_context.get('requested_dasha_summary', {})
+            #         if dasha_summary:
+            #             vims_count = len(dasha_summary.get('vimshottari_sequence', []))
+            #             f.write(f"- Dasha Periods: {vims_count}\n")
             
-            print(f"📝 FLOW SUMMARY LOGGED: {flow_log_file}")
+            # print(f"📝 FLOW SUMMARY LOGGED: {flow_log_file}")
             
             print(f"\n{'='*80}")
             print(f"📥 GEMINI RESPONSE #{call_type}")
             print(f"{'='*80}")
             if response and hasattr(response, 'text'):
-                response_text_preview = response.text[:1000] + "..." if len(response.text) > 1000 else response.text
-                print(f"\nGEMINI RESPONSE (first 1000 chars):\n{response_text_preview}")
+                response_text_preview = response.text
+                print(f"\nFULL GEMINI RESPONSE:\n{response_text_preview}")
                 
                 # Log divisional chart mentions
                 divisional_mentions = []
@@ -329,9 +330,19 @@ class GeminiChatAnalyzer:
             else:
                 print(f"📊 PERFORMANCE SUMMARY - FIRST CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
             
+            # Parse response for terms and glossary
+            parsed_response = ResponseParser.parse_response(cleaned_text)
+            
+            print(f"\n🔍 RESPONSE PARSER DEBUG:")
+            print(f"   Terms found: {parsed_response['terms']}")
+            print(f"   Glossary keys: {list(parsed_response['glossary'].keys())}")
+            print(f"   Content preview: {parsed_response['content'][:200]}...")
+            
             return {
                 'success': True,
-                'response': cleaned_text,
+                'response': parsed_response['content'],
+                'terms': parsed_response['terms'],
+                'glossary': parsed_response['glossary'],
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
                 'timing': {
@@ -653,6 +664,40 @@ Provide ONLY a Quick Answer section with:
 Do NOT include detailed analysis, multiple sections, or extensive explanations.
 Format: <div class="quick-answer-card">**Quick Answer**: [Comprehensive summary in everyday language that covers all major insights]</div>
 
+TECHNICAL TERMS EDUCATION - MANDATORY:
+Wrap ALL astrological terms in <term id="key">Term</term> format. You must identify and wrap EVERY astrological term, concept, yoga, dasha, planet name, house reference, chart type, or Sanskrit astrological word.
+
+Examples include (but are not limited to):
+- Charts: D9 → <term id="d9">D9</term>, Navamsa → <term id="navamsa">Navamsa</term>
+- Dashas: Mahadasha → <term id="mahadasha">Mahadasha</term>, Antardasha → <term id="antardasha">Antardasha</term>
+- Yogas: Rajyoga → <term id="rajyoga">Rajyoga</term>, Malavya Yoga → <term id="malavyayoga">Malavya Yoga</term>, Bhadra Yoga → <term id="bhadrayoga">Bhadra Yoga</term>
+- Karakas: Amatyakaraka → <term id="amatyakaraka">Amatyakaraka</term>, Atmakaraka → <term id="atmakaraka">Atmakaraka</term>
+- Systems: Sudarshana → <term id="sudarshana">Sudarshana</term>, Ashtakavarga → <term id="ashtakavarga">Ashtakavarga</term>
+- Planets: Jupiter, Venus, Saturn, Mars, Mercury, Sun, Moon, Rahu, Ketu
+- Houses: 1st house, 7th house, 10th house, etc.
+- Signs: Aries, Taurus, Gemini, etc.
+- Nakshatras: Ashwini, Bharani, Rohini, etc.
+- Any Sanskrit astrological term
+
+CRITICAL: This is not a complete list. You must wrap ANY and ALL astrological terms you use, regardless of whether they appear in these examples.
+
+GLOSSARY FORMAT - CRITICAL:
+At the very end of your response, add a clean JSON glossary with COMPREHENSIVE, LAYMAN-FRIENDLY definitions in this EXACT format:
+
+GLOSSARY_START
+{"d9": "D9 (Navamsa Chart) - A special chart that reveals your destiny, marriage compatibility, and spiritual path. It shows the deeper qualities of your personality and how your life will unfold after marriage. Think of it as your soul's blueprint that becomes more active in the second half of life.", "mahadasha": "Mahadasha - A major life period ruled by one planet, lasting several years (6-20 years depending on the planet). During this time, that planet's energy dominates your life experiences, opportunities, and challenges. It's like having a planetary 'CEO' running your life for that entire period."}
+GLOSSARY_END
+
+IMPORTANT GLOSSARY REQUIREMENTS:
+- Explain each term in a clear paragraph that anyone can understand
+- Use simple, everyday language that anyone can understand
+- Explain WHY the concept matters in practical life
+- Include analogies or comparisons when helpful (like 'CEO', 'blueprint', etc.)
+- Avoid Sanskrit terms unless absolutely necessary
+- Focus on how it affects the person's real life
+
+Do NOT use code blocks, HTML encoding, or escape characters. Just plain JSON between the markers.
+
 """
         else:
             response_format_instruction = """
@@ -674,6 +719,40 @@ Start with comprehensive Quick Answer then provide full analysis:
 [Age-appropriate recommendations]
 
 <div class="final-thoughts-card">**Final Thoughts**: [Balanced conclusion]</div>
+
+TECHNICAL TERMS EDUCATION - MANDATORY:
+Wrap ALL astrological terms in <term id="key">Term</term> format. You must identify and wrap EVERY astrological term, concept, yoga, dasha, planet name, house reference, chart type, or Sanskrit astrological word.
+
+Examples include (but are not limited to):
+- Charts: D9 → <term id="d9">D9</term>, Navamsa → <term id="navamsa">Navamsa</term>
+- Dashas: Mahadasha → <term id="mahadasha">Mahadasha</term>, Antardasha → <term id="antardasha">Antardasha</term>
+- Yogas: Rajyoga → <term id="rajyoga">Rajyoga</term>, Malavya Yoga → <term id="malavyayoga">Malavya Yoga</term>, Bhadra Yoga → <term id="bhadrayoga">Bhadra Yoga</term>
+- Karakas: Amatyakaraka → <term id="amatyakaraka">Amatyakaraka</term>, Atmakaraka → <term id="atmakaraka">Atmakaraka</term>
+- Systems: Sudarshana → <term id="sudarshana">Sudarshana</term>, Ashtakavarga → <term id="ashtakavarga">Ashtakavarga</term>
+- Planets: Jupiter, Venus, Saturn, Mars, Mercury, Sun, Moon, Rahu, Ketu
+- Houses: 1st house, 7th house, 10th house, etc.
+- Signs: Aries, Taurus, Gemini, etc.
+- Nakshatras: Ashwini, Bharani, Rohini, etc.
+- Any Sanskrit astrological term
+
+CRITICAL: This is not a complete list. You must wrap ANY and ALL astrological terms you use, regardless of whether they appear in these examples.
+
+GLOSSARY FORMAT - CRITICAL:
+At the very end of your response, add a clean JSON glossary with COMPREHENSIVE, LAYMAN-FRIENDLY definitions in this EXACT format:
+
+GLOSSARY_START
+{"d9": "D9 (Navamsa Chart) - A special chart that reveals your destiny, marriage compatibility, and spiritual path. It shows the deeper qualities of your personality and how your life will unfold after marriage. Think of it as your soul's blueprint that becomes more active in the second half of life.", "mahadasha": "Mahadasha - A major life period ruled by one planet, lasting several years (6-20 years depending on the planet). During this time, that planet's energy dominates your life experiences, opportunities, and challenges. It's like having a planetary 'CEO' running your life for that entire period."}
+GLOSSARY_END
+
+IMPORTANT GLOSSARY REQUIREMENTS:
+- Explain each term in a clear paragraph that anyone can understand
+- Use simple, everyday language that anyone can understand
+- Explain WHY the concept matters in practical life
+- Include analogies or comparisons when helpful (like 'CEO', 'blueprint', etc.)
+- Avoid Sanskrit terms unless absolutely necessary
+- Focus on how it affects the person's real life
+
+Do NOT use code blocks, HTML encoding, or escape characters. Just plain JSON between the markers.
 
 FOLLOW-UP QUESTIONS - MANDATORY:
 End your response with 3-4 relevant follow-up questions in this exact format:

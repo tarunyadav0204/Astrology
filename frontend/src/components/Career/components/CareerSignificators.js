@@ -27,7 +27,7 @@ const CareerSignificators = ({ data, loading }) => {
             <div className="planet-details">
               <div className="detail-row">
                 <span className="label">Position:</span>
-                <span className="value">{planet.sign} ({planet.house}th House)</span>
+                <span className="value">{planetary_signs && planetary_signs[planet.name] ? `${planetary_signs[planet.name].sign} (${planet.house}th House)` : `${planet.sign} (${planet.house}th House)`}</span>
               </div>
               <div className="detail-row">
                 <span className="label">Degree:</span>

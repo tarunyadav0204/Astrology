@@ -1,0 +1,67 @@
+COMPLETE GEMINI FLOW SUMMARY - FIRST_CALL_REQUEST
+Timestamp: 2025-12-29T12:16:30.280193
+Question: 
+You are an expert Vedic astrologer. Analyze the birth chart for Health and Wellness.
+
+IMPORTANT: You MUST respond with EXACTLY this JSON structure. Do not add extra fields or change field names.
+
+{
+  "quick_answer": "Brief health summary based on chart analysis",
+  "detailed_analysis": [
+    {
+      "question": "What are my primary health vulnerabilities?",
+      "answer": "Detailed analysis of 6th/8th house, lords, and afflictions",
+      "key_points": ["Point 1", "Point 2"],
+      "astrological_basis": "Planetary positions and aspects"
+    },
+    {
+      "question": "When should I be extra cautious about health?",
+      "answer": "Timing analysis based on dashas and transits",
+      "key_points": ["Period 1", "Period 2"],
+      "astrological_basis": "Dasha periods and planetary transits"
+    },
+    {
+      "question": "What body parts need special attention?",
+      "answer": "Body parts analysis based on houses and signs",
+      "key_points": ["Body part 1", "Body part 2"],
+      "astrological_basis": "House and sign correlations"
+    },
+    {
+      "question": "How is my mental and emotional health?",
+      "answer": "Moon, Mercury, and 4th house analysis",
+      "key_points": ["Mental aspect 1", "Mental aspect 2"],
+      "astrological_basis": "Moon and Mercury positions"
+    },
+    {
+      "question": "What remedies can improve my health?",
+      "answer": "Practical remedies and suggestions",
+      "key_points": ["Remedy 1", "Remedy 2"],
+      "astrological_basis": "Planetary strengthening methods"
+    }
+  ],
+  "final_thoughts": "Positive health outlook and guidance",
+  "follow_up_questions": [
+    "🏥 How to improve my immunity?",
+    "🧘 Best yoga/exercise for my body type?",
+    "💊 Specific dietary precautions?",
+    "🌿 Natural remedies for my weak planets?"
+  ]
+}
+
+CRITICAL RULES:
+1. Response must be ONLY valid JSON - no extra text
+2. Use EXACTLY the field names shown above
+3. Include exactly 5 questions in detailed_analysis array
+4. Always mention this is astrological guidance, not medical advice
+5. Use ** for bold text in JSON strings
+
+Processing Time: 55.621s
+Total Request Time: 55.63s
+Context Size: 80571 characters
+Has Transit Data: No
+Response Length: 12388 characters
+================================================================================
+PERFORMANCE METRICS:
+- Prompt Creation: 0.009s
+- Gemini Processing: 55.621s
+- Total Time: 55.630s

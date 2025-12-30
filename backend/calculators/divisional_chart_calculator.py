@@ -9,9 +9,9 @@ class DivisionalChartCalculator(BaseCalculator):
         """Calculate divisional chart - extracted from main.py"""
         
         def get_divisional_sign(sign, degree_in_sign, division):
-            """Calculate divisional sign using proper Vedic formulas"""
-            # Basic partition calculation
-            part = int(degree_in_sign / (30/division))
+            """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
+            EPS = 1e-9  # Prevent 10.0 becoming 9.999
+            part = int((degree_in_sign + EPS) / (30.0/division))
             
             # --- MISSING CHARTS ADDED ---
             
@@ -121,11 +121,16 @@ class DivisionalChartCalculator(BaseCalculator):
             'ayanamsa': self.chart_data.get('ayanamsa', 0)
         }
         
-        # Calculate divisional ascendant
+        # Calculate divisional ascendant with proper scaling
         asc_sign = int(self.chart_data['ascendant'] / 30)
         asc_degree = self.chart_data['ascendant'] % 30
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
-        divisional_data['ascendant'] = divisional_asc_sign * 30 + 15  # Middle of sign
+        
+        # Scaled degree calculation with epsilon buffer
+        EPS = 1e-9
+        part_size = 30.0 / division_number
+        scaled_asc_degree = ((asc_degree + EPS) % part_size) * division_number
+        divisional_data['ascendant'] = (divisional_asc_sign * 30) + scaled_asc_degree
         
         # Calculate divisional houses with house numbers
         for i in range(12):
@@ -149,10 +154,11 @@ class DivisionalChartCalculator(BaseCalculator):
                 
                 divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
                 
-                # Calculate the actual degree within the divisional sign
+                # Calculate the actual degree within the divisional sign with proper scaling
+                EPS = 1e-9
                 part_size = 30.0 / division_number
-                part_index = int(planet_degree / part_size)
-                degree_within_part = planet_degree % part_size
+                part_index = int((planet_degree + EPS) / part_size)  # Buffer here
+                degree_within_part = (planet_degree + EPS) % part_size  # Buffer here
                 # Scale the degree within part to full sign (0-30 degrees)
                 actual_degree = (degree_within_part / part_size) * 30.0
                 

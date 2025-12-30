@@ -2,24 +2,34 @@ import React from 'react';
 
 const SunriseSunsetInfo = ({ sunriseSunsetData, location }) => {
   if (!sunriseSunsetData) {
-    throw new Error('Sunrise/Sunset data is required');
+    return (
+      <div className="sunrise-sunset-info">
+        <div className="loading-message">
+          <p>Loading sunrise/sunset data...</p>
+        </div>
+      </div>
+    );
   }
 
   const formatTime = (timeString) => {
     if (!timeString) {
-      throw new Error('Time string is required');
+      return 'N/A';
     }
-    return new Date(timeString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
+    try {
+      return new Date(timeString).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   const formatDuration = (hours) => {
-    if (typeof hours !== 'number') {
-      throw new Error('Duration must be a number');
+    if (typeof hours !== 'number' || isNaN(hours)) {
+      return 'N/A';
     }
     const h = Math.floor(hours);
     const m = Math.floor((hours - h) * 60);

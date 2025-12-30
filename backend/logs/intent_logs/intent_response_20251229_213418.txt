@@ -1,0 +1,51 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2025-12-29T21:34:22.303132
+Question: All events that you can find.
+Processing Time: 3.565s
+Response Length: 485 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on for January 2026? Career, Health, Relationships, Finance, or another specific area?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on for January 2026? Career, Health, Relationships, Finance, or another specific area?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January"
+      ]
+    }
+  }
+}
