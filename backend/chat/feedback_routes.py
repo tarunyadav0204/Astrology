@@ -53,12 +53,15 @@ async def submit_feedback(request: FeedbackRequest, current_user: User = Depends
         raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
 
 @router.get("/stats")
-async def get_feedback_stats(current_user: User = Depends(get_current_user)):
-    """Get feedback statistics (admin only)"""
-    print(f"📊 Feedback stats request from user: {current_user.phone if current_user else 'None'}, role: {current_user.role if current_user else 'None'}")
-    
+async def get_feedback_stats(
+    page: int = 1,
+    limit: int = 10,
+    username: Optional[str] = None,
+    rating: Optional[int] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Get feedback statistics with pagination and search (admin only)"""
     if current_user.role != 'admin':
-        print(f"❌ Access denied: User {current_user.phone} with role '{current_user.role}' attempted to access admin stats")
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -73,17 +76,50 @@ async def get_feedback_stats(current_user: User = Depends(get_current_user)):
         cursor.execute("SELECT rating, COUNT(*) FROM message_feedback GROUP BY rating ORDER BY rating")
         rating_distribution = dict(cursor.fetchall())
         
-        # Get recent feedback with user names in single query
-        cursor.execute('''
+        # Build WHERE clause for filtering
+        where_conditions = []
+        params = []
+        
+        if username:
+            where_conditions.append("LOWER(COALESCE(u.name, 'Unknown User')) LIKE LOWER(?)")
+            params.append(f"%{username}%")
+        
+        if rating:
+            where_conditions.append("mf.rating = ?")
+            params.append(rating)
+        
+        where_clause = " AND ".join(where_conditions)
+        if where_clause:
+            where_clause = "WHERE " + where_clause
+        
+        # Get total count for pagination
+        count_query = f'''
+            SELECT COUNT(*)
+            FROM message_feedback mf
+            LEFT JOIN chat_messages cm ON CAST(mf.message_id AS INTEGER) = cm.message_id
+            LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
+            LEFT JOIN users u ON cs.user_id = u.userid
+            {where_clause}
+        '''
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+        
+        # Calculate offset
+        offset = (page - 1) * limit
+        
+        # Get paginated feedback with user names
+        feedback_query = f'''
             SELECT mf.rating, mf.comment, mf.created_at, COALESCE(u.name, 'Unknown User') as user_name
             FROM message_feedback mf
             LEFT JOIN chat_messages cm ON CAST(mf.message_id AS INTEGER) = cm.message_id
             LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
             LEFT JOIN users u ON cs.user_id = u.userid
+            {where_clause}
             ORDER BY mf.created_at DESC
-            LIMIT 10
-        ''')
-        recent_feedback = cursor.fetchall()
+            LIMIT ? OFFSET ?
+        '''
+        cursor.execute(feedback_query, params + [limit, offset])
+        feedback_results = cursor.fetchall()
         
         feedback_with_users = [
             {
@@ -92,17 +128,22 @@ async def get_feedback_stats(current_user: User = Depends(get_current_user)):
                 "created_at": row[2],
                 "user_name": row[3]
             }
-            for row in recent_feedback
+            for row in feedback_results
         ]
         
         conn.close()
         
-        print(f"✅ Feedback stats retrieved successfully: {total_feedback} total, {len(feedback_with_users)} recent")
         return {
             "total_feedback": total_feedback or 0,
             "average_rating": round(avg_rating or 0, 2),
             "rating_distribution": rating_distribution,
-            "recent_feedback": feedback_with_users
+            "feedback": feedback_with_users,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit
+            }
         }
         
     except Exception as e:

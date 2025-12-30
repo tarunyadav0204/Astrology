@@ -39,7 +39,7 @@ const DashaProgress = ({ percentage }) => (
   </View>
 );
 
-const YoginiCard = ({ item, isCurrent, isExpanded, onPress }) => {
+const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha }) => {
   const config = YOGINI_CONFIG[item.name] || YOGINI_CONFIG['Mangala'];
   
   return (
@@ -65,7 +65,7 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress }) => {
             </View>
             <View>
               <Text style={styles.yoginiName}>{item.name}</Text>
-              <Text style={styles.yoginiLord}>{item.lord} • {item.years} Years</Text>
+              <Text style={styles.yoginiLord}>{item.lord}</Text>
             </View>
           </View>
 
@@ -91,21 +91,34 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress }) => {
       {/* Expanded Sub-Periods (Antardasha) */}
       {isExpanded && item.sub_periods && (
         <View style={styles.subList}>
-          {item.sub_periods.map((sub, idx) => (
-            <View key={idx} style={styles.subItem}>
-              <View style={styles.subTimelineLine} />
-              <View style={[styles.subDot, { backgroundColor: YOGINI_CONFIG[sub.name]?.color[0] || '#ccc' }]} />
-              
-              <View style={styles.subContent}>
-                <Text style={styles.subName}>{sub.name} ({sub.lord})</Text>
-                <Text style={styles.subDates}>{formatDate(sub.start)} - {formatDate(sub.end)}</Text>
+          {item.sub_periods.map((sub, idx) => {
+            const now = new Date();
+            const subStart = new Date(sub.start);
+            const subEnd = new Date(sub.end);
+            const isCurrentAntar = now >= subStart && now <= subEnd;
+            
+            return (
+              <View key={idx} style={[styles.subItem, isCurrentAntar && styles.currentSubItem]}>
+                <View style={styles.subTimelineLine} />
+                <View style={[styles.subDot, { backgroundColor: YOGINI_CONFIG[sub.name]?.color[0] || '#ccc' }]} />
+                
+                <View style={styles.subContent}>
+                  <Text style={[styles.subName, isCurrentAntar && styles.currentSubName]}>{sub.name} ({sub.lord})</Text>
+                  <Text style={[styles.subDates, isCurrentAntar && styles.currentSubDates]}>{formatDate(sub.start)} - {formatDate(sub.end)}</Text>
+                </View>
+                
+                <Text style={[styles.subVibe, { color: YOGINI_CONFIG[sub.name]?.color[0] || '#888' }, isCurrentAntar && styles.currentSubVibe]}>
+                  {YOGINI_CONFIG[sub.name]?.label}
+                </Text>
+                
+                {isCurrentAntar && (
+                  <View style={styles.currentAntarIndicator}>
+                    <Text style={styles.currentAntarText}>Current</Text>
+                  </View>
+                )}
               </View>
-              
-              <Text style={[styles.subVibe, { color: YOGINI_CONFIG[sub.name]?.color[0] || '#888' }]}>
-                {YOGINI_CONFIG[sub.name]?.label}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -115,9 +128,14 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress }) => {
 // --- MAIN COMPONENT ---
 
 export default function YoginiDashaTab({ data }) {
+  console.log('YoginiDashaTab received data:', JSON.stringify(data, null, 2));
+  
   // Find current period index (safe with optional chaining)
   const currentIndex = React.useMemo(() => {
-    if (!data?.timeline) return -1;
+    if (!data?.timeline) {
+      console.log('No timeline in data:', data);
+      return -1;
+    }
     return data.timeline.findIndex(item => 
       item.name === data.current.mahadasha.name && 
       item.start === data.current.mahadasha.start && 
@@ -140,6 +158,17 @@ export default function YoginiDashaTab({ data }) {
     return (
       <View style={styles.container}>
         <Text style={styles.loadingText}>Loading Yogini Dasha data...</Text>
+      </View>
+    );
+  }
+
+  // Check if data has the expected structure
+  if (!data.timeline || !data.current) {
+    console.log('Data missing expected structure. Available keys:', Object.keys(data));
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Data structure error. Check console for details.</Text>
+        <Text style={styles.loadingText}>Available keys: {Object.keys(data).join(', ')}</Text>
       </View>
     );
   }
@@ -231,6 +260,7 @@ export default function YoginiDashaTab({ data }) {
               isCurrent={isCurrent}
               isExpanded={isExpanded}
               onPress={() => handlePress(index)}
+              currentAntardasha={data.current.antardasha}
             />
           );
         })}
@@ -482,11 +512,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    height: 40,
+    minHeight: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  currentSubItem: {
+    backgroundColor: '#f8f0ff',
+    borderWidth: 1,
+    borderColor: '#8E2DE2',
   },
   subTimelineLine: {
     position: 'absolute',
-    left: 7,
+    left: 15,
     top: 0,
     bottom: -16, // Connect to next
     width: 2,
@@ -512,13 +550,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  currentSubName: {
+    color: '#8E2DE2',
+    fontWeight: '700',
+  },
   subDates: {
     fontSize: 11,
     color: '#999',
   },
+  currentSubDates: {
+    color: '#8E2DE2',
+    fontWeight: '600',
+  },
   subVibe: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  currentSubVibe: {
+    fontWeight: '700',
+  },
+  currentAntarIndicator: {
+    backgroundColor: '#8E2DE2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  currentAntarText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   loadingText: {
     fontSize: 16,

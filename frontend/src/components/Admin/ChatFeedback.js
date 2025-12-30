@@ -6,6 +6,10 @@ const ChatFeedback = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({});
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchRating, setSearchRating] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ username: '', rating: '' });
 
   useEffect(() => {
     // Check if user is admin
@@ -17,61 +21,69 @@ const ChatFeedback = () => {
     }
     
     fetchFeedbacks();
-    fetchStats();
-  }, []);
+  }, [pagination.page, appliedFilters]);
 
   const fetchFeedbacks = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
-      console.log('Fetching feedback with token:', token ? 'Present' : 'Missing');
       
-      const response = await fetch('/api/chat/feedback/stats', {
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
+      });
+      
+      if (appliedFilters.username.trim()) {
+        params.append('username', appliedFilters.username.trim());
+      }
+      
+      if (appliedFilters.rating) {
+        params.append('rating', appliedFilters.rating);
+      }
+      
+      const response = await fetch(`/api/chat/feedback/stats?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      console.log('Feedback response status:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('Feedback data received:', data);
-        setFeedbacks(data.recent_feedback || []);
+        setFeedbacks(data.feedback || []);
+        setStats({
+          total_feedback: data.total_feedback,
+          average_rating: data.average_rating,
+          rating_distribution: data.rating_distribution
+        });
+        setPagination(prev => ({
+          ...prev,
+          total: data.pagination.total,
+          pages: data.pagination.pages
+        }));
       } else {
-        const errorText = await response.text();
-        console.error('Feedback fetch failed:', response.status, errorText);
         setError(`Failed to fetch feedback data: ${response.status} ${response.statusText}`);
       }
     } catch (err) {
-      console.error('Error fetching feedback data:', err);
-      if (err.response) {
-        console.error('Response status:', err.response.status);
-        console.error('Response data:', err.response.data);
-        setError(`Failed to fetch feedback data: ${err.response.status} ${err.response.statusText}`);
-      } else {
-        setError('Error loading feedback data: ' + err.message);
-      }
+      setError('Error loading feedback data: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/chat/feedback/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      }
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handleSearch = () => {
+    setAppliedFilters({ username: searchUsername, rating: searchRating });
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const clearFilters = () => {
+    setSearchUsername('');
+    setSearchRating('');
+    setAppliedFilters({ username: '', rating: '' });
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const renderStars = (rating) => {
@@ -82,7 +94,7 @@ const ChatFeedback = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  if (loading) return <div className="loading">Loading feedback data...</div>;
+  if (loading && pagination.page === 1) return <div className="loading">Loading feedback data...</div>;
   if (error) return <div className="error">{error}</div>;
 
   return (
@@ -111,8 +123,40 @@ const ChatFeedback = () => {
         </div>
       </div>
 
+      <div className="feedback-filters">
+        <div className="filter-group">
+          <input
+            type="text"
+            placeholder="Search by username..."
+            value={searchUsername}
+            onChange={(e) => setSearchUsername(e.target.value)}
+            className="search-input"
+          />
+          <select
+            value={searchRating}
+            onChange={(e) => setSearchRating(e.target.value)}
+            className="rating-filter"
+          >
+            <option value="">All Ratings</option>
+            <option value="5">5 Stars</option>
+            <option value="4">4 Stars</option>
+            <option value="3">3 Stars</option>
+            <option value="2">2 Stars</option>
+            <option value="1">1 Star</option>
+          </select>
+          <button onClick={handleSearch} className="search-btn">Search</button>
+          <button onClick={clearFilters} className="clear-btn">Clear</button>
+        </div>
+      </div>
+
       <div className="feedback-table-container">
-        <h3>Recent Feedback</h3>
+        <div className="table-header">
+          <h3>Feedback Results</h3>
+          <div className="pagination-info">
+            Showing {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+          </div>
+        </div>
+        
         <table className="feedback-table">
           <thead>
             <tr>
@@ -144,6 +188,44 @@ const ChatFeedback = () => {
             )}
           </tbody>
         </table>
+
+        {pagination.pages > 1 && (
+          <div className="pagination">
+            <button 
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className="page-btn"
+            >
+              Previous
+            </button>
+            
+            {[...Array(pagination.pages)].map((_, i) => {
+              const page = i + 1;
+              if (page === 1 || page === pagination.pages || (page >= pagination.page - 2 && page <= pagination.page + 2)) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={`page-btn ${page === pagination.page ? 'active' : ''}`}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (page === pagination.page - 3 || page === pagination.page + 3) {
+                return <span key={page} className="page-ellipsis">...</span>;
+              }
+              return null;
+            })}
+            
+            <button 
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.pages}
+              className="page-btn"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
