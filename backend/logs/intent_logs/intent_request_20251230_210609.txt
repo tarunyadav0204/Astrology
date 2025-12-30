@@ -1,0 +1,208 @@
+INTENT ROUTER REQUEST
+Timestamp: 2025-12-30T21:06:09.683666
+Question: What are my strengths and weaknesses?
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 27451 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: career direction
+A: What are my strengths and weaknesses?
+Q: What does my birth chart say about my career?
+A: <div class="quick-answer-card">The current period, marked by your <term id="saturn">Saturn</term>-<term id="rahu">Rahu</term> <term id="vimshottari">Vimshottari</term> <term id="dasha">Dasha</term> and active <term id="aquarius">Aquarius</term> <term id="chara">Chara</term> <term id="dasha">Dasha</term>, indicates a highly transformative phase for your career. Specifically, expect a period of intense learning and communication mastery starting **January 2025** due to <term id="saturn">Saturn</term> activating your natal <term id="mercury">Mercury</term>, followed by a significant rise in authority and leadership starting **April 2025** as <term id="saturn">Saturn</term> triggers your natal <term id="sun">Sun</term>. This culminates in structured growth and wealth expansion from **November 2026 through November 2027**, propelled by <term id="jupiter">Jupiter</term>'s activation of key <term id="planets">planets</term> in your <term id="2ndhouse">2nd house</term>. However, your <term id="d9">D9</term> <term id="navamsa">Navamsa</term> shows exceptional inner resilience and strong drive for success, ensuring these challenges lead to substantial achievements. To maximize these opportunities, focus on disciplined communication, acquiring new skills, and proactively seeking leadership roles.</div>
+
+### Key Insights
+*   **Transformative Career Path (2025-2027):** You are entering a multi-year period of significant career shifts, marked by intense learning and a rise in authority, especially from **January 2025** through **November 2027**.
+*   **Wealth & Leadership Potential:** Your <term id="d1">D1</term> <term id="10thlord">10th lord</term> <term id="mars">Mars</term> with <term id="jupiter">Jupiter</term>, <term id="saturn">Saturn</term>, and <term id="rahu">Rahu</term> in the <term id="2ndhouse">2nd house</term> signifies a career strongly tied to wealth generation, respected positions, and potentially foreign or innovative ventures.
+*   **Strong Foundation in Dasamsa (D10):** Your <term id="d10">D10</term> <term id="dasamsa">Dasamsa</term> shows an exalted <term id="mercury">Mercury</term> in the <term id="10thhouse">10th house</term>, pointing to high intellectual capacity, strong analytical skills, and success in communication-heavy or technical fields.
+*   **The Jaimini/Yogini Confirmation:** The current <term id="chara">Chara</term> <term id="dasha">Dasha</term> of <term id="aquarius">Aquarius</term> (until April 2026) activates your <term id="8thhouse">8th house</term> of transformation, and the subsequent <term id="capricorn">Capricorn</term> period (until April 2031) focuses on structured growth. This is further aligned by <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) <term id="yogini">Yogini</term> (<term id="grief">grief</term>, <term id="fear">fear</term>, <term id="suddenloss">sudden loss</term>) until July 2026, indicating hard work, followed by <term id="siddha">Siddha</term> (<term id="venus">Venus</term>) <term id="yogini">Yogini</term> (<term id="success">success</term>, <term id="luxury">luxury</term>, <term id="romance">romance</term>, <term id="knowledge">knowledge</term>) until June 2027, promising smoother success.
+
+### Astrological Analysis
+
+**1. The Promise (Chart Analysis)**
+Your <term id="ascendant">Ascendant</term> in <term id="cancer">Cancer</term> makes <term id="moon">Moon</term> your <term id="lagnalord">Lagna Lord</term>. For career, we examine the <term id="10thhouse">10th house</term> and its <term id="lord">lord</term>, <term id="saturn">Saturn</term> (natural <term id="karaka">Karaka</term> for career), and the <term id="d10">D10</term> <term id="dasamsa">Dasamsa</term>.
+Your <term id="10thhouse">10th house</term> in the <term id="d1">D1</term> <term id="rashi">Rashi</term> chart is <term id="aries">Aries</term>, ruled by <term id="mars">Mars</term>. <term id="mars">Mars</term> is powerfully placed in the <term id="2ndhouse">2nd house</term> (<term id="leo">Leo</term>) conjunct with <term id="jupiter">Jupiter</term>, <term id="saturn">Saturn</term>, and <term id="rahu">Rahu</term>. This stellium in the <term id="houseofwealth">house of wealth</term> indicates that your career will be a significant source of income and will involve roles where you command authority and respect.
+The conjunction of <term id="10thlord">10th lord</term> <term id="mars">Mars</term> with <term id="saturn">Saturn</term> creates a <term id="shanikarmayoga">Śani-Karma Yoga</term>, signifying a structured, responsible, and diligent approach to work. Your career may involve engineering, technology, management, or leadership in fields demanding technical precision and strategic thinking. The <term id="dharmakarmayoga">Dharma-Karma Yoga</term> (Jupiter-Mars) suggests a career path aligned with righteous principles, bringing auspicious success. The <term id="gurumangalyoga">Guru-Mangal Yoga</term> (Jupiter-Mars) further enhances your aptitude for technical and scientific learning, pointing to intellectual and specialized professional pursuits.
+The <term id="d10">D10</term> <term id="dasamsa">Dasamsa</term> is crucial for professional analysis. Your <term id="d10">D10</term> <term id="ascendant">Ascendant</term> is <term id="sagittarius">Sagittarius</term>. The <term id="10thhouse">10th house</term> of <term id="d10">D10</term> is <term id="virgo">Virgo</term>, which is ruled by <term id="mercury">Mercury</term>. Here, <term id="mercury">Mercury</term> is **exalted** in <term id="virgo">Virgo</term>, forming a powerful <term id="bhadrayoga">Bhadra Yoga</term> (a type of <term id="panchamahapurusha">Pancha Mahapurusha</term> Yoga if <term id="mercury">Mercury</term> is in <term id="kendra">Kendra</term> in <term id="d1">D1</term>, though not explicitly listed as such in this JSON). This placement confirms exceptional intelligence, analytical skills, and strong communication abilities. With <term id="rahu">Rahu</term> also in the <term id="10thhouse">10th house</term> of <term id="d10">D10</term>, your career is likely to involve advanced technology, foreign associations, or unconventional, cutting-edge fields. The exalted <term id="mercury">Mercury</term> in <term id="d10">D10</term> is a prime indicator of high professional distinction and intellectual mastery.
+
+**2. The Master Clock (Vimshottari)**
+You are currently in your <term id="saturn">Saturn</term> <term id="mahadasha">Mahadasha</term> (active until November 2030), with the <term id="antardasha">Antardasha</term> of <term id="rahu">Rahu</term> (June 2025 to May 2028).
+<term id="saturn">Saturn</term> as your <term id="atmakaraka">Atmakaraka</term> and <term id="7thlord">7th lord</term> and <term id="8thlord">8th lord</term> is in your <term id="2ndhouse">2nd house</term> (<term id="leo">Leo</term>). <term id="rahu">Rahu</term> is also in the <term id="2ndhouse">2nd house</term> with <term id="saturn">Saturn</term>. This period is highly significant for transformation and growth related to wealth, family, and public image. The influence of <term id="rahu">Rahu</term> suggests that gains and changes may come through unconventional means, foreign connections, or innovative approaches. It's a period that demands discipline and hard work but promises substantial rewards and a clear focus on long-term goals.
+
+**3. Timing Synthesis (Multi-System)**
+This timing is confirmed by the **Aquarius** <term id="chara">Chara</term> <term id="dasha">Dasha</term> (active until April 2026) and **Ulka** (<term id="saturn">Saturn</term>) <term id="yogini">Yogini</term> (until July 2026), creating a period of intensive effort and karmic transformation in your career. The <term id="aquarius">Aquarius</term> <term id="chara">Chara</term> <term id="dasha">Dasha</term> activates your <term id="8thhouse">8th house</term>, which houses your <term id="amatyakaraka">Amatyakaraka</term> <term id="mercury">Mercury</term>, indicating a period of profound research, discovery, or engagement with hidden aspects of your profession.
+Following this, the **Capricorn** <term id="chara">Chara</term> <term id="dasha">Dasha</term> (from April 2026 to April 2031) and **Siddha** (<term id="venus">Venus</term>) <term id="yogini">Yogini</term> (from July 2026 to June 2027) will bring about more auspiciousness, ease, and significant success in partnerships and public life, leading to the full manifestation of your career aspirations.
+
+**4. The Triple Perspective (Sudarshana)**
+Your career potential from three perspectives:
+-   **From <term id="lagna">Lagna</term> (<term id="cancer">Cancer</term>):** The <term id="10thhouse">10th house</term> is <term id="aries">Aries</term>, ruled by <term id="mars">Mars</term>, situated in the <term id="2ndhouse">2nd house</term> with <term id="jupiter">Jupiter</term>, <term id="saturn">Saturn</term>, and <term id="rahu">Rahu</term>. This indicates a career driven by ambition and a strong desire for wealth and influence, demanding significant effort but promising financial gains and respect.
+-   **From <term id="chandra">Chandra</term> <term id="lagna">Lagna</term> (<term id="moon">Moon</term> in <term id="libra">Libra</term>):** The <term id="10thhouse">10th house</term> from <term id="moon">Moon</term> is <term id="cancer">Cancer</term>, ruled by <term id="moon">Moon</term> itself, positioned in the <term id="4thhouse">4th house</term> from your <term id="lagna">Lagna</term>. This suggests a career deeply connected to your emotional well-being and possibly involving public interaction, nurturing, or establishing a strong base. It reflects a desire for a stable and fulfilling work life.
+-   **From <term id="surya">Surya</term> <term id="lagna">Lagna</term> (<term id="sun">Sun</term> in <term id="pisces">Pisces</term>):** The <term id="10thhouse">10th house</term> from <term id="sun">Sun</term> is <term id="sagittarius">Sagittarius</term>, ruled by <term id="jupiter">Jupiter</term>, which is in the <term id="2ndhouse">2nd house</term> from your <term id="lagna">Lagna</term>. This perspective emphasizes a career path that brings authority, wisdom, and recognition, often in advisory, teaching, or leadership roles where your knowledge is highly valued.
+
+Since this strong career potential appears in **3 out of 3 charts** (<term id="lagna">Lagna</term>/<term id="moon">Moon</term>/<term id="sun">Sun</term>), the confidence level is 95% - expect a major life milestone in your professional journey.
+
+**5. Nadi Precision (The Nature of Career)**
+Your chart reveals specific <term id="nadi">Nadi</term> connections that define the exact nature of your career. While explicit <term id="nadi">Nadi</term> links for Saturn are not provided in the data, the placement of <term id="saturn">Saturn</term> (the <term id="karaka">Karaka</term> for career) with <term id="mars">Mars</term> and <term id="jupiter">Jupiter</term> in <term id="leo">Leo</term> in the <term id="2ndhouse">2nd house</term> suggests a career path demanding significant technical skill, leadership, and a strong sense of purpose. This combination would typically indicate success in managing large projects, technical innovation, or roles that require both strategic vision and practical implementation.
+
+**6. The Micro-Timing (Yogini Confirmation)**
+Your <term id="vimshottari">Vimshottari</term> <term id="dasha">Dasha</term> of <term id="saturn">Saturn</term>-<term id="rahu">Rahu</term> points to significant career changes and growth, potentially through unconventional means. This is further nuanced by the <term id="yogini">Yogini</term> <term id="dasha">Dasha</term>. The current <term id="bhadrika">Bhadrika</term> (<term id="mercury">Mercury</term>) <term id="mahadasha">Mahadasha</term> (until Dec 2029) is generally auspicious for career growth and social status. However, the <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) <term id="antardasha">Antardasha</term> (until July 2026) indicates a period requiring intense hard work, discipline, and perhaps dealing with sudden shifts or increased responsibilities. Following this, the <term id="siddha">Siddha</term> (<term id="venus">Venus</term>) <term id="antardasha">Antardasha</term> (July 2026 to June 2027) promises smoother sailing, with success, auspiciousness, and ease, indicating that your hard work will pay off, leading to recognition and potential luxury.
+
+**7. The Synthesis (D1 vs. D9)**
+Your <term id="d1">D1</term> chart shows a formidable planetary grouping in your <term id="2ndhouse">2nd house</term>, including your <term id="10thlord">10th lord</term> <term id="mars">Mars</term>, <term id="jupiter">Jupiter</term>, <term id="saturn">Saturn</term>, and <term id="rahu">Rahu</term>. While this promises a powerful career focused on wealth and authority, the presence of multiple <term id="planets">planets</term> in <term id="planetarywars">planetary wars</term> (especially <term id="mercury">Mercury</term> and <term id="saturn">Saturn</term> being prominent losers) in the initial years might have presented internal conflicts or challenges in expressing these energies smoothly. However, your <term id="d9">D9</term> <term id="navamsa">Navamsa</term> provides strong internal support. Your <term id="10thlord">10th lord</term> <term id="mars">Mars</term> is in its own sign <term id="aries">Aries</term> in the <term id="d9">D9</term> <term id="2ndhouse">2nd house</term>, signifying immense inner strength, courage, and self-reliance to overcome obstacles and achieve financial success. This combination of strong <term id="d1">D1</term> potential with robust <term id="d9">D9</term> strength means that any initial struggles or periods of intense effort will ultimately lead to enduring success and personal fulfillment in your professional life.
+
+**8. Karmic Triggers (Progressive Nadi Transits)**
+This period from 2025 to 2027 is a highly activated karmic phase for your career:
+-   **Saturn triggers natal Mercury - Communication Mastery:** From **January 2025** for 2.5 years, <term id="saturn">Saturn</term> will trigger your natal <term id="mercury">Mercury</term> in the <term id="8thhouse">8th house</term>. This is a period of intense learning, deep research, and mastering complex communication. Expect significant developments in writing, public speaking, or specialized technical communication, permanently altering your intellectual and professional approach.
+-   **Saturn triggers natal Sun - Authority Transformation:** From **April 2025** for 2.5 years, <term id="saturn">Saturn</term> will trigger your natal <term id="sun">Sun</term> in the <term id="9thhouse">9th house</term>. This is a potent period for significant transformation in your authority, leadership roles, and public image. You may experience a shift in your position, take on greater responsibilities, or redefine your relationship with mentors and higher management.
+-   **Jupiter triggers natal Mars, Jupiter, Saturn - Structured Growth:** From **November 2026 to November 2027**, <term id="jupiter">Jupiter</term> will trigger your natal <term id="mars">Mars</term>, <term id="jupiter">Jupiter</term>, and <term id="saturn">Saturn</term> in the <term id="2ndhouse">2nd house</term>. This alignment indicates a year of structured growth, righteous action, and significant expansion in wealth, responsibilities, and influence. It is a period where your efforts will yield substantial material and professional benefits.
+
+### Nakshatra Insights
+Your <term id="birth">birth</term> <term id="nakshatra">Nakshatra</term> is <term id="swati">Swati</term> (<term id="libra">Libra</term> <term id="moon">Moon</term>). <term id="swati">Swati</term> is associated with independence, diplomacy, business acumen, and a desire for freedom. This <term id="nakshatra">Nakshatra</term> often grants natives the ability to adapt and achieve success through their own efforts, especially in fields requiring negotiation or trade. Your career will likely reflect these qualities, emphasizing self-reliance and the pursuit of harmonious yet ambitious goals. The ruling <term id="planet">planet</term> of <term id="swati">Swati</term> is <term id="rahu">Rahu</term>, which is currently active in your <term id="antardasha">Antardasha</term> and conjunct with your <term id="10thlord">10th lord</term> <term id="mars">Mars</term>, <term id="jupiter">Jupiter</term>, and <term id="saturn">Saturn</term> in the <term id="2ndhouse">2nd house</term>. This reinforces themes of unconventional success, foreign connections, and a strong drive for material prosperity within your professional life.
+
+### Practical Guidance
+*   **Embrace Specialization:** With an exalted <term id="mercury">Mercury</term> in your <term id="d10">D10</term> <term id="10thhouse">10th house</term>, focusing on highly specialized technical, analytical, or research-intensive fields will bring the greatest rewards.
+*   **Strategic Communication:** The <term id="saturn">Saturn</term>-<term id="mercury">Mercury</term> <term id="karmic">Karmic</term> <term id="trigger">trigger</term> (Jan 2025 onwards) highlights the importance of communication. Develop your writing, presentation, and negotiation skills to a mastery level.
+*   **Leadership & Authority:** Prepare for a rise in leadership and authority from April 2025. Be proactive in taking on new responsibilities and leading initiatives. This period will demand discipline but offer significant recognition.
+*   **Navigate Challenges with Discipline:** The period until mid-2026, especially under the <term id="ulka">Ulka</term> <term id="yogini">Yogini</term>, will require hard work and persistence. See this as a foundational period for future gains.
+*   **Financial Foresight:** Your <term id="2ndhouse">2nd house</term> is very strong for wealth. Plan your investments wisely, especially from November 2026 to November 2027, when <term id="jupiter">Jupiter</term> triggers multiple <term id="planets">planets</term> there, indicating significant financial expansion.
+
+<div class="final-thoughts-card">Your chart indicates a powerful and intellectually driven career path destined for significant authority, wealth, and recognition. The next two to three years (2025-2027) will be particularly transformative, demanding dedicated effort but promising substantial rewards and a clear ascent in your professional life. By focusing on your strengths in specialized knowledge and communication, you are well-positioned for exceptional success.</div>
+
+
+<div class="follow-up-questions">
+📅 When will this happen?
+🔮 What remedies can help?
+💼 How to maximize success?
+🌟 What should I focus on?
+</div>
+
+        
+        Current question: "What are my strengths and weaknesses?"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2026, endYear: 2026
+        - For general timing questions without specific year, use startYear: 2025, endYear: 2027
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2025, endYear: 2027 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

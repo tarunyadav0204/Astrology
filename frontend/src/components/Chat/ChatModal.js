@@ -384,7 +384,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 messageId: msg.message_id, // Add messageId from database
                                 isFromDatabase: true, // Mark as from database
                                 terms: msg.terms || [],
-                                glossary: msg.glossary || {}
+                                glossary: msg.glossary || {},
+                                message_type: msg.message_type || 'answer'
                             };
                             
                             console.log('📜 Loaded message:', { id: msg.message_id, sender: msg.sender, hasContent: !!msg.content });
@@ -636,7 +637,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                         return;
                     }
                     
-                    // Replace processing message with actual response including terms and glossary
+                    // Replace processing message with actual response including terms, glossary, and message_type
                     setMessages(prev => prev.map(msg => 
                         msg.messageId === messageId 
                             ? { 
@@ -644,7 +645,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 content: status.content, 
                                 isProcessing: false,
                                 terms: status.terms || [],
-                                glossary: status.glossary || {}
+                                glossary: status.glossary || {},
+                                message_type: status.message_type || 'answer'
                             }
                             : msg
                     ));

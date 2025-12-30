@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
+import ChatFeedback from './ChatFeedback';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
@@ -448,6 +449,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Credits
         </button>
+        <button 
+          className={`tab ${activeTab === 'analysis' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('analysis');
+            setActiveSubTab('feedback');
+          }}
+        >
+          Analysis
+        </button>
       </div>
 
       {/* Credit Sub-tabs */}
@@ -470,6 +480,18 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('requests')}
           >
             Requests
+          </button>
+        </div>
+      )}
+
+      {/* Analysis Sub-tabs */}
+      {activeTab === 'analysis' && (
+        <div className="admin-subtabs">
+          <button 
+            className={`subtab ${activeSubTab === 'feedback' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('feedback')}
+          >
+            Chat Feedback
           </button>
         </div>
       )}
@@ -969,6 +991,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'analysis' && activeSubTab === 'feedback' && (
+          <ChatFeedback />
         )}
       </div>
       </div>

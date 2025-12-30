@@ -43,6 +43,7 @@ from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
 from wealth.wealth_routes import router as wealth_router
 from chat.chat_routes import router as chat_router
+from chat.feedback_routes import router as chat_feedback_router
 from nakshatra.nakshatra_routes import router as nakshatra_router
 from festivals.routes import router as festivals_router
 from chat_history.routes import router as chat_history_router, init_chat_tables
@@ -226,6 +227,7 @@ app.include_router(charts_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(chat_feedback_router, prefix="/api")
 app.include_router(nakshatra_router, prefix="/api")
 app.include_router(festivals_router, prefix="/api")
 app.include_router(chat_history_router, prefix="/api")

@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 
 import MessageBubble from './MessageBubble';
+import FeedbackComponent from './FeedbackComponent';
 import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
@@ -842,7 +843,7 @@ export default function ChatScreen({ navigation, route }) {
           
           if (loadingInterval) clearInterval(loadingInterval);
           
-          // Update message with response content including terms and glossary
+          // Update message with response content including terms, glossary, and message_type
           setMessagesWithStorage(prev => {
             const updated = prev.map(msg => 
               msg.messageId === messageId 
@@ -851,7 +852,8 @@ export default function ChatScreen({ navigation, route }) {
                     content: status.content || 'Response received but content is empty', 
                     isTyping: false,
                     terms: status.terms || [],
-                    glossary: status.glossary || {}
+                    glossary: status.glossary || {},
+                    message_type: status.message_type || 'answer'
                   }
                 : msg
             );
@@ -1547,8 +1549,16 @@ export default function ChatScreen({ navigation, route }) {
             {messages.map((item, index) => {
               const isLastMessage = index === messages.length - 1;
               return (
-                <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
-                  <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} />
+                <View key={item.id}>
+                  <View ref={isLastMessage ? lastMessageRef : null}>
+                    <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} />
+                  </View>
+                  <FeedbackComponent 
+                    message={item} 
+                    onFeedbackSubmitted={(messageId, rating) => {
+                      console.log('Feedback submitted:', messageId, rating);
+                    }}
+                  />
                 </View>
               );
             })}

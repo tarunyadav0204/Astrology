@@ -1151,7 +1151,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   clarificationBubble: {
-    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderLeftWidth: 3,
     borderLeftColor: '#FFA726',
     borderWidth: 1,

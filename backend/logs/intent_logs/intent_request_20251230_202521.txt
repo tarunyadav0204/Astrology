@@ -1,0 +1,203 @@
+INTENT ROUTER REQUEST
+Timestamp: 2025-12-30T20:25:21.473046
+Question: I am married. I want to know about relationship in 2026
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 26460 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: When is a good time for marriage?
+A: I am married. I want to know about relationship in 2026
+Q: career direction
+A: I'd be happy to analyze your marriage prospects! Are you currently married, engaged, or looking for marriage? And what aspect concerns you most - timing, compatibility, challenges, or harmony?
+Q: What does my birth chart say about my career?
+A: <div class="quick-answer-card">**Quick Answer**: The current <term id="saturn">Saturn</term> <term id="mahadasha">Mahadasha</term> and <term id="rahu">Rahu</term> <term id="antardasha">Antardasha</term> (ending **July 6, 2026**), combined with the <term id="aquarius">Aquarius</term> <term id="chara_dasha">Chara Dasha</term> and <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) <term id="yogini_dasha">Yogini Dasha</term>, indicates a phase of significant workload and transformation in your Software Development Manager role, aligning with navigating new product teams at Amazon. Specifically, expect a period of intense focus on overcoming challenges and implementing new strategies until **mid-2026**, leading to clear growth. However, your <term id="d9">D9 Navamsa</term> and <term id="d10">D10 Dasamsa</term> show strong underlying professional capability, exceptional technical acumen, and eventual authority, ensuring success through these demanding times. Focus on leveraging your deep technical expertise, enhancing strategic communication, and embracing the new product development landscape to turn obstacles into distinct growth opportunities.</div>
+
+### Key Insights
+*   **Transformative Career Period (Until July 2026):** Your current <term id="saturn">Saturn</term>-<term id="rahu">Rahu</term> <term id="vimshottari_dasha">Vimshottari Dasha</term> and the concurrent <term id="aquarius">Aquarius</term> <term id="chara_dasha">Chara Dasha</term> (until April 2026), coupled with the challenging <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) <term id="yogini_dasha">Yogini Dasha</term>, signifies a period of immense effort, high pressure, and significant, often forced, professional changes. This aligns with navigating new product teams and demanding managerial responsibilities.
+*   **Exceptional Technical Aptitude & Leadership:** Your <term id="d10">D10 Dasamsa</term> features an exalted <term id="mercury">Mercury</term> in the <term id="10thhouse">10th house</term> with <term id="rahu">Rahu</term>, strongly confirming your role as a Software Development Manager, indicating sharp intellect, technical mastery, and the ability to innovate in cutting-edge, unconventional areas.
+*   **Growth Through Challenge (Benefic Dasha, Difficult Yogini):** Despite the stress and heavy workload indicated by the <term id="ulka">Ulka Yogini Dasha</term>, the overarching <term id="bhadrika">Bhadrika</term> (<term id="mercury">Mercury</term>) <term id="yogini_dasha">Yogini Mahadasha</term> promises career growth, expanded network, and enhanced social status, suggesting that the current challenges will ultimately lead to positive professional advancement.
+*   **The Jaimini/Yogini Confirmation:** The current <term id="aquarius">Aquarius</term> <term id="chara_dasha">Chara Dasha</term> activates your <term id="8thhouse">8th house</term> of transformation, confirming deep, fundamental shifts. This is further nuanced by the <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) <term id="yogini_dasha">Yogini Antardasha</term>, which brings a vibe of intense labor and karmic lessons that ultimately fuel career growth promised by the <term id="bhadrika">Bhadrika Mahadasha</term>.
+
+### Astrological Analysis
+
+**The Promise (Chart Analysis)**
+Your <term id="ascendant">Ascendant</term> is <term id="cancer">Cancer</term>, making <term id="moon">Moon</term> your <term id="lagnalord">Lagna Lord</term>. The <term id="10thhouse">10th house</term> of <term id="career">career</term> is <term id="aries">Aries</term>, ruled by <term id="mars">Mars</term>. <term id="mars">Mars</term> is placed in the <term id="2ndhouse">2nd house</term> (of wealth, family, speech) in <term id="leo">Leo</term> along with <term id="jupiter">Jupiter</term> (9th <term id="lord">lord</term>), <term id="saturn">Saturn</term> (7th and 8th <term id="lord">lord</term>), and <term id="rahu">Rahu</term>. This powerful conjunction in the <term id="2ndhouse">2nd house</term> (<term id="dhanabhava">Dhana Bhava</term>) indicates a career deeply intertwined with wealth creation, family responsibilities, and impactful communication. The presence of <term id="mars">Mars</term> (<term id="10thlord">10th lord</term>) and <term id="jupiter">Jupiter</term> (<term id="9thlord">9th lord</term>) forms a significant <term id="dharmakarmadhipati_yoga">Dharma Karmadhipati Yoga</term>, promising success, reputation, and ethical career growth. However, the sheer number of planets in this <term id="house">house</term>, especially with <term id="rahu">Rahu</term> and <term id="saturn">Saturn</term>, suggests that this success comes with immense hard work, occasional conflicts, and periods of stress, as further evidenced by multiple <term id="planetary_wars">planetary wars</term> involving <term id="mars">Mars</term> and <term id="mercury">Mercury</term>. Your <term id="amatyakaraka">Amatyakaraka</term> <term id="mercury">Mercury</term> (career significator) is in <term id="aquarius">Aquarius</term> in the <term id="8thhouse">8th house</term>, signifying a career involving research, hidden knowledge, transformation, and possibly large organizations or foreign connections (Rahu-like qualities of Aquarius). This <term id="8thhouse">8th house</term> placement also means you delve into complex, often behind-the-scenes aspects of your work.
+
+**The Master Clock (Vimshottari)**
+You are currently in your <term id="saturn">Saturn</term> <term id="mahadasha">Mahadasha</term> (November 2011 - November 2030). <term id="saturn">Saturn</term> as the <term id="7th">7th</term> and <term id="8thlord">8th lord</term> from your <term id="cancer">Cancer Ascendant</term> sits in the <term id="2ndhouse">2nd house</term> with <term id="mars">Mars</term>, <term id="jupiter">Jupiter</term>, and <term id="rahu">Rahu</term>. This <term id="dasha">Dasha</term> period is highly significant for transformation, structured efforts, and navigating complex situations, which resonates with your role as a Software Development Manager. The current <term id="antardasha">Antardasha</term> is <term id="rahu">Rahu</term> (ending **July 6, 2026**). <term id="rahu">Rahu</term> is also in the <term id="2ndhouse">2nd house</term> with <term id="saturn">Saturn</term>. This combination often brings sudden, unconventional, or foreign-related opportunities and challenges, accelerating changes. This explains your current experience of "navigating new product teams" and significant workload, as it demands adaptability and strategic foresight.
+
+**Timing Synthesis (Multi-System)**
+This timing is confirmed by the <term id="aquarius">Aquarius</term> <term id="chara_dasha">Chara Dasha</term> (April 2020 - April 2026), which activates your <term id="8thhouse">8th House</term> of transformation and research, further emphasizing a period of deep professional shifts. Additionally, the <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) <term id="yogini">Yogini</term> <term id="antardasha">Antardasha</term> (September 2025 - July 2026) strongly indicates an period of intense labor, significant workload, and sudden, karmic changes. The combination of these systems points to a challenging yet highly productive period in your career, especially until mid-2026.
+
+**The Triple Perspective (Sudarshana)**
+Your career prospects are viewed from three critical perspectives:
+*   From your <term id="lagna">Lagna</term> (<term id="cancer">Cancer</term>), the <term id="10thhouse">10th house</term> (<term id="aries">Aries</term>) is activated by <term id="mars">Mars</term> in <term id="leo">Leo</term> (<term id="2ndhouse">2nd house</term>), indicating a career driven by ambition, action, and wealth accumulation, but also intense effort in the family/finance sector.
+*   From your <term id="chandralagna">Chandra Lagna</term> (<term id="moon">Moon</term> in <term id="libra">Libra</term>), the <term id="10thhouse">10th house</term> is <term id="cancer">Cancer</term>, with <term id="moon">Moon</term> (its ruler) in <term id="libra">Libra</term> (1st house from itself). This suggests a career deeply aligned with your emotional self and identity, possibly involving public interaction or a strong sense of personal connection to your work.
+*   From your <term id="suryalagna">Surya Lagna</term> (<term id="sun">Sun</term> in <term id="pisces">Pisces</term>), the <term id="10thhouse">10th house</term> is <term id="sagittarius">Sagittarius</term>, ruled by <term id="jupiter">Jupiter</term> (in <term id="leo">Leo</term>, <term id="6thhouse">6th house</term> from <term id="suryalagna">Surya Lagna</term>). This highlights a career path that involves overcoming challenges and continuous learning to achieve authority and wisdom.
+Since career appears significant and influenced by personal drive, emotional connection, and wisdom gained through overcoming obstacles in all 3 charts (<term id="lagna">Lagna</term>/<term id="moon">Moon</term>/<term id="sun">Sun</term>), the confidence level is 95% - expect a highly impactful and evolving career journey.
+
+**The Micro-Timing (Yogini Confirmation)**
+Your current <term id="yogini_dasha">Yogini Mahadasha</term> is <term id="bhadrika">Bhadrika</term> (<term id="mercury">Mercury</term>) from late 2024 to late 2029, which promises "Career Growth, Friends, Social Status." However, the current <term id="antardasha">Antardasha</term> is <term id="ulka">Ulka</term> (<term id="saturn">Saturn</term>) until July 2026, bringing a "Grief, Fear, Sudden Loss" vibe, which translates to intense labor and pressure. This creates a fascinating <term id="dasha_conflict">Dasha Conflict</term>: while your <term id="bhadrika">Bhadrika</term> <term id="dasha">Dasha</term> promises overall career growth, the <term id="ulka">Ulka</term> <term id="yogini">Yogini</term> indicates that this growth will come through significant stress, heavy workload, and potentially difficult, forced changes. It's a period where you earn your growth through sheer effort.
+
+**The Synthesis (D1 vs D9)**
+Your <term id="d1">D1</term> <term id="rashi">Rashi</term> chart shows a powerful yet complex configuration for career, with many planets in the <term id="2ndhouse">2nd house</term> indicating ambition and challenges. However, the <term id="d9">D9 Navamsa</term> provides strong confirmation and resilience. In <term id="d9">D9</term>, your <term id="ascendant">Ascendant</term> is <term id="pisces">Pisces</term>. The <term id="10thhouse">10th house</term> (<term id="sagittarius">Sagittarius</term>) contains <term id="sun">Sun</term>, <term id="moon">Moon</term>, and <term id="saturn">Saturn</term>, while <term id="10thlord">10th lord</term> <term id="jupiter">Jupiter</term> is well-placed in the <term id="4thhouse">4th house</term> in <term id="gemini">Gemini</term>. This indicates that despite any initial struggles or outward pressures (D1), your inner capacity and the final outcome for your career are strong, leading to authority, respect, and emotional fulfillment. Your <term id="10thlord">10th lord</term> <term id="mars">Mars</term> in <term id="d1">D1</term> is in its own sign of <term id="aries">Aries</term> in <term id="d9">D9</term>'s <term id="2ndhouse">2nd house</term>, further bolstering your inherent drive and capability. This means you are a fighter, capable of navigating and succeeding through challenges.
+
+**D10 Dasamsa (The Career Blueprint)**
+Your <term id="d10">D10 Dasamsa</term> is exceptionally strong for your career as a Software Development Manager. The <term id="d10">D10 Lagna</term> is <term id="sagittarius">Sagittarius</term>. The <term id="10thhouse">10th house</term> from <term id="d10">D10 Lagna</term> is <term id="virgo">Virgo</term>, where <term id="mercury">Mercury</term> is **exalted** and conjunct <term id="rahu">Rahu</term>. This is a phenomenal combination, indicating high intelligence, analytical prowess, strong communication skills, and an aptitude for modern, cutting-edge technology and unconventional solutions. This placement directly explains your success in software development and navigating new product teams at a global company like Amazon. The conjunction with <term id="rahu">Rahu</term> gives you an edge in innovation and working with foreign/large corporate structures.
+
+**Ashtakavarga Gatekeeper**
+Your <term id="10thhouse">10th house</term> (<term id="aries">Aries</term>) in <term id="d1">D1</term> has 29 <term id="bindus">bindus</term>, indicating consistent career progress and stable professional life. Your <term id="11thhouse">11th house</term> (<term id="taurus">Taurus</term>) has 31 <term id="bindus">bindus</term>, which is excellent for gains and networking, affirming strong income potential. However, your <term id="8thhouse">8th house</term> (<term id="aquarius">Aquarius</term>), where your <term id="amatyakaraka">Amatyakaraka</term> <term id="mercury">Mercury</term> is located, only has 22 <term id="bindus">bindus</term>. This suggests that while this period of transformation (8th house) is active and involves your career significator, the house itself lacks optimal strength to deliver benefits smoothly. Expect the changes and new team navigation to require more effort and bring more stress than anticipated, but with ultimate positive outcome due to other strong placements.
+
+### Nakshatra Insights
+Your <term id="moon">Moon</term> is in <term id="swati">Swati</term> <term id="nakshatra">Nakshatra</term> (ruled by <term id="rahu">Rahu</term>), giving you an independent, freedom-loving, and analytical mind, prone to unconventional paths and diplomatic solutions. This enhances your ability to manage diverse teams and navigate complex corporate dynamics. Your <term id="10thlord">10th Lord</term> <term id="mars">Mars</term> is in <term id="magha">Magha</term> <term id="nakshatra">Nakshatra</term> (ruled by <term id="ketu">Ketu</term>), which is associated with leadership, authority, and ancestral wisdom. This implies a powerful drive for status and recognition, often with a detached yet profound approach to leadership. Your <term id="amatyakaraka">Amatyakaraka</term> <term id="mercury">Mercury</term> is in <term id="purva_bhadrapada">Purva Bhadrapada</term> <term id="nakshatra">Nakshatra</term> (ruled by <term id="jupiter">Jupiter</term>), bestowing strong communication skills, an intellectual curiosity, and a focus on solving deeper, complex problems, which is highly beneficial for a Software Development Manager role.
+
+### Nadi Precision (The Nature of Career)
+Your chart does not show explicit, strong <term id="nadi_links">Nadi links</term> for <term id="saturn">Saturn</term> to highly specific planets that would define your career (e.g., <term id="saturn">Saturn</term>+<term id="mars">Mars</term> for 'Technical Master'). However, the general astrological indicators strongly align with your background. Your exalted <term id="mercury">Mercury</term> in <term id="virgo">Virgo</term> with <term id="rahu">Rahu</term> in the <term id="10thhouse">10th house</term> of <term id="d10">D10</term> is a clear indicator of **Technical Management & Innovation**. This <term id="d10">D10</term> placement signifies that your career involves profound analytical work, intricate communication, and pioneering new technologies, aligning perfectly with your role in software development and new product teams at a global tech company. This explains *why* your career manifests in this particular way, not just that it exists.
+
+### Practical Guidance
+1.  **Embrace Transformation:** The period until **July 2026** is karmically intense for career, requiring you to adapt to new challenges with resilience. View new product teams and increased workload as opportunities for significant professional growth.
+2.  **Strategic Communication:** With multiple <term id="planetary_wars">planetary wars</term> and <term id="mercury">Mercury</term> as your <term id="amatyakaraka">Amatyakaraka</term> in the <term id="8thhouse">8th house</term>, clear and empathetic communication will be crucial in managing team dynamics and navigating complex projects. Your role as a manager means being the bridge in difficult situations.
+3.  **Leverage Technical Acumen:** Your exalted <term id="mercury">Mercury</term> in <term id="d10">D10</term> highlights your core strength. Lean into your technical expertise to solve problems and guide your teams through the transitions. This will solidify your authority.
+4.  **Manage Stress:** The <term id="ulka">Ulka Yogini Dasha</term> can be demanding. Incorporate stress-relief techniques like meditation or regular physical activity to maintain mental and emotional well-being amidst your heavy responsibilities.
+
+### Final Thoughts
+Your chart reveals a destiny for a highly impactful and dynamic career, particularly in technology and management. The current period, while demanding with significant shifts and a heavy workload, is ultimately laying the groundwork for substantial growth and enhanced status. Your inherent resilience, sharp intellect, and strong ethical foundation will enable you to not only navigate but thrive through these changes, solidifying your position as a respected leader and innovator.
+
+<div class="follow-up-questions">
+📅 When will this happen?
+🔮 What remedies can help?
+💼 How to maximize success?
+🌟 What should I focus on?
+</div>
+
+        
+        Current question: "I am married. I want to know about relationship in 2026"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2026, endYear: 2026
+        - For general timing questions without specific year, use startYear: 2025, endYear: 2027
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2025, endYear: 2027 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        
