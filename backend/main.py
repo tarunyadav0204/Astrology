@@ -1655,6 +1655,10 @@ async def health_detailed():
             "timestamp": datetime.now().isoformat()
         }
 
+from blog.routes import router as blog_router
+
+app.include_router(blog_router)
+
 # Import chart routes
 from charts.routes import router as chart_router
 app.include_router(chart_router, prefix="/api")

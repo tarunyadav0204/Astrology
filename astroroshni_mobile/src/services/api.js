@@ -91,13 +91,71 @@ export const healthAPI = {
 };
 
 export const chartAPI = {
-  calculateChart: (birthData) => api.post(getEndpoint('/calculate-chart'), birthData),
-  calculateChartOnly: (birthData) => api.post(getEndpoint('/calculate-chart-only'), birthData),
-  calculateAllCharts: (birthData) => api.post(getEndpoint('/calculate-all-charts'), birthData),
-  calculateDivisionalChart: (birthData, division = 9) => 
-    api.post(getEndpoint('/calculate-divisional-chart'), { birth_data: birthData, division }),
-  calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => 
-    api.post(getEndpoint('/calculate-transits'), { birth_data: birthData, transit_date: transitDate }),
+  calculateChart: (birthData) => {
+    // console.log('[API] Calling calculateChart');
+    const startTime = Date.now();
+    return api.post(getEndpoint('/calculate-chart'), birthData)
+      .then(response => {
+        // console.log(`[API] calculateChart completed in ${Date.now() - startTime}ms`);
+        return response;
+      })
+      .catch(error => {
+        // console.error(`[API] calculateChart failed after ${Date.now() - startTime}ms:`, error);
+        throw error;
+      });
+  },
+  calculateChartOnly: (birthData) => {
+    // console.log('[API] Calling calculateChartOnly');
+    const startTime = Date.now();
+    return api.post(getEndpoint('/calculate-chart-only'), birthData)
+      .then(response => {
+        // console.log(`[API] calculateChartOnly completed in ${Date.now() - startTime}ms`);
+        return response;
+      })
+      .catch(error => {
+        // console.error(`[API] calculateChartOnly failed after ${Date.now() - startTime}ms:`, error);
+        throw error;
+      });
+  },
+  calculateAllCharts: (birthData) => {
+    // console.log('[API] Calling calculateAllCharts');
+    const startTime = Date.now();
+    return api.post(getEndpoint('/calculate-all-charts'), birthData)
+      .then(response => {
+        // console.log(`[API] calculateAllCharts completed in ${Date.now() - startTime}ms`);
+        return response;
+      })
+      .catch(error => {
+        // console.error(`[API] calculateAllCharts failed after ${Date.now() - startTime}ms:`, error);
+        throw error;
+      });
+  },
+  calculateDivisionalChart: (birthData, division = 9) => {
+    // console.log(`[API] Calling calculateDivisionalChart for D${division}`);
+    const startTime = Date.now();
+    return api.post(getEndpoint('/calculate-divisional-chart'), { birth_data: birthData, division })
+      .then(response => {
+        // console.log(`[API] calculateDivisionalChart D${division} completed in ${Date.now() - startTime}ms`);
+        return response;
+      })
+      .catch(error => {
+        // console.error(`[API] calculateDivisionalChart D${division} failed after ${Date.now() - startTime}ms:`, error);
+        throw error;
+      });
+  },
+  calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => {
+    // console.log(`[API] Calling calculateTransits for date ${transitDate}`);
+    const startTime = Date.now();
+    return api.post(getEndpoint('/calculate-transits'), { birth_data: birthData, transit_date: transitDate })
+      .then(response => {
+        // console.log(`[API] calculateTransits completed in ${Date.now() - startTime}ms`);
+        return response;
+      })
+      .catch(error => {
+        // console.error(`[API] calculateTransits failed after ${Date.now() - startTime}ms:`, error);
+        throw error;
+      });
+  },
   calculateYogi: (birthData) => api.post(getEndpoint('/calculate-yogi'), birthData),
   calculateCascadingDashas: (birthData, targetDate) => 
     api.post(getEndpoint('/calculate-cascading-dashas'), { birth_data: birthData, target_date: targetDate }),

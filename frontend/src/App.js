@@ -46,6 +46,9 @@ import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
 import FloatingChatButton from './components/FloatingChatButton/FloatingChatButton';
 import ChatModal from './components/Chat/ChatModal';
+import BlogList from './components/Blog/BlogList';
+import BlogPost from './components/Blog/BlogPost';
+import BlogDashboard from './components/Blog/BlogDashboard';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
@@ -802,6 +805,8 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/calendar-2026" element={<Calendar2026 user={null} onLogin={() => setShowLoginModal(true)} />} />
+            <Route path="/blog" element={<BlogList />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               <ToastContainer />
@@ -895,6 +900,15 @@ function App() {
           } />
           <Route path="/about" element={<AboutUs user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
           <Route path="/calendar-2026" element={<Calendar2026 user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
+          <Route path="/blog" element={<BlogList />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/admin/blog" element={
+            user && user.role === 'admin' ? (
+              <BlogDashboard />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
 
           <Route path="/beginners-guide" element={<BeginnersGuide />} />
           <Route path="/advanced-courses" element={<AdvancedCourses />} />

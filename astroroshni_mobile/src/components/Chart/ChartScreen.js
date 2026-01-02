@@ -127,7 +127,7 @@ export default function ChartScreen({ navigation, route }) {
   // Add focus effect to reload data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('📊 ChartScreen focused - reloading birth data');
+      // console.log('📊 ChartScreen focused - reloading birth data');
       loadBirthData();
     });
     
@@ -155,7 +155,7 @@ export default function ChartScreen({ navigation, route }) {
       
       // Get fresh data from storage
       const data = await storage.getBirthDetails();
-      console.log('📊 ChartScreen loading data for:', data?.name, 'ID:', data?.id);
+      // console.log('📊 ChartScreen loading data for:', data?.name, 'ID:', data?.id);
       
       if (data && data.name) {
         setBirthData(data);
@@ -169,7 +169,7 @@ export default function ChartScreen({ navigation, route }) {
           longitude: parseFloat(data.longitude)
         };
         
-        console.log('🚀 Calculating chart for ID:', data.id, 'Name:', data.name);
+        // console.log('🚀 Calculating chart for ID:', data.id, 'Name:', data.name);
         const response = await chartAPI.calculateChartOnly(formattedData);
         setChartData(response.data);
         // console.log('✅ Chart calculated - Ascendant:', response.data.ascendant);

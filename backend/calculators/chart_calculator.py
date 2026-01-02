@@ -13,10 +13,14 @@ class ChartCalculator(BaseCalculator):
     
     def calculate_chart(self, birth_data, node_type='mean'):
         """Calculate birth chart with planetary positions and houses"""
+        import time
+        calc_start = time.time()
+        
         # CRITICAL: Force geocentric mode first (must be first line)
         swe.set_topo(0, 0, 0)  # Reset to geocentric (center of Earth)
         
         # CRITICAL: Force ephemeris path for high-precision data files
+        ephe_start = time.time()
         try:
             import os
             ephe_path = os.path.join(os.path.dirname(__file__), '..', 'ephe')
@@ -41,16 +45,20 @@ class ChartCalculator(BaseCalculator):
                     print(f"⚠️  EPHEMERIS: No .se1 files found anywhere - using Moshier model")
         except Exception as e:
             print(f"⚠️  EPHEMERIS: Path setting failed - {e}")
+        ephe_end = time.time()
+        # print(f"[CALC] Ephemeris setup took {ephe_end - ephe_start:.3f}s")
         
         # CRITICAL: Use Mode 27 (True Chitra Paksha) for AstroSage parity
         swe.set_sid_mode(27, 0, 0)  # Mode 27 = True Chitra Paksha
         
         # Calculate Julian Day with high precision for exact AstroSage matching
+        jd_start = time.time()
         time_parts = birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60.0
         print(f"DEBUG: Birth data - Date: {birth_data.date}, Time: {birth_data.time}, Timezone: {getattr(birth_data, 'timezone', 'None')}")
         
         # Get timezone offset using centralized service
+        tz_start = time.time()
         timezone_input = getattr(birth_data, 'timezone', '')
         latitude_input = getattr(birth_data, 'latitude', None)
         longitude_input = getattr(birth_data, 'longitude', None)
@@ -58,6 +66,8 @@ class ChartCalculator(BaseCalculator):
         print(f"🌍 TIMEZONE DEBUG: Input timezone='{timezone_input}', lat={latitude_input}, lon={longitude_input}")
         
         tz_offset = parse_timezone_offset(timezone_input, latitude_input, longitude_input)
+        tz_end = time.time()
+        # print(f"[CALC] Timezone calculation took {tz_end - tz_start:.3f}s")
         
         print(f"🌍 TIMEZONE DEBUG: Final offset={tz_offset} hours")
         
@@ -72,8 +82,11 @@ class ChartCalculator(BaseCalculator):
             int(birth_data.date.split('-')[2]),
             float(utc_hour)
         )
+        jd_end = time.time()
+        # print(f"[CALC] Julian Day calculation took {jd_end - jd_start:.3f}s")
         
         # Calculate planetary positions
+        planets_start = time.time()
         planets = {}
         planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
         
@@ -106,6 +119,8 @@ class ChartCalculator(BaseCalculator):
                 'degree': longitude % 30,
                 'retrograde': is_retrograde
             }
+        planets_end = time.time()
+        # print(f"[CALC] Planetary calculations took {planets_end - planets_start:.3f}s")
 
         # LOG: All planetary positions from Swiss Ephemeris
         print(f"\n🌟 SWISS EPHEMERIS PLANETARY POSITIONS (Mode 27 - True Chitra):")
@@ -117,11 +132,14 @@ class ChartCalculator(BaseCalculator):
         print(f"🔚 End Swiss Ephemeris Data\n")
 
         # Calculate ascendant and houses  
+        houses_start = time.time()
         houses_data = swe.houses(jd, birth_data.latitude, birth_data.longitude, b'P')
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
         ascendant_tropical = houses_data[1][0]
         ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
+        houses_end = time.time()
+        # print(f"[CALC] Houses calculation took {houses_end - houses_start:.3f}s")
         
         # Convert to degrees, minutes, seconds for display
         def decimal_to_dms(decimal_degrees):
@@ -149,9 +167,13 @@ class ChartCalculator(BaseCalculator):
             })
         
         # Calculate Gulika and Mandi using accurate sunrise/sunset
+        upagraha_start = time.time()
         self._calculate_upagrahas(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa)
+        upagraha_end = time.time()
+        # print(f"[CALC] Upagraha calculation took {upagraha_end - upagraha_start:.3f}s")
         
         # Add InduLagna
+        indu_start = time.time()
         from .indu_lagna_calculator import InduLagnaCalculator
         indu_calc = InduLagnaCalculator({
             'ascendant': ascendant_sidereal,
@@ -159,17 +181,28 @@ class ChartCalculator(BaseCalculator):
         })
         indu_data = indu_calc.get_indu_lagna_data()
         planets['InduLagna'] = indu_data
+        indu_end = time.time()
+        print(f"[CALC] InduLagna calculation took {indu_end - indu_start:.3f}s")
         
         # Calculate house positions for all planets
+        house_pos_start = time.time()
         for planet_name in planets:
             if 'house' not in planets[planet_name] or planets[planet_name]['house'] == 1:
                 planet_longitude = planets[planet_name]['longitude']
                 planet_sign = int(planet_longitude / 30)
                 house_number = ((planet_sign - ascendant_sign) % 12) + 1
                 planets[planet_name]['house'] = house_number
+        house_pos_end = time.time()
+        # print(f"[CALC] House positions took {house_pos_end - house_pos_start:.3f}s")
         
         # Calculate Bhav Chalit using professional house system
+        bhav_start = time.time()
         bhav_chalit = self._calculate_bhav_chalit_professional(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa)
+        bhav_end = time.time()
+        # print(f"[CALC] Bhav Chalit calculation took {bhav_end - bhav_start:.3f}s")
+        
+        calc_end = time.time()
+        # print(f"[CALC] Total chart calculation took {calc_end - calc_start:.3f}s")
         
         return {
             "planets": planets,

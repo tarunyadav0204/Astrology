@@ -5,6 +5,7 @@ from typing import Dict, Any
 from datetime import datetime
 import sqlite3
 import traceback
+import time
 from pydantic import BaseModel
 from auth import get_current_user, User
 from calculators.chart_calculator import ChartCalculator
@@ -157,6 +158,9 @@ def get_divisional_sign(sign, degree_in_sign, division):
 @router.post("/calculate-chart-only")
 async def calculate_chart_only(request: dict, current_user: User = Depends(get_current_user)):
     """Calculate basic chart data only"""
+    print(f"[BACKEND] Starting calculate_chart_only for user {current_user.userid}")
+    start_time = time.time()
+    
     try:
         print(f"🔍 Raw request: {request}")
         
@@ -184,33 +188,44 @@ async def calculate_chart_only(request: dict, current_user: User = Depends(get_c
             @property
             def timezone_offset(self):
                 """Auto-detect timezone from coordinates and return as offset string"""
+                tz_start = time.time()
                 try:
                     from utils.timezone_service import get_timezone_from_coordinates
                     detected_tz = get_timezone_from_coordinates(self.latitude, self.longitude)
-                    print(f"🌍 Timezone auto-detected for {self.latitude}, {self.longitude}: {detected_tz}")
+                    tz_end = time.time()
+                    print(f"🌍 Timezone detection took {tz_end - tz_start:.3f}s: {detected_tz}")
                     return detected_tz
                 except Exception as e:
-                    print(f"❌ Timezone detection failed: {e}")
+                    tz_end = time.time()
+                    print(f"❌ Timezone detection failed in {tz_end - tz_start:.3f}s: {e}")
                     return "UTC+0"  # UTC default instead of IST
         
+        obj_start = time.time()
         birth_obj = BirthDataSimple(birth_data)
-        print(f"📋 Birth object created - Date: {birth_obj.date}, Time: {birth_obj.time}")
-        print(f"🌍 Using timezone: {birth_obj.timezone_offset} for coordinates: {birth_obj.latitude}, {birth_obj.longitude}")
+        obj_end = time.time()
+        print(f"📋 Birth object created in {obj_end - obj_start:.3f}s - Date: {birth_obj.date}, Time: {birth_obj.time}")
         
         # Calculate chart
+        calc_start = time.time()
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj)
+        calc_end = time.time()
         
-        # print(f"📊 Chart calculated - Ascendant: {chart_data.get('ascendant', 'N/A')}°")
+        print(f"📊 Chart calculation took {calc_end - calc_start:.3f}s")
+        
         if 'houses' in chart_data and len(chart_data['houses']) > 0:
             asc_sign = chart_data['houses'][0].get('sign', 'N/A')
             print(f"📊 Ascendant sign: {asc_sign}")
+        
+        end_time = time.time()
+        print(f"[BACKEND] Total calculate_chart_only completed in {end_time - start_time:.3f}s")
         
         # Return chart data directly (not wrapped in success/chart_data)
         return chart_data
         
     except Exception as e:
-        print(f"❌ Chart calculation error: {str(e)}")
+        end_time = time.time()
+        print(f"❌ Chart calculation error after {end_time - start_time:.3f}s: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -281,6 +296,10 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
 @router.post("/calculate-divisional-chart")
 async def calculate_divisional_chart(request: dict, current_user: User = Depends(get_current_user)):
     """Calculate accurate divisional charts using proper Vedic formulas"""
+    import time
+    
+    print(f"[BACKEND] Starting calculate_divisional_chart for user {current_user.userid}")
+    start_time = time.time()
     
     def get_divisional_sign(sign, degree_in_sign, division):
         """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
@@ -421,6 +440,9 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         # Support both 'division' and 'division_number' for backward compatibility
         division_number = request.get('division', request.get('division_number', 9))
         
+        print(f"[BACKEND] Processing D{division_number} chart for {birth_data.get('name', 'Unknown')}")
+        print(f"[BACKEND] Birth data: {birth_data.get('date')} {birth_data.get('time')} at {birth_data.get('latitude')},{birth_data.get('longitude')}")
+        
         # Create birth data object - simple class like in main.py backup
         class BirthDataSimple:
             def __init__(self, data):
@@ -437,10 +459,15 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         birth_obj = BirthDataSimple(birth_data)
         
         # Calculate main chart first
+        calc_start = time.time()
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj)
+        calc_end = time.time()
+        
+        print(f"[BACKEND] Base chart calculation completed in {calc_end - calc_start:.3f}s")
         
         # Calculate divisional chart
+        div_start = time.time()
         divisional_data = {
             'planets': {},
             'houses': [],
@@ -453,7 +480,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
         divisional_data['ascendant'] = divisional_asc_sign * 30 + 15  # Middle of sign
         
-        print(f"DEBUG D{division_number}: Original ASC={chart_data['ascendant']:.2f} (Sign {asc_sign}, {asc_degree:.2f}°) -> Divisional ASC Sign={divisional_asc_sign}")
+        print(f"[BACKEND] D{division_number}: Original ASC={chart_data['ascendant']:.2f} (Sign {asc_sign}, {asc_degree:.2f}°) -> Divisional ASC Sign={divisional_asc_sign}")
         
         # Calculate divisional houses
         for i in range(12):
@@ -501,6 +528,12 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
                         'retrograde': planet_data.get('retrograde', False)
                     }
         
+        div_end = time.time()
+        print(f"[BACKEND] D{division_number} divisional calculation completed in {div_end - div_start:.3f}s")
+        
+        end_time = time.time()
+        print(f"[BACKEND] Total divisional chart request completed in {end_time - start_time:.3f}s")
+        
         return {
             'divisional_chart': divisional_data,
             'division_number': division_number,
@@ -508,6 +541,10 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         }
         
     except Exception as e:
+        end_time = time.time()
+        print(f"[BACKEND] ERROR: Divisional chart calculation failed after {end_time - start_time:.3f}s: {str(e)}")
+        import traceback
+        print(f"[BACKEND] Traceback: {traceback.format_exc()}")
         return {"success": False, "error": str(e)}
 
 @router.post("/calculate-chart")

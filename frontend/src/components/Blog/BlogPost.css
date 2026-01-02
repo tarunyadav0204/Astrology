@@ -1,0 +1,278 @@
+.blog-post-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.loading, .error {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.error h2 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.error p {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.back-link {
+    display: inline-block;
+    color: #fff !important;
+    text-decoration: none;
+    font-weight: 500;
+    margin-bottom: 20px;
+    transition: color 0.3s ease;
+}
+
+.back-link:hover {
+    color: rgba(255,255,255,0.8) !important;
+}
+
+.blog-post {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.post-header {
+    padding: 40px 40px 20px 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.post-meta {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.post-category {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-weight: 500;
+}
+
+.post-title {
+    margin: 0 0 15px 0;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.post-excerpt {
+    font-size: 18px;
+    opacity: 0.9;
+    margin: 0 0 20px 0;
+    font-style: italic;
+    color: white !important;
+}
+
+.post-featured-image {
+    margin-top: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.post-featured-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.post-content {
+    padding: 40px;
+    font-size: 16px;
+    color: #333;
+}
+
+.post-content p {
+    margin-bottom: 20px;
+}
+
+.post-content h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 30px 0 20px 0;
+    color: #222;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.post-content h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 25px 0 15px 0;
+    color: #333;
+}
+
+.post-content h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 20px 0 10px 0;
+    color: #444;
+}
+
+.post-content ul {
+    margin: 15px 0;
+    padding-left: 20px;
+}
+
+.post-content li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.post-content p {
+    margin-bottom: 20px;
+}
+
+.post-content p:has(+ table),
+.post-content p:has(table) {
+    margin-bottom: 5px;
+}
+
+.post-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 10px 0 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.post-content br + table {
+    margin-top: -15px !important;
+}
+
+.post-content table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.post-content table tr:first-child td {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.post-content table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+.post-content strong {
+    font-weight: 600;
+    color: #222;
+}
+
+.post-content em {
+    font-style: italic;
+    color: #555;
+}
+
+.post-content .content-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 20px 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.post-content a {
+    color: #667eea;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+.post-content a:hover {
+    border-bottom-color: #667eea;
+}
+
+.post-footer {
+    padding: 0 40px 40px 40px;
+    border-top: 1px solid #eee;
+    margin-top: 20px;
+    padding-top: 20px;
+}
+
+.post-tags {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tags-label {
+    font-weight: 500;
+    color: #666;
+}
+
+.post-tag {
+    background: #f0f0f0;
+    color: #666;
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.post-navigation {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.nav-button {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.nav-button:hover {
+    background: #764ba2;
+}
+
+@media (max-width: 768px) {
+    .blog-post-container {
+        padding: 15px;
+    }
+    
+    .post-header {
+        padding: 30px 25px 20px 25px;
+    }
+    
+    .post-title {
+        font-size: 28px;
+    }
+    
+    .post-excerpt {
+        font-size: 16px;
+    }
+    
+    .post-content {
+        padding: 30px 25px;
+        font-size: 15px;
+    }
+    
+    .post-footer {
+        padding: 0 25px 30px 25px;
+    }
+    
+    .post-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}

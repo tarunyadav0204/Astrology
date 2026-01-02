@@ -87,7 +87,7 @@ class ApiService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error calculating chart:', error);
+      // console.error('Error calculating chart:', error);
       throw new Error('Failed to calculate chart');
     }
   }

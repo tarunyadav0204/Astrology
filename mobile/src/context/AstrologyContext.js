@@ -111,7 +111,7 @@ export const AstrologyProvider = ({ children }) => {
       return chart;
     } catch (error) {
       setError(error.message);
-      console.error('Error calculating chart:', error);
+      // console.error('Error calculating chart:', error);
       if (error.response?.status === 401) {
         await logout();
       }
