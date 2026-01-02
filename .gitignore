@@ -125,3 +125,8 @@ backend/backend.log
 frontend/frontend.log
 backend/server_shutdown.log
 *.log
+# Google Cloud credentials
+backend/gcp_key.json
+*.json
+!package.json
+!package-lock.json
