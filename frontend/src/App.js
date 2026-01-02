@@ -373,6 +373,9 @@ function App() {
                 <LandingPage onLogin={handleLogin} onRegister={handleLogin} domainConfig={domainConfig} />
               )
             } />
+            <Route path="/beginners-guide" element={<BeginnersGuide />} />
+            <Route path="/advanced-courses" element={<AdvancedCourses />} />
+            <Route path="/myths-vs-reality" element={<MythsVsReality />} />
             <Route path="/horoscope/:period" element={<HoroscopePage />} />
             <Route path="/horoscope" element={<HoroscopePage />} />
             <Route path="/marriage-analysis" element={
@@ -783,10 +786,7 @@ function App() {
                 )}
               </>
             } />
-            <Route path="/myths-vs-reality" element={<MythsVsReality />} />
-          <Route path="/advanced-courses" element={<AdvancedCourses />} />
-          <Route path="/beginners-guide" element={<BeginnersGuide />} />
-          <Route path="/lesson/:lessonId" element={<LessonPage />} />
+            <Route path="/lesson/:lessonId" element={<LessonPage />} />
           <Route path="/nakshatras" element={<NakshatraListPage />} />
           <Route path="/nakshatra/:nakshatraName/:year" element={<NakshatraPage />} />
           <Route path="/monthly-panchang" element={
@@ -896,6 +896,10 @@ function App() {
           <Route path="/about" element={<AboutUs user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
           <Route path="/calendar-2026" element={<Calendar2026 user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} />} />
 
+          <Route path="/beginners-guide" element={<BeginnersGuide />} />
+          <Route path="/advanced-courses" element={<AdvancedCourses />} />
+          <Route path="/myths-vs-reality" element={<MythsVsReality />} />
+          <Route path="/lesson/:lessonId" element={<LessonPage />} />
           <Route path="/astroroshni" element={<AstroRoshniPage />} />
           <Route path="/*" element={
             <div style={{ 

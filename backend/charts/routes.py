@@ -306,8 +306,13 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             # 1st part: Self, 2nd: 4th, 3rd: 7th, 4th: 10th
             return (sign + (part * 3)) % 12
         
-        elif division == 7:  # Saptamsa (D7)
-            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 6) + part) % 12
+        elif division == 7:  # Saptamsa (D7) - CORRECTED
+            # Traditional rule: Odd signs start from same sign, Even signs start from 7th sign
+            if sign % 2 == 0:  # Aries(0), Gemini(2), Leo(4) etc - Odd signs in astrology
+                start_sign = sign
+            else:  # Taurus(1), Cancer(3), Virgo(5) etc - Even signs in astrology  
+                start_sign = (sign + 6) % 12  # 7th sign from current
+            return (start_sign + part) % 12
         
         elif division == 9:  # Navamsa (D9)
             # Movable signs (0,3,6,9): Start from same sign

@@ -47,9 +47,9 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
   });
 
   const bannerSlides = [
-    { id: 1, image: '/images/banner-ai-astrologers.jpg', title: 'AI Astrologers Available 24/7' },
-    { id: 2, image: '/images/banner-premium-reports.jpg', title: 'Premium Astrology Reports' },
-    { id: 3, image: '/images/banner-live-consultation.jpg', title: 'Live Consultation with Experts' }
+    { id: 1, image: '/images/banner-tara-consultation.jpg', title: 'Consult Tara - World\'s Most Advanced Digital Vedic Astrologer' },
+    { id: 2, image: '/images/banner-career-2026.jpg', title: 'Your Career Breakthrough in 2026 - Discover Your Professional Destiny' },
+    { id: 3, image: '/images/banner-relationships.jpg', title: 'Your Relationships & Love Life - Find Your Perfect Match' }
   ];
 
 
@@ -956,17 +956,58 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
       {/* Banner Slider */}
       <section className="banner-slider">
         <div className="slider-container">
-          {bannerSlides.map((slide, index) => (
-            <div 
-              key={slide.id}
-              className={`slide ${index === currentSlide ? 'active' : ''}`}
-            >
-              <div className="slide-content">
-                <h2>{slide.title}</h2>
-                <button className="cta-btn">Get Started</button>
+          {bannerSlides.map((slide, index) => {
+            return (
+              <div 
+                key={slide.id}
+                className={`slide ${index === currentSlide ? 'active' : ''}`}
+                style={{ 
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                  zIndex: index === currentSlide ? 10 : 5
+                }}
+                onClick={() => {
+                  console.log('Slide clicked - Index:', index, 'ID:', slide.id, 'Title:', slide.title);
+                  
+                  // Route based on array index
+                  if (index === 0) {
+                    console.log('Opening Tara chat');
+                    if (user) {
+                      setShowChatModal(true);
+                    } else {
+                      onLogin();
+                    }
+                  } else if (index === 1) {
+                    console.log('Navigating to career');
+                    if (user) {
+                      navigate('/career-guidance');
+                    } else {
+                      onLogin();
+                    }
+                  } else if (index === 2) {
+                    console.log('Navigating to marriage');
+                    if (user) {
+                      navigate('/marriage-analysis');
+                    } else {
+                      onLogin();
+                    }
+                  }
+                }}
+              >
+                <div className="slide-content">
+                  <h2>{slide.title}</h2>
+                  <button 
+                    className="cta-btn"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent double-click
+                    }}
+                  >
+                    {index === 0 ? 'Ask Tara Now' : index === 1 ? 'Explore Career' : 'Find Love'}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -2009,11 +2050,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
               <h3>🎓 Beginner's Guide</h3>
               <p>Start your astrology journey with basics</p>
               <button className="learn-btn" onClick={() => navigate('/beginners-guide')}>Start Learning</button>
-            </div>
-            <div className="education-card">
-              <h3>📚 Advanced Courses</h3>
-              <p>Master complex astrological techniques</p>
-              <button className="learn-btn" onClick={() => navigate('/advanced-courses')}>Explore Courses</button>
             </div>
             <div className="education-card">
               <h3>🔍 Myth vs Reality</h3>

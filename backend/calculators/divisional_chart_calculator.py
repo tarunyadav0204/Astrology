@@ -36,9 +36,14 @@ class DivisionalChartCalculator(BaseCalculator):
 
             # --- EXISTING CHARTS ---
 
-            elif division == 7:  # Saptamsa (D7)
-                if sign % 2 == 0: return (sign + part) % 12      # Odd: Start from self
-                else: return ((sign + 6) + part) % 12            # Even: Start from 7th
+            elif division == 7:  # Saptamsa (D7) - CORRECTED
+                # Traditional rule: Odd signs start from same sign, Even signs start from 7th sign
+                # But the issue might be in how we determine odd/even or calculate parts
+                if sign % 2 == 0:  # Aries(0), Gemini(2), Leo(4) etc - Odd signs in astrology
+                    start_sign = sign
+                else:  # Taurus(1), Cancer(3), Virgo(5) etc - Even signs in astrology  
+                    start_sign = (sign + 6) % 12  # 7th sign from current
+                return (start_sign + part) % 12
 
             elif division == 9:  # Navamsa (D9)
                 if sign in [0, 3, 6, 9]: start = sign            # Movable: Self

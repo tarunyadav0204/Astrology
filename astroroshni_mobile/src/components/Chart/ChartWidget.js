@@ -48,7 +48,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   }, [currentChartType]);
   
   const chartTypes = [
-    'lagna', 'navamsa', 'transit', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
+    'lagna', 'navamsa', 'transit', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
     'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa', 
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
@@ -57,6 +57,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     lagna: 'Birth Chart (Lagna)',
     navamsa: 'Navamsa (D9)',
     transit: 'Transit Chart',
+    saptamsa: 'Saptamsa (D7)',
     dasamsa: 'Dasamsa (D10)',
     dwadasamsa: 'Dwadasamsa (D12)',
     shodasamsa: 'Shodasamsa (D16)',
@@ -70,7 +71,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   };
   
   const chartDivisions = {
-    navamsa: 9, dasamsa: 10, dwadasamsa: 12, shodasamsa: 16,
+    navamsa: 9, saptamsa: 7, dasamsa: 10, dwadasamsa: 12, shodasamsa: 16,
     vimshamsa: 20, chaturvimshamsa: 24, saptavimshamsa: 27,
     trimshamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60
   };
