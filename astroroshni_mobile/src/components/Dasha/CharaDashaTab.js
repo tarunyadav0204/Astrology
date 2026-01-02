@@ -86,21 +86,34 @@ const SignCard = ({ item, isCurrent, isExpanded, onPress }) => {
 
       {isExpanded && item.sub_periods && (
         <View style={styles.subList}>
-          {item.sub_periods.map((sub, idx) => (
-            <View key={idx} style={styles.subItem}>
-              <View style={styles.subTimelineLine} />
-              <View style={[styles.subDot, { backgroundColor: SIGN_CONFIG[sub.sign]?.color[0] || '#ccc' }]} />
-              
-              <View style={styles.subContent}>
-                <Text style={styles.subName}>{sub.sign}</Text>
-                <Text style={styles.subDates}>{formatDate(sub.start_date)} - {formatDate(sub.end_date)}</Text>
+          {item.sub_periods.map((sub, idx) => {
+            const now = new Date();
+            const subStart = new Date(sub.start_date);
+            const subEnd = new Date(sub.end_date);
+            const isCurrentAntar = now >= subStart && now <= subEnd;
+            
+            return (
+              <View key={idx} style={[styles.subItem, isCurrentAntar && styles.currentSubItem]}>
+                <View style={styles.subTimelineLine} />
+                <View style={[styles.subDot, { backgroundColor: SIGN_CONFIG[sub.sign]?.color[0] || '#ccc' }]} />
+                
+                <View style={styles.subContent}>
+                  <Text style={[styles.subName, isCurrentAntar && styles.currentSubName]}>{sub.sign}</Text>
+                  <Text style={[styles.subDates, isCurrentAntar && styles.currentSubDates]}>{formatDate(sub.start_date)} - {formatDate(sub.end_date)}</Text>
+                </View>
+                
+                <Text style={[styles.subElement, { color: SIGN_CONFIG[sub.sign]?.color[0] || '#888' }, isCurrentAntar && styles.currentSubElement]}>
+                  {SIGN_CONFIG[sub.sign]?.element}
+                </Text>
+                
+                {isCurrentAntar && (
+                  <View style={styles.currentAntarIndicator}>
+                    <Text style={styles.currentAntarText}>Current</Text>
+                  </View>
+                )}
               </View>
-              
-              <Text style={[styles.subElement, { color: SIGN_CONFIG[sub.sign]?.color[0] || '#888' }]}>
-                {SIGN_CONFIG[sub.sign]?.element}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -477,7 +490,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    height: 40,
+    minHeight: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  currentSubItem: {
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
   },
   subTimelineLine: {
     position: 'absolute',
@@ -507,13 +528,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  currentSubName: {
+    color: '#FF6B6B',
+    fontWeight: '700',
+  },
   subDates: {
     fontSize: 11,
     color: '#999',
   },
+  currentSubDates: {
+    color: '#FF6B6B',
+    fontWeight: '600',
+  },
   subElement: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  currentSubElement: {
+    fontWeight: '700',
+  },
+  currentAntarIndicator: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  currentAntarText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   loadingText: {
     fontSize: 16,

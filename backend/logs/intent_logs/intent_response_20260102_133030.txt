@@ -1,0 +1,39 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-02T13:30:33.380967
+Question: General well being
+Processing Time: 2.884s
+Response Length: 262 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "aspect": "general well being"
+    },
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "aspect": "general well being"
+  },
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

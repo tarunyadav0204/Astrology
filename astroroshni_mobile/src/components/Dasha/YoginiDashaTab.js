@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,13 +20,18 @@ const YOGINI_CONFIG = {
 
 const formatDate = (dateString) => {
   if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  } catch {
+    return '';
+  }
 };
 
 // --- SUB-COMPONENTS ---
 
-const DashaProgress = ({ percentage }) => (
+const DashaProgress = ({ percentage = 0 }) => (
   <View style={styles.progressContainer}>
     <View style={styles.track} />
     <LinearGradient
@@ -131,28 +136,28 @@ export default function YoginiDashaTab({ data }) {
   // console.log('YoginiDashaTab received data:', JSON.stringify(data, null, 2));
   
   // Find current period index (safe with optional chaining)
-  const currentIndex = React.useMemo(() => {
-    if (!data?.timeline) {
+  const currentIndex = useMemo(() => {
+    if (!data?.timeline || !Array.isArray(data.timeline)) {
       console.log('No timeline in data:', data);
       return -1;
     }
     return data.timeline.findIndex(item => 
-      item.name === data.current.mahadasha.name && 
-      item.start === data.current.mahadasha.start && 
-      item.end === data.current.mahadasha.end
+      item.name === data?.current?.mahadasha?.name && 
+      item.start === data?.current?.mahadasha?.start && 
+      item.end === data?.current?.mahadasha?.end
     );
   }, [data]);
   
   const [expandedId, setExpandedId] = useState(null);
   
   // Auto-expand current period on mount
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentIndex >= 0 && expandedId === null) {
       console.log('Setting expandedId to:', currentIndex);
-      console.log('Current period has sub_periods:', !!data?.timeline[currentIndex]?.sub_periods);
+      console.log('Current period has sub_periods:', !!data?.timeline?.[currentIndex]?.sub_periods);
       setExpandedId(currentIndex);
     }
-  }, [currentIndex, data]);
+  }, [currentIndex, data, expandedId]);
 
   if (!data) {
     return (
@@ -163,12 +168,12 @@ export default function YoginiDashaTab({ data }) {
   }
 
   // Check if data has the expected structure
-  if (!data.timeline || !data.current) {
-    console.log('Data missing expected structure. Available keys:', Object.keys(data));
+  if (!data?.timeline || !Array.isArray(data.timeline) || !data?.current) {
+    console.log('Data missing expected structure. Available keys:', Object.keys(data || {}));
     return (
       <View style={styles.container}>
         <Text style={styles.loadingText}>Data structure error. Check console for details.</Text>
-        <Text style={styles.loadingText}>Available keys: {Object.keys(data).join(', ')}</Text>
+        <Text style={styles.loadingText}>Available keys: {Object.keys(data || {}).join(', ')}</Text>
       </View>
     );
   }
@@ -196,8 +201,8 @@ export default function YoginiDashaTab({ data }) {
           <View style={styles.activeRow}>
             <View>
               <Text style={styles.label}>Mahadasha</Text>
-              <Text style={styles.activeValue}>{data.current.mahadasha.name}</Text>
-              <Text style={styles.activeLord}>{YOGINI_CONFIG[data.current.mahadasha.name]?.label}</Text>
+              <Text style={styles.activeValue}>{data?.current?.mahadasha?.name || 'N/A'}</Text>
+              <Text style={styles.activeLord}>{YOGINI_CONFIG[data?.current?.mahadasha?.name]?.label || 'Unknown'}</Text>
             </View>
             
             <View style={styles.arrowContainer}>
@@ -207,18 +212,18 @@ export default function YoginiDashaTab({ data }) {
             <View>
               <Text style={[styles.label, { textAlign: 'right' }]}>Antardasha</Text>
               <Text style={[styles.activeValue, { textAlign: 'right', color: '#8E2DE2' }]}>
-                {data.current.antardasha.name}
+                {data?.current?.antardasha?.name || 'N/A'}
               </Text>
               <Text style={[styles.activeLord, { textAlign: 'right' }]}>
-                {YOGINI_CONFIG[data.current.antardasha.name]?.label}
+                {YOGINI_CONFIG[data?.current?.antardasha?.name]?.label || 'Unknown'}
               </Text>
             </View>
           </View>
 
-          <DashaProgress percentage={data.current.progress} />
+          <DashaProgress percentage={data?.current?.progress || 0} />
           
           <View style={styles.dateRange}>
-            <Text style={styles.dateLabel}>Ends: {formatDate(data.current.antardasha.end)}</Text>
+            <Text style={styles.dateLabel}>Ends: {formatDate(data?.current?.antardasha?.end)}</Text>
             <Text style={styles.remainingText}>
                Critical Timing
             </Text>
@@ -244,9 +249,9 @@ export default function YoginiDashaTab({ data }) {
       
       <View style={styles.listContainer}>
         {data.timeline.map((item, index) => {
-          const isCurrent = item.name === data.current.mahadasha.name && 
-                           item.start === data.current.mahadasha.start && 
-                           item.end === data.current.mahadasha.end;
+          const isCurrent = item.name === data?.current?.mahadasha?.name && 
+                           item.start === data?.current?.mahadasha?.start && 
+                           item.end === data?.current?.mahadasha?.end;
           const isExpanded = expandedId === index;
           
           if (isCurrent) {
@@ -260,7 +265,7 @@ export default function YoginiDashaTab({ data }) {
               isCurrent={isCurrent}
               isExpanded={isExpanded}
               onPress={() => handlePress(index)}
-              currentAntardasha={data.current.antardasha}
+              currentAntardasha={data?.current?.antardasha}
             />
           );
         })}

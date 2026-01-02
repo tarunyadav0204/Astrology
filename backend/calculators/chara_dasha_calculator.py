@@ -1,6 +1,7 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from typing import Dict, List, Any
+import pytz
 
 class CharaDashaCalculator:
     """
@@ -21,6 +22,9 @@ class CharaDashaCalculator:
         dasha_periods = []
         start_date = dob_dt
         
+        # FIX: Get 'now' in the SAME timezone as dob_dt
+        current_time = self._get_current_datetime(dob_dt)
+        
         for sign_idx in dasha_order:
             years = self._calculate_dasha_length(sign_idx)
             end_date = start_date + relativedelta(years=years)
@@ -31,7 +35,8 @@ class CharaDashaCalculator:
                 "duration_years": years,
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "end_date": end_date.strftime("%Y-%m-%d"),
-                "is_current": start_date <= datetime.now() < end_date
+                # FIX: Safe comparison now that timezones match
+                "is_current": start_date <= current_time < end_date
             })
             start_date = end_date
             
@@ -115,15 +120,13 @@ class CharaDashaCalculator:
         K.N. Rao Rules:
         1. Exception: If one lord is in the sign itself, REJECT it. Use the other.
         2. Association: More planets conjoined > Stronger.
-        3. Degrees: Higher longitude > Stronger.
+        3. Exaltation: Exalted planet > Non-exalted.
+        4. Degrees: Higher longitude > Stronger.
         """
         p1_sign = self._get_planet_sign(p1_name)
         p2_sign = self._get_planet_sign(p2_name)
         
-        # [NEW] RULE 1: The "Lord in Sign" Exception (K.N. Rao)
-        # If Scorpio Dasha: Mars is in Scorpio? Use Ketu.
-        # If Aquarius Dasha: Saturn is in Aquarius? Use Rahu.
-        # Mars(p1)/Ketu(p2) -> Scorpio(7). Saturn(p1)/Rahu(p2) -> Aquarius(10).
+        # RULE 1: The "Lord in Sign" Exception (K.N. Rao)
         target_sign = 7 if p1_name == 'Mars' else 10
         
         if p1_sign == target_sign and p2_sign != target_sign:
@@ -138,9 +141,16 @@ class CharaDashaCalculator:
         if p1_count > p2_count: return p1_sign
         if p2_count > p1_count: return p2_sign
         
-        # RULE 3: Degrees (Tie-breaker)
-        p1_deg = self.planets.get(p1_name, {}).get('degree', 0)
-        p2_deg = self.planets.get(p2_name, {}).get('degree', 0)
+        # RULE 3: Exaltation Check
+        p1_exalted = self._is_exalted(p1_name, p1_sign)
+        p2_exalted = self._is_exalted(p2_name, p2_sign)
+        
+        if p1_exalted and not p2_exalted: return p1_sign
+        if p2_exalted and not p1_exalted: return p2_sign
+        
+        # RULE 4: Degrees (Tie-breaker)
+        p1_deg = self._normalize_degree(self.planets.get(p1_name, {}).get('degree', 0))
+        p2_deg = self._normalize_degree(self.planets.get(p2_name, {}).get('degree', 0))
         
         return p1_sign if p1_deg >= p2_deg else p2_sign
 
@@ -158,3 +168,25 @@ class CharaDashaCalculator:
         signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
                  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
         return signs[idx]
+    
+    def _is_exalted(self, planet: str, sign: int) -> bool:
+        """Check if planet is exalted in given sign."""
+        exaltations = {
+            'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5,
+            'Jupiter': 3, 'Venus': 11, 'Saturn': 6, 'Rahu': 1, 'Ketu': 7
+        }
+        return exaltations.get(planet) == sign
+    
+    def _normalize_degree(self, degree: float) -> float:
+        """Normalize degree to 0-30 range for sign-based calculations."""
+        return degree % 30
+    
+    def _get_current_datetime(self, reference_dt: datetime) -> datetime:
+        """Get current datetime matching the timezone of the reference."""
+        now = datetime.now()
+        if reference_dt.tzinfo:
+            # If input has timezone, convert 'now' to that timezone
+            return datetime.now(reference_dt.tzinfo)
+        else:
+            # If input is naive, ensure 'now' is naive
+            return now.replace(tzinfo=None)

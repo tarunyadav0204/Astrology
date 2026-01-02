@@ -63,6 +63,9 @@ def get_divisional_sign(sign, degree_in_sign, division):
         # 1st part: Self, 2nd: 4th, 3rd: 7th, 4th: 10th
         return (sign + (part * 3)) % 12
     
+    elif division == 7:  # Saptamsa (D7)
+        return (sign + part) % 12 if sign % 2 == 0 else ((sign + 6) + part) % 12
+    
     elif division == 9:  # Navamsa (D9)
         # Movable signs (0,3,6,9): Start from same sign
         # Fixed signs (1,4,7,10): Start from 9th sign
@@ -100,7 +103,8 @@ def get_divisional_sign(sign, degree_in_sign, division):
         return (d20_start + part) % 12
     
     elif division == 24:  # Chaturvimsamsa (D24)
-        return (3 + part) % 12  # Cancer
+        start = 4 if sign % 2 == 0 else 3  # Odd: Leo, Even: Cancer
+        return (start + part) % 12
     
     elif division == 27:  # Saptavimsamsa (D27)
         if sign in [0, 4, 8]:  # Fire signs
@@ -114,27 +118,24 @@ def get_divisional_sign(sign, degree_in_sign, division):
         return (d27_start + part) % 12
     
     elif division == 30:  # Trimsamsa (D30)
-        if sign % 2 == 1:  # Odd signs
-            if part < 5: return 3  # Mars (0-5 degrees)
-            elif part < 10: return 6  # Saturn (5-10 degrees)
-            elif part < 18: return 4  # Jupiter (10-18 degrees)
-            elif part < 25: return 1  # Mercury (18-25 degrees)
-            else: return 2  # Venus (25-30 degrees)
+        # Use degree_in_sign directly for unequal parts
+        if sign % 2 == 0:  # Odd signs (Aries=0 is odd)
+            if degree_in_sign < 5: return 0    # Aries
+            elif degree_in_sign < 10: return 10  # Aquarius
+            elif degree_in_sign < 18: return 8   # Sagittarius
+            elif degree_in_sign < 25: return 2   # Gemini
+            else: return 6                       # Libra
         else:  # Even signs
-            if part < 5: return 2  # Venus (0-5 degrees)
-            elif part < 12: return 1  # Mercury (5-12 degrees)
-            elif part < 20: return 4  # Jupiter (12-20 degrees)
-            elif part < 25: return 6  # Saturn (20-25 degrees)
-            else: return 3  # Mars (25-30 degrees)
+            if degree_in_sign < 5: return 1      # Taurus
+            elif degree_in_sign < 12: return 5   # Virgo
+            elif degree_in_sign < 20: return 11  # Pisces
+            elif degree_in_sign < 25: return 9   # Capricorn
+            else: return 7                       # Scorpio
     
     elif division == 40:  # Khavedamsa (D40)
-        if sign in [0, 3, 6, 9]:  # Movable signs
-            d40_start = 0  # Aries
-        elif sign in [1, 4, 7, 10]:  # Fixed signs
-            d40_start = 4  # Leo
-        else:  # Dual signs
-            d40_start = 8  # Sagittarius
-        return (d40_start + part) % 12
+        # Odd Signs start from Aries(0), Even Signs start from Libra(6)
+        start = 0 if sign % 2 == 0 else 6
+        return (start + part) % 12
     
     elif division == 45:  # Akshavedamsa (D45)
         if sign in [0, 3, 6, 9]:  # Movable signs
@@ -146,13 +147,8 @@ def get_divisional_sign(sign, degree_in_sign, division):
         return (d45_start + part) % 12
     
     elif division == 60:  # Shashtyamsa (D60)
-        if sign in [0, 3, 6, 9]:  # Movable signs
-            d60_start = 0  # Aries
-        elif sign in [1, 4, 7, 10]:  # Fixed signs
-            d60_start = 4  # Leo
-        else:  # Dual signs
-            d60_start = 8  # Sagittarius
-        return (d60_start + part) % 12
+        # Start from the sign itself
+        return (sign + part) % 12
     
     else:
         # Default calculation for other divisions
@@ -310,6 +306,9 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             # 1st part: Self, 2nd: 4th, 3rd: 7th, 4th: 10th
             return (sign + (part * 3)) % 12
         
+        elif division == 7:  # Saptamsa (D7)
+            return (sign + part) % 12 if sign % 2 == 0 else ((sign + 6) + part) % 12
+        
         elif division == 9:  # Navamsa (D9)
             # Movable signs (0,3,6,9): Start from same sign
             # Fixed signs (1,4,7,10): Start from 9th sign
@@ -353,8 +352,9 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             return (d20_start + part) % 12
         
         elif division == 24:  # Chaturvimsamsa (D24)
-            # All signs start from Cancer
-            return (3 + part) % 12  # Cancer
+            # Odd: Leo, Even: Cancer
+            start = 4 if sign % 2 == 0 else 3
+            return (start + part) % 12
         
         elif division == 27:  # Saptavimsamsa (D27)
             # Fire signs (Aries, Leo, Sagittarius): start from Aries
@@ -372,31 +372,24 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             return (d27_start + part) % 12
         
         elif division == 30:  # Trimsamsa (D30)
-            # Special calculation for D30 based on planetary rulership within each sign
-            if sign % 2 == 1:  # Odd signs
-                if part < 5: return 3  # Mars (0-5 degrees)
-                elif part < 10: return 6  # Saturn (5-10 degrees)
-                elif part < 18: return 4  # Jupiter (10-18 degrees)
-                elif part < 25: return 1  # Mercury (18-25 degrees)
-                else: return 2  # Venus (25-30 degrees)
+            # Use degree_in_sign directly for unequal parts
+            if sign % 2 == 0:  # Odd signs (Aries=0 is odd)
+                if degree_in_sign < 5: return 0    # Aries
+                elif degree_in_sign < 10: return 10  # Aquarius
+                elif degree_in_sign < 18: return 8   # Sagittarius
+                elif degree_in_sign < 25: return 2   # Gemini
+                else: return 6                       # Libra
             else:  # Even signs
-                if part < 5: return 2  # Venus (0-5 degrees)
-                elif part < 12: return 1  # Mercury (5-12 degrees)
-                elif part < 20: return 4  # Jupiter (12-20 degrees)
-                elif part < 25: return 6  # Saturn (20-25 degrees)
-                else: return 3  # Mars (25-30 degrees)
+                if degree_in_sign < 5: return 1      # Taurus
+                elif degree_in_sign < 12: return 5   # Virgo
+                elif degree_in_sign < 20: return 11  # Pisces
+                elif degree_in_sign < 25: return 9   # Capricorn
+                else: return 7                       # Scorpio
         
         elif division == 40:  # Khavedamsa (D40)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Leo
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d40_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d40_start = 4  # Leo
-            else:  # Dual signs
-                d40_start = 8  # Sagittarius
-            return (d40_start + part) % 12
+            # Odd Signs start from Aries(0), Even Signs start from Libra(6)
+            start = 0 if sign % 2 == 0 else 6
+            return (start + part) % 12
         
         elif division == 45:  # Akshavedamsa (D45)
             # For movable signs: start from Aries
@@ -411,16 +404,8 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
             return (d45_start + part) % 12
         
         elif division == 60:  # Shashtyamsa (D60)
-            # For movable signs: start from Aries
-            # For fixed signs: start from Leo
-            # For dual signs: start from Sagittarius
-            if sign in [0, 3, 6, 9]:  # Movable signs
-                d60_start = 0  # Aries
-            elif sign in [1, 4, 7, 10]:  # Fixed signs
-                d60_start = 4  # Leo
-            else:  # Dual signs
-                d60_start = 8  # Sagittarius
-            return (d60_start + part) % 12
+            # Start from the sign itself
+            return (sign + part) % 12
         
         else:
             # Default calculation for other divisions
