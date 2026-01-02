@@ -1,6 +1,7 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 from .house_significations import SIGN_LORDS, NATURAL_BENEFICS, NATURAL_MALEFICS, EXALTATION_SIGNS, DEBILITATION_SIGNS
+from utils.timezone_service import parse_timezone_offset
 
 class YogiAnalyzer:
     """Analyzes Yogi/Avayogi impact on houses"""
@@ -15,16 +16,11 @@ class YogiAnalyzer:
         time_parts = self.birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
         
-        if 6.0 <= self.birth_data.latitude <= 37.0 and 68.0 <= self.birth_data.longitude <= 97.0:
-            tz_offset = 5.5
-        else:
-            tz_offset = 0
-            if self.birth_data.timezone.startswith('UTC'):
-                tz_str = self.birth_data.timezone[3:]
-                if tz_str and ':' in tz_str:
-                    sign = 1 if tz_str[0] == '+' else -1
-                    parts = tz_str[1:].split(':')
-                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+        tz_offset = parse_timezone_offset(
+            self.birth_data.timezone,
+            self.birth_data.latitude,
+            self.birth_data.longitude
+        )
         
         utc_hour = hour - tz_offset
         jd = swe.julday(
@@ -33,6 +29,12 @@ class YogiAnalyzer:
             int(self.birth_data.date.split('-')[2]),
             utc_hour
         )
+        
+        # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+        
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+
         
         sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
         moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]

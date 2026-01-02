@@ -6,6 +6,8 @@ Implements the Kalchakra (Time-Wheel) dasha system based on Moon's nakshatra and
 import swisseph as swe
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
+from utils.timezone_service import parse_timezone_offset
+
 class KalachakraDashaCalculator:
     """Calculate Kalchakra Dasha periods"""
     
@@ -156,17 +158,12 @@ class KalachakraDashaCalculator:
             time_parts = birth_data['time'].split(':')
             hour = float(time_parts[0]) + float(time_parts[1])/60
             
-            # Handle timezone
-            if 6.0 <= birth_data['latitude'] <= 37.0 and 68.0 <= birth_data['longitude'] <= 97.0:
-                tz_offset = 5.5
-            else:
-                tz_offset = 0
-                if birth_data.get('timezone', '').startswith('UTC'):
-                    tz_str = birth_data['timezone'][3:]
-                    if tz_str and ':' in tz_str:
-                        sign = 1 if tz_str[0] == '+' else -1
-                        parts = tz_str[1:].split(':')
-                        tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+            # Get timezone offset using centralized utility
+            tz_offset = parse_timezone_offset(
+                birth_data.get('timezone', ''),
+                birth_data.get('latitude'),
+                birth_data.get('longitude')
+            )
             
             utc_hour = hour - tz_offset
             jd = swe.julday(
@@ -175,6 +172,12 @@ class KalachakraDashaCalculator:
                 int(birth_data['date'].split('-')[2]),
                 utc_hour
             )
+            
+            # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+            
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
+
             
             return swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
             

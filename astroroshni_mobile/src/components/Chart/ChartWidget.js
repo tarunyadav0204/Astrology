@@ -106,7 +106,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
             time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
             latitude: parseFloat(birthData.latitude),
             longitude: parseFloat(birthData.longitude),
-            timezone: birthData.timezone || 'Asia/Kolkata'
           };
           const response = await chartAPI.calculateChartOnly(formattedData);
           d1ChartData = response.data;
@@ -228,7 +227,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
       };
       
       // Batch fetch all divisional charts
@@ -289,7 +287,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
       };
       
       const response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
@@ -334,7 +331,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
       };
       
       let response;
@@ -471,7 +467,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       );
     }
     
-    console.log('Rendering chart with showKarakas:', showKarakas, 'karakas:', karakas ? 'loaded' : 'null');
+    // console.log('Rendering chart with showKarakas:', showKarakas, 'karakas:', karakas ? 'loaded' : 'null');
     
     return chartStyle === 'north' ? (
       <NorthIndianChart 

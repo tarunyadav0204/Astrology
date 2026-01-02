@@ -18,9 +18,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storage } from '../../services/storage';
 import { chartAPI, authAPI } from '../../services/api';
-import { COLORS } from '../../utils/constants';
+import { COLORS, API_BASE_URL } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
@@ -108,7 +109,6 @@ export default function BirthFormScreen({ navigation, route }) {
           place: existingData.place || prev.place,
           latitude: existingData.latitude || prev.latitude,
           longitude: existingData.longitude || prev.longitude,
-          timezone: existingData.timezone || prev.timezone,
           gender: prev.gender || '', // Keep existing selection, don't overwrite
         }));
         // console.log('✅ [DEBUG] BirthForm: Data loaded without overwriting gender selection');
@@ -247,6 +247,8 @@ export default function BirthFormScreen({ navigation, route }) {
     } catch (error) {}
   };
 
+
+
   const handlePlaceSelect = (place) => {
     setFormData(prev => ({
       ...prev,
@@ -327,28 +329,12 @@ export default function BirthFormScreen({ navigation, route }) {
 
       // 1. Calculate chart for validation
       const [chartData, yogiData] = await Promise.all([
-        chartAPI.calculateChartOnly(birthData),
+        chartAPI.calculateChart(birthData),
         chartAPI.calculateYogi(birthData)
       ]);
 
-      // 2. Save to database FIRST to get real ID
-      let birthChartId = editProfile?.id || null;
-      const token = await storage.getAuthToken();
-      if (token) {
-        if (editProfile && birthChartId) {
-          // Edit mode: update existing chart by ID
-          console.log('✏️ Updating existing chart with ID:', birthChartId);
-          await chartAPI.updateChart(birthChartId, birthData);
-        } else {
-          // New profile: use updateSelfBirthChart
-          const shouldClearExisting = !updateGender;
-          const response = await authAPI.updateSelfBirthChart(birthData, shouldClearExisting);
-          birthChartId = response.data?.birth_chart_id;
-        }
-      } else {
-        // Generate temporary ID if no auth token
-        birthChartId = birthChartId || Date.now() + Math.random();
-      }
+      // The calculateChart endpoint already saves to database, so we just need the ID from response
+      let birthChartId = chartData.birth_chart_id || editProfile?.id || Date.now() + Math.random();
 
       // 3. Create profile data with REAL ID from database
       const profileData = {

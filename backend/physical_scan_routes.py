@@ -39,7 +39,7 @@ async def scan_physical_traits(request: PhysicalScanRequest, current_user = Depe
         
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
-        logging.info(f"Chart calculated - Ascendant: {chart_data.get('ascendant_sign')}, Planets: {list(chart_data.get('planets', {}).keys())}")
+        # logging.info(f"Chart calculated - Ascendant: {chart_data.get('ascendant_sign')}, Planets: {list(chart_data.get('planets', {}).keys())}")
         
         # Get birth chart ID from request
         birth_chart_id = request.birth_chart_id

@@ -1,0 +1,41 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-01T23:28:46.488192
+Question: Employed. Looking for salary growth
+Processing Time: 2.094s
+Response Length: 297 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "focus": "salary growth",
+        "employment_status": "employed"
+    },
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "focus": "salary growth",
+    "employment_status": "employed"
+  },
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

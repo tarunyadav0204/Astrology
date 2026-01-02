@@ -128,7 +128,7 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha })
 // --- MAIN COMPONENT ---
 
 export default function YoginiDashaTab({ data }) {
-  console.log('YoginiDashaTab received data:', JSON.stringify(data, null, 2));
+  // console.log('YoginiDashaTab received data:', JSON.stringify(data, null, 2));
   
   // Find current period index (safe with optional chaining)
   const currentIndex = React.useMemo(() => {
@@ -250,7 +250,7 @@ export default function YoginiDashaTab({ data }) {
           const isExpanded = expandedId === index;
           
           if (isCurrent) {
-            console.log(`Current period at index ${index}: expanded=${isExpanded}, has sub_periods=${!!item.sub_periods}`);
+            // console.log(`Current period at index ${index}: expanded=${isExpanded}, has sub_periods=${!!item.sub_periods}`);
           }
           
           return (

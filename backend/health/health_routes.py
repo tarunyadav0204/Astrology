@@ -13,7 +13,7 @@ from credits.credit_service import CreditService
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai.health_ai_context_generator import HealthAIContextGenerator
-from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from ai.structured_analyzer import StructuredAnalysisAnalyzer
 
 class HealthAnalysisRequest(BaseModel):
     name: Optional[str] = None
@@ -26,6 +26,7 @@ class HealthAnalysisRequest(BaseModel):
     gender: Optional[str] = None
     language: Optional[str] = 'english'
     response_style: Optional[str] = 'detailed'
+    force_regenerate: Optional[bool] = False
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -49,6 +50,33 @@ async def analyze_health(request: HealthAnalysisRequest, current_user: User = De
     
     async def generate_health_analysis():
         try:
+            # Check for cached analysis first (unless force_regenerate)
+            print(f"🔍 DEBUG: force_regenerate = {request.force_regenerate}")
+            if not request.force_regenerate:
+                import sqlite3
+                import hashlib
+                
+                birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
+                
+                conn = sqlite3.connect('astrology.db')
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT insights_data FROM ai_health_insights WHERE birth_hash = ?
+                """, (birth_hash,))
+                
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result:
+                    analysis_data = json.loads(result[0])
+                    analysis_data['cached'] = True
+                    final_response = {'status': 'complete', 'data': analysis_data, 'cached': True}
+                    response_json = json.dumps(final_response)
+                    print(f"🚀 SENDING CACHED HEALTH RESPONSE: {len(response_json)} chars")
+                    yield f"data: {response_json}\n\n"
+                    return
+            
             # Prepare birth data
             from datetime import date
             birth_data = {
@@ -58,7 +86,7 @@ async def analyze_health(request: HealthAnalysisRequest, current_user: User = De
                 'place': request.place,
                 'latitude': request.latitude or 28.6139,
                 'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+5:30',
+                'timezone': request.timezone or 'UTC+0',
                 'gender': request.gender,
                 'current_year': date.today().year
             }
@@ -127,132 +155,67 @@ CRITICAL RULES:
 5. Use ** for bold text in JSON strings
 """
             
-            # Generate AI response with retry logic
-            gemini_analyzer = GeminiChatAnalyzer()
-            
-            # Try up to 3 times with increasing timeouts
-            max_retries = 3
-            ai_result = None
-            
-            for attempt in range(max_retries):
-                try:
-                    print(f"🔄 Gemini API attempt {attempt + 1}/{max_retries}")
-                    
-                    # Send progress update to frontend
-                    if attempt > 0:
-                        progress_msg = f"Retrying analysis (attempt {attempt + 1}/{max_retries})..."
-                        yield f"data: {json.dumps({'status': 'processing', 'message': progress_msg})}\n\n"
-                    
-                    # Add timeout to the analyzer call
-                    ai_result = await asyncio.wait_for(
-                        gemini_analyzer.generate_chat_response(
-                            health_question, 
-                            context, 
-                            [], 
-                            request.language, 
-                            request.response_style
-                        ),
-                        timeout=180.0 + (attempt * 60)  # 3, 4, 5 minute timeouts
-                    )
-                    
-                    if ai_result and ai_result.get('success'):
-                        print(f"✅ Gemini API succeeded on attempt {attempt + 1}")
-                        break
-                    else:
-                        print(f"⚠️ Gemini API returned unsuccessful result on attempt {attempt + 1}")
-                        if attempt == max_retries - 1:
-                            raise Exception("Gemini API returned unsuccessful result after all retries")
-                        
-                except asyncio.TimeoutError:
-                    print(f"⏰ Gemini API timeout on attempt {attempt + 1}")
-                    if attempt == max_retries - 1:
-                        raise Exception("Gemini API timed out after all retry attempts. The analysis is too complex for current processing capacity.")
-                    
-                    # Send timeout message to frontend
-                    timeout_msg = f"Analysis timed out on attempt {attempt + 1}. Retrying with extended timeout..."
-                    yield f"data: {json.dumps({'status': 'processing', 'message': timeout_msg})}\n\n"
-                    await asyncio.sleep(5)  # Wait 5 seconds before retry
-                    
-                except Exception as e:
-                    print(f"❌ Gemini API error on attempt {attempt + 1}: {e}")
-                    if attempt == max_retries - 1:
-                        raise e
-                    
-                    # Send error message to frontend
-                    error_msg = f"Attempt {attempt + 1} failed: {str(e)[:100]}. Retrying..."
-                    yield f"data: {json.dumps({'status': 'processing', 'message': error_msg})}\n\n"
-                    await asyncio.sleep(5)  # Wait 5 seconds before retry
+            # Generate AI response using structured analyzer
+            analyzer = StructuredAnalysisAnalyzer()
+            ai_result = await analyzer.generate_structured_report(
+                health_question, 
+                context, 
+                request.language or 'english'
+            )
             
             if ai_result['success']:
-                # Parse AI response
                 try:
-                    ai_response_text = ai_result.get('response', '')
-                    print(f"📄 PARSING HEALTH RESPONSE length: {len(ai_response_text)}")
-
-                    # Extract and clean JSON
-                    import html
-                    import re
-                    
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
-                    if json_match:
-                        json_text = json_match.group(1)
+                    # Handle structured analyzer response format
+                    if ai_result.get('is_raw'):
+                        # Raw response format (fallback)
+                        parsed_response = {
+                            "quick_answer": "Analysis completed successfully.",
+                            "detailed_analysis": [],
+                            "final_thoughts": "Analysis provided in detailed format.",
+                            "follow_up_questions": []
+                        }
                     else:
-                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
-                        if json_match:
-                            json_text = json_match.group(1)
-                        else:
-                            json_text = ai_response_text
-
-                    decoded_json = html.unescape(json_text)
+                        # JSON data format (preferred) - map to mobile expected format
+                        raw_data = ai_result.get('data', {})
+                        
+                        # Map detailed_analysis fields to mobile expected format
+                        detailed_analysis = []
+                        for item in raw_data.get('detailed_analysis', []):
+                            detailed_analysis.append({
+                                "question": item.get('question', ''),
+                                "answer": item.get('answer', '')
+                            })
+                        
+                        parsed_response = {
+                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
+                            "detailed_analysis": detailed_analysis,
+                            "final_thoughts": raw_data.get('final_thoughts', ''),
+                            "follow_up_questions": raw_data.get('follow_up_questions', []),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
                     
-                    replacements = {
-                        '&quot;': '"',
-                        '&amp;': '&',
-                        '&lt;': '<',
-                        '&gt;': '>',
-                        '&#39;': "'",
-                        '&apos;': "'"
+                    # Map to mobile expected format
+                    detailed_analysis = []
+                    for item in parsed_response.get('detailed_analysis', []):
+                        detailed_analysis.append({
+                            "question": item.get('question', ''),
+                            "answer": item.get('answer', '')
+                        })
+                    
+                    formatted_response = {
+                        "quick_answer": parsed_response.get('quick_answer', 'Analysis completed successfully.'),
+                        "detailed_analysis": detailed_analysis,
+                        "final_thoughts": parsed_response.get('final_thoughts', ''),
+                        "follow_up_questions": parsed_response.get('follow_up_questions', []),
+                        "terms": ai_result.get('terms', []),
+                        "glossary": ai_result.get('glossary', {})
                     }
-                    for code, char in replacements.items():
-                        decoded_json = decoded_json.replace(code, char)
-
-                    parsing_successful = False
-                    try:
-                        parsed_response = json.loads(decoded_json)
-                        parsing_successful = True
-                        print(f"✅ JSON PARSED SUCCESSFULLY")
-                        print(f"   Keys: {list(parsed_response.keys())}")
-                        print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
-                    except json.JSONDecodeError as parse_error:
-                        print(f"⚠️ Standard parse failed: {parse_error}")
-                        try:
-                            cleaned_json = re.sub(r'\n(?![\s]*")', '<br>', decoded_json)
-                            cleaned_json = cleaned_json.replace('\\\\"', '\\"')
-                            parsed_response = json.loads(cleaned_json)
-                            parsing_successful = True
-                            print(f"✅ JSON PARSED AFTER CLEANUP")
-                            print(f"   Keys: {list(parsed_response.keys())}")
-                            print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
-                        except json.JSONDecodeError as cleanup_error:
-                            print(f"❌ JSON parsing failed: {cleanup_error}")
-                            print(f"📄 Raw response appears to be HTML, using as raw_response")
-                            # If JSON parsing fails, treat as HTML response
-                            parsed_response = {
-                                "raw_response": ai_response_text,
-                                "quick_answer": "Analysis completed successfully.",
-                                "detailed_analysis": [],
-                                "final_thoughts": "Analysis provided in detailed format.",
-                                "follow_up_questions": []
-                            }
-                            parsing_successful = True  # HTML response is still valid
                     
-                    # Build complete response with advanced data indicators
                     health_insights = {
-                        'health_analysis': {
-                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
-                            'raw_response': parsed_response.get('raw_response'),
-                            'summary': 'Advanced Vedic health analysis with Mrityu Bhaga, Badhaka, and D-30 calculations.'
-                        },
+                        'analysis': formatted_response,
+                        'terms': ai_result.get('terms', []),
+                        'glossary': ai_result.get('glossary', {}),
                         'enhanced_context': True,
                         'advanced_calculations': {
                             'mrityu_bhaga': True,
@@ -260,26 +223,23 @@ CRITICAL RULES:
                             'd30_trimsamsa': True,
                             'functional_malefics': True
                         },
-                        'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'health_ai_context_generator_advanced',
+                        'questions_covered': len(detailed_analysis),
+                        'context_type': 'structured_analyzer',
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    # Only deduct credits if parsing was successful
-                    if parsing_successful:
-                        success = credit_service.spend_credits(
-                            current_user.userid, 
-                            health_cost, 
-                            'health_analysis', 
-                            f"Health analysis for {birth_data.get('name', 'user')}"
-                        )
-                        
-                        if success:
-                            print(f"💳 Credits deducted successfully")
-                        else:
-                            print(f"❌ Credit deduction failed")
+                    # Only deduct credits if analysis was successful
+                    success = credit_service.spend_credits(
+                        current_user.userid, 
+                        health_cost, 
+                        'health_analysis', 
+                        f"Health analysis for {birth_data.get('name', 'user')}"
+                    )
+                    
+                    if success:
+                        print(f"💳 Credits deducted successfully")
                     else:
-                        print(f"⚠️ Skipping credit deduction due to parsing failure")
+                        print(f"❌ Credit deduction failed")
                     
                     # Cache the analysis
                     try:
@@ -394,7 +354,7 @@ async def get_overall_health_assessment(request: HealthAnalysisRequest, current_
             place=request.place,
             latitude=request.latitude or 28.6139,
             longitude=request.longitude or 77.2090,
-            timezone=request.timezone or 'UTC+5:30'
+            timezone=request.timezone or 'UTC+0'
         )
         
         # Calculate birth chart

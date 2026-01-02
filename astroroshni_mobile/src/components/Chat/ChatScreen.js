@@ -226,7 +226,7 @@ export default function ChatScreen({ navigation, route }) {
         time: birthData.time,
         latitude: birthData.latitude,
         longitude: birthData.longitude,
-        timezone: birthData.timezone,
+        place: birthData.place || "",
         place: birthData.place || '',
         gender: birthData.gender || ''
       }, 18, 50);
@@ -334,8 +334,7 @@ export default function ChatScreen({ navigation, route }) {
         date: typeof birth.date === 'string' ? birth.date.split('T')[0] : birth.date,
         time: typeof birth.time === 'string' ? birth.time.split('T')[1]?.slice(0, 5) || birth.time : birth.time,
         latitude: parseFloat(birth.latitude),
-        longitude: parseFloat(birth.longitude),
-        timezone: birth.timezone || 'Asia/Kolkata'
+        longitude: parseFloat(birth.longitude)
       };
       
       const { chartAPI } = require('../../services/api');
@@ -362,7 +361,6 @@ export default function ChatScreen({ navigation, route }) {
         time: birth.time.includes('T') ? new Date(birth.time).toTimeString().slice(0, 5) : birth.time,
         latitude: parseFloat(birth.latitude),
         longitude: parseFloat(birth.longitude),
-        timezone: birth.timezone || 'Asia/Kolkata',
         location: birth.place || 'Unknown'
       };
       
@@ -465,6 +463,7 @@ export default function ChatScreen({ navigation, route }) {
         setCurrentPersonId(personId);
         
         // Load chart data for the new person
+        setChartData(null); // Clear cached data
         loadChartData(birthData);
         loadDashaData(birthData);
         
@@ -1093,7 +1092,6 @@ export default function ChatScreen({ navigation, route }) {
           time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
           latitude: parseFloat(birthData.latitude),
           longitude: parseFloat(birthData.longitude),
-          timezone: birthData.timezone || 'Asia/Kolkata',
           place: birthData.place || '',
           gender: birthData.gender || ''
         },
@@ -1106,7 +1104,6 @@ export default function ChatScreen({ navigation, route }) {
           partner_place: partnerChart.place || '',
           partner_latitude: parseFloat(partnerChart.latitude),
           partner_longitude: parseFloat(partnerChart.longitude),
-          partner_timezone: partnerChart.timezone || 'Asia/Kolkata',
           partner_gender: partnerChart.gender || ''
         })
       };

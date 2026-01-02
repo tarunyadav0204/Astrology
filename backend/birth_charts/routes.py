@@ -222,7 +222,7 @@ async def update_birth_chart(chart_id: int, birth_data: dict, current_user: User
             SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?
             WHERE id=? AND userid=?
         ''', (enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-            birth_data.get('timezone', 'UTC+5:30'), enc_place, birth_data.get('gender', ''), chart_id, current_user.userid))
+            birth_data.get('timezone', 'UTC+0'), enc_place, birth_data.get('gender', ''), chart_id, current_user.userid))
 
         conn.commit()
         return {"message": "Chart updated successfully"}

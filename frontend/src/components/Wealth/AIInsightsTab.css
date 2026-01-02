@@ -725,14 +725,10 @@
   margin-bottom: 0;
 }
 
-.section-title {
-  color: #475569;
-  font-size: 1.1em;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #E2E8F0;
-  display: inline-block;
+.wealth-section-title {
+  text-align: left !important;
+  color: #2c3e50 !important;
+  font-size: 1.2em !important;
 }
 
 .answer-text {
@@ -744,6 +740,7 @@
   line-height: 1.7;
   color: #475569;
   white-space: pre-line;
+  font-size: 0.95em; /* Reduced from default */
 }
 
 .answer-text strong {
@@ -1220,5 +1217,103 @@
   .follow-up-chip {
     padding: 10px 16px;
     font-size: 0.9em;
+  }
+}
+
+/* Clickable Terms Styles */
+.clickable-term {
+  color: #ff69b4 !important;
+  text-decoration: underline;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-term:hover {
+  color: #ff1493 !important;
+  text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
+}
+
+/* Tooltip Modal Styles */
+.tooltip-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.tooltip-modal-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.tooltip-modal-content {
+  padding: 24px;
+  text-align: center;
+}
+
+.tooltip-modal-title {
+  color: #ff69b4;
+  font-size: 1.3em;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-decoration: underline;
+}
+
+.tooltip-modal-text {
+  color: #333;
+  font-size: 1em;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.tooltip-modal-close {
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8c5a 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.tooltip-modal-close:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 107, 53, 0.4);
+  background: linear-gradient(135deg, #ff8c5a 0%, #ff6b35 100%);
+}
+
+/* Mobile responsive for tooltip */
+@media (max-width: 768px) {
+  .tooltip-modal-container {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .tooltip-modal-content {
+    padding: 20px;
+  }
+  
+  .tooltip-modal-title {
+    font-size: 1.2em;
+  }
+  
+  .tooltip-modal-text {
+    font-size: 0.95em;
   }
 }

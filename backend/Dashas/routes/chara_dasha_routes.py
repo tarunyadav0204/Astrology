@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from calculators.chara_dasha_calculator import CharaDashaCalculator
 from calculators.chart_calculator import ChartCalculator
+from utils.timezone_service import parse_timezone_offset
 
 router = APIRouter(prefix="/chara-dasha", tags=["Chara Dasha"])
 
@@ -18,8 +19,15 @@ class BirthData(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: Optional[str] = "Asia/Kolkata"
     place: Optional[str] = None
+    
+    @property
+    def timezone(self):
+        """Auto-detect timezone from coordinates"""
+        try:
+            return parse_timezone_offset('', self.latitude, self.longitude)
+        except Exception:
+            return 5.5  # IST fallback
 
 @router.post("/calculate")
 async def calculate_chara_dasha(birth_data: BirthData):
@@ -53,9 +61,16 @@ class AntardashaRequest(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: Optional[str] = "Asia/Kolkata"
     place: Optional[str] = None
     maha_sign_id: int
+    
+    @property
+    def timezone(self):
+        """Auto-detect timezone from coordinates"""
+        try:
+            return parse_timezone_offset('', self.latitude, self.longitude)
+        except Exception:
+            return 5.5  # IST fallback
 
 @router.post("/antardasha")
 async def calculate_chara_antardasha(request: AntardashaRequest):

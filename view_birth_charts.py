@@ -65,7 +65,7 @@ def main():
         print("💡 Looking for: ENCRYPTION_KEY env var or encryption.key file")
     
     # Connect to database (check multiple paths)
-    db_paths = ['astrology.db', 'backend/astrology.db', '/home/tarun_yadav/AstrologyApp/backend/astrology.db']
+    db_paths = ['backend/astrology.db', 'astrology.db', '/Users/tarunydv/Desktop/Code/AstrologyApp/backend/astrology.db']
     db_path = None
     for path in db_paths:
         if os.path.exists(path):

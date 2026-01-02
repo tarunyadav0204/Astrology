@@ -40,6 +40,10 @@ class EventAnalyzer:
         
         for i, planet_id in enumerate(planet_ids):
             if planet_id <= 6:
+                # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+
                 pos = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL)[0]
             else:
                 pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)[0]

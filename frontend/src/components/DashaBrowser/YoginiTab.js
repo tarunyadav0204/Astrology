@@ -35,7 +35,6 @@ const YoginiTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentStatus
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'UTC+5:30',
         place: birthData.place || 'Unknown'
       };
 
@@ -193,7 +192,6 @@ const YoginiTab = ({ birthData, transitDate, onDateChange, showOnlyCurrentStatus
                         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
                         latitude: parseFloat(birthData.latitude),
                         longitude: parseFloat(birthData.longitude),
-                        timezone: birthData.timezone || 'UTC+5:30',
                         place: birthData.place || 'Unknown'
                       };
 

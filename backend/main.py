@@ -10,7 +10,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from utils.timezone_service import get_timezone_from_coordinates
+from utils.timezone_service import parse_timezone_offset
 import bcrypt
 import jwt
 from horoscope.api import HoroscopeAPI
@@ -251,6 +251,31 @@ app.include_router(financial_router)
 
 
 
+@app.post("/api/detect-timezone")
+async def detect_timezone_from_coordinates(request: dict):
+    """Detect timezone from coordinates using professional libraries"""
+    try:
+        from utils.timezone_service import get_timezone_from_coordinates
+        
+        latitude = request.get('latitude')
+        longitude = request.get('longitude')
+        
+        if latitude is None or longitude is None:
+            raise HTTPException(status_code=400, detail="Latitude and longitude required")
+        
+        timezone = get_timezone_from_coordinates(float(latitude), float(longitude))
+        
+        return {
+            "timezone": timezone,
+            "latitude": latitude,
+            "longitude": longitude
+        }
+        
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Timezone detection libraries not available: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Timezone detection failed: {str(e)}")
+
 @app.get("/api/test")
 async def test_endpoint():
     return {"status": "ok", "message": "API is working", "timestamp": datetime.now().isoformat()}
@@ -406,7 +431,6 @@ class BirthData(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: Optional[str] = None  # Will be auto-detected if not provided
     place: str = ""
     gender: str = ""
     relation: Optional[str] = "other"
@@ -420,23 +444,15 @@ class BirthData(BaseModel):
                 return f"{parts[0]}:{parts[1]}"
         return v
     
-    @validator('timezone', always=True)
-    def set_timezone(cls, v, values):
-        if v is None and 'latitude' in values and 'longitude' in values:
-            # Auto-detect timezone from coordinates
-            detected_tz = get_timezone_from_coordinates(values['latitude'], values['longitude'])
-            return detected_tz or "UTC+5:30"  # Fallback to IST if detection fails
-        return v or "UTC+5:30"
-    
-    class Config:
-        # Allow string coercion for timezone field
-        str_strip_whitespace = True
-        
-    @validator('timezone')
-    def validate_timezone(cls, v):
-        if v is None:
-            return "UTC+5:30"  # Default to IST
-        return str(v).strip()
+    @property
+    def timezone(self):
+        """Auto-detect timezone from coordinates and return as offset hours"""
+        try:
+            from utils.timezone_service import parse_timezone_offset
+            return parse_timezone_offset('', self.latitude, self.longitude)
+        except Exception as e:
+            print(f"Timezone detection failed: {e}")
+            return 0.0  # UTC fallback
 
 class TransitRequest(BaseModel):
     birth_data: BirthData
@@ -1662,16 +1678,11 @@ async def calculate_friendship(birth_data: BirthData):
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
     
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    tz_offset = parse_timezone_offset(
+        birth_data.timezone,
+        birth_data.latitude,
+        birth_data.longitude
+    )
     
     utc_hour = hour - tz_offset
     jd = swe.julday(
@@ -1890,16 +1901,11 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
     
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    tz_offset = parse_timezone_offset(
+        birth_data.timezone,
+        birth_data.latitude,
+        birth_data.longitude
+    )
     
     utc_hour = hour - tz_offset
     birth_jd = swe.julday(
@@ -1936,16 +1942,11 @@ async def calculate_yogi(birth_data: BirthData):
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
     
-    if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-        tz_offset = 5.5
-    else:
-        tz_offset = 0
-        if birth_data.timezone.startswith('UTC'):
-            tz_str = birth_data.timezone[3:]
-            if tz_str and ':' in tz_str:
-                sign = 1 if tz_str[0] == '+' else -1
-                parts = tz_str[1:].split(':')
-                tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+    tz_offset = parse_timezone_offset(
+        birth_data.timezone,
+        birth_data.latitude,
+        birth_data.longitude
+    )
     
     utc_hour = hour - tz_offset
     jd = swe.julday(

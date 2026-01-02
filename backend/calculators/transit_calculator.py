@@ -1,5 +1,6 @@
 import swisseph as swe
 from .base_calculator import BaseCalculator
+from utils.timezone_service import parse_timezone_offset
 
 class TransitCalculator(BaseCalculator):
     """Extract transit calculation logic from main.py"""
@@ -19,6 +20,10 @@ class TransitCalculator(BaseCalculator):
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):
             if planet <= 6:
+                # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+
                 pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED)
             else:
                 pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED)
@@ -43,16 +48,12 @@ class TransitCalculator(BaseCalculator):
         time_parts = birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
         
-        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-            tz_offset = 5.5
-        else:
-            tz_offset = 0
-            if birth_data.timezone.startswith('UTC'):
-                tz_str = birth_data.timezone[3:]
-                if tz_str and ':' in tz_str:
-                    sign = 1 if tz_str[0] == '+' else -1
-                    parts = tz_str[1:].split(':')
-                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+        # Get timezone offset using centralized service
+        tz_offset = parse_timezone_offset(
+            getattr(birth_data, 'timezone', ''),
+            getattr(birth_data, 'latitude', None),
+            getattr(birth_data, 'longitude', None)
+        )
         
         utc_hour = hour - tz_offset
         birth_jd = swe.julday(

@@ -1,6 +1,7 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
+from utils.timezone_service import parse_timezone_offset
 
 class RealTransitCalculator:
     """Real astronomical transit calculations using Swiss Ephemeris"""
@@ -241,18 +242,12 @@ class RealTransitCalculator:
             hour = float(time_parts[0]) + float(time_parts[1])/60
             # print(f"     Parsed time: {hour} hours")
             
-            # Handle timezone
-            if 6.0 <= birth_data['latitude'] <= 37.0 and 68.0 <= birth_data['longitude'] <= 97.0:
-                tz_offset = 5.5
-            else:
-                tz_offset = 0
-                timezone_str = birth_data.get('timezone', '')
-                if timezone_str.startswith('UTC'):
-                    tz_str = timezone_str[3:]
-                    if tz_str and ':' in tz_str:
-                        sign = 1 if tz_str[0] == '+' else -1
-                        parts = tz_str[1:].split(':')
-                        tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+            # Handle timezone using centralized service
+            tz_offset = parse_timezone_offset(
+                birth_data.get('timezone', ''),
+                birth_data.get('latitude'),
+                birth_data.get('longitude')
+            )
             
             # print(f"     Timezone offset: {tz_offset} hours")
 

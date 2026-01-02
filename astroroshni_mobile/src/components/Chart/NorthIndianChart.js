@@ -4,7 +4,7 @@ import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Sto
 
 const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null }) => {
   
-  console.log('NorthIndianChart - showKarakas:', showKarakas, 'karakas:', karakas ? Object.keys(karakas) : 'null');
+  // console.log('NorthIndianChart - showKarakas:', showKarakas, 'karakas:', karakas ? Object.keys(karakas) : 'null');
   
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });

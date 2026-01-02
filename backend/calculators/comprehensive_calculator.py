@@ -15,7 +15,7 @@ from .yoga_calculator import YogaCalculator
 from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
 from .argala_calculator import ArgalaCalculator
 from .profession_calculator import ProfessionCalculator
-from utils.timezone_service import get_timezone_from_coordinates
+from utils.timezone_service import parse_timezone_offset
 # Import these only when needed to avoid import errors
 # from ..shared.dasha_calculator import DashaCalculator
 # from ..calculators.ashtakavarga import AshtakavargaCalculator
@@ -29,10 +29,19 @@ class ComprehensiveCalculator:
         self.birth_data = birth_data
         self.chart_data = chart_data or {}
         
-        # Auto-detect timezone if not provided
+        # Auto-detect timezone if not provided using centralized service
         if not hasattr(birth_data, 'timezone') or not birth_data.timezone:
             if hasattr(birth_data, 'latitude') and hasattr(birth_data, 'longitude'):
-                birth_data.timezone = get_timezone_from_coordinates(birth_data.latitude, birth_data.longitude)
+                tz_offset = parse_timezone_offset(
+                    '',  # No timezone string
+                    birth_data.latitude,
+                    birth_data.longitude
+                )
+                # Convert offset back to UTC format
+                if tz_offset >= 0:
+                    birth_data.timezone = f"UTC+{tz_offset}"
+                else:
+                    birth_data.timezone = f"UTC{tz_offset}"
         
         # Initialize individual calculators with chart_data only
         self.shadbala_calc = ShadbalaCalculator(chart_data)

@@ -42,7 +42,6 @@ export default function ModernAuthFlow({ navigation }) {
       place: '',
       latitude: null,
       longitude: null,
-      timezone: 'Asia/Kolkata',
       gender: ''
     },
     collectBirthDetails: false

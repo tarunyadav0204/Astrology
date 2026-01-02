@@ -523,7 +523,7 @@ async def get_chat_history(request: ClearChatRequest):
             'place': request.place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30',
+            'timezone': request.timezone or 'UTC+0',
             'gender': request.gender
         }
         
@@ -549,7 +549,7 @@ async def clear_chat_history(request: ClearChatRequest):
             'place': request.place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30',
+            'timezone': request.timezone or 'UTC+0',
             'gender': request.gender
         }
         
@@ -594,7 +594,7 @@ async def get_event_periods(request: ClearChatRequest):
             'place': request.place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30',
+            'timezone': request.timezone or 'UTC+0',
             'gender': request.gender
         }
         
@@ -745,7 +745,7 @@ async def save_message(request: dict):
             'place': request.get('place'),
             'latitude': request.get('latitude', 28.6139),
             'longitude': request.get('longitude', 77.2090),
-            'timezone': request.get('timezone', 'UTC+5:30'),
+            'timezone': request.get('timezone', 'UTC+0'),
             'gender': request.get('gender')
         }
         
@@ -826,7 +826,7 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
             'place': request.place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30',
+            'timezone': request.timezone or 'UTC+0',
             'gender': request.gender
         }
         

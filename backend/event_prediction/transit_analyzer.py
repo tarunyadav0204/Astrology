@@ -33,6 +33,8 @@ class TransitAnalyzer:
             jd = swe.julday(year, month, 15, 12.0)
             
             # Get transit planet position
+            # Set Lahiri Ayanamsa for accurate Vedic calculations
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
             if transit_planet in PLANET_NUMBERS:
                 planet_num = PLANET_NUMBERS[transit_planet]
                 transit_pos = swe.calc_ut(jd, planet_num, swe.FLG_SIDEREAL)[0][0]

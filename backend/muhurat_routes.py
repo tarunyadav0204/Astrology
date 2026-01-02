@@ -4,6 +4,7 @@ from typing import Optional
 from calculators.muhurat_calculator import MuhuratCalculator
 from auth import get_current_user, User
 from credits.credit_service import CreditService
+from utils.timezone_service import parse_timezone_offset
 import swisseph as swe
 
 router = APIRouter(prefix="/muhurat", tags=["muhurat"])
@@ -16,24 +17,24 @@ class ChildbirthMuhuratRequest(BaseModel):
     end_date: str
     delivery_latitude: float
     delivery_longitude: float
-    delivery_timezone: Optional[str] = "UTC+5:30"
+    delivery_timezone: Optional[str] = None
     mother_dob: str
     mother_time: str
     mother_lat: float
     mother_lon: float
-    mother_timezone: Optional[str] = "UTC+5:30"
+    mother_timezone: Optional[str] = None
 
 class GeneralMuhuratRequest(BaseModel):
     start_date: str
     end_date: str
     latitude: float
     longitude: float
-    timezone: Optional[str] = "UTC+5:30"
+    timezone: Optional[str] = None
     user_dob: str
     user_time: str
     user_lat: float
     user_lon: float
-    user_timezone: Optional[str] = "UTC+5:30"
+    user_timezone: Optional[str] = None
 
 # --- HELPER ---
 async def _process_muhurat(request, current_user, feature_name, calc_method):
@@ -56,10 +57,20 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
 
         time_parts = time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
-        tz_offset = 5.5 # Simplified
+        
+        # Get timezone offset using centralized service
+        if hasattr(request, 'mother_lat'):
+            lat, lon = request.mother_lat, request.mother_lon
+            tz = getattr(request, 'mother_timezone', None)
+        else:
+            lat, lon = request.user_lat, request.user_lon
+            tz = getattr(request, 'user_timezone', None)
+        
+        tz_offset = parse_timezone_offset(tz, lat, lon)
         utc_hour = hour - tz_offset
         
         jd = swe.julday(int(dob.split('-')[0]), int(dob.split('-')[1]), int(dob.split('-')[2]), utc_hour)
+        # Set Lahiri Ayanamsa for accurate Vedic calculations
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
         user_nak_id = int(moon_pos / (360/27)) + 1
@@ -68,7 +79,7 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
         # Map location fields
         lat = getattr(request, 'delivery_latitude', getattr(request, 'latitude', 0.0))
         lon = getattr(request, 'delivery_longitude', getattr(request, 'longitude', 0.0))
-        tz = getattr(request, 'delivery_timezone', getattr(request, 'timezone', "UTC+5:30"))
+        tz = getattr(request, 'delivery_timezone', getattr(request, 'timezone', None))
 
         result = calc_method(
             request.start_date,

@@ -113,8 +113,7 @@ export default function AshtakvargaOracle({ navigation }) {
             date: birth.date,
             time: birth.time,
             latitude: birth.latitude,
-            longitude: birth.longitude,
-            timezone: birth.timezone || 'Asia/Kolkata'
+            longitude: birth.longitude
           },
           chart_type: 'lagna'
         })
@@ -434,7 +433,6 @@ export default function AshtakvargaOracle({ navigation }) {
             time: birthData.time,
             latitude: birthData.latitude,
             longitude: birthData.longitude,
-            timezone: birthData.timezone || 'Asia/Kolkata',
             place: birthData.place || '',
             gender: birthData.gender || ''
           }

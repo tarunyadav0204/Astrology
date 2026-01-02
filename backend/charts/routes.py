@@ -23,10 +23,19 @@ class BirthData(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: str = "UTC+5:30"
     place: str = ""
     gender: str = ""
     relation: str = "other"
+    
+    @property
+    def timezone(self):
+        """Auto-detect timezone from coordinates and return as offset string"""
+        try:
+            from utils.timezone_service import get_timezone_from_coordinates
+            return get_timezone_from_coordinates(self.latitude, self.longitude)
+        except Exception as e:
+            print(f"Timezone detection failed: {e}")
+            return "UTC+0"  # UTC default instead of IST
 
 router = APIRouter()
 
@@ -171,17 +180,35 @@ async def calculate_chart_only(request: dict, current_user: User = Depends(get_c
                 self.time = data.get('time')
                 self.latitude = float(data.get('latitude', 0))
                 self.longitude = float(data.get('longitude', 0))
-                self.timezone = data.get('timezone', 'UTC+5:30')
+                self.timezone = data.get('timezone', '')  # Empty string, not UTC+0
                 self.place = data.get('place', '')
                 self.gender = data.get('gender', '')
                 self.relation = data.get('relation', 'other')
+                
+            @property
+            def timezone_offset(self):
+                """Auto-detect timezone from coordinates and return as offset string"""
+                try:
+                    from utils.timezone_service import get_timezone_from_coordinates
+                    detected_tz = get_timezone_from_coordinates(self.latitude, self.longitude)
+                    print(f"🌍 Timezone auto-detected for {self.latitude}, {self.longitude}: {detected_tz}")
+                    return detected_tz
+                except Exception as e:
+                    print(f"❌ Timezone detection failed: {e}")
+                    return "UTC+0"  # UTC default instead of IST
         
         birth_obj = BirthDataSimple(birth_data)
         print(f"📋 Birth object created - Date: {birth_obj.date}, Time: {birth_obj.time}")
+        print(f"🌍 Using timezone: {birth_obj.timezone_offset} for coordinates: {birth_obj.latitude}, {birth_obj.longitude}")
         
         # Calculate chart
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj)
+        
+        # print(f"📊 Chart calculated - Ascendant: {chart_data.get('ascendant', 'N/A')}°")
+        if 'houses' in chart_data and len(chart_data['houses']) > 0:
+            asc_sign = chart_data['houses'][0].get('sign', 'N/A')
+            print(f"📊 Ascendant sign: {asc_sign}")
         
         # Return chart data directly (not wrapped in success/chart_data)
         return chart_data
@@ -206,7 +233,7 @@ async def calculate_all_charts(request: dict, current_user: User = Depends(get_c
                 self.time = data.get('time')
                 self.latitude = float(data.get('latitude', 0))
                 self.longitude = float(data.get('longitude', 0))
-                self.timezone = data.get('timezone', 'UTC+5:30')
+                self.timezone = data.get('timezone', 'UTC+0')
                 self.place = data.get('place', '')
                 self.gender = data.get('gender', '')
                 self.relation = data.get('relation', 'other')
@@ -412,7 +439,7 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
                 self.time = data.get('time')
                 self.latitude = float(data.get('latitude', 0))
                 self.longitude = float(data.get('longitude', 0))
-                self.timezone = data.get('timezone', 'UTC+5:30')
+                self.timezone = data.get('timezone', 'UTC+0')
                 self.place = data.get('place', '')
                 self.gender = data.get('gender', '')
                 self.relation = data.get('relation', 'other')
@@ -546,30 +573,13 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
-        # Check if chart exists for this user with same details
+        # Always insert new chart (allow duplicates)
         cursor.execute('''
-            SELECT id FROM birth_charts 
-            WHERE userid = ? AND name = ? AND date = ? AND time = ? AND latitude = ? AND longitude = ?
-        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon))
-        
-        existing_chart = cursor.fetchone()
-        
-        if existing_chart:
-            # Update existing chart for this user
-            cursor.execute('''
-                UPDATE birth_charts 
-                SET timezone=?, place=?, gender=?, relation=?
-                WHERE id=?
-            ''', (birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other', existing_chart[0]))
-            print(f"📝 Updated existing chart with id: {existing_chart[0]}")
-        else:
-            # Insert new chart for this user
-            cursor.execute('''
-                INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
-                birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
-            print(f"📝 Inserted new chart with id: {cursor.lastrowid}")
+            INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
+            birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
+        print(f"📝 Inserted new chart with id: {cursor.lastrowid}")
 
         conn.commit()
         conn.close()

@@ -13,7 +13,7 @@ from credits.credit_service import CreditService
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai.career_ai_context_generator import CareerAIContextGenerator
-from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from ai.structured_analyzer import StructuredAnalysisAnalyzer
 
 class CareerAnalysisRequest(BaseModel):
     name: Optional[str] = None
@@ -57,7 +57,7 @@ async def get_career_ai_insights(request: CareerAnalysisRequest, current_user: U
                 'place': request.place,
                 'latitude': request.latitude or 28.6139,
                 'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+5:30',
+                'timezone': request.timezone or 'UTC+0',
                 'gender': request.gender
             }
             
@@ -212,128 +212,68 @@ CRITICAL RULES:
 
 """
             
-            # Generate AI response with retry logic
-            gemini_analyzer = GeminiChatAnalyzer()
-            
-            max_retries = 3
-            ai_result = None
-            
-            for attempt in range(max_retries):
-                try:
-                    print(f"🔄 Gemini API attempt {attempt + 1}/{max_retries}")
-                    
-                    if attempt > 0:
-                        progress_msg = f"Retrying analysis (attempt {attempt + 1}/{max_retries})..."
-                        yield f"data: {json.dumps({'status': 'processing', 'message': progress_msg})}\n\n"
-                    
-                    ai_result = await asyncio.wait_for(
-                        gemini_analyzer.generate_chat_response(
-                            career_question, 
-                            context, 
-                            [], 
-                            request.language, 
-                            request.response_style
-                        ),
-                        timeout=180.0 + (attempt * 60)
-                    )
-                    
-                    if ai_result and ai_result.get('success'):
-                        print(f"✅ Gemini API succeeded on attempt {attempt + 1}")
-                        break
-                    else:
-                        print(f"⚠️ Gemini API returned unsuccessful result on attempt {attempt + 1}")
-                        if attempt == max_retries - 1:
-                            raise Exception("Gemini API returned unsuccessful result after all retries")
-                        
-                except asyncio.TimeoutError:
-                    print(f"⏰ Gemini API timeout on attempt {attempt + 1}")
-                    if attempt == max_retries - 1:
-                        raise Exception("Gemini API timed out after all retry attempts")
-                    
-                    timeout_msg = f"Analysis timed out on attempt {attempt + 1}. Retrying..."
-                    yield f"data: {json.dumps({'status': 'processing', 'message': timeout_msg})}\n\n"
-                    await asyncio.sleep(5)
-                    
-                except Exception as e:
-                    print(f"❌ Gemini API error on attempt {attempt + 1}: {e}")
-                    if attempt == max_retries - 1:
-                        raise e
-                    
-                    error_msg = f"Attempt {attempt + 1} failed. Retrying..."
-                    yield f"data: {json.dumps({'status': 'processing', 'message': error_msg})}\n\n"
-                    await asyncio.sleep(5)
+            # Generate AI response using structured analyzer
+            analyzer = StructuredAnalysisAnalyzer()
+            ai_result = await analyzer.generate_structured_report(
+                career_question, 
+                context, 
+                request.language or 'english'
+            )
             
             if ai_result['success']:
                 try:
-                    ai_response_text = ai_result.get('response', '')
-                    print(f"📄 PARSING CAREER RESPONSE length: {len(ai_response_text)}")
-
-                    import html
-                    import re
-                    
-                    json_match = re.search(r'```(?:json)?\\s*({.*?})\\s*```', ai_response_text, re.DOTALL)
-                    if json_match:
-                        json_text = json_match.group(1)
-                    else:
-                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
-                        if json_match:
-                            json_text = json_match.group(1)
-                        else:
-                            json_text = ai_response_text
-
-                    decoded_json = html.unescape(json_text)
-                    
-                    replacements = {
-                        '&quot;': '"',
-                        '&amp;': '&',
-                        '&lt;': '<',
-                        '&gt;': '>',
-                        '&#39;': "'",
-                        '&apos;': "'"
-                    }
-                    for code, char in replacements.items():
-                        decoded_json = decoded_json.replace(code, char)
-
-                    parsing_successful = False
-                    try:
-                        parsed_response = json.loads(decoded_json)
-                        parsing_successful = True
-                        print(f"✅ JSON PARSED SUCCESSFULLY")
-                    except json.JSONDecodeError:
-                        print(f"⚠️ JSON parsing failed")
+                    # Handle structured analyzer response format
+                    if ai_result.get('is_raw'):
+                        # Raw response format (fallback)
                         parsed_response = {
-                            "raw_response": ai_response_text,
                             "quick_answer": "Analysis completed successfully.",
                             "detailed_analysis": [],
                             "final_thoughts": "Analysis provided in detailed format.",
                             "follow_up_questions": []
                         }
-                        parsing_successful = True
+                    else:
+                        # JSON data format (preferred) - map to mobile expected format
+                        raw_data = ai_result.get('data', {})
+                        
+                        # Map detailed_analysis fields to mobile expected format
+                        detailed_analysis = []
+                        for item in raw_data.get('detailed_analysis', []):
+                            detailed_analysis.append({
+                                "question": item.get('question', ''),
+                                "answer": item.get('answer', '')
+                            })
+                        
+                        parsed_response = {
+                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
+                            "detailed_analysis": detailed_analysis,
+                            "final_thoughts": raw_data.get('final_thoughts', ''),
+                            "follow_up_questions": raw_data.get('follow_up_questions', []),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
                     
                     career_insights = {
-                        'career_analysis': {
-                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
-                            'raw_response': parsed_response.get('raw_response'),
-                            'summary': 'Comprehensive Vedic career analysis with 10th house, Amatyakaraka, and D10 calculations.'
-                        },
+                        'analysis': parsed_response,
+                        'terms': ai_result.get('terms', []),
+                        'glossary': ai_result.get('glossary', {}),
                         'enhanced_context': True,
                         'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'career_ai_context_generator',
+                        'context_type': 'structured_analyzer',
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    if parsing_successful:
-                        success = credit_service.spend_credits(
-                            current_user.userid, 
-                            career_cost, 
-                            'career_analysis', 
-                            f"Career analysis for {birth_data.get('name', 'user')}"
-                        )
-                        
-                        if success:
-                            print(f"💳 Credits deducted successfully")
-                        else:
-                            print(f"❌ Credit deduction failed")
+                    # Deduct credits for successful analysis
+                    success = credit_service.spend_credits(
+                        current_user.userid, 
+                        career_cost, 
+                        'career_analysis', 
+                        f"Career analysis for {birth_data.get('name', 'user')}"
+                    )
+                    
+                    if success:
+                        print(f"💳 Credits deducted successfully")
+                    else:
+                        print(f"❌ Credit deduction failed")
                     
                     # Cache the analysis
                     try:

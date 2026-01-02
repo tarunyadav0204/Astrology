@@ -44,8 +44,8 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
   const [location, setLocation] = useState({
     name: 'New Delhi, India',
     latitude: 28.6139,
-    longitude: 77.2090,
-    timezone: 'UTC+5:30'
+    longitude: 77.2090
+    // timezone will be detected by backend
   });
   const [calendarSystem, setCalendarSystem] = useState(CALENDAR_SYSTEMS.GREGORIAN);
   const [loading, setLoading] = useState(true);
@@ -79,8 +79,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
         panchangService.calculatePanchang(
           dateString, 
           location.latitude, 
-          location.longitude, 
-          location.timezone
+          location.longitude
         ).catch(() => null),
         panchangService.calculateSunriseSunset(
           dateString,
@@ -91,8 +90,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
         panchangService.calculatePlanetaryPositions(
           dateString,
           location.latitude,
-          location.longitude,
-          location.timezone
+          location.longitude
         ).catch(() => null),
         panchangService.getInauspiciousTimes(
           dateString,
@@ -102,20 +100,17 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
         panchangService.calculateChoghadiya(
           dateString,
           location.latitude,
-          location.longitude,
-          location.timezone
+          location.longitude
         ).catch(() => null),
         panchangService.calculateHora(
           dateString,
           location.latitude,
-          location.longitude,
-          location.timezone
+          location.longitude
         ).catch(() => null),
         panchangService.calculateSpecialMuhurtas(
           dateString,
           location.latitude,
-          location.longitude,
-          location.timezone
+          location.longitude
         ).catch(() => null),
         panchangService.getFestivals(dateString).catch(() => [])
       ]);

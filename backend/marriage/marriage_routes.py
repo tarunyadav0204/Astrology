@@ -1,3 +1,7 @@
+"""
+Marriage Analysis API Routes
+"""
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -13,7 +17,7 @@ from credits.credit_service import CreditService
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai.marriage_ai_context_generator import MarriageAIContextGenerator
-from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from ai.structured_analyzer import StructuredAnalysisAnalyzer
 
 class MarriageAnalysisRequest(BaseModel):
     name: Optional[str] = None
@@ -29,7 +33,6 @@ class MarriageAnalysisRequest(BaseModel):
 
 router = APIRouter(prefix="/marriage", tags=["marriage"])
 
-# Initialize components
 marriage_context_generator = MarriageAIContextGenerator()
 credit_service = CreditService()
 
@@ -58,7 +61,7 @@ async def analyze_marriage(request: MarriageAnalysisRequest, current_user: User 
                 'place': request.place,
                 'latitude': request.latitude or 28.6139,
                 'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+5:30',
+                'timezone': request.timezone or 'UTC+0',
                 'gender': request.gender,
                 'current_year': date.today().year
             }
@@ -70,75 +73,41 @@ async def analyze_marriage(request: MarriageAnalysisRequest, current_user: User 
                 birth_data
             )
             
-            # Add marriage-specific AI instructions to context
-            context['marriage_analysis_instructions'] = {
-                'focus_areas': [
-                    'Precise timing using Dasha combined with Jupiter/Saturn Transits',
-                    'Spouse appearance and profession using D9 (Navamsa)',
-                    'Mangal Dosha intensity (Low/High) and exact remedies',
-                    'Nature of relationship (Love vs Arranged)'
-                ],
-                'classical_methods': [
-                    'Use "Double Transit Theory": Marriage happens when Jupiter AND Saturn influence the 7th house/lord',
-                    'Check D9 (Navamsa) Lagna and 7th Lord for the final confirmation of timing',
-                    'Use Vimshottari Dasha for the broad timeframe',
-                    'Use Jupiter Transit for the specific year of the event'
-                ],
-                'response_format': 'Strict JSON. Be specific with ages and years. Avoid generic advice.'
-            }
-            
-            # Universal status-agnostic marriage question
+            # Marriage-specific AI question (EXACT same format as education)
             marriage_question = """
 As an expert Vedic astrologer, analyze the birth chart for **Relationship and Marriage Destiny**.
-Note: The user's marital status is UNKNOWN. You must frame your answers to be valuable for both single and married individuals.
-
-STRATEGY FOR AMBIGUITY:
-- Instead of "You will marry in...", use phrases like "Strong activation of the 7th house (Marriage/Partnership) occurs in..."
-- Frame timing as "Relationship Milestones". For singles, this is marriage. For married, this is a renewal of vows, childbirth, or a significant joint event.
-- Focus on the **Nature of the Partner** and **Quality of Life**, which applies to everyone.
-
-CRITICAL INSTRUCTION FOR TIMING:
-Identify the "High Probability Windows" for relationship events by cross-referencing Dasha and Transits (Jupiter/Saturn).
-
-CRITICAL REALISM CHECK:
-Ignore any astrological activations that occur before Age 22 for "Marriage Timing".
-If a strong period appears at age 18-21, interpret it as a "Relationship Learning Phase" or "Serious Relationship", NOT a wedding.
-Prioritize windows between Age 24-32 for the "Primary Window".
 
 CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
 Start your response with { and end with }. Use markdown ** for bold text within JSON strings.
-
 {
-  "quick_answer": "A summary of the 7th house strength. E.g., 'Your chart shows a relationship dynamic driven by intellect (Mercury). The years <strong>2026-2027</strong> mark a significant relationship milestone.'",
+  "quick_answer": "Summary of marriage prospects and timing.",
   "detailed_analysis": [
     {
       "question": "What is the timeline for major relationship events?",
-      "answer": "<strong>Primary Activation Window: [Year] to [Year]</strong><br>Reason: The [Planet] Dasha and Jupiter Transit activate your 7th house.<br><em>Implication:</em> This period marks a significant evolution in your personal life—whether that manifests as a new union or the deepening of an existing bond."
+      "answer": "Analyze timing using Vimshottari Dasha and Jupiter/Saturn transits",
+      "key_points": ["Current period", "Best timing"],
+      "astrological_basis": "7th house and lord analysis..."
     },
     {
-      "question": "What is the personality and nature of my partner?", 
-      "answer": "Describe the spouse's likely traits (D9 & 7th Lord). E.g., 'Your 7th lord in a fire sign suggests a partner who is ambitious and energetic, possibly in a technical or leadership role.'"
+      "question": "What is the personality and nature of my partner?",
+      "answer": "Describe spouse traits from 7th house and D9 Navamsa"
     },
     {
-      "question": "Are there any Doshas (Mars/Saturn) affecting harmony?",
-      "answer": "Analyze Mangal Dosha or Saturn aspects. Explain how this creates 'friction' or 'delays' generally, without assuming current status."
+      "question": "Are there any Doshas affecting harmony?",
+      "answer": "Analyze Mangal Dosha and Saturn aspects"
     },
     {
       "question": "Is my destiny inclined towards Love or Traditional connection?",
-      "answer": "Analyze the 5th-7th house connection. Discuss the 'style' of the relationship (Romantic/Spontaneous vs. Stable/Traditional)."
+      "answer": "Analyze 5th-7th house connection and relationship style"
     },
     {
       "question": "What is the key to happiness in my specific chart?",
-      "answer": "Look at the D9 Navamsa. Give advice like 'You need intellectual stimulation' or 'You need emotional space' based on the chart."
-    },
-    {
-      "question": "What remedies strengthen my relationship luck?",
-      "answer": "List 2 generic remedies that help both finding a partner AND keeping peace (e.g., 'Donate to X', 'Worship Goddess Katyayani')."
+      "answer": "Guidance based on D9 Navamsa analysis"
     }
   ],
-  "final_thoughts": "A positive summary about the long-term promise of the 7th house.",
+  "final_thoughts": "Encouraging summary focusing on marriage potential.",
   "follow_up_questions": [
-    "📅 Is [Next Year] significant for love?",
+    "📅 Best timing for marriage?",
     "❤️ How to improve compatibility?",
     "💍 What are my partner's key traits?",
     "⚡ Remedies for relationship peace?"
@@ -152,133 +121,79 @@ Use <br> for line breaks within JSON strings.
 Escape quotes properly: \"text\"
 """
             
-            # Generate AI response
-            gemini_analyzer = GeminiChatAnalyzer()
-            ai_result = await gemini_analyzer.generate_chat_response(
+            # Generate AI response using structured analyzer
+            analyzer = StructuredAnalysisAnalyzer()
+            ai_result = await analyzer.generate_structured_report(
                 marriage_question, 
                 context, 
-                [], 
-                request.language, 
-                request.response_style
+                request.language or 'english'
             )
             
             if ai_result['success']:
-                # Parse AI response
                 try:
-                    ai_response_text = ai_result.get('response', '')
-                    print(f"📄 PARSING MARRIAGE RESPONSE length: {len(ai_response_text)}")
-
-                    # 1. EXTRACT JSON
-                    import html
-                    import re
-                    
-                    # Try finding markdown block first
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
-                    if json_match:
-                        json_text = json_match.group(1)
+                    # Handle structured analyzer response format
+                    if ai_result.get('is_raw'):
+                        # Raw response format (fallback)
+                        parsed_response = {
+                            "quick_answer": "Analysis completed successfully.",
+                            "detailed_analysis": [],
+                            "final_thoughts": "Analysis provided in detailed format.",
+                            "follow_up_questions": []
+                        }
                     else:
-                        # Try finding the first opening { and last closing }
-                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
-                        if json_match:
-                            json_text = json_match.group(1)
-                        else:
-                            json_text = ai_response_text
-
-                    # 2. CLEANUP HTML ENTITIES (Common issue with Gemini)
-                    # Decode HTML entities (e.g., &quot; -> ")
-                    decoded_json = html.unescape(json_text)
+                        # JSON data format (preferred) - map to mobile expected format
+                        raw_data = ai_result.get('data', {})
+                        
+                        # Map detailed_analysis fields to mobile expected format
+                        detailed_analysis = []
+                        for item in raw_data.get('detailed_analysis', []):
+                            detailed_analysis.append({
+                                "question": item.get('question', ''),
+                                "answer": item.get('answer', '')
+                            })
+                        
+                        parsed_response = {
+                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
+                            "detailed_analysis": detailed_analysis,
+                            "final_thoughts": raw_data.get('final_thoughts', ''),
+                            "follow_up_questions": raw_data.get('follow_up_questions', []),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
                     
-                    # Double check specific troublesome entities just in case
-                    replacements = {
-                        '&quot;': '"',
-                        '&amp;': '&',
-                        '&lt;': '<',
-                        '&gt;': '>',
-                        '&#39;': "'",
-                        '&apos;': "'"
-                    }
-                    for code, char in replacements.items():
-                        decoded_json = decoded_json.replace(code, char)
-
-                    # 3. PARSE JSON
-                    parsing_successful = False
-                    try:
-                        # Attempt 1: Parse the clean string
-                        parsed_response = json.loads(decoded_json)
-                        parsing_successful = True
-                        print(f"✅ JSON PARSED SUCCESSFULLY")
-
-                    except json.JSONDecodeError:
-                        print(f"⚠️ Standard parse failed. Attempting aggressive cleanup...")
-                        try:
-                            # Attempt 2: Fix newlines inside strings (common LLM error)
-                            # This regex looks for newlines that are NOT followed by a JSON key
-                            # It replaces them with <br>
-                            cleaned_json = re.sub(r'\n(?![\s]*")', '<br>', decoded_json)
-                            
-                            # Fix triple backslashes which sometimes happen
-                            cleaned_json = cleaned_json.replace('\\\\"', '\\"')
-                            
-                            parsed_response = json.loads(cleaned_json)
-                            parsing_successful = True
-                            print(f"✅ JSON PARSED AFTER CLEANUP")
-                            
-                        except json.JSONDecodeError:
-                            print(f"❌ JSON parsing failed completely. Treating as HTML response.")
-                            # If JSON parsing fails completely, treat as HTML response
-                            parsed_response = {
-                                "raw_response": ai_response_text,
-                                "quick_answer": "Analysis completed successfully.",
-                                "detailed_analysis": [],
-                                "final_thoughts": "Analysis provided in detailed format.",
-                                "follow_up_questions": []
-                            }
-                            parsing_successful = True  # HTML response is still valid
-                    
-                    print(f"   Keys: {list(parsed_response.keys())}")
-                    print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
-                    
-                    # Build complete response
                     marriage_insights = {
-                        'marriage_analysis': {
-                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
-                            'raw_response': parsed_response.get('raw_response'),
-                            'summary': 'Comprehensive marriage analysis based on Vedic astrology principles.'
-                        },
+                        'analysis': parsed_response,
+                        'terms': ai_result.get('terms', []),
+                        'glossary': ai_result.get('glossary', {}),
                         'enhanced_context': True,
                         'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'marriage_ai_context_generator',
+                        'context_type': 'structured_analyzer',
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    # Only deduct credits if parsing was successful
-                    if parsing_successful:
-                        success = credit_service.spend_credits(
-                            current_user.userid, 
-                            marriage_cost, 
-                            'marriage_analysis', 
-                            f"Marriage analysis for {birth_data.get('name', 'user')}"
-                        )
-                        
-                        if success:
-                            print(f"💳 Credits deducted successfully")
-                        else:
-                            print(f"❌ Credit deduction failed")
+                    # Deduct credits for successful analysis
+                    success = credit_service.spend_credits(
+                        current_user.userid, 
+                        marriage_cost, 
+                        'marriage_analysis', 
+                        f"Marriage analysis for {birth_data.get('name', 'user')}"
+                    )
+                    
+                    if success:
+                        print(f"💳 Credits deducted successfully")
                     else:
-                        print(f"⚠️ Skipping credit deduction due to parsing failure")
+                        print(f"❌ Credit deduction failed")
                     
                     # Cache the analysis
                     try:
                         import sqlite3
                         import hashlib
                         
-                        # Create birth hash
                         birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
                         
                         conn = sqlite3.connect('astrology.db')
                         cursor = conn.cursor()
                         
-                        # Create table if not exists
                         cursor.execute("""
                             CREATE TABLE IF NOT EXISTS ai_marriage_insights (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -289,7 +204,6 @@ Escape quotes properly: \"text\"
                             )
                         """)
                         
-                        # Insert or replace analysis
                         cursor.execute("""
                             INSERT OR REPLACE INTO ai_marriage_insights 
                             (birth_hash, insights_data, updated_at)
@@ -312,12 +226,8 @@ Escape quotes properly: \"text\"
                     yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
                 
             else:
-                error_response = {
-                    'marriage_analysis': 'AI analysis failed. Please try again.',
-                    'enhanced_context': False,
-                    'error': ai_result.get('error', 'Unknown error') if ai_result else 'No response from AI'
-                }
-                yield f"data: {json.dumps({'status': 'complete', 'data': error_response, 'cached': False})}\n\n"
+                error_message = ai_result.get('error', 'AI analysis failed') if ai_result else 'No response from AI'
+                yield f"data: {json.dumps({'status': 'error', 'error': error_message})}\n\n"
                 
         except Exception as e:
             print(f"❌ MARRIAGE ANALYSIS ERROR: {type(e).__name__}: {str(e)}")
@@ -325,13 +235,8 @@ Escape quotes properly: \"text\"
             full_traceback = traceback.format_exc()
             print(f"Full traceback:\n{full_traceback}")
             
-            error_response = {
-                'marriage_analysis': f'Analysis error: {str(e)}. Please try again.',
-                'enhanced_context': False,
-                'error': str(e),
-                'error_type': type(e).__name__
-            }
-            yield f"data: {json.dumps({'status': 'error', 'error': str(e), 'error_type': type(e).__name__})}\n\n"
+            error_message = str(e) if str(e) else 'Unknown error occurred'
+            yield f"data: {json.dumps({'status': 'error', 'error': error_message, 'error_type': type(e).__name__})}\n\n"
     
     return StreamingResponse(
         generate_marriage_analysis(),
@@ -342,40 +247,3 @@ Escape quotes properly: \"text\"
             "X-Accel-Buffering": "no"
         }
     )
-
-@router.post("/get-analysis")
-async def get_previous_analysis(request: MarriageAnalysisRequest, current_user: User = Depends(get_current_user)):
-    """Get previously generated marriage analysis if exists"""
-    import sqlite3
-    import hashlib
-    
-    try:
-        # Create birth hash
-        birth_hash = hashlib.md5(f"{request.date}_{request.time}_{request.place}".encode()).hexdigest()
-        
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        # Query for existing analysis
-        cursor.execute("""
-            SELECT insights_data FROM ai_marriage_insights WHERE birth_hash = ?
-        """, (birth_hash,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            analysis_data = json.loads(result[0])
-            analysis_data['cached'] = True
-            return {"analysis": analysis_data}
-        
-        return {"analysis": None}
-        
-    except Exception as e:
-        print(f"Error fetching previous analysis: {e}")
-        return {"analysis": None}
-
-@router.get("/test")
-async def test_marriage_routes():
-    """Test endpoint to verify marriage routes are working"""
-    return {"status": "success", "message": "Marriage routes are working"}

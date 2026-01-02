@@ -19,7 +19,7 @@ from .education_analyzer import EducationAnalyzer
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai.education_ai_context_generator import EducationAIContextGenerator
-from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from ai.structured_analyzer import StructuredAnalysisAnalyzer
 
 class EducationAnalysisRequest(BaseModel):
     name: Optional[str] = None
@@ -63,7 +63,7 @@ async def analyze_education(
             'place': request.place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30'
+            'timezone': request.timezone or 'UTC+0'
         }
         
         from types import SimpleNamespace
@@ -109,7 +109,7 @@ async def analyze_education_ai(request: EducationAnalysisRequest, current_user: 
                 'place': request.place,
                 'latitude': request.latitude or 28.6139,
                 'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+5:30',
+                'timezone': request.timezone or 'UTC+0',
                 'gender': request.gender,
                 'current_year': date.today().year
             }
@@ -182,106 +182,68 @@ Escape quotes properly: \"text\"
 DISCLAIMER: Always mention this is astrological guidance, not career counseling.
 """
             
-            # Generate AI response
-            gemini_analyzer = GeminiChatAnalyzer()
-            ai_result = await gemini_analyzer.generate_chat_response(
+            # Generate AI response using structured analyzer
+            analyzer = StructuredAnalysisAnalyzer()
+            ai_result = await analyzer.generate_structured_report(
                 education_question, 
                 context, 
-                [], 
-                request.language, 
-                request.response_style
+                request.language or 'english'
             )
             
             if ai_result['success']:
-                # Parse AI response
                 try:
-                    ai_response_text = ai_result.get('response', '')
-                    print(f"📄 PARSING EDUCATION RESPONSE length: {len(ai_response_text)}")
-
-                    # Extract and clean JSON
-                    import html
-                    import re
-                    
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
-                    if json_match:
-                        json_text = json_match.group(1)
+                    # Handle structured analyzer response format
+                    if ai_result.get('is_raw'):
+                        # Raw response format (fallback)
+                        parsed_response = {
+                            "quick_answer": "Analysis completed successfully.",
+                            "detailed_analysis": [],
+                            "final_thoughts": "Analysis provided in detailed format.",
+                            "follow_up_questions": []
+                        }
                     else:
-                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
-                        if json_match:
-                            json_text = json_match.group(1)
-                        else:
-                            json_text = ai_response_text
-
-                    decoded_json = html.unescape(json_text)
+                        # JSON data format (preferred) - map to mobile expected format
+                        raw_data = ai_result.get('data', {})
+                        
+                        # Map detailed_analysis fields to mobile expected format
+                        detailed_analysis = []
+                        for item in raw_data.get('detailed_analysis', []):
+                            detailed_analysis.append({
+                                "question": item.get('question', ''),
+                                "answer": item.get('answer', '')
+                            })
+                        
+                        parsed_response = {
+                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
+                            "detailed_analysis": detailed_analysis,
+                            "final_thoughts": raw_data.get('final_thoughts', ''),
+                            "follow_up_questions": raw_data.get('follow_up_questions', []),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
                     
-                    replacements = {
-                        '&quot;': '"',
-                        '&amp;': '&',
-                        '&lt;': '<',
-                        '&gt;': '>',
-                        '&#39;': "'",
-                        '&apos;': "'"
-                    }
-                    for code, char in replacements.items():
-                        decoded_json = decoded_json.replace(code, char)
-
-                    parsing_successful = False
-                    try:
-                        parsed_response = json.loads(decoded_json)
-                        parsing_successful = True
-                        print(f"✅ JSON PARSED SUCCESSFULLY")
-                        print(f"   Keys: {list(parsed_response.keys())}")
-                        print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
-                    except json.JSONDecodeError as parse_error:
-                        print(f"⚠️ Standard parse failed: {parse_error}")
-                        try:
-                            cleaned_json = re.sub(r'\n(?![\s]*")', '<br>', decoded_json)
-                            cleaned_json = cleaned_json.replace('\\\\"', '\\"')
-                            parsed_response = json.loads(cleaned_json)
-                            parsing_successful = True
-                            print(f"✅ JSON PARSED AFTER CLEANUP")
-                        except json.JSONDecodeError as cleanup_error:
-                            print(f"❌ JSON parsing failed completely. Treating as HTML response.")
-                            print(f"📄 Raw response length: {len(ai_response_text)}")
-                            print(f"📄 Raw response preview: {ai_response_text[:500]}...")
-                            # If JSON parsing fails completely, treat as HTML response
-                            parsed_response = {
-                                "raw_response": ai_response_text,
-                                "quick_answer": "Analysis completed successfully.",
-                                "detailed_analysis": [],
-                                "final_thoughts": "Analysis provided in detailed format.",
-                                "follow_up_questions": []
-                            }
-                            parsing_successful = True  # HTML response is still valid
-                    
-                    # Build complete response
                     education_insights = {
-                        'education_analysis': {
-                            'json_response': parsed_response if 'raw_response' not in parsed_response else None,
-                            'raw_response': parsed_response.get('raw_response'),
-                            'summary': 'Advanced Vedic education analysis with house and planetary calculations.'
-                        },
+                        'analysis': parsed_response,
+                        'terms': ai_result.get('terms', []),
+                        'glossary': ai_result.get('glossary', {}),
                         'enhanced_context': True,
                         'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'education_ai_context_generator',
+                        'context_type': 'structured_analyzer',
                         'generated_at': datetime.now().isoformat()
                     }
                     
-                    # Only deduct credits if parsing was successful
-                    if parsing_successful:
-                        success = credit_service.spend_credits(
-                            current_user.userid, 
-                            education_cost, 
-                            'education_analysis', 
-                            f"Education analysis for {birth_data.get('name', 'user')}"
-                        )
-                        
-                        if success:
-                            print(f"💳 Credits deducted successfully")
-                        else:
-                            print(f"❌ Credit deduction failed")
+                    # Deduct credits for successful analysis
+                    success = credit_service.spend_credits(
+                        current_user.userid, 
+                        education_cost, 
+                        'education_analysis', 
+                        f"Education analysis for {birth_data.get('name', 'user')}"
+                    )
+                    
+                    if success:
+                        print(f"💳 Credits deducted successfully")
                     else:
-                        print(f"⚠️ Skipping credit deduction due to parsing failure")
+                        print(f"❌ Credit deduction failed")
                     
                     # Cache the analysis
                     try:

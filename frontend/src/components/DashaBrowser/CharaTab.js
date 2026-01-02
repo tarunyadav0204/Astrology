@@ -38,7 +38,6 @@ const CharaTab = ({ birthData, showOnlyCurrentStatus = false }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata',
         place: birthData.place || 'Unknown'
       };
 
@@ -76,7 +75,6 @@ const CharaTab = ({ birthData, showOnlyCurrentStatus = false }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata',
         place: birthData.place || 'Unknown',
         maha_sign_id: signId
       };

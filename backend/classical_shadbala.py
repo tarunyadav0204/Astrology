@@ -4,6 +4,7 @@ from typing import Dict, List, Any
 import math
 from datetime import datetime
 import swisseph as swe
+from utils.timezone_service import parse_timezone_offset
 from shadbala_formulas import (
     get_sthana_bala_formulas, get_dig_bala_formula, get_kala_bala_formulas,
     get_chesta_bala_formula, get_naisargika_bala_formula, get_drik_bala_formula
@@ -104,9 +105,13 @@ def get_julian_day(birth_data: Dict) -> float:
     day = int(date_parts[2])
     hour = float(time_parts[0]) + float(time_parts[1])/60
     
-    # Convert to UTC (assuming IST for Indian coordinates)
-    if 6.0 <= birth_data.get('latitude', 0) <= 37.0 and 68.0 <= birth_data.get('longitude', 0) <= 97.0:
-        hour -= 5.5  # IST offset
+    # Convert to UTC using centralized timezone service
+    tz_offset = parse_timezone_offset(
+        birth_data.get('timezone', 'UTC+0'),
+        birth_data.get('latitude', 0),
+        birth_data.get('longitude', 0)
+    )
+    hour -= tz_offset
     
     return swe.julday(year, month, day, hour)
 
@@ -347,6 +352,10 @@ def calculate_natonnata_bala(planet: str, birth_data: Dict) -> float:
 def calculate_paksha_bala(planet: str, jd: float) -> float:
     """Lunar fortnight strength"""
     # Get Moon's longitude
+    # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
     moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
     sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
     

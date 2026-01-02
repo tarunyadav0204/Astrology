@@ -1,11 +1,13 @@
-"""
+"""  
 Shared Dasha Calculator
 Used by both main.py and classical engine to ensure consistent calculations
 """
 
 import swisseph as swe
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List
+from utils.timezone_service import parse_timezone_offset
 
 class DashaCalculator:
     def __init__(self):
@@ -36,17 +38,17 @@ class DashaCalculator:
             time_parts = birth_data['time'].split(':')
             hour = float(time_parts[0]) + float(time_parts[1])/60
             
-            # Handle timezone
-            if 6.0 <= birth_data['latitude'] <= 37.0 and 68.0 <= birth_data['longitude'] <= 97.0:
-                tz_offset = 5.5
-            else:
-                tz_offset = 0
-                if birth_data.get('timezone', '').startswith('UTC'):
-                    tz_str = birth_data['timezone'][3:]
-                    if tz_str and ':' in tz_str:
-                        sign = 1 if tz_str[0] == '+' else -1
-                        parts = tz_str[1:].split(':')
-                        tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+            # Get timezone offset - it's already a float from BirthData.timezone property
+            tz_offset = birth_data.get('timezone', 5.5)
+            if isinstance(tz_offset, str):
+                # Fallback: parse string timezone if somehow a string is passed
+                tz_offset = parse_timezone_offset(
+                    tz_offset,
+                    birth_data.get('latitude'),
+                    birth_data.get('longitude')
+                )
+            elif tz_offset is None:
+                tz_offset = 5.5  # IST fallback
             
             utc_hour = hour - tz_offset
             jd = swe.julday(
@@ -56,17 +58,39 @@ class DashaCalculator:
                 utc_hour
             )
             
-            # Get Moon position
-            moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+            # Use geocentric mode (same as chart calculator)
+            swe.set_topo(0, 0, 0)  # Reset to geocentric (center of Earth)
+            
+            # Use Indian Government Standard Lahiri ayanamsa for Drik alignment
+            swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+            
+            # Use same flags as chart calculator
+            flags = swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH
+            moon_result = swe.calc_ut(jd, swe.MOON, flags)
+            moon_pos = moon_result[0][0]
+            
+            # Convert to degrees, minutes, seconds and log
+            degrees = int(moon_pos)
+            minutes = int((moon_pos - degrees) * 60)
+            seconds = int(((moon_pos - degrees) * 60 - minutes) * 60)
+            # print(f"DASHA CALCULATOR - Moon position: {degrees}° {minutes}' {seconds}'' (decimal: {moon_pos:.6f})")
+            # print(f"DASHA CALCULATOR - Birth data: {birth_data.get('date')} {birth_data.get('time')} at {birth_data.get('latitude')}, {birth_data.get('longitude')}")
             
             # Calculate nakshatra and lord
             nakshatra_index = int(moon_pos / 13.333333333333334)
             moon_lord = self.NAKSHATRA_LORDS[nakshatra_index]
+            # print(f"DASHA CALCULATOR - Nakshatra: {nakshatra_index + 1}, Moon Lord: {moon_lord}")
             
-            # Calculate balance of first dasha
-            nakshatra_start = nakshatra_index * 13.333333333333334
-            elapsed_degrees = moon_pos - nakshatra_start
-            balance_fraction = 1 - (elapsed_degrees / 13.333333333333334)
+            # Calculate balance using high-precision arc-minutes
+            # Nakshatra span = 13°20' = 800 arc-minutes
+            moon_minutes = moon_pos * 60.0
+            nakshatra_start_minutes = nakshatra_index * 800.0
+            elapsed_minutes = moon_minutes - nakshatra_start_minutes
+            
+            # balance_fraction is (Remaining Arc / Total Arc)
+            balance_fraction = (800.0 - elapsed_minutes) / 800.0
+            # print(f"DASHA CALCULATOR - Arc-minute calculation: elapsed={elapsed_minutes:.2f}, remaining={800.0 - elapsed_minutes:.2f}")
+            # print(f"DASHA CALCULATOR - Balance fraction: {balance_fraction:.6f}")
             
             # Handle time format with or without seconds
             time_str = birth_data['time']
@@ -80,24 +104,37 @@ class DashaCalculator:
             current_maha_date = birth_datetime
             start_index = self.PLANET_ORDER.index(moon_lord)
             
+            # Solar year length used by high-precision Panchangs
+            YEAR_LEN = 365.242199
+            
             for i in range(9):
                 planet = self.PLANET_ORDER[(start_index + i) % 9]
+                total_duration_years = self.DASHA_PERIODS[planet]
                 
                 if i == 0:
-                    # Balance of first dasha
-                    years = self.DASHA_PERIODS[planet] * balance_fraction
+                    # DRIK ALIGNMENT FINAL: Use 365.25 (Julian Year) for balance portion
+                    rem_y = int(total_duration_years * balance_fraction)
+                    rem_fractional_y = (total_duration_years * balance_fraction) - rem_y
+                    
+                    # Use 365.25 for balance to match Drik Panchang's traditional algorithm
+                    end_date = birth_datetime + relativedelta(years=rem_y) + timedelta(days=rem_fractional_y * 365.25)
+                    actual_years = total_duration_years * balance_fraction
                 else:
-                    years = self.DASHA_PERIODS[planet]
-                
-                days = years * 365.25
-                end_date = current_maha_date + timedelta(days=days)
+                    # Use calendar years for subsequent dashas
+                    end_date = current_maha_date + relativedelta(years=total_duration_years)
+                    actual_years = total_duration_years
                 
                 maha_dashas.append({
                     'planet': planet,
                     'start': current_maha_date,
                     'end': end_date - timedelta(seconds=1),
-                    'years': round(years, 2)
+                    'years': round(actual_years, 2)
                 })
+                
+                # Log Rahu Mahadasha end date
+                if planet == 'Rahu':
+                    # print(f"DASHA CALCULATOR - Rahu Mahadasha ends: {end_date.strftime('%Y-%m-%d %H:%M:%S')}")
+                    pass
                 
                 current_maha_date = end_date
             
@@ -136,9 +173,9 @@ class DashaCalculator:
             }
             
         except Exception as e:
-            print(f"Error calculating dashas: {e}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            # print(f"Error calculating dashas: {e}")
+            # import traceback
+            # print(f"Traceback: {traceback.format_exc()}")
             return {
                 'mahadasha': {'planet': 'Sun'},
                 'antardasha': {'planet': 'Moon'},
@@ -162,7 +199,7 @@ class DashaCalculator:
         for i in range(9):
             antar_planet = self.PLANET_ORDER[(start_index + i) % 9]
             antar_period = (self.DASHA_PERIODS[maha_planet] * self.DASHA_PERIODS[antar_planet]) / 120
-            antar_days = antar_period * 365.25
+            antar_days = antar_period * 365.242199
             antar_end = current_antar_date + timedelta(days=antar_days)
             
             if current_antar_date <= current_date <= antar_end:
@@ -192,7 +229,7 @@ class DashaCalculator:
         for i in range(9):
             pratyantar_planet = self.PLANET_ORDER[(start_index + i) % 9]
             pratyantar_period = (antar_period * self.DASHA_PERIODS[pratyantar_planet]) / 120
-            pratyantar_days = pratyantar_period * 365.25
+            pratyantar_days = pratyantar_period * 365.242199
             pratyantar_end = current_pratyantar_date + timedelta(days=pratyantar_days)
             
             if current_pratyantar_date <= current_date <= pratyantar_end:
@@ -223,7 +260,7 @@ class DashaCalculator:
         for i in range(9):
             sookshma_planet = self.PLANET_ORDER[(start_index + i) % 9]
             sookshma_period = (pratyantar_period * self.DASHA_PERIODS[sookshma_planet]) / 120
-            sookshma_days = sookshma_period * 365.25
+            sookshma_days = sookshma_period * 365.242199
             sookshma_end = current_sookshma_date + timedelta(days=sookshma_days)
             
             if current_sookshma_date <= current_date <= sookshma_end:
@@ -256,7 +293,7 @@ class DashaCalculator:
         for i in range(9):
             prana_planet = self.PLANET_ORDER[(start_index + i) % 9]
             prana_period = (sookshma_period * self.DASHA_PERIODS[prana_planet]) / 120
-            prana_days = prana_period * 365.25
+            prana_days = prana_period * 365.242199
             prana_end = current_prana_date + timedelta(days=prana_days)
             
             if current_prana_date <= current_date <= prana_end:

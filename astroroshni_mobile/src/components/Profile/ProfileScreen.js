@@ -13,10 +13,12 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Rect, Line, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
+import NorthIndianChart from '../Chart/NorthIndianChart';
 
 const { width } = Dimensions.get('window');
 
@@ -114,7 +116,6 @@ export default function ProfileScreen({ navigation }) {
         time: typeof birth.time === 'string' ? birth.time.split('T')[1]?.slice(0, 5) || birth.time : birth.time,
         latitude: parseFloat(birth.latitude),
         longitude: parseFloat(birth.longitude),
-        timezone: birth.timezone || 'Asia/Kolkata'
       };
       
       const { chartAPI } = require('../../services/api');
@@ -171,7 +172,6 @@ export default function ProfileScreen({ navigation }) {
         time: birth.time.includes('T') ? new Date(birth.time).toTimeString().slice(0, 5) : birth.time,
         latitude: parseFloat(birth.latitude),
         longitude: parseFloat(birth.longitude),
-        timezone: birth.timezone || 'Asia/Kolkata',
         location: birth.place || 'Unknown'
       };
       
@@ -277,7 +277,7 @@ export default function ProfileScreen({ navigation }) {
                     {chartData ? (() => {
                       const signIndex = chartData?.houses?.[0]?.sign || 0;
                       return getSignIcon(signIndex);
-                    })() : getZodiacSign(birthData?.date)}
+                    })() : (loadingChart ? '⏳' : getZodiacSign(birthData?.date))}
                   </Text>
                 </View>
               </View>
@@ -355,7 +355,15 @@ export default function ProfileScreen({ navigation }) {
                       }
                     }}
                   >
-                    <Text style={styles.miniChartIcon}>🔮</Text>
+                    <Svg width="48" height="48" viewBox="0 0 48 48" style={{ marginBottom: 8 }}>
+                      {/* Outer square */}
+                      <Rect x="2" y="2" width="44" height="44" fill="none" stroke="#ff6b35" strokeWidth="2" />
+                      {/* Inner diamond */}
+                      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke="#ffd700" strokeWidth="1.5" />
+                      {/* Diagonal lines creating triangular houses */}
+                      <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
+                      <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
+                    </Svg>
                     <Text style={styles.miniChartText}>View Full Chart</Text>
                   </TouchableOpacity>
                   
@@ -552,6 +560,7 @@ const styles = StyleSheet.create({
   chartSummaryCard: { borderRadius: 16, overflow: 'hidden' },
   chartSummaryGradient: { padding: 20 },
   miniChart: { alignItems: 'center', marginBottom: 20, paddingVertical: 20, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
+  miniChartIcon: { width: 48, height: 48, marginBottom: 8 },
   miniChartIcon: { fontSize: 48, marginBottom: 8 },
   miniChartText: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
   chartDetails: { gap: 12 },

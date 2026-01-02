@@ -126,8 +126,7 @@ export default function CharaDashaTab({ birthData }) {
         date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
         time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
         latitude: parseFloat(birthData.latitude),
-        longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
+        longitude: parseFloat(birthData.longitude)
       };
 
       const response = await chartAPI.calculateCharaDasha(formattedData);
@@ -157,8 +156,7 @@ export default function CharaDashaTab({ birthData }) {
         date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
         time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
         latitude: parseFloat(birthData.latitude),
-        longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
+        longitude: parseFloat(birthData.longitude)
       };
 
       const response = await chartAPI.calculateCharaAntardasha(formattedData, signId);

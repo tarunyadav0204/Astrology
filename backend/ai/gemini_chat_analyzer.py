@@ -32,6 +32,7 @@ class GeminiChatAnalyzer:
         
         # Standard models (try in order of preference)
         model_names = [
+            'models/gemini-3-flash-preview',
             'models/gemini-2.5-flash',
             'models/gemini-2.0-flash-exp',
             'models/gemini-2.0-flash',
@@ -157,23 +158,7 @@ class GeminiChatAnalyzer:
             # print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
             # print(f"Prompt length: {len(prompt)} characters")
             
-            # LOG COMPLETE REQUEST
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs', 'gemini_logs')
-            os.makedirs(log_dir, exist_ok=True)
-            
-            # Log request
-            request_log_file = os.path.join(log_dir, f"gemini_prompt_{call_type}_{timestamp}.txt")
-            with open(request_log_file, 'w', encoding='utf-8') as f:
-                f.write(f"GEMINI REQUEST - {call_type}\n")
-                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                f.write(f"Question: {user_question}\n")
-                f.write(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}\n")
-                f.write(f"Prompt Length: {len(prompt)} characters\n")
-                f.write(f"{'='*80}\n")
-                f.write(prompt)
-            
-            print(f"📝 REQUEST LOGGED: {request_log_file}")
+
             
             # CALL GEMINI ASYNC DIRECTLY with request_options
             response = await asyncio.wait_for(
@@ -187,47 +172,7 @@ class GeminiChatAnalyzer:
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start
             
-            # # LOG COMPLETE RESPONSE
-            # response_log_file = os.path.join(log_dir, f"gemini_response_{call_type}_{timestamp}.txt")
-            # with open(response_log_file, 'w', encoding='utf-8') as f:
-            #     f.write(f"GEMINI RESPONSE - {call_type}\n")
-            #     f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-            #     f.write(f"Question: {user_question}\n")
-            #     f.write(f"Processing Time: {gemini_total_time:.3f}s\n")
-            #     f.write(f"Response Length: {len(response.text) if response and hasattr(response, 'text') else 0} characters\n")
-            #     f.write(f"{'='*80}\n")
-            #     if response and hasattr(response, 'text'):
-            #         f.write(response.text)
-            #     else:
-            #         f.write("No response or empty response")
-            
-            # print(f"📝 RESPONSE LOGGED: {response_log_file}")
-            
-            # # LOG COMPLETE FLOW SUMMARY
-            # flow_log_file = os.path.join(log_dir, f"complete_flow_{call_type}_{timestamp}.txt")
-            # with open(flow_log_file, 'w', encoding='utf-8') as f:
-            #     f.write(f"COMPLETE GEMINI FLOW SUMMARY - {call_type}\n")
-            #     f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-            #     f.write(f"Question: {user_question}\n")
-            #     f.write(f"Processing Time: {gemini_total_time:.3f}s\n")
-            #     f.write(f"Total Request Time: {total_request_time:.2f}s\n")
-            #     f.write(f"Context Size: {len(json.dumps(pruned_context, default=str))} characters\n")
-            #     f.write(f"Has Transit Data: {'Yes' if 'transit_activations' in enhanced_context else 'No'}\n")
-            #     f.write(f"Response Length: {len(response.text) if response and hasattr(response, 'text') else 0} characters\n")
-            #     f.write(f"{'='*80}\n")
-            #     f.write(f"PERFORMANCE METRICS:\n")
-            #     f.write(f"- Prompt Creation: {prompt_time:.3f}s\n")
-            #     f.write(f"- Gemini Processing: {gemini_total_time:.3f}s\n")
-            #     f.write(f"- Total Time: {total_request_time:.3f}s\n")
-            #     if 'transit_activations' in enhanced_context:
-            #         transit_count = len(enhanced_context.get('transit_activations', []))
-            #         f.write(f"- Transit Activations: {transit_count}\n")
-            #         dasha_summary = enhanced_context.get('requested_dasha_summary', {})
-            #         if dasha_summary:
-            #             vims_count = len(dasha_summary.get('vimshottari_sequence', []))
-            #             f.write(f"- Dasha Periods: {vims_count}\n")
-            
-            # print(f"📝 FLOW SUMMARY LOGGED: {flow_log_file}")
+
             
             print(f"\n{'='*80}")
             print(f"📥 GEMINI RESPONSE #{call_type}")

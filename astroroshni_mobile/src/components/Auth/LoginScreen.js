@@ -47,7 +47,6 @@ export default function LoginScreen({ navigation }) {
     place: '',
     latitude: null,
     longitude: null,
-    timezone: 'Asia/Kolkata',
     gender: ''
   });
   const [debugInfo, setDebugInfo] = useState('');
@@ -300,8 +299,7 @@ export default function LoginScreen({ navigation }) {
         id: item.place_id,
         name: item.display_name,
         latitude: parseFloat(item.lat),
-        longitude: parseFloat(item.lon),
-        timezone: 'Asia/Kolkata'
+        longitude: parseFloat(item.lon)
       }));
     } catch (error) {
       return [];
@@ -313,8 +311,7 @@ export default function LoginScreen({ navigation }) {
       ...prev,
       place: place.name,
       latitude: place.latitude,
-      longitude: place.longitude,
-      timezone: place.timezone
+      longitude: place.longitude
     }));
   };
 

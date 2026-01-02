@@ -42,14 +42,13 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
           (birthData.time.includes('T') ? birthData.time.split('T')[1]?.slice(0, 8) || birthData.time : birthData.time) : 
           birthData.time,
         latitude: parseFloat(birthData.latitude),
-        longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
+        longitude: parseFloat(birthData.longitude)
       };
       
       console.log('🔍 [DASHA_MOBILE_DEBUG] Formatted data being sent to API:', JSON.stringify(formattedData, null, 2));
       console.log('🔍 [DASHA_MOBILE_DEBUG] About to call chartAPI.calculateDasha');
 
-      const response = await chartAPI.calculateDasha(formattedData);
+      const response = await chartAPI.calculateCascadingDashas(formattedData, date.toISOString().split('T')[0]);
       
       console.log('🔍 [DASHA_MOBILE_DEBUG] API response received:', JSON.stringify(response.data, null, 2));
 

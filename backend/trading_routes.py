@@ -97,6 +97,19 @@ async def get_daily_forecast(request: TradingRequest, current_user: User = Depen
         target_dt = datetime.strptime(request.target_date, "%Y-%m-%d") if request.target_date else datetime.now()
         birth_data = request.dict()
         
+        # Auto-detect timezone from coordinates if not provided
+        if not birth_data.get('timezone') and birth_data.get('latitude') and birth_data.get('longitude'):
+            try:
+                from utils.timezone_service import get_timezone_from_coordinates
+                detected_tz = get_timezone_from_coordinates(birth_data['latitude'], birth_data['longitude'])
+                birth_data['timezone'] = detected_tz
+                print(f"🌍 Trading: Auto-detected timezone {detected_tz} for coordinates {birth_data['latitude']}, {birth_data['longitude']}")
+            except Exception as e:
+                print(f"❌ Trading: Timezone detection failed: {e}")
+                birth_data['timezone'] = 'UTC+0'
+        elif not birth_data.get('timezone'):
+            birth_data['timezone'] = 'UTC+0'
+        
         context = await asyncio.get_event_loop().run_in_executor(
             None, context_gen.build_trading_context, birth_data, target_dt
         )
@@ -266,9 +279,19 @@ async def get_monthly_calendar(request: TradingRequest, year: int, month: int, c
     async def generate():
         try:
             birth_data = request.dict()
-            # FORCE TIMEZONE SAFETY - ensure consistency with daily forecast
-            if not birth_data.get('timezone'):
-                birth_data['timezone'] = 'UTC+5:30'
+            
+            # Auto-detect timezone from coordinates if not provided
+            if not birth_data.get('timezone') and birth_data.get('latitude') and birth_data.get('longitude'):
+                try:
+                    from utils.timezone_service import get_timezone_from_coordinates
+                    detected_tz = get_timezone_from_coordinates(birth_data['latitude'], birth_data['longitude'])
+                    birth_data['timezone'] = detected_tz
+                    print(f"🌍 Trading: Auto-detected timezone {detected_tz} for coordinates {birth_data['latitude']}, {birth_data['longitude']}")
+                except Exception as e:
+                    print(f"❌ Trading: Timezone detection failed: {e}")
+                    birth_data['timezone'] = 'UTC+0'
+            elif not birth_data.get('timezone'):
+                birth_data['timezone'] = 'UTC+0'
             
             # Ensure Base Context is built for cache
             context_gen.build_base_context(birth_data)

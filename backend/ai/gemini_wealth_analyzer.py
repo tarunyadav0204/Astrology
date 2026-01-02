@@ -125,7 +125,7 @@ class GeminiWealthAnalyzer:
                 'place': wealth_data.get('place', ''),
                 'latitude': wealth_data.get('latitude', 0.0),
                 'longitude': wealth_data.get('longitude', 0.0),
-                'timezone': wealth_data.get('timezone', 'UTC+5:30')
+                'timezone': wealth_data.get('timezone', 'UTC+0')
             },
             'chart_data': chart_summary,
             'special_points': special_points,
@@ -443,7 +443,7 @@ CRITICAL: You MUST respond ONLY with valid JSON format. Do not include any text 
                 'time': wealth_data.get('time', ''),
                 'latitude': wealth_data.get('latitude', 0.0),
                 'longitude': wealth_data.get('longitude', 0.0),
-                'timezone': wealth_data.get('timezone', 'UTC+5:30')
+                'timezone': wealth_data.get('timezone', 'UTC+0')
             }
             
             print(f"Debug - Birth data for wealth activations: {birth_data}")

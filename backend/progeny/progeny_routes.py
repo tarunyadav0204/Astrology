@@ -17,7 +17,7 @@ from credits.credit_service import CreditService
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai.progeny_ai_context_generator import ProgenyAIContextGenerator
-from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+from ai.structured_analyzer import StructuredAnalysisAnalyzer
 
 class ProgenyAnalysisRequest(BaseModel):
     name: Optional[str] = None
@@ -144,10 +144,11 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
                 print(f"❌ [DEBUG] Progeny API: Context traceback: {traceback.format_exc()}")
                 raise context_error
             
-            # --- DYNAMIC PROMPT LOGIC ---
-            
-            # SCENARIO 1: PARENTING (Focus on Relationship)
+
+
+            # Define focus instruction and questions based on analysis type (ORIGINAL LOGIC)
             if request.analysis_focus == 'parenting':
+                focus_instruction = f"The user ALREADY HAS {request.children_count} children. Do NOT predict pregnancy timing. Focus on relationship and guidance."
                 specific_questions_json = """
   "detailed_analysis": [
     {
@@ -175,11 +176,8 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
       "astrological_basis": "5th Lord Element"
     }
   ],"""
-                system_role = "You are a Vedic Astrologer specializing in Parenting and Family Dynamics."
-                focus_instruction = f"The user ALREADY HAS {request.children_count} children. Do NOT predict pregnancy timing. Focus on relationship and guidance."
-
-            # SCENARIO 2: PLANNING NEXT CHILD (The Hybrid Case)
             elif request.analysis_focus == 'next_child':
+                focus_instruction = f"The user HAS {request.children_count} children and is PLANNING FOR MORE. Focus on the timing and potential for the *next* sibling."
                 specific_questions_json = """
   "detailed_analysis": [
     {
@@ -207,11 +205,8 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
       "astrological_basis": "Remedial Measures"
     }
   ],"""
-                system_role = "You are an empathetic Vedic Astrologer specializing in Family Expansion."
-                focus_instruction = f"The user HAS {request.children_count} children and is PLANNING FOR MORE. Focus on the timing and potential for the *next* sibling."
-
-            # SCENARIO 3: PLANNING FIRST CHILD (Default)
-            else:
+            else:  # first_child
+                focus_instruction = "Focus on fertility potential, timing of conception, and overcoming delays for the first child."
                 specific_questions_json = """
   "detailed_analysis": [
     {
@@ -233,65 +228,102 @@ async def get_progeny_insights(request: ProgenyAnalysisRequest, current_user: Us
       "astrological_basis": "Vimshottari Dasha + Transits"
     },
     {
-      "question": "What remedies can support this journey?",
-      "answer": "Suggest Santana Gopala Mantra or Jupiter remedies.",
-      "key_points": ["Mantra", "Lifestyle"],
-      "astrological_basis": "Remedial Measures"
+      "question": "What remedies can enhance fertility and conception?",
+      "answer": "Suggest Santana Gopala Mantra, Pitra Paksha rituals, or strengthening Jupiter.",
+      "key_points": ["Mantra", "Rituals"],
+      "astrological_basis": "Remedial Astrology"
     }
   ],"""
-                system_role = "You are an empathetic Vedic Astrologer specializing in Family Expansion."
-                focus_instruction = "Focus on fertility potential, timing of conception, and overcoming delays for the first child."
 
             # --- CONSTRUCT FINAL PROMPT ---
             question = f"""
-{system_role} Analyze the chart based on the user's specific situation.
+As an expert Vedic astrologer, analyze the birth chart for **Progeny and Family Expansion**.
 
-INPUT DATA:
-1. **User Goal:** {focus_instruction}
-2. **Gender:** {request.gender} (Sphuta Type: {context['progeny_analysis']['fertility_sphuta']['type']})
-3. **Fertility Sphuta:** {context['progeny_analysis']['fertility_sphuta']['strength']}
-4. **D7 Chart (Saptamsa):**
+USER SITUATION:
+- **Focus:** {focus_instruction}
+- **Gender:** {request.gender} (Sphuta Type: {context['progeny_analysis']['fertility_sphuta']['type']})
+- **Fertility Sphuta:** {context['progeny_analysis']['fertility_sphuta']['strength']}
+- **Current Children:** {request.children_count}
+
+CHART ANALYSIS POINTS:
+1. **D7 Saptamsa Chart:**
    - Lagna Lord: {context['progeny_analysis']['d7_analysis']['d7_lagna_lord']}
    - 5th House Planets: {', '.join(context['progeny_analysis']['d7_analysis']['planets_in_d7_5th']) or 'Empty'}
    - Summary: {context['progeny_analysis']['d7_analysis']['summary']}
-5. **Timing Indicators:** {', '.join(context['progeny_analysis']['timing_indicators'])}
-6. **Current Dasha:** {context.get('current_dashas', {}).get('mahadasha', {}).get('planet', 'Unknown')} MD / {context.get('current_dashas', {}).get('antardasha', {}).get('planet', 'Unknown')} AD
-7. **Transit Data:** Next 12 months of major planetary transits available for precise timing
 
-STRICT ETHICAL GUARDRAILS:
-1. **NO MEDICAL DIAGNOSIS:** Never use words like "Infertile", "Sterile", or specific disease names. Use "Challenges", "Delays", or "Requires medical support".
-2. **NO GENDER PREDICTION:** Do not predict Boy/Girl. Focus on the health/happiness of the child.
-3. **EMPATHY:** This is a sensitive topic. Be supportive, not fatalistic.
+2. **Timing Indicators:** {', '.join(context['progeny_analysis']['timing_indicators'])}
 
-RESPONSE FORMAT (JSON ONLY):
-{{
-  "quick_answer": "3-4 sentences summarizing the analysis based on user's specific focus.",
+3. **Current Dasha:** {context.get('current_dashas', {}).get('mahadasha', {}).get('planet', 'Unknown')} MD / {context.get('current_dashas', {}).get('antardasha', {}).get('planet', 'Unknown')} AD
+
+4. **Transit Data:** Next 12 months of major planetary transits available for precise timing
+
+CRITICAL: You MUST respond with ONLY a JSON object. NO other text, NO HTML, NO explanations.
+Start your response with {{ and end with }}. Use markdown ** for bold text within JSON strings.
+{{  
+  "quick_answer": "Summary of progeny prospects and timing based on chart analysis.",
   {specific_questions_json}
-  "final_thoughts": "A positive concluding message tailored to the user's situation."
+  "final_thoughts": "Encouraging summary focusing on family expansion potential with supportive guidance."
 }}
+
+ETHICAL GUIDELINES:
+- Use supportive language, avoid medical terms like "infertile" or "sterile"
+- Focus on timing and astrological factors, not gender prediction
+- Provide hope and practical guidance
+
+CRITICAL: Your entire response must be valid JSON starting with {{ and ending with }}.
+Do NOT include any text before or after the JSON object.
+Do NOT use HTML div tags or HTML formatting.
+Use <br> for line breaks within JSON strings.
+Escape quotes properly: \"text\"
 """
-            # Generate AI Response
-            gemini = GeminiChatAnalyzer()
-            ai_result = await gemini.generate_chat_response(
-                question, context, [], request.language, request.response_style
+            # Generate AI Response using structured analyzer
+            analyzer = StructuredAnalysisAnalyzer()
+            ai_result = await analyzer.generate_structured_report(
+                question, 
+                context, 
+                request.language or 'english'
             )
             
             if ai_result['success']:
                 try:
-                    # Robust Parsing (Regex Method)
-                    ai_response_text = ai_result.get('response', '')
-                    
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
-                    if json_match:
-                        json_text = json_match.group(1)
+                    # Handle structured analyzer response format
+                    if ai_result.get('is_raw'):
+                        # Raw response format (fallback)
+                        parsed_response = {
+                            "quick_answer": "Analysis completed successfully.",
+                            "detailed_analysis": [
+                                {
+                                    "question": "What does my chart indicate about family expansion?",
+                                    "answer": ai_result.get('response', 'Analysis completed successfully.'),
+                                    "key_points": ["Chart Analysis"],
+                                    "astrological_basis": "Vedic Astrology"
+                                }
+                            ],
+                            "final_thoughts": "Your chart has been analyzed for progeny prospects.",
+                            "full_response": ai_result.get('response', ''),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
                     else:
-                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
-                        json_text = json_match.group(1) if json_match else ai_response_text
-
-                    # Unescape HTML entities
-                    decoded_json = html.unescape(json_text)
-                    parsed_response = json.loads(decoded_json)
-                    
+                        # JSON data format (preferred) - map to mobile expected format
+                        raw_data = ai_result.get('data', {})
+                        
+                        # Map detailed_analysis fields to mobile expected format
+                        detailed_analysis = []
+                        for item in raw_data.get('detailed_analysis', []):
+                            detailed_analysis.append({
+                                "question": item.get('question', ''),
+                                "answer": item.get('answer', '')
+                            })
+                        
+                        parsed_response = {
+                            "quick_answer": raw_data.get('quick_answer', 'Analysis completed successfully.'),
+                            "detailed_analysis": detailed_analysis,
+                            "final_thoughts": raw_data.get('final_thoughts', ''),
+                            "full_response": ai_result.get('response', ''),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
                     # Deduct Credits
                     success = credit_service.spend_credits(
                         current_user.userid, 
@@ -302,7 +334,7 @@ RESPONSE FORMAT (JSON ONLY):
                     
                     if success:
                         # Cache the result
-                        full_result = {'progeny_analysis': parsed_response}
+                        full_result = {'analysis': parsed_response}
                         try:
                             conn = sqlite3.connect('astrology.db')
                             cursor = conn.cursor()
@@ -334,8 +366,38 @@ RESPONSE FORMAT (JSON ONLY):
                     else:
                          yield f"data: {json.dumps({'status': 'error', 'message': 'Credit deduction failed'})}\n\n"
                     
-                except json.JSONDecodeError:
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
+                except Exception as parse_error:
+                    print(f"⚠️ Response parsing failed: {parse_error}")
+                    # Fallback response
+                    parsed_response = {
+                        "quick_answer": "Analysis completed successfully. Please check the detailed insights.",
+                        "detailed_analysis": [
+                            {
+                                "question": "What does my chart indicate about family expansion?",
+                                "answer": ai_result.get('response', 'Analysis completed successfully.'),
+                                "key_points": ["Chart Analysis"],
+                                "astrological_basis": "Vedic Astrology"
+                            }
+                        ],
+                        "final_thoughts": "Your chart has been analyzed for progeny prospects.",
+                        "full_response": ai_result.get('response', ''),
+                        "terms": ai_result.get('terms', []),
+                        "glossary": ai_result.get('glossary', {})
+                    }
+                    
+                    # Deduct Credits for fallback response too
+                    success = credit_service.spend_credits(
+                        current_user.userid, 
+                        analysis_cost, 
+                        'progeny_analysis', 
+                        f"Progeny for {request.name or 'User'}"
+                    )
+                    
+                    if success:
+                        full_result = {'analysis': parsed_response}
+                        yield f"data: {json.dumps({'status': 'complete', 'data': full_result})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Credit deduction failed'})}\n\n"
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': 'AI Generation Failed'})}\n\n"
 

@@ -454,7 +454,7 @@ const LocationFinder = ({ isOpen, onClose, onLocationSelect, currentLocation }) 
       name: location.name,
       latitude: location.latitude,
       longitude: location.longitude,
-      timezone: 'UTC+5:30'
+      // timezone will be auto-detected by backend
     });
     onClose();
   };

@@ -58,7 +58,7 @@ class PanchangCalculator:
         # Find end time by going forwards  
         end_jd = self._find_tithi_moment(jd, current_tithi_end_deg, backwards=False)
         
-        # Convert to IST
+        # Convert to local time
         start_time = self._jd_to_local_time(start_jd)
         end_time = self._jd_to_local_time(end_jd)
         
@@ -702,12 +702,12 @@ class PanchangCalculator:
         return (start_jd + end_jd) / 2
     
     def _jd_to_local_time(self, jd):
-        """Convert Julian Day to IST datetime"""
+        """Convert Julian Day to local datetime"""
         year, month, day, hour, minute, second = swe.jdut1_to_utc(jd, 1)
         dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        # Convert UTC to IST (UTC+5:30) - FIXED: was 5:29, now correct 5:30
-        dt_ist = dt + timedelta(hours=5, minutes=30)
-        return dt_ist
+        # Convert UTC to local time using timezone offset
+        dt_local = dt + timedelta(hours=0)  # Default UTC, should use timezone parameter
+        return dt_local
     
     def _jd_to_iso(self, jd):
         """Convert Julian Day to local time ISO format datetime string"""

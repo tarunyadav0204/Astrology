@@ -263,7 +263,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         return;
       }
       
-      console.log('Yogini Dasha Response:', JSON.stringify(response.data, null, 2));
+      // console.log('Yogini Dasha Response:', JSON.stringify(response.data, null, 2));
       setYoginiData(response.data);
     } catch (err) {
       setError('Failed to load Yogini Dasha data');

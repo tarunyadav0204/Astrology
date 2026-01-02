@@ -2,6 +2,7 @@ import swisseph as swe
 from datetime import datetime, timedelta
 from .house_significations import SIGN_LORDS
 from .config import DASHA_PERIODS, NAKSHATRA_LORDS, PLANET_ORDER
+from utils.timezone_service import parse_timezone_offset
 
 class DashaIntegration:
     """Integrates Vimshottari Dasha system with event predictions"""
@@ -17,16 +18,11 @@ class DashaIntegration:
         time_parts = self.birth_data.time.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
         
-        if 6.0 <= self.birth_data.latitude <= 37.0 and 68.0 <= self.birth_data.longitude <= 97.0:
-            tz_offset = 5.5
-        else:
-            tz_offset = 0
-            if self.birth_data.timezone.startswith('UTC'):
-                tz_str = self.birth_data.timezone[3:]
-                if tz_str and ':' in tz_str:
-                    sign = 1 if tz_str[0] == '+' else -1
-                    parts = tz_str[1:].split(':')
-                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+        tz_offset = parse_timezone_offset(
+            self.birth_data.timezone,
+            self.birth_data.latitude,
+            self.birth_data.longitude
+        )
         
         utc_hour = hour - tz_offset
         jd = swe.julday(
@@ -37,6 +33,10 @@ class DashaIntegration:
         )
         
         # Get Moon position
+        # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+
         moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
         
         # Find Moon's nakshatra

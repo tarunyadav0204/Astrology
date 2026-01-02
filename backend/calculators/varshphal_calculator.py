@@ -41,7 +41,7 @@ class VarshphalCalculator:
             'time': return_time.strftime('%H:%M:%S'),
             'latitude': birth_data['latitude'],
             'longitude': birth_data['longitude'],
-            'timezone': birth_data.get('timezone', 'UTC+5:30') 
+            'timezone': birth_data.get('timezone', 'UTC+0') 
         }
         
         vp_obj = SimpleNamespace(**varshphal_input)
@@ -95,7 +95,7 @@ class VarshphalCalculator:
                 'time': current_check_time.strftime('%H:%M:%S'),
                 'latitude': birth_data['latitude'],
                 'longitude': birth_data['longitude'],
-                'timezone': birth_data.get('timezone', 'UTC+5:30')
+                'timezone': birth_data.get('timezone', 'UTC+0')
             }
             from types import SimpleNamespace
             check_obj = SimpleNamespace(name="Check", **check_input)

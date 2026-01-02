@@ -98,7 +98,6 @@ export default function TradingCalendarScreen({ navigation }) {
               time: firstChart.time,
               latitude: firstChart.latitude,
               longitude: firstChart.longitude,
-              timezone: firstChart.timezone,
               place: firstChart.place,
               gender: firstChart.gender
             };

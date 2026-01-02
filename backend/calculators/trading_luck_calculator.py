@@ -121,7 +121,7 @@ class TradingLuckCalculator(BaseCalculator):
         # Tithi Shunya Check
         try:
             panchang_calc = PanchangCalculator()
-            tz = self.birth_data.get('timezone', 'UTC+5:30') 
+            tz = self.birth_data.get('timezone', 'UTC+0') 
             panchang = panchang_calc.calculate_panchang(
                 self.transit_date.strftime('%Y-%m-%d'), 
                 self.birth_data.get('latitude', 28.61), 

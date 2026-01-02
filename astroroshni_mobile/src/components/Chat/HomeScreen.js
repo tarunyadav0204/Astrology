@@ -14,7 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
-import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line } from 'react-native-svg';
+import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line, Rect, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
 import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
@@ -211,7 +211,6 @@ const loadHomeData = async (nativeData = null) => {
             time: currentBirthData.time.includes('T') ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : currentBirthData.time,
             latitude: parseFloat(currentBirthData.latitude),
             longitude: parseFloat(currentBirthData.longitude),
-            timezone: currentBirthData.timezone || 'Asia/Kolkata',
             location: currentBirthData.place || 'Unknown'
           };
           const transitResponse = await chartAPI.calculateTransits(formattedBirthData, targetDate);
@@ -278,9 +277,10 @@ const loadHomeData = async (nativeData = null) => {
           time: currentBirthData.time.includes('T') ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : currentBirthData.time,
           latitude: parseFloat(currentBirthData.latitude),
           longitude: parseFloat(currentBirthData.longitude),
-          timezone: currentBirthData.timezone || 'Asia/Kolkata',
           location: currentBirthData.place || 'Unknown'
         };
+        
+        // console.log('🏠 HomeScreen - Sending birth data to backend:', JSON.stringify(formattedBirthData, null, 2));
         
         const [dashResponse, chartResponse] = await Promise.allSettled([
           chartAPI.calculateCascadingDashas(formattedBirthData, targetDate),
@@ -292,6 +292,8 @@ const loadHomeData = async (nativeData = null) => {
         }
         
         if (chartResponse.status === 'fulfilled' && chartResponse.value?.data) {
+          // console.log('🏠 HomeScreen - Received chart data from backend:', JSON.stringify(chartResponse.value.data, null, 2));
+          // console.log('🏠 HomeScreen - Ascendant sign from chart:', chartResponse.value.data?.houses?.[0]?.sign);
           setChartData(chartResponse.value.data);
         }
       }
@@ -371,7 +373,6 @@ const loadHomeData = async (nativeData = null) => {
         time: scanBirthData.time,
         latitude: scanBirthData.latitude,
         longitude: scanBirthData.longitude,
-        timezone: scanBirthData.timezone || 'Asia/Kolkata',
         place: scanBirthData.place || ''
       };
       
@@ -404,7 +405,6 @@ const loadHomeData = async (nativeData = null) => {
             time: scanBirthData.time,
             latitude: scanBirthData.latitude,
             longitude: scanBirthData.longitude,
-            timezone: scanBirthData.timezone || 'Asia/Kolkata',
             place: scanBirthData.place || '',
             gender: scanBirthData.gender || ''
           },
@@ -592,7 +592,7 @@ const loadHomeData = async (nativeData = null) => {
                 {chartData ? (() => {
                   const signIndex = chartData?.houses?.[0]?.sign || 0;
                   return getSignIcon(signIndex);
-                })() : '♈'}
+                })() : '⏳'}
               </Text>
             </Animated.View>
           </View>
@@ -750,7 +750,12 @@ const loadHomeData = async (nativeData = null) => {
                 activeOpacity={0.8}
               >
                 <View style={styles.toolGlassmorphism}>
-                  <Text style={styles.toolEmoji}>📊</Text>
+                  <Svg width="28" height="28" viewBox="0 0 48 48" style={{ marginBottom: 8 }}>
+                    <Rect x="2" y="2" width="44" height="44" fill="none" stroke="#ffffff" strokeWidth="2" />
+                    <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke="#ffd700" strokeWidth="1.5" />
+                    <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
+                    <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
+                  </Svg>
                   <Text style={styles.toolTitle}>Charts</Text>
                 </View>
               </TouchableOpacity>

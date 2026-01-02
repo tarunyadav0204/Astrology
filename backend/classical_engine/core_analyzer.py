@@ -6,6 +6,7 @@ Implements the user's sophisticated 7-step prediction technique with comprehensi
 from datetime import datetime
 import swisseph as swe
 from typing import Dict, List, Any, Tuple
+from utils.timezone_service import parse_timezone_offset
 import json
 
 class CoreClassicalAnalyzer:
@@ -578,10 +579,11 @@ class CoreClassicalAnalyzer:
             time_parts = self.birth_data['time'].split(':')
             hour = float(time_parts[0]) + float(time_parts[1])/60
             
-            if 6.0 <= self.birth_data['latitude'] <= 37.0 and 68.0 <= self.birth_data['longitude'] <= 97.0:
-                tz_offset = 5.5
-            else:
-                tz_offset = 0
+            tz_offset = parse_timezone_offset(
+                self.birth_data['timezone'],
+                self.birth_data['latitude'],
+                self.birth_data['longitude']
+            )
             
             utc_hour = hour - tz_offset
             birth_jd = swe.julday(
@@ -600,6 +602,10 @@ class CoreClassicalAnalyzer:
             planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
             
             for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6]):
+                # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+
                 pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
                 longitude = pos[0]
                 sign_num = int(longitude / 30)
@@ -651,10 +657,11 @@ class CoreClassicalAnalyzer:
             time_parts = self.birth_data['time'].split(':')
             hour = float(time_parts[0]) + float(time_parts[1])/60
             
-            if 6.0 <= self.birth_data['latitude'] <= 37.0 and 68.0 <= self.birth_data['longitude'] <= 97.0:
-                tz_offset = 5.5
-            else:
-                tz_offset = 0
+            tz_offset = parse_timezone_offset(
+                self.birth_data['timezone'],
+                self.birth_data['latitude'],
+                self.birth_data['longitude']
+            )
             
             utc_hour = hour - tz_offset
             jd = swe.julday(

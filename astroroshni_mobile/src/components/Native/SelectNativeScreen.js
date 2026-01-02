@@ -198,7 +198,6 @@ export default function SelectNativeScreen({ navigation, route }) {
           place: chart.place,
           latitude: chart.latitude,
           longitude: chart.longitude,
-          timezone: chart.timezone,
           gender: chart.gender,
           relation: chart.relation,
           isSelf: chart.relation === 'self'
@@ -210,19 +209,12 @@ export default function SelectNativeScreen({ navigation, route }) {
       // Calculate chart data for each profile
       const chartPromises = profileList.map(async (profile) => {
         try {
-          // Fix incorrect UTC+5 timezone to UTC+5:30 for Indian locations
-          let timezone = profile.timezone || 'Asia/Kolkata';
-          if (timezone === 'UTC+5' && profile.latitude >= 8 && profile.latitude <= 37 && profile.longitude >= 68 && profile.longitude <= 97) {
-            timezone = 'UTC+5:30'; // Correct timezone for India
-          }
-          
           const formattedData = {
             name: profile.name,
             date: profile.date.includes('T') ? profile.date.split('T')[0] : profile.date,
             time: profile.time.includes('T') ? new Date(profile.time).toTimeString().slice(0, 5) : profile.time,
             latitude: parseFloat(profile.latitude),
-            longitude: parseFloat(profile.longitude),
-            timezone: timezone
+            longitude: parseFloat(profile.longitude)
           };
           
           const response = await chartAPI.calculateChartOnly(formattedData);

@@ -86,6 +86,8 @@ class AuthenticHoroscopeGenerator:
         
         for planet_name, planet_id in planets.items():
             try:
+                # Set Lahiri Ayanamsa for accurate Vedic calculations
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
                 pos, _ = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL)
                 sign_num = int(pos[0] // 30)
                 

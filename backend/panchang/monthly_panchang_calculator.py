@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import calendar
 from typing import Dict, List, Any
 import pytz
+from utils.timezone_service import parse_timezone_offset
 from .panchang_calculator import PanchangCalculator
 
 class MonthlyPanchangCalculator:
@@ -12,24 +13,10 @@ class MonthlyPanchangCalculator:
     
     def _parse_timezone(self, tz_str):
         """Helper to parse timezone string like 'UTC+5:30' into float offset"""
-        offset = 5.5 # Default IST
-        if isinstance(tz_str, (int, float)):
-            return float(tz_str)
-        if isinstance(tz_str, str) and 'UTC' in tz_str:
-            try:
-                tz_part = tz_str.replace('UTC', '')
-                sign = -1 if '-' in tz_part else 1
-                tz_part = tz_part.replace('+', '').replace('-', '')
-                
-                if ':' in tz_part:
-                    hours, minutes = tz_part.split(':')
-                    offset = sign * (float(hours) + float(minutes)/60.0)
-                else:
-                    offset = sign * float(tz_part)
-            except: pass
-        return offset
+        # Use centralized timezone service
+        return parse_timezone_offset(tz_str, 0, 0)  # Default coordinates for parsing
     
-    def calculate_monthly_panchang(self, year: int, month: int, latitude: float, longitude: float, timezone: str = "UTC+5:30") -> Dict[str, Any]:
+    def calculate_monthly_panchang(self, year: int, month: int, latitude: float, longitude: float, timezone: str = None) -> Dict[str, Any]:
         """Calculate complete panchang for entire month with timezone parameter"""
         
         # Get number of days in month
@@ -52,7 +39,7 @@ class MonthlyPanchangCalculator:
         
         return monthly_data
     
-    def calculate_daily_panchang(self, date_str: str, latitude: float, longitude: float, timezone: str = "UTC+5:30") -> Dict[str, Any]:
+    def calculate_daily_panchang(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> Dict[str, Any]:
         """Calculate detailed panchang for a single day with dynamic timezone"""
         
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
@@ -90,7 +77,7 @@ class MonthlyPanchangCalculator:
             'timezone': timezone
         }
     
-    def _calculate_sunrise_sunset(self, date_str: str, latitude: float, longitude: float, timezone: str = "UTC+5:30") -> Dict[str, Any]:
+    def _calculate_sunrise_sunset(self, date_str: str, latitude: float, longitude: float, timezone: str = None) -> Dict[str, Any]:
         """Calculate sunrise, sunset, moonrise, moonset with proper timezone handling using pytz"""
         
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
@@ -111,7 +98,7 @@ class MonthlyPanchangCalculator:
                 dt_localized = local_tz.localize(dt_naive)
                 tz_offset = dt_localized.utcoffset().total_seconds() / 3600
             except:
-                tz_offset = 5.5  # Fallback to IST
+                tz_offset = 0.0  # Fallback to UTC
         
         try:
             # Calculate sunrise/sunset
@@ -161,7 +148,7 @@ class MonthlyPanchangCalculator:
                 'day_duration': None
             }
     
-    def _calculate_special_times(self, date_str: str, latitude: float, longitude: float, sunrise_sunset: Dict, timezone: str = "UTC+5:30") -> Dict[str, Any]:
+    def _calculate_special_times(self, date_str: str, latitude: float, longitude: float, sunrise_sunset: Dict, timezone: str = None) -> Dict[str, Any]:
         """Calculate Rahu Kaal, Gulikai Kalam, Yamaganda with dynamic muhurta windows"""
         
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
@@ -433,7 +420,7 @@ class MonthlyPanchangCalculator:
         
         return planetary_data
     
-    def _jd_to_time_string(self, jd: float, timezone: str = "UTC+5:30") -> str:
+    def _jd_to_time_string(self, jd: float, timezone: str = None) -> str:
         """Convert Julian Day to time string with proper timezone handling using pytz"""
         if not jd:
             return None
@@ -455,7 +442,7 @@ class MonthlyPanchangCalculator:
                     dt_utc_aware = pytz.utc.localize(dt_utc)
                     dt_local = dt_utc_aware.astimezone(local_tz)
                 except:
-                    dt_local = dt_utc + timedelta(hours=5.5)  # Fallback to IST
+                    dt_local = dt_utc + timedelta(hours=0.0)  # Fallback to UTC
             
             return dt_local.strftime('%I:%M %p')
         except:

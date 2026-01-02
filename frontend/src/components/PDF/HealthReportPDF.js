@@ -71,8 +71,8 @@ const cleanText = (html) => {
 };
 
 export const HealthReportPDF = ({ data, userName }) => {
-  // Handle both health_analysis format and direct insights format
-  const analysis = data?.health_analysis?.json_response || data?.insights || {};
+  // Handle both old format (data.health_analysis.json_response) and new format (data.analysis)
+  const analysis = data?.health_analysis?.json_response || data?.analysis || {};
   const insights = data?.insights || {};
   
   return (
@@ -85,61 +85,23 @@ export const HealthReportPDF = ({ data, userName }) => {
           </Text>
         </View>
 
-        {/* Health Overview */}
-        {insights.health_overview && (
+        {/* Quick Answer from new format */}
+        {analysis.quick_answer && (
+          <View style={styles.highlightBox}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 5 }}>Health Overview:</Text>
+            <Text>{cleanText(analysis.quick_answer)}</Text>
+          </View>
+        )}
+
+        {/* Health Overview from old format */}
+        {!analysis.quick_answer && insights.health_overview && (
           <View style={styles.highlightBox}>
             <Text style={{ fontWeight: 'bold', marginBottom: 5 }}>Health Overview:</Text>
             <Text>{cleanText(insights.health_overview)}</Text>
           </View>
         )}
 
-        {/* Constitutional Analysis */}
-        {insights.constitutional_analysis && (
-          <View style={styles.section}>
-            <Text style={styles.questionText}>Constitutional Analysis</Text>
-            <Text style={styles.answerText}>{cleanText(insights.constitutional_analysis)}</Text>
-          </View>
-        )}
-
-        {/* Key Health Areas */}
-        {insights.key_health_areas && insights.key_health_areas.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.questionText}>Key Health Areas</Text>
-            {insights.key_health_areas.map((area, idx) => (
-              <Text key={idx} style={{ fontSize: 10, marginBottom: 2 }}>• {cleanText(area)}</Text>
-            ))}
-          </View>
-        )}
-
-        {/* Lifestyle Recommendations */}
-        {insights.lifestyle_recommendations && insights.lifestyle_recommendations.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.questionText}>Lifestyle Recommendations</Text>
-            {insights.lifestyle_recommendations.map((rec, idx) => (
-              <Text key={idx} style={{ fontSize: 10, marginBottom: 2 }}>• {cleanText(rec)}</Text>
-            ))}
-          </View>
-        )}
-
-        {/* Preventive Measures */}
-        {insights.preventive_measures && insights.preventive_measures.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.questionText}>Preventive Measures</Text>
-            {insights.preventive_measures.map((measure, idx) => (
-              <Text key={idx} style={{ fontSize: 10, marginBottom: 2 }}>• {cleanText(measure)}</Text>
-            ))}
-          </View>
-        )}
-
-        {/* Positive Indicators */}
-        {insights.positive_indicators && (
-          <View style={styles.section}>
-            <Text style={styles.questionText}>Positive Health Indicators</Text>
-            <Text style={styles.answerText}>{cleanText(insights.positive_indicators)}</Text>
-          </View>
-        )}
-
-        {/* Fallback for structured analysis */}
+        {/* Detailed Analysis from new format */}
         {analysis.detailed_analysis && analysis.detailed_analysis.map((item, index) => (
           <View key={index} style={styles.section}>
             <Text style={styles.questionText}>{index + 1}. {cleanText(item.question)}</Text>
@@ -153,8 +115,74 @@ export const HealthReportPDF = ({ data, userName }) => {
                 ))}
               </View>
             )}
+            
+            {item.astrological_basis && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 4 }}>Astrological Basis:</Text>
+                <Text style={{ fontSize: 10 }}>{cleanText(item.astrological_basis)}</Text>
+              </View>
+            )}
           </View>
         ))}
+
+        {/* Old format sections - only show if new format not available */}
+        {!analysis.detailed_analysis && (
+          <>
+            {/* Constitutional Analysis */}
+            {insights.constitutional_analysis && (
+              <View style={styles.section}>
+                <Text style={styles.questionText}>Constitutional Analysis</Text>
+                <Text style={styles.answerText}>{cleanText(insights.constitutional_analysis)}</Text>
+              </View>
+            )}
+
+            {/* Key Health Areas */}
+            {insights.key_health_areas && insights.key_health_areas.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.questionText}>Key Health Areas</Text>
+                {insights.key_health_areas.map((area, idx) => (
+                  <Text key={idx} style={{ fontSize: 10, marginBottom: 2 }}>• {cleanText(area)}</Text>
+                ))}
+              </View>
+            )}
+
+            {/* Lifestyle Recommendations */}
+            {insights.lifestyle_recommendations && insights.lifestyle_recommendations.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.questionText}>Lifestyle Recommendations</Text>
+                {insights.lifestyle_recommendations.map((rec, idx) => (
+                  <Text key={idx} style={{ fontSize: 10, marginBottom: 2 }}>• {cleanText(rec)}</Text>
+                ))}
+              </View>
+            )}
+
+            {/* Preventive Measures */}
+            {insights.preventive_measures && insights.preventive_measures.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.questionText}>Preventive Measures</Text>
+                {insights.preventive_measures.map((measure, idx) => (
+                  <Text key={idx} style={{ fontSize: 10, marginBottom: 2 }}>• {cleanText(measure)}</Text>
+                ))}
+              </View>
+            )}
+
+            {/* Positive Indicators */}
+            {insights.positive_indicators && (
+              <View style={styles.section}>
+                <Text style={styles.questionText}>Positive Health Indicators</Text>
+                <Text style={styles.answerText}>{cleanText(insights.positive_indicators)}</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Final Thoughts from new format */}
+        {analysis.final_thoughts && (
+          <View style={styles.highlightBox}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 5 }}>Final Thoughts:</Text>
+            <Text>{cleanText(analysis.final_thoughts)}</Text>
+          </View>
+        )}
 
         <Text style={styles.disclaimer}>
           This health analysis is based on Vedic astrological principles and is for educational purposes only. 

@@ -22,6 +22,10 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6]):
+            # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
+
             pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
             transit_planets[planet_names[i]] = {
                 'sign': int(pos[0] / 30),

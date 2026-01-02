@@ -205,7 +205,6 @@ export default function TradingDashboardScreen({ navigation }) {
               time: firstChart.time,
               latitude: firstChart.latitude,
               longitude: firstChart.longitude,
-              timezone: firstChart.timezone,
               place: firstChart.place,
               gender: firstChart.gender
             };
@@ -237,11 +236,6 @@ export default function TradingDashboardScreen({ navigation }) {
       if (!birthData || !birthData.name || !birthData.date) {
         navigation.replace('SelectNative');
         return;
-      }
-
-      // Fix timezone format for IST
-      if (birthData.timezone === 'UTC+5' || birthData.timezone === 'Asia/Kolkata') {
-        birthData.timezone = 'UTC+5:30';
       }
 
       // console.log('🚀 Making API request to:', `${API_BASE_URL}/api/trading/daily-forecast`);

@@ -71,7 +71,8 @@ const cleanText = (html) => {
 };
 
 export const MarriageReportPDF = ({ data, userName }) => {
-  const analysis = data?.marriage_analysis?.json_response || {};
+  // Handle both old and new data formats
+  const analysis = data?.marriage_analysis?.json_response || data?.analysis || {};
   
   return (
     <Document>

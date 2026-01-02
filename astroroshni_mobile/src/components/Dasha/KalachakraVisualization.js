@@ -45,7 +45,6 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 5.5,
         location: birthData.place || 'Unknown'
       };
       
@@ -91,7 +90,6 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 5.5,
         location: birthData.place || 'Unknown'
       };
       

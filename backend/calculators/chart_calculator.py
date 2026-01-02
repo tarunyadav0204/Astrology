@@ -1,6 +1,6 @@
 import swisseph as swe
 from .base_calculator import BaseCalculator
-from utils.timezone_service import get_timezone_from_coordinates
+from utils.timezone_service import parse_timezone_offset
 
 class ChartCalculator(BaseCalculator):
     """Extract chart calculation logic from main.py"""
@@ -50,49 +50,16 @@ class ChartCalculator(BaseCalculator):
         hour = float(time_parts[0]) + float(time_parts[1])/60.0
         print(f"DEBUG: Birth data - Date: {birth_data.date}, Time: {birth_data.time}, Timezone: {getattr(birth_data, 'timezone', 'None')}")
         
-        # Parse timezone offset with auto-detection
-        tz_offset = 0.0
-        if hasattr(birth_data, 'timezone') and birth_data.timezone:
-            if birth_data.timezone.startswith('UTC'):
-                tz_str = birth_data.timezone[3:]  # Remove 'UTC'
-                if tz_str:
-                    if ':' in tz_str:
-                        # Handle UTC+5:30 format
-                        sign = 1 if tz_str[0] == '+' else -1
-                        parts = tz_str[1:].split(':')
-                        tz_offset = float(sign) * (float(parts[0]) + float(parts[1])/60.0)
-                    else:
-                        # Handle UTC+5 format
-                        tz_offset = float(tz_str)
-        else:
-            # Auto-detect timezone from coordinates if not provided
-            if hasattr(birth_data, 'latitude') and hasattr(birth_data, 'longitude'):
-                detected_tz = get_timezone_from_coordinates(birth_data.latitude, birth_data.longitude)
-                print(f"DEBUG: Auto-detected timezone: {detected_tz}")
-                # Convert IANA timezone to offset (simplified)
-                if detected_tz == 'Asia/Kolkata':
-                    tz_offset = 5.5
-                elif detected_tz == 'America/New_York':
-                    tz_offset = -5.0  # EST (simplified)
-                elif detected_tz == 'America/Los_Angeles':
-                    tz_offset = -8.0  # PST (simplified)
-                elif detected_tz == 'Europe/London':
-                    tz_offset = 0.0   # GMT (simplified)
-                elif detected_tz == 'Australia/Sydney':
-                    tz_offset = 10.0  # AEST (simplified)
-                else:
-                    tz_offset = 0.0   # UTC fallback
+        # Get timezone offset using centralized service
+        timezone_input = getattr(birth_data, 'timezone', '')
+        latitude_input = getattr(birth_data, 'latitude', None)
+        longitude_input = getattr(birth_data, 'longitude', None)
         
-        # Override with geographic timezone for specific regions if timezone seems incorrect
-        if 6.0 <= birth_data.latitude <= 37.0 and 68.0 <= birth_data.longitude <= 97.0:
-            # Indian coordinates - verify IST
-            if abs(tz_offset - 5.5) > 0.1:  # If not IST, override
-                print(f"DEBUG: Indian coordinates with incorrect timezone {getattr(birth_data, 'timezone', 'None')} (offset: {tz_offset}), overriding to IST")
-                tz_offset = 5.5
-            else:
-                print(f"DEBUG: Indian coordinates with correct IST timezone: {tz_offset}")
-        else:
-            print(f"DEBUG: Non-Indian coordinates, using timezone: {getattr(birth_data, 'timezone', 'None')} -> offset: {tz_offset}")
+        print(f"🌍 TIMEZONE DEBUG: Input timezone='{timezone_input}', lat={latitude_input}, lon={longitude_input}")
+        
+        tz_offset = parse_timezone_offset(timezone_input, latitude_input, longitude_input)
+        
+        print(f"🌍 TIMEZONE DEBUG: Final offset={tz_offset} hours")
         
         # Convert local time to UTC with high precision
         utc_hour = float(hour) - float(tz_offset)
@@ -151,10 +118,6 @@ class ChartCalculator(BaseCalculator):
 
         # Calculate ascendant and houses  
         houses_data = swe.houses(jd, birth_data.latitude, birth_data.longitude, b'P')
-        # CRITICAL: Get Ayanamsa immediately after sidereal mode to ensure synchronization
-        ayanamsa = swe.get_ayanamsa_ut(jd)
-        
-        # CRITICAL: Get Ayanamsa immediately after sidereal mode to ensure synchronization
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
         ascendant_tropical = houses_data[1][0]
@@ -170,13 +133,12 @@ class ChartCalculator(BaseCalculator):
         
         asc_deg, asc_min, asc_sec = decimal_to_dms(ascendant_sidereal % 30)
         print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}")
-        print(f"ASCENDANT: {asc_deg}d {asc_min}m {asc_sec:.0f}s Cancer")
-        asc_sign_num = int(ascendant_sidereal / 30)
-        asc_sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][asc_sign_num]
-        print(f"DEBUG: ASC Sign: {asc_sign_num} ({asc_sign_name})")
+        asc_sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][int(ascendant_sidereal / 30)]
+        print(f"ASCENDANT: {asc_deg}d {asc_min}m {asc_sec:.0f}s {asc_sign_name}")
         
         # Whole Sign houses based on sidereal ascendant
         ascendant_sign = int(ascendant_sidereal / 30)
+        print(f"DEBUG: ASC Sign: {ascendant_sign} ({asc_sign_name})")
         houses = []
         for i in range(12):
             house_sign = (ascendant_sign + i) % 12

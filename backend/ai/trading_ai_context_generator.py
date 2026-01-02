@@ -28,7 +28,7 @@ class TradingAIContextGenerator(BaseAIContextGenerator):
             time="09:15",
             latitude=birth_data.get('latitude', 28.61),
             longitude=birth_data.get('longitude', 77.20),
-            timezone=birth_data.get('timezone', 'UTC+5:30')
+            timezone=birth_data.get('timezone', 'UTC+0')
         )
         calc = ChartCalculator({})
         transit_chart = calc.calculate_chart(transit_input)

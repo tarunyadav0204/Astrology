@@ -2,7 +2,7 @@ import swisseph as swe
 from datetime import datetime, timedelta
 import pytz
 from .panchang_calculator import PanchangCalculator
-from utils.timezone_service import get_timezone_from_coordinates
+from utils.timezone_service import parse_timezone_offset
 
 class MuhuratCalculator:
     def __init__(self):
@@ -22,7 +22,7 @@ class MuhuratCalculator:
     
     def _parse_timezone(self, tz_str):
         """Helper to parse timezone string like 'UTC+5:30' into float offset"""
-        offset = 5.5 # Default IST
+        offset = 0.0 # Default UTC
         if isinstance(tz_str, (int, float)):
             return float(tz_str)
         if isinstance(tz_str, str) and 'UTC' in tz_str:
@@ -61,34 +61,39 @@ class MuhuratCalculator:
 
     def calculate_childbirth_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
         if tz is None:
-            tz = get_timezone_from_coordinates(lat, lon)
+            tz_offset = parse_timezone_offset('', lat, lon)
+            tz = f"UTC+{tz_offset}" if tz_offset >= 0 else f"UTC{tz_offset}"
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.CHILDBIRTH_NAKSHATRAS, [1, 2, 3, 4, 5, 6, 8, 11], [], "Childbirth")
 
     def calculate_vehicle_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
         # Auto-detect timezone if not provided
         if tz is None:
-            tz = get_timezone_from_coordinates(lat, lon)
+            tz_offset = parse_timezone_offset('', lat, lon)
+            tz = f"UTC+{tz_offset}" if tz_offset >= 0 else f"UTC{tz_offset}"
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.VEHICLE_NAKSHATRAS, [0, 3, 6, 9], [1], "Vehicle Purchase",
             check_4th_house=True, karaka_planet=swe.VENUS)
 
     def calculate_griha_pravesh_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
         if tz is None:
-            tz = get_timezone_from_coordinates(lat, lon)
+            tz_offset = parse_timezone_offset('', lat, lon)
+            tz = f"UTC+{tz_offset}" if tz_offset >= 0 else f"UTC{tz_offset}"
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.HOME_NAKSHATRAS, [1, 4, 7, 10], [1, 6], "Griha Pravesh",
             check_4th_house=True, karaka_planet=swe.MARS)
 
     def calculate_gold_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
         if tz is None:
-            tz = get_timezone_from_coordinates(lat, lon)
+            tz_offset = parse_timezone_offset('', lat, lon)
+            tz = f"UTC+{tz_offset}" if tz_offset >= 0 else f"UTC{tz_offset}"
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.GOLD_NAKSHATRAS, [1, 2, 3, 4, 5, 6, 8, 11], [1], "Gold Purchase")
 
     def calculate_business_muhurat(self, start_date, end_date, lat, lon, user_nak, tz=None):
         if tz is None:
-            tz = get_timezone_from_coordinates(lat, lon)
+            tz_offset = parse_timezone_offset('', lat, lon)
+            tz = f"UTC+{tz_offset}" if tz_offset >= 0 else f"UTC{tz_offset}"
         return self._generic_muhurat_search(start_date, end_date, lat, lon, user_nak, tz,
             self.BUSINESS_NAKSHATRAS, [1, 4, 7, 10], [1, 6], "Business Opening",
             check_4th_house=True)

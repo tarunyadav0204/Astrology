@@ -1,37 +1,33 @@
 import { apiService } from './apiService';
 
 export const muhuratService = {
-  async getVivahMuhurat(date, latitude, longitude, timezone) {
+  async getVivahMuhurat(date, latitude, longitude) {
     try {
-      const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      return await apiService.getVivahMuhurat(date, latitude, longitude, userTimezone);
+      return await apiService.getVivahMuhurat(date, latitude, longitude);
     } catch (error) {
       throw new Error(`Failed to get marriage muhurat: ${error.message}`);
     }
   },
 
-  async getPropertyMuhurat(date, latitude, longitude, timezone) {
+  async getPropertyMuhurat(date, latitude, longitude) {
     try {
-      const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      return await apiService.getPropertyMuhurat(date, latitude, longitude, userTimezone);
+      return await apiService.getPropertyMuhurat(date, latitude, longitude);
     } catch (error) {
       throw new Error(`Failed to get property muhurat: ${error.message}`);
     }
   },
 
-  async getVehicleMuhurat(date, latitude, longitude, timezone) {
+  async getVehicleMuhurat(date, latitude, longitude) {
     try {
-      const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      return await apiService.getVehicleMuhurat(date, latitude, longitude, userTimezone);
+      return await apiService.getVehicleMuhurat(date, latitude, longitude);
     } catch (error) {
       throw new Error(`Failed to get vehicle muhurat: ${error.message}`);
     }
   },
 
-  async getGrihaPraveshMuhurat(date, latitude, longitude, timezone) {
+  async getGrihaPraveshMuhurat(date, latitude, longitude) {
     try {
-      const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      return await apiService.getGrihaPraveshMuhurat(date, latitude, longitude, userTimezone);
+      return await apiService.getGrihaPraveshMuhurat(date, latitude, longitude);
     } catch (error) {
       throw new Error(`Failed to get griha pravesh muhurat: ${error.message}`);
     }

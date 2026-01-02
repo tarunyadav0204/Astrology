@@ -454,7 +454,7 @@ CRITICAL: You MUST respond ONLY with valid JSON format. Do not include any text 
                 'time': health_data.get('time', ''),
                 'latitude': health_data.get('latitude', 0.0),
                 'longitude': health_data.get('longitude', 0.0),
-                'timezone': health_data.get('timezone', 'UTC+5:30')
+                'timezone': health_data.get('timezone', 'UTC+0')
             }
             
             print(f"Debug - Birth data for activations: {birth_data}")
@@ -471,7 +471,7 @@ CRITICAL: You MUST respond ONLY with valid JSON format. Do not include any text 
                         'time': bd.get('time', ''),
                         'latitude': bd.get('latitude', 0.0),
                         'longitude': bd.get('longitude', 0.0),
-                        'timezone': bd.get('timezone', 'UTC+5:30')
+                        'timezone': bd.get('timezone', 'UTC+0')
                     })
                     print(f"Debug - Updated birth data from chart_data: {birth_data}")
                 

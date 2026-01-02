@@ -71,7 +71,8 @@ const cleanText = (html) => {
 };
 
 export const WealthReportPDF = ({ data, userName }) => {
-  const analysis = data?.wealth_analysis?.json_response || {};
+  // Handle both old format (data.wealth_analysis.json_response) and new format (data.analysis)
+  const analysis = data?.analysis || data?.wealth_analysis?.json_response || {};
   
   return (
     <Document>

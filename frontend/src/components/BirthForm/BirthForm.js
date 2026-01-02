@@ -17,7 +17,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     place: '',
     latitude: null,
     longitude: null,
-    timezone: '',
     gender: ''
   });
   
@@ -58,7 +57,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         place: prefilledData.person1.place || '',
         latitude: null,
         longitude: null,
-        timezone: '',
         gender: 'Male'
       });
     }
@@ -72,7 +70,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         place: birthData.place || '',
         latitude: birthData.latitude || null,
         longitude: birthData.longitude || null,
-        timezone: birthData.timezone || '',
         gender: birthData.gender || ''
       });
     }
@@ -115,7 +112,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         time: chart.time,
         latitude: chart.latitude,
         longitude: chart.longitude,
-        timezone: chart.timezone,
         place: chart.place || '',
         gender: chart.gender || ''
       };
@@ -137,8 +133,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         time: chart.time,
         place: `${chart.latitude}, ${chart.longitude}`,
         latitude: chart.latitude,
-        longitude: chart.longitude,
-        timezone: chart.timezone
+        longitude: chart.longitude
       });
       
       setChartData(enhancedChartData);
@@ -164,7 +159,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       place: chart.place || `${chart.latitude}, ${chart.longitude}`,
       latitude: chart.latitude,
       longitude: chart.longitude,
-      timezone: chart.timezone,
       gender: chart.gender || ''
     });
   };
@@ -190,7 +184,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       place: '',
       latitude: null,
       longitude: null,
-      timezone: '',
       gender: ''
     });
   };
@@ -251,8 +244,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         ...prev, 
         [name]: value,
         latitude: null,
-        longitude: null,
-        timezone: ''
+        longitude: null
       }));
       // Clear place error when typing to search
       setErrors(prev => ({ ...prev, place: '' }));
@@ -269,8 +261,7 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       ...prev,
       place: place.name,
       latitude: place.latitude,
-      longitude: place.longitude,
-      timezone: place.timezone
+      longitude: place.longitude
     }));
     setShowSuggestions(false);
     setSuggestions([]);

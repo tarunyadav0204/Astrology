@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 from calculators.chart_calculator import ChartCalculator
+from utils.timezone_service import parse_timezone_offset
 router = APIRouter()
 
 class YoginiDashaRequest(BaseModel):
@@ -11,9 +12,16 @@ class YoginiDashaRequest(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: str
     years: Optional[int] = 5
     target_date: Optional[str] = None
+    
+    @property
+    def timezone(self):
+        """Auto-detect timezone from coordinates"""
+        try:
+            return parse_timezone_offset('', self.latitude, self.longitude)
+        except Exception:
+            return 5.5  # IST fallback
 
 @router.post("/yogini-dasha")
 async def get_yogini_dasha(request: YoginiDashaRequest):

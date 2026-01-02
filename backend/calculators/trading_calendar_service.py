@@ -47,7 +47,7 @@ class TradingCalendarService:
                 time="09:15",  # Explicitly set Market Open Time
                 latitude=self.birth_data.get('latitude', 28.61),
                 longitude=self.birth_data.get('longitude', 77.20),
-                timezone=self.birth_data.get('timezone', 'UTC+5:30')  # Ensure Timezone matches
+                timezone=self.birth_data.get('timezone', 'UTC+0')  # Ensure Timezone matches
             )
             transit_chart = chart_calc.calculate_chart(transit_input)
             

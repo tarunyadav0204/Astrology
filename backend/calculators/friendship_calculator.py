@@ -1,5 +1,6 @@
 import swisseph as swe
 from .base_calculator import BaseCalculator
+from utils.timezone_service import parse_timezone_offset, get_timezone_from_coordinates
 
 class FriendshipCalculator(BaseCalculator):
     """Extract friendship calculation logic from main.py"""
@@ -44,22 +45,22 @@ class FriendshipCalculator(BaseCalculator):
             date_str = birth_data.date
             latitude = birth_data.latitude
             longitude = birth_data.longitude
-            timezone = birth_data.timezone
+            # Calculate timezone from coordinates if not provided
+            if hasattr(birth_data, 'timezone'):
+                timezone = birth_data.timezone
+            else:
+                timezone = get_timezone_from_coordinates(latitude, longitude)
         
         # Calculate planetary positions
         time_parts = time_str.split(':')
         hour = float(time_parts[0]) + float(time_parts[1])/60
         
-        if 6.0 <= latitude <= 37.0 and 68.0 <= longitude <= 97.0:
-            tz_offset = 5.5
-        else:
-            tz_offset = 0
-            if timezone.startswith('UTC'):
-                tz_str = timezone[3:]
-                if tz_str and ':' in tz_str:
-                    sign = 1 if tz_str[0] == '+' else -1
-                    parts = tz_str[1:].split(':')
-                    tz_offset = sign * (float(parts[0]) + float(parts[1])/60)
+        # Get timezone offset using centralized service
+        tz_offset = parse_timezone_offset(
+            timezone,
+            latitude,
+            longitude
+        )
         
         utc_hour = hour - tz_offset
         jd = swe.julday(
@@ -75,6 +76,10 @@ class FriendshipCalculator(BaseCalculator):
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):
             if planet <= 6:
+                # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+
                 pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
             else:
                 pos = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)[0]

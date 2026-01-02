@@ -62,6 +62,12 @@ class AshtakavargaEventPredictor(AshtakavargaTransitCalculator):
             check_date = datetime(year, month, 15)
             jd = swe.julday(year, month, 15, 12.0)
             
+            # Set Lahiri Ayanamsa for accurate Vedic calculations
+
+            
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+            
             jupiter_pos = swe.calc_ut(jd, 5, swe.FLG_SIDEREAL)[0][0]
             jupiter_sign = int(jupiter_pos / 30)
             

@@ -1,12 +1,12 @@
 import { apiService } from '../../../services/apiService';
 
 class PanchangService {
-  async calculatePanchang(date, latitude, longitude, timezone) {
-    if (!date || !latitude || !longitude || !timezone) {
+  async calculatePanchang(date, latitude, longitude) {
+    if (!date || !latitude || !longitude) {
       throw new Error('Missing required parameters for Panchang calculation');
     }
 
-    console.log('[DEBUG] Calling calculatePanchang with:', { date, latitude, longitude, timezone });
+    console.log('[DEBUG] Calling calculatePanchang with:', { date, latitude, longitude });
 
     try {
       const response = await apiService.calculatePanchang({
@@ -17,7 +17,6 @@ class PanchangService {
           time: '12:00',
           latitude: latitude,
           longitude: longitude,
-          timezone: timezone,
           place: `${latitude}, ${longitude}`
         }
       });
@@ -47,8 +46,8 @@ class PanchangService {
     }
   }
 
-  async calculatePlanetaryPositions(date, latitude, longitude, timezone) {
-    if (!date || !latitude || !longitude || !timezone) {
+  async calculatePlanetaryPositions(date, latitude, longitude) {
+    if (!date || !latitude || !longitude) {
       throw new Error('Missing required parameters for planetary positions');
     }
 
@@ -60,7 +59,6 @@ class PanchangService {
         time: '12:00',
         latitude: latitude,
         longitude: longitude,
-        timezone: timezone,
         place: `${latitude}, ${longitude}`
       }
     });
@@ -104,33 +102,30 @@ class PanchangService {
     return response;
   }
 
-  async calculateChoghadiya(date, latitude, longitude, timezone) {
+  async calculateChoghadiya(date, latitude, longitude) {
     if (!date || !latitude || !longitude) {
       throw new Error('Missing required parameters for Choghadiya calculation');
     }
 
-    const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const response = await apiService.calculateChoghadiya(date, latitude, longitude, userTimezone);
+    const response = await apiService.calculateChoghadiya(date, latitude, longitude);
     return response;
   }
 
-  async calculateHora(date, latitude, longitude, timezone) {
+  async calculateHora(date, latitude, longitude) {
     if (!date || !latitude || !longitude) {
       throw new Error('Missing required parameters for Hora calculation');
     }
 
-    const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const response = await apiService.calculateHora(date, latitude, longitude, userTimezone);
+    const response = await apiService.calculateHora(date, latitude, longitude);
     return response;
   }
 
-  async calculateSpecialMuhurtas(date, latitude, longitude, timezone) {
+  async calculateSpecialMuhurtas(date, latitude, longitude) {
     if (!date || !latitude || !longitude) {
       throw new Error('Missing required parameters for Special Muhurtas calculation');
     }
 
-    const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const response = await apiService.calculateSpecialMuhurtas(date, latitude, longitude, userTimezone);
+    const response = await apiService.calculateSpecialMuhurtas(date, latitude, longitude);
     return response;
   }
 }

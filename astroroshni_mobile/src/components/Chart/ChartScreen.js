@@ -98,7 +98,7 @@ export default function ChartScreen({ navigation, route }) {
     // Get from preloader cache
     const cachedChart = chartPreloader.getChart(birthData, chartType);
     if (cachedChart) {
-      console.log(`Using cached data for ${chartType}`);
+      // console.log(`Using cached data for ${chartType}`);
       return cachedChart;
     }
     
@@ -107,7 +107,7 @@ export default function ChartScreen({ navigation, route }) {
 
     // CRITICAL FIX: Return null for other charts if not cached.
     // This forces ChartWidget to fetch the data itself instead of showing Lagna.
-    console.log(`No cached data for ${chartType}, returning null`);
+    // console.log(`No cached data for ${chartType}, returning null`);
     return null; 
   }, [birthData, chartData]);
   
@@ -166,14 +166,13 @@ export default function ChartScreen({ navigation, route }) {
           date: typeof data.date === 'string' ? data.date.split('T')[0] : data.date,
           time: typeof data.time === 'string' ? data.time.split('T')[1]?.slice(0, 5) || data.time : data.time,
           latitude: parseFloat(data.latitude),
-          longitude: parseFloat(data.longitude),
-          timezone: data.timezone || 'Asia/Kolkata'
+          longitude: parseFloat(data.longitude)
         };
         
         console.log('🚀 Calculating chart for ID:', data.id, 'Name:', data.name);
         const response = await chartAPI.calculateChartOnly(formattedData);
         setChartData(response.data);
-        console.log('✅ Chart calculated - Ascendant:', response.data.ascendant);
+        // console.log('✅ Chart calculated - Ascendant:', response.data.ascendant);
       } else {
         console.log('⚠️ No birth data found in storage');
       }
@@ -192,8 +191,7 @@ export default function ChartScreen({ navigation, route }) {
         date: typeof data.date === 'string' ? data.date.split('T')[0] : data.date,
         time: typeof data.time === 'string' ? data.time.split('T')[1]?.slice(0, 5) || data.time : data.time,
         latitude: parseFloat(data.latitude),
-        longitude: parseFloat(data.longitude),
-        timezone: data.timezone || 'Asia/Kolkata'
+        longitude: parseFloat(data.longitude)
       };
       
       // Pre-load all charts at once

@@ -36,6 +36,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const [rotateAnim] = useState(new Animated.Value(0));
   const [pulseAnim] = useState(new Animated.Value(1));
   const [glowAnim] = useState(new Animated.Value(0));
+  const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
 
   useEffect(() => {
     checkBirthData();
@@ -341,70 +342,39 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 // console.log('🎯 Complete status received');
                 // console.log('📦 Data keys:', Object.keys(parsed.data || {}));
                 
-                // Handle nested response structure - try multiple formats
+                // Handle nested response structure - simple and clean
                 let analysisData = null;
                 
+                console.log('🔍 [DEBUG] Complete parsed.data structure:', JSON.stringify(parsed.data, null, 2));
+                
+                // Try direct analysis key (our new clean format)
                 if (parsed.data && parsed.data.analysis) {
-                  // console.log('✅ Found direct analysis data');
+                  console.log('✅ Found direct analysis data');
                   analysisData = parsed.data.analysis;
-                } else if (parsed.data && parsed.data[`${analysisType}_analysis`]) {
-                  // console.log('✅ Found typed analysis data for:', analysisType);
-                  analysisData = parsed.data[`${analysisType}_analysis`];
                 }
                 
                 if (analysisData) {
                   // console.log('📋 Analysis data keys:', Object.keys(analysisData));
                   
-                  // Direct analysis object (new format)
-                  if (typeof analysisData === 'object' && analysisData.quick_answer) {
-                    // console.log('✅ Valid analysis object found');
-                    // console.log('📊 Response keys:', Object.keys(analysisData));
-                    setAnalysisResult(analysisData);
-                    await saveAnalysis(analysisData);
-                    if (!parsed.cached) {
-                      console.log('💳 Fetching balance (not cached)');
-                      fetchBalance();
-                    } else {
-                      console.log('💾 Using cached response, not fetching balance');
-                    }
-                    return;
-                  } else if (analysisData.detailed_analysis && analysisData.final_thoughts) {
-                    // console.log('✅ Valid progeny analysis format found');
-                    // console.log('📊 Response keys:', Object.keys(analysisData));
-                    // Transform progeny format to standard format
-                    const transformedData = {
-                      quick_answer: analysisData.final_thoughts,
-                      detailed_analysis: analysisData.detailed_analysis,
-                      final_thoughts: analysisData.final_thoughts
-                    };
-                    setAnalysisResult(transformedData);
-                    await saveAnalysis(transformedData);
-                    if (!parsed.cached) {
-                      // console.log('💳 Fetching balance (not cached)');
-                      fetchBalance();
-                    } else {
-                      console.log('💾 Using cached response, not fetching balance');
-                    }
-                    return;
-                  } else if (analysisData.json_response && typeof analysisData.json_response === 'object') {
-                    // console.log('✅ Valid JSON response found in legacy format');
-                    // console.log('📊 Response keys:', Object.keys(analysisData.json_response));
-                    setAnalysisResult(analysisData.json_response);
-                    await saveAnalysis(analysisData.json_response);
-                    if (!parsed.cached) {
-                      // console.log('💳 Fetching balance (not cached)');
-                      fetchBalance();
-                    } else {
-                      console.log('💾 Using cached response, not fetching balance');
-                    }
-                    return;
-                  } else if (analysisData.raw_response) {
-                    // console.log('⚠️ Raw response found, will parse');
-                    fullContent = analysisData.raw_response;
-                  } else {
-                    // console.log('❌ No valid response format in analysis data');
-                    fullContent = '';
+                  // DEBUG: Log the complete analysis data structure
+                  console.log('🔍 [DEBUG] Complete analysisData structure:', JSON.stringify(analysisData, null, 2));
+                  console.log('🔍 [DEBUG] analysisData.terms:', analysisData.terms);
+                  console.log('🔍 [DEBUG] analysisData.glossary:', analysisData.glossary);
+                  
+                  // Ensure terms and glossary are merged into the final object
+                  const finalResult = {
+                    ...analysisData,
+                    // Safely extract terms/glossary from wherever they might be hiding
+                    terms: analysisData.terms || parsed.data[`${analysisType}_analysis`]?.terms || parsed.data.terms || [],
+                    glossary: analysisData.glossary || parsed.data[`${analysisType}_analysis`]?.glossary || parsed.data.glossary || {}
+                  };
+
+                  setAnalysisResult(finalResult);
+                  await saveAnalysis(finalResult);
+                  if (!parsed.cached) {
+                    fetchBalance();
                   }
+                  return;
                 } else {
                   // console.log('⚠️ No analysis data found, using response field');
                   fullContent = parsed.response || '';
@@ -442,8 +412,14 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           // If no JSON found, try parsing the entire cleaned content
           try {
             const analysisData = JSON.parse(cleanContent.trim());
-            setAnalysisResult(analysisData);
-            await saveAnalysis(analysisData);
+            // Ensure terms and glossary are included
+            const enrichedData = {
+              ...analysisData,
+              terms: analysisData.terms || [],
+              glossary: analysisData.glossary || {}
+            };
+            setAnalysisResult(enrichedData);
+            await saveAnalysis(enrichedData);
             fetchBalance();
             return;
           } catch (directParseError) {
@@ -454,7 +430,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               detailed_analysis: [{
                 question: `${analysisType.charAt(0).toUpperCase() + analysisType.slice(1)} Analysis`,
                 answer: htmlContent
-              }]
+              }],
+              terms: [],
+              glossary: {}
             };
             setAnalysisResult(simpleResult);
             await saveAnalysis(simpleResult);
@@ -505,59 +483,95 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }));
   };
 
-  const formatTextWithBold = (text, isFinalThoughts = false) => {
+  const formatTextWithBold = (text, isFinalThoughts = false, terms = null, glossary = null) => {
     if (!text) return null;
     
-    // Replace HTML entities
+    // 1. Clean HTML entities and common tags
     let processedText = text
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&');
-    
-    // Handle lists - convert to bullet points
-    processedText = processedText
-      .replace(/<ul>/gi, '')
-      .replace(/<\/ul>/gi, '\n')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;/g, "'")
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?p>/gi, '')
       .replace(/<li>/gi, '• ')
-      .replace(/<\/li>/gi, '\n');
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<\/?ul>/gi, '\n')
+      .replace(/<\/?strong>/gi, '**');
     
-    // Handle strong/bold tags
-    processedText = processedText
-      .replace(/<strong>/gi, '**')
-      .replace(/<\/strong>/gi, '**');
-    
-    // Split by paragraph tags and process each paragraph
-    const paragraphs = processedText.split(/<\/p>\s*<p>/gi);
+    // 2. Step One: Convert <term> tags to unique internal markers
+    if (terms && glossary) {
+      processedText = processedText.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
+        if (glossary[termId]) {
+          // Use a delimiter that won't conflict with standard regex characters
+          return `###TERM_START###${termId}###TERM_MID###${termText}###TERM_END###`;
+        }
+        return termText;
+      });
+    }
+
+    // 3. Process Paragraphs
+    const paragraphs = processedText.split('\n\n');
     
     return paragraphs.map((paragraph, pIndex) => {
-      // Clean up opening/closing p tags
-      let cleanPara = paragraph.replace(/<\/?p>/gi, '').trim();
-      
-      // Replace <br> tags with line breaks
-      cleanPara = cleanPara.replace(/<br\s*\/?>/gi, '\n');
-      
-      // Split by ** for bold formatting
-      const parts = cleanPara.split(/\*\*(.*?)\*\*/g);
-      
-      const formattedParts = parts.map((part, index) => {
-        if (index % 2 === 1) {
-          return <Text key={`${pIndex}-${index}`} style={isFinalThoughts ? styles.boldDarkText : styles.boldYellowText}>{part}</Text>;
-        }
-        // Return regular text with proper styling for final thoughts
-        return <Text key={`${pIndex}-${index}-text`} style={isFinalThoughts ? {color: '#333'} : undefined}>{part}</Text>;
+      let cleanPara = paragraph.trim();
+      if (!cleanPara) return null;
+
+      // 4. Step Two: Refined Regex to handle underscores safely
+      // We use [^#]+ to capture everything except our delimiter
+      cleanPara = cleanPara.replace(/###TERM_START###([^#]+)###TERM_MID###([^#]+)###TERM_END###/g, (match, termId, termText) => {
+        return `__CLICKABLE_TERM__${termId}__TEXT__${termText}__END__`;
       });
-      
-      // Add paragraph spacing
-      if (pIndex < paragraphs.length - 1) {
-        return (
-          <Text key={pIndex}>
-            {formattedParts}
-            {'\n\n'}
-          </Text>
-        );
+
+      const parts = [];
+      let currentIndex = 0;
+
+      // 5. Final Regex for Rendering - Fixed to handle underscores in term IDs
+      const termRegex = /__CLICKABLE_TERM__(.*?)__TEXT__(.*?)__END__/g;
+      const boldRegex = /\*\*(.*?)\*\*/g;
+      const allMatches = [];
+
+      let match;
+      while ((match = termRegex.exec(cleanPara)) !== null) {
+        allMatches.push({ type: 'term', start: match.index, end: termRegex.lastIndex, termId: match[1], text: match[2] });
       }
-      return <Text key={pIndex}>{formattedParts}</Text>;
+      
+      while ((match = boldRegex.exec(cleanPara)) !== null) {
+        // Avoid overlap with terms
+        if (!allMatches.some(t => match.index >= t.start && match.index < t.end)) {
+          allMatches.push({ type: 'bold', start: match.index, end: boldRegex.lastIndex, text: match[1] });
+        }
+      }
+
+      allMatches.sort((a, b) => a.start - b.start);
+
+      // 6. Assembly
+      allMatches.forEach((m, i) => {
+        if (m.start > currentIndex) {
+          parts.push(<Text key={`text-${i}`} style={isFinalThoughts ? {color: '#333'} : {color: 'white'}}>{cleanPara.substring(currentIndex, m.start)}</Text>);
+        }
+        if (m.type === 'term') {
+          parts.push(
+            <Text 
+              key={`term-${i}`} 
+              style={[{ color: '#FFD700', textDecorationLine: 'underline', fontWeight: '700' }, isFinalThoughts && {color: '#1a0033'}]}
+              onPress={() => setTooltipModal({ show: true, term: m.text, definition: glossary[m.termId] })}
+            >
+              {m.text}
+            </Text>
+          );
+        } else {
+          parts.push(<Text key={`bold-${i}`} style={isFinalThoughts ? styles.boldDarkText : styles.boldYellowText}>{m.text}</Text>);
+        }
+        currentIndex = m.end;
+      });
+
+      if (currentIndex < cleanPara.length) {
+        parts.push(<Text key="tail" style={isFinalThoughts ? {color: '#333'} : {color: 'white'}}>{cleanPara.substring(currentIndex)}</Text>);
+      }
+
+      return <Text key={pIndex} style={{marginBottom: 10}}>{parts}</Text>;
     });
   };
 
@@ -679,7 +693,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               <div class="quick-answer">${analysisResult.quick_answer?.replace(/<[^>]*>/g, '').replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>') || 'No quick answer available'}</div>
             </div>
             
-            ${analysisResult.detailed_analysis ? `
+            ${analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) ? `
               <div class="section">
                 <div class="section-title">📊 Detailed Analysis</div>
                 ${analysisResult.detailed_analysis.map(item => `
@@ -975,11 +989,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     style={styles.quickAnswerCard}
                   >
                     <Text style={styles.quickAnswerTitle}>✨ Quick Insights</Text>
-                    <Text style={styles.quickAnswerText}>{formatTextWithBold(analysisResult.quick_answer)}</Text>
+                    <Text style={styles.quickAnswerText}>{formatTextWithBold(analysisResult.quick_answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
                   </LinearGradient>
                 </View>
 
-                {analysisResult.detailed_analysis && (
+                {analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) && (
                   <View style={styles.detailedSection}>
                     <Text style={styles.sectionTitle}>📋 Detailed Analysis</Text>
                     {analysisResult.detailed_analysis.map((item, index) => (
@@ -1003,19 +1017,19 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         
                         {expandedItems[index] && (
                           <View style={styles.answerSection}>
-                            <Text style={styles.answerText}>{formatTextWithBold(item.answer)}</Text>
+                            <Text style={styles.answerText}>{formatTextWithBold(item.answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
                             {item.key_points && item.key_points.length > 0 && (
                               <View style={styles.keyPointsSection}>
                                 <Text style={styles.keyPointsTitle}>Key Points:</Text>
                                 {item.key_points.map((point, pointIndex) => (
-                                  <Text key={pointIndex} style={styles.keyPoint}>• {formatTextWithBold(point)}</Text>
+                                  <Text key={pointIndex} style={styles.keyPoint}>• {formatTextWithBold(point, false, analysisResult.terms, analysisResult.glossary)}</Text>
                                 ))}
                               </View>
                             )}
                             {item.astrological_basis && (
                               <View style={styles.basisSection}>
                                 <Text style={styles.basisTitle}>Astrological Basis:</Text>
-                                <Text style={styles.basisText}>{formatTextWithBold(item.astrological_basis)}</Text>
+                                <Text style={styles.basisText}>{formatTextWithBold(item.astrological_basis, false, analysisResult.terms, analysisResult.glossary)}</Text>
                               </View>
                             )}
                           </View>
@@ -1033,13 +1047,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     >
                       <Text style={styles.finalTitle}>🌟 Final Thoughts</Text>
                       <View style={styles.finalTextContainer}>
-                        {formatTextWithBold(analysisResult.final_thoughts, true)}
+                        {formatTextWithBold(analysisResult.final_thoughts, true, analysisResult.terms, analysisResult.glossary)}
                       </View>
                     </LinearGradient>
                   </View>
                 )}
 
-                {analysisResult.follow_up_questions && (
+                {analysisResult.follow_up_questions && Array.isArray(analysisResult.follow_up_questions) && (
                   <View style={styles.followUpSection}>
                     <Text style={styles.sectionTitle}>💭 Explore Further</Text>
                     {analysisResult.follow_up_questions.map((question, index) => (
@@ -1172,6 +1186,32 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           )}
         </SafeAreaView>
       </LinearGradient>
+      
+      {/* Tooltip Modal */}
+      {tooltipModal.show && (
+        <View style={styles.tooltipModalOverlay}>
+          <View style={styles.tooltipModalContainer}>
+            <LinearGradient
+              colors={['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)']}
+              style={styles.tooltipModalContent}
+            >
+              <Text style={styles.tooltipModalTitle}>{tooltipModal.term}</Text>
+              <Text style={styles.tooltipModalText}>{tooltipModal.definition}</Text>
+              <TouchableOpacity
+                style={styles.tooltipModalButton}
+                onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
+              >
+                <LinearGradient
+                  colors={['#ff6b35', '#ff8c5a']}
+                  style={styles.tooltipModalButtonGradient}
+                >
+                  <Text style={styles.tooltipModalButtonText}>Close</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1765,5 +1805,56 @@ const styles = StyleSheet.create({
   },
   modalCountButtonTextSelected: {
     color: COLORS.white,
+  },
+  
+  // Tooltip Modal Styles
+  tooltipModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  tooltipModalContainer: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    maxWidth: 350,
+  },
+  tooltipModalContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  tooltipModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFD700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  tooltipModalText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  tooltipModalButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  tooltipModalButtonGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  tooltipModalButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

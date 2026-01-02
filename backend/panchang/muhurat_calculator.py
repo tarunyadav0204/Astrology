@@ -8,7 +8,7 @@ class MuhuratCalculator:
         # Set Lahiri Ayanamsa for Drik-level accuracy
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-    def _jd_to_local_iso(self, jd_val, timezone_name="Asia/Kolkata"):
+    def _jd_to_local_iso(self, jd_val, timezone_name=None):
         """
         Pinpoint accurate converter: Julian Day -> Local Timezone ISO String.
         Handles Daylight Savings (DST) automatically.
@@ -28,10 +28,10 @@ class MuhuratCalculator:
             dt_local = dt_utc_aware.astimezone(local_zone)
             return dt_local.isoformat()
         except Exception:
-            # Fallback to IST if timezone name is invalid
+            # Fallback to UTC if timezone name is invalid
             return (dt_utc + timedelta(hours=5, minutes=30)).isoformat()
     
-    def calculate_vivah_muhurat(self, date_str: str, latitude: float, longitude: float, timezone="Asia/Kolkata") -> dict:
+    def calculate_vivah_muhurat(self, date_str: str, latitude: float, longitude: float, timezone=None) -> dict:
         """Calculate marriage muhurat for given date localized to user's city"""
         if not date_str or latitude is None or longitude is None:
             raise ValueError("Date string, latitude, and longitude are required")
@@ -95,7 +95,7 @@ class MuhuratCalculator:
         except Exception as e:
             raise ValueError(f"Error calculating Vivah Muhurat: {str(e)}")
     
-    def calculate_property_muhurat(self, date_str: str, latitude: float, longitude: float, timezone="Asia/Kolkata") -> dict:
+    def calculate_property_muhurat(self, date_str: str, latitude: float, longitude: float, timezone=None) -> dict:
         """Calculate property purchase muhurat localized to user's city"""
         if not date_str or latitude is None or longitude is None:
             raise ValueError("Date string, latitude, and longitude are required")
@@ -150,7 +150,7 @@ class MuhuratCalculator:
         except Exception as e:
             raise ValueError(f"Error calculating Property Muhurat: {str(e)}")
     
-    def calculate_vehicle_muhurat(self, date_str: str, latitude: float, longitude: float, timezone="Asia/Kolkata") -> dict:
+    def calculate_vehicle_muhurat(self, date_str: str, latitude: float, longitude: float, timezone=None) -> dict:
         """Calculate vehicle purchase muhurat localized to user's city"""
         if not date_str or latitude is None or longitude is None:
             raise ValueError("Date string, latitude, and longitude are required")
@@ -205,7 +205,7 @@ class MuhuratCalculator:
         except Exception as e:
             raise ValueError(f"Error calculating Vehicle Muhurat: {str(e)}")
     
-    def calculate_griha_pravesh_muhurat(self, date_str: str, latitude: float, longitude: float, timezone="Asia/Kolkata") -> dict:
+    def calculate_griha_pravesh_muhurat(self, date_str: str, latitude: float, longitude: float, timezone=None) -> dict:
         """Calculate house warming muhurat localized to user's city"""
         if not date_str or latitude is None or longitude is None:
             raise ValueError("Date string, latitude, and longitude are required")

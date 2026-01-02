@@ -1,7 +1,7 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 from .base_calculator import BaseCalculator
-from utils.timezone_service import get_timezone_from_coordinates
+from utils.timezone_service import parse_timezone_offset
 
 class PanchangCalculator(BaseCalculator):
     """Extract panchang calculation logic"""
@@ -33,8 +33,8 @@ class PanchangCalculator(BaseCalculator):
         self.KARANA_MOVABLE = ['Bava', 'Balava', 'Kaulava', 'Taitila', 'Gara', 'Vanija', 'Vishti']
 
     def _parse_timezone(self, tz_str):
-        """Helper to parse timezone string like 'UTC+5:30' into float offset"""
-        offset = 5.5 # Default IST
+        """Helper to parse timezone string like 'UTC+0' into float offset"""
+        offset = 0.0 # Default UTC
         if isinstance(tz_str, (int, float)):
             return float(tz_str)
         if isinstance(tz_str, str) and 'UTC' in tz_str:
@@ -52,11 +52,16 @@ class PanchangCalculator(BaseCalculator):
         return offset
     
     def calculate_panchang(self, date_str, time_str="12:00:00", latitude=0.0, longitude=0.0, timezone=None):
-        # Auto-detect timezone if not provided
+        # Auto-detect timezone if not provided using centralized service
         if timezone is None and latitude != 0.0 and longitude != 0.0:
-            timezone = get_timezone_from_coordinates(latitude, longitude)
+            tz_offset = parse_timezone_offset('', latitude, longitude)
+            # Convert offset back to UTC format
+            if tz_offset >= 0:
+                timezone = f"UTC+{tz_offset}"
+            else:
+                timezone = f"UTC{tz_offset}"
         elif timezone is None:
-            timezone = "UTC+5:30"  # Default fallback
+            timezone = "UTC+0"  # Default fallback
         # Parse Date
         try:
             if 'T' in str(date_str): date_str = str(date_str).split('T')[0]
@@ -132,11 +137,11 @@ class PanchangCalculator(BaseCalculator):
         
         lat = getattr(birth_data, 'latitude', 0.0) or birth_data.get('latitude', 0.0)
         lon = getattr(birth_data, 'longitude', 0.0) or birth_data.get('longitude', 0.0)
-        tz = getattr(birth_data, 'timezone', "UTC+5:30") or birth_data.get('timezone', "UTC+5:30")
+        tz = getattr(birth_data, 'timezone', "UTC+0") or birth_data.get('timezone', "UTC+0")
 
         return self.calculate_panchang(date_str, time_str, float(lat), float(lon), tz)
     
-    def calculate_choghadiya(self, date_str, lat, lon, timezone="UTC+5:30"):
+    def calculate_choghadiya(self, date_str, lat, lon, timezone="UTC+0"):
         """Calculate daily Choghadiya segments with dynamic timezone"""
         if 'T' in str(date_str): date_str = str(date_str).split('T')[0]
         year, month, day = map(int, str(date_str).split('-'))
@@ -197,7 +202,7 @@ class PanchangCalculator(BaseCalculator):
             
         return {"day_choghadiya": day_slots, "night_choghadiya": night_slots}
     
-    def get_local_sunrise_sunset(self, date_str, latitude, longitude, timezone="UTC+5:30"):
+    def get_local_sunrise_sunset(self, date_str, latitude, longitude, timezone="UTC+0"):
         """Professional sunrise/sunset using Swiss Ephemeris with atmospheric refraction"""
         if 'T' in str(date_str): date_str = str(date_str).split('T')[0]
         year, month, day = map(int, str(date_str).split('-'))
@@ -215,9 +220,11 @@ class PanchangCalculator(BaseCalculator):
         
         def jd_to_local_time(jd_val):
             if not jd_val: return None
-            year, month, day, hour, minute, second = swe.jdut1_to_utc(jd_val, 1)
-            dt_utc = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            dt_local = dt_utc + timedelta(hours=tz_offset)
+            # Swiss Ephemeris returns JD in UTC
+            # Convert JD directly to local time by adding timezone offset to JD
+            local_jd = jd_val + (tz_offset / 24.0)  # Convert hours to days
+            year, month, day, hour, minute, second = swe.jdut1_to_utc(local_jd, 1)
+            dt_local = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
             return dt_local
         
         sunrise_time = jd_to_local_time(sunrise_result[1][0]) if sunrise_result[0] == 0 else None
@@ -304,7 +311,7 @@ class PanchangCalculator(BaseCalculator):
         
         return jd
     
-    def calculate_hora(self, date_str, latitude, longitude, timezone="UTC+5:30"):
+    def calculate_hora(self, date_str, latitude, longitude, timezone="UTC+0"):
         """Calculate planetary hours (Hora) for the day"""
         if 'T' in str(date_str): date_str = str(date_str).split('T')[0]
         year, month, day = map(int, str(date_str).split('-'))
@@ -371,7 +378,7 @@ class PanchangCalculator(BaseCalculator):
         
         return {'day_horas': day_horas, 'night_horas': night_horas}
     
-    def calculate_special_muhurtas(self, date_str, latitude, longitude, timezone="UTC+5:30"):
+    def calculate_special_muhurtas(self, date_str, latitude, longitude, timezone="UTC+0"):
         """Calculate special muhurtas like Abhijit, Brahma Muhurta"""
         sunrise_sunset = self.get_local_sunrise_sunset(date_str, latitude, longitude, timezone)
         

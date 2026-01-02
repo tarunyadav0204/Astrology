@@ -25,6 +25,7 @@ class BirthDetailsRequest(BaseModel):
     timezone: Optional[str] = None
     force_regenerate: Optional[bool] = False
     user_role: Optional[str] = None
+    language: Optional[str] = 'english'
 
 class WealthAnalysisRequest(BaseModel):
     name: Optional[str] = None
@@ -60,7 +61,8 @@ async def analyze_wealth(request: WealthAnalysisRequest, current_user: User = De
         latitude=request.latitude,
         longitude=request.longitude,
         timezone=request.timezone,
-        force_regenerate=request.force_regenerate
+        force_regenerate=request.force_regenerate,
+        language=request.language
     )
     print(f"🔄 Birth request force_regenerate: {birth_request.force_regenerate}")
     # Call the existing enhanced insights endpoint
@@ -219,7 +221,7 @@ async def get_overall_wealth_assessment(request: BirthDetailsRequest, current_us
             place=request.birth_place,
             latitude=request.latitude or 28.6139,
             longitude=request.longitude or 77.2090,
-            timezone=request.timezone or 'UTC+5:30'
+            timezone=request.timezone or 'UTC+0'
         )
         
         # Calculate chart
@@ -278,10 +280,10 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
                 raise
                 
             try:
-                from ai.gemini_chat_analyzer import GeminiChatAnalyzer
-                print(f"✅ GeminiChatAnalyzer imported successfully")
+                from ai.structured_analyzer import StructuredAnalysisAnalyzer
+                print(f"✅ StructuredAnalysisAnalyzer imported successfully")
             except Exception as e:
-                print(f"❌ Failed to import GeminiChatAnalyzer: {e}")
+                print(f"❌ Failed to import StructuredAnalysisAnalyzer: {e}")
                 raise
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Initializing enhanced wealth analysis...'})}\n\n"
@@ -294,7 +296,7 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
                 'place': request.birth_place,
                 'latitude': request.latitude or 28.6139,
                 'longitude': request.longitude or 77.2090,
-                'timezone': request.timezone or 'UTC+5:30'
+                'timezone': request.timezone or 'UTC+0'
             }
             
             # Create birth data object
@@ -313,15 +315,14 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             
             if stored_insights and not force_regen:
                 print(f"💾 Using cached insights (force_regenerate={force_regen})")
-                # Format cached response properly
+                # Format cached response for mobile compatibility
                 cached_response = {
-                    'wealth_analysis': {
-                        'json_response': stored_insights,
-                        'summary': 'Comprehensive wealth analysis based on Vedic astrology principles.'
-                    },
+                    'analysis': stored_insights,
+                    'terms': stored_insights.get('terms', []),
+                    'glossary': stored_insights.get('glossary', {}),
                     'enhanced_context': True,
                     'questions_covered': len(stored_insights.get('detailed_analysis', [])),
-                    'context_type': 'chat_context_builder',
+                    'context_type': 'cached_analysis',
                     'generated_at': datetime.now().isoformat()
                 }
                 yield f"data: {json.dumps({'status': 'complete', 'data': cached_response, 'cached': True})}\n\n"
@@ -356,104 +357,58 @@ async def get_enhanced_wealth_insights(request: BirthDetailsRequest, current_use
             
             yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating AI insights with enhanced context...'})}\n\n"
             
-            # Create comprehensive wealth question with strict JSON format requirement
+            # Create comprehensive wealth question with JSON structure
             wealth_question = """
-As an expert Vedic astrologer, provide a comprehensive wealth analysis using the complete astrological context provided.
-
-IMPORTANT: Be completely honest and realistic in your analysis. Do not give false hope or exaggerated promises. If the chart shows challenges or limitations, mention them clearly. Provide balanced insights that include both positive potential and realistic challenges.
-
-SPECIAL FOCUS ON WEALTH INDICATORS:
-- InduLagna (Wealth Ascendant): Analyze the InduLagna position, sign, house placement, and aspects for wealth potential
-- 2nd House (Wealth): Primary wealth house analysis with lord placement and aspects
-- 11th House (Gains): Income and gains analysis with planetary influences
-- 9th House (Fortune): Luck and fortune factors affecting wealth accumulation
-- Jupiter (Karaka for Wealth): Natural significator analysis for financial wisdom
-- Venus (Luxury): Material comforts and luxury potential
-- Dhana Yogas: Classical wealth combinations from BPHS and other texts
-- Dasha Periods: Current and upcoming periods affecting financial growth
-
-MANDATORY INDU LAGNA ANALYSIS:
-In the Wealth Analysis section, specifically analyze the Indu Lagna provided in the special_lagnas data.
-Assess the financial magnitude based on the planets occupying or aspecting the Indu Lagna sign.
-Cross-reference this with the 2nd and 11th house strength to determine if the wealth is 'Stable' (2nd/11th) or 'Sudden/Speculative' (Indu Lagna).
-Mention the Indu Lagna explicitly in your final verdict on financial volume.
-
-CRITICAL REQUIREMENT: You MUST respond ONLY with valid JSON. Use markdown formatting for emphasis within JSON strings.
-
-STRICT MANDATORY FORMAT - Validate your JSON before responding:
-
 {
-  "quick_answer": "Brief summary with <strong>bold text</strong> and <br> for line breaks",
+  "summary": "Brief wealth overview with key insights",
   "detailed_analysis": [
     {
-      "question": "What is my overall wealth potential according to my birth chart?",
-      "answer": "Detailed answer with <strong>bold</strong>, <br> for line breaks, and <p> for paragraphs"
+      "title": "Wealth Houses Analysis",
+      "content": "Analysis of 2nd, 11th, and 9th houses for wealth indicators"
     },
     {
-      "question": "Will I be wealthy or face financial struggles in life?", 
-      "answer": "Detailed answer with HTML markup"
+      "title": "Planetary Wealth Indicators", 
+      "content": "Jupiter, Venus, and other wealth-giving planets analysis"
     },
     {
-      "question": "Should I do business or job for better financial success?",
-      "answer": "Detailed answer with HTML markup"
+      "title": "Dhana Yogas",
+      "content": "Wealth combinations and yogas in the chart"
     },
     {
-      "question": "What are my best sources of income and earning methods?",
-      "answer": "Detailed answer with HTML markup"
+      "title": "Dasha Periods for Wealth",
+      "content": "Current and upcoming periods for financial gains"
     },
     {
-      "question": "Can I do stock trading and speculation successfully?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "When will I see significant financial growth in my life?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "At what age will I achieve financial stability?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "What types of investments and financial strategies suit me best?",
-      "answer": "Detailed answer with HTML markup"
-    },
-    {
-      "question": "Should I invest in property, stocks, or other assets?",
-      "answer": "Detailed answer with HTML markup"
+      "title": "Investment & Business Guidance",
+      "content": "Recommendations for investments and business ventures"
     }
   ],
-  "final_thoughts": "Summary with <strong>bold</strong> and <br> line breaks",
-  "follow_up_questions": [
-    "📅 When will this happen?",
-    "🔮 What remedies can help?",
-    "💼 How to maximize success?",
-    "🌟 What should I focus on?"
-  ]
+  "final_thoughts": "Concluding summary with key takeaways and overall wealth outlook",
+  "glossary": {
+    "term_id": "Simple explanation of the term"
+  }
 }
 
-MANDATORY RULES:
-1. Response must start with { and end with }
-2. All strings must be properly escaped
-3. No markdown code blocks (```)
-4. No additional text outside JSON
-5. Validate JSON syntax before responding
+Analyze the wealth potential focusing on:
+- 2nd House (Wealth accumulation)
+- 11th House (Gains and income)
+- 9th House (Fortune and luck) 
+- Jupiter and Venus placements
+- Dhana Yogas and wealth combinations
+- Current and upcoming dasha periods
+- Investment recommendations
+- Business vs job suitability
 
-HTML markup for content formatting:
-- <strong>text</strong> for bold
-- <br> for line breaks  
-- <p>text</p> for paragraphs
-- <em>text</em> for emphasis
-
-Provide detailed astrological analysis using the birth chart data and planetary periods.
+IMPORTANT: Include meaningful final_thoughts with overall assessment and key advice.
 """
             
-            # Use chat analyzer (async)
+            # Use structured analyzer (async)
             try:
-                print(f"🤖 Initializing Gemini analyzer...")
-                gemini_analyzer = GeminiChatAnalyzer()
-                print(f"✅ Gemini analyzer initialized")
+                print(f"🤖 Initializing Structured analyzer...")
+                analyzer = StructuredAnalysisAnalyzer()
+                print(f"✅ Structured analyzer initialized")
             except Exception as e:
-                print(f"❌ Failed to initialize Gemini analyzer: {e}")
+                print(f"❌ Failed to initialize Structured analyzer: {e}")
                 import traceback
                 traceback.print_exc()
                 raise
@@ -487,20 +442,21 @@ Provide detailed astrological analysis using the birth chart data and planetary 
             
             for attempt in range(max_retries):
                 try:
-                    print(f"🔄 Attempt {attempt + 1}/{max_retries} - Calling Gemini API...")
-                    ai_result = await gemini_analyzer.generate_chat_response(
-                        wealth_question, context_dict, [], 'english', 'detailed'
+                    print(f"🔄 Attempt {attempt + 1}/{max_retries} - Calling Structured API...")
+                    ai_result = await analyzer.generate_structured_report(
+                        wealth_question, context_dict, request.language
                     )
-                    print(f"📝 GEMINI API RESPONSE RECEIVED:")
+                    print(f"📝 STRUCTURED API RESPONSE RECEIVED:")
                     print(f"   Success: {ai_result.get('success') if ai_result else 'None'}")
-                    
-                    if ai_result and ai_result.get('success'):
-                        # HTML decode the response to fix encoded characters
-                        import html
-                        raw_response = ai_result.get('response', '')
-                        decoded_response = html.unescape(raw_response)
-                        ai_result['response'] = decoded_response
-                        print(f"   Response decoded from HTML entities")
+                    print(f"   AI Result keys: {list(ai_result.keys()) if ai_result else 'None'}")
+                    print(f"   AI Result type: {type(ai_result)}")
+                    if ai_result:
+                        print(f"   Error (if any): {ai_result.get('error', 'No error')}")
+                        print(f"   Is raw: {ai_result.get('is_raw', False)}")
+                        if ai_result.get('data'):
+                            print(f"   Data keys: {list(ai_result['data'].keys())}")
+                        if ai_result.get('response'):
+                            print(f"   Response length: {len(str(ai_result['response']))} chars")
                     
                     break  # Success, exit retry loop
                     
@@ -531,118 +487,77 @@ Provide detailed astrological analysis using the birth chart data and planetary 
                         break
             
             if ai_result and ai_result.get('success'):
-                # Parse AI response
                 try:
-                    ai_response_text = ai_result.get('response', '')
-                    print(f"📄 PARSING RESPONSE:")
-                    print(f"   Length: {len(ai_response_text)} chars")
-                    print(f"   First 200 chars: {ai_response_text[:200]}...")
-                    
-                    # Extract JSON from markdown code blocks first
-                    import html
-                    import re
-                    
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_text, re.DOTALL)
-                    if json_match:
-                        json_text = json_match.group(1)
-                        print(f"✅ EXTRACTED JSON FROM MARKDOWN")
+                    # Handle structured analyzer response format
+                    if ai_result.get('is_raw'):
+                        # Raw response format (fallback)
+                        parsed_response = {
+                            "raw_response": ai_result.get('response', ''),
+                            "quick_answer": "Analysis provided below.",
+                            "detailed_analysis": [],
+                            "final_thoughts": "View the detailed report below.",
+                            "follow_up_questions": []
+                        }
+                        print(f"📄 Using raw response format")
                     else:
-                        # Try to find JSON object in raw text
-                        json_match = re.search(r'({.*})', ai_response_text, re.DOTALL)
-                        if json_match:
-                            json_text = json_match.group(1)
-                            print(f"✅ EXTRACTED JSON FROM RAW TEXT")
-                        else:
-                            json_text = ai_response_text
-                            print(f"⚠️ NO JSON FOUND, using raw response")
+                        # JSON data format (preferred) - map to mobile expected format
+                        raw_data = ai_result.get('data', {})
+                        
+                        # Map detailed_analysis fields to mobile expected format
+                        detailed_analysis = []
+                        for item in raw_data.get('detailed_analysis', []):
+                            detailed_analysis.append({
+                                "question": item.get('title', ''),
+                                "answer": item.get('content', '')
+                            })
+                        
+                        parsed_response = {
+                            "quick_answer": raw_data.get('summary', 'Analysis completed successfully.'),
+                            "detailed_analysis": detailed_analysis,
+                            "final_thoughts": raw_data.get('final_thoughts', ''),
+                            "follow_up_questions": raw_data.get('follow_up_questions', []),
+                            "terms": ai_result.get('terms', []),
+                            "glossary": ai_result.get('glossary', {})
+                        }
+                        print(f"📄 Using structured JSON format with field mapping")
                     
-                    # Now decode HTML entities in the extracted JSON
-                    decoded_json = json_text
-                    
-                    # Multiple rounds of HTML decoding
-                    for _ in range(5):
-                        new_decoded = html.unescape(decoded_json)
-                        if new_decoded == decoded_json:
-                            break
-                        decoded_json = new_decoded
-                    
-                    # Manual replacements for stubborn entities (multiple passes)
-                    for _ in range(3):
-                        decoded_json = decoded_json.replace('&quot;', '"')
-                        decoded_json = decoded_json.replace('&amp;', '&')
-                        decoded_json = decoded_json.replace('&lt;', '<')
-                        decoded_json = decoded_json.replace('&gt;', '>')
-                        decoded_json = decoded_json.replace('&#39;', "'")
-                        decoded_json = decoded_json.replace('&apos;', "'")
-                    
-                    # Additional cleanup for common JSON issues
-                    decoded_json = decoded_json.replace('\\"', '"')  # Fix escaped quotes
-                    decoded_json = decoded_json.replace('\\\\\\"', '"')  # Fix double-escaped quotes
-                    
-                    json_text = decoded_json
-                    
-                    # Debug: Print first 500 chars of cleaned JSON
-                    print(f"🔍 CLEANED JSON (first 500 chars): {json_text[:500]}...")
-                    
-                    parsing_successful = False
-                    try:
-                        parsed_response = json.loads(json_text)
-                        parsing_successful = True
-                        print(f"✅ JSON PARSED SUCCESSFULLY")
-                    except json.JSONDecodeError as json_error:
-                        print(f"⚠️ JSON parsing failed, trying fallback parsing...")
-                        # Fallback: Try to parse with more aggressive cleaning
-                        fallback_json = json_text
-                        # Remove any remaining HTML-like content in strings
-                        fallback_json = re.sub(r'&[a-zA-Z0-9#]+;', '', fallback_json)
-                        try:
-                            parsed_response = json.loads(fallback_json)
-                            parsing_successful = True
-                            print(f"✅ FALLBACK JSON PARSING SUCCEEDED")
-                        except:
-                            # Don't deduct credits for parsing failures
-                            print(f"❌ All JSON parsing failed, not deducting credits")
-                            yield f"data: {json.dumps({'status': 'error', 'message': 'AI response formatting error. Please try again.'})}\n\n"
-                            return
-                    
+                    print(f"✅ RESPONSE PROCESSED SUCCESSFULLY")
                     print(f"   Keys: {list(parsed_response.keys())}")
                     print(f"   Questions count: {len(parsed_response.get('detailed_analysis', []))}")
                     
-                    # Only deduct credits if parsing was successful
-                    if parsing_successful:
-                        success = credit_service.spend_credits(current_user.userid, wealth_cost, 'wealth_analysis', f"Wealth analysis for {request.birth_date}")
-                        if success:
-                            print(f"💳 Credits deducted successfully")
-                        else:
-                            print(f"❌ Credit deduction failed")
+                    # Deduct credits for successful analysis
+                    success = credit_service.spend_credits(current_user.userid, wealth_cost, 'wealth_analysis', f"Wealth analysis for {request.birth_date}")
+                    if success:
+                        print(f"💳 Credits deducted successfully")
                     else:
-                        print(f"⚠️ Skipping credit deduction due to parsing failure")
+                        print(f"❌ Credit deduction failed")
                     
-                    # Store in cache (always store, even fallback responses)
+                    # Store in cache
                     _store_ai_insights(birth_hash, parsed_response)
                     print(f"💾 Response cached successfully")
                     
-                    # Send complete response in expected format
+                    # Build the final insights object - send data in mobile-expected format
                     enhanced_insights = {
-                        'wealth_analysis': {
-                            'json_response': parsed_response,
-                            'summary': 'Comprehensive wealth analysis based on Vedic astrology principles.'
-                        },
+                        # Send the parsed data directly as 'analysis' for mobile compatibility
+                        'analysis': parsed_response,
+                        'terms': ai_result.get('terms', []),
+                        'glossary': ai_result.get('glossary', {}),
                         'enhanced_context': True,
                         'questions_covered': len(parsed_response.get('detailed_analysis', [])),
-                        'context_type': 'chat_context_builder',
+                        'context_type': 'structured_analyzer',
                         'generated_at': datetime.now().isoformat()
                     }
                     
                     final_response = {'status': 'complete', 'data': enhanced_insights, 'cached': False}
                     response_json = json.dumps(final_response)
                     print(f"🚀 SENDING FINAL RESPONSE: {len(response_json)} chars")
+                    print(f"📝 FINAL RESPONSE PREVIEW: {response_json[:200]}...")
                     yield f"data: {response_json}\n\n"
-                        
-                except json.JSONDecodeError as e:
-                    print(f"❌ JSON PARSING FAILED: {e}")
-                    print(f"   Extracted JSON (first 1000 chars): {json_text[:1000] if 'json_text' in locals() else 'N/A'}...")
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse AI response'})}\n\n"
+                    print(f"✅ FINAL RESPONSE SENT SUCCESSFULLY")
+                    
+                except Exception as parse_error:
+                    print(f"❌ Response processing failed: {parse_error}")
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to process AI response'})}\n\n"
             else:
                 error_response = {
                     'wealth_analysis': 'AI analysis failed. Please try again.',
@@ -687,7 +602,7 @@ async def check_cached_insights(request: BirthDetailsRequest, current_user: User
             place=request.birth_place,
             latitude=request.latitude or 28.6139,
             longitude=request.longitude or 77.2090,
-            timezone=request.timezone or 'UTC+5:30'
+            timezone=request.timezone or 'UTC+0'
         )
         
         birth_hash = _create_birth_hash(birth_data)
@@ -696,15 +611,14 @@ async def check_cached_insights(request: BirthDetailsRequest, current_user: User
         stored_insights = _get_stored_ai_insights(birth_hash)
         
         if stored_insights:
-            # Format cached response properly
+            # Format cached response for mobile compatibility
             cached_response = {
-                'wealth_analysis': {
-                    'json_response': stored_insights,
-                    'summary': 'Comprehensive wealth analysis based on Vedic astrology principles.'
-                },
+                'analysis': stored_insights,
+                'terms': stored_insights.get('terms', []),
+                'glossary': stored_insights.get('glossary', {}),
                 'enhanced_context': True,
                 'questions_covered': len(stored_insights.get('detailed_analysis', [])),
-                'context_type': 'chat_context_builder',
+                'context_type': 'cached_analysis',
                 'generated_at': datetime.now().isoformat()
             }
             return {"success": True, "data": cached_response, "cached": True}
@@ -735,7 +649,7 @@ async def get_astrological_context(request: BirthDetailsRequest, current_user: U
             'place': request.birth_place,
             'latitude': request.latitude or 28.6139,
             'longitude': request.longitude or 77.2090,
-            'timezone': request.timezone or 'UTC+5:30'
+            'timezone': request.timezone or 'UTC+0'
         }
         
         # Build complete context
