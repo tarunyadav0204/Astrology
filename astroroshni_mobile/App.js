@@ -50,7 +50,12 @@ export default function App() {
         // User is logged in, check if they have charts
         try {
           const { chartAPI } = require('./src/services/api');
-          const response = await chartAPI.getExistingCharts();
+          const response = await Promise.race([
+            chartAPI.getExistingCharts(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 10000)
+            )
+          ]);
           
           if (response.data && response.data.charts && response.data.charts.length > 0) {
             // User has charts, check if one is selected in local storage
@@ -66,6 +71,7 @@ export default function App() {
             setInitialRoute('BirthForm');
           }
         } catch (apiError) {
+          console.log('API Error on startup:', apiError);
           // If API fails, go to BirthForm as fallback
           setInitialRoute('BirthForm');
         }
@@ -74,6 +80,7 @@ export default function App() {
         setInitialRoute('Welcome');
       }
     } catch (error) {
+      console.log('Auth check error:', error);
       setInitialRoute('Welcome');
     } finally {
       setIsLoading(false);
