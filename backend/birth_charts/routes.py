@@ -85,15 +85,20 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
     cursor = conn.cursor()
     
     try:
-        print(f"Setting chart {chart_id} as self for user {current_user.userid}")
+        print(f"🔍 [SET_SELF_DEBUG] Setting chart {chart_id} as self for user {current_user.userid}")
         
         # Verify the chart belongs to the current user
-        cursor.execute('SELECT id FROM birth_charts WHERE id=? AND userid=?', (chart_id, current_user.userid))
+        cursor.execute('SELECT id, name FROM birth_charts WHERE id=? AND userid=?', (chart_id, current_user.userid))
         result = cursor.fetchone()
-        print(f"Chart verification result: {result}")
+        print(f"🔍 [SET_SELF_DEBUG] Chart verification result: {result}")
         
         if not result:
             raise HTTPException(status_code=404, detail="Chart not found or access denied")
+        
+        # Check current self charts before clearing
+        cursor.execute('SELECT id, name FROM birth_charts WHERE userid=? AND relation="self"', (current_user.userid,))
+        current_self_charts = cursor.fetchall()
+        print(f"🔍 [SET_SELF_DEBUG] Current self charts before clearing: {current_self_charts}")
         
         # 1. Clear all existing 'self' relations for this user
         cursor.execute('''
@@ -101,7 +106,7 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
             SET relation='other' 
             WHERE userid=? AND relation='self'
         ''', (current_user.userid,))
-        print(f"Cleared {cursor.rowcount} existing self relations")
+        print(f"🔍 [SET_SELF_DEBUG] Cleared {cursor.rowcount} existing self relations")
         
         # 2. Set the specified chart as 'self'
         cursor.execute('''
@@ -109,7 +114,12 @@ async def set_chart_as_self(chart_id: int, current_user: User = Depends(get_curr
             SET relation='self' 
             WHERE id=? AND userid=?
         ''', (chart_id, current_user.userid))
-        print(f"Set chart {chart_id} as self, rows affected: {cursor.rowcount}")
+        print(f"🔍 [SET_SELF_DEBUG] Set chart {chart_id} as self, rows affected: {cursor.rowcount}")
+        
+        # Verify the final state
+        cursor.execute('SELECT id, name, relation FROM birth_charts WHERE userid=? AND relation="self"', (current_user.userid,))
+        final_self_charts = cursor.fetchall()
+        print(f"✅ [SET_SELF_DEBUG] Final self charts after update: {final_self_charts}")
         
         # Commit transaction
         conn.commit()

@@ -267,7 +267,7 @@
   border: 1px solid #ddd;
   border-radius: 2px;
   padding: 0.01rem 0.02rem;
-  font-size: 0.3rem;
+  font-size: 0.7rem !important;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -286,13 +286,13 @@
   color: white;
   border-radius: 2px;
   padding: 0.01rem 0.08rem;
-  font-size: 0.4rem;
+  font-size: 0.75rem !important;
   font-weight: 600;
   line-height: 1;
 }
 
 .period-date {
-  font-size: 0.25rem;
+  font-size: 0.65rem !important;
   color: #333;
   line-height: 0.8;
 }

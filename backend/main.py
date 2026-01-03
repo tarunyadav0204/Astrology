@@ -1407,6 +1407,8 @@ async def reset_password(request: ResetPassword):
 @app.get("/api/user/self-birth-chart")
 async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
     """Get user's self birth chart"""
+    print(f"🔍 [AUTH_DEBUG] get_self_birth_chart called by user: {current_user.userid} ({current_user.name}) - Phone: {current_user.phone}")
+    
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     

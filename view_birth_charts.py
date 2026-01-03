@@ -64,8 +64,8 @@ def main():
         print("⚠️  No encryption key found - showing raw data")
         print("💡 Looking for: ENCRYPTION_KEY env var or encryption.key file")
     
-    # Connect to database (check multiple paths)
-    db_paths = ['backend/astrology.db', 'astrology.db', '/Users/tarunydv/Desktop/Code/AstrologyApp/backend/astrology.db']
+    # Connect to production database
+    db_paths = ['/home/tarun_yadav/AstrologyApp/backend/astrology.db', 'backend/astrology.db', 'astrology.db', '/Users/tarunydv/Desktop/Code/AstrologyApp/backend/astrology.db']
     db_path = None
     for path in db_paths:
         if os.path.exists(path):
@@ -80,38 +80,50 @@ def main():
     cursor = conn.cursor()
     
     try:
-        # Get all birth chart records
-        cursor.execute("SELECT * FROM birth_charts")
-        records = cursor.fetchall()
-        
         # Get column names
         cursor.execute("PRAGMA table_info(birth_charts)")
         columns = [col[1] for col in cursor.fetchall()]
         
-        print(f"\n📊 Found {len(records)} birth chart records\n")
-        print("=" * 100)
+        # Get specific chart that's causing the issue (ID 3033)
+        cursor.execute("SELECT * FROM birth_charts WHERE id = 3033")
+        problem_record = cursor.fetchone()
         
-        for i, record in enumerate(records, 1):
-            print(f"\n🔍 Record {i}:")
-            print("-" * 50)
+        if problem_record:
+            print(f"\n🚨 PROBLEM CHART (ID 3033 - User 2's 'self' chart):")
+            print("-" * 60)
             
-            for j, value in enumerate(record):
+            for j, value in enumerate(problem_record):
                 col_name = columns[j]
                 
                 # Decrypt sensitive fields if encryptor is available
                 if encryptor and col_name in ['name', 'date', 'time', 'latitude', 'longitude', 'place'] and value:
-                    # Check if value looks like Fernet encrypted data (starts with gAAAAA)
                     if isinstance(value, str) and (value.startswith('gAAAAA') or (len(value) > 20 and any(c in value for c in ['=', '+', '/']))):
                         decrypted_value = decrypt_data(value, encryptor)
                         print(f"{col_name:12}: {decrypted_value}")
                     else:
-                        # Data is not encrypted, show as-is
                         print(f"{col_name:12}: {value}")
                 else:
                     print(f"{col_name:12}: {value}")
         
+        # Also get all self charts for user 2
+        cursor.execute("SELECT * FROM birth_charts WHERE userid = 2 AND relation = 'self' ORDER BY created_at DESC")
+        self_records = cursor.fetchall()
+        
+        print(f"\n📋 All 'self' charts for User 2 ({len(self_records)} found):")
+        print("-" * 60)
+        
+        for record in self_records:
+            chart_id = record[0]
+            created_at = record[8] if len(record) > 8 else 'Unknown'
+            
+            # Decrypt name to see who this chart belongs to
+            name_encrypted = record[1] if len(record) > 1 else None
+            name_decrypted = decrypt_data(name_encrypted, encryptor) if encryptor and name_encrypted else name_encrypted
+            
+            print(f"Chart ID {chart_id}: {name_decrypted} (Created: {created_at})")
+        
         print("\n" + "=" * 100)
-        print(f"Total records: {len(records)}")
+        print(f"Total self records for user 2: {len(self_records)}")
         
     except sqlite3.Error as e:
         print(f"❌ Database error: {e}")

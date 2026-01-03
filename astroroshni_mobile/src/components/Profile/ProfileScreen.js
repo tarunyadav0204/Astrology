@@ -89,8 +89,8 @@ export default function ProfileScreen({ navigation }) {
           id: response.data.birth_chart_id // Ensure id is included
         };
         setBirthData(birthDataWithId);
-        // Also update local storage with the id
-        await storage.setBirthDetails(birthDataWithId);
+        // DO NOT update local storage - this would change the selected native
+        // The ProfileScreen should only display the self chart, not change selection
         setStats({
           totalChats: 24,
           chartsViewed: 12,

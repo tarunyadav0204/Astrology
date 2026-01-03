@@ -273,7 +273,22 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   };
   
   const getFilteredAspects = () => {
-    return getGroupedAspects();
+    const grouped = getGroupedAspects();
+    
+    // Sort by earliest date in each group
+    return grouped.sort((a, b) => {
+      const aTimeline = getCombinedTimeline(a);
+      const bTimeline = getCombinedTimeline(b);
+      
+      if (aTimeline.length === 0 && bTimeline.length === 0) return 0;
+      if (aTimeline.length === 0) return 1;
+      if (bTimeline.length === 0) return -1;
+      
+      const aEarliestDate = new Date(aTimeline[0].start_date);
+      const bEarliestDate = new Date(bTimeline[0].start_date);
+      
+      return aEarliestDate - bEarliestDate;
+    });
   };
   
   const getCombinedTimeline = (aspectGroup) => {
@@ -296,10 +311,12 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
   };
 
   const handlePredictionClick = (aspect, period, event) => {
+    console.log('handlePredictionClick called:', { aspect, period, event });
     event.stopPropagation();
     setSelectedAspect(aspect);
     setSelectedPeriod(period);
     setShowPredictionPopup(true);
+    console.log('Popup state set to true');
   };
 
   const getDashaDataForPeriod = (period) => {
@@ -385,17 +402,16 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
                     key={pIndex}
                     className={`timeline-chip ${getPeriodClass(period, period.aspect)}`}
                     onClick={(e) => {
-                      if (e.shiftKey || e.ctrlKey || e.metaKey) {
-                        handlePredictionClick(period.aspect, period, e);
-                      } else {
-                        onTimelineClick(new Date(period.peak_date || period.start_date));
-                      }
+                      console.log('Chip clicked:', { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey });
+                      console.log('Opening prediction popup');
+                      handlePredictionClick(period.aspect, period, e);
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
+                      console.log('Right click - opening prediction popup');
                       handlePredictionClick(period.aspect, period, e);
                     }}
-                    title={`${getAspectName(period.aspectType)} aspect\n${period.start_date} to ${period.end_date}${getDashaContext(period.aspect, period) ? '\n' + getDashaContext(period.aspect, period) : ''}\n\nRight-click or Shift+click for prediction`}
+                    title={`${getAspectName(period.aspectType)} aspect\n${period.start_date} to ${period.end_date}${getDashaContext(period.aspect, period) ? '\n' + getDashaContext(period.aspect, period) : ''}\n\nClick for prediction details`}
                   >
                     <div className="chip-content">
                       <div className="aspect-number">{getAspectName(period.aspectType).replace(/th$/, '')}</div>
@@ -410,7 +426,7 @@ const VedicTransitAspects = ({ birthData, onTimelineClick, natalChart }) => {
       </div>
       
       <div className="transit-help-text">
-        💡 Right-click or Shift+click on time periods for details
+        💡 Click on time periods for detailed analysis
       </div>
       
       <AstrologerPredictionPopup

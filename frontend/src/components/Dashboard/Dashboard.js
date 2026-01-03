@@ -16,6 +16,7 @@ import CompleteHealthAnalysisTab from '../Health/CompleteHealthAnalysisTab';
 import NadiTab from '../Nadi/NadiTab';
 import DashaBrowser from '../DashaBrowser/DashaBrowser';
 
+import TransitAspectsPopup from '../TransitAspectsPopup/TransitAspectsPopup';
 import ClassicalPrediction from '../ClassicalPrediction/ClassicalPrediction';
 import ChartSearchDropdown from '../ChartSearchDropdown/ChartSearchDropdown';
 import UnifiedHeader from '../UnifiedHeader/UnifiedHeader';
@@ -180,6 +181,7 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
   const [mobileSubTab, setMobileSubTab] = useState('lagna');
   const [userSettings, setUserSettings] = useState({ node_type: 'mean', default_chart_style: 'north' });
   const [chartRefHighlight, setChartRefHighlight] = useState(null);
+  const [showTransitAspectsPopup, setShowTransitAspectsPopup] = useState(false);
 
   useEffect(() => {
     // Load saved layout from localStorage
@@ -755,11 +757,35 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
               </GridItem>
               
               <GridItem dasha style={{ gridColumn: 'span 2' }}>
-                <VedicTransitAspects 
-                  birthData={birthData} 
-                  onTimelineClick={handleTransitDateChange}
-                  natalChart={chartData}
-                />
+                <div style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid #e91e63'
+                }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#e91e63' }}>Transit Aspects</h4>
+                  <button
+                    onClick={() => setShowTransitAspectsPopup(true)}
+                    style={{
+                      background: '#e91e63',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.75rem 1.5rem',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    🎯 View Transit Aspects
+                  </button>
+                </div>
               </GridItem>
             </div>
           </GridContainer>
@@ -793,6 +819,14 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
           </div>
         )
       )}
+      
+      <TransitAspectsPopup
+        isOpen={showTransitAspectsPopup}
+        onClose={() => setShowTransitAspectsPopup(false)}
+        birthData={birthData}
+        natalChart={chartData}
+        onTimelineClick={handleTransitDateChange}
+      />
     </DashboardContainer>
   );
 };

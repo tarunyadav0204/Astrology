@@ -326,6 +326,13 @@ export default function BirthFormScreen({ navigation, route }) {
         gender: formData.gender,
         relation: editProfile?.relation || 'other',
       };
+      
+      // DEBUG: Log the exact relation value being sent
+      // console.log('🔍 [BIRTH_FORM_DEBUG] Birth data being sent to API:');
+      // console.log('🔍 [BIRTH_FORM_DEBUG] - Name:', birthData.name);
+      // console.log('🔍 [BIRTH_FORM_DEBUG] - editProfile:', editProfile);
+      // console.log('🔍 [BIRTH_FORM_DEBUG] - editProfile?.relation:', editProfile?.relation);
+      // console.log('🔍 [BIRTH_FORM_DEBUG] - Final relation value:', birthData.relation);
 
       // 1. Calculate chart for validation
       const [chartData, yogiData] = await Promise.all([

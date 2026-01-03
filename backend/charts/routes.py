@@ -601,12 +601,24 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place
 
         # Always insert new chart (allow duplicates)
+        print(f"🔍 [CHART_DEBUG] About to insert chart for user {current_user.userid}:")
+        print(f"🔍 [CHART_DEBUG] - Name: {birth_data.name}")
+        print(f"🔍 [CHART_DEBUG] - Relation: {birth_data.relation}")
+        print(f"🔍 [CHART_DEBUG] - Final relation value: {birth_data.relation or 'other'}")
+        
         cursor.execute('''
             INSERT INTO birth_charts (userid, name, date, time, latitude, longitude, timezone, place, gender, relation)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon, 
             birth_data.timezone, enc_place, birth_data.gender, birth_data.relation or 'other'))
-        print(f"📝 Inserted new chart with id: {cursor.lastrowid}")
+        
+        new_chart_id = cursor.lastrowid
+        print(f"📝 [CHART_DEBUG] Inserted new chart with id: {new_chart_id}")
+        
+        # Verify what was actually inserted
+        cursor.execute("SELECT relation FROM birth_charts WHERE id = ?", (new_chart_id,))
+        actual_relation = cursor.fetchone()[0]
+        print(f"✅ [CHART_DEBUG] Verified inserted relation: {actual_relation}")
 
         conn.commit()
         conn.close()

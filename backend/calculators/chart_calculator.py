@@ -123,13 +123,13 @@ class ChartCalculator(BaseCalculator):
         # print(f"[CALC] Planetary calculations took {planets_end - planets_start:.3f}s")
 
         # LOG: All planetary positions from Swiss Ephemeris
-        print(f"\n🌟 SWISS EPHEMERIS PLANETARY POSITIONS (Mode 27 - True Chitra):")
-        print(f"📅 JD: {jd:.6f}, Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°")
+        # print(f"\n🌟 SWISS EPHEMERIS PLANETARY POSITIONS (Mode 27 - True Chitra):")
+        # print(f"📅 JD: {jd:.6f}, Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°")
         for planet_name in planet_names:
             planet_data = planets[planet_name]
             sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][planet_data['sign']]
             print(f"  {planet_name:8}: {planet_data['longitude']:8.4f}° = {planet_data['degree']:6.2f}° {sign_name} (Sign {planet_data['sign']}) {'R' if planet_data['retrograde'] else 'D'}")
-        print(f"🔚 End Swiss Ephemeris Data\n")
+        # print(f"🔚 End Swiss Ephemeris Data\n")
 
         # Calculate ascendant and houses  
         houses_start = time.time()
@@ -150,13 +150,13 @@ class ChartCalculator(BaseCalculator):
             return degrees, minutes, seconds
         
         asc_deg, asc_min, asc_sec = decimal_to_dms(ascendant_sidereal % 30)
-        print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}")
+        # print(f"DEBUG: Tropical ASC: {ascendant_tropical:.6f}, Ayanamsa: {ayanamsa:.6f}, Sidereal ASC: {ascendant_sidereal:.6f}")
         asc_sign_name = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][int(ascendant_sidereal / 30)]
-        print(f"ASCENDANT: {asc_deg}d {asc_min}m {asc_sec:.0f}s {asc_sign_name}")
+        # print(f"ASCENDANT: {asc_deg}d {asc_min}m {asc_sec:.0f}s {asc_sign_name}")
         
         # Whole Sign houses based on sidereal ascendant
         ascendant_sign = int(ascendant_sidereal / 30)
-        print(f"DEBUG: ASC Sign: {ascendant_sign} ({asc_sign_name})")
+        # print(f"DEBUG: ASC Sign: {ascendant_sign} ({asc_sign_name})")
         houses = []
         for i in range(12):
             house_sign = (ascendant_sign + i) % 12

@@ -248,8 +248,8 @@ export default function SelectNativeScreen({ navigation, route }) {
       
       if (fromProfile) {
         // Connect chart to profile and return to Profile screen
-        const { authAPI } = require('../../services/api');
-        await authAPI.updateSelfBirthChart(profileWithId);
+        const { chartAPI } = require('../../services/api');
+        await chartAPI.setChartAsSelf(profileWithId.id);
         Alert.alert('Success', '✅ Chart connected to your profile!');
         navigation.navigate('Profile');
       } else if (returnTo === 'ChildbirthPlanner') {
