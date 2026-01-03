@@ -15,7 +15,7 @@ import re
 router = APIRouter(prefix="/api/blog", tags=["blog"])
 
 def get_db_connection():
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'blog_database.db')
+    db_path = os.path.join(os.path.dirname(__file__), '..', 'astrology.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
