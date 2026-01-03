@@ -32,9 +32,10 @@ const BlogList = () => {
     const fetchCategories = async () => {
         try {
             const response = await axios.get('/api/blog/categories');
-            setCategories(response.data);
+            setCategories(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             console.error('Error fetching categories:', error);
+            setCategories([]); // Set empty array on error
         }
     };
 
@@ -73,7 +74,7 @@ const BlogList = () => {
                 >
                     All Posts
                 </button>
-                {categories.map(category => (
+                {Array.isArray(categories) && categories.map(category => (
                     <button
                         key={category}
                         className={selectedCategory === category ? 'active' : ''}

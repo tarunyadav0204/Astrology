@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import ChatFeedback from './ChatFeedback';
+import BlogDashboard from '../Blog/BlogDashboard';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
 
@@ -457,6 +458,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           }}
         >
           Analysis
+        </button>
+        <button 
+          className={`tab ${activeTab === 'blog' ? 'active' : ''}`}
+          onClick={() => setActiveTab('blog')}
+        >
+          Blog
         </button>
       </div>
 
@@ -995,6 +1002,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'analysis' && activeSubTab === 'feedback' && (
           <ChatFeedback />
+        )}
+
+        {activeTab === 'blog' && (
+          <BlogDashboard />
         )}
       </div>
       </div>

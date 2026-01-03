@@ -256,4 +256,4 @@ async def get_categories():
     categories = [row[0] for row in cursor.fetchall()]
     conn.close()
     
-    return {"categories": categories}
+    return categories

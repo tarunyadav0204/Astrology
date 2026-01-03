@@ -55,9 +55,11 @@ const BlogPost = () => {
             // Bold and italic
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Links and images
+            // Links and images - handle edge cases
             .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
             .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="content-image" />')
+            .replace(/!\[([^\]]*)\]\(\s*\)/g, '') // Remove images with empty URLs
+            .replace(/!Image/g, '') // Remove standalone !Image text
             // Lists
             .replace(/^- (.+)$/gm, '<li>$1</li>')
             .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
