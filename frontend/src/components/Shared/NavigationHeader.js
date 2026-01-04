@@ -121,7 +121,7 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
             <li><button onClick={() => navigate('/muhurat-finder')}>Muhurat Finder</button></li>
             <li><button onClick={() => navigate('/festivals')}>Festivals</button></li>
             <li><button onClick={() => navigate('/nakshatras')}>Nakshatras</button></li>
-            <li><a href="/#calculators">Calculators</a></li>
+            <li><button onClick={() => navigate('/blog')}>Blogs</button></li>
           </ul>
         </div>
       </nav>
