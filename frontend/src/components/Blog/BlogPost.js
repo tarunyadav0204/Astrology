@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import NavigationHeader from '../Shared/NavigationHeader';
 import './BlogPost.css';
 
 const BlogPost = () => {
@@ -44,6 +45,15 @@ const BlogPost = () => {
             .replace(/^### (.*$)/gim, '<h3>$1</h3>')
             .replace(/^## (.*$)/gim, '<h2>$1</h2>')
             .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            // YouTube embeds - handle markdown image format and plain URLs
+            .replace(/\[!\[[^\]]*\]\(https:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)(?:[&?][^\s]*)*\)\]/g, 
+                '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
+            .replace(/\[!\[[^\]]*\]\(https:\/\/youtu\.be\/([a-zA-Z0-9_-]+)(?:[?][^\s]*)*\)\]/g, 
+                '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
+            .replace(/https:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)(?:[&?][^\s]*)*/g, 
+                '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
+            .replace(/https:\/\/youtu\.be\/([a-zA-Z0-9_-]+)(?:[?][^\s]*)*/g, 
+                '<div class="youtube-embed"><iframe width="560" height="315" src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>')
             // Tables
             .replace(/\|(.+)\|/g, (match, content) => {
                 // Skip separator rows (containing only dashes and pipes)
@@ -85,26 +95,34 @@ const BlogPost = () => {
 
     if (loading) {
         return (
-            <div className="blog-post-container">
+            <>
+                <NavigationHeader />
+                <div className="blog-post-container" style={{paddingTop: '230px'}}>
                 <div className="loading">Loading post...</div>
             </div>
+        </>
         );
     }
 
     if (error || !post) {
         return (
-            <div className="blog-post-container">
+            <>
+                <NavigationHeader />
+                <div className="blog-post-container" style={{paddingTop: '23000px'}}>
                 <div className="error">
                     <h2>Post Not Found</h2>
                     <p>The blog post you're looking for doesn't exist.</p>
                     <Link to="/blog" className="back-link">← Back to Blog</Link>
                 </div>
             </div>
+        </>
         );
     }
 
     return (
-        <div className="blog-post-container">
+        <>
+            <NavigationHeader />
+            <div className="blog-post-container" style={{paddingTop: '230px'}}>
             <article className="blog-post">
                 <header className="post-header">
                     <Link to="/blog" className="back-link">← Back to Blog</Link>
@@ -156,7 +174,8 @@ const BlogPost = () => {
                     View All Posts
                 </Link>
             </div>
-        </div>
+            </div>
+        </>
     );
 };
 
