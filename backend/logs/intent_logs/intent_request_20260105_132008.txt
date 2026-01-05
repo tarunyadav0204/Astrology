@@ -1,0 +1,196 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-05T13:20:08.023745
+Question: employed and looking for salary hike in 2026
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 15833 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: What does my birth chart say about my career?
+A: employed and looking for salary hike in 2026
+Q: What does my birth chart say about my career?
+A: I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?
+Q: What does my birth chart say about my career?
+A: <div class="quick-answer-card">**Quick Answer**: The current **Saturn-Rahu** period creates an intense focus on accumulating wealth, though it brings fluctuations. **Specifically, expect a significant salary hike or status elevation between April 2026 and July 2026**, triggered by the activation of your Arudha Lagna (Reputation). However, your **D9 Mars in Aries** ensures that while the workload will be heavy (due to Ulka Yogini), you have the executive strength to conquer it. **Action:** Initiate salary negotiations now, but aim to close the deal/transition in Q2 2026 for maximum gain.</div>
+
+### Key Insights
+
+*   **The "Wealth-Career" Fusion:** Your 10th Lord (<term id="key">Mars</term>) is sitting in the 2nd House of Wealth with Saturn, Jupiter, and Rahu. This implies your career is not just about passion; it is strictly driven by financial accumulation. You are likely in a high-pressure environment where technical skill meets management.
+*   **The 2026 "Status" Shift:** On **April 2, 2026**, your Jaimini Chara Dasha shifts from Aquarius to **Capricorn**. Since Capricorn holds your <term id="key">Arudha Lagna</term> (AL), this guarantees a change in how the world sees you—typically a promotion or a new, more prestigious title.
+*   **The Technical Authority (D10):** Your D10 (Dasamsa) chart features an **Exalted Mercury** in the 10th house. This confirms that despite the chaos in your main chart, your professional output is precise, analytical, and highly valued.
+*   **The Yogini Confirmation:** You are currently in the **Bhadrika-Ulka** period. <term id="key">Ulka</term> (ruled by Saturn) indicates a period of "Labor and Transition." The hike will come, but it will require you to take on a heavier, perhaps burdensome, responsibility.
+
+### Astrological Analysis
+
+**1. The Promise (Chart Analysis)**
+Your chart shows a massive concentration of energy in the 2nd House (Leo), containing **Mars, Jupiter, Saturn, and Rahu**.
+*   **Dharma-Karma Adhipati Yoga:** The conjunction of 9th Lord (<term id="key">Jupiter</term>) and 10th Lord (<term id="key">Mars</term>) in the house of wealth is a primary indicator of financial success through professional authority.
+*   **The Challenge:** <term id="key">Rahu</term> here makes income unstable or subject to sudden spikes and drops. It also suggests working with foreign technologies or unconventional financial structures.
+
+**2. The Master Clock (Vimshottari)**
+You are running **Saturn Mahadasha / Rahu Antardasha** (until approx. mid-2026).
+*   **Saturn** is the 7th and 8th Lord in the 2nd house: This links your career earnings to "Other People's Money" or managing crises/transformations.
+*   **Rahu** amplifies the 2nd house: This creates an insatiable hunger for a salary hike. Rahu gives sudden results. Combined, they promise wealth but demand you navigate office politics carefully.
+
+**3. Nadi Precision (The Nature of Career)**
+Your chart reveals specific Nadi connections that define the exact nature of your work:
+
+*   **The "Technical Master" Link (Saturn + Mars):** Saturn (Career) conjoined Mars indicates success in engineering, machinery, technical management, or aggressive execution roles. You don't just plan; you build.
+*   **The "Shadow Boss" Link (Saturn + Rahu):** This specifically points to careers in modern tech (AI, Cloud), foreign MNCs, or roles where you deal with large-scale, intangible networks. It also suggests success away from your birthplace.
+*   **The "Advisor" Link (Saturn + Jupiter):** This softens the harshness of Mars/Rahu, giving you the capacity to teach, mentor, or act as a consultant within your technical field.
+
+**4. Timing Synthesis (Multi-System)**
+The timing for your salary hike is confirmed by **Capricorn** Chara Dasha and **Ulka (Saturn)** Yogini.
+*   **Chara Dasha Evidence:** From **April 2, 2026**, you enter the **Capricorn** period. Capricorn contains your <term id="key">Arudha Lagna</term> (AL). When the Dasha sign holds the AL, professional status rises. This is the "Double Confirmation" of the promotion.
+*   **Yogini Evidence:** You are in the **Ulka** Antardasha (ruled by Saturn) until July 2026. Ulka is often feared for stress, but for career, it forces a change. The overlap of the Capricorn shift (April) and the Ulka climax (July) pinpoints Q2 2026 as the manifestation window.
+
+**5. The Triple Perspective (Sudarshana)**
+*   **Lagna (Body):** 10th Lord Mars is in the 2nd house (Wealth focus).
+*   **Moon (Mind):** 10th from Moon (Libra) is Cancer (Ascendant). This brings the focus back to self-development and personal brand.
+*   **Sun (Soul):** 10th from Sun (Pisces) is Sagittarius. In your D9 chart, Sagittarius contains the Sun, Moon, and Saturn.
+*   **Verdict:** Since 3 out of 3 perspectives link the 10th house to strong planets (Mars, Moon, Jupiter), the confidence level for career longevity is **95%**. The salary hike is not a "maybe"; it is a structural requirement of the chart in 2026.
+
+**6. The Synthesis (D9 Navamsa)**
+While your D1 10th Lord (Mars) is in a planetary war in D1, look at the D9: **Mars is in Aries (Own Sign)**. This is the "Root vs. Fruit" rule. You may feel stressed or undervalued outwardly (D1), but your internal capacity and final outcome (D9) are incredibly strong. You have the resilience to demand and get what you are worth.
+
+### Nakshatra Insights
+Your **10th Lord Mars** is in <term id="key">Magha</term> Nakshatra (ruled by Ketu/Ancestors). Magha represents "The Throne." This suggests that you do well in roles that have a lineage or established hierarchy. You are not meant to be a subordinate forever; Magha demands authority.
+Your **Saturn** is in <term id="key">Uttara Phalguni</term> (ruled by Sun). This favors earnings through government contracts, large corporations, or administrative leadership.
+
+### Practical Guidance
+1.  **Negotiation Timing:** Schedule your performance reviews or job interviews for **March-April 2026**. The planetary wind is at your back then.
+2.  **Wealth Management:** With Rahu in the 2nd house, money comes in chunks but can leave quickly. Invest in fixed assets (real estate/land) rather than liquid stocks during the Rahu Antardasha.
+3.  **Remedy:** Since Yogini Ulka and Saturn-Rahu can cause mental anxiety, maintain a strict routine. The energy of the 2nd house (Leo) benefits from offering water to the Sun (Surya) daily, enhancing your administrative authority.
+
+<div class="final-thoughts-card">**Final Thoughts**: 2026 is a pivotal year. The shift in April marks a graduation from "Working Hard" (Aquarius) to "Being Recognized" (Capricorn/AL). The salary hike is indicated, but it comes with a heavier crown. Prepare for the responsibility.</div>
+
+        
+        Current question: "employed and looking for salary hike in 2026"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

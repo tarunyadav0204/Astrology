@@ -1,0 +1,81 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T12:41:30.477285
+Question: What does my birth chart say about my career? employed looking for salary hike.
+Processing Time: 3.282s
+Response Length: 600 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "extracted_context": {
+    "employment_status": "employed",
+    "desire": "salary hike"
+  },
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "employment_status": "employed",
+    "desire": "salary hike"
+  },
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

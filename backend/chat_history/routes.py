@@ -55,27 +55,6 @@ def init_chat_tables():
         )
     ''')
     
-    # Add status columns to existing table if they don't exist
-    try:
-        cursor.execute('ALTER TABLE chat_messages ADD COLUMN status TEXT DEFAULT "completed"')
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    try:
-        cursor.execute('ALTER TABLE chat_messages ADD COLUMN started_at TIMESTAMP')
-    except sqlite3.OperationalError:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE chat_messages ADD COLUMN completed_at TIMESTAMP')
-    except sqlite3.OperationalError:
-        pass
-    
-    try:
-        cursor.execute('ALTER TABLE chat_messages ADD COLUMN error_message TEXT')
-    except sqlite3.OperationalError:
-        pass
-    
     # Add indexes for performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON chat_sessions (user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_birth_chart ON chat_sessions (birth_chart_id)')
@@ -224,7 +203,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Session not found")
     
     cursor.execute('''
-        SELECT message_id, sender, content, timestamp, terms, glossary
+        SELECT message_id, sender, content, timestamp, terms, glossary, images
         FROM chat_messages
         WHERE session_id = ?
         ORDER BY timestamp ASC
@@ -258,6 +237,15 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["glossary"] = []
         else:
             message_data["glossary"] = []
+            
+        # Add images if they exist
+        if len(msg) > 6 and msg[6]:  # images
+            try:
+                message_data["images"] = json.loads(msg[6])
+            except:
+                message_data["images"] = []
+        else:
+            message_data["images"] = []
             
         conversation.append(message_data)
     
@@ -374,7 +362,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary
+        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images
         FROM chat_messages cm
         JOIN chat_sessions cs ON cm.session_id = cs.session_id
         WHERE cm.message_id = ?
@@ -386,7 +374,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
     if not result:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary = result
+    status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image = result
     
     # Verify message belongs to user
     if user_id != current_user.userid:
@@ -414,6 +402,12 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 response["glossary"] = {}
         else:
             response["glossary"] = {}
+            
+        # Add summary image if it exists
+        if summary_image:
+            response["summary_image"] = summary_image
+        else:
+            response["summary_image"] = None
             
     elif status == "failed":
         response["error_message"] = error_message or "An error occurred while processing your request"
@@ -570,7 +564,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 print(f"✅ RESET CLARIFICATION COUNT TO 0 (READY status)")
             
             routing_time = time.time() - routing_start
-            print(f"✅ ROUTING DECISION COMPLETE: {intent['mode'].upper()} mode")
+            print(f"✅ ROUTING DECISION COMPLETE: {intent.get('mode', 'birth').upper()} mode")
             print(f"Category: {intent.get('category', 'general')}")
             print(f"Routing time: {routing_time:.3f}s")
             print(f"{'='*80}\n")
@@ -738,12 +732,17 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 
                 if success:
                     print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
+                    
+                    # Get summary image from result if available (store as string, not JSON)
+                    summary_image = result.get('summary_image', None)
+                    
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
                         (
                             sanitize_text(result['response']), 
                             json.dumps(terms),
                             json.dumps(glossary),
+                            summary_image,  # Store as string URL, not JSON
                             "completed", 
                             "answer", 
                             datetime.now(), 

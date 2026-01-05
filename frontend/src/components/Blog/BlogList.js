@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import NavigationHeader from '../Shared/NavigationHeader';
 import './BlogList.css';
 
 const BlogList = () => {
@@ -61,7 +62,9 @@ const BlogList = () => {
     }
 
     return (
-        <div className="blog-list-container">
+        <>
+            <NavigationHeader />
+            <div className="blog-list-container">
             <div className="blog-header">
                 <h1>AstroRoshni Blog</h1>
                 <p>Discover the wisdom of Vedic astrology and cosmic insights</p>
@@ -131,7 +134,8 @@ const BlogList = () => {
                     ))}
                 </div>
             )}
-        </div>
+            </div>
+        </>
     );
 };
 

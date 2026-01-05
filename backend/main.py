@@ -1661,6 +1661,10 @@ from blog.routes import router as blog_router
 
 app.include_router(blog_router)
 
+# Add sitemap router
+from sitemap_routes import router as sitemap_router
+app.include_router(sitemap_router)
+
 # Import chart routes
 from charts.routes import router as chart_router
 app.include_router(chart_router, prefix="/api")

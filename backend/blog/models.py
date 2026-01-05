@@ -4,6 +4,7 @@ from datetime import datetime
 
 class BlogPostCreate(BaseModel):
     title: str
+    slug: Optional[str] = None
     content: str
     excerpt: Optional[str] = None
     meta_description: Optional[str] = None
@@ -15,6 +16,7 @@ class BlogPostCreate(BaseModel):
 
 class BlogPostUpdate(BaseModel):
     title: Optional[str] = None
+    slug: Optional[str] = None
     content: Optional[str] = None
     excerpt: Optional[str] = None
     meta_description: Optional[str] = None

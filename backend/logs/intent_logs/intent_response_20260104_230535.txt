@@ -1,0 +1,23 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-04T23:05:38.315821
+Question: What do the current transits mean for me?
+Processing Time: 2.952s
+Response Length: 372 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I'd be happy to help! Could you please tell me which area of your life you're most interested in understanding with regard to current transits? For example, are you curious about their impact on your career, relationships, health, or something else?",
+    "mode": "annual",
+    "needs_transits": true
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I'd be happy to help! Could you please tell me which area of your life you're most interested in understanding with regard to current transits? For example, are you curious about their impact on your career, relationships, health, or something else?",
+  "mode": "annual",
+  "needs_transits": true
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import NavigationHeader from '../Shared/NavigationHeader';
 import BlogEditor from './BlogEditor';
 import './BlogDashboard.css';
 
@@ -82,7 +83,9 @@ const BlogDashboard = () => {
     }
 
     return (
-        <div className="blog-dashboard">
+        <>
+            <NavigationHeader />
+            <div className="blog-dashboard">
             <div className="dashboard-header">
                 <h1>Blog Management</h1>
                 <button onClick={handleCreatePost} className="btn-create">
@@ -187,7 +190,8 @@ const BlogDashboard = () => {
                     )}
                 </div>
             )}
-        </div>
+            </div>
+        </>
     );
 };
 

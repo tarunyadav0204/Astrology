@@ -852,7 +852,8 @@ export default function ChatScreen({ navigation, route }) {
                     isTyping: false,
                     terms: status.terms || [],
                     glossary: status.glossary || {},
-                    message_type: status.message_type || 'answer'
+                    message_type: status.message_type || 'answer',
+                    summary_image: status.summary_image || null
                   }
                 : msg
             );

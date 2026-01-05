@@ -110,6 +110,30 @@
     gap: 10px;
 }
 
+.alt-text-input {
+    margin-bottom: 10px;
+}
+
+.alt-text-field {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.alt-text-field:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.help-text {
+    color: #666;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
 .featured-preview {
     max-width: 200px;
     max-height: 150px;

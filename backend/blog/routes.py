@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Form
 from typing import List, Optional
 import sqlite3
 import json
@@ -68,8 +68,8 @@ async def create_post(post: BlogPostCreate):
     """Create new blog post"""
     conn = get_db_connection()
     
-    # Generate slug
-    slug = create_slug(post.title)
+    # Use provided slug or generate from title
+    slug = post.slug or create_slug(post.title)
     
     # Check if slug exists
     cursor = conn.execute("SELECT id FROM blog_posts WHERE slug = ?", (slug,))
@@ -189,7 +189,7 @@ async def delete_post(post_id: int):
     return {"message": "Post deleted successfully"}
 
 @router.post("/upload-image")
-async def upload_image(file: UploadFile = File(...), alt_text: str = ""):
+async def upload_image(file: UploadFile = File(...), alt_text: str = Form("")):
     """Upload image to Cloud Storage"""
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
@@ -220,7 +220,8 @@ async def upload_image(file: UploadFile = File(...), alt_text: str = ""):
     return {
         "id": media_id,
         "url": upload_result['public_url'],
-        "filename": upload_result['filename']
+        "filename": upload_result['filename'],
+        "alt_text": alt_text
     }
 
 @router.get("/storage-status")
@@ -257,3 +258,70 @@ async def get_categories():
     conn.close()
     
     return categories
+
+@router.get("/media")
+async def get_media(limit: int = 20, offset: int = 0):
+    """Get uploaded media files with alt text"""
+    conn = get_db_connection()
+    cursor = conn.execute(
+        "SELECT * FROM blog_media ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (limit, offset)
+    )
+    media = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in media]
+
+# Remove the blog sitemap endpoint since we're moving to root
+# @router.get("/sitemap.xml")
+# async def generate_complete_sitemap(x_sitemap_key: str = Header(None)):
+    
+    conn = get_db_connection()
+    cursor = conn.execute(
+        "SELECT slug, updated_at FROM blog_posts WHERE status = 'published' ORDER BY updated_at DESC"
+    )
+    posts = cursor.fetchall()
+    conn.close()
+    
+    # Static pages from existing sitemap
+    sitemap_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://astroroshni.com/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://astroroshni.com/blog</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://astroroshni.com/marriage-analysis</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://astroroshni.com/career-guidance</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://astroroshni.com/panchang</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>'''
+    
+    # Add blog posts
+    for post in posts:
+        sitemap_xml += f'''
+  <url>
+    <loc>https://astroroshni.com/blog/{post[0]}</loc>
+    <lastmod>{post[1][:10]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>'''
+    
+    sitemap_xml += '\n</urlset>'
+    
+    return Response(content=sitemap_xml, media_type="application/xml")

@@ -167,162 +167,107 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         };
     }, []);
     const formatContent = (content, message = {}) => {
-        if (!content || content.trim() === '') {
-            return '';
+        if (!content || content.trim() === '') return '';
+        
+        console.log('🔍 Format Debug:', {
+            hasTerms: !!message.terms,
+            termsCount: message.terms?.length,
+            hasGlossary: !!message.glossary,
+            glossaryKeys: Object.keys(message.glossary || {}),
+            contentPreview: content.substring(0, 200)
+        });
+        
+        // 1. Decode HTML entities
+        let formatted = content
+            .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+        
+        // 2. Add summary image (centered, 500px)
+        if (message.summary_image) {
+            formatted = `<div class="summary-image-container" style="margin: 0 auto 20px auto; borderRadius: 12px; overflow: hidden; boxShadow: 0 4px 16px rgba(0,0,0,0.15); background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(138,43,226,0.1)); border: 2px solid rgba(255,107,53,0.3); maxWidth: 500px;"><img src="${message.summary_image}" alt="Analysis Summary" style="width: 100%; height: auto; display: block;" onError="this.style.display='none'; this.parentElement.style.display='none';" /></div>` + formatted;
         }
         
-        // First decode HTML entities
-        let formatted = content
-            .replace(/&quot;/g, '"')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&#39;/g, "'")
-            .replace(/&nbsp;/g, ' ');
-        
-        // Clean up section headers with HTML formatting immediately after decoding
-        formatted = formatted.replace(/<div class="section-header"><em class="chat-italic">([^<]*)<\/em><\/div>/g, 
-            '<div class="section-header">$1</div>');
-        formatted = formatted.replace(/<div class="section-header"><strong class="chat-bold">([^<]*)<\/strong><\/div>/g, 
-            '<div class="section-header">$1</div>');
-        
-        // Then normalize line breaks
+        // 3. Normalize line breaks
         formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         
-        // Handle Follow-up Questions section
+        // 4. Handle Follow-up Questions
         formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
-            const questionList = questions.trim().split('\n')
-                .filter(q => q.trim())
-                .map(q => `<button class="follow-up-btn">${q.trim()}</button>`)
-                .join('');
+            const questionList = questions.trim().split('\n').filter(q => q.trim()).map(q => `<button class="follow-up-btn">${q.trim()}</button>`).join('');
             return `<div class="follow-up-questions">${questionList}</div>`;
         });
         
-        // Handle Final Thoughts section specially - close any open section first
+        // 5. Handle Final Thoughts
         formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
-            const cleanContent = finalThoughts
-                .replace(/### Final Thoughts\n?/, '')
-                .replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>')
-                .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>')
-                .trim();
+            const cleanContent = finalThoughts.replace(/### Final Thoughts\n?/, '').replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>').replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>').trim();
             return `</div></div><div class="final-thoughts-card"><strong class="chat-bold">Final Thoughts</strong>: ${cleanContent}</div>`;
         });
         
-        // Process headers - convert to section cards
-        formatted = formatted.replace(/### (.*?)\n/g, (match, header) => {
-            const cleanHeader = header.replace(/<[^>]*>/g, '').trim();
-            return `<div class="section-card"><div class="section-header">${cleanHeader}</div><div class="section-content">`;
-        });
-        
-        // Specifically handle "Nakshatra Insights" if it appears as bold or italic text
-        formatted = formatted.replace(/\*\*?(Nakshatra Insights)\*\*?/g, '<div class="section-card"><div class="section-header">$1</div><div class="section-content">');
-        formatted = formatted.replace(/<strong class="chat-bold">(Nakshatra Insights)<\/strong>/g, '<div class="section-card"><div class="section-header">$1</div><div class="section-content">');
-        formatted = formatted.replace(/<em class="chat-italic">(Nakshatra Insights)<\/em>/g, '<div class="section-card"><div class="section-header">$1</div><div class="section-content">');
-        
-        // Close section cards before next header or at end
-        formatted = formatted.replace(/<div class="section-card"><div class="section-header">(.*?)<\/div><div class="section-content">(.*?)(?=<div class="section-card">|<div class="final-thoughts-card">|$)/gs, 
-            (match, header, content) => {
-                const cleanHeader = header.replace(/<[^>]*>/g, '').trim();
-                return `<div class="section-card"><div class="section-header">${cleanHeader}</div><div class="section-content">${content}</div></div>`;
-            });
-        
-        // Handle the last section if it doesn't have a closing
-        if (formatted.includes('<div class="section-content">') && !formatted.includes('</div></div>')) {
-            formatted = formatted.replace(/<div class="section-content">([^<]*(?:<(?!\/div>)[^<]*)*[^<]*)$/, '<div class="section-content">$1</div></div>');
-        }
-        
-
-        
-        // Remove standalone # symbols that appear alone on lines
-        formatted = formatted.replace(/^\s*#\s*$/gm, '');
-        
-        // Clean up any remaining # symbols at start of lines
-        formatted = formatted.replace(/^\s*#+\s*/gm, '');
-        
-        // Process term tooltips FIRST, before any other formatting
-        if (message.terms && message.glossary) {
-            // Replace existing <term id="termname">text</term> with clickable spans
-            formatted = formatted.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
-                if (message.glossary[termId]) {
-                    const definition = message.glossary[termId].replace(/"/g, '&quot;');
-                    return `<span class="tooltip-wrapper" data-term="${termId}" data-definition="${definition}" style="display: inline-block; padding: 4px; margin: -4px; cursor: pointer;"><span class="term-tooltip" data-term="${termId}" title="${definition}">${termText}</span></span>`;
-                }
-                return match;
-            });
-        }
-        
-        // Process bold text
+        // 6. Process Markdown BEFORE terms
         formatted = formatted.replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>');
+        formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
         
-        // Process italics (single asterisks not part of bold) - but preserve tooltip spans
-        formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, (match, content) => {
-            // Don't italicize if content contains tooltip spans
-            if (content.includes('term-tooltip')) {
-                return match.replace(/\*/g, ''); // Just remove the asterisks
+        console.log('🔍 After markdown, before terms:', formatted.substring(0, 300));
+        
+        // 7. PROCESS TERMS - auto-wrap terms found in glossary
+        if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
+            console.log('🔍 Processing terms:', message.terms);
+            
+            // First try to find existing <term> tags
+            const termRegex = /<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi;
+            let termCount = 0;
+            formatted = formatted.replace(termRegex, (match, termId, termText) => {
+                const normalizedId = termId.toLowerCase().trim();
+                if (message.glossary[normalizedId]) {
+                    termCount++;
+                    const definition = message.glossary[normalizedId].replace(/"/g, '&quot;');
+                    return `<span class="tooltip-wrapper" data-term="${normalizedId}" data-definition="${definition}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${termText}</span></span>`;
+                }
+                return termText;
+            });
+            
+            // If no tags found, auto-wrap terms from glossary keys
+            if (termCount === 0) {
+                Object.keys(message.glossary).forEach(termKey => {
+                    const definition = message.glossary[termKey].replace(/"/g, '&quot;');
+                    // Create case-insensitive regex for the term
+                    const termPattern = new RegExp(`\\b(${termKey.replace(/[()]/g, '\\$&')})\\b`, 'gi');
+                    formatted = formatted.replace(termPattern, (match) => {
+                        termCount++;
+                        return `<span class="tooltip-wrapper" data-term="${termKey}" data-definition="${definition}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${match}</span></span>`;
+                    });
+                });
             }
-            return `<em class="chat-italic">${content}</em>`;
+            
+            console.log('🔍 Terms replaced:', termCount);
+        }
+        
+        // 8. Convert headers to section cards
+        formatted = formatted.replace(/### (.*?)\n/g, (match, header) => {
+            return `</div></div><div class="section-card"><div class="section-header">${header.trim()}</div><div class="section-content">`;
         });
         
-
-        // Clean up multiple line breaks and split into paragraphs
-        formatted = formatted.replace(/\n\s*\n\s*\n+/g, '\n\n');
-        formatted = formatted.replace(/^\s*\n+/, ''); // Remove leading whitespace and newlines
-        formatted = formatted.trim(); // Remove trailing whitespace
+        // 9. Process paragraphs and lists
+        const sections = formatted.split('</div></div>');
+        formatted = sections.map(section => {
+            if (!section.includes('<div class="section-content">')) return section;
+            
+            const parts = section.split('<div class="section-content">');
+            if (parts.length < 2) return section;
+            
+            let content = parts[1];
+            // Process lists
+            content = content.replace(/\n\*\s+(.+)/g, '<li class="chat-bullet">• $1</li>');
+            content = content.replace(/(<li class="chat-bullet">.*?<\/li>)/gs, '<ul class="chat-list">$1</ul>');
+            
+            return parts[0] + '<div class="section-content">' + content;
+        }).join('</div></div>');
         
-        const paragraphs = formatted.split(/\n\s*\n/).filter(p => p.trim());
+        // 10. Close divs and remove leading closures
+        formatted = formatted.trim() + '</div></div>';
+        formatted = formatted.replace(/^<\/div><\/div>/, '');
         
-        let result = paragraphs.map((paragraph, index) => {
-            paragraph = paragraph.trim();
-            if (!paragraph) return '';
-            
-            // Skip if already processed
-            if (paragraph.includes('final-thoughts-card') || paragraph.includes('chat-insights') || paragraph.includes('chat-header')) {
-                return paragraph;
-            }
-            
-
-            
-            // Check if it's a numbered list paragraph
-            if (/^\d+\./m.test(paragraph)) {
-                const items = paragraph.split(/\n(?=\d+\.)/)
-                    .map(item => {
-                        const match = item.match(/^(\d+\.)\s*(.*)$/s);
-                        if (match) {
-                            return `<li class="chat-numbered">▸ ${match[2].replace(/\n/g, ' ').trim()}</li>`;
-                        }
-                        return '';
-                    })
-                    .filter(item => item);
-                return `<ol class="chat-numbered-list">${items.join('')}</ol>`;
-            }
-            
-            // Check if it's a bullet list paragraph
-            if (/^[•*]/m.test(paragraph)) {
-                const items = paragraph.split(/\n(?=[•*])/)
-                    .map(item => {
-                        const match = item.match(/^[•*]\s*(.*)$/s);
-                        if (match) {
-                            return `<li class="chat-bullet">• ${match[1].replace(/\n/g, ' ').trim()}</li>`;
-                        }
-                        return '';
-                    })
-                    .filter(item => item);
-                return `<ul class="chat-list">${items.join('')}</ul>`;
-            }
-            
-
-            
-            // Regular paragraph - replace single line breaks with spaces
-            return `<p class="chat-paragraph">${paragraph.replace(/\n/g, ' ')}</p>`;
-        }).join('').replace(/^<p class="chat-paragraph">\s*<\/p>/, ''); // Remove first empty paragraph
-        
-        // Final cleanup: remove HTML formatting from section headers in already processed content
-        result = result.replace(/<div class="section-header"><em class="chat-italic">([^<]*)<\/em><\/div>/g, 
-            '<div class="section-header">$1</div>');
-        result = result.replace(/<div class="section-header"><strong class="chat-bold">([^<]*)<\/strong><\/div>/g, 
-            '<div class="section-header">$1</div>');
-        
-        return result;
+        return formatted;
     };
 
     const handleSpeak = () => {

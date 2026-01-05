@@ -38,14 +38,14 @@ import { Platform } from 'react-native';
 // API Configuration for AstroRoshni
 const getApiUrl = () => {
   // Localhost for testing (only works on simulator/emulator)
-  // if (Platform.OS === 'ios') {
-  //   return 'http://localhost:8001';
-  // } else {
-  //   return 'http://10.0.2.2:8001';
-  // }
+  if (Platform.OS === 'ios') {
+    return 'http://localhost:8001';
+  } else {
+    return 'http://10.0.2.2:8001';
+  }
   
   // Production (works on real devices)
-  return 'https://astroroshni.com';
+  // return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();
@@ -69,5 +69,20 @@ export const LANGUAGES = [
 export const CREDIT_COSTS = {
   SINGLE_CHAT: 1,
   PARTNERSHIP_CHAT: 2,
+};
+
+export const VOICE_CONFIG = {
+  rate: 0.75,           // Slower for more natural speech
+  pitch: 0.9,           // Slightly lower pitch for warmth
+  volume: 1.0,          // Full volume
+  quality: 'enhanced',  // Try enhanced quality
+  preferredVoices: {
+    'en-US': ['Kathy', 'Samantha', 'Albert'],
+    'en-IN': ['Rishi'],
+    'hi-IN': [],
+    'te-IN': [],
+    'ta-IN': [],
+    'gu-IN': []
+  }
 };
 

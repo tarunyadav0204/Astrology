@@ -1,0 +1,31 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T12:31:55.373956
+Question: Didnt I already say salary hike?
+Processing Time: 2.368s
+Response Length: 165 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "category": "job",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "job",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

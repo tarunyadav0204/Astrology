@@ -1,0 +1,77 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T12:33:40.123283
+Question: What does my birth chart say about my career?
+Processing Time: 2.460s
+Response Length: 920 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I can help with that! Are you currently employed or running a business? And what specifically would you like to know about your career and salary hike in 2026 - job change, promotion prospects, or challenges?",
+    "mode": "annual",
+    "category": "career",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can help with that! Are you currently employed or running a business? And what specifically would you like to know about your career and salary hike in 2026 - job change, promotion prospects, or challenges?",
+  "mode": "annual",
+  "category": "career",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

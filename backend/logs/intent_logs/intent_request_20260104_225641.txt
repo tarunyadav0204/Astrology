@@ -1,0 +1,256 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-04T22:56:41.983582
+Question: What does my birth chart say about my career?
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 23312 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: What does my birth chart say about my career?
+A: What does my birth chart say about my career?
+Q: What does my birth chart say about my career?
+A: <div class="quick-answer-card">**Quick Answer**: The current **Saturn-Rahu period** (active now) combined with the **Aquarius Chara Dasha** creates a high-pressure "financial hunger" phase where you likely feel your salary does not match your effort. **Specifically, expect a significant role transformation or lucrative jump between April 2026 and November 2026**, when the Chara Dasha shifts to Capricorn and the Saturn-Rahu energy peaks in your wealth sector. **However, your D9 Navamsa Mars in Aries** is exceptionally strong, confirming that while the current workload is draining (Ulka Yogini), the financial breakthrough is guaranteed if you persist through this friction. **Action:** Focus on specialized technical or analytical upskilling now to leverage the upcoming exaltation of Mercury in your career chart.</div>
+
+### Key Insights
+*   **The "Money-Career" Connection:** Your 10th Lord (Mars) is in the 2nd House (Leo) joining a massive 4-planet cluster (Saturn, Jupiter, Rahu, Mars). This creates a direct linkage between your professional status and liquid wealth. You are not wired to work for passion alone; your career must pay well to satisfy this yoga.
+*   **The "Technocrat" Signature:** The conjunction of Saturn (Work) and Mars (Engineering/Logic) strongly suggests success in technical fields, engineering, operations, or structured management.
+*   **The Hidden Strength (D10):** While your main chart shows struggle/intensity, your **D10 Dasamsa chart features an Exalted Mercury in the 10th House**. This is a "Executive Grade" placement, indicating that your true potential lies in specialized knowledge, data, or communication, which will bloom fully in your late 40s.
+*   **The Jaimini/Yogini Confirmation:** The current **Aquarius Chara Dasha** (containing your Career Significator Mercury) coinciding with the **Ulka (Saturn) Yogini** confirms a period of "Laborious Transformation"—hard work now, payout later.
+
+### Astrological Analysis
+
+#### 1. The Promise (Chart Analysis)
+Your chart features a **Dharma-Karma Adhipati Yoga** in the 2nd house (Leo), formed by the conjunction of the 9th Lord (Jupiter) and 10th Lord (Mars). This is one of the most powerful successes yogas in Vedic astrology, located in the house of **Accumulated Wealth**.
+*   **The Challenge:** Saturn (8th Lord) and Rahu are also here. This "poisons" the yoga slightly, introducing delays (Saturn) and insatiable ambition (Rahu). You likely experience cycles where you earn well but expenses or family responsibilities drain it immediately.
+*   **The Solution:** Mars is strong in your D9 Navamsa (Aries), canceling the negativity. This <term id="neecha_bhanga">Neecha Bhanga</term> dynamic suggests your greatest career rises will come *after* periods of intense restriction or crisis.
+
+#### 2. The Master Clock (Vimshottari Dasha)
+You are currently in the **Saturn Mahadasha**, **Rahu Antardasha**.
+*   **Saturn (The Taskmaster):** Located in your 2nd house, Saturn demands financial discipline.
+*   **Rahu (The Amplifier):** Rahu is also in the 2nd house. This combination creates "The Storm." You are currently obsessed with financial security and likely frustrated with the pace of growth. Rahu here often triggers a **change of job for money** rather than role satisfaction.
+
+#### 3. Timing Synthesis (Multi-System)
+This timeline is cross-verified by multiple systems:
+*   **Jaimini Chara Dasha:** You are currently in the **Aquarius** period (ends April 2026). Aquarius is your 8th House sign but contains **Mercury (your Amatyakaraka/Career Planet)**. This indicates career research, hidden strategies, or backend work.
+*   **The Shift:** In **April 2026**, you shift into **Capricorn**, which is the 7th House of public visibility and partnerships. This shift from an 8th-house vibe (hidden struggle) to a 7th-house vibe (public rise) marks the turning point.
+*   **Yogini Dasha:** You are running **Ulka (Saturn)**. Ulka represents "The Fire that Burns the Forest" to make way for new growth. It confirms high stress and workload but promises that the old structures preventing your salary growth are being burned away.
+
+#### 4. The Triple Perspective (Sudarshana)
+*   **10th from Lagna (Cancer):** Aries (Ruled by Mars). Indicates career requires aggression, initiative, and independence.
+*   **10th from Moon (Libra):** Cancer (Ruled by Moon). Indicates a need for emotional connection or public service in the career.
+*   **10th from Sun (Pisces):** Sagittarius (Ruled by Jupiter). Indicates authority comes through wisdom, teaching, or advisory roles.
+*   **Verdict:** Since Mars (Action) and Jupiter (Wisdom) are conjoined in your chart, your best career path blends "Technical Action" with "Advisory Wisdom."
+
+#### 5. Nadi Precision (The Nature of Career)
+Your chart reveals specific Nadi connections that define the exact nature of your work:
+
+*   **The "Karma-Yogi" Link (Saturn + Mars):** Saturn (Karma) is conjoined with Mars. This specifically indicates a career involving **Machinery, Technology, Engineering, or enforcing execution**. You are not just a planner; you are a builder.
+*   **The "Shadow" Link (Saturn + Rahu):** This indicates engagement with **"Foreign" or "Virtual" elements**. In modern context, this often points to Software, IT, internet-based businesses, or working for MNCs.
+*   **The "Dharma" Link (Saturn + Jupiter):** This elevates the career to a managerial or respectable status. You will not stay a subordinate forever; this combination demands eventually becoming a mentor or director.
+
+### Divisional Chart (D10 Dasamsa) Deep Dive
+The D10 is the specific microscope for career.
+*   **Mercury is Exalted in Virgo** in the 10th House of the D10.
+*   **Significance:** This is a massive dominance signal. While your D1 chart shows the "hustle" (Saturn/Rahu), the D10 shows the "skill." Exalted Mercury here guarantees that your intelligence, communication, and analytical skills are your ticket to the top.
+*   **Strategy:** Pivot your career towards roles that require high intellect—Architecture, Data Science, Strategic Planning, or specialized Consulting.
+
+### Practical Guidance
+
+1.  **April 2026 is the Pivot:** Do not force a major move before April 2026 unless the offer is extraordinary. The current **Aquarius Chara Dasha** favors planning and upskilling. The **Capricorn Dasha** starting April 2026 activates the 7th house of contracts and negotiations—that is your time to strike.
+2.  **Negotiate on "Bonus" not just "Base":** With Rahu in the 2nd house, your wealth luck comes in sudden spikes (bonuses, stock options) rather than just steady salary increments. Structure your compensation packages accordingly.
+3.  **Remedy for Saturn-Rahu:** To stabilize the chaotic energy in your finance house (Leo), keep a small square piece of solid silver in your wallet (remedy for Rahu). Also, prioritize transparency in tax and financial dealings, as the 8th house activation can bring scrutiny.
+
+<div class="final-thoughts-card">**Final Thoughts**: Your birth chart shows a "Late Bloomer" trajectory that is currently accelerating. The congestion in your 2nd house (Leo) has made financial growth feel like a battle, but the <b>Exalted Mercury in your D10</b> ensures that you win the war. The period from <b>April to November 2026</b> is your golden window for the salary correction you are seeking.</div>
+
+<term id="neecha_bhanga">Neecha Bhanga</term>
+
+<div class="follow-up-questions">
+📅 Is April 2026 the best time to switch jobs?
+🔮 How can I activate the Exalted Mercury in my D10?
+💼 Should I move towards management or stay technical?
+🌟 Will the Saturn-Rahu period cause any family spending issues?
+</div>
+Q: <div class="quick-answer-card">**Quick Answer**: The current **Saturn-Rahu period** (until Nov 2026) creates an intense "financial hunger" where your ambition for growth is high, but obstacles may feel heavy. **Specifically, expect a massive salary jump or lucrative role change between October 2026 and January 2027**, when Jupiter transits into Leo, triggering your powerful 4-planet wealth cluster. **However, your D9 Navamsa Mars in Aries** ensures you have the aggressive vitality needed to secure this deal—you are in a strong negotiating position. **Action**: Use the first half of 2026 to upskill; launch your bid for a raise/new role in Q3 2026.</div>
+
+### Key Insights
+*   **The "Wealth Engine" (2nd House Cluster):** You have a rare and explosive combination of **Mars, Jupiter, Saturn, and Rahu** all sitting in your 2nd House (Leo). This indicates your financial life is not linear—it grows in massive, sudden spikes rather than slow increments.
+*   **The "Gains" from the Mind (Moon Chart):** From your Moon Sign (Libra), this massive cluster sits in the **11th House of Gains**. This is a "Double Confirmation" that your primary source of mental satisfaction comes from seeing tangible financial results and network expansion.
+*   **The Jaimini Confirmation:** The shift to **Capricorn Chara Dasha** in April 2026 is the turning point. Capricorn aspects Leo (your wealth sign), unlocking the financial promise held in your chart.
+
+### Astrological Analysis
+
+**1. The Promise (Dhana Yogas & The 2nd House)**
+Your chart is dominated by the 2nd House of accumulated wealth (Leo). The presence of the <term id="yogakaraka">Yogakaraka</term> Mars (ruling Career/10th) combined with Jupiter (ruling Luck/9th) creates a powerful **Dharma-Karma Adhipati Yoga** right in the house of money.
+*   **Result:** This guarantees that your career status (10th lord) is directly tied to your liquid wealth (2nd house). You are not meant for a fixed, stagnant salary; you are wired for high-value compensation structures (bonuses, stock, equity).
+
+**2. The Master Clock (Vimshottari Dasha)**
+You are currently in **Saturn Mahadasha / Rahu Antardasha** (Ends Nov 2026).
+*   **The Conflict:** Saturn dictates discipline and delay, while Rahu demands shortcuts and sudden explosions. Since both are in your 2nd House (Salary), you are likely feeling "underpaid" relative to your effort, creating a psychological pressure cooker.
+*   **The Release:** As this period concludes in late 2026 and transitions into **Saturn-Jupiter**, the "expansion" energy of Jupiter takes over, releasing the wealth that Saturn has been accumulating/delaying.
+
+**3. Nadi Precision (The Nature of Your Wealth)**
+Your chart reveals specific Nadi connections that define *how* your salary growth manifests:
+
+*   **The "Technical Commander" Link (Saturn + Mars):** Your career planet (Saturn) is conjoined with Mars. This indicates that your highest salary potential comes from **Technical Management, Engineering Leadership, or Strategy Execution**. You are paid for "Hard Skills" + "Authority."
+*   **The "Foreign/Shadow" Link (Saturn + Rahu):** This connection strongly suggests that your best financial growth comes from **MNCs, foreign currency, or "Shadow" industries** (like backend tech, AI, or cybersecurity).
+*   **The "Expansion" Link (Jupiter + Saturn):** Jupiter's influence on Saturn ensures that despite delays, your career trajectory is ultimately one of high respect and advisory capacity.
+
+**4. The Triple Perspective (Sudarshana)**
+*   **Lagna (Body):** The 2nd house (Salary) contains the massive planetary cluster. **Verdict:** High potential, high expenditure.
+*   **Moon (Mind):** The 11th house (Gains) contains the massive planetary cluster. **Verdict:** Exceptional desire for and realization of profits.
+*   **Sun (Soul):** The 6th house (Service) contains the cluster. **Verdict:** Wealth comes through solving difficult problems, litigation, or overcoming competition.
+*   **Confidence Score:** Since wealth indicators appear strongly in **3 out of 3** perspectives, the confidence level is **95%**—financial growth is inevitable, provided you navigate the Saturnian delays.
+
+**5. Timing Synthesis (Multi-System)**
+*   **The Trigger:** The JSON data identifies a specific <term id="karmic_trigger">Karmic Trigger</term> starting **October 31, 2026**, where transiting Jupiter enters Leo.
+*   **The Synthesis:** This transit touches your natal Mars, Jupiter, Saturn, and Rahu simultaneously. This is a "once-in-12-years" activation.
+*   **Confirmation:** This timing aligns perfectly with the end of the stressful **Ulka Yogini** (Saturn) in July 2026 and the start of the auspicious **Siddha Yogini** (Venus).
+*   **Prediction:** The period of **October 2026 to January 2027** is your "Golden Window" for a major salary renegotiation or job switch.
+
+### Nakshatra Insights
+Your **10th Lord Mars** is in **Magha Nakshatra** (ruled by Ketu/Ancestors). Magha represents "The Throne."
+*   **Impact on Career:** You naturally seek authority and autonomy. You struggle in roles where you are micromanaged. To maximize salary, you must position yourself as an authority figure or a specialist who works independently.
+*   **Advice:** In interviews, emphasize your ability to take ownership of projects (Magha energy) rather than just being a team player.
+
+### Practical Guidance
+1.  **Immediate (Now - July 2026):** This is the end of a "Karmic Squeeze." Do not rage-quit if you feel undervalued. Use this time to certify or upgrade technical skills (Saturn+Mars requirement).
+2.  **The Strategy:** Your chart shows <term id="dharma_karma">Dharma-Karma Yoga</term> in the wealth house. Your salary growth is tied to *responsibility*. You cannot get a raise just for tenure; you get it for taking on a "burden" (Saturn) that others avoid.
+3.  **Negotiation Window:** Schedule your performance reviews or job interviews for **September/October 2026**. The planetary wind will be at your back.
+
+<div class="final-thoughts-card">**Final Thoughts**: You are sitting on a "volcano of wealth" in your 2nd house. While Saturn has likely kept a lid on it recently, the pressure is building for a release. The transition to Capricorn Chara Dasha and the Jupiter transit in late 2026 guarantees a significant level-up. Be patient, stay skilled, and prepare to strike in Q4 2026.</div>
+
+IMAGE_PROMPTS_START
+{"wealth_cluster": "astrological chart visualization showing four planets Mars Jupiter Saturn Rahu glowing intensely in the Leo sign 2nd house, vedic style gold and red energies", "karmic_trigger": "cosmic clock mechanism shifting gears, symbolizing the change from Saturn to Jupiter influence, mystical lighting"}
+IMAGE_PROMPTS_END
+A: employed, salary growth
+
+        
+        Current question: "What does my birth chart say about my career?"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

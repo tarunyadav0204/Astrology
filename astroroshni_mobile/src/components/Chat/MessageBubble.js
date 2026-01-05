@@ -11,12 +11,15 @@ import {
   Share,
   ActivityIndicator,
   Modal,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/constants';
 import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
+import * as Speech from 'expo-speech';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -24,6 +27,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const isPartnership = partnership || message.partnership_mode;
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -39,6 +46,83 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       }),
     ]).start();
   }, []);
+  const speak = async () => {
+    if (isSpeaking) {
+      Speech.stop();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const cleanText = message.content
+      .replace(/<[^>]*>/g, '')
+      .replace(/[#*]/g, '')
+      .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .trim();
+
+    setIsSpeaking(true);
+    const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-US';
+
+    try {
+      const voices = await Speech.getAvailableVoicesAsync();
+      const languageVoices = voices.filter(v => v.language === voiceLanguage || v.language === 'en-IN');
+      
+      // Use selected voice or find best voice
+      let preferredVoice = selectedVoice;
+      if (!preferredVoice) {
+        // Default to Rishi (Indian English) first, then Kathy, then Samantha
+        preferredVoice = languageVoices.find(v => v.name === 'Rishi') ||
+                        languageVoices.find(v => v.name === 'Kathy') ||
+                        languageVoices.find(v => v.name === 'Samantha') ||
+                        languageVoices[0];
+      }
+
+      const speechOptions = {
+        language: voiceLanguage,
+        rate: VOICE_CONFIG.rate,
+        pitch: VOICE_CONFIG.pitch,
+        volume: VOICE_CONFIG.volume,
+        onDone: () => setIsSpeaking(false),
+        onStopped: () => setIsSpeaking(false),
+        onError: (error) => {
+          console.log('Speech error:', error);
+          setIsSpeaking(false);
+        }
+      };
+
+      if (preferredVoice) {
+        speechOptions.voice = preferredVoice.identifier;
+        console.log('Using voice:', preferredVoice.name);
+      }
+
+      Speech.speak(cleanText, speechOptions);
+    } catch (error) {
+      console.log('Voice setup error:', error);
+      setIsSpeaking(false);
+    }
+  };
+
+  const showVoiceSelector = async () => {
+    try {
+      const voices = await Speech.getAvailableVoicesAsync();
+      const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-US';
+      
+      // Filter out novelty/effect voices and keep only normal human voices
+      const weirdVoices = ['Bad News', 'Bahh', 'Bells', 'Boing', 'Bubbles', 'Cellos', 'Wobble', 'Fred', 'Good News', 'Jester', 'Junior', 'Organ', 'Superstar', 'Ralph', 'Trinoids', 'Whisper', 'Zarvox'];
+      
+      const languageVoices = voices.filter(v => {
+        const isRightLanguage = v.language === voiceLanguage || v.language === 'en-IN' || v.language.startsWith('en-');
+        const isNormalVoice = !weirdVoices.includes(v.name);
+        return isRightLanguage && isNormalVoice;
+      });
+      
+      setAvailableVoices(languageVoices);
+      setShowVoicePicker(true);
+    } catch (error) {
+      console.log('Error getting voices:', error);
+    }
+  };
+
   const sharePDF = async () => {
     try {
       setIsGeneratingPDF(true);
@@ -142,6 +226,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     // Normalize line breaks
     formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
+    // Handle markdown tables - convert to simple format
+    formatted = formatted.replace(/\|(.+)\|\n\|[:\s-]+\|\n((?:\|.+\|\n?)+)/g, (match, header, rows) => {
+      return `<table>${header}|||${rows}</table>`;
+    });
+    
     // Handle Follow-up Questions section
     formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
       return `<followup>${questions}</followup>`;
@@ -169,7 +258,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     const sections = [
       { regex: /<quickanswer>(.*?)<\/quickanswer>/gs, type: 'quick' },
       { regex: /<finalthoughts>(.*?)<\/finalthoughts>/gs, type: 'final' },
-      { regex: /<followup>(.*?)<\/followup>/gs, type: 'followup' }
+      { regex: /<followup>(.*?)<\/followup>/gs, type: 'followup' },
+      { regex: /<table>(.*?)<\/table>/gs, type: 'table' }
     ];
     
     // Find all matches and sort by position
@@ -394,6 +484,37 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             </View>
           );
         }
+      } else if (item.type === 'table') {
+        // Parse table data
+        const tableData = item.match[1].split('|||');
+        const headerRow = tableData[0].split('|').map(h => h.trim()).filter(h => h);
+        const dataRows = tableData[1].split('\n').filter(r => r.trim() && r.includes('|'));
+        
+        elements.push(
+          <View key={`table-${currentIndex++}`} style={styles.tableContainer}>
+            {/* Header */}
+            <View style={styles.tableHeaderRow}>
+              {headerRow.map((header, idx) => (
+                <Text key={`th-${idx}`} style={[styles.tableHeaderCell, { flex: idx === 0 ? 1.5 : 1 }]}>
+                  {header.replace(/\*\*/g, '')}
+                </Text>
+              ))}
+            </View>
+            {/* Rows */}
+            {dataRows.map((row, rowIdx) => {
+              const cells = row.split('|').map(c => c.trim()).filter(c => c);
+              return (
+                <View key={`tr-${rowIdx}`} style={styles.tableRow}>
+                  {cells.map((cell, cellIdx) => (
+                    <Text key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCell, { flex: cellIdx === 0 ? 1.5 : 1 }]}>
+                      {cell.replace(/\*\*/g, '')}
+                    </Text>
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        );
       }
       
       lastIndex = item.lastIndex;
@@ -789,12 +910,39 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
         
+        {/* Summary Image */}
+        {message.summary_image && (
+          <View style={{ marginBottom: 15, alignItems: 'center' }}>
+            <Image 
+              source={{ uri: message.summary_image }}
+              style={{ width: '100%', maxWidth: 400, height: 250, borderRadius: 12 }}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+        
         <View style={styles.messageContent}>
           {renderedElements}
         </View>
 
         {!message.isTyping && message.messageId && (
           <View style={styles.actionButtons}>
+            {message.role === 'assistant' && (
+              <>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={speak}
+                >
+                  <Ionicons name={isSpeaking ? "stop-circle" : "volume-medium"} size={16} color={isSpeaking ? "#ff6b35" : "#666"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={showVoiceSelector}
+                >
+                  <Ionicons name="settings" size={16} color="#666" />
+                </TouchableOpacity>
+              </>
+            )}
             <TouchableOpacity
               style={styles.actionButton}
               onPress={copyToClipboard}
@@ -845,6 +993,48 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           })}
         </Text>
       </View>
+      
+      {/* Voice Picker Modal */}
+      <Modal
+        visible={showVoicePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowVoicePicker(false)}
+      >
+        <View style={styles.voiceModalOverlay}>
+          <View style={styles.voiceModalContent}>
+            <Text style={styles.voiceModalTitle}>Choose Voice</Text>
+            <ScrollView style={styles.voiceScrollView} showsVerticalScrollIndicator={true}>
+              {availableVoices.map((voice, index) => (
+                <TouchableOpacity
+                  key={voice.identifier}
+                  style={[
+                    styles.voiceOption,
+                    selectedVoice?.identifier === voice.identifier && styles.selectedVoiceOption
+                  ]}
+                  onPress={() => {
+                    setSelectedVoice(voice);
+                    setShowVoicePicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.voiceOptionText,
+                    selectedVoice?.identifier === voice.identifier && styles.selectedVoiceText
+                  ]}>
+                    {voice.name} ({voice.language})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.voiceModalClose}
+              onPress={() => setShowVoicePicker(false)}
+            >
+              <Text style={styles.voiceModalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       
       {/* Tooltip Modal */}
       <Modal
@@ -1216,6 +1406,99 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   tooltipModalCloseText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  tableContainer: {
+    marginVertical: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  tableHeaderCell: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ff6b35',
+    paddingHorizontal: 4,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 107, 53, 0.1)',
+  },
+  tableCell: {
+    fontSize: 11,
+    color: '#2c3e50',
+    paddingHorizontal: 4,
+  },
+  voiceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  voiceModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    maxWidth: '90%',
+    maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  voiceModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ff6b35',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  voiceScrollView: {
+    maxHeight: 300,
+    marginBottom: 15,
+  },
+  voiceOption: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  selectedVoiceOption: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#ff6b35',
+  },
+  voiceOptionText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  selectedVoiceText: {
+    color: '#ff6b35',
+    fontWeight: '600',
+  },
+  voiceModalClose: {
+    backgroundColor: '#ff6b35',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignSelf: 'center',
+    marginTop: 15,
+  },
+  voiceModalCloseText: {
     color: 'white',
     fontWeight: '600',
   },

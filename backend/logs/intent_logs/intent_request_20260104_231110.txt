@@ -1,0 +1,197 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-04T23:11:10.642668
+Question: What does my birth chart say about my career?
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 16200 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: relationships with my wife.
+A: What does my birth chart say about my career?
+Q: What do the current transits mean for me?
+A: <div class="quick-answer-card">**Quick Answer**: The current **Saturn-Rahu period** (active until late 2026) creates a "pressure-cooker" effect in relationships, where family responsibilities and financial stress (2nd house concentration) may trigger misunderstandings with your spouse. **Specifically, expect a major positive shift between April 2026 and July 2026.** This window marks the start of the **Capricorn Chara Dasha** (activating marriage) and the **Siddha (Venus)** Yogini period, bringing harmony after a period of friction. However, with your **7th Lord Saturn heavily influenced by Mars**, you must consciously avoid harsh speech during disagreements to protect the bond.</div>
+
+### Key Insights
+*   **The Challenge (D1):** Your 7th Lord (Saturn) is in a massive conjunction with Mars, Rahu, and Jupiter in the 2nd House. This indicates that **speech, extended family interference, or financial discussions** are the primary sources of marital friction, not a lack of love.
+*   **The Protection (D9):** Your Navamsa Venus is in Aquarius. While this can show a spouse who needs their own space or acts detached at times, it provides intellectual compatibility that overrides emotional volatility.
+*   **The Jaimini/Yogini Confirmation:** The transition from the **Aquarius Chara Dasha** (current, 8th house vibe of transformation) to the **Capricorn Chara Dasha** (starting April 2026, 7th house of marriage) is a massive "Double Confirmation" that relationship matters will take center stage and stabilize this year.
+*   **The "Mangal" Factor:** You have a **Low Mangal Dosha**, which makes you passionate but occasionally impulsive in arguments. This is manageable but requires patience.
+
+### Astrological Analysis
+
+#### 1. The Promise (Chart Analysis)
+Your chart features a unique and intense combination affecting relationships. The **7th Lord Saturn** (ruling spouse) is placed in the **2nd House (Leo)** alongside **Mars, Jupiter, and Rahu**.
+*   **The Conflict:** Saturn (Cold/Discipline) and Mars (Heat/Aggression) together often create a "Hot and Cold" dynamic in marriage. One moment is passionate, the next is distant.
+*   **The Root Cause:** Since this happens in the 2nd House (Speech/Family), arguments likely stem from *how* things are said rather than *what* is said. The presence of Rahu suggests unconventional family dynamics or misunderstandings caused by assumptions.
+*   **The Saving Grace:** <div class="image-placeholder" data-image-id="venus_own_sign" data-description="Venus in Taurus" style="background: yellow; padding: 10px; border: 2px solid red; margin: 10px 0;">🖼️ IMAGE PLACEHOLDER: venus_own_sign - Venus in Taurus</div> acts as a stabilizer. Venus is in its own sign in the 11th House (Gains), promising that despite friction, the relationship brings material luck and social gain.
+
+#### 2. The Master Clock (Vimshottari & Timing)
+You are currently in **Saturn Mahadasha / Rahu Antardasha**.
+*   **Saturn** rules your 7th house (Marriage).
+*   **Rahu** is conjunct Saturn.
+*   **The Effect:** This creates a "Stormy" period where you may feel the spouse is being stubborn or difficult to understand. This is a karmic clearing period active until **November 2026**.
+*   **The Turnaround:** Once **Jupiter Antardasha** begins in late 2026, wisdom returns to the relationship, and tensions dissolve.
+
+#### 3. Timing Synthesis (Multi-System)
+The timing for relationship improvement is confirmed by two independent systems:
+*   **Jaimini Chara Dasha:** On **April 2, 2026**, your major period shifts from **Aquarius** (struggle) to **Capricorn**. Capricorn is your **7th House of Marriage**. This acts as a spotlight, prioritizing the spouse and bringing structure to the union.
+*   **Yogini Dasha:** You are currently in the **Ulka (Saturn)** period, which brings grief or pressure. On **July 6, 2026**, you enter the **Siddha (Venus)** period. Venus is the natural significator of love.
+*   **Synthesis:** The overlap of **Capricorn Dasha** and **Siddha Yogini** guarantees that mid-2026 is the turning point for relationship happiness.
+
+#### 4. Nadi Precision (The Nature of Marriage)
+Your chart reveals specific Nadi connections that define the exact nature of your spouse and relationship dynamics:
+
+*   **The "Technical Friction" Link (Saturn + Mars):** Your 7th Lord connects with Mars. This indicates a spouse who is capable, perhaps technical or administrative in nature, but who has a "short fuse." They respond better to logic than emotional appeals.
+*   **The "Guru-Chandala" Influence (Jupiter + Rahu):** Since Jupiter (Husband/Guidance) is with Rahu, there is a non-traditional element to your relationship. You or your spouse may have different cultural backgrounds or distinctively different belief systems that require bridging.
+*   **The "Wealth" Link (Venus + Moon):** Venus in Taurus (Stable) aspected by no malefics in the 11th house indicates that your wife is a source of financial stability or brings luck in liquid cash flow (Indu Lagna connection).
+
+#### 5. The Triple Perspective (Sudarshana)
+*   **Lagna (Body):** 7th House is Capricorn. Ruler Saturn is Afflicted. **(Challenge: Responsibilities)**
+*   **Moon (Mind):** Moon is in Libra. 7th from Moon is Aries, ruled by Mars. Mars is with Saturn/Rahu. **(Challenge: Emotional volatility)**
+*   **Sun (Soul):** Sun is in Pisces. 7th from Sun is Virgo, ruled by Mercury. Mercury is in the 8th house (dusthana). **(Challenge: Communication gaps)**
+*   **Verdict:** Since 3 out of 3 charts show challenges involving the 7th lord or house, the confidence level is **High** that marriage is a "Karmic Workspace" for you. It is designed to teach patience, not just provide comfort.
+
+### Nakshatra Insights
+Your **Venus is in Krittika Nakshatra**, ruled by the Sun. Krittika is the "Cutter."
+*   **Meaning:** In love, you or your spouse may have a sharp, cutting way of expressing dissatisfaction. Krittika energy is purifying but painful.
+*   **Guidance:** Ensure that "honesty" doesn't become "cruelty." Krittika demands purity—secrets or lies will be exposed instantly in this relationship.
+
+### Practical Guidance
+1.  **The "2nd House" Remedy:** Since the affliction is in the house of speech, implement a **"24-Hour Rule."** If a disagreement starts, wait 24 hours before discussing the core issue to let the Mars/Rahu impulse subside.
+2.  **Venus Activation:** Your Venus is strong in the 11th. Engage in social activities together. Going out with friends or attending social gatherings (11th house) acts as a buffer and improves bonding.
+3.  **Specific Timing:** Plan important relationship discussions or vacations for **August 2026**, when the Siddha (Venus) Yogini is fully active.
+
+<div class="final-thoughts-card">**Final Thoughts**: While the current Saturn-Rahu influence feels heavy, it is temporary. The chart clearly indicates a "lifting of the fog" starting April 2026. Your relationship is built on a strong Venus foundation, meaning the love is real, even if the "packaging" (communication) is currently messy.</div>
+Q: employed, salary growth
+A: I'd be happy to help! Could you please tell me which area of your life you're most interested in understanding with regard to current transits? For example, are you curious about their impact on your career, relationships, health, or something else?
+
+        
+        Current question: "What does my birth chart say about my career?"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

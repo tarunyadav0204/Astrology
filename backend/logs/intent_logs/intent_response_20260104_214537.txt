@@ -1,0 +1,41 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-04T21:45:41.094064
+Question: What does my birth chart say about my career?
+Processing Time: 3.705s
+Response Length: 284 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "clarification_question": null,
+    "extracted_context": {
+        "area": "career"
+    },
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "clarification_question": null,
+  "extracted_context": {
+    "area": "career"
+  },
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

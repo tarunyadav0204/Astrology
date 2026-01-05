@@ -390,8 +390,20 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         # Use json.dumps with proper error handling
                         response_data = {
                             'status': 'complete', 
-                            'response': clean_response
+                            'response': clean_response,
+                            'terms': ai_result.get('terms', []),
+                            'glossary': ai_result.get('glossary', {})
                         }
+                        
+                        # Add images if available (DEPRECATED - use summary_image)
+                        if ai_result.get('images'):
+                            response_data['images'] = ai_result['images']
+                            print(f"📸 Including {len(ai_result['images'])} images in response")
+                        
+                        # Add summary image if available
+                        if ai_result.get('summary_image'):
+                            response_data['summary_image'] = ai_result['summary_image']
+                            print(f"🇼 Including summary image in response: {ai_result['summary_image']}")
                         
                         # Context already sent earlier for admin users
                         
@@ -411,6 +423,12 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                                     'total_chunks': len(chunks),
                                     'response': chunk
                                 }
+                                # Include summary_image and terms/glossary in first chunk
+                                if i == 0:
+                                    if ai_result.get('summary_image'):
+                                        chunk_data['summary_image'] = ai_result['summary_image']
+                                    chunk_data['terms'] = ai_result.get('terms', [])
+                                    chunk_data['glossary'] = ai_result.get('glossary', {})
                                 # Context already sent earlier for admin users
                                 chunk_json = json.dumps(chunk_data, ensure_ascii=True, separators=(',', ':'))
                                 yield f"data: {chunk_json}\n\n"

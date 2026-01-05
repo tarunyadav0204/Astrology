@@ -1,0 +1,41 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-04T23:16:07.176880
+Question: What are my strengths and weaknesses in health?
+Processing Time: 2.265s
+Response Length: 303 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "clarification_question": null,
+    "extracted_context": null,
+    "mode": "birth",
+    "category": "health",
+    "year": null,
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ],
+    "transit_request": null
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "clarification_question": null,
+  "extracted_context": null,
+  "mode": "birth",
+  "category": "health",
+  "year": null,
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": null
+}

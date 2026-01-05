@@ -5,6 +5,7 @@ import './BlogEditor.css';
 const BlogEditor = ({ postId, onSave, onCancel }) => {
     const [post, setPost] = useState({
         title: '',
+        slug: '',
         content: '',
         excerpt: '',
         category: '',
@@ -15,6 +16,7 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
     });
     const [loading, setLoading] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
+    const [imageAltText, setImageAltText] = useState('');
 
     useEffect(() => {
         if (postId) {
@@ -38,7 +40,16 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setPost(prev => ({ ...prev, [name]: value }));
+        if (name === 'title' && !post.slug) {
+            // Auto-generate slug from title if slug is empty
+            const autoSlug = value.toLowerCase()
+                .replace(/[^\w\s-]/g, '')
+                .replace(/[-\s]+/g, '-')
+                .trim('-');
+            setPost(prev => ({ ...prev, [name]: value, slug: autoSlug }));
+        } else {
+            setPost(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleImageUpload = async (e) => {
@@ -48,6 +59,7 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
         setImageUploading(true);
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('alt_text', imageAltText.trim() || 'Image');
 
         try {
             const response = await axios.post('/api/blog/upload-image', formData, {
@@ -57,17 +69,21 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
             const imageUrl = response.data.url;
             setPost(prev => ({ ...prev, featured_image: imageUrl }));
             
-            // Insert image into content at cursor position
+            // Insert image into content at cursor position with alt text
             const textarea = document.getElementById('content-editor');
             const cursorPos = textarea.selectionStart;
             const textBefore = post.content.substring(0, cursorPos);
             const textAfter = post.content.substring(cursorPos);
-            const imageMarkdown = `\n![Image](${imageUrl})\n`;
+            const altText = imageAltText.trim() || 'Image';
+            const imageMarkdown = `\n![${altText}](${imageUrl})\n`;
             
             setPost(prev => ({
                 ...prev,
                 content: textBefore + imageMarkdown + textAfter
             }));
+            
+            // Clear alt text after successful upload
+            setImageAltText('');
         } catch (error) {
             console.error('Error uploading image:', error);
             alert('Failed to upload image');
@@ -125,6 +141,20 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
                     />
                 </div>
 
+                <div className="form-group">
+                    <label>URL Slug</label>
+                    <input
+                        type="text"
+                        name="slug"
+                        value={post.slug}
+                        onChange={handleInputChange}
+                        placeholder="url-friendly-slug"
+                    />
+                    <small className="help-text">
+                        URL will be: /blog/{post.slug || 'your-slug-here'}
+                    </small>
+                </div>
+
                 <div className="form-row">
                     <div className="form-group">
                         <label>Category</label>
@@ -179,8 +209,17 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
                 </div>
 
                 <div className="form-group">
-                    <label>Featured Image</label>
+                    <label>Image Upload</label>
                     <div className="image-upload">
+                        <div className="alt-text-input">
+                            <input
+                                type="text"
+                                value={imageAltText}
+                                onChange={(e) => setImageAltText(e.target.value)}
+                                placeholder="Enter alt text for the image (optional)"
+                                className="alt-text-field"
+                            />
+                        </div>
                         <input
                             type="file"
                             accept="image/*"
@@ -191,6 +230,9 @@ const BlogEditor = ({ postId, onSave, onCancel }) => {
                         {post.featured_image && (
                             <img src={post.featured_image} alt="Featured" className="featured-preview" />
                         )}
+                        <small className="help-text">
+                            Enter descriptive alt text for better accessibility and SEO (optional).
+                        </small>
                     </div>
                 </div>
 

@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T12:31:35.021761
+Question: What does my birth chart say about my career? Salary hike?
+Processing Time: 1.871s
+Response Length: 406 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I can help with that! Are you currently employed or running a business? And what specifically would you like to know regarding a salary hike - timing, amount, or influencing factors?",
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can help with that! Are you currently employed or running a business? And what specifically would you like to know regarding a salary hike - timing, amount, or influencing factors?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

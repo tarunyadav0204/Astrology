@@ -1,0 +1,39 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T15:31:16.681330
+Question: Employed, looking for a salary hike which didn’t happen from years.
+Processing Time: 2.778s
+Response Length: 216 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "extracted_context": {
+    "area": "career"
+  },
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "area": "career"
+  },
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

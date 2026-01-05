@@ -3,10 +3,12 @@ import json
 import os
 import html
 import asyncio
+import re
 from typing import Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
 from ai.response_parser import ResponseParser
+from ai.flux_image_service import FluxImageService
 
 # Load environment variables
 env_paths = [
@@ -30,6 +32,14 @@ class GeminiChatAnalyzer:
         
         genai.configure(api_key=api_key)
         
+        # Initialize Flux image service
+        try:
+            self.flux_service = FluxImageService()
+            print("✅ Flux image service initialized")
+        except Exception as e:
+            print(f"⚠️ Flux service unavailable: {e}")
+            self.flux_service = None
+        
         # Standard models (try in order of preference)
         model_names = [
             'models/gemini-3-flash-preview',
@@ -45,7 +55,14 @@ class GeminiChatAnalyzer:
         # Initialize standard model
         for model_name in model_names:
             try:
-                self.model = genai.GenerativeModel(model_name)
+                self.model = genai.GenerativeModel(
+                    model_name,
+                    generation_config=genai.GenerationConfig(
+                        temperature=0.7,
+                        top_p=0.95,
+                        top_k=40
+                    )
+                )
                 print(f"✅ Initialized standard model: {model_name}")
                 break
             except Exception as e:
@@ -54,7 +71,14 @@ class GeminiChatAnalyzer:
         
         # Initialize premium model (Gemini 3 Pro Preview)
         try:
-            self.premium_model = genai.GenerativeModel('models/gemini-3-pro-preview')
+            self.premium_model = genai.GenerativeModel(
+                'models/gemini-3-pro-preview',
+                generation_config=genai.GenerationConfig(
+                    temperature=0.7,
+                    top_p=0.95,
+                    top_k=40
+                )
+            )
             print(f"✅ Initialized premium model: gemini-3-pro-preview")
         except Exception as e:
             print(f"⚠️ Premium model not available, using standard: {e}")
@@ -118,7 +142,7 @@ class GeminiChatAnalyzer:
         # print(f"💾 COMPRESSION RATIO: {((original_size - pruned_size) / original_size * 100):.1f}% reduction")
         
         prompt_start = time.time()
-        prompt = self._create_chat_prompt(user_question, pruned_context, conversation_history or [], language, response_style, user_context)
+        prompt = self._create_chat_prompt(user_question, pruned_context, conversation_history or [], language, response_style, user_context, premium_analysis)
         prompt_time = time.time() - prompt_start
         
       
@@ -160,7 +184,7 @@ class GeminiChatAnalyzer:
             
 
             
-            # CALL GEMINI ASYNC DIRECTLY with request_options
+            # CALL GEMINI ASYNC DIRECTLY with SDK timeout
             response = await asyncio.wait_for(
                 selected_model.generate_content_async(
                     prompt,
@@ -179,7 +203,11 @@ class GeminiChatAnalyzer:
             print(f"{'='*80}")
             if response and hasattr(response, 'text'):
                 response_text_preview = response.text
-                print(f"\nFULL GEMINI RESPONSE:\n{response_text_preview}")
+                print(f"\n📝 COMPLETE GEMINI RESPONSE (ALL {len(response_text_preview)} CHARACTERS):")
+                print(response_text_preview)
+                print(f"\n{'='*80}")
+                print(f"📄 END OF GEMINI RESPONSE")
+                print(f"{'='*80}")
                 
                 # Log divisional chart mentions
                 divisional_mentions = []
@@ -275,19 +303,33 @@ class GeminiChatAnalyzer:
             else:
                 print(f"📊 PERFORMANCE SUMMARY - FIRST CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
             
-            # Parse response for terms and glossary
-            parsed_response = ResponseParser.parse_response(cleaned_text)
+            # Parse response for terms, glossary, and summary image
+            parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
             
             print(f"\n🔍 RESPONSE PARSER DEBUG:")
             print(f"   Terms found: {parsed_response['terms']}")
             print(f"   Glossary keys: {list(parsed_response['glossary'].keys())}")
+            print(f"   Summary image prompt: {parsed_response.get('summary_image_prompt', 'None')[:100] if parsed_response.get('summary_image_prompt') else 'None'}...")
             print(f"   Content preview: {parsed_response['content'][:200]}...")
             
+            # Generate summary image if prompt exists
+            summary_image_url = None
+            if self.flux_service and premium_analysis and parsed_response.get('summary_image_prompt'):
+                try:
+                    print(f"\n🎨 Generating summary image...")
+                    summary_image_url = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
+                    if summary_image_url:
+                        print(f"   ✅ Generated summary image: {summary_image_url}")
+                    else:
+                        print(f"   ❌ Failed to generate summary image")
+                except Exception as e:
+                    print(f"   ⚠️ Image generation error: {e}")
             return {
                 'success': True,
                 'response': parsed_response['content'],
                 'terms': parsed_response['terms'],
                 'glossary': parsed_response['glossary'],
+                'summary_image': summary_image_url,
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
                 'timing': {
@@ -325,10 +367,12 @@ class GeminiChatAnalyzer:
                 error_message = "There's a temporary service configuration issue. Please try again shortly."
             elif "content" in str(e).lower() or "safety" in str(e).lower():
                 error_message = "I couldn't process this question due to content guidelines. Please try rephrasing your question."
-            elif "timeout" in str(e).lower():
-                error_message = "Your question is taking too long to process. Please try a more specific question."
+            elif "timeout" in str(e).lower() or "deadline" in str(e).lower() or "504" in str(e):
+                error_message = "The AI service took too long to respond. Please try a shorter or more specific question."
             elif "model" in str(e).lower() or "unavailable" in str(e).lower():
                 error_message = "The AI service is temporarily unavailable. Please try again in a few minutes."
+            elif "cancelled" in str(e).lower() or "499" in str(e):
+                error_message = "The request was interrupted. Please try asking your question again."
             
             return {
                 'success': False,
@@ -427,6 +471,10 @@ class GeminiChatAnalyzer:
         
         return response_text
     
+    def _extract_image_prompts(self, response_text: str) -> dict:
+        """DEPRECATED: Extract image prompts from Gemini response (old inline method)"""
+        return {}
+    
     def _prune_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Aggressively removes heavy, redundant data to reduce token count.
@@ -464,7 +512,7 @@ class GeminiChatAnalyzer:
         
         return clean
     
-    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed', user_context: Dict = None) -> str:
+    def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False) -> str:
         """Create comprehensive chat prompt for Gemini"""
         
         history_text = ""
@@ -610,46 +658,51 @@ Do NOT include detailed analysis, multiple sections, or extensive explanations.
 Format: <div class="quick-answer-card">**Quick Answer**: [Comprehensive summary in everyday language that covers all major insights]</div>
 
 TECHNICAL TERMS EDUCATION - MANDATORY:
-Wrap ALL astrological terms in <term id="key">Term</term> format. You must identify and wrap EVERY astrological term, concept, yoga, dasha, planet name, house reference, chart type, or Sanskrit astrological word.
-
-Examples include (but are not limited to):
-- Charts: D9 → <term id="d9">D9</term>, Navamsa → <term id="navamsa">Navamsa</term>
-- Dashas: Mahadasha → <term id="mahadasha">Mahadasha</term>, Antardasha → <term id="antardasha">Antardasha</term>
-- Yogas: Rajyoga → <term id="rajyoga">Rajyoga</term>, Malavya Yoga → <term id="malavyayoga">Malavya Yoga</term>, Bhadra Yoga → <term id="bhadrayoga">Bhadra Yoga</term>
-- Karakas: Amatyakaraka → <term id="amatyakaraka">Amatyakaraka</term>, Atmakaraka → <term id="atmakaraka">Atmakaraka</term>
-- Systems: Sudarshana → <term id="sudarshana">Sudarshana</term>, Ashtakavarga → <term id="ashtakavarga">Ashtakavarga</term>
-- Planets: Jupiter, Venus, Saturn, Mars, Mercury, Sun, Moon, Rahu, Ketu
-- Houses: 1st house, 7th house, 10th house, etc.
-- Signs: Aries, Taurus, Gemini, etc.
-- Nakshatras: Ashwini, Bharani, Rohini, etc.
-- Any Sanskrit astrological term
-
-CRITICAL: This is not a complete list. You must wrap ANY and ALL astrological terms you use, regardless of whether they appear in these examples.
+Wrap ALL astrological terms in <term id="key">Term</term> format.
 
 GLOSSARY FORMAT - CRITICAL:
 At the very end of your response, add a clean JSON glossary with COMPREHENSIVE, LAYMAN-FRIENDLY definitions in this EXACT format:
 
 GLOSSARY_START
-{"d9": "D9 (Navamsa Chart) - A special chart that reveals your destiny, marriage compatibility, and spiritual path. It shows the deeper qualities of your personality and how your life will unfold after marriage. Think of it as your soul's blueprint that becomes more active in the second half of life.", "mahadasha": "Mahadasha - A major life period ruled by one planet, lasting several years (6-20 years depending on the planet). During this time, that planet's energy dominates your life experiences, opportunities, and challenges. It's like having a planetary 'CEO' running your life for that entire period."}
+{"d9": "D9 (Navamsa Chart) - A special chart that reveals your destiny, marriage compatibility, and spiritual path."}
 GLOSSARY_END
-
-IMPORTANT GLOSSARY REQUIREMENTS:
-- Explain each term in a clear paragraph that anyone can understand
-- Use simple, everyday language that anyone can understand
-- Explain WHY the concept matters in practical life
-- Include analogies or comparisons when helpful (like 'CEO', 'blueprint', etc.)
-- Avoid Sanskrit terms unless absolutely necessary
-- Focus on how it affects the person's real life
-
-Do NOT use code blocks, HTML encoding, or escape characters. Just plain JSON between the markers.
 
 """
         else:
-            response_format_instruction = """
+            # Build image instructions based on premium_analysis flag
+            image_instructions = ""
+            if premium_analysis:
+                image_instructions = """
+SUMMARY IMAGE - MANDATORY:
+Create a prompt for a COMPOSITE NARRATIVE SKETCH. This image must act as a visual storyboard of your entire analysis.
+
+🚨 STRUCTURE: 
+The sketch should be divided into 3 distinct "vignettes" or small scenes within the same frame:
+1. LEFT SCENE: Represents the "Current Challenge" (e.g., a person walking through a misty path).
+2. CENTER SCENE: Represents the "Core Prediction/Verdict" (e.g., a large golden sun rising over a mountain).
+3. RIGHT SCENE: Represents the "Future Outcome" (e.g., a harvest of fruit or a successful journey).
+
+✅ VISUAL STYLE:
+- Professional hand-drawn pencil sketch with watercolor washes.
+- Use symbolic colors: Deep indigo for challenges, vibrant gold for success, and emerald green for growth.
+- Minimalist and clean; avoid clutter.
+
+🔤 TEXT LABELS:
+- Use EXACTLY THREE short labels (one for each scene).
+- Use ALL CAPS and specify "Clear, elegant, hand-lettered serif font."
+- Examples: "CHALLENGE", "SUCCESS", "GROWTH".
+
+Format:
+SUMMARY_IMAGE_START
+[Detailed prompt describing the three specific scenes, the visual style, and the three text labels.]
+SUMMARY_IMAGE_END
+"""
+            
+            response_format_instruction = f"""
 RESPONSE FORMAT - DETAILED MODE:
 Start with comprehensive Quick Answer then provide full analysis:
 
-<div class="quick-answer-card">**Quick Answer**: [Complete summary of your entire analysis in plain, accessible language. This should cover all major insights, predictions, and guidance without technical terms. Most people will only read this section, so make it comprehensive yet easy to understand.]</div>
+<div class="quick-answer-card">**Quick Answer**: [Complete summary]</div>
 
 ### Key Insights
 [Bullet points with specific predictions]
@@ -666,41 +719,18 @@ Start with comprehensive Quick Answer then provide full analysis:
 <div class="final-thoughts-card">**Final Thoughts**: [Balanced conclusion]</div>
 
 TECHNICAL TERMS EDUCATION - MANDATORY:
-Wrap ALL astrological terms in <term id="key">Term</term> format. You must identify and wrap EVERY astrological term, concept, yoga, dasha, planet name, house reference, chart type, or Sanskrit astrological word.
+Wrap ALL astrological terms in <term id="key">Term</term> format.
 
-Examples include (but are not limited to):
-- Charts: D9 → <term id="d9">D9</term>, Navamsa → <term id="navamsa">Navamsa</term>
-- Dashas: Mahadasha → <term id="mahadasha">Mahadasha</term>, Antardasha → <term id="antardasha">Antardasha</term>
-- Yogas: Rajyoga → <term id="rajyoga">Rajyoga</term>, Malavya Yoga → <term id="malavyayoga">Malavya Yoga</term>, Bhadra Yoga → <term id="bhadrayoga">Bhadra Yoga</term>
-- Karakas: Amatyakaraka → <term id="amatyakaraka">Amatyakaraka</term>, Atmakaraka → <term id="atmakaraka">Atmakaraka</term>
-- Systems: Sudarshana → <term id="sudarshana">Sudarshana</term>, Ashtakavarga → <term id="ashtakavarga">Ashtakavarga</term>
-- Planets: Jupiter, Venus, Saturn, Mars, Mercury, Sun, Moon, Rahu, Ketu
-- Houses: 1st house, 7th house, 10th house, etc.
-- Signs: Aries, Taurus, Gemini, etc.
-- Nakshatras: Ashwini, Bharani, Rohini, etc.
-- Any Sanskrit astrological term
-
-CRITICAL: This is not a complete list. You must wrap ANY and ALL astrological terms you use, regardless of whether they appear in these examples.
+{image_instructions}
 
 GLOSSARY FORMAT - CRITICAL:
-At the very end of your response, add a clean JSON glossary with COMPREHENSIVE, LAYMAN-FRIENDLY definitions in this EXACT format:
+At the very end, add JSON glossary:
 
 GLOSSARY_START
-{"d9": "D9 (Navamsa Chart) - A special chart that reveals your destiny, marriage compatibility, and spiritual path. It shows the deeper qualities of your personality and how your life will unfold after marriage. Think of it as your soul's blueprint that becomes more active in the second half of life.", "mahadasha": "Mahadasha - A major life period ruled by one planet, lasting several years (6-20 years depending on the planet). During this time, that planet's energy dominates your life experiences, opportunities, and challenges. It's like having a planetary 'CEO' running your life for that entire period."}
+{{"term": "definition"}}
 GLOSSARY_END
 
-IMPORTANT GLOSSARY REQUIREMENTS:
-- Explain each term in a clear paragraph that anyone can understand
-- Use simple, everyday language that anyone can understand
-- Explain WHY the concept matters in practical life
-- Include analogies or comparisons when helpful (like 'CEO', 'blueprint', etc.)
-- Avoid Sanskrit terms unless absolutely necessary
-- Focus on how it affects the person's real life
-
-Do NOT use code blocks, HTML encoding, or escape characters. Just plain JSON between the markers.
-
 FOLLOW-UP QUESTIONS - MANDATORY:
-End your response with 3-4 relevant follow-up questions in this exact format:
 <div class="follow-up-questions">
 📅 When will this happen?
 🔮 What remedies can help?
