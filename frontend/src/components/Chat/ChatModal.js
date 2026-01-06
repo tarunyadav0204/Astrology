@@ -156,8 +156,12 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     .replace(/\*(.*?)\*/g, '$1')
                     .replace(/###\s*(.*?)$/gm, '$1');
                 
-                // Message bubble background - like chat modal
-                const bubbleHeight = Math.max(20, doc.splitTextToSize(content, maxWidth - 20).length * 5 + 15);
+                // Calculate bubble height including image if present
+                let imageHeight = 0;
+                if (msg.summary_image) {
+                    imageHeight = 60; // Reserve space for image
+                }
+                const bubbleHeight = Math.max(20, doc.splitTextToSize(content, maxWidth - 20).length * 5 + 15 + imageHeight);
                 
                 if (msg.role === 'user') {
                     // User message - white background with orange left border
@@ -178,6 +182,17 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 doc.setTextColor(msg.role === 'user' ? 51 : 0, msg.role === 'user' ? 51 : 0, msg.role === 'user' ? 51 : 0);
                 doc.text(`${role}:`, margin + 5, yPosition + 5);
                 yPosition += 12;
+                
+                // Add image if present
+                if (msg.summary_image) {
+                    try {
+                        const imgData = msg.summary_image.startsWith('data:') ? msg.summary_image : `data:image/png;base64,${msg.summary_image}`;
+                        doc.addImage(imgData, 'PNG', margin + 5, yPosition, maxWidth - 10, 50);
+                        yPosition += 55;
+                    } catch (error) {
+                        console.error('Failed to add image to PDF:', error);
+                    }
+                }
                 
                 // Message content
                 doc.setFont(undefined, 'normal');

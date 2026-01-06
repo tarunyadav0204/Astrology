@@ -135,6 +135,11 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
     VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION = """
 STRICT COMPLIANCE WARNING: Your response will be considered INCORRECT and mathematically incomplete if you fail to synthesize the Chara Dasha sign and Yogini Dasha lord. If chara_sequence or yogini_sequence are in the JSON, they are NOT optional background info—they are the primary timing triggers.
 
+⚠️ CRITICAL REQUIREMENT: ALWAYS CITE ASHTAKAVARGA POINTS
+When discussing ANY transit, you MUST explicitly mention the Ashtakavarga points for that house.
+Format: "The Ashtakavarga shows [X] points for this house, indicating [strength level] support."
+This is NON-NEGOTIABLE. Users need numerical evidence, not just general predictions.
+
 You are an expert Vedic Astrologer (Jyotish Acharya) with deep technical mastery of Parashari, Jaimini, and Nadi systems.
 
 Tone: Empathetic, insightful, objective, and solution-oriented.
@@ -154,15 +159,18 @@ You have access to a "KNOWN USER BACKGROUND" section containing facts extracted 
 You must never rely on a single chart or a single placement. You must synthesize data using the following hierarchy:
 
 ### A. The "Root vs. Fruit" Rule (D1 vs. D9 Synthesis)
-- D1 (Rashi) is the Body: It shows the physical situation or the visible challenge.
-- D9 (Navamsa) is the Soul/Strength: It shows the internal capacity and the final outcome.
+- **Data Priority:** D1 data is found in `planetary_analysis`; D9 data is found in `d9_planetary_analysis`.
+- **Vargottama Definition:** A planet is Vargottama ONLY if it is in the same Sign Name in both charts.
+- **Verification Rule:** If D1_Sign != D9_Sign, calling it Vargottama is a FACTUAL ERROR and will be penalized.
+- **Example:** Mars in Leo (D1) and Mars in Aries (D9) is NOT Vargottama. It is "Dignified in Navamsa." Use that specific phrasing.
+- **Strength vs. Status:** If a planet is in its Own Sign or Exalted in D9 but a different sign in D1, describe it as "Internally strong" or "Gaining strength in the Navamsa," but do NOT use the term Vargottama.
 
 CRITICAL LOGIC:
 - Weak D1 + Strong D9: Predict "Initial struggle or health scare, but strong recovery/success due to inner resilience." (Native is a fighter).
 - Strong D1 + Weak D9: Predict "Outward success that may feel hollow or lack longevity."
 - Weak D1 + Weak D9: Predict "Significant challenges requiring remedies and caution."
 
-NEVER predict failure or death based on D1 alone. Always check the D9 dignity of the relevant planet (e.g., if Sun is afflicted in D1 but in Leo/Aries in D9, the vitality is strong).
+NEVER predict failure or death based on D1 alone. Always check the D9 dignity of the relevant planet by comparing sign_name in both charts.
 
 ### B. The "Master Clock" Rule (Dasha & Transit)
 - Dasha is Primary: An event cannot happen unless the current Mahadasha or Antardasha lord signifies it.
@@ -203,38 +211,44 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
     - If user asks about "Talent" or "Soul Purpose", analyze planets in the Karkamsa or Swamsa.
 
 ### G. Jaimini Full System (Rashi Drishti & Yogas)
-- **Rashi Drishti (Sign Aspects):** In Jaimini, SIGNS aspect SIGNS, not planets. Use `jaimini_full_analysis['sign_aspects']` to see which signs connect.
-- **Jaimini Raj Yogas:** Check `jaimini_full_analysis['jaimini_yogas']` for powerful combinations:
+- **Sign Aspects (Rashi Drishti) - THE ID RULE:** You are FORBIDDEN from calculating aspects from memory.
+- **The Protocol:**
+  1. Identify the `sign_id` of the current Chara Dasha sign (0-11).
+  2. Locate that ID in the `sign_aspects` dictionary.
+  3. ONLY the Sign IDs listed in that specific array are aspected.
+  4. If an ID is not in that list, you MUST NOT claim an aspect exists.
+- **Example:** If sign_aspects[9] = [0, 3, 6], then Capricorn (ID 9) aspects ONLY Aries, Cancer, and Libra. It does NOT aspect Aquarius (ID 10).
+- **Verification:** If a sign ID is not in that list, there is NO Jaimini aspect. Never imply an aspect exists if it is not explicitly mapped in the JSON.
+- **Jaimini Raj Yogas:** Check `jaimini_full_analysis['raj_yogas']` for powerful combinations:
     - **Jaimini Raj Yoga (AK+AmK):** Soul + Career connection = High status and authority
     - **Atma-Putra Yoga (AK+PK):** Soul + Children connection = Creative genius
     - **Atma-Dara Yoga (AK+DK):** Soul + Spouse connection = Wealth through partnerships
 - **When to Use:** For career questions, check if Jaimini Raj Yoga is present. For timing, cross-reference with Chara Dasha to see if the yoga is activated in current period.
 
-### H. JAIMINI SYSTEM INSTRUCTIONS (THE "SECOND OPINION")
-You have access to a full Jaimini System in `jaimini_points` and `jaimini_full_analysis`. Use this to confirm predictions or find hidden details.
+### H. 🏛️ THE JAIMINI PILLAR (THE "PREDICTIVE CORE")
+You must treat Jaimini as the primary system for verifying the "Ground Reality" of any life event.
 
-1. **The "Stage" (Lagnas):**
-   - **Arudha Lagna (AL):** represents "Perception & Status".
-     * Rule: If user asks about Fame, Reputation, or Promotions, prioritize planets aspecting the AL (using Rashi Drishti).
-   - **Upapada Lagna (UL):** represents "Marriage & Spouse".
-     * Rule: If user asks about Spouse characteristics, describe the sign of UL and planets aspecting it.
-   - **Swamsa (Navamsa Lagna):** represents "Soul's Path & Talent".
-     * Rule: Use this for "Purpose", "Skills", and "Spiritual" questions.
+1. **The Relative Lagna Technique (MANDATORY):**
+   - For ANY topic (Career, Health, Marriage, Wealth), you MUST analyze the `relative_views` in `jaimini_full_analysis`.
+   - **Timing (Chara Dasha):** Treat the active sign from `mahadasha_lagna` and `antardasha_lagna` as the 1st House. The JSON provides pre-calculated `houses` object with house_1 through house_12.
+   - **Soul/Career Capacity:** Treat the `atmakaraka_lagna` (Soul) or `amatyakaraka_lagna` (Career) as the 1st House.
+   - **How to Read:** Check `relative_views['mahadasha_lagna']['houses']['house_10']['planets']` to see which planets sit in the 10th house FROM the current Dasha sign.
 
-2. **The "Connection" (Rashi Drishti - Sign Aspects):**
-   - **CRITICAL:** In Jaimini, Signs aspect Signs. Do not use planetary aspects here.
-   - Check `jaimini_full_analysis['sign_aspects']` to see which signs are connected.
-   - *Example:* If Aries aspects Leo, then planets in Aries influence the 5th House (if Leo is 5th).
+2. **Universal Verdict Rules (By Topic):**
+   - **Career:** Check houses 10 and 11 FROM the current Dasha Sign (`mahadasha_lagna`) and AmK-Lagna (`amatyakaraka_lagna`). Benefics here indicate professional gains.
+   - **Health:** Check houses 1 and 8 FROM the current Dasha Sign. Malefics here (Saturn, Mars, Rahu, Ketu) indicate physical vulnerability or high stress.
+   - **Wealth:** Check houses 2 and 11 FROM the Arudha Lagna (AL) using `sutra_logic['wealth_from_al']` AND from the current Dasha Sign.
+   - **Marriage:** Check house 7 FROM the Dasha Sign and use `sutra_logic['marriage_from_ul']` for stability verdict.
+   - **Children:** Check house 5 FROM the Dasha Sign and Atmakaraka.
+   - **Education:** Check houses 4 and 5 FROM the Dasha Sign.
 
-3. **The "Power" (Jaimini Yogas):**
-   - Check `jaimini_full_analysis['jaimini_yogas']`.
-   - If a **"Jaimini Raj Yoga"** (AK + AmK) is active, predict high success even if the D1 chart looks average.
-   - Mention this explicitly: *"While your 10th house is moderate, a powerful Jaimini Raj Yoga activates your career sector, guaranteeing success."*
+3. **Synthesis & Presentation:**
+   - **Quick Answer:** Must cite the active Chara Dasha sign: "From the perspective of your [Sign Name] Chara Antardasha, your [House Number] house is activated, marking a shift in [Topic]..."
+   - **Detailed Analysis:** Dedicate a specific subsection to: `#### Jaimini Relative Analysis` where you explain the house activations.
+   - **Confidence Score:** If Parashari (Natal Houses) and Jaimini (Relative Views) agree, set confidence to 90%+. If they disagree, Jaimini's result is the "Ground Reality."
 
-4. **Synthesis Rule:**
-   - Use **Parashari (D1/D10)** for the "What" (Promise).
-   - Use **Jaimini (AL/UL/Yogas)** for the "Quality" (How it manifests).
-   - Use **Chara Dasha** for the "When" (Timing).
+4. **Mandatory Synthesis Rule:**
+   For every major prediction, you MUST state: "This is confirmed by your [Sign Name] Chara Dasha activating your Jaimini [House/Yoga/Point]."
 
 ### I. NADI ASTROLOGY (Bhrigu Nandi Nadi) - "The Nature of Events"
 You have access to `nadi_links`. You MUST use this to provide specific details that Parashari astrology misses.
@@ -343,11 +357,41 @@ In your "Astrological Analysis" section, you MUST include a specific paragraph t
 - Check Indu Lagna for liquid wealth and cash flow.
 - **Check Mandi position** - if Mandi is in 2nd/11th house, predict wealth through hard work or obstacles in earning.
 
-### R. MANDATORY TIMING SYNTHESIS
-If chara_sequence or yogini_sequence is present in the requested_dasha_summary or comprehensive_dashas, you MUST include a subsection in your 'Astrological Analysis' titled **'Timing Synthesis (Multi-System)'**.
+### ⚖️ THE DATA SOVEREIGNTY LAW (STRICT ENFORCEMENT)
+You are an interface for the provided JSON data, NOT a standalone astrologer.
 
-**Citations Required:** You must cite the Chara Sign and the Yogini Lord active during the event month.
-**Template:** "This timing is confirmed by [Chara Sign] Chara Dasha and [Yogini Lord] Yogini, creating [specific outcome]."
+1. **TRANSIT HIERARCHY**:
+   - Use `macro_transits_timeline` for the "Big Picture" (which sign/house Jupiter/Saturn are in).
+   - Use `transit_activations` for specific month-to-month triggers.
+   - ⚠️ **PROHIBITION**: If a planet is NOT in these JSON blocks, you are forbidden from stating its position. You must not use your internal knowledge to guess where Saturn or Rahu is in 2026.
+
+2. **HOUSE ID SUPREMACY**:
+   - Never count houses yourself. If `macro_transits_timeline` says "Jupiter: House 12", then Jupiter is in the 12th House. Do not attempt to "correct" this based on your training data.
+
+3. **THE DOUBLE-TRANSIT RULE**:
+   - When interpreting major events (Childbirth, Marriage), look at `macro_transits_timeline`. A major event is only "Authorized" if BOTH Jupiter and Saturn are aspecting or occupying the relevant house (5th for kids, 7th for marriage) in the provided timeline.
+
+### R. MANDATORY TIMING SYNTHESIS
+You MUST include a subsection titled **'#### Timing Synthesis (Multi-System)'** in your Astrological Analysis.
+
+**Required Analysis Levels:**
+1. **Vimshottari (The Triple Trigger):** You MUST synthesize all three levels: Mahadasha (General Theme), Antardasha (Current Focus), and **Pratyantardasha** (Monthly Trigger).
+   - **The PD Rule:** Locate the `pratyantardasha` lord in `current_dashas`. Identify which house it occupies in the `d1_chart` by checking `planetary_analysis[PD_planet]['house']`.
+   - **Mandatory Statement:** You MUST explicitly state: "The [PD Planet] Pratyantardasha, sitting in your [House Number] house, brings [specific signification] to this month."
+   - **Weight:** The PD is NOT a minor detail—it is the PRIMARY monthly trigger that colors the entire MD/AD experience.
+   
+2. **Chara:** Cite the active Chara Mahadasha AND Antardasha signs from `jaimini_full_analysis['relative_views']`.
+   - State: "From the [AD Sign] Chara Antardasha perspective, your [House Number] house is activated."
+   
+3. **Yogini:** Cite the active Yogini Lord from the yogini_sequence.
+   - Mention the vibe: Sankata (crisis), Siddha (success), Ulka (labor), etc.
+   
+4. **Varshphal:** If `varshphal` data is present, you MUST synthesize:
+   - Muntha house activation
+   - Year lord influence
+   - Mudda Dasha monthly periods
+
+**Mandatory Template:** "This timing is confirmed by [Sign] Chara Dasha, [Yogini Lord] Yogini, and your [Planet] Pratyantardasha in the [House] house, creating [specific outcome]."
 
 ### K. DIVISIONAL CHARTS (VARGA) - MASTER ANALYSIS PROTOCOL
 You have access to specific Divisional Charts (D-Charts) in the `divisional_charts` object. You must use them as the "Final Verdict" for their specific domains.
@@ -435,12 +479,17 @@ You have access to `ashtakavarga_filter` data in each transit activation which s
 **CRITICAL PREDICTION FILTER:**
 A planet transiting a traditionally good house (e.g., Jupiter in 11th) can FAIL to deliver if that house has low Ashtakavarga points.
 
+**MANDATORY: YOU MUST EXPLICITLY MENTION ASHTAKAVARGA POINTS IN EVERY TRANSIT PREDICTION.**
+
 **Mandatory Ashtakavarga Cross-Check:**
 - **28+ points:** "Exceptional results - transit delivers outstanding benefits"
 - **25-27 points:** "Good results - transit delivers as promised"
 - **22-24 points:** "Moderate results - some benefits but also obstacles"
 - **19-21 points:** "Weak results - transit struggles to deliver"
 - **Below 19 points:** "Disappointing results - despite good planetary position, house lacks strength to manifest benefits"
+
+**REQUIRED FORMAT - Always include this line:**
+"The Ashtakavarga shows [X] points for this house, indicating [strength level] support."
 
 **Template for Weak Ashtakavarga:**
 "While [Planet] transits your [House]th house (traditionally beneficial), the Ashtakavarga shows only [X] points, indicating the house lacks strength to fully manifest the promised benefits. Expect [modified prediction] rather than [traditional expectation]."
@@ -516,7 +565,9 @@ You have access to `prediction_matrix` which identifies exceptional periods wher
 **CRITICAL CONVERGENCE DETECTION:**
 When multiple astrological factors align, predictions become "stunning" in accuracy:
 
-**Life Pivot Points:** Karmic Trigger + High Ashtakavarga + Maximum Dasha Significance
+**Life Pivot Points:** Karmic Trigger + High Ashtakavarga (28+ points) + Maximum Dasha Significance
+
+**REMINDER: Always cite the exact Ashtakavarga points when discussing transits. Users need to see the numerical evidence.**
 **Rags to Riches Activation:** Neecha Bhanga Planet + Current Dasha Alignment
 
 **Mandatory Matrix Analysis:**
@@ -595,7 +646,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
     
     def build_annual_context(self, birth_data: Dict, target_year: int, user_question: str = "", intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Builds context with BOTH Birth Chart (Base) and Varshphal (Overlay)."""
-        print(f"📅 Building Annual Context for Year: {target_year}")
+        # print(f"📅 Building Annual Context for Year: {target_year}")
         
         base_context = self.build_complete_context(birth_data, user_question, None, None, intent_result)
         
@@ -613,7 +664,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 'mudda_dasha': varshphal_data['mudda_dasha']
             }
         except Exception as e:
-            print(f"❌ Varshphal calculation failed: {e}")
+            # print(f"❌ Varshphal calculation failed: {e}")
             base_context['analysis_error'] = f"Annual calculation failed: {str(e)}"
             
         return base_context
@@ -626,12 +677,12 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         import json
         
         prashna_start = time.time()
-        print(f"\n{'='*80}")
-        print(f"🔮 PRASHNA CONTEXT BUILDING STARTED")
-        print(f"{'='*80}")
-        print(f"Question: {user_question}")
-        print(f"Category: {category}")
-        print(f"Location: {user_location_data}")
+        # print(f"\n{'='*80}")
+        # print(f"🔮 PRASHNA CONTEXT BUILDING STARTED")
+        # print(f"{'='*80}")
+        # print(f"Question: {user_question}")
+        # print(f"Category: {category}")
+        # print(f"Location: {user_location_data}")
         
         # 1. Get "Right Now" Data
         now = datetime.now()
@@ -644,7 +695,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             'timezone': user_location_data.get('timezone', 'Asia/Kolkata'),
             'place': user_location_data.get('place', 'Query Location')
         }
-        print(f"\n⏰ Question Time: {prashna_data['date']} {prashna_data['time']}")
+        # print(f"\n⏰ Question Time: {prashna_data['date']} {prashna_data['time']}")
         
         # 2. Calculate the Chart for NOW
         chart_start = time.time()
@@ -652,21 +703,21 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(prashna_obj)
         chart_time = time.time() - chart_start
-        print(f"✅ Chart calculation: {chart_time:.3f}s")
+        # print(f"✅ Chart calculation: {chart_time:.3f}s")
         
         # 3. Add Sign Names
         chart_data_enriched = self._add_sign_names_to_chart_copy(chart_data)
-        print(f"✅ Chart enrichment complete")
+        # print(f"✅ Chart enrichment complete")
         
         # 4. Run the Physics Engine (Tajik Aspects)
         tajik_start = time.time()
         prashna_calc = PrashnaCalculator(chart_data_enriched)
-        print(f"\n🔬 TAJIK PHYSICS ENGINE INITIALIZED")
-        print(f"Lagna: {chart_data_enriched.get('ascendant', 0):.2f}°")
-        print(f"Lagna Lord: {prashna_calc.lagna_lord_name}")
+        # print(f"\n🔬 TAJIK PHYSICS ENGINE INITIALIZED")
+        # print(f"Lagna: {chart_data_enriched.get('ascendant', 0):.2f}°")
+        # print(f"Lagna Lord: {prashna_calc.lagna_lord_name}")
         
         # 5. Pre-calculate multiple categories for Gemini to choose from
-        print(f"\n📊 CALCULATING PRASHNA TOOLS...")
+        # print(f"\n📊 CALCULATING PRASHNA TOOLS...")
         categories_to_calc = ['job', 'love', 'health', 'wealth', 'lost_item', 'travel', 'property', 'education']
         prashna_tools = {}
         
@@ -678,25 +729,25 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             
             # Log focused category with full details
             if cat == category:
-                print(f"\n⭐ FOCUSED CATEGORY: {cat.upper()}")
-                print(f"   Verdict: {analysis['verdict']}")
-                print(f"   Confidence: {analysis['confidence']}")
-                print(f"   Summary: {analysis['summary']}")
-                print(f"   Yoga: {analysis['analysis']['yoga']['name']} ({analysis['analysis']['yoga']['aspect']})")
-                print(f"   Timing: {analysis['timing']['prediction']}")
+                # print(f"\n⭐ FOCUSED CATEGORY: {cat.upper()}")
+                # print(f"   Verdict: {analysis['verdict']}")
+                # print(f"   Confidence: {analysis['confidence']}")
+                # print(f"   Summary: {analysis['summary']}")
+                # print(f"   Yoga: {analysis['analysis']['yoga']['name']} ({analysis['analysis']['yoga']['aspect']})")
+                # print(f"   Timing: {analysis['timing']['prediction']}")
                 print(f"   Calculation time: {cat_time:.3f}s")
             else:
                 print(f"   {cat}: {analysis['verdict']} ({cat_time:.3f}s)")
         
         tajik_time = time.time() - tajik_start
-        print(f"\n✅ All Tajik calculations: {tajik_time:.3f}s")
+        # print(f"\n✅ All Tajik calculations: {tajik_time:.3f}s")
         
         # 6. Get current panchang
         panchang_start = time.time()
         pc = PanchangCalculator()
         current_panchang = pc.calculate_birth_panchang(prashna_data)
         panchang_time = time.time() - panchang_start
-        print(f"✅ Panchang calculation: {panchang_time:.3f}s")
+        # print(f"✅ Panchang calculation: {panchang_time:.3f}s")
         
         # 7. Build the Context Payload
         context = {
@@ -711,10 +762,10 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         total_time = time.time() - prashna_start
         context_size = len(json.dumps(context, default=str))
         
-        print(f"\n✅ PRASHNA CONTEXT COMPLETE")
-        print(f"Total time: {total_time:.3f}s")
-        print(f"Context size: {context_size:,} characters")
-        print(f"{'='*80}\n")
+        # print(f"\n✅ PRASHNA CONTEXT COMPLETE")
+        # print(f"Total time: {total_time:.3f}s")
+        # print(f"Context size: {context_size:,} characters")
+        # print(f"{'='*80}\n")
         
         return context
     
@@ -724,7 +775,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         import json
         
         context_start_time = time.time()
-        print(f"\n⏱️ CONTEXT PREPARATION STARTED")
+        # print(f"\n⏱️ CONTEXT PREPARATION STARTED")
         
         # Create birth hash for caching
         birth_hash = self._create_birth_hash(birth_data)
@@ -732,13 +783,13 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         # Get static data (cached)
         static_start_time = time.time()
         if birth_hash not in self.static_cache:
-            print(f"   📊 Building static context (not cached)...")
+            # print(f"   📊 Building static context (not cached)...")
             self.static_cache[birth_hash] = self._build_static_context(birth_data)
         else:
             print(f"   ✅ Using cached static context")
         static_context = self.static_cache[birth_hash]
         static_time = time.time() - static_start_time
-        print(f"   Static context time: {static_time:.2f}s")
+        # print(f"   Static context time: {static_time:.2f}s")
         
         # Dynamic Cache Key (birth_hash + current_date + requested_period + intent_result)
         current_date_str = datetime.now().strftime("%Y-%m-%d")
@@ -749,17 +800,17 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         # Check Dynamic Cache
         dynamic_start_time = time.time()
         if dynamic_cache_key not in self.dynamic_cache:
-            print(f"   🔄 Calculating fresh dynamic context...")
+            # print(f"   🔄 Calculating fresh dynamic context...")
             self.dynamic_cache[dynamic_cache_key] = self._build_dynamic_context(birth_data, user_question, target_date, requested_period, intent_result)
         else:
             print(f"   ✅ Using cached dynamic context")
         
         dynamic_context = self.dynamic_cache[dynamic_cache_key]
         dynamic_time = time.time() - dynamic_start_time
-        print(f"   Dynamic context time: {dynamic_time:.2f}s")
+        # print(f"   Dynamic context time: {dynamic_time:.2f}s")
         
         total_context_time = time.time() - context_start_time
-        print(f"⏱️ TOTAL CONTEXT PREPARATION TIME: {total_context_time:.2f}s")
+        # print(f"⏱️ TOTAL CONTEXT PREPARATION TIME: {total_context_time:.2f}s")
         
         # Combine contexts and apply minification
         full_context = {
@@ -767,10 +818,38 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             **dynamic_context
         }
         
+        # Enrich current_dashas with house and sign info for easy access
+        current_dashas = full_context.get('current_dashas', {})
+        d1_chart = full_context.get('d1_chart', {})
+        d1_planets = d1_chart.get('planets', {})
+        house_lordships = full_context.get('house_lordships', {})
+        
+        for level in ['mahadasha', 'antardasha', 'pratyantardasha']:
+            dasha_info = current_dashas.get(level, {})
+            lord = dasha_info.get('planet')
+            if lord and lord in d1_planets:
+                planet_data = d1_planets[lord]
+                # Use house from d1_chart for consistency
+                house = planet_data.get('house')
+                sign_name = planet_data.get('sign_name', '')
+                
+                # Inject house and sign directly into dasha info
+                dasha_info['house'] = house
+                dasha_info['sign'] = sign_name
+                
+                # Add analysis hint with lordships
+                ruled_houses = house_lordships.get(lord, [])
+                dasha_info['analysis_hint'] = (
+                    f"{lord} is in house {house} ({sign_name}). "
+                    f"It rules houses {', '.join(map(str, ruled_houses))}."
+                )
+        
+        full_context['current_dashas'] = current_dashas
+        
         # Filter divisional charts based on intent router recommendations
         if intent_result and intent_result.get('divisional_charts'):
             requested_chart_codes = intent_result['divisional_charts']
-            print(f"🎯 Filtering divisional charts for Gemini: {requested_chart_codes}")
+            # print(f"🎯 Filtering divisional charts for Gemini: {requested_chart_codes}")
             
             # Map codes to chart names
             chart_name_mapping = {
@@ -789,15 +868,15 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 chart_name = chart_name_mapping.get(code)
                 if chart_name and chart_name in all_charts:
                     filtered_divisional_charts[chart_name] = all_charts[chart_name]
-                    print(f"   ✅ Including {code} ({chart_name})")
+                    # print(f"   ✅ Including {code} ({chart_name})")
             
             # Always ensure D9 is included (required for analysis)
             if 'd9_navamsa' not in filtered_divisional_charts and 'd9_navamsa' in all_charts:
                 filtered_divisional_charts['d9_navamsa'] = all_charts['d9_navamsa']
-                print(f"   ✅ Added mandatory D9 Navamsa")
+                # print(f"   ✅ Added mandatory D9 Navamsa")
             
             full_context['divisional_charts'] = filtered_divisional_charts
-            print(f"📊 Sending {len(filtered_divisional_charts)} divisional charts to Gemini")
+            # print(f"📊 Sending {len(filtered_divisional_charts)} divisional charts to Gemini")
         else:
             print(f"📊 No filtering - sending all {len(full_context.get('divisional_charts', {}))} divisional charts")
         
@@ -812,6 +891,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         birth_obj = SimpleNamespace(**birth_data)
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
+        chart_data_original = chart_data  # Store original before enrichment
         
         # Initialize analyzers
         planet_analyzer = PlanetAnalyzer(chart_data, birth_obj)
@@ -886,7 +966,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             'D1', 'D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 
             'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60'
         ]
-        print(f"📊 Calculating ALL Divisional Charts for Cache (prevents topic-switch bugs)...")
+        # print(f"📊 Calculating ALL Divisional Charts for Cache (prevents topic-switch bugs)...")
         
         divisional_charts = {}
         
@@ -920,10 +1000,10 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 
                 chart_name = chart_name_mapping.get(chart_number, f'd{chart_number}')
                 divisional_charts[chart_name] = chart_data
-                print(f"   ✅ Calculated {chart_code} ({chart_name})")
+                # print(f"   ✅ Calculated {chart_code} ({chart_name})")
                 
             except Exception as e:
-                print(f"   ❌ Failed to calculate {chart_code}: {e}")
+                # print(f"   ❌ Failed to calculate {chart_code}: {e}")
                 continue
         
         # Update advanced calculators with divisional charts
@@ -941,39 +1021,58 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         # Calculate Chara Karakas
         karaka_data = chara_karaka_calc.calculate_chara_karakas()
         
+        # NOTE: Chara Dasha will be calculated in dynamic context with proper focus_date
+        # We'll pass it to Jaimini analyzer from there
+        chara_dasha_data = None
+        
         # Calculate Jaimini Points
         # FIX: Extract the planet name string explicitly to prevent "unhashable type: dict" error
         atmakaraka_data = karaka_data['chara_karakas'].get('Atmakaraka', {})
         atmakaraka_planet = atmakaraka_data.get('planet')  # e.g., "Sun"
         
-        # Initialize with the planet name string, not the dictionary object
+        # 1. Calculate Jaimini Points (static - doesn't depend on date)
         jaimini_calc = JaiminiPointCalculator(
             chart_data, 
             divisional_charts['d9_navamsa'], 
             atmakaraka_planet
         )
+        jaimini_points = jaimini_calc.calculate_jaimini_points()
         
-        # Run Full Jaimini Analysis
-        jaimini_analyzer = JaiminiFullAnalyzer(chart_data, karaka_data)
-        jaimini_report = jaimini_analyzer.get_jaimini_report()
+        # NOTE: Jaimini Full Analysis moved to dynamic context for focus_date sync
         
-        # Calculate Nadi Links
-        nadi_calc = NadiLinkageCalculator(chart_data)
-        nadi_links = nadi_calc.get_nadi_links()
+        # Calculate Nadi Links (use original chart_data before enrichment)
+        try:
+            nadi_calc = NadiLinkageCalculator(chart_data_original)
+            nadi_links = nadi_calc.get_nadi_links()
+            # print(f"   Nadi links calculated: {len(nadi_links)} planets")
+            if not nadi_links:
+                print(f"   ⚠️ Nadi links returned empty - check calculator")
+        except Exception as e:
+            # print(f"   ❌ Nadi calculation error: {e}")
+            nadi_links = {}
         
-        # Calculate Sudarshana Chakra (Triple Perspective)
-        sudarshana_calc = SudarshanaChakraCalculator(chart_data)
-        sudarshana_data = sudarshana_calc.get_sudarshana_view()
+        # Calculate Sudarshana Chakra (use original chart_data)
+        try:
+            sudarshana_calc = SudarshanaChakraCalculator(chart_data_original)
+            sudarshana_data = sudarshana_calc.get_sudarshana_view()
+            # print(f"   Sudarshana calculated: {len(sudarshana_data)} perspectives")
+            if not sudarshana_data:
+                print(f"   ⚠️ Sudarshana returned empty - check calculator")
+        except Exception as e:
+            # print(f"   ❌ Sudarshana calculation error: {e}")
+            sudarshana_data = {}
         
         context.update({
             # Key divisional charts
             "divisional_charts": divisional_charts,
             
-            # Jaimini Points
-            "jaimini_points": jaimini_calc.calculate_jaimini_points(),
+            # Jaimini Points (static)
+            "jaimini_points": jaimini_points,
             
-            # Full Jaimini Analysis
-            "jaimini_full_analysis": jaimini_report,
+            # Chara Karakas (static)
+            "chara_karakas": karaka_data,
+            
+            # NOTE: jaimini_full_analysis will be added in dynamic context
             
             # Nadi Links
             "nadi_links": nadi_links,
@@ -1001,11 +1100,11 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             # Chara Karakas
             "chara_karakas": karaka_data,
             
-            # Advanced Analysis
+            # Advanced Analysis (pruned for relevance)
             "advanced_analysis": {
-                "planetary_wars": planetary_war_calc.get_war_summary(),
+                "planetary_wars": self._prune_planetary_wars(planetary_war_calc.get_war_summary()),
                 "vargottama_positions": vargottama_calc.get_vargottama_summary(),
-                "neecha_bhanga": neecha_bhanga_calc.get_neecha_bhanga_summary(),
+                "neecha_bhanga": self._prune_neecha_bhanga(neecha_bhanga_calc.get_neecha_bhanga_summary()),
                 "pancha_mahapurusha": pancha_mahapurusha_calc.get_pancha_mahapurusha_summary()
             },
             
@@ -1183,6 +1282,36 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             context['yogini_dasha']
         )
         
+        # Add Varshphal if question is about a specific year
+        if intent_result and intent_result.get('transit_request'):
+            req = intent_result['transit_request']
+            year = req.get('startYear') or req.get('start_year')
+            if year:
+                try:
+                    chart_calc = ChartCalculator({})
+                    vp_calc = VarshphalCalculator(chart_calc)
+                    varshphal_data = vp_calc.calculate_varshphal(birth_data, int(year))
+                    
+                    # Extract muntha lord from sign
+                    muntha_sign = varshphal_data['muntha']['sign']
+                    sign_lords = {
+                        1: 'Mars', 2: 'Venus', 3: 'Mercury', 4: 'Moon', 5: 'Sun', 6: 'Mercury',
+                        7: 'Venus', 8: 'Mars', 9: 'Jupiter', 10: 'Saturn', 11: 'Saturn', 12: 'Jupiter'
+                    }
+                    muntha_lord = sign_lords.get(muntha_sign, 'Unknown')
+                    
+                    context['varshphal'] = {
+                        'muntha_house': varshphal_data['muntha']['house'],
+                        'muntha_sign': muntha_sign,
+                        'muntha_lord': muntha_lord,
+                        'mudda_dasha': varshphal_data['mudda_dasha'],
+                        'year_lord': varshphal_data['year_lord'],
+                        'year': year
+                    }
+                    # print(f"✅ Varshphal calculated for year {year}")
+                except Exception as e:
+                    print(f"❌ Varshphal calculation failed: {e}")
+        
         # Add Chara Dasha (Jaimini) with DYNAMIC TARGETING
         try:
             from datetime import datetime
@@ -1223,6 +1352,20 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                     period['note'] = "ACTIVE PERIOD for User Question"
             
             context['chara_dasha'] = full_chara_data
+            
+            # Update Jaimini Full Analysis with the correct chara_dasha
+            try:
+                birth_hash = self._create_birth_hash(birth_data)
+                static_data = self.static_cache[birth_hash]
+                karaka_data = static_data.get('chara_karakas', {})
+                jaimini_points = static_data.get('jaimini_points', {})
+                
+                # Recalculate Jaimini analyzer with the focus_date chara_dasha
+                jaimini_analyzer = JaiminiFullAnalyzer(chart_data, karaka_data, jaimini_points, full_chara_data)
+                context['jaimini_full_analysis'] = jaimini_analyzer.get_jaimini_report()
+                # print(f"✅ Jaimini Full Analysis updated with focus_date Chara Dasha")
+            except Exception as e:
+                print(f"❌ Jaimini analyzer update failed: {e}")
         except Exception as e:
             print(f"Chara Dasha calculation error: {e}")
         
@@ -1237,6 +1380,31 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         context['house_lordships'] = self._get_house_lordships(ascendant_sign)
         
 
+        
+        # Add 5-year macro transit timeline for slow-moving planets
+        try:
+            real_calc = RealTransitCalculator()
+            macro_transits = real_calc.get_slow_planet_transits(birth_data, years=5)
+            context['macro_transits_timeline'] = macro_transits
+            
+            total_periods = sum(len(periods) for periods in macro_transits.values())
+            # print(f"✅ Macro transits timeline: {total_periods} periods for 5 years")
+            
+            # Print detailed breakdown
+            # print(f"\n📊 MACRO TRANSITS TIMELINE (5 YEARS):")
+            for planet, periods in macro_transits.items():
+                # print(f"\n{planet.upper()} ({len(periods)} periods):")
+                for i, period in enumerate(periods[:3], 1):  # Show first 3 periods
+                    retro_flag = " [RETROGRADE RETURN]" if period.get('retrograde_return') else ""
+                    # print(f"  {i}. {period['start_date']} to {period['end_date']}")
+                    # print(f"     Sign: {period['sign']} | House: {period['house']} | Segment: {period['segment']}{retro_flag}")
+                if len(periods) > 3:
+                    print(f"  ... and {len(periods) - 3} more periods")
+            # print()
+            
+        except Exception as e:
+            # print(f"❌ Macro transits calculation failed: {e}")
+            context['macro_transits_timeline'] = {}
         
         # Add transit data availability info with enhanced methodology
         current_year = datetime.now().year
@@ -1298,28 +1466,28 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         
         # Calculate transit data if requested by Intent Router or Gemini
         transit_request = None
-        print(f"\n🔍 TRANSIT REQUEST DEBUG:")
-        print(f"   intent_result type: {type(intent_result)}")
-        print(f"   intent_result exists: {intent_result is not None}")
-        print(f"   intent_result value: {intent_result}")
+        # print(f"\n🔍 TRANSIT REQUEST DEBUG:")
+        # print(f"   intent_result type: {type(intent_result)}")
+        # print(f"   intent_result exists: {intent_result is not None}")
+        # print(f"   intent_result value: {intent_result}")
         if intent_result:
-            print(f"   needs_transits: {intent_result.get('needs_transits')}")
-            print(f"   transit_request exists: {'transit_request' in intent_result}")
+            # print(f"   needs_transits: {intent_result.get('needs_transits')}")
+            # print(f"   transit_request exists: {'transit_request' in intent_result}")
             if 'transit_request' in intent_result:
                 print(f"   transit_request: {intent_result['transit_request']}")
-        print(f"   requested_period: {requested_period}")
+        # print(f"   requested_period: {requested_period}")
         
         if intent_result and intent_result.get('needs_transits') and intent_result.get('transit_request'):
             transit_request = intent_result['transit_request']
-            print(f"\n🎯 INTENT ROUTER REQUESTED TRANSITS: {transit_request['startYear']}-{transit_request['endYear']}")
+            # print(f"\n🎯 INTENT ROUTER REQUESTED TRANSITS: {transit_request['startYear']}-{transit_request['endYear']}")
         elif requested_period:
             transit_request = requested_period
-            print(f"\n🎯 GEMINI REQUESTED TRANSITS: {requested_period}")
+            # print(f"\n🎯 GEMINI REQUESTED TRANSITS: {requested_period}")
         else:
             print(f"\n❌ NO TRANSIT REQUEST DETECTED - intent_result: {intent_result}, requested_period: {requested_period}")
         
         
-        print(f"\n🎯 FINAL TRANSIT REQUEST: {transit_request}")
+        # print(f"\n🎯 FINAL TRANSIT REQUEST: {transit_request}")
         if transit_request:
             import time
             transit_start_time = time.time()
@@ -1328,8 +1496,8 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             start_year = transit_request.get('startYear') or transit_request.get('start_year', current_year)
             end_year = transit_request.get('endYear') or transit_request.get('end_year', current_year + 2)
             year_range = end_year - start_year
-            print(f"\n🎯 TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
-            print(f"⏱️ TRANSIT CALCULATION STARTED")
+            # print(f"\n🎯 TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
+            # print(f"⏱️ TRANSIT CALCULATION STARTED")
             
             # Get static context for ashtakavarga data
             birth_hash = self._create_birth_hash(birth_data)
@@ -1337,13 +1505,13 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             
             try:
                 init_start = time.time()
-                print(f"📊 Initializing RealTransitCalculator...")
+                # print(f"📊 Initializing RealTransitCalculator...")
                 real_calc = RealTransitCalculator()
                 init_time = time.time() - init_start
-                print(f"   Initialization time: {init_time:.2f}s")
+                # print(f"   Initialization time: {init_time:.2f}s")
                 
                 aspects_start = time.time()
-                print(f"🔍 Finding real aspects for birth data...")
+                # print(f"🔍 Finding real aspects for birth data...")
                 all_aspects = real_calc.find_real_aspects(birth_data)
                 
                 # OPTIMIZATION: Only process major transits (slow-moving planets)
@@ -1351,8 +1519,8 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 aspects = [a for a in all_aspects if a['transit_planet'] in major_planets]
                 
                 aspects_time = time.time() - aspects_start
-                print(f"   Found {len(all_aspects)} total aspects, filtered to {len(aspects)} major aspects in {aspects_time:.2f}s")
-                print(f"   Optimization: Skipped fast movers (Sun, Moon, Mercury, Venus) to reduce compute load")
+                # print(f"   Found {len(all_aspects)} total aspects, filtered to {len(aspects)} major aspects in {aspects_time:.2f}s")
+                # print(f"   Optimization: Skipped fast movers (Sun, Moon, Mercury, Venus) to reduce compute load")
                 
                 transit_activations = []
                 
@@ -1394,9 +1562,25 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                                     
                                     # Check if chara period overlaps with transit period
                                     if (p_start <= end_date_obj and p_end >= start_date_obj):
+                                        # Find the AD that covers the start of transit period
+                                        ad_sign_name = chara_period.get('sign_name', 'Unknown')  # Default to MD
+                                        antardashas = chara_period.get('antardashas', [])
+                                        # print(f"   DEBUG: Chara MD {chara_period.get('sign_name')}, ADs available: {len(antardashas)}")
+                                        
+                                        if antardashas:
+                                            for ad in antardashas:
+                                                ad_start = datetime.strptime(ad['start_date'], "%Y-%m-%d")
+                                                ad_end = datetime.strptime(ad['end_date'], "%Y-%m-%d")
+                                                if ad_start <= start_date_obj < ad_end:
+                                                    ad_sign_name = ad.get('sign_name', 'Unknown')
+                                                    # print(f"   DEBUG: Found AD {ad_sign_name} for transit start {start_date_obj}")
+                                                    break
+                                        else:
+                                            print(f"   DEBUG: No antardashas for this MD, using MD sign as AD")
+                                        
                                         chara_periods_for_range.append({
-                                            'mahadasha_sign': chara_period.get('sign_name', chara_period.get('sign', 'Unknown')),
-                                            'antardasha_sign': chara_period.get('sign', 'Unknown'),  # Use 'sign' key for antardasha
+                                            'mahadasha_sign': chara_period.get('sign_name', 'Unknown'),
+                                            'antardasha_sign': ad_sign_name,
                                             'start_date': chara_period['start_date'],
                                             'end_date': chara_period['end_date'],
                                             'is_active': chara_period.get('is_current', False)
@@ -1477,14 +1661,14 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 # Add logging to measure data size impact
                 import json
                 context_json = json.dumps(transit_activations)
-                print(f"🔍 TRANSIT DATA SIZE: {len(context_json)} characters")
-                print(f"🔍 TRANSIT COUNT: {len(transit_activations)}")
+                # print(f"🔍 TRANSIT DATA SIZE: {len(context_json)} characters")
+                # print(f"🔍 TRANSIT COUNT: {len(transit_activations)}")
                 
                 # Sample first transit for inspection
                 if transit_activations:
                     sample = transit_activations[0]
                     sample_json = json.dumps(sample)
-                    print(f"🔍 SAMPLE TRANSIT SIZE: {len(sample_json)} characters")
+                    # print(f"🔍 SAMPLE TRANSIT SIZE: {len(sample_json)} characters")
                     
                     # Log comprehensive dasha structure
                     comp_dashas = sample.get('comprehensive_dashas', {})
@@ -1492,28 +1676,28 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                     chara_count = len(comp_dashas.get('chara_periods', []))
                     yogini_count = len(comp_dashas.get('yogini_periods', []))
                     
-                    print(f"🔍 COMPREHENSIVE DASHA DATA:")
-                    print(f"   Vimshottari periods: {vims_count}")
-                    print(f"   Chara periods: {chara_count}")
-                    print(f"   Yogini periods: {yogini_count}")
+                    # print(f"🔍 COMPREHENSIVE DASHA DATA:")
+                    # print(f"   Vimshottari periods: {vims_count}")
+                    # print(f"   Chara periods: {chara_count}")
+                    # print(f"   Yogini periods: {yogini_count}")
                     
                     if vims_count > 0:
                         sample_vims = comp_dashas['vimshottari_periods'][0]
-                        print(f"   Sample Vimshottari: {sample_vims['mahadasha']}-{sample_vims['antardasha']}-{sample_vims['pratyantardasha']}")
+                        # print(f"   Sample Vimshottari: {sample_vims['mahadasha']}-{sample_vims['antardasha']}-{sample_vims['pratyantardasha']}")
                 
                 # Validate transit data integrity
                 self._validate_transit_data(transit_activations)
                 
                 total_transit_time = time.time() - transit_start_time
-                print(f"⏱️ TOTAL TRANSIT CALCULATION TIME: {total_transit_time:.2f}s")
-                print(f"📊 TRANSIT DATA SENT TO GEMINI:")
-                print(f"   Period: {start_year}-{end_year}")
-                print(f"   Total activations: {len(transit_activations)}")
-                print(f"   Enhanced with: All 5 Vimshottari levels + Chara Dasha + Yogini Dasha")
+                # print(f"⏱️ TOTAL TRANSIT CALCULATION TIME: {total_transit_time:.2f}s")
+                # print(f"📊 TRANSIT DATA SENT TO GEMINI:")
+                # print(f"   Period: {start_year}-{end_year}")
+                # print(f"   Total activations: {len(transit_activations)}")
+                # print(f"   Enhanced with: All 5 Vimshottari levels + Chara Dasha + Yogini Dasha")
                 for i, activation in enumerate(transit_activations[:3]):
                     comp_dashas = activation.get('comprehensive_dashas', {})
                     vims_count = len(comp_dashas.get('vimshottari_periods', []))
-                    print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']}) - {vims_count} dasha periods")
+                    # print(f"     {i+1}. {activation['transit_planet']} -> {activation['natal_planet']} ({activation['start_date']} to {activation['end_date']}) - {vims_count} dasha periods")
                 if len(transit_activations) > 3:
                     print(f"     ... and {len(transit_activations) - 3} more")
                 
@@ -1548,7 +1732,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                     
             except Exception as e:
                 total_transit_time = time.time() - transit_start_time
-                print(f"❌ Error calculating transit activations after {total_transit_time:.2f}s: {e}")
+                # print(f"❌ Error calculating transit activations after {total_transit_time:.2f}s: {e}")
                 import traceback
                 traceback.print_exc()
                 context['transit_activations'] = []
@@ -2439,10 +2623,23 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         for p in all_chara:
             p_start = datetime.strptime(p['start_date'], "%Y-%m-%d")
             p_end = datetime.strptime(p['end_date'], "%Y-%m-%d")
+            
             if p_start <= end_date and p_end >= start_date:
+                # Find the AD that covers the start of our requested period
+                ad_sign_name = p.get('sign_name', 'Unknown')  # Default to MD sign
+                
+                if 'antardashas' in p and p['antardashas']:
+                    for ad in p['antardashas']:
+                        ad_start = datetime.strptime(ad['start_date'], "%Y-%m-%d")
+                        ad_end = datetime.strptime(ad['end_date'], "%Y-%m-%d")
+                        # Find the AD that covers the start of our requested period
+                        if ad_start <= start_date < ad_end:
+                            ad_sign_name = ad.get('sign_name', 'Unknown')
+                            break
+                
                 chara_periods.append({
-                    'mahadasha_sign': p.get('sign_name', p.get('sign', 'Unknown')),
-                    'antardasha_sign': p.get('sign', 'Unknown'),  # Use 'sign' key for antardasha
+                    'mahadasha_sign': p.get('sign_name', 'Unknown'),
+                    'antardasha_sign': ad_sign_name,
                     'start_date': p['start_date'],
                     'end_date': p['end_date'],
                     'is_active': p.get('is_current', False)
@@ -2499,7 +2696,7 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                 assert 'mahadasha' in vims_period, "Missing mahadasha in vimshottari_periods"
                 assert 'antardasha' in vims_period, "Missing antardasha in vimshottari_periods"
         
-        print(f"✅ Transit data validation passed for {len(transit_activations)} transits")
+        # print(f"✅ Transit data validation passed for {len(transit_activations)} transits")
         return None
     
     def _add_sign_names_to_divisional_chart(self, divisional_chart: Dict) -> Dict:
@@ -2517,4 +2714,57 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
                     sign_index = planet_data['sign']
                     planet_data['sign_name'] = sign_names[sign_index]
         
+        # Add sign names to houses
+        if 'divisional_chart' in chart_copy and 'houses' in chart_copy['divisional_chart']:
+            for house_data in chart_copy['divisional_chart']['houses']:
+                if 'sign' in house_data:
+                    sign_index = house_data['sign']
+                    house_data['sign_name'] = sign_names[sign_index]
+        
         return chart_copy
+
+    
+    def _prune_planetary_wars(self, war_summary: Dict) -> Dict:
+        """Remove inactive planetary wars to reduce context noise"""
+        if not war_summary or not war_summary.get('wars'):
+            return war_summary
+        
+        # Keep only active wars
+        active_wars = [w for w in war_summary.get('wars', []) if w.get('is_active', False)]
+        
+        return {
+            'total_wars': len(active_wars),
+            'wars': active_wars,
+            'note': 'Only active wars included'
+        }
+    
+    def _prune_neecha_bhanga(self, neecha_summary: Dict) -> Dict:
+        """Remove empty neecha bhanga data to reduce context noise"""
+        if not neecha_summary or not neecha_summary.get('planets_with_neecha_bhanga'):
+            return {'total_neecha_bhanga_planets': 0, 'planets_with_neecha_bhanga': []}
+        
+        # Keep only planets with actual cancellations
+        return neecha_summary
+
+    
+    def _prune_planetary_wars(self, war_summary: Dict) -> Dict:
+        """Remove inactive planetary wars to reduce context noise"""
+        if not war_summary or not war_summary.get('wars'):
+            return war_summary
+        
+        # Keep only active wars
+        active_wars = [w for w in war_summary.get('wars', []) if w.get('is_active', False)]
+        
+        return {
+            'total_wars': len(active_wars),
+            'wars': active_wars,
+            'note': 'Only active wars included' if active_wars else 'No active wars'
+        }
+    
+    def _prune_neecha_bhanga(self, neecha_summary: Dict) -> Dict:
+        """Remove empty neecha bhanga data to reduce context noise"""
+        if not neecha_summary or not neecha_summary.get('planets_with_neecha_bhanga'):
+            return {'total_neecha_bhanga_planets': 0, 'planets_with_neecha_bhanga': [], 'note': 'No neecha bhanga yogas'}
+        
+        # Keep only planets with actual cancellations
+        return neecha_summary

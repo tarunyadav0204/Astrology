@@ -242,7 +242,13 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             console.log('🔍 Terms replaced:', termCount);
         }
         
-        // 8. Convert headers to section cards
+        // 8. Convert headers to section cards (### only, not ####)
+        // First, protect #### subsections from being converted
+        formatted = formatted.replace(/#### (.*?)\n/g, (match, header) => {
+            return `<h4 class="subsection-header">${header.trim()}</h4>\n`;
+        });
+        
+        // Then convert ### main sections to cards
         formatted = formatted.replace(/### (.*?)\n/g, (match, header) => {
             return `</div></div><div class="section-card"><div class="section-header">${header.trim()}</div><div class="section-content">`;
         });
@@ -256,7 +262,9 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
             if (parts.length < 2) return section;
             
             let content = parts[1];
-            // Process lists
+            // Process numbered lists (1. 2. 3.) with line breaks
+            content = content.replace(/(\d+\.\s+[^\n]+)/g, '<p class="numbered-item">$1</p>');
+            // Process bullet lists
             content = content.replace(/\n\*\s+(.+)/g, '<li class="chat-bullet">• $1</li>');
             content = content.replace(/(<li class="chat-bullet">.*?<\/li>)/gs, '<ul class="chat-list">$1</ul>');
             

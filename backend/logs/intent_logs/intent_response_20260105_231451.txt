@@ -1,0 +1,75 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T23:14:55.454386
+Question: What are my health vulnerabilities? What problems I may face in 2026 related to health.
+Processing Time: 3.871s
+Response Length: 676 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "annual",
+    "category": "health",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "annual",
+  "category": "health",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

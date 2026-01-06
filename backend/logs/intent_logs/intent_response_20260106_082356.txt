@@ -1,0 +1,31 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T08:23:59.518185
+Question: Why are you not including pratyantar dasha even though I told it is mandatory
+Processing Time: 3.354s
+Response Length: 175 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

@@ -1,0 +1,101 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T22:27:00.012919
+Question: Oct 31, 2026 – Jan 24, 2027: Jupiter moves into Leo (your Ascendant). From here, it casts its direct 5th aspect on your 5th House (Sagittarius). Simultaneously, Saturn (in Pisces) will aspect the 5th House. The Rule: When BOTH Jupiter and Saturn aspect the 5th House (Double Transit), childbirth is "Authorized" by the cosmos. - But double transit is activated in jan 2026 as well where jupiter in gemini in 11th house is aspecting 5th house by 7th aspect and saturn from pisces 8th house is aspecting 5th house with its 10th aspect. why did ivf fail then if you are saying double transit is a firm promise.
+Processing Time: 4.412s
+Response Length: 745 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2027,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2027,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

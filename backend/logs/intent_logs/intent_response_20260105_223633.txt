@@ -1,0 +1,25 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T22:36:39.010043
+Question: What does my birth chart say about my career? What are my health prospects in general. What could be the problems in 2026.
+Processing Time: 5.494s
+Response Length: 323 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can analyze your career and health prospects and potential problems in 2026. For your health, what specific concerns do you have (e.g., general well-being, specific ailments, energy levels)?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can analyze your career and health prospects and potential problems in 2026. For your health, what specific concerns do you have (e.g., general well-being, specific ailments, energy levels)?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true
+}

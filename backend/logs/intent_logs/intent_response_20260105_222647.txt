@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T22:26:50.360357
+Question: What does my birth chart say about my career? Tell me about this office politics that is going on right now. When will this end? What should I do?
+Processing Time: 3.330s
+Response Length: 188 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

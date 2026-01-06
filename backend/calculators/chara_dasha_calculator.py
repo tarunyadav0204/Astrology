@@ -17,8 +17,8 @@ class CharaDashaCalculator:
         self.ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
 
     def calculate_dasha(self, dob_dt: datetime) -> Dict[str, Any]:
-        """Generates the Chara Dasha sequence and timing."""
-        dasha_order = self._get_dasha_sequence(self.ascendant_sign)
+        """Generates the Chara Dasha sequence and timing with antardashas."""
+        dasha_order = self._get_dasha_sequence(self.ascendant_sign, is_mahadasha=True)
         dasha_periods = []
         start_date = dob_dt
         
@@ -29,14 +29,21 @@ class CharaDashaCalculator:
             years = self._calculate_dasha_length(sign_idx)
             end_date = start_date + relativedelta(years=years)
             
+            is_current = start_date <= current_time < end_date
+            
+            # Calculate antardashas for current mahadasha
+            antardashas = []
+            if is_current:
+                antardashas = self._calculate_antardashas(sign_idx, years, start_date, current_time)
+            
             dasha_periods.append({
                 "sign_id": sign_idx,
                 "sign_name": self._get_sign_name(sign_idx),
                 "duration_years": years,
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "end_date": end_date.strftime("%Y-%m-%d"),
-                # FIX: Safe comparison now that timezones match
-                "is_current": start_date <= current_time < end_date
+                "is_current": is_current,
+                "antardashas": antardashas
             })
             start_date = end_date
             
@@ -47,32 +54,44 @@ class CharaDashaCalculator:
 
     # --- INTERNAL LOGIC (Safe & Isolated) ---
     
-    def _get_dasha_sequence(self, asc_sign: int) -> List[int]:
+    def _get_dasha_sequence(self, start_sign: int, is_mahadasha: bool = True) -> List[int]:
         """
-        K.N. Rao Sequence: 
-        Aries, Leo, Virgo, Libra, Aquarius, Pisces run DIRECT.
-        Taurus, Gemini, Cancer, Scorpio, Sagittarius, Capricorn run REVERSE.
+        K.N. Rao Sequence Logic:
+        - For MD: Direction depends on the ASCENDANT.
+        - For AD: Direction depends on the Mahadasha sign (start_sign).
         """
-        direct_signs = {0, 4, 5, 6, 10, 11} 
-        is_direct = asc_sign in direct_signs
+        direct_signs = {0, 4, 5, 6, 10, 11}  # Ar, Le, Vi, Li, Aq, Pi
+        
+        # FIX: Dynamically determine direction based on context
+        target_for_direction = self.ascendant_sign if is_mahadasha else start_sign
+        is_direct = target_for_direction in direct_signs
         
         sequence = []
-        current = asc_sign
-        for _ in range(12):
+        current = start_sign
+        
+        if is_mahadasha:
             sequence.append(current)
+            iterations = 11
+        else:
+            # For ADs, we skip the starting sign and move immediately to the next/prev
+            iterations = 12
+            
+        for _ in range(iterations):
             if is_direct:
                 current = (current + 1) % 12
             else:
                 current = (current - 1 + 12) % 12
+            sequence.append(current)
+            
         return sequence
 
     def _calculate_dasha_length(self, sign_idx: int) -> int:
         """Calculates years by counting from Sign to Lord."""
         lord_sign = self._get_lord_sign(sign_idx)
         
-        # Counting Rule: Odd signs Forward, Even signs Backward
-        # Note: sign_idx 0 (Aries) is Odd-footed. sign_idx 1 (Taurus) is Even-footed.
-        is_forward_counting = (sign_idx % 2 == 0)
+        # K.N. Rao Method: Aries, Taurus, Gemini, Libra, Scorpio, Sagittarius are Odd-footed (Forward)
+        forward_counting_signs = {0, 1, 2, 6, 7, 8}
+        is_forward_counting = sign_idx in forward_counting_signs
 
         count = 0
         if is_forward_counting:
@@ -190,3 +209,37 @@ class CharaDashaCalculator:
         else:
             # If input is naive, ensure 'now' is naive
             return now.replace(tzinfo=None)
+
+    
+    def _calculate_antardashas(self, maha_sign_id: int, total_years: int, start_date: datetime, current_time: datetime) -> List[Dict]:
+        """
+        Calculates 12 equal antardasha sub-periods for a mahadasha.
+        In Jaimini, each AD is exactly 1/12th of the MD.
+        """
+        antardashas = []
+        
+        # Get the sequence starting from the NEXT sign after maha (not maha itself)
+        sequence = self._get_dasha_sequence(maha_sign_id, is_mahadasha=False)
+        
+        # Each antardasha is exactly 1/12th of the mahadasha
+        # Duration in months = total_years (e.g., 9-year MD = 9-month ADs)
+        ad_months = total_years
+        
+        current_period_start = start_date
+        
+        for sign_id in sequence:
+            end_date = current_period_start + relativedelta(months=ad_months)
+            
+            antardashas.append({
+                "sign_id": sign_id,
+                "sign_name": self._get_sign_name(sign_id),
+                "start_date": current_period_start.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+                "months": ad_months,
+                "years": round(ad_months / 12, 2),
+                "is_current": current_period_start <= current_time < end_date
+            })
+            
+            current_period_start = end_date
+        
+        return antardashas

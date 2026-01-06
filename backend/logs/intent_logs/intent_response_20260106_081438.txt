@@ -1,0 +1,73 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T08:14:41.035639
+Question: How will be my savings in 2026. I am never able to save anything even though I earn good.
+Processing Time: 2.914s
+Response Length: 662 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "annual",
+    "category": "finance",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "annual",
+  "category": "finance",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

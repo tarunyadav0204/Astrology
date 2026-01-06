@@ -1,0 +1,81 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T00:15:11.969207
+Question: savings.
+Processing Time: 3.818s
+Response Length: 753 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "timeframe": "2026",
+        "aspect": "savings"
+    },
+    "mode": "annual",
+    "category": "finance",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "timeframe": "2026",
+    "aspect": "savings"
+  },
+  "mode": "annual",
+  "category": "finance",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

@@ -1,0 +1,75 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T22:52:43.209801
+Question: Tell me about may married life relationship in 2026. How will it remain in general.
+Processing Time: 4.873s
+Response Length: 768 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best analyze your married life in 2026, could you please specify what aspects you're most interested in? For example, are you concerned about harmony, potential challenges, or overall satisfaction in your relationship?",
+  "mode": "annual",
+  "category": "marriage",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best analyze your married life in 2026, could you please specify what aspects you're most interested in? For example, are you concerned about harmony, potential challenges, or overall satisfaction in your relationship?",
+  "mode": "annual",
+  "category": "marriage",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

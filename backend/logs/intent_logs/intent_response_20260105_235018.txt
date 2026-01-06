@@ -1,0 +1,75 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-05T23:50:22.964200
+Question: How will be my finances in 2026. Give detailed answer about my finances from all aspects.
+Processing Time: 4.270s
+Response Length: 677 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "annual",
+    "category": "finance",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "annual",
+  "category": "finance",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

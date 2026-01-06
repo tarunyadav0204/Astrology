@@ -1,0 +1,129 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T12:54:45.012278
+Question: Analyze from my chart only. I want to understand when will I have kids I have 2 IVF failures in last 6 months why are IVFs failing and when can I conceive in 2026
+Processing Time: 3.851s
+Response Length: 1355 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "child",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D7",
+        "D9"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2028,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2027": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2028": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2028,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2028": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

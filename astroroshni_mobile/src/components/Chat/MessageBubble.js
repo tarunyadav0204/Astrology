@@ -61,43 +61,25 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       .trim();
 
     setIsSpeaking(true);
-    const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-US';
+    const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-IN';
 
     try {
       const voices = await Speech.getAvailableVoicesAsync();
       const languageVoices = voices.filter(v => v.language === voiceLanguage || v.language === 'en-IN');
       
-      // Use selected voice or find best voice
-      let preferredVoice = selectedVoice;
-      if (!preferredVoice) {
-        // Default to Rishi (Indian English) first, then Kathy, then Samantha
-        preferredVoice = languageVoices.find(v => v.name === 'Rishi') ||
-                        languageVoices.find(v => v.name === 'Kathy') ||
-                        languageVoices.find(v => v.name === 'Samantha') ||
-                        languageVoices[0];
-      }
+      let preferredVoice = selectedVoice || languageVoices.find(v => v.name === 'Rishi') || languageVoices[0];
 
-      const speechOptions = {
+      Speech.speak(cleanText, {
         language: voiceLanguage,
-        rate: VOICE_CONFIG.rate,
-        pitch: VOICE_CONFIG.pitch,
-        volume: VOICE_CONFIG.volume,
+        voice: preferredVoice?.identifier,
+        rate: 1.0,
+        pitch: 1.0,
         onDone: () => setIsSpeaking(false),
         onStopped: () => setIsSpeaking(false),
-        onError: (error) => {
-          console.log('Speech error:', error);
-          setIsSpeaking(false);
-        }
-      };
-
-      if (preferredVoice) {
-        speechOptions.voice = preferredVoice.identifier;
-        console.log('Using voice:', preferredVoice.name);
-      }
-
-      Speech.speak(cleanText, speechOptions);
+        onError: () => setIsSpeaking(false)
+      });
     } catch (error) {
-      console.log('Voice setup error:', error);
+      console.log('Speech error:', error);
       setIsSpeaking(false);
     }
   };
@@ -105,16 +87,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const showVoiceSelector = async () => {
     try {
       const voices = await Speech.getAvailableVoicesAsync();
-      const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-US';
+      const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-IN';
       
-      // Filter out novelty/effect voices and keep only normal human voices
-      const weirdVoices = ['Bad News', 'Bahh', 'Bells', 'Boing', 'Bubbles', 'Cellos', 'Wobble', 'Fred', 'Good News', 'Jester', 'Junior', 'Organ', 'Superstar', 'Ralph', 'Trinoids', 'Whisper', 'Zarvox'];
-      
-      const languageVoices = voices.filter(v => {
-        const isRightLanguage = v.language === voiceLanguage || v.language === 'en-IN' || v.language.startsWith('en-');
-        const isNormalVoice = !weirdVoices.includes(v.name);
-        return isRightLanguage && isNormalVoice;
-      });
+      const languageVoices = voices.filter(v => v.language === voiceLanguage || v.language === 'en-IN' || v.language.startsWith('en-'));
       
       setAvailableVoices(languageVoices);
       setShowVoicePicker(true);

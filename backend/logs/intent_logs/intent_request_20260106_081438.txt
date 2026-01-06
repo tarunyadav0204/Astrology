@@ -1,0 +1,260 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-06T08:14:38.120368
+Question: How will be my savings in 2026. I am never able to save anything even though I earn good.
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 23851 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: <div class="quick-answer-card">**Quick Answer**: The year 2026 marks a decisive **"Financial Restructuring"** where your high earning potential (Venus in 11th) finally meets the discipline required to retain it. The current inability to save is caused by the **Saturn-Rahu-Mars cluster** in your 2nd House (Savings), creating a "leaky bucket" effect where expenses manifest as soon as money arrives. Specifically, the first half of 2026 (under **Ulka Yogini**) will force you to clear old financial baggage, while the second half (starting July, under **Siddha Yogini**) triggers a massive accumulation phase. Your **D9 Navamsa Mars in Aries** confirms you have the grit to break this cycle if you switch from "saving what is left" to "locking funds before spending."</div>
+
+### Key Insights
+• **The "Income vs. Savings" Paradox**: Your chart shows a classic "High Earner, Low Saver" combination. **Venus in the 11th House (Taurus)** guarantees excellent cash flow and luxury. However, the **2nd House (Leo)** contains a volatile "War" between Saturn (Restriction), Rahu (Obsession/Sudden Loss), and Mars (Impulse). This energy burns liquid cash immediately.
+• **The Jaimini Confirmation**: The shift to your **Capricorn Chara Dasha** in April 2026 is a game-changer. From Capricorn, your <term id="amatyakaraka">Amatyakaraka</term> (Career Planet, Mercury) sits in the 2nd House, indicating that savings will now come directly through career restructuring rather than random luck.
+• **The Turning Point**: The dates **July 6, 2026** are critical. You move from the stressful **Ulka (Saturn)** Yogini to the auspicious **Siddha (Venus)** Yogini. This aligns with your 11th House Venus, turning the "faucet" of wealth fully on while the drain finally plugs.
+• **D9 Strength**: Your Mars is <term id="vargottama">Vargottama</term> (strong in D9), implying that real estate or "locked" assets are your path to wealth, not liquid cash in a bank account.
+
+### Astrological Analysis
+
+#### The Parashari View (The Root Cause)
+Your 2nd House of Accumulated Wealth is the most active and conflicted sector of your chart. It hosts **Saturn (Retrograde), Jupiter (Retrograde), Mars (Retrograde), and Rahu**.
+*   **The Conflict:** Saturn wants to hoard, Mars wants to spend, and Rahu creates confusion. This planetary war in Leo (a fire sign) means money "burns" a hole in your pocket.
+*   **The Saving Grace:** **Venus in the 11th House (Taurus)** is in its own sign. This is a primary <term id="dhana_yoga">Dhana Yoga</term>. The source of money is never the problem; the *container* (2nd House) is cracked.
+
+#### Jaimini Sutra Deep-Dive (MANDATORY)
+*   **Chara Dasha Shift:** You are ending the **Aquarius** period and entering the **Capricorn** Mahadasha in April 2026.
+    *   **From Capricorn (New Dasha Lagna):** The 2nd House is Aquarius, containing your **Amatyakaraka (Mercury)** and **Ketu**.
+    *   **Verdict:** The presence of the Career Planet (AmK) in the wealth sector (2nd from Dasha) confirms that **2026 is a year of wealth accumulation**, but the presence of Ketu suggests this savings must remain "invisible" (e.g., automated investments, crypto, or assets you cannot easily liquidate) to survive.
+*   **Arudha Lagna (AL):** Your AL is in Capricorn. Planets in the 2nd from AL (Aquarius) dictate your financial status. Again, Mercury and Ketu here show that intellectual or digital assets build your status, but you must avoid impulsive liquid spending.
+
+#### Nadi Precision (The Nature of Wealth)
+Your chart reveals specific Nadi connections that define *how* you lose and make money:
+*   **The "Dragon's Mouth" Link (Saturn + Rahu):** Saturn (Karma/Wealth Storage) is conjunct Rahu. In Nadi, this creates "Shadow Expenses." Money disappears into "unknown" categories—subscriptions, sudden tech failures, or impulsive travels.
+*   **The "Dharma-Karma" Link (Saturn + Jupiter):** Despite the chaos, Jupiter links to Saturn. This means wealth is preserved *only* when used for "Dharmic" purposes—education, home ownership, or family welfare. Frivolous spending is instantly punished by the Mars-Rahu influence.
+
+#### Timing Synthesis (Multi-System)
+*   **Vimshottari:** You are in **Saturn Mahadasha / Rahu Antardasha**. This is the peak of the "Storm" in your 2nd House. It forces you to address financial fears.
+*   **Yogini:** The shift is stark. You are currently in **Ulka (Saturn)**—a period of strain. On **July 6, 2026**, you enter **Siddha (Venus)**. Since Venus is your strongest planet (11th House Lord in 11th), this marks the "Golden Period" of 2026 where savings finally stick.
+*   **Chara:** The **Capricorn** period (starting April) activates the <term id="indulagna">Indu Lagna</term> axis (Pisces/Virgo), further supporting financial recovery.
+
+#### Triple Perspective (Sudarshana)
+*   **Lagna (Body):** 2nd House has the 4-planet cluster (High Stress).
+*   **Moon (Mind):** Moon is in Libra. The 2nd from Moon is Scorpio (ruled by Mars). Mars is in the "War" cluster. The *mind* is anxious about money.
+*   **Sun (Soul):** Sun is in Pisces. The 2nd from Sun is Aries, ruled by Mars.
+*   **Verdict:** All three references point to **Mars** as the key. Since Mars is your <term id="darakaraka">Darakaraka</term> (Planet of Spouse/Partnership), joint finances or locking money in property (Mars signification) is the solution.
+
+### Nakshatra Insights
+Your **Saturn (Mahadasha Lord)** is in **Purva Ashadha**, ruled by Venus.
+*   *Interpretation:* Purva Ashadha is the "Invincible Star." Even though Saturn seems restrictive, its placement in a Venus-ruled Nakshatra connects it directly to your wealthy 11th House. The struggle is temporary; the victory is promised.
+*   **Rahu (Antardasha Lord)** is in **Magha**, ruled by Ketu. This connects to lineage and past lives. Your inability to save may be linked to a subconscious family pattern of "feasting and fasting." 2026 is the year to break this ancestral cycle.
+
+### Timing & Guidance
+**The Strategy for 2026:**
+1.  **Phase 1 (Jan - April): The Cleanse.** Expect high expenses. Do not fight them; pay off debts. Use the **Saturn-Rahu** energy to "cut" unnecessary subscriptions.
+2.  **Phase 2 (May - July): The Shift.** As the Chara Dasha settles into Capricorn, automate your savings. If you see the money, you will spend it. Move it to an account you cannot touch.
+3.  **Phase 3 (July - Dec): The Harvest.** **Siddha Yogini** brings ease. This is the time to make a major investment (Property or Gold) that locks the value.
+
+**Actionable Remedy:**
+*   Since the 2nd House is afflicted by Rahu/Mars (Fire/Air), **liquid cash is your enemy.**
+*   **Rule:** Convert cash into "Saturn" objects immediately upon receipt. Put money into Land, PPF, Retirement Funds, or Gold. Saturn protects long-term assets but destroys instant gratification.
+
+<div class="final-thoughts-card">**Final Thoughts**: You are not "bad with money"; you are simply running a high-energy financial engine without a cooling system. 2026 is the year you install that cooling system. The alignment of **Siddha Yogini (Venus)** and **Capricorn Dasha** in the second half of the year guarantees that if you *lock* your funds, your wealth will grow exponentially.</div>
+A: How will be my savings in 2026. I am never able to save anything even though I earn good.
+Q: savings.
+A: How will be my savings in 2026. I am never able to save anything even though I earn good.
+Q: How will be my finances in 2026. Give detailed answer about my finances from all aspects.
+A: <div class="quick-answer-card">**Quick Answer**: The year 2026 presents a **"High Flow, High Fluctuation"** scenario for your savings. While your income potential is exceptional (Venus in 11th House), your 2nd House of savings is under the intense "Storm" of Saturn and Rahu, creating a tendency for money to fly out as fast as it comes in. Specifically, expect **volatility and unexpected expenses between January and April 2026**, followed by a **massive stabilization and accumulation phase starting July 6, 2026**, when the auspicious Siddha (Venus) Yogini Dasha activates. However, your D9 Navamsa shows Mars in its own sign in the 2nd House, confirming that despite the chaos, you possess the inner discipline to build substantial assets if you lock funds into illiquid investments. **Action:** Automate transfers to a locked account/asset immediately upon receipt of income to bypass Rahu's spending impulse.</div>
+
+### Key Insights
+• **The "Leaky Bucket" Phenomenon:** Your 2nd House (Savings) contains a rare 4-planet conjunction (Saturn, Rahu, Mars, Jupiter). This creates massive energy—you can generate wealth aggressively, but holding liquid cash will be your biggest challenge in 2026.
+• **The Venus Jackpot:** Your 11th Lord Venus is in its own sign (Taurus) in the 11th House. This is a **Maha Dhana Yoga**, ensuring that "Income" will not be the problem; "Retention" is the focus.
+• **The Jaimini Confirmation:** The transition to the **Capricorn Chara Dasha** in April 2026 places your Amatyakaraka (Career Planet) Mercury in the 2nd House from the Dasha Lagna, signaling that professional status will directly fuel your savings growth.
+
+### Astrological Analysis
+
+#### The Parashari View (The Root)
+Your chart features a spectacular but chaotic **2nd House (Leo)**, the domain of accumulated wealth. It hosts **Saturn (Discipline), Rahu (Obsession), Mars (Aggression), and Jupiter (Expansion)**.
+*   **The Challenge:** Saturn and Rahu together creates "Ebbs and Flows." Rahu wants to gamble or spend on luxury/status, while Saturn tries to restrict. This often manifests as periods of extreme frugality followed by sudden large expenses.
+*   **The Strength:** The 2nd Lord (Sun) is in the 9th House (Luck) conjunct the **Indu Lagna** (Point of Wealth). This is a classic "Wealth through Fortune" signature. The source of your savings is protected by Providence, even if the container (2nd House) is shaky.
+
+#### Jaimini Sutra Deep-Dive (MANDATORY)
+*   **Wealth from Arudha Lagna (AL):** Your AL is in Capricorn. The 2nd House from AL is Aquarius, containing Mercury (AmK) and Ketu.
+    *   *Verdict:* Mercury as Amatyakaraka in the 2nd from AL indicates that your savings are directly tied to your **commercial intelligence and professional rank**.
+*   **Wealth from Chara Dasha:**
+    *   **Jan-April 2026 (Aquarius Dasha):** Aquarius is the 8th House (Transformation). This is a period of *re-allocating* assets rather than pure accumulation.
+    *   **April-Dec 2026 (Capricorn Dasha):** Capricorn activates your AL. From here, the 11th House is Scorpio (ruled by Mars/Ketu). This shifts the focus to "strategic accumulation."
+*   **Status Verdict:** The presence of the AmK in the 2nd from the active Dasha (Capricorn) confirms **financial rise through career elevation**.
+
+#### Nadi Precision (The Nature of Savings)
+Your chart reveals specific Nadi connections that define the *nature* of your wealth accumulation:
+
+*   **The "Polymath" Link (Saturn + Jupiter + Mars + Rahu in 2nd):** This rare combination in your savings house suggests your wealth does not come from a single salary. It accumulates through **multiple, simultaneous channels**—likely involving technical management (Saturn+Mars), advisory roles (Jupiter), and foreign/digital sources (Rahu).
+*   **The "Luxury" Link (Venus in Taurus):** Venus is unconnected to the malefics in the 2nd house. This is crucial. It means your *incoming* cash flow (11th House) is pure and unblemished. The stress only starts when you try to *store* it.
+
+#### Timing Synthesis (Multi-System)
+*   **Vimshottari (The Master Clock):** You are in **Saturn Mahadasha / Rahu Antardasha** until November 2026.
+    *   *Effect:* Saturn and Rahu are conjunct in your 2nd House. This is the peak of the "Financial Storm." Expect the highest volatility of the decade regarding savings during this year.
+*   **Yogini (The Micro-Trigger):**
+    *   **Ulka (Saturn) until July 2026:** Mirrors the Vimshottari stress. High pressure to restructure finances.
+    *   **Siddha (Venus) starts July 6, 2026:** <term id="key">Siddha</term> means "Perfection/Success." Since Venus is your strongest planet (11th Lord in 11th), this marks the **turning point** where savings finally stabilize and grow rapidly.
+*   **Synthesis:** The **Capricorn** Chara Dasha (starting April) + **Siddha** Yogini (starting July) creates a "Golden Window" in the second half of 2026.
+
+#### Triple Perspective (Sudarshana)
+*   **From Lagna (Cancer):** 2nd House has 4 planets (High activity).
+*   **From Moon (Libra):** 2nd House is Scorpio (ruled by Mars). Mars is in Leo. The focus remains on the Leo cluster.
+*   **From Sun (Pisces):** 2nd House is Aries (ruled by Mars). Mars again points to the Leo cluster.
+*   **Verdict:** All three perspectives point to **Mars and the Leo cluster** as the key to your savings. Since Mars is in its Own Sign in D9, the **Confidence Level is 95%** that aggressive investment (Mars) is better for you than passive saving.
+
+#### Divisional Chart Analysis (D9 Navamsa)
+*   **D9 Lagna:** Pisces.
+*   **D9 2nd House (Wealth):** Aries.
+*   **Planet in D9 2nd:** **Mars**.
+*   **The "Root vs. Fruit":** In D1, the 2nd house is chaotic. In D9 (the fruit), the 2nd house is ruled by Mars *in* Mars' own sign (Aries).
+*   **Conclusion:** This is a **massive protective factor**. It means that while you feel stress about money (D1), your actual asset base is growing stronger and more resilient (D9). You are building "muscle" in your portfolio.
+
+### Nakshatra Insights
+Your 2nd House planets sit in **Magha** (Ketu-ruled) and **Purva Phalguni** (Venus-ruled).
+*   **Magha Influence:** Savings may come from legacy, inheritance, or "root" knowledge.
+*   **Venus Influence:** Since Venus is strong in the 11th, planets in Purva Phalguni (like Saturn) will eventually funnel wealth from your professional network into your savings.
+
+### Timing & Guidance
+**Critical Window:** **July 6, 2026 – December 2026**
+This is when the **Siddha (Venus)** Yogini Dasha overlaps with the stability of the Capricorn Chara Dasha. This is your "Harvest Period" for savings.
+
+**Actionable Strategy:**
+1.  **The "Rahu Bypass":** Since Rahu in the 2nd House makes cash "slippery," do not keep money in a savings account. Divert it immediately into **Real Estate, Gold, or Long-term Bonds** (Saturn assets). Make it hard to liquidate.
+2.  **Conflict Management:** The planetary war in the 2nd house suggests family disputes over money. Ensure your will, nominations, and joint accounts are legally clear in 2026.
+3.  **Leverage the 11th House:** Focus on maximizing *income* (11th house Venus) rather than obsessing over penny-pinching. Your chart is built for high earning, not extreme frugality.
+
+<div class="final-thoughts-card">**Final Thoughts**: 2026 is a year of financial *velocity*. You will likely see more money flow through your hands than in previous years, but retaining it requires a strategy of "forced illiquidity." Trust the second half of the year (post-July) for substantial accumulation.</div>
+
+        
+        Current question: "How will be my savings in 2026. I am never able to save anything even though I earn good."
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

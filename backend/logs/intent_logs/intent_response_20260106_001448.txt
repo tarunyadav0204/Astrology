@@ -1,0 +1,77 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T00:14:52.048165
+Question: How will be my finances in 2026. Give detailed answer about my finances from all aspects.
+Processing Time: 3.601s
+Response Length: 950 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "I can help with that! To provide a detailed answer about your finances in 2026, could you please specify what aspects you're most interested in? For example, are you concerned about income, savings, investments, debts, or something else?",
+    "mode": "annual",
+    "category": "finance",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can help with that! To provide a detailed answer about your finances in 2026, could you please specify what aspects you're most interested in? For example, are you concerned about income, savings, investments, debts, or something else?",
+  "mode": "annual",
+  "category": "finance",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

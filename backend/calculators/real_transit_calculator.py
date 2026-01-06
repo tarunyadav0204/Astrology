@@ -323,6 +323,84 @@ class RealTransitCalculator:
         
         return False
     
+    def get_slow_planet_transits(self, birth_data: Dict, years: int = 5) -> Dict[str, List[Dict]]:
+        """Generate 5-year transit timeline for slow-moving planets with retrograde awareness"""
+        natal_positions = self._calculate_natal_positions(birth_data)
+        if not natal_positions:
+            return {}
+        
+        ascendant_longitude = natal_positions.get('ascendant_longitude', 0)
+        slow_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu']
+        
+        start_date = datetime.now()
+        end_date = start_date + timedelta(days=365 * years)
+        
+        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+                      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        
+        transits = {}
+        
+        for planet in slow_planets:
+            planet_transits = []
+            current_date = start_date
+            prev_sign = None
+            period_start = None
+            segment_count = {}
+            
+            while current_date <= end_date:
+                longitude = self.get_planet_position(current_date, planet)
+                if longitude is None:
+                    current_date += timedelta(days=1)
+                    continue
+                
+                current_sign = int(longitude / 30)
+                
+                if prev_sign is None:
+                    prev_sign = current_sign
+                    period_start = current_date
+                    segment_count[current_sign] = segment_count.get(current_sign, 0) + 1
+                elif current_sign != prev_sign:
+                    # Sign change detected (forward or retrograde)
+                    house = self.calculate_house_from_longitude(prev_sign * 30, ascendant_longitude)
+                    segment_num = segment_count.get(prev_sign, 1)
+                    is_retrograde_return = segment_num > 1
+                    
+                    planet_transits.append({
+                        'planet': planet,
+                        'sign': sign_names[prev_sign],
+                        'house': house,
+                        'start_date': period_start.strftime('%Y-%m-%d'),
+                        'end_date': (current_date - timedelta(days=1)).strftime('%Y-%m-%d'),
+                        'segment': segment_num,
+                        'retrograde_return': is_retrograde_return
+                    })
+                    
+                    prev_sign = current_sign
+                    period_start = current_date
+                    segment_count[current_sign] = segment_count.get(current_sign, 0) + 1
+                
+                current_date += timedelta(days=1)
+            
+            # Add final period
+            if prev_sign is not None and period_start is not None:
+                house = self.calculate_house_from_longitude(prev_sign * 30, ascendant_longitude)
+                segment_num = segment_count.get(prev_sign, 1)
+                is_retrograde_return = segment_num > 1
+                
+                planet_transits.append({
+                    'planet': planet,
+                    'sign': sign_names[prev_sign],
+                    'house': house,
+                    'start_date': period_start.strftime('%Y-%m-%d'),
+                    'end_date': end_date.strftime('%Y-%m-%d'),
+                    'segment': segment_num,
+                    'retrograde_return': is_retrograde_return
+                })
+            
+            transits[planet] = planet_transits
+        
+        return transits
+    
     def _get_comprehensive_transit_data(self, transit_planet: str, transit_house: int, 
                                        start_date: datetime, end_date: datetime,
                                        natal_positions: Dict, ascendant_longitude: float) -> Dict:

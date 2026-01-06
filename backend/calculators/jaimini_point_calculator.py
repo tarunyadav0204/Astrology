@@ -26,54 +26,60 @@ class JaiminiPointCalculator:
         # 1. Arudha Lagna (AL) - Arudha of the 1st House (D1)
         al_sign = self._calculate_arudha_pada(house_num=1)
         
-        # 2. Upapada Lagna (UL) - Arudha of the 12th House (D1)
+        # 2. Darapada (A7) - Arudha of the 7th House (Business/Physical Partnerships)
+        a7_sign = self._calculate_arudha_pada(house_num=7)
+        
+        # 3. Upapada Lagna (UL) - Arudha of the 12th House (Legal Marriage)
         ul_sign = self._calculate_arudha_pada(house_num=12)
         
-        # 3. Karkamsa Lagna (KL) - Sign of Atmakaraka in D9
+        # 4. Karkamsa Lagna (KL) - Sign of Atmakaraka in D9
         kl_sign = self._calculate_karkamsa()
         
-        # 4. Swamsa Lagna - Ascendant of D9
-        # Note: Often Swamsa and Karkamsa are used interchangeably, 
-        # but here we treat Swamsa as the 'Lagnamsa' (D9 Ascendant) for yoga analysis.
+        # 5. Swamsa Lagna - Ascendant of D9
         swamsa_degree = self.d9_chart.get('ascendant', 0)
         swamsa_sign = int(swamsa_degree / 30)
         
-        # 5. Hora Lagna (HL) - Wealth indicator
+        # 6. Hora Lagna (HL) - Wealth indicator
         hl_sign = self._calculate_hora_lagna()
         
-        # 6. Ghatika Lagna (GL) - Power/Authority indicator
+        # 7. Ghatika Lagna (GL) - Power/Authority indicator
         gl_sign = self._calculate_ghatika_lagna()
         
         return {
             "arudha_lagna": {
                 "sign_id": al_sign,
                 "sign_name": self._get_sign_name(al_sign),
-                "description": "How the world sees you (Status/Image)."
+                "description": "Public Status & Image (AL)"
+            },
+            "darapada": {
+                "sign_id": a7_sign,
+                "sign_name": self._get_sign_name(a7_sign),
+                "description": "Business & Physical Partnerships (A7)"
             },
             "upapada_lagna": {
                 "sign_id": ul_sign,
                 "sign_name": self._get_sign_name(ul_sign),
-                "description": "Marriage and relationships."
+                "description": "Legal Marriage & Spouse (UL)"
             },
             "karkamsa_lagna": {
                 "sign_id": kl_sign,
                 "sign_name": self._get_sign_name(kl_sign),
-                "description": "Soul's desire and professional talent (AK in D9)."
+                "description": "Soul's Skill/Talent (KL)"
             },
             "swamsa_lagna": {
                 "sign_id": swamsa_sign,
                 "sign_name": self._get_sign_name(swamsa_sign),
-                "description": "The Ascendant of the Navamsa (Soul's Path)."
+                "description": "Soul's Internal Path (D9 Asc)"
             },
             "hora_lagna": {
                 "sign_id": hl_sign,
                 "sign_name": self._get_sign_name(hl_sign),
-                "description": "Wealth and financial status indicator."
+                "description": "Financial Strength (HL)"
             },
             "ghatika_lagna": {
                 "sign_id": gl_sign,
                 "sign_name": self._get_sign_name(gl_sign),
-                "description": "Power, authority, and political influence."
+                "description": "Authority & Rank (GL)"
             }
         }
 

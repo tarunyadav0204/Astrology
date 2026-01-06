@@ -124,42 +124,20 @@ async def calculate_chara_antardasha(request: AntardashaRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 def _calculate_antardashas(maha_period: dict, chara_calc: CharaDashaCalculator) -> list:
-    """Calculate 12 antardasha sub-periods for a mahadasha"""
-    antardashas = []
+    """Calculate 12 antardasha sub-periods for a mahadasha using calculator's method"""
+    from datetime import datetime
     
-    # Get the sequence starting from the maha sign
     maha_sign_id = maha_period["sign_id"]
-    sequence = chara_calc._get_dasha_sequence(maha_sign_id)
-    
-    # Calculate duration for each antardasha
     total_years = maha_period["duration_years"]
     start_date = datetime.strptime(maha_period["start_date"], "%Y-%m-%d")
+    current_time = datetime.now()
     
-    # Each antardasha gets proportional time based on its own duration
-    total_duration_units = sum(chara_calc._calculate_dasha_length(sign) for sign in sequence)
+    # Use the calculator's method to ensure consistency
+    antardashas = chara_calc._calculate_antardashas(maha_sign_id, total_years, start_date, current_time)
     
-    current_date = start_date
-    now = datetime.now()
-    
-    for sign_id in sequence:
-        sign_duration = chara_calc._calculate_dasha_length(sign_id)
-        years = (sign_duration / total_duration_units) * total_years
-        
-        # Convert years to days for accurate calculation
-        from dateutil.relativedelta import relativedelta
-        total_days = int(years * 365.25)
-        end_date = current_date + relativedelta(days=total_days)
-        
-        antardashas.append({
-            "sign_id": sign_id,
-            "sign": _get_sign_name(sign_id),
-            "start_date": current_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d"),
-            "years": round(years, 2),
-            "current": current_date <= now < end_date
-        })
-        
-        current_date = end_date
+    # Add 'sign' key for frontend compatibility
+    for ad in antardashas:
+        ad['sign'] = ad['sign_name']  # Frontend expects 'sign' key
     
     return antardashas
 

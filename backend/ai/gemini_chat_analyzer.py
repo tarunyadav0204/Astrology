@@ -177,10 +177,19 @@ class GeminiChatAnalyzer:
             selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
             model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
             
-            # print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-            # print(f"Analysis Type: {model_type}")
-            # print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-            # print(f"Prompt length: {len(prompt)} characters")
+            print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+            print(f"Analysis Type: {model_type}")
+            print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+            print(f"Prompt length: {len(prompt)} characters")
+            
+            # Log full prompt
+            print(f"\n{'='*80}")
+            print(f"📤 FULL GEMINI REQUEST PROMPT")
+            print(f"{'='*80}")
+            print(prompt)
+            print(f"\n{'='*80}")
+            print(f"📝 END OF REQUEST PROMPT")
+            print(f"{'='*80}\n")
             
 
             
@@ -702,13 +711,44 @@ SUMMARY_IMAGE_END
 RESPONSE FORMAT - DETAILED MODE:
 Start with comprehensive Quick Answer then provide full analysis:
 
-<div class="quick-answer-card">**Quick Answer**: [Complete summary]</div>
+⚠️ CRITICAL HEADER FORMATTING RULES - STRICT ENFORCEMENT:
+- Main sections use ### (three hashes): Key Insights, Astrological Analysis, Nakshatra Insights, Timing & Guidance
+- Subsections use #### (four hashes) and MUST be placed INSIDE the Astrological Analysis section
+- ABSOLUTELY FORBIDDEN: Do NOT use # or ## anywhere in your response
+- The Parashari View, Jaimini Sutra Deep-Dive, Timing Synthesis, Nadi Precision, Triple Perspective, and Divisional Chart Analysis are ALL #### subsections
+
+🏛️ JAIMINI QUICK ANSWER RULES:
+- For STATUS/REPUTATION questions: Use `jaimini_full_analysis['wealth_sutras']['dhana_yoga_status']` as the verdict.
+- For MARRIAGE questions: Use `jaimini_full_analysis['marriage_sutras']['marriage_stability']` as the primary answer.
+- If Parashari and Jaimini conflict, the Jaimini Arudha (AL/UL) result is the FINAL VERDICT.
+
+CORRECT FORMAT:
+<div class="quick-answer-card">**Quick Answer**: [Complete summary using Jaimini verdict for status/marriage]</div>
 
 ### Key Insights
 [Bullet points with specific predictions]
+• **The Jaimini Secret**: [MANDATORY - Insight from `career_talents` or `wealth_sutras`]
 
 ### Astrological Analysis
-[Detailed chart analysis with classical references]
+You MUST write content directly under this header, then add subsections with ####. DO NOT leave this section empty.
+
+#### The Parashari View
+[Houses/Lords analysis]
+
+#### Jaimini Sutra Deep-Dive (MANDATORY)
+[Explain AL 2nd/11th for wealth, UL 2nd for marriage, Karkamsa planets for talents, Karaka yogas]
+
+#### Nadi Precision (if applicable)
+[Nadi links analysis]
+
+#### Timing Synthesis
+[Vimshottari + Chara Dasha + Yogini]
+
+#### Triple Perspective (if applicable)
+[Sudarshana analysis]
+
+#### Divisional Chart Analysis (if applicable)
+[D10 for career, D7 for children, D24 for education, etc. - use relevant chart based on question]
 
 ### Nakshatra Insights
 [Nakshatra analysis with classical authority]
@@ -772,14 +812,16 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
 
 ### SYNTHESIS PROTOCOL (MANDATORY):
 1. **The "Background Tone" (Birth Chart):**
-   - Check the Vimshottari Dasha first. If it is negative (e.g., Saturn-Rahu), the year will have an undercurrent of stress, even if the Varshphal is good.
+   - Check the Vimshottari Dasha (MD/AD/PD). If it is negative (e.g., Saturn-Rahu), the year will have an undercurrent of stress, even if the Varshphal is good.
    
 2. **The "Active Focus" (Varshphal):**
-   - **Look at the MUNTHA:** This is the most important point. The house the Muntha occupies in the Varshphal chart indicates the *inescapable focus* of the year (e.g., Muntha in 6th = Health/Enemies focus).
-   - **Look at the MUDDA DASHA:** Use the 'mudda_dasha' list to predict specific months (e.g. "Mars Mudda runs from Feb-March, bringing energy").
+   - ⚠️ MANDATORY TERMINOLOGY: You MUST explicitly mention the word **"Muntha"** and its house position from `varshphal['muntha_house']`.
+   - ⚠️ MANDATORY TERMINOLOGY: You MUST explicitly mention the current **"Mudda Dasha"** planet from `varshphal['mudda_dasha']` and how it restricts or expands the birth dasha.
+   - Example: "Your Muntha is in the 1st House, focusing this year on personal identity, while the Rahu Mudda Dasha (April-June) triggers the impulse to spend."
+   - The Muntha house is the "Inescapable Focus" of the year (e.g., Muntha in 6th = Health/Enemies focus).
 
 3. **Response Structure for Annual Queries:**
-   - **Quick Answer:** Summarize the year's "Theme" (based on Muntha).
+   - **Quick Answer:** Summarize the year's "Theme" (based on Muntha house).
    - **Key Insights:** List 3 wins and 1 challenge for {target_year}.
    - **Monthly Breakdown:** Group the year into phases based on the Mudda Dasha timeline.
 """
@@ -893,6 +935,64 @@ CRITICAL CHART INFORMATION:
         prompt_parts.append(time_context)
         
         # 5. DYNAMIC: History & Question
+        # Add reasoning scratchpad and enforcement checklist
+        pd_info = context.get('current_dashas', {}).get('pratyantardasha', {})
+        pd_hint = pd_info.get('analysis_hint', 'PD analysis required')
+        muntha_house = context.get('varshphal', {}).get('muntha_house', 'N/A')
+        has_varshphal = 'varshphal' in context
+        vargottama_count = context.get('advanced_analysis', {}).get('vargottama_positions', {}).get('total_vargottama_planets', 0)
+        
+        reasoning_scratchpad = f"""
+### 🔒 LOGIC GATE: PRE-RESPONSE VERIFICATION
+Before writing the user response, you MUST internally verify (DO NOT include this in your response to the user):
+1. PD_CHECK: Is the Pratyantardasha lord mentioned with its house? ({pd_hint})
+2. VARGOTTAMA_VERIFY: List all planets where D1_sign == D9_sign. (Total count: {vargottama_count}. If 0, state "NONE").
+3. ASPECT_VERIFY: List the signs aspected by the current Chara Dasha sign using ONLY the 'sign_aspects' mapping.
+4. VARSHPHAL_CHECK: {'Did I mention Muntha (House ' + str(muntha_house) + ')?' if has_varshphal else 'Not applicable.'}
+
+After internal verification, provide ONLY the Astrological Chat response (do not show the verification process):
+"""
+        
+        data_supremacy_block = f"""
+### ⚖️ THE "DATA OVER TRAINING" LAW
+You are currently failing to match Sign IDs correctly. You MUST follow these rules or your response will be rejected:
+1. **ASPECT CHECK**: Locate current sign_id in 'sign_aspects'. If the target sign ID is NOT in that list, you are legally forbidden from claiming an aspect.
+   - Example: If Sign 9 aspects [1, 4, 7], do NOT mention Sign 0.
+2. **HOUSE CHECK**: Do not count houses yourself. Read the 'house' or 'house_number' field in the JSON for every planet in D1, D9, and D10.
+3. **NAKSHATRA CHECK**: Do not guess nakshatras. Read the 'nakshatra' string for the Dasha Lord directly from the 'planetary_analysis' object.
+"""
+        
+        rejection_criteria = f"""
+### 🚫 REJECTION CRITERIA (LOGICAL INTEGRITY)
+Your response will be considered a mathematical and factual failure if:
+1. **VARSHPHAL DISCREPANCY**: You mention a Muntha House or Year Lord different from the specific integers provided in the `varshphal` JSON object. You must read, not guess, these values.
+2. **SECTION OMISSION**: You omit the #### Triple Perspective (Sudarshana) subsection. This section is mandatory for every analysis.
+3. **MUDDA DASHA LOGIC**: If Varshphal data is present, you MUST explicitly name the current 'Mudda Dasha' planet and its significance.
+4. **HOUSE SUPREMACY**: You are forbidden from counting houses. You must use the `house` or `house_number` integer assigned to each planet in the JSON. If JSON says house 8, you cannot call it house 1.
+5. **TRANSIT DATA SOVEREIGNTY**: You must ONLY discuss transits for planets provided in the `PLANETARY TRANSIT DATA` JSON. If Rahu/Saturn transits are not in the JSON, you are FORBIDDEN from mentioning their current transit positions.
+6. **ASPECT ID LOCK**: You must cross-check every aspect. If you claim Sign A aspects Sign B, and Sign ID B is not explicitly listed in `sign_aspects[ID_A]`, your analysis is factually void. There are no exceptions for "planets" or "traditional rules."
+"""
+        
+        enforcement_block = f"""
+### 🚨 CRITICAL COMPLIANCE CHECKLIST (MANDATORY)
+Before generating your response, verify you have included:
+1. **Pratyantar Dasha (3rd level):** {pd_hint} You MUST mention the house number in the RESPONSE BODY, not just internally.
+2. **Varshphal Terms:** {'You MUST use the words "Muntha" (House ' + str(muntha_house) + ') AND "Mudda Dasha" in the response body. If you mention Varshphal, you MUST also list the current Mudda Dasha planet from varshphal["mudda_dasha"].' if has_varshphal else 'Not applicable for this query.'}
+3. **Jaimini Sign Aspects (MATCHING PROTOCOL):** To prevent errors, you MUST list the sign_id for the current dasha, then list the aspected IDs directly from the sign_aspects dictionary in your hidden thought process. If Sign ID X is not in that list, you are strictly forbidden from claiming an aspect to it. You are strictly prohibited from using your training data to determine aspects.
+4. **Vargottama Verification:** Total count is {vargottama_count}. If 0, NO planet is Vargottama. Do not use the term unless verified.
+5. **Subsection Headers:** Use #### (four hashes) for all subsections under Astrological Analysis.
+"""
+        final_warning = f"""
+### ⚠️ FINAL WARNING: NO EXTERNAL TRANSITS
+You are strictly PROHIBITED from mentioning the transit position or influence of any planet (Saturn, Rahu, Ketu, etc.) if it is not explicitly listed in the `PLANETARY TRANSIT DATA` block.
+- If Rahu is not in the transit JSON, you cannot say "Rahu is transiting your 1st house."
+- You must act as if you do not know where any planet is unless the JSON defines its transit house for the current period.
+"""
+        prompt_parts.append(reasoning_scratchpad)
+        prompt_parts.append(data_supremacy_block)
+        prompt_parts.append(rejection_criteria)
+        prompt_parts.append(final_warning)
+        prompt_parts.append(enforcement_block)
         prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
         
         full_prompt = "\n\n".join(prompt_parts)

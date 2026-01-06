@@ -2,16 +2,15 @@ from typing import Dict, Any, List
 
 class JaiminiFullAnalyzer:
     """
-    The "Brain" of the Jaimini System.
-    Calculates:
-    1. Rashi Drishti (Sign Aspects) - The Jaimini method of connection.
-    2. Jaimini Yogas - The specific Raj Yogas formed by Karakas.
+    Jaimini Logic Engine. Translates planetary positions into Sutra-based predictions.
     """
 
-    def __init__(self, chart_data: Dict[str, Any], karaka_data: Dict[str, Any]):
+    def __init__(self, chart_data: Dict[str, Any], karaka_data: Dict[str, Any], points: Dict[str, Any], chara_dasha_data: Dict[str, Any] = None):
         self.chart = chart_data
+        self.points = points
         self.karakas = karaka_data.get('chara_karakas', {})
         self.planets = chart_data.get('planets', {})
+        self.chara_dasha = chara_dasha_data
         self.asc_sign = int(chart_data.get('ascendant', 0) / 30)
 
         # Map Planet Name -> Sign Index
@@ -19,14 +18,123 @@ class JaiminiFullAnalyzer:
         
         # Map Karaka -> Planet Name (e.g., 'Atmakaraka': 'Sun')
         self.karaka_map = {k: v['planet'] for k, v in self.karakas.items()}
+        
+        # Create sign map for quick lookup
+        self.sign_map = {i: [] for i in range(12)}
+        for p, data in self.planets.items():
+            self.sign_map[data['sign']].append(p)
 
     def get_jaimini_report(self) -> Dict[str, Any]:
         """Generates the comprehensive Jaimini analysis."""
+        # Identify active dasha signs for relative analysis
+        current_md_sign = None
+        current_ad_sign = None
+        if self.chara_dasha:
+            periods = self.chara_dasha.get('periods', [])
+            current_md = next((p for p in periods if p.get('is_current')), {})
+            current_md_sign = current_md.get('sign_id')
+            
+            # Debug logging
+            print(f"\n🔍 JAIMINI ANALYZER DEBUG:")
+            print(f"   Current MD: {current_md.get('sign_name')} (ID: {current_md_sign})")
+            
+            # Get current antardasha
+            antardashas = current_md.get('antardashas', [])
+            current_ad = next((a for a in antardashas if a.get('is_current')), {})
+            current_ad_sign = current_ad.get('sign_id')
+            print(f"   Current AD: {current_ad.get('sign_name')} (ID: {current_ad_sign})")
+            print(f"   Total ADs available: {len(antardashas)}")
+        
+        # Get Karaka signs from the karaka data structure
+        ak_data = self.karakas.get('Atmakaraka', {})
+        amk_data = self.karakas.get('Amatyakaraka', {})
+        ak_sign = ak_data.get('sign')
+        amk_sign = amk_data.get('sign')
+        print(f"   AK Sign: {ak_sign}, AmK Sign: {amk_sign}")
+        
         return {
+            "relative_views": {
+                "mahadasha_lagna": self._analyze_relative_lagna(current_md_sign, "Mahadasha Sign"),
+                "antardasha_lagna": self._analyze_relative_lagna(current_ad_sign, "Antardasha Sign"),
+                "atmakaraka_lagna": self._analyze_relative_lagna(ak_sign, "Atmakaraka (AK)"),
+                "amatyakaraka_lagna": self._analyze_relative_lagna(amk_sign, "Amatyakaraka (AmK)")
+            },
+            "raj_yogas": self._check_jaimini_yogas(),
+            "sutra_logic": {
+                "wealth_from_al": self._analyze_arudha_wealth(),
+                "marriage_from_ul": self._analyze_upapada_longevity(),
+                "talent_from_kl": self._analyze_karkamsa_skills()
+            },
             "sign_aspects": self._calculate_all_aspects(),
-            "jaimini_yogas": self._check_jaimini_yogas(),
             "karaka_status": self._analyze_karaka_positions()
         }
+
+    # -------------------------------------------------------------------------
+    # RELATIVE LAGNA ENGINE
+    # -------------------------------------------------------------------------
+    def _analyze_relative_lagna(self, base_sign: int, label: str) -> Dict[str, Any]:
+        """Creates a virtual chart perspective from a specific sign/karaka."""
+        if base_sign is None:
+            return {"perspective": label, "base_sign": None, "houses": {}}
+        
+        relative_houses = {}
+        # Pre-calculate houses 1-12 from this base sign
+        for h in range(1, 13):
+            target_sign = (base_sign + (h - 1)) % 12
+            relative_houses[f"house_{h}"] = {
+                "sign_id": target_sign,
+                "sign_name": self._get_sign_name(target_sign),
+                "planets": self.sign_map[target_sign]
+            }
+            
+        return {
+            "perspective": label,
+            "base_sign": base_sign,
+            "base_sign_name": self._get_sign_name(base_sign),
+            "houses": relative_houses
+        }
+
+    # -------------------------------------------------------------------------
+    # SUTRA ANALYSIS METHODS
+    # -------------------------------------------------------------------------
+    def _analyze_arudha_wealth(self) -> Dict[str, Any]:
+        """Sutras for 2nd and 11th from Arudha Lagna (AL)."""
+        al_sign = self.points['arudha_lagna']['sign_id']
+        second_sign = (al_sign + 1) % 12
+        eleventh_sign = (al_sign + 10) % 12
+        p_2nd = self.sign_map[second_sign]
+        p_11th = self.sign_map[eleventh_sign]
+        
+        is_dhana = any(p in ['Jupiter', 'Venus', 'Moon'] for p in p_2nd + p_11th)
+        return {
+            "dhana_yoga_status": "Strong" if is_dhana else "Average",
+            "source_planets": p_2nd + p_11th,
+            "note": "Benefics in 2nd/11th from AL indicate natural flow of wealth."
+        }
+
+    def _analyze_upapada_longevity(self) -> Dict[str, Any]:
+        """Longevity of marriage based on the 2nd from Upapada (UL)."""
+        ul_sign = self.points['upapada_lagna']['sign_id']
+        second_from_ul = (ul_sign + 1) % 12
+        planets = self.sign_map[second_from_ul]
+        malefics = [p for p in planets if p in ['Saturn', 'Mars', 'Rahu', 'Ketu']]
+        return {
+            "marriage_stability": "Challenged" if malefics else "High",
+            "blocking_factors": malefics,
+            "ul_sign": self.points['upapada_lagna']['sign_name']
+        }
+
+    def _analyze_karkamsa_skills(self) -> List[str]:
+        """Interpretations for Atmakaraka's position in Navamsa."""
+        kl_sign = self.points['karkamsa_lagna']['sign_id']
+        planets = self.sign_map.get(kl_sign, [])
+        results = []
+        if 'Ketu' in planets: results.append("Natural affinity for Mathematics, Coding, or Astrology.")
+        if 'Sun' in planets: results.append("Innate leadership and desire for public service.")
+        if 'Mercury' in planets: results.append("Business acumen and commercial talent.")
+        if 'Jupiter' in planets: results.append("Teaching, counseling, or spiritual guidance abilities.")
+        if 'Venus' in planets: results.append("Artistic talents and creative expression.")
+        return results
 
     # -------------------------------------------------------------------------
     # 1. RASHI DRISHTI (Sign Aspects)

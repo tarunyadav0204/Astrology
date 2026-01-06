@@ -2844,3 +2844,44 @@
         margin: 12px 0;
     }
 }
+
+
+/* Subsection headers (####) styling */
+.subsection-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ff6b35;
+    margin: 20px 0 12px 0;
+    padding-left: 12px;
+    border-left: 3px solid rgba(255, 107, 53, 0.4);
+}
+
+
+/* Subsection headers (####) - nested under main sections */
+.subsection-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ff6b35;
+    margin: 20px 0 12px 0;
+    padding: 10px 0 10px 12px;
+    border-left: 3px solid rgba(255, 107, 53, 0.4);
+    background: rgba(255, 107, 53, 0.05);
+    border-radius: 4px;
+}
+
+/* Numbered list formatting with line breaks */
+.section-content {
+    line-height: 1.8;
+}
+
+.section-content p {
+    margin-bottom: 12px;
+}
+
+
+/* Numbered list items with line breaks */
+.numbered-item {
+    margin: 10px 0;
+    line-height: 1.6;
+    display: block;
+}

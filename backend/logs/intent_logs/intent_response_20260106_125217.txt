@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T12:52:20.998825
+Question: My question is about progeny. I am not able to have kids, 2 IVFs failed in last 4 months. Please analyze.
+Processing Time: 3.181s
+Response Length: 510 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "I understand you're concerned about progeny after unsuccessful IVF attempts. To best analyze this, could you please share your and your partner's birth details (date, time, and place of birth)? Also, is there any specific aspect you're most worried about, such as the reason for IVF failure or alternative options?",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I understand you're concerned about progeny after unsuccessful IVF attempts. To best analyze this, could you please share your and your partner's birth details (date, time, and place of birth)? Also, is there any specific aspect you're most worried about, such as the reason for IVF failure or alternative options?",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ]
+}

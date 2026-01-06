@@ -1,0 +1,252 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-06T22:51:36.568805
+Question: My question is about progeny. I had 2 IVFs in second half of 2025 and both failed. I want to now understand what is wrong astrologically and when can my IVF be successful.
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 22622 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: Oct 31, 2026 – Jan 24, 2027: Jupiter moves into Leo (your Ascendant). From here, it casts its direct 5th aspect on your 5th House (Sagittarius). Simultaneously, Saturn (in Pisces) will aspect the 5th House. The Rule: When BOTH Jupiter and Saturn aspect the 5th House (Double Transit), childbirth is "Authorized" by the cosmos. - But double transit is activated in jan 2026 as well where jupiter in gemini in 11th house is aspecting 5th house by 7th aspect and saturn from pisces 8th house is aspecting 5th house with its 10th aspect. why did ivf fail then if you are saying double transit is a firm promise.
+A: My question is about progeny. I had 2 IVFs in second half of 2025 and both failed. I want to now understand what is wrong astrologically and when can my IVF be successful.
+Q: My question is about progeny. I had 2 IVFs in second half of 2025 and both failed. I want to now understand what is wrong astrologically and when can my IVF be successful.
+A: <div class="quick-answer-card">**Quick Answer**: You have correctly identified the "Mechanical Aspect," but the "Functional Result" failed due to a critical energy deficit: your **5th House (Sagittarius) has only 20 Ashtakavarga Bindus** (28 is average).
+
+Think of the Double Transit as the "Power Switch" and the Ashtakavarga as the "Wiring." Even though the switch was ON (Double Transit), the wiring (20 Bindus) was too weak to carry the current, leading to failure. Additionally, **Transit Saturn in the 8th House** (Pisces) creates "Ashtama Shani," where its aspect restricts/blocks rather than blesses.
+
+**The Turnaround:** Success is strongly indicated between **October 31, 2026 – January 24, 2027**, when Jupiter moves to **Leo (Your Lagna)**. By sitting in your Ascendant, Jupiter strengthens *YOU* (the container), bypassing the weak 5th house wiring and directly supporting the pregnancy through a powerful trinal aspect.</div>
+
+### Key Insights
+*   **The "Low Voltage" Issue:** Your 5th House (Progeny) has the lowest score in your chart (20 points). This means "natural" conception is difficult, and even IVF needs exceptional planetary support (like Jupiter in Lagna) to succeed.
+*   **The "Tainted" Aspect:** While Saturn aspects your 5th house now, it does so from the **8th House** (Pisces). An aspect from the 8th house carries the energy of "dead ends" and "delays," effectively freezing the embryo's progress.
+*   **The D7 Saptamsa Verdict:** In your Divisional Chart for children (D7), **Mars sits in the 5th House**. Mars represents "Heat" and "Surgery." This confirms that medical intervention (IVF) is the correct path, but the "Heat" can cause early rejection (miscarriage/implantation failure) if cooling remedies aren't applied.
+
+### Astrological Analysis
+
+#### The Parashari View (Why the Logic Failed)
+You spotted the **Double Transit** (Jupiter aspecting 5th, Saturn aspecting 5th), which is the classic rule. However, three deeper factors overrode this:
+1.  **Functional Maleficence:** Jupiter is currently in **Gemini**, which is an enemy sign for it. It is also your **8th Lord** (ruling Pisces). When the 8th Lord aspects the 5th House from an enemy sign, it brings "8th house problems" (medical complications) rather than blessings.
+2.  **Ashtakavarga Gatekeeper:** As mentioned, **20 Bindus** in the 5th house is a "Red Flag." It indicates that the house lacks the inherent strength to manifest results during average transits. It requires a "Super Transit" (like Exalted planet or Jupiter in Lagna) to work.
+3.  **Saturn's 8th House Transit:** Saturn in Pisces is "Ashtama Shani" for Leo Lagna. This is a period of karmic cleansing and obstruction. Its 10th aspect to the 5th house is currently acting as a "Stop Sign," not a green light.
+
+#### Jaimini Sutra Deep-Dive (MANDATORY)
+*   **The Chara Dasha Obstacle:** You are running the **Sagittarius Mahadasha** (2017–2028). Sagittarius is your 5th House, which *should* be good.
+*   **The Problem:** Sagittarius contains **Venus**, which is your **Gnati Karaka (GK)**. In Jaimini, the GK represents obstacles, medical battles, and enemies.
+*   **The Verdict:** The entire Sagittarius period is "Pregnant with Obstacles" because the GK sits right in the house of children.
+*   **The Solution:** The upcoming **Aquarius Antardasha** (starts Feb 2026) is better because Aquarius activates your **Amatyakaraka (Saturn)** and **Indu Lagna**, shifting the focus to "Gains through persistent effort."
+
+#### Nadi Precision (The Medical Link)
+Your chart shows a specific Nadi link that explains the "Medical" necessity:
+*   **Transit Jupiter (Life Force) Trine Natal Mars:** When Jupiter moves into **Leo** (Oct 2026), it will form a perfect 120° trine to your **Natal Mars** in Sagittarius (5th House).
+*   **Why this matters:** Mars represents "Technical/Surgical" intervention. When the Life Force (Jupiter) trines the Surgery Planet (Mars) in the Child House (5th), it signifies **"Success through Surgery."** This is the precise trigger for a successful IVF.
+
+#### Timing Synthesis (Multi-System)
+*   **Vimshottari:** You will be in **Jupiter-Mercury** Dasha (starts Aug 2026). Mercury rules your **2nd House (Family Expansion)** and **11th House (Gains/Desires)**. This is far more supportive than the current Jupiter-Saturn (Saturn = Delay) period.
+*   **Pratyantardasha:** The **Rahu Pratyantardasha** (in your 3rd house of artificial methods) during late 2026 will support the "artificial" nature of IVF.
+*   **Alignment:** The convergence of **Jupiter in Lagna (Oct 2026)** + **Jupiter-Mercury Dasha** + **Nadi Mars Activation** creates the strongest window in years.
+
+### Nakshatra Insights
+*   **Natal 5th House:** Contains **Mula Nakshatra** (ruled by Ketu). Mula is the "Root" or "Destruction." Planets here often deny the *first* attempt to force a "restart." The failure of the first two IVFs is a classic Mula manifestation—it demands a "fresh start."
+*   **Remedy:** Propitiating Ketu is essential to calm the Mula energy in the 5th house.
+
+### Timing & Guidance
+**Primary Success Window:** **October 31, 2026 – January 24, 2027**
+*   **Why:** Jupiter in Leo (Lagna) gains **Digbala** (Directional Strength) and casts a friendly trinal aspect on the 5th house, overriding the low Ashtakavarga points.
+
+**Action Plan:**
+1.  **Cooling Remedies:** Since Mars (Heat) is in your D7 5th house, you must "cool" the body. Avoid spicy foods and heat-generating activities during the implantation phase.
+2.  **Mula Pacification:** Donate grey blankets or sesame seeds on Tuesdays/Saturdays to appease Ketu (ruler of your 5th house star).
+3.  **Wait for Mercury:** Do not attempt another cycle before **August 2026** (start of Jupiter-Mercury dasha). The current Saturn AD is too restrictive.
+
+<div class="final-thoughts-card">**Final Thoughts**: Your logic was perfect, but the "Battery" (Ashtakavarga) was low. The upcoming transit of Jupiter into your Ascendant acts as a "Generator," providing the external power needed to override the weak 5th house. Patience until late 2026 is your best strategy.</div>
+Q: My question is about progeny. I had 2 IVFs in second half of 2025 and both failed. I want to now understand what is wrong astrologically and when can my IVF be successful.
+A: <div class="quick-answer-card">**Quick Answer**: The IVF challenges in late 2025 were caused by the restrictive "Karmic Freeze" of **Transit Saturn** (in your 8th House of obstacles) casting its 10th aspect directly onto your natal 5th House, blocking the "fruit" of the procedure. However, your D9 Navamsa shows a powerful **Jupiter in its Own Sign (Pisces)**, confirming that progeny is definitely promised. Specifically, expect success between **October 31, 2026 – January 24, 2027**, when Jupiter transits your Ascendant and activates your 5th House. Plan your next medical intervention for this "Double Transit" window.</div>
+
+### Key Insights
+*   **The Root of the Delay**: Your 5th House (Progeny) contains **Mars** and **Venus**. While Mars is a Yogakaraka, its presence here indicates "Surgical/Technical" birth (IVF), and Venus acts as the *Gnatikaraka* (GK), creating biological obstacles that require medical workarounds.
+*   **The 2025 Block**: During late 2025, you were in the **Jupiter-Saturn** Vimshottari period. Saturn, being the 6th Lord (obstacles), cast a restrictive aspect on your 5th Lord Jupiter, effectively "denying" the result temporarily.
+*   **The Jaimini Confirmation**: You are currently in the **Sagittarius Chara Mahadasha** (your 5th House sign), which keeps the focus on children. The upcoming **Aquarius Antardasha** (starting Feb 2026) is the 2nd house from your Arudha Lagna (AL), signaling "Family Expansion."
+
+### Astrological Analysis
+
+#### The Parashari View
+Your 5th House (Sagittarius) is activated by Mars and Venus. Mars here confirms that conception will likely require technical assistance (IVF/IUI). The 5th Lord, **Jupiter**, is placed in the 4th House (Scorpio) with the **Sun** (Putrakaraka - Significator of Children).
+*   **The Issue:** In late 2025, the sub-period lord was **Saturn**. Saturn is the natural *Karaka* for delay. From the 7th/8th house transit, Saturn was aspecting your natal 5th house, creating a "cold" environment that prevented implantation.
+*   **The Shift:** In **July 2026**, you enter the **Jupiter-Mercury** Dasha. Mercury is conjunct your 5th Lord Jupiter and rules your 2nd House (Family). This shifts the energy from "Obstacle (Saturn)" to "Gain/Addition (Mercury)."
+
+#### Jaimini Sutra Deep-Dive
+*   **Putrakaraka (PK):** Your PK is the **Sun**, placed in Scorpio.
+*   **Gnatikaraka (GK):** Your GK is **Venus**, placed in the 5th House. In Jaimini, the GK causes blockages due to biological factors (hormonal or structural).
+*   **Relative Analysis:** From your current **Sagittarius** Chara Mahadasha, the 5th House is **Aries** (containing Ketu). This confirms the need for "unconventional" (Ketu) methods. The upcoming **Aquarius** Antardasha (Feb 2026) places the 5th House (Gemini) in the 5th position from itself (*Bhavat Bhavam*), strongly supporting childbirth.
+
+#### Nadi Precision (The Nature of Progeny)
+Your chart reveals specific Nadi connections that define the nature of this event:
+*   **The "Sanjivani" Link (Jupiter + Mars):** Your Jupiter (Progeny) has a direct Nadi link to Mars (Surgery/Technology). This specifically indicates "Childbirth through technical intervention."
+*   **The "Biological" Link (Venus + Mars):** Venus in the 5th house linked with Mars suggests inflammation or heat in the reproductive system. The remedy lies in "Cooling" Mars (patience and timing) rather than forcing it.
+
+#### Timing Synthesis (Multi-System)
+This timing is confirmed by **Sagittarius** Chara Dasha (activating 5th House), **Bhramari** Yogini (starting Feb 2026), and your **Mercury** Antardasha.
+*   **Vimshottari:** The **Jupiter-Mercury** period (starts July 2026) is the "Golden Period." Mercury is with the 5th Lord Jupiter.
+*   **Transits (The Trigger):** The decisive factor is **Transit Jupiter**.
+    *   **Oct 31, 2026 – Jan 24, 2027:** Jupiter moves into **Leo** (your Ascendant). From here, it casts its direct 5th aspect on your 5th House (Sagittarius).
+    *   Simultaneously, Saturn (in Pisces) will aspect the 5th House.
+    *   **The Rule:** When BOTH Jupiter and Saturn aspect the 5th House (Double Transit), childbirth is "Authorized" by the cosmos.
+
+#### Triple Perspective (Sudarshana)
+*   **Lagna (Leo):** 5th House contains Mars/Venus (Medical need).
+*   **Moon (Capricorn):** 5th House from Moon is **Taurus**, occupied by Saturn (in D1). This confirms the delay/stress felt emotionally regarding children.
+*   **Sun (Scorpio):** 5th House from Sun is **Pisces**, which is Jupiter's own sign. This is the **Soul's Guarantee** that progeny is destined, regardless of the delay.
+*   **Verdict:** 2 out of 3 charts show challenges, but the Soul (Sun) chart guarantees success. Confidence: 85%.
+
+#### Divisional Chart Analysis (D7 Saptamsa)
+In the D7 chart (specific for children):
+*   **Lagna:** Leo (same as D1).
+*   **5th House:** Sagittarius, containing the **Moon**.
+*   **5th Lord:** Jupiter is in **Scorpio** (3rd House).
+*   **Key Strength:** The D7 Lagna Lord (Sun) is in the 11th House (Gains), promising the fulfillment of desires regarding children.
+
+### Nakshatra Insights
+Your 5th Lord Jupiter is in **Jyeshtha** Nakshatra (ruled by Mercury). Jyeshtha represents "The Eldest" or "Authority." The fact that your upcoming Antardasha is **Mercury** (ruler of Jyeshtha) indicates that the "fruit" of this Nakshatra will ripen specifically in the Mercury period (starting July 2026).
+
+### Timing & Guidance
+**Primary Success Window:** **October 31, 2026 to January 24, 2027**.
+*   **Why:** Jupiter in Lagna activates the 5th House + Mercury Antardasha + Double Transit.
+
+**Actionable Strategy:**
+1.  **Medical Timing:** Schedule the next stimulation/transfer cycle to align with **late October or November 2026**.
+2.  **Remedy (Mars/Venus):** Since Mars/Venus in the 5th causes "Heat," consume cooling foods (avoid spicy/acidic) and perform *Subramanya* prayers on Tuesdays.
+3.  **Protection:** During the **Rahu Pratyantardasha** (Jan 2026), focus on detoxifying the body to prepare for the Mercury period.
+
+<div class="final-thoughts-card">**Final Thoughts**: The failure in 2025 was a "Timing Block," not a "Destiny Denial." Your D9 Jupiter is too strong to deny progeny. The cosmos opens the gate in **Late 2026**—use this time to prepare physically and mentally, as the astrological support will be at its peak.</div>
+
+        
+        Current question: "My question is about progeny. I had 2 IVFs in second half of 2025 and both failed. I want to now understand what is wrong astrologically and when can my IVF be successful."
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
+           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
+           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
+           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
+           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+           
+           Generate similar contextual questions that:
+           - Gather factual information (number of kids, marital status, employment status, etc.)
+           - Narrow down the specific concern within that topic
+           - Sound warm and conversational, not robotic
+           - Are tailored to the user's specific question
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Questions involving 'when', 'growth', or 'timing' → ALWAYS set needs_transits: true
+        - Career questions about promotions/hikes → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

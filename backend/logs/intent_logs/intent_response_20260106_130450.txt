@@ -1,0 +1,73 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-06T13:04:54.281209
+Question: Analyze from my chart only. I want to understand when will I have kids I have 2 IVF failures in last 6 months why are IVFs failing and when can I conceive in 2026
+Processing Time: 3.508s
+Response Length: 655 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "child",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D7",
+        "D9"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

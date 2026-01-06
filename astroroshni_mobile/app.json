@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "31",
+      "buildNumber": "32",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "icon": "./assets/icon.png",
@@ -26,14 +26,7 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "UIViewControllerBasedStatusBarAppearance": false,
-        "CFBundleIconName": "AppIcon",
-        "CFBundleIcons": {
-          "CFBundlePrimaryIcon": {
-            "CFBundleIconFiles": ["AppIcon"],
-            "CFBundleIconName": "AppIcon"
-          }
-        }
+        "UIViewControllerBasedStatusBarAppearance": false
       }
     },
     "android": {

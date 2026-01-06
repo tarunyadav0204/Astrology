@@ -114,6 +114,8 @@ class IntentRouter:
         - "What period is good for..." → needs_transits: true
         - "How is 2025/next year..." → needs_transits: true
         - "Marriage timing" → needs_transits: true
+        - Questions involving 'when', 'growth', or 'timing' → ALWAYS set needs_transits: true
+        - Career questions about promotions/hikes → needs_transits: true
         - Personality/yoga/general questions → needs_transits: false
 
         CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
