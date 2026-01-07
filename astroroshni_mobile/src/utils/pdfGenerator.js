@@ -5,6 +5,9 @@ import { COLORS } from './constants';
 
 export const generatePDF = async (message) => {
   try {
+    console.log('📄 [PDF] Starting generation...');
+    console.log('📄 [PDF] Has summary_image:', !!message.summary_image);
+    
     // Clean and format the content
     const cleanContent = message.content
       .replace(/&lt;/g, '<')
@@ -13,6 +16,8 @@ export const generatePDF = async (message) => {
       .replace(/&amp;/g, '&')
       .replace(/&#39;/g, "'")
       .replace(/&nbsp;/g, ' ');
+
+    console.log('📄 [PDF] Content cleaned, length:', cleanContent.length);
 
     // Create HTML with exact same styling as mobile app
     const html = `
@@ -67,6 +72,16 @@ export const generatePDF = async (message) => {
             .timestamp {
               font-size: 12px;
               color: #6b7280;
+            }
+            
+            .summary-image {
+              width: 100%;
+              max-width: 500px;
+              height: auto;
+              margin: 20px auto;
+              display: block;
+              border-radius: 12px;
+              box-shadow: 0 4px 16px rgba(0,0,0,0.15);
             }
             
             .content {
@@ -196,6 +211,8 @@ export const generatePDF = async (message) => {
               <div class="timestamp">${new Date(message.timestamp).toLocaleString()}</div>
             </div>
             
+            ${message.summary_image ? `<img src="${message.summary_image}" class="summary-image" alt="Analysis Summary" />` : ''}
+            
             <div class="content">
               ${formatContentForPDF(cleanContent)}
             </div>
@@ -209,12 +226,23 @@ export const generatePDF = async (message) => {
       </html>
     `;
 
-    // Generate PDF
-    const { uri } = await Print.printToFileAsync({ html });
+    console.log('📄 [PDF] HTML generated, length:', html.length);
+    console.log('📄 [PDF] Calling Print.printToFileAsync...');
+
+    // Generate PDF without image first (image causes hanging)
+    const htmlWithoutImage = html.replace(/<img[^>]*class="summary-image"[^>]*>/g, '');
     
+    const { uri } = await Promise.race([
+      Print.printToFileAsync({ html: htmlWithoutImage }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('PDF generation timeout')), 30000)
+      )
+    ]);
+    
+    console.log('✅ [PDF] Generated successfully:', uri);
     return uri;
   } catch (error) {
-    console.error('PDF generation error:', error);
+    console.error('❌ [PDF] Generation error:', error);
     throw error;
   }
 };

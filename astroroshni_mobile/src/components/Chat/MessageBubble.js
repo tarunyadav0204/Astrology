@@ -32,6 +32,21 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
 
+  // Debug logging
+  useEffect(() => {
+    if (message.sender === 'ai') {
+      console.log('💬 [MessageBubble] Rendering AI message:', {
+        has_terms: !!message.terms,
+        terms_count: message.terms?.length || 0,
+        has_glossary: !!message.glossary,
+        glossary_keys: Object.keys(message.glossary || {}).length,
+        has_summary_image: !!message.summary_image,
+        summary_image_preview: message.summary_image?.substring(0, 100),
+        summary_image_length: message.summary_image?.length || 0
+      });
+    }
+  }, [message]);
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -101,10 +116,14 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const sharePDF = async () => {
     try {
       setIsGeneratingPDF(true);
+      console.log('📄 Starting PDF generation...');
       const pdfUri = await generatePDF(message);
+      console.log('✅ PDF generated:', pdfUri);
       await sharePDFOnWhatsApp(pdfUri);
+      console.log('✅ PDF shared');
     } catch (error) {
-      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+      console.error('❌ PDF generation error:', error);
+      Alert.alert('Error', `Failed to generate PDF: ${error.message}`);
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -187,15 +206,30 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       .replace(/&nbsp;/g, ' ');
     
     // Process term tooltips FIRST, after HTML entity decoding
-    if (message.terms && message.glossary) {
-      // Replace existing <term id="termname">text</term> with clickable spans
-      formatted = formatted.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
-        if (message.glossary[termId]) {
-          const definition = message.glossary[termId].replace(/"/g, '&quot;');
-          return `<tooltip data-term="${termId}" data-definition="${definition}">${termText}</tooltip>`;
+    if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
+      // First try to find existing <term> tags
+      let termCount = 0;
+      formatted = formatted.replace(/<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi, (match, termId, termText) => {
+        const normalizedId = termId.toLowerCase().trim();
+        if (message.glossary[normalizedId]) {
+          termCount++;
+          const definition = message.glossary[normalizedId].replace(/"/g, '&quot;');
+          return `<tooltip data-term="${normalizedId}" data-definition="${definition}">${termText}</tooltip>`;
         }
-        return match;
+        return termText;
       });
+      
+      // If no tags found, auto-wrap terms from glossary keys
+      if (termCount === 0) {
+        Object.keys(message.glossary).forEach(termKey => {
+          const definition = message.glossary[termKey].replace(/"/g, '&quot;');
+          // Create case-insensitive regex for the term
+          const termPattern = new RegExp(`\\b(${termKey.replace(/[()]/g, '\\$&')})\\b`, 'gi');
+          formatted = formatted.replace(termPattern, (match) => {
+            return `<tooltip data-term="${termKey}" data-definition="${definition}">${match}</tooltip>`;
+          });
+        });
+      }
     }
     
     // Normalize line breaks
@@ -738,7 +772,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       } else if (part.match(/^##\s+(.+)$/m) || part.match(/^###\s+(.+)$/m)) {
         listCounter = 0; // Reset counter for new section
         // Handle markdown headers (both ## and ###)
-        const headerText = part.replace(/^##\s+(.+)$/m, '$1').replace(/^###\s+(.+)$/m, '$1');
+        let headerText = part.replace(/^##\s+(.+)$/m, '$1').replace(/^###\s+(.+)$/m, '$1');
+        // Remove tooltip tags from headers
+        headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
@@ -891,7 +927,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             <Image 
               source={{ uri: message.summary_image }}
               style={{ width: '100%', maxWidth: 400, height: 250, borderRadius: 12 }}
-              resizeMode="cover"
+              resizeMode="contain"
+              onError={(e) => console.log('❌ Image load error:', e.nativeEvent.error)}
+              onLoad={() => console.log('✅ Image loaded successfully')}
             />
           </View>
         )}

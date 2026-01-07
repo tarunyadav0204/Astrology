@@ -289,23 +289,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           if (data && data.length > 0) {
             try {
               const parsed = JSON.parse(data);
-              // console.log('✅ [DEBUG] Parsed SSE data:', parsed.status, parsed.cached ? '(cached)' : '');
-              // console.log('📊 [DEBUG] SSE parsed object:', JSON.stringify(parsed, null, 2));
               
               if (parsed.status === 'error' && parsed.error_code === 'GENDER_REQUIRED') {
-                // console.log('⚠️ [DEBUG] GENDER_REQUIRED error detected');
-                // console.log('⚠️ [DEBUG] Error message:', parsed.message);
-                // console.log('⚠️ [DEBUG] Current birth data gender:', birthData?.gender);
-                // console.log('⚠️ [DEBUG] Request body gender:', requestBody.gender);
-                // console.log('⚠️ [DEBUG] Fixed birth data gender:', fixedBirthData.gender);
-                
-                // Log all storage data for debugging
-                try {
-                  const allStorageData = await storage.getBirthDetails();
-                  // console.log('⚠️ [DEBUG] Current storage data:', JSON.stringify(allStorageData, null, 2));
-                } catch (storageError) {
-                  console.error('⚠️ [DEBUG] Failed to read storage:', storageError);
-                }
                 
                 Alert.alert(
                   'Gender Required',
@@ -339,47 +324,16 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               } else if (parsed.status === 'chunk') {
                 fullContent += parsed.response || '';
               } else if (parsed.status === 'complete') {
-                // console.log('🎯 Complete status received');
-                // console.log('📦 Data keys:', Object.keys(parsed.data || {}));
                 
-                // Handle nested response structure - simple and clean
+                // Handle nested response structure
                 let analysisData = null;
                 
-                console.log('🔍 [DEBUG] Complete parsed.data structure:', JSON.stringify(parsed.data, null, 2));
-                
-                // 🔍 DEBUG: Log planetary placements if present
+                // Try direct analysis key
                 if (parsed.data && parsed.data.analysis) {
-                  const analysis = parsed.data.analysis;
-                  console.log('\n' + '='.repeat(80));
-                  console.log('📱 [MOBILE DEBUG] CAREER ANALYSIS PLANETARY DATA');
-                  console.log('='.repeat(80));
-                  
-                  // Check for planetary data in detailed_analysis
-                  if (analysis.detailed_analysis && Array.isArray(analysis.detailed_analysis)) {
-                    analysis.detailed_analysis.forEach((item, idx) => {
-                      if (item.answer && (item.answer.includes('house') || item.answer.includes('sign'))) {
-                        console.log(`\n📊 Question ${idx + 1}: ${item.question}`);
-                        console.log(`   Answer snippet: ${item.answer.substring(0, 200)}...`);
-                      }
-                    });
-                  }
-                  
-                  console.log('\n' + '='.repeat(80) + '\n');
-                }
-                
-                // Try direct analysis key (our new clean format)
-                if (parsed.data && parsed.data.analysis) {
-                  console.log('✅ Found direct analysis data');
                   analysisData = parsed.data.analysis;
                 }
                 
                 if (analysisData) {
-                  // console.log('📋 Analysis data keys:', Object.keys(analysisData));
-                  
-                  // DEBUG: Log the complete analysis data structure
-                  console.log('🔍 [DEBUG] Complete analysisData structure:', JSON.stringify(analysisData, null, 2));
-                  console.log('🔍 [DEBUG] analysisData.terms:', analysisData.terms);
-                  console.log('🔍 [DEBUG] analysisData.glossary:', analysisData.glossary);
                   
                   // Ensure terms and glossary are merged into the final object
                   const finalResult = {
@@ -396,7 +350,6 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                   }
                   return;
                 } else {
-                  // console.log('⚠️ No analysis data found, using response field');
                   fullContent = parsed.response || '';
                 }
                 break;

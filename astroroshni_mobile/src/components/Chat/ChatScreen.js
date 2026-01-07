@@ -843,6 +843,15 @@ export default function ChatScreen({ navigation, route }) {
           if (loadingInterval) clearInterval(loadingInterval);
           
           // Update message with response content including terms, glossary, and message_type
+          console.log('📊 [DEBUG] Status received:', {
+            has_terms: !!status.terms,
+            terms_count: status.terms?.length || 0,
+            has_glossary: !!status.glossary,
+            glossary_keys: Object.keys(status.glossary || {}).length,
+            has_summary_image: !!status.summary_image,
+            summary_image: status.summary_image
+          });
+          
           setMessagesWithStorage(prev => {
             const updated = prev.map(msg => 
               msg.messageId === messageId 

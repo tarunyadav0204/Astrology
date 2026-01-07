@@ -69,38 +69,6 @@ async def get_career_ai_insights(request: CareerAnalysisRequest, current_user: U
                 birth_data
             )
             
-            # 🔍 DEBUG: Log planetary placements being sent to AI
-            print("\n" + "="*80)
-            print("🔍 [CAREER DEBUG] PLANETARY PLACEMENTS IN CONTEXT")
-            print("="*80)
-            
-            # Log D1 planets
-            if 'd1_chart' in context and 'planets' in context['d1_chart']:
-                print("\n📊 D1 CHART PLANETS:")
-                for planet, data in context['d1_chart']['planets'].items():
-                    print(f"  {planet}: House {data.get('house')}, Sign {data.get('sign')} ({data.get('sign_name', 'N/A')}), Long {data.get('longitude', 0):.2f}°")
-            
-            # Log D10 planets
-            if 'd10_detailed' in context and 'planets' in context['d10_detailed']:
-                print("\n📊 D10 CHART PLANETS:")
-                for planet, data in context['d10_detailed']['planets'].items():
-                    print(f"  {planet}: House {data.get('house')}, Sign {data.get('sign')} ({data.get('sign_name', 'N/A')})")
-            
-            # Log 10th house analysis
-            if 'tenth_house_analysis' in context:
-                print("\n🏠 10TH HOUSE ANALYSIS:")
-                print(f"  Sign: {context['tenth_house_analysis'].get('sign_name')}")
-                print(f"  Lord: {context['tenth_house_analysis'].get('lord')}")
-                print(f"  Planets in 10th: {context['tenth_house_analysis'].get('planets_in_house')}")
-            
-            # Log Amatyakaraka
-            if 'chara_karakas' in context:
-                print("\n👑 CHARA KARAKAS:")
-                for karaka, planet in context['chara_karakas'].items():
-                    print(f"  {karaka}: {planet}")
-            
-            print("\n" + "="*80 + "\n")
-            
             # Career-specific AI question
             career_question = """
 You are an expert Vedic astrologer specializing in Career and Professional direction (Karma). Analyze the birth chart for Professional Success.
@@ -285,28 +253,6 @@ CRITICAL RULES:
                             "glossary": ai_result.get('glossary', {})
                         }
                     
-                    # 🔍 VALIDATE PLANETARY PLACEMENTS
-                    print("\n" + "="*80)
-                    print("🔍 VALIDATING PLANETARY PLACEMENTS IN AI RESPONSE")
-                    print("="*80)
-                    
-                    validator = PlanetaryPlacementValidator(context)
-                    
-                    # Validate quick_answer
-                    quick_valid = validator.validate_and_log(parsed_response.get('quick_answer', ''), 'd1')
-                    
-                    # Validate detailed_analysis
-                    for idx, item in enumerate(parsed_response.get('detailed_analysis', [])):
-                        print(f"\n📋 Validating Question {idx + 1}: {item.get('question', 'N/A')[:50]}...")
-                        answer_valid = validator.validate_and_log(item.get('answer', ''), 'd1')
-                        if not answer_valid:
-                            print(f"⚠️ Validation failed for question {idx + 1}")
-                    
-                    # Validate final_thoughts
-                    final_valid = validator.validate_and_log(parsed_response.get('final_thoughts', ''), 'd1')
-                    
-                    print("\n" + "="*80 + "\n")
-                    
                     career_insights = {
                         'analysis': parsed_response,
                         'terms': ai_result.get('terms', []),
@@ -364,7 +310,6 @@ CRITICAL RULES:
                     
                     final_response = {'status': 'complete', 'data': career_insights, 'cached': False}
                     response_json = json.dumps(final_response)
-                    print(f"🚀 SENDING FINAL CAREER RESPONSE: {len(response_json)} chars")
                     yield f"data: {response_json}\n\n"
                         
                 except json.JSONDecodeError as e:
