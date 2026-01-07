@@ -13,7 +13,7 @@ const ConsultationHistory = ({ user }) => {
   const fetchChatHistory = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/chat/history', {
+      const response = await fetch('http://localhost:8001/api/chat-v2/history', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -34,7 +34,7 @@ const ConsultationHistory = ({ user }) => {
   const fetchSessionDetails = async (sessionId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/chat/session/${sessionId}`, {
+      const response = await fetch(`http://localhost:8001/api/chat-v2/session/${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

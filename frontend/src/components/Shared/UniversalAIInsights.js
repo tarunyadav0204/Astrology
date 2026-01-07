@@ -323,7 +323,6 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
         birth_place: birthDetails?.place || '',
         latitude: birthDetails?.latitude || 0,
         longitude: birthDetails?.longitude || 0,
-        timezone: birthDetails?.timezone || 'UTC+0',
         language: 'english',
         force_regenerate: forceRegenerate
       } : {
@@ -333,7 +332,6 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
         place: birthDetails?.place || '',
         latitude: birthDetails?.latitude || 0,
         longitude: birthDetails?.longitude || 0,
-        timezone: birthDetails?.timezone || 'UTC+0',
         gender: birthDetails?.gender || '',
         language: 'english',
         response_style: 'detailed',
@@ -450,7 +448,6 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
           birth_place: birthDetails?.place || '',
           latitude: birthDetails?.latitude || 0,
           longitude: birthDetails?.longitude || 0,
-          timezone: birthDetails?.timezone || 'UTC+0',
           language: 'english'
         } : {
           name: birthDetails?.name || 'User',
@@ -459,7 +456,6 @@ const UniversalAIInsights = ({ analysisType, chartData, birthDetails, PDFCompone
           place: birthDetails?.place || '',
           latitude: birthDetails?.latitude || 0,
           longitude: birthDetails?.longitude || 0,
-          timezone: birthDetails?.timezone || 'UTC+0',
           gender: birthDetails?.gender || '',
           language: 'english',
           response_style: 'detailed'

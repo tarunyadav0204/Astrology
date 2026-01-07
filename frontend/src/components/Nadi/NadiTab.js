@@ -29,7 +29,14 @@ const NadiTab = ({ birthData, transitDate: propTransitDate, onTransitDateChange,
       const { apiService } = await import('../../services/apiService');
       
       // Get chart data in the format existing components expect
-      const chartData = await apiService.calculateChart(birthData);
+      const chartData = await apiService.calculateChartOnly({
+        name: birthData.name,
+        date: birthData.date,
+        time: birthData.time,
+        latitude: birthData.latitude,
+        longitude: birthData.longitude,
+        place: birthData.place || ''
+      });
       
       // Get transit data for current date
       const transitData = await apiService.calculateTransits({

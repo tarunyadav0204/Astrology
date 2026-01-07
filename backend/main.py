@@ -280,141 +280,141 @@ async def detect_timezone_from_coordinates(request: dict):
 async def test_endpoint():
     return {"status": "ok", "message": "API is working", "timestamp": datetime.now().isoformat()}
 
-@app.get("/api/test-gemini")
-async def test_gemini_connectivity():
-    """Test Gemini API connectivity and configuration"""
-    import os
-    import requests
+# @app.get("/api/test-gemini")
+# async def test_gemini_connectivity():
+#     """Test Gemini API connectivity and configuration"""
+#     import os
+#     import requests
     
-    print(f"🧪 Testing Gemini connectivity...")
+#     print(f"🧪 Testing Gemini connectivity...")
     
-    # Check API key
-    api_key = os.getenv('GEMINI_API_KEY')
-    print(f"🔑 API key present: {bool(api_key)}")
-    print(f"🔑 API key length: {len(api_key) if api_key else 0}")
+#     # Check API key
+#     api_key = os.getenv('GEMINI_API_KEY')
+#     print(f"🔑 API key present: {bool(api_key)}")
+#     print(f"🔑 API key length: {len(api_key) if api_key else 0}")
     
-    if not api_key:
-        return {"success": False, "error": "GEMINI_API_KEY not set"}
+#     if not api_key:
+#         return {"success": False, "error": "GEMINI_API_KEY not set"}
     
-    # Test network connectivity
-    try:
-        print(f"🌐 Testing network connectivity...")
-        response = requests.get('https://generativelanguage.googleapis.com', timeout=10)
-        network_ok = True
-        network_status = response.status_code
-        print(f"✅ Network connectivity: {network_status}")
-    except Exception as e:
-        network_ok = False
-        network_status = str(e)
-        print(f"❌ Network connectivity failed: {e}")
+#     # Test network connectivity
+#     try:
+#         print(f"🌐 Testing network connectivity...")
+#         response = requests.get('https://generativelanguage.googleapis.com', timeout=10)
+#         network_ok = True
+#         network_status = response.status_code
+#         print(f"✅ Network connectivity: {network_status}")
+#     except Exception as e:
+#         network_ok = False
+#         network_status = str(e)
+#         print(f"❌ Network connectivity failed: {e}")
     
-    # Test Gemini API
-    try:
-        print(f"🤖 Testing Gemini API...")
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+#     # Test Gemini API
+#     try:
+#         print(f"🤖 Testing Gemini API...")
+#         import google.generativeai as genai
+#         genai.configure(api_key=api_key)
+#         model = genai.GenerativeModel('gemini-pro')
         
-        # Simple test request
-        response = model.generate_content("Hello, just testing connectivity")
-        gemini_ok = True
-        gemini_response = response.text[:100] if response.text else "No response text"
-        print(f"✅ Gemini API test successful: {gemini_response}")
-    except Exception as e:
-        gemini_ok = False
-        gemini_response = str(e)
-        print(f"❌ Gemini API test failed: {e}")
+#         # Simple test request
+#         response = model.generate_content("Hello, just testing connectivity")
+#         gemini_ok = True
+#         gemini_response = response.text[:100] if response.text else "No response text"
+#         print(f"✅ Gemini API test successful: {gemini_response}")
+#     except Exception as e:
+#         gemini_ok = False
+#         gemini_response = str(e)
+#         print(f"❌ Gemini API test failed: {e}")
     
-    return {
-        "success": network_ok and gemini_ok,
-        "api_key_present": bool(api_key),
-        "api_key_length": len(api_key) if api_key else 0,
-        "network_connectivity": {
-            "success": network_ok,
-            "status": network_status
-        },
-        "gemini_api": {
-            "success": gemini_ok,
-            "response": gemini_response
-        }
-    }
+#     return {
+#         "success": network_ok and gemini_ok,
+#         "api_key_present": bool(api_key),
+#         "api_key_length": len(api_key) if api_key else 0,
+#         "network_connectivity": {
+#             "success": network_ok,
+#             "status": network_status
+#         },
+#         "gemini_api": {
+#             "success": gemini_ok,
+#             "response": gemini_response
+#         }
+#     }
 
-@app.get("/api/test-blank-chart-predictor")
-async def test_blank_chart_predictor():
-    """Test blank chart predictor initialization and connection"""
-    try:
-        print(f"🧪 Testing blank chart predictor...")
+# @app.get("/api/test-blank-chart-predictor")
+# async def test_blank_chart_predictor():
+#     """Test blank chart predictor initialization and connection"""
+#     try:
+#         print(f"🧪 Testing blank chart predictor...")
         
-        # Test predictor initialization
-        from calculators.blank_chart_gemini_predictor import BlankChartGeminiPredictor
-        predictor = BlankChartGeminiPredictor()
+#         # Test predictor initialization
+#         from calculators.blank_chart_gemini_predictor import BlankChartGeminiPredictor
+#         predictor = BlankChartGeminiPredictor()
         
-        # Test connection
-        connection_test = predictor.test_gemini_connection()
+#         # Test connection
+#         connection_test = predictor.test_gemini_connection()
         
-        return {
-            "predictor_initialized": True,
-            "connection_test": connection_test
-        }
+#         return {
+#             "predictor_initialized": True,
+#             "connection_test": connection_test
+#         }
         
-    except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        print(f"❌ Blank chart predictor test failed: {str(e)}")
-        print(f"❌ Stack trace: {error_trace}")
+#     except Exception as e:
+#         import traceback
+#         error_trace = traceback.format_exc()
+#         print(f"❌ Blank chart predictor test failed: {str(e)}")
+#         print(f"❌ Stack trace: {error_trace}")
         
-        return {
-            "predictor_initialized": False,
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "stack_trace": error_trace
-        }
+#         return {
+#             "predictor_initialized": False,
+#             "error": str(e),
+#             "error_type": type(e).__name__,
+#             "stack_trace": error_trace
+#         }
 
 # Remove custom /docs override - let FastAPI handle it automatically
 # GCP health checks will use the default FastAPI /docs endpoint
 
-@app.get("/api/debug-environment")
-async def debug_environment():
-    """Debug environment variables and configuration"""
-    import os
+# @app.get("/api/debug-environment")
+# async def debug_environment():
+#     """Debug environment variables and configuration"""
+#     import os
     
-    env_vars = {
-        'GEMINI_API_KEY': bool(os.getenv('GEMINI_API_KEY')),
-        'GEMINI_API_KEY_LENGTH': len(os.getenv('GEMINI_API_KEY', '')),
-        'ENVIRONMENT': os.getenv('ENVIRONMENT', 'not_set'),
-        'PORT': os.getenv('PORT', 'not_set'),
-        'JWT_SECRET': bool(os.getenv('JWT_SECRET')),
-        'TWILIO_ACCOUNT_SID': bool(os.getenv('TWILIO_ACCOUNT_SID')),
-        'PYTHON_PATH': os.getenv('PYTHONPATH', 'not_set'),
-        'CURRENT_WORKING_DIR': os.getcwd()
-    }
+#     env_vars = {
+#         'GEMINI_API_KEY': bool(os.getenv('GEMINI_API_KEY')),
+#         'GEMINI_API_KEY_LENGTH': len(os.getenv('GEMINI_API_KEY', '')),
+#         'ENVIRONMENT': os.getenv('ENVIRONMENT', 'not_set'),
+#         'PORT': os.getenv('PORT', 'not_set'),
+#         'JWT_SECRET': bool(os.getenv('JWT_SECRET')),
+#         'TWILIO_ACCOUNT_SID': bool(os.getenv('TWILIO_ACCOUNT_SID')),
+#         'PYTHON_PATH': os.getenv('PYTHONPATH', 'not_set'),
+#         'CURRENT_WORKING_DIR': os.getcwd()
+#     }
     
-    # Test imports
-    import_tests = {}
+#     # Test imports
+#     import_tests = {}
     
-    try:
-        import google.generativeai as genai
-        import_tests['google.generativeai'] = 'SUCCESS'
-    except Exception as e:
-        import_tests['google.generativeai'] = f'FAILED: {str(e)}'
+#     try:
+#         import google.generativeai as genai
+#         import_tests['google.generativeai'] = 'SUCCESS'
+#     except Exception as e:
+#         import_tests['google.generativeai'] = f'FAILED: {str(e)}'
     
-    try:
-        from calculators.blank_chart_context_builder import BlankChartContextBuilder
-        import_tests['BlankChartContextBuilder'] = 'SUCCESS'
-    except Exception as e:
-        import_tests['BlankChartContextBuilder'] = f'FAILED: {str(e)}'
+#     try:
+#         from calculators.blank_chart_context_builder import BlankChartContextBuilder
+#         import_tests['BlankChartContextBuilder'] = 'SUCCESS'
+#     except Exception as e:
+#         import_tests['BlankChartContextBuilder'] = f'FAILED: {str(e)}'
     
-    try:
-        from calculators.blank_chart_gemini_predictor import BlankChartGeminiPredictor
-        import_tests['BlankChartGeminiPredictor'] = 'SUCCESS'
-    except Exception as e:
-        import_tests['BlankChartGeminiPredictor'] = f'FAILED: {str(e)}'
+#     try:
+#         from calculators.blank_chart_gemini_predictor import BlankChartGeminiPredictor
+#         import_tests['BlankChartGeminiPredictor'] = 'SUCCESS'
+#     except Exception as e:
+#         import_tests['BlankChartGeminiPredictor'] = f'FAILED: {str(e)}'
     
-    return {
-        'environment_variables': env_vars,
-        'import_tests': import_tests,
-        'timestamp': datetime.now().isoformat()
-    }
+#     return {
+#         'environment_variables': env_vars,
+#         'import_tests': import_tests,
+#         'timestamp': datetime.now().isoformat()
+#     }
 
 @app.get("/api/status")
 async def api_status():
@@ -531,199 +531,199 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 43200  # 1 month (30 days)
 security = HTTPBearer()
 
 # Initialize SQLite database
-def init_db():
-    try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
+# def init_db():
+#     try:
+#         conn = sqlite3.connect('astrology.db')
+#         cursor = conn.cursor()
         
-        # Create users table (simplified)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                userid INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                phone TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT DEFAULT 'user',
-                email TEXT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+#         # Create users table (simplified)
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS users (
+#                 userid INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 name TEXT NOT NULL,
+#                 phone TEXT UNIQUE NOT NULL,
+#                 password TEXT NOT NULL,
+#                 role TEXT DEFAULT 'user',
+#                 email TEXT NULL,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+#             )
+#         ''')
         
-        # Add email column if it doesn't exist (backward compatibility)
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN email TEXT NULL')
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
+#         # Add email column if it doesn't exist (backward compatibility)
+#         try:
+#             cursor.execute('ALTER TABLE users ADD COLUMN email TEXT NULL')
+#             conn.commit()
+#         except sqlite3.OperationalError:
+#             pass  # Column already exists
         
-        # Create subscription plans table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS subscription_plans (
-                plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                platform TEXT NOT NULL,
-                plan_name TEXT NOT NULL,
-                price DECIMAL(10,2) DEFAULT 0.00,
-                duration_months INTEGER DEFAULT 1,
-                features TEXT NOT NULL,
-                is_active BOOLEAN DEFAULT true,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+#         # Create subscription plans table
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS subscription_plans (
+#                 plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 platform TEXT NOT NULL,
+#                 plan_name TEXT NOT NULL,
+#                 price DECIMAL(10,2) DEFAULT 0.00,
+#                 duration_months INTEGER DEFAULT 1,
+#                 features TEXT NOT NULL,
+#                 is_active BOOLEAN DEFAULT true,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+#             )
+#         ''')
         
-        # Create user subscriptions table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_subscriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                userid INTEGER NOT NULL,
-                plan_id INTEGER NOT NULL,
-                status TEXT DEFAULT 'active',
-                start_date DATE NOT NULL,
-                end_date DATE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (userid) REFERENCES users (userid),
-                FOREIGN KEY (plan_id) REFERENCES subscription_plans (plan_id)
-            )
-        ''')
+#         # Create user subscriptions table
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS user_subscriptions (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 userid INTEGER NOT NULL,
+#                 plan_id INTEGER NOT NULL,
+#                 status TEXT DEFAULT 'active',
+#                 start_date DATE NOT NULL,
+#                 end_date DATE NOT NULL,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#                 FOREIGN KEY (userid) REFERENCES users (userid),
+#                 FOREIGN KEY (plan_id) REFERENCES subscription_plans (plan_id)
+#             )
+#         ''')
         
-        # Insert default subscription plans
-        cursor.execute("SELECT COUNT(*) FROM subscription_plans")
-        if cursor.fetchone()[0] == 0:
-            default_plans = [
-                ('astrovishnu', 'Free', 0.00, 12, '{"charts": true, "basic_features": true}'),
-                ('astrovishnu', 'Premium', 99.99, 12, '{"charts": true, "predictions": true, "api_access": true, "advanced_features": true}'),
-                ('astroroshni', 'Free', 0.00, 12, '{"consultations": 1, "basic_reports": true}'),
-                ('astroroshni', 'Basic', 29.99, 1, '{"consultations": 3, "reports": true, "priority_support": false}'),
-                ('astroroshni', 'Premium', 99.99, 12, '{"consultations": 10, "reports": true, "priority_support": true, "custom_remedies": true}')
-            ]
+#         # Insert default subscription plans
+#         cursor.execute("SELECT COUNT(*) FROM subscription_plans")
+#         if cursor.fetchone()[0] == 0:
+#             default_plans = [
+#                 ('astrovishnu', 'Free', 0.00, 12, '{"charts": true, "basic_features": true}'),
+#                 ('astrovishnu', 'Premium', 99.99, 12, '{"charts": true, "predictions": true, "api_access": true, "advanced_features": true}'),
+#                 ('astroroshni', 'Free', 0.00, 12, '{"consultations": 1, "basic_reports": true}'),
+#                 ('astroroshni', 'Basic', 29.99, 1, '{"consultations": 3, "reports": true, "priority_support": false}'),
+#                 ('astroroshni', 'Premium', 99.99, 12, '{"consultations": 10, "reports": true, "priority_support": true, "custom_remedies": true}')
+#             ]
             
-            for platform, plan_name, price, duration, features in default_plans:
-                cursor.execute('''
-                    INSERT INTO subscription_plans (platform, plan_name, price, duration_months, features)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (platform, plan_name, price, duration, features))
+#             for platform, plan_name, price, duration, features in default_plans:
+#                 cursor.execute('''
+#                     INSERT INTO subscription_plans (platform, plan_name, price, duration_months, features)
+#                     VALUES (?, ?, ?, ?, ?)
+#                 ''', (platform, plan_name, price, duration, features))
         
-        # Check if birth_charts table exists and has userid column
-        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='birth_charts'")
-        result = cursor.fetchone()
+#         # Check if birth_charts table exists and has userid column
+#         cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='birth_charts'")
+#         result = cursor.fetchone()
         
-        if result and 'userid' not in result[0]:
-            # Drop existing table and recreate with userid column
-            cursor.execute('DROP TABLE birth_charts')
+#         if result and 'userid' not in result[0]:
+#             # Drop existing table and recreate with userid column
+#             cursor.execute('DROP TABLE birth_charts')
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS birth_charts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                userid INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                date TEXT NOT NULL,
-                time TEXT NOT NULL,
-                latitude REAL NOT NULL,
-                longitude REAL NOT NULL,
-                timezone TEXT NOT NULL,
-                place TEXT DEFAULT '',
-                gender TEXT DEFAULT '',
-                relation TEXT DEFAULT 'other',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (userid) REFERENCES users (userid),
-                UNIQUE(userid, name, date, time, latitude, longitude)
-            )
-        ''')
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS birth_charts (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 userid INTEGER NOT NULL,
+#                 name TEXT NOT NULL,
+#                 date TEXT NOT NULL,
+#                 time TEXT NOT NULL,
+#                 latitude REAL NOT NULL,
+#                 longitude REAL NOT NULL,
+#                 timezone TEXT NOT NULL,
+#                 place TEXT DEFAULT '',
+#                 gender TEXT DEFAULT '',
+#                 relation TEXT DEFAULT 'other',
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#                 FOREIGN KEY (userid) REFERENCES users (userid),
+#                 UNIQUE(userid, name, date, time, latitude, longitude)
+#             )
+#         ''')
         
-        # Add relation column if it doesn't exist (backward compatibility)
-        try:
-            cursor.execute('ALTER TABLE birth_charts ADD COLUMN relation TEXT DEFAULT "other"')
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
+#         # Add relation column if it doesn't exist (backward compatibility)
+#         try:
+#             cursor.execute('ALTER TABLE birth_charts ADD COLUMN relation TEXT DEFAULT "other"')
+#             conn.commit()
+#         except sqlite3.OperationalError:
+#             pass  # Column already exists
         
-        # Add place column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE birth_charts ADD COLUMN place TEXT DEFAULT ""')
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
+#         # Add place column if it doesn't exist
+#         try:
+#             cursor.execute('ALTER TABLE birth_charts ADD COLUMN place TEXT DEFAULT ""')
+#             conn.commit()
+#         except sqlite3.OperationalError:
+#             pass  # Column already exists
         
-        # Add gender column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE birth_charts ADD COLUMN gender TEXT DEFAULT ""')
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
+#         # Add gender column if it doesn't exist
+#         try:
+#             cursor.execute('ALTER TABLE birth_charts ADD COLUMN gender TEXT DEFAULT ""')
+#             conn.commit()
+#         except sqlite3.OperationalError:
+#             pass  # Column already exists
         
-        # Create planet nakshatra interpretations table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS planet_nakshatra_interpretations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                planet TEXT NOT NULL,
-                nakshatra TEXT NOT NULL,
-                house INTEGER NOT NULL,
-                interpretation TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(planet, nakshatra, house)
-            )
-        ''')
+#         # Create planet nakshatra interpretations table
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS planet_nakshatra_interpretations (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 planet TEXT NOT NULL,
+#                 nakshatra TEXT NOT NULL,
+#                 house INTEGER NOT NULL,
+#                 interpretation TEXT NOT NULL,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#                 UNIQUE(planet, nakshatra, house)
+#             )
+#         ''')
         
-        # Create nakshatras table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS nakshatras (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                lord TEXT NOT NULL,
-                deity TEXT NOT NULL,
-                nature TEXT NOT NULL,
-                guna TEXT NOT NULL,
-                description TEXT NOT NULL,
-                characteristics TEXT NOT NULL,
-                positive_traits TEXT NOT NULL,
-                negative_traits TEXT NOT NULL,
-                careers TEXT NOT NULL,
-                compatibility TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+#         # Create nakshatras table
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS nakshatras (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 name TEXT UNIQUE NOT NULL,
+#                 lord TEXT NOT NULL,
+#                 deity TEXT NOT NULL,
+#                 nature TEXT NOT NULL,
+#                 guna TEXT NOT NULL,
+#                 description TEXT NOT NULL,
+#                 characteristics TEXT NOT NULL,
+#                 positive_traits TEXT NOT NULL,
+#                 negative_traits TEXT NOT NULL,
+#                 careers TEXT NOT NULL,
+#                 compatibility TEXT NOT NULL,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+#             )
+#         ''')
         
-        # Create password reset codes table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS password_reset_codes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone TEXT NOT NULL,
-                code TEXT NOT NULL,
-                token TEXT NOT NULL,
-                expires_at TIMESTAMP NOT NULL,
-                used BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Database initialization error: {str(e)}")
-        # Create a minimal database if initialization fails
-        try:
-            conn = sqlite3.connect('astrology.db')
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    userid INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    phone TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    role TEXT DEFAULT 'user',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            conn.commit()
-            conn.close()
-            print("Minimal database created")
-        except Exception as e2:
-            print(f"Failed to create minimal database: {str(e2)}")
+#         # Create password reset codes table
+#         cursor.execute('''
+#             CREATE TABLE IF NOT EXISTS password_reset_codes (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 phone TEXT NOT NULL,
+#                 code TEXT NOT NULL,
+#                 token TEXT NOT NULL,
+#                 expires_at TIMESTAMP NOT NULL,
+#                 used BOOLEAN DEFAULT FALSE,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+#             )
+#         ''')
+#         conn.commit()
+#         conn.close()
+#     except Exception as e:
+#         print(f"Database initialization error: {str(e)}")
+#         # Create a minimal database if initialization fails
+#         try:
+#             conn = sqlite3.connect('astrology.db')
+#             cursor = conn.cursor()
+#             cursor.execute('''
+#                 CREATE TABLE IF NOT EXISTS users (
+#                     userid INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     name TEXT NOT NULL,
+#                     phone TEXT UNIQUE NOT NULL,
+#                     password TEXT NOT NULL,
+#                     role TEXT DEFAULT 'user',
+#                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+#                 )
+#             ''')
+#             conn.commit()
+#             conn.close()
+#             print("Minimal database created")
+#         except Exception as e2:
+#             print(f"Failed to create minimal database: {str(e2)}")
 
-try:
-    init_db()
-    init_chat_tables()
-    print("Database initialized successfully")
-except Exception as e:
-    print(f"Database initialization failed: {str(e)}")
+# try:
+#     init_db()
+#     init_chat_tables()
+#     print("Database initialized successfully")
+# except Exception as e:
+#     print(f"Database initialization failed: {str(e)}")
 
 # Authentication functions
 def hash_password(password: str) -> str:

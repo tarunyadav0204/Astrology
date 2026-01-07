@@ -210,13 +210,13 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
     if (!birthData) return;
     try {
       const { apiService } = await import('../../services/apiService');
-      const chartData = await apiService.calculateChart({
+      const chartData = await apiService.calculateChartOnly({
         name: birthData.name,
         date: birthData.date,
         time: birthData.time,
         latitude: birthData.latitude,
         longitude: birthData.longitude,
-        timezone: birthData.timezone
+        place: birthData.place || ''
       }, userSettings.node_type);
       
       setChartData(chartData);
@@ -237,20 +237,20 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
     try {
       const { apiService } = await import('../../services/apiService');
       
-      const chartData = await apiService.calculateChart({
+      const chartData = await apiService.calculateChartOnly({
         name: chart.name,
         date: chart.date,
         time: chart.time,
         latitude: chart.latitude,
         longitude: chart.longitude,
-        timezone: chart.timezone
+        place: chart.place || ''
       }, userSettings.node_type);
       
       setBirthData({
         name: chart.name,
         date: chart.date,
         time: chart.time,
-        place: `${chart.latitude}, ${chart.longitude}`,
+        place: chart.place || `${chart.latitude}, ${chart.longitude}`,
         latitude: chart.latitude,
         longitude: chart.longitude,
         timezone: chart.timezone

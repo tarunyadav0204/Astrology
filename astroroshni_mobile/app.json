@@ -17,9 +17,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "34",
+      "buildNumber": "36",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
+      "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
@@ -34,7 +35,8 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "newArchEnabled": false
+      "newArchEnabled": false,
+      "icon": "./assets/icon.png"
     },
     "web": {
       "favicon": "./assets/favicon.png"
