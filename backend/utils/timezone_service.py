@@ -71,7 +71,7 @@ def get_timezone_from_coordinates(lat: float, lon: float) -> str:
 def parse_timezone_offset(timezone_str, latitude: float = None, longitude: float = None) -> float:
     """
     Parse timezone string to UTC offset in hours (as float)
-    Uses coordinate-based detection if timezone_str is empty
+    Uses coordinate-based detection if timezone_str is empty or invalid
     
     Args:
         timezone_str: Timezone string (e.g., 'UTC+5:30', 'UTC-8') or float
@@ -99,16 +99,20 @@ def parse_timezone_offset(timezone_str, latitude: float = None, longitude: float
     except (ValueError, TypeError):
         pass
     
-    # If no timezone string provided, try coordinate-based detection
-    if not timezone_str and latitude is not None and longitude is not None:
-        try:
-            detected_tz = get_timezone_from_coordinates(latitude, longitude)
-            timezone_str = detected_tz
-        except Exception as e:
-            pass  # Fall through to default
-    
-    if not timezone_str:
-        return 0.0  # UTC default
+    # If timezone is 'UTC+0', 'UTC', or empty, try coordinate-based detection
+    if (not timezone_str or 
+        timezone_str in ['UTC', 'UTC+0', 'UTC-0', 'UTC0'] or
+        timezone_str.strip() == ''):
+        if latitude is not None and longitude is not None:
+            try:
+                detected_tz = get_timezone_from_coordinates(latitude, longitude)
+                timezone_str = detected_tz
+                print(f"🌍 TIMEZONE: Detected '{detected_tz}' from coordinates ({latitude}, {longitude})")
+            except Exception as e:
+                print(f"⚠️ TIMEZONE: Failed to detect from coordinates: {e}")
+                return 0.0  # Fall back to UTC
+        else:
+            return 0.0  # UTC default
     
     # Parse UTC format
     if timezone_str.startswith('UTC'):

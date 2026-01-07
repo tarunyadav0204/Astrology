@@ -8,6 +8,9 @@ class DivisionalChartCalculator(BaseCalculator):
     def calculate_divisional_chart(self, division_number=9):
         """Calculate divisional chart - extracted from main.py"""
         
+        print(f"\n🔮 [BACKEND] Starting divisional chart calculation for D{division_number}")
+        print(f"📍 [BACKEND] Input ascendant: {self.chart_data.get('ascendant')}")
+        
         def get_divisional_sign(sign, degree_in_sign, division):
             """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
             EPS = 1e-9  # Prevent 10.0 becoming 9.999
@@ -131,6 +134,9 @@ class DivisionalChartCalculator(BaseCalculator):
         asc_degree = self.chart_data['ascendant'] % 30
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
         
+        print(f"⚙️ [BACKEND] D1 Ascendant: sign={asc_sign}, degree={asc_degree:.2f}")
+        print(f"✅ [BACKEND] D{division_number} Ascendant sign: {divisional_asc_sign}")
+        
         # Scaled degree calculation with epsilon buffer
         EPS = 1e-9
         part_size = 30.0 / division_number
@@ -188,6 +194,10 @@ class DivisionalChartCalculator(BaseCalculator):
                     'house': house_number,
                     **dignity_info
                 }
+        
+        print(f"📊 [BACKEND] D{division_number} Result:")
+        print(f"  - Ascendant: {divisional_data['ascendant']:.2f} (sign {divisional_asc_sign})")
+        print(f"  - Houses: {[{'house': h['house_number'], 'sign': h['sign']} for h in divisional_data['houses'][:3]]}...")
         
         return {
             'divisional_chart': divisional_data,

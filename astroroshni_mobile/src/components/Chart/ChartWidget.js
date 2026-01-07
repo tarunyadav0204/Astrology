@@ -276,17 +276,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   };
 
   const loadDivisionalChart = async (divisionNumber) => {
-    // console.log(`[ChartWidget] Starting loadDivisionalChart for division ${divisionNumber}`);
+    console.log(`📱 [MOBILE] Starting loadDivisionalChart for division ${divisionNumber}`);
     if (!birthData || !divisionNumber || loading) {
-      // console.log(`[ChartWidget] Skipping loadDivisionalChart - birthData: ${!!birthData}, divisionNumber: ${divisionNumber}, loading: ${loading}`);
+      console.log(`📱 [MOBILE] Skipping - birthData: ${!!birthData}, divisionNumber: ${divisionNumber}, loading: ${loading}`);
       return;
     }
     
     const typeAtStart = currentChartType;
-    // console.log(`[ChartWidget] Loading divisional chart ${divisionNumber} for type ${typeAtStart}`);
+    console.log(`📱 [MOBILE] Loading divisional chart ${divisionNumber} for type ${typeAtStart}`);
     
     try {
-      // console.log(`[ChartWidget] Setting loading to true`);
       setLoading(true);
       const formattedData = {
         ...birthData,
@@ -296,44 +295,52 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
         longitude: parseFloat(birthData.longitude),
       };
       
-      // console.log(`[ChartWidget] Calling API with formatted data:`, formattedData);
+      console.log('📱 [MOBILE] Requesting divisional chart:', {
+        division: divisionNumber,
+        birthData: formattedData
+      });
+      
       const startTime = Date.now();
       const response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
       const endTime = Date.now();
-      // console.log(`[ChartWidget] API call completed in ${endTime - startTime}ms`);
+      console.log(`📱 [MOBILE] API call completed in ${endTime - startTime}ms`);
       
       const data = response.data.divisional_chart;
-      // console.log(`[ChartWidget] Received chart data:`, data ? 'success' : 'null');
+      console.log('✅ [MOBILE] Received divisional chart:', {
+        division: divisionNumber,
+        ascendant: data?.ascendant,
+        ascendant_sign: data?.ascendant ? Math.floor(data.ascendant / 30) : null,
+        houses: data?.houses?.map(h => ({ house: h.house_number, sign: h.sign }))
+      });
       
       // Only update if user hasn't switched charts while loading
       if (data && activeChartTypeRef.current === typeAtStart) {
-        // console.log(`[ChartWidget] Updating chart cache and data for ${currentChartType}`);
+        console.log(`📱 [MOBILE] Updating chart cache and data for ${currentChartType}`);
         setChartDataCache(prev => ({ ...prev, [currentChartType]: data }));
         setCurrentChartData(data);
       } else {
-        // console.log(`[ChartWidget] Skipping update - data: ${!!data}, activeType: ${activeChartTypeRef.current}, typeAtStart: ${typeAtStart}`);
+        console.log(`📱 [MOBILE] Skipping update - data: ${!!data}, activeType: ${activeChartTypeRef.current}, typeAtStart: ${typeAtStart}`);
       }
     } catch (error) {
-      // console.error(`[ChartWidget] Error loading divisional chart:`, error);
+      console.error(`❌ [MOBILE] Error loading divisional chart:`, error);
     } finally {
       if (activeChartTypeRef.current === typeAtStart) {
-        // console.log(`[ChartWidget] Setting loading to false`);
         setLoading(false);
       }
     }
   };
 
   const loadChartData = async (type, setCurrent = true, customDate = null) => {
-    // console.log(`[ChartWidget] Starting loadChartData for type: ${type}, setCurrent: ${setCurrent}`);
+    console.log(`📱 [MOBILE] Starting loadChartData for type: ${type}, setCurrent: ${setCurrent}`);
     
     if (chartDataCache[type] && !(type === 'transit' && customDate)) {
-      // console.log(`[ChartWidget] Using cached data for ${type}`);
+      console.log(`📱 [MOBILE] Using cached data for ${type}`);
       if (setCurrent) setCurrentChartData(chartDataCache[type]);
       return;
     }
     
     if (type === 'lagna') {
-      // console.log(`[ChartWidget] Using provided chartData for lagna`);
+      console.log(`📱 [MOBILE] Using provided chartData for lagna`);
       const data = chartData;
       setChartDataCache(prev => ({ ...prev, [type]: data }));
       if (setCurrent) setCurrentChartData(data);
@@ -341,16 +348,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
     }
     
     if (!birthData || loading) {
-      // console.log(`[ChartWidget] Skipping loadChartData - birthData: ${!!birthData}, loading: ${loading}`);
+      console.log(`📱 [MOBILE] Skipping loadChartData - birthData: ${!!birthData}, loading: ${loading}`);
       return;
     }
     
     const typeAtStart = currentChartType;
-    // console.log(`[ChartWidget] Loading chart data for ${type}, currentType: ${typeAtStart}`);
+    console.log(`📱 [MOBILE] Loading chart data for ${type}, currentType: ${typeAtStart}`);
     
     try {
       if (setCurrent) {
-        // console.log(`[ChartWidget] Setting loading to true for ${type}`);
         setLoading(true);
       }
       const formattedData = {
@@ -366,33 +372,39 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       const startTime = Date.now();
       
       if (chartDivisions[type]) {
-        // console.log(`[ChartWidget] Calling calculateDivisionalChart for ${type} (D${chartDivisions[type]})`);
+        console.log(`📱 [MOBILE] Calling calculateDivisionalChart for ${type} (D${chartDivisions[type]})`);
+        console.log('📱 [MOBILE] Request data:', formattedData);
         response = await chartAPI.calculateDivisionalChart(formattedData, chartDivisions[type]);
         data = response.data.divisional_chart;
+        console.log('✅ [MOBILE] Received divisional chart:', {
+          type,
+          division: chartDivisions[type],
+          ascendant: data?.ascendant,
+          ascendant_sign: data?.ascendant ? Math.floor(data.ascendant / 30) : null
+        });
       } else if (type === 'transit') {
         const targetDate = customDate || transitDate;
         const dateStr = targetDate.toISOString().split('T')[0];
-        // console.log(`[ChartWidget] Calling calculateTransits for date ${dateStr}`);
+        console.log(`📱 [MOBILE] Calling calculateTransits for date ${dateStr}`);
         response = await chartAPI.calculateTransits(formattedData, dateStr);
         data = response.data;
       }
       
       const endTime = Date.now();
-      // console.log(`[ChartWidget] API call for ${type} completed in ${endTime - startTime}ms`);
+      console.log(`📱 [MOBILE] API call for ${type} completed in ${endTime - startTime}ms`);
       
       // Only update if user hasn't switched charts while loading
       if (data && activeChartTypeRef.current === typeAtStart) {
-        // console.log(`[ChartWidget] Updating cache and data for ${type}`);
+        console.log(`📱 [MOBILE] Updating cache and data for ${type}`);
         setChartDataCache(prev => ({ ...prev, [type]: data }));
         if (setCurrent) setCurrentChartData(data);
       } else {
-        console.log(`[ChartWidget] Skipping update for ${type} - data: ${!!data}, activeType: ${activeChartTypeRef.current}, typeAtStart: ${typeAtStart}`);
+        console.log(`📱 [MOBILE] Skipping update for ${type} - data: ${!!data}, activeType: ${activeChartTypeRef.current}, typeAtStart: ${typeAtStart}`);
       }
     } catch (error) {
-      console.error(`[ChartWidget] Error loading chart data for ${type}:`, error);
+      console.error(`❌ [MOBILE] Error loading chart data for ${type}:`, error);
     } finally {
       if (setCurrent && activeChartTypeRef.current === typeAtStart) {
-        // console.log(`[ChartWidget] Setting loading to false for ${type}`);
         setLoading(false);
       }
     }

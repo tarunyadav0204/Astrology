@@ -40,13 +40,32 @@ const ChartWidget = ({ title, chartType, chartData, birthData, transitDate, divi
       setLoading(true);
       const divisionNum = chartType === 'navamsa' ? 9 : (division || 9);
       
+      console.log('🌐 [WEB] Requesting divisional chart:', {
+        chartType,
+        division: divisionNum,
+        birthData: {
+          name: birthData.name,
+          date: birthData.date,
+          time: birthData.time,
+          latitude: birthData.latitude,
+          longitude: birthData.longitude,
+          timezone: birthData.timezone
+        }
+      });
+      
       // Always use backend for all divisional charts
       apiService.calculateDivisionalChart(birthData, divisionNum)
         .then(response => {
+          console.log('✅ [WEB] Received divisional chart:', {
+            division: divisionNum,
+            ascendant: response.divisional_chart?.ascendant,
+            ascendant_sign: Math.floor(response.divisional_chart?.ascendant / 30),
+            houses: response.divisional_chart?.houses?.map(h => ({ house: h.house_number, sign: h.sign }))
+          });
           setDivisionalData(response.divisional_chart);
         })
         .catch(error => {
-          console.error('Failed to calculate divisional chart:', error);
+          console.error('❌ [WEB] Failed to calculate divisional chart:', error);
           setDivisionalData(null);
         })
         .finally(() => {

@@ -347,6 +347,26 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 
                 console.log('🔍 [DEBUG] Complete parsed.data structure:', JSON.stringify(parsed.data, null, 2));
                 
+                // 🔍 DEBUG: Log planetary placements if present
+                if (parsed.data && parsed.data.analysis) {
+                  const analysis = parsed.data.analysis;
+                  console.log('\n' + '='.repeat(80));
+                  console.log('📱 [MOBILE DEBUG] CAREER ANALYSIS PLANETARY DATA');
+                  console.log('='.repeat(80));
+                  
+                  // Check for planetary data in detailed_analysis
+                  if (analysis.detailed_analysis && Array.isArray(analysis.detailed_analysis)) {
+                    analysis.detailed_analysis.forEach((item, idx) => {
+                      if (item.answer && (item.answer.includes('house') || item.answer.includes('sign'))) {
+                        console.log(`\n📊 Question ${idx + 1}: ${item.question}`);
+                        console.log(`   Answer snippet: ${item.answer.substring(0, 200)}...`);
+                      }
+                    });
+                  }
+                  
+                  console.log('\n' + '='.repeat(80) + '\n');
+                }
+                
                 // Try direct analysis key (our new clean format)
                 if (parsed.data && parsed.data.analysis) {
                   console.log('✅ Found direct analysis data');
