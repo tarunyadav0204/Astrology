@@ -19,6 +19,10 @@ class FluxImageService:
     async def generate_image(self, prompt: str, aspect_ratio: str = "1:1") -> Optional[str]:
         """Generate image using Flux model"""
         try:
+            print(f"🎨 IMAGE GENERATION START:")
+            print(f"   Prompt: {prompt[:100]}...")
+            print(f"   Aspect ratio: {aspect_ratio}")
+            
             output = self.client.run(
                 "black-forest-labs/flux-dev:6e4a938f85952bdabcc15aa329178c4d681c52bf25a0342403287dc26944661d",
                 input={
@@ -28,8 +32,22 @@ class FluxImageService:
                     "output_quality": 80
                 }
             )
-            return output[0] if output else None
+            
+            if output:
+                image_url = output[0]
+                print(f"✅ IMAGE GENERATION SUCCESS:")
+                print(f"   URL: {image_url}")
+                print(f"   Domain: {image_url.split('/')[2] if '/' in image_url else 'unknown'}")
+                return image_url
+            else:
+                print(f"❌ IMAGE GENERATION FAILED: No output returned")
+                return None
+                
         except Exception as e:
+            print(f"❌ IMAGE GENERATION ERROR:")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   Error message: {str(e)}")
+            print(f"   Full error: {repr(e)}")
             logger.error(f"Flux image generation failed: {e}")
             return None
 

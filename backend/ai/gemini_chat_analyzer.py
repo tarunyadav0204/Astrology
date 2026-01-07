@@ -329,14 +329,29 @@ class GeminiChatAnalyzer:
             summary_image_url = None
             if self.flux_service and premium_analysis and parsed_response.get('summary_image_prompt'):
                 try:
-                    print(f"\n🎨 Generating summary image...")
+                    print(f"\n🎨 SUMMARY IMAGE GENERATION:")
+                    print(f"   Premium analysis: {premium_analysis}")
+                    print(f"   Flux service available: {bool(self.flux_service)}")
+                    print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
+                    print(f"   Prompt preview: {parsed_response.get('summary_image_prompt', '')[:150]}...")
+                    
                     summary_image_url = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
+                    
                     if summary_image_url:
-                        print(f"   ✅ Generated summary image: {summary_image_url}")
+                        print(f"   ✅ SUMMARY IMAGE SUCCESS: {summary_image_url}")
                     else:
-                        print(f"   ❌ Failed to generate summary image")
+                        print(f"   ❌ SUMMARY IMAGE FAILED: No URL returned")
+                        
                 except Exception as e:
-                    print(f"   ⚠️ Image generation error: {e}")
+                    print(f"   ⚠️ SUMMARY IMAGE EXCEPTION:")
+                    print(f"      Error type: {type(e).__name__}")
+                    print(f"      Error message: {str(e)}")
+                    print(f"      Full error: {repr(e)}")
+            else:
+                print(f"\n🎨 SUMMARY IMAGE SKIPPED:")
+                print(f"   Premium analysis: {premium_analysis}")
+                print(f"   Flux service available: {bool(self.flux_service)}")
+                print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
             return {
                 'success': True,
                 'response': parsed_response['content'],
