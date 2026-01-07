@@ -1,0 +1,41 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-07T17:47:18.853812
+Question: Both.
+Processing Time: 3.555s
+Response Length: 262 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "extracted_context": {
+        "area": "Both"
+    },
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "extracted_context": {
+    "area": "Both"
+  },
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10",
+    "D30"
+  ]
+}

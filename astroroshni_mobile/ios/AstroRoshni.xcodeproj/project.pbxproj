@@ -8,12 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		217145CDC02004EEC32A57EE /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBFE65E8AF6BB1305B031F0A /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		694CE44849B4F85234BA9116 /* libPods-AstroRoshni.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CCC41C336B40160FB56293A8 /* libPods-AstroRoshni.a */; };
-		82D31F7B77F141D285004682 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FAC571952A698217138AB6E9 /* PrivacyInfo.xcprivacy */; };
+		63C0D7E60DE2CF025A8C5943 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F254B68BB55EF95469DCE8B2 /* ExpoModulesProvider.swift */; };
+		73620474768478CABDD4091D /* Pods_AstroRoshni.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C451E2D8083AEAAAD8F95D97 /* Pods_AstroRoshni.framework */; };
+		B1B04C30F2022A4390B98A3A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 713103410770514C4BF4C8A7 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		D584BF9B2F0B875000B32EFC /* icon.png in Resources */ = {isa = PBXBuildFile; fileRef = D584BF9A2F0B875000B32EFC /* icon.png */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -21,17 +20,16 @@
 		13B07F961A680F5B00A75B9A /* AstroRoshni.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AstroRoshni.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = AstroRoshni/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = AstroRoshni/Info.plist; sourceTree = "<group>"; };
-		796BEC090855AF202FD8C73F /* Pods-AstroRoshni.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AstroRoshni.release.xcconfig"; path = "Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni.release.xcconfig"; sourceTree = "<group>"; };
-		91D7703DB8F27ADFE73EA26A /* Pods-AstroRoshni.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AstroRoshni.debug.xcconfig"; path = "Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni.debug.xcconfig"; sourceTree = "<group>"; };
+		3576C8D9081E6990E09C1A49 /* Pods-AstroRoshni.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AstroRoshni.debug.xcconfig"; path = "Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni.debug.xcconfig"; sourceTree = "<group>"; };
+		713103410770514C4BF4C8A7 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = AstroRoshni/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = AstroRoshni/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CCC41C336B40160FB56293A8 /* libPods-AstroRoshni.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-AstroRoshni.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		D584BF9A2F0B875000B32EFC /* icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = icon.png; sourceTree = "<group>"; };
-		EBFE65E8AF6BB1305B031F0A /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-AstroRoshni/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		C451E2D8083AEAAAD8F95D97 /* Pods_AstroRoshni.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_AstroRoshni.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = AstroRoshni/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* AstroRoshni-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "AstroRoshni-Bridging-Header.h"; path = "AstroRoshni/AstroRoshni-Bridging-Header.h"; sourceTree = "<group>"; };
-		FAC571952A698217138AB6E9 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = AstroRoshni/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F254B68BB55EF95469DCE8B2 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-AstroRoshni/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		FDAE4A4FA066B5753878E3D9 /* Pods-AstroRoshni.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AstroRoshni.release.xcconfig"; path = "Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -39,13 +37,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				694CE44849B4F85234BA9116 /* libPods-AstroRoshni.a in Frameworks */,
+				73620474768478CABDD4091D /* Pods_AstroRoshni.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0F418EB37D3EDBC6E91A2604 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				17B27562B28BB709CFCAB607 /* AstroRoshni */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* AstroRoshni */ = {
 			isa = PBXGroup;
 			children = (
@@ -53,10 +59,17 @@
 				F11748442D0722820044C1D9 /* AstroRoshni-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
-				D584BF9A2F0B875000B32EFC /* icon.png */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				FAC571952A698217138AB6E9 /* PrivacyInfo.xcprivacy */,
+				713103410770514C4BF4C8A7 /* PrivacyInfo.xcprivacy */,
+			);
+			name = AstroRoshni;
+			sourceTree = "<group>";
+		};
+		17B27562B28BB709CFCAB607 /* AstroRoshni */ = {
+			isa = PBXGroup;
+			children = (
+				F254B68BB55EF95469DCE8B2 /* ExpoModulesProvider.swift */,
 			);
 			name = AstroRoshni;
 			sourceTree = "<group>";
@@ -65,17 +78,9 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				CCC41C336B40160FB56293A8 /* libPods-AstroRoshni.a */,
+				C451E2D8083AEAAAD8F95D97 /* Pods_AstroRoshni.framework */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		490F38BA4D4F596BB7759BBA /* AstroRoshni */ = {
-			isa = PBXGroup;
-			children = (
-				EBFE65E8AF6BB1305B031F0A /* ExpoModulesProvider.swift */,
-			);
-			name = AstroRoshni;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -92,8 +97,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				99FE387CF76DC3AC70C99326 /* Pods */,
-				A3C395450267930F20CF7F50 /* ExpoModulesProviders */,
+				AD773958F9F16BC211A34C1E /* Pods */,
+				0F418EB37D3EDBC6E91A2604 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -108,21 +113,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		99FE387CF76DC3AC70C99326 /* Pods */ = {
+		AD773958F9F16BC211A34C1E /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				91D7703DB8F27ADFE73EA26A /* Pods-AstroRoshni.debug.xcconfig */,
-				796BEC090855AF202FD8C73F /* Pods-AstroRoshni.release.xcconfig */,
+				3576C8D9081E6990E09C1A49 /* Pods-AstroRoshni.debug.xcconfig */,
+				FDAE4A4FA066B5753878E3D9 /* Pods-AstroRoshni.release.xcconfig */,
 			);
+			name = Pods;
 			path = Pods;
-			sourceTree = "<group>";
-		};
-		A3C395450267930F20CF7F50 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				490F38BA4D4F596BB7759BBA /* AstroRoshni */,
-			);
-			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -142,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "AstroRoshni" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				E0CD8A3354CBDFA947DC083E /* [Expo] Configure project */,
+				23D39F8473C3F696A4A364F1 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				9EC9CAFF183E8A5BACC7D794 /* [CP] Embed Pods Frameworks */,
+				437864103C04C8A0AC84B1C9 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,10 +194,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
-				D584BF9B2F0B875000B32EFC /* icon.png in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				82D31F7B77F141D285004682 /* PrivacyInfo.xcprivacy in Resources */,
+				B1B04C30F2022A4390B98A3A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,6 +242,48 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		23D39F8473C3F696A4A364F1 /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/AstroRoshni/AstroRoshni.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-AstroRoshni/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-AstroRoshni/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-AstroRoshni/expo-configure-project.sh\"\n";
+		};
+		437864103C04C8A0AC84B1C9 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -281,48 +320,6 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		9EC9CAFF183E8A5BACC7D794 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-AstroRoshni/Pods-AstroRoshni-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		E0CD8A3354CBDFA947DC083E /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/AstroRoshni/AstroRoshni.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-AstroRoshni/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-AstroRoshni/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-AstroRoshni/expo-configure-project.sh\"\n";
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -331,7 +328,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				217145CDC02004EEC32A57EE /* ExpoModulesProvider.swift in Sources */,
+				63C0D7E60DE2CF025A8C5943 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -340,13 +337,12 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 91D7703DB8F27ADFE73EA26A /* Pods-AstroRoshni.debug.xcconfig */;
+			baseConfigurationReference = 3576C8D9081E6990E09C1A49 /* Pods-AstroRoshni.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = AstroRoshni/AstroRoshni.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7RCQ9WCKKN;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -377,13 +373,12 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 796BEC090855AF202FD8C73F /* Pods-AstroRoshni.release.xcconfig */;
+			baseConfigurationReference = FDAE4A4FA066B5753878E3D9 /* Pods-AstroRoshni.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = AstroRoshni/AstroRoshni.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7RCQ9WCKKN;
 				INFOPLIST_FILE = AstroRoshni/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -402,7 +397,6 @@
 				SWIFT_OBJC_BRIDGING_HEADER = "AstroRoshni/AstroRoshni-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = NO;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
@@ -454,6 +448,19 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers/react/nativemodule/core",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-runtimeexecutor/React_runtimeexecutor.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-runtimeexecutor/React_runtimeexecutor.framework/Headers/platform/ios",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers/platform/ios",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers/react/renderer/components/view/platform/cxx",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-NativeModulesApple/React_NativeModulesApple.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers/react/renderer/graphics/platform/ios",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					/usr/lib/swift,
@@ -509,6 +516,19 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers/react/nativemodule/core",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-runtimeexecutor/React_runtimeexecutor.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-runtimeexecutor/React_runtimeexecutor.framework/Headers/platform/ios",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers/platform/ios",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers/react/renderer/components/view/platform/cxx",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-NativeModulesApple/React_NativeModulesApple.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers/react/renderer/graphics/platform/ios",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					/usr/lib/swift,

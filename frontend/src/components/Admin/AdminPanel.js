@@ -40,6 +40,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [approvalData, setApprovalData] = useState({ amount: 0, notes: '' });
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [adminSettings, setAdminSettings] = useState([]);
+  const [debugLogging, setDebugLogging] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -59,8 +61,48 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       // Chat history will be loaded by AdminChatHistory component
     } else if (activeTab === 'ledger') {
       // Credit ledger will be loaded by AdminCreditLedger component
+    } else if (activeTab === 'settings') {
+      fetchAdminSettings();
     }
   }, [activeTab, activeSubTab]);
+
+  const fetchAdminSettings = async () => {
+    try {
+      const response = await fetch('/api/admin/settings', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setAdminSettings(data.settings || []);
+      const debugSetting = data.settings.find(s => s.key === 'debug_logging_enabled');
+      setDebugLogging(debugSetting?.value === 'true');
+    } catch (error) {
+      console.error('Error fetching admin settings:', error);
+    }
+  };
+
+  const handleToggleDebugLogging = async () => {
+    const newValue = !debugLogging;
+    try {
+      const response = await fetch('/api/admin/settings/debug_logging_enabled', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          key: 'debug_logging_enabled',
+          value: newValue ? 'true' : 'false',
+          description: 'Enable complete Gemini request/response logging'
+        })
+      });
+      if (response.ok) {
+        setDebugLogging(newValue);
+        alert(`Debug logging ${newValue ? 'enabled' : 'disabled'}`);
+      }
+    } catch (error) {
+      console.error('Error updating debug logging:', error);
+    }
+  };
 
   const fetchSubscriptionPlans = async () => {
     try {
@@ -464,6 +506,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('blog')}
         >
           Blog
+        </button>
+        <button 
+          className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
         </button>
       </div>
 
@@ -1006,6 +1054,30 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'blog' && (
           <BlogDashboard />
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="admin-settings">
+            <h2>System Settings</h2>
+            
+            <div className="settings-section">
+              <h3>Debug & Logging</h3>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Gemini Debug Logging</strong>
+                  <p>Enable complete request/response logging for Gemini AI chat</p>
+                </div>
+                <label className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    checked={debugLogging}
+                    onChange={handleToggleDebugLogging}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       </div>

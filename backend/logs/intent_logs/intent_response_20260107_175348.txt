@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-07T17:53:51.115990
+Question: I had a career rise in December 2016 and my Mother had a colon cancer in June-July 2017   What caused these events pls analyse  Could it be avoided
+Processing Time: 2.206s
+Response Length: 177 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10",
+    "D12"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10",
+    "D12"
+  ]
+}

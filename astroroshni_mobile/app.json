@@ -17,10 +17,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "32",
+      "buildNumber": "34",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
-      "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
@@ -49,6 +48,15 @@
     "updates": {
       "url": "https://u.expo.dev/8e33070b-ac6c-42e0-a089-bd830019bb1a"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ]
   }
 }

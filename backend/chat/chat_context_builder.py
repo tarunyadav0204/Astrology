@@ -692,7 +692,6 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
             'time': now.strftime('%H:%M'),
             'latitude': user_location_data.get('latitude', 28.6139),
             'longitude': user_location_data.get('longitude', 77.2090),
-            'timezone': user_location_data.get('timezone', 'Asia/Kolkata'),
             'place': user_location_data.get('place', 'Query Location')
         }
         # print(f"\n⏰ Question Time: {prashna_data['date']} {prashna_data['time']}")
@@ -889,6 +888,16 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         # Calculate birth chart using existing API endpoint logic
         from types import SimpleNamespace
         birth_obj = SimpleNamespace(**birth_data)
+        
+        # DEBUG: Log what we're sending to calculate chart
+        print(f"\n📤 [CHART CALCULATION INPUT]")
+        print(f"Date: {birth_data.get('date')}")
+        print(f"Time: {birth_data.get('time')}")
+        print(f"Latitude: {birth_data.get('latitude')}")
+        print(f"Longitude: {birth_data.get('longitude')}")
+        print(f"Timezone: {birth_data.get('timezone', 'NOT PROVIDED')}")
+        print(f"Place: {birth_data.get('place', 'NOT PROVIDED')}")
+        
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
         chart_data_original = chart_data  # Store original before enrichment
@@ -921,10 +930,19 @@ Sentence 4 (Action): "Focus on [specific action] to [specific outcome]."
         
         # Extract and validate ascendant information
         ascendant_degree = chart_data.get('ascendant', 0)
+        
+        # DEBUG: Log ascendant value
+        print(f"\n🔍 [ASCENDANT DEBUG]")
+        print(f"Raw ascendant from chart_data: {ascendant_degree}°")
+        print(f"Birth data: {birth_data.get('date')} {birth_data.get('time')} at {birth_data.get('latitude')}, {birth_data.get('longitude')}")
+        
         ascendant_sign_num = int(ascendant_degree / 30)
         ascendant_sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
                                'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
         ascendant_sign_name = ascendant_sign_names[ascendant_sign_num]
+        
+        print(f"Calculated sign: {ascendant_sign_name} (sign #{ascendant_sign_num})")
+        print(f"Degree in sign: {ascendant_degree % 30:.2f}°")
         
         # Validate ascendant calculation
         try:

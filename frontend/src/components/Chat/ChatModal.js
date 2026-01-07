@@ -520,7 +520,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                     time: birthData.time,
                     latitude: parseFloat(birthData.latitude),
                     longitude: parseFloat(birthData.longitude),
-                    timezone: birthData.timezone || 'Asia/Kolkata',
                     place: birthData.place || '',
                     gender: birthData.gender || ''
                 }
@@ -533,7 +532,6 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 requestData.partner_place = selectedPartnerChart.place || '';
                 requestData.partner_latitude = parseFloat(selectedPartnerChart.latitude);
                 requestData.partner_longitude = parseFloat(selectedPartnerChart.longitude);
-                requestData.partner_timezone = selectedPartnerChart.timezone || 'Asia/Kolkata';
                 requestData.partner_gender = selectedPartnerChart.gender || '';
             }
             

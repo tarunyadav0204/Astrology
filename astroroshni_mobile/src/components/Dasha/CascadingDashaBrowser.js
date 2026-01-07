@@ -180,7 +180,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'UTC+5:30',
         place: birthData.place || 'Unknown'
       };
       
@@ -252,8 +251,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         date: birthData.date.includes('T') ? birthData.date.split('T')[0] : birthData.date,
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
-        longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'Asia/Kolkata'
+        longitude: parseFloat(birthData.longitude)
       };
       
       const response = await chartAPI.calculateYoginiDasha(formattedBirthData, 5);
@@ -285,7 +283,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'UTC+5:30',
         location: birthData.place || 'Unknown'
       };
       
@@ -339,7 +336,6 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         time: birthData.time.includes('T') ? new Date(birthData.time).toTimeString().slice(0, 5) : birthData.time,
         latitude: parseFloat(birthData.latitude),
         longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'UTC+5:30',
         location: birthData.place || 'Unknown'
       };
       

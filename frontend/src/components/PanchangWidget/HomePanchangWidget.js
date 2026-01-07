@@ -112,7 +112,6 @@ const HomePanchangWidget = () => {
             time: '12:00',
             latitude: 28.6139,
             longitude: 77.2090,
-            timezone: 'UTC+5:30',
             place: 'New Delhi, India'
           }
         }),

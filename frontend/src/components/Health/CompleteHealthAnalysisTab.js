@@ -29,8 +29,7 @@ const CompleteHealthAnalysisTab = ({ chartData, birthDetails }) => {
             time: birthDetails.time || '12:00',
             place: birthDetails.place || 'New Delhi',
             latitude: birthDetails.latitude || 28.6139,
-            longitude: birthDetails.longitude || 77.2090,
-            timezone: birthDetails.timezone || 'UTC+5:30'
+            longitude: birthDetails.longitude || 77.2090
           })
         });
         

@@ -90,10 +90,14 @@ class GeminiChatAnalyzer:
     async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False) -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION"""
         import time
+        from utils.admin_settings import is_debug_logging_enabled
+        
+        debug_logging = is_debug_logging_enabled()
         
         total_request_start = time.time()
-        print(f"\n🚀 GEMINI CHAT REQUEST STARTED")
-        print(f"🔍 REQUEST TYPE: {'SECOND (with transit data)' if 'transit_activations' in astrological_context else 'FIRST (requesting transit data)'}")
+        if debug_logging:
+            print(f"\n🚀 GEMINI CHAT REQUEST STARTED")
+            print(f"🔍 REQUEST TYPE: {'SECOND (with transit data)' if 'transit_activations' in astrological_context else 'FIRST (requesting transit data)'}")
         
         # Add current date context and calculate native's age
         enhanced_context = astrological_context.copy()
@@ -177,19 +181,20 @@ class GeminiChatAnalyzer:
             selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
             model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
             
-            print(f"\n=== CALLING GEMINI API (ASYNC) ===")
-            print(f"Analysis Type: {model_type}")
-            print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
-            print(f"Prompt length: {len(prompt)} characters")
-            
-            # Log full prompt
-            print(f"\n{'='*80}")
-            print(f"📤 FULL GEMINI REQUEST PROMPT")
-            print(f"{'='*80}")
-            print(prompt)
-            print(f"\n{'='*80}")
-            print(f"📝 END OF REQUEST PROMPT")
-            print(f"{'='*80}\n")
+            if debug_logging:
+                print(f"\n=== CALLING GEMINI API (ASYNC) ===")
+                print(f"Analysis Type: {model_type}")
+                print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+                print(f"Prompt length: {len(prompt)} characters")
+                
+                # Log full prompt
+                print(f"\n{'='*80}")
+                print(f"📤 FULL GEMINI REQUEST PROMPT")
+                print(f"{'='*80}")
+                print(prompt)
+                print(f"\n{'='*80}")
+                print(f"📝 END OF REQUEST PROMPT")
+                print(f"{'='*80}\n")
             
 
             
@@ -205,34 +210,33 @@ class GeminiChatAnalyzer:
             gemini_total_time = time.time() - gemini_start_time
             total_request_time = time.time() - prompt_start
             
-
-            
-            print(f"\n{'='*80}")
-            print(f"📥 GEMINI RESPONSE #{call_type}")
-            print(f"{'='*80}")
-            if response and hasattr(response, 'text'):
-                response_text_preview = response.text
-                print(f"\n📝 COMPLETE GEMINI RESPONSE (ALL {len(response_text_preview)} CHARACTERS):")
-                print(response_text_preview)
+            if debug_logging:
                 print(f"\n{'='*80}")
-                print(f"📄 END OF GEMINI RESPONSE")
+                print(f"📥 GEMINI RESPONSE #{call_type}")
                 print(f"{'='*80}")
-                
-                # Log divisional chart mentions
-                divisional_mentions = []
-                for d_chart in ['D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60']:
-                    if d_chart in response.text:
-                        divisional_mentions.append(d_chart)
-                
-                if divisional_mentions:
-                    print(f"\n📊 DIVISIONAL CHARTS MENTIONED: {', '.join(divisional_mentions)}")
+                if response and hasattr(response, 'text'):
+                    response_text_preview = response.text
+                    print(f"\n📝 COMPLETE GEMINI RESPONSE (ALL {len(response_text_preview)} CHARACTERS):")
+                    print(response_text_preview)
+                    print(f"\n{'='*80}")
+                    print(f"📄 END OF GEMINI RESPONSE")
+                    print(f"{'='*80}")
+                    
+                    # Log divisional chart mentions
+                    divisional_mentions = []
+                    for d_chart in ['D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60']:
+                        if d_chart in response.text:
+                            divisional_mentions.append(d_chart)
+                    
+                    if divisional_mentions:
+                        print(f"\n📊 DIVISIONAL CHARTS MENTIONED: {', '.join(divisional_mentions)}")
+                    else:
+                        print(f"\n📊 NO DIVISIONAL CHARTS MENTIONED in response")
                 else:
-                    print(f"\n📊 NO DIVISIONAL CHARTS MENTIONED in response")
-            else:
-                print(f"No response or empty response")
-            print(f"{'='*80}\n")
-            
-            print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
+                    print(f"No response or empty response")
+                print(f"{'='*80}\n")
+                
+                print(f"⏱️ Gemini API call time: {gemini_total_time:.2f}s")
             
             if not response or not hasattr(response, 'text') or not response.text:
                 return {

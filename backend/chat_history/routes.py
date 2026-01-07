@@ -626,7 +626,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             user_location = {
                 'latitude': birth_data.get('latitude'),
                 'longitude': birth_data.get('longitude'),
-                'timezone': birth_data.get('timezone', 'Asia/Kolkata'),
                 'place': birth_data.get('place', 'Query Location')
             }
             

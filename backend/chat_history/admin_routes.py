@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 import sqlite3
 import json
 from datetime import datetime
 from auth import get_current_user
+
+class AdminSetting(BaseModel):
+    key: str
+    value: str
+    description: Optional[str] = None
 
 def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user.role != 'admin':
@@ -202,3 +208,32 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching session details: {str(e)}")
+
+@router.get("/admin/settings")
+async def get_all_settings(current_user: dict = Depends(require_admin)):
+    """Get all admin settings"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value, description FROM admin_settings")
+        settings = [{"key": row["key"], "value": row["value"], "description": row["description"]} for row in cursor.fetchall()]
+        conn.close()
+        return {"settings": settings}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")
+
+@router.put("/admin/settings/{key}")
+async def update_setting(key: str, setting: AdminSetting, current_user: dict = Depends(require_admin)):
+    """Update admin setting"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO admin_settings (key, value, description, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+            (key, setting.value, setting.description)
+        )
+        conn.commit()
+        conn.close()
+        return {"message": "Setting updated", "key": key, "value": setting.value}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")

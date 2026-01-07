@@ -10,8 +10,7 @@ const PartnerForm = ({ onSubmit, user, onLogin }) => {
     time: '',
     place: '',
     latitude: null,
-    longitude: null,
-    timezone: 'UTC+5:30'
+    longitude: null
   });
 
   const [girlData, setGirlData] = useState({
@@ -20,8 +19,7 @@ const PartnerForm = ({ onSubmit, user, onLogin }) => {
     time: '',
     place: '',
     latitude: null,
-    longitude: null,
-    timezone: 'UTC+5:30'
+    longitude: null
   });
 
   const [boySuggestions, setBoySuggestions] = useState([]);
@@ -150,8 +148,7 @@ const PartnerForm = ({ onSubmit, user, onLogin }) => {
           ...prev, 
           [name]: value,
           latitude: null,
-          longitude: null,
-          timezone: 'UTC+5:30'
+          longitude: null
         }));
       } else {
         setBoyData(prev => ({ ...prev, [name]: value }));
@@ -162,8 +159,7 @@ const PartnerForm = ({ onSubmit, user, onLogin }) => {
           ...prev, 
           [name]: value,
           latitude: null,
-          longitude: null,
-          timezone: 'UTC+5:30'
+          longitude: null
         }));
       } else {
         setGirlData(prev => ({ ...prev, [name]: value }));

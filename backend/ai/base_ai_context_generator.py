@@ -134,11 +134,8 @@ For every user query, structure your response exactly as follows:
         
         # Calculate birth chart
         from types import SimpleNamespace
-        # Ensure timezone is set for chart calculation
-        birth_data_with_tz = birth_data.copy()
-        if 'timezone' not in birth_data_with_tz:
-            birth_data_with_tz['timezone'] = 'Asia/Kolkata'  # Default timezone
-        birth_obj = SimpleNamespace(**birth_data_with_tz)
+        # Timezone will be calculated from coordinates by ChartCalculator
+        birth_obj = SimpleNamespace(**birth_data)
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
         
