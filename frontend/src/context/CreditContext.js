@@ -137,16 +137,6 @@ export const CreditProvider = ({ children }) => {
             setLoading(false);
         };
         loadData();
-        
-        // Set up periodic balance refresh every 30 seconds
-        const intervalId = setInterval(() => {
-            const token = localStorage.getItem('token');
-            if (token) {
-                fetchBalance();
-            }
-        }, 30000); // 30 seconds
-        
-        return () => clearInterval(intervalId);
     }, []);
 
     const spendCredits = async (amount, feature, description) => {

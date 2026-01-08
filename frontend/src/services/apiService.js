@@ -18,7 +18,7 @@ const getEndpoint = (path) => {
   }
   // For production, add /api prefix
   const endpoint = `/api${path}`;
-  console.log('PROD - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', endpoint);
+  // console.log('PROD - API_BASE_URL:', API_BASE_URL, 'Path:', path, 'Final endpoint:', endpoint);
   return endpoint;
 };
 

@@ -169,13 +169,13 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
     const formatContent = (content, message = {}) => {
         if (!content || content.trim() === '') return '';
         
-        console.log('🔍 Format Debug:', {
-            hasTerms: !!message.terms,
-            termsCount: message.terms?.length,
-            hasGlossary: !!message.glossary,
-            glossaryKeys: Object.keys(message.glossary || {}),
-            contentPreview: content.substring(0, 200)
-        });
+        // console.log('🔍 Format Debug:', {
+        //     hasTerms: !!message.terms,
+        //     termsCount: message.terms?.length,
+        //     hasGlossary: !!message.glossary,
+        //     glossaryKeys: Object.keys(message.glossary || {}),
+        //     contentPreview: content.substring(0, 200)
+        // });
         
         // 1. Decode HTML entities
         let formatted = content
@@ -207,11 +207,11 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
         formatted = formatted.replace(/\*\*(.*?)\*\*/gs, '<strong class="chat-bold">$1</strong>');
         formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="chat-italic">$1</em>');
         
-        console.log('🔍 After markdown, before terms:', formatted.substring(0, 300));
+        // console.log('🔍 After markdown, before terms:', formatted.substring(0, 300));
         
         // 7. PROCESS TERMS - auto-wrap terms found in glossary
         if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
-            console.log('🔍 Processing terms:', message.terms);
+            // console.log('🔍 Processing terms:', message.terms);
             
             // First try to find existing <term> tags
             const termRegex = /<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi;

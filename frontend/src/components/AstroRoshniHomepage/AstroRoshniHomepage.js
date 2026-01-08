@@ -453,8 +453,8 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         const allHoras = [...(hora.day_horas || []), ...(hora.night_horas || [])];
         const now = new Date();
         
-        console.log('Raw hora response:', hora);
-        console.log('All horas:', allHoras);
+        // console.log('Raw hora response:', hora);
+        // console.log('All horas:', allHoras);
         
         const getPlanetaryFavorability = (planet) => {
           const planetQualities = {
@@ -477,7 +477,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         
         // Get current and next hora
         const currentHoras = allHoras.slice(currentHoraIndex, currentHoraIndex + 2);
-        console.log('Current horas:', currentHoras);
+        // console.log('Current horas:', currentHoras);
         
         parsedHora = currentHoras.map(item => {
           if (!item || !item.start_time || !item.end_time || !item.planet) {
@@ -508,7 +508,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           };
         });
         
-        console.log('Parsed Hora:', parsedHora);
+        // console.log('Parsed Hora:', parsedHora);
       } catch (horaError) {
         console.error('Error parsing hora data:', horaError);
         parsedHora = [
