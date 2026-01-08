@@ -4,7 +4,6 @@
     "slug": "astroroshni-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
@@ -17,8 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "49",
-      "icon": "./assets/icon.png",
+      "buildNumber": "50",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "infoPlist": {
