@@ -299,6 +299,11 @@ async def get_event_timeline_cost():
     cost = credit_service.get_credit_setting('event_timeline_cost')
     return {"cost": cost}
 
+@router.get("/settings/karma-cost")
+async def get_karma_cost():
+    cost = credit_service.get_credit_setting('karma_analysis_cost')
+    return {"cost": cost}
+
 @router.get("/settings")
 async def get_all_settings():
     """Get all credit settings for frontend use"""

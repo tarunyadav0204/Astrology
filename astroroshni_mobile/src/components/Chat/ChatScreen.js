@@ -2071,6 +2071,36 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
+                        navigation.navigate('KarmaAnalysis', { chartId: birthData?.id });
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+                      style={styles.menuGradient}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#667eea', '#764ba2']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🕉️</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={styles.menuText}>Past Life Regression</Text>
+                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.menuOption}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
                         navigation.navigate('ChatHistory');
                       });
                     }}

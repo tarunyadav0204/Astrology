@@ -203,6 +203,13 @@ class CreditService:
                 VALUES ('partnership_analysis_cost', 2, 'Credits per partnership compatibility analysis')
             ''')
         
+        cursor.execute("SELECT COUNT(*) FROM credit_settings WHERE setting_key = 'karma_analysis_cost'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO credit_settings (setting_key, setting_value, description)
+                VALUES ('karma_analysis_cost', 25, 'Credits per karma analysis')
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -260,6 +267,29 @@ class CreditService:
             (userid, transaction_type, amount, balance_after, source, reference_id, description)
             VALUES (?, 'spent', ?, ?, ?, ?, ?)
         """, (userid, -amount, new_balance, 'feature_usage', feature, description))
+        
+        conn.commit()
+        conn.close()
+        return True
+    
+    def refund_credits(self, userid: int, amount: int, feature: str, description: str = None) -> bool:
+        """Refund credits to user account"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        current_balance = self.get_user_credits(userid)
+        new_balance = current_balance + amount
+        
+        cursor.execute("""
+            UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE userid = ?
+        """, (new_balance, userid))
+        
+        cursor.execute("""
+            INSERT INTO credit_transactions 
+            (userid, transaction_type, amount, balance_after, source, reference_id, description)
+            VALUES (?, 'refund', ?, ?, ?, ?, ?)
+        """, (userid, amount, new_balance, 'refund', feature, description))
         
         conn.commit()
         conn.close()
@@ -371,7 +401,7 @@ class CreditService:
         cursor.execute("""
             SELECT setting_key, setting_value, description 
             FROM credit_settings 
-            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost')
+            WHERE setting_key IN ('chat_question_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'event_timeline_cost', 'karma_analysis_cost')
             ORDER BY setting_key
         """)
         

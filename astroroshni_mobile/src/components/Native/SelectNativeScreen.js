@@ -257,6 +257,11 @@ export default function SelectNativeScreen({ navigation, route }) {
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate('ChildbirthPlanner');
+      } else if (returnTo === 'KarmaAnalysis') {
+        // Return to Karma Analysis with selected chart
+        await storage.setBirthDetails(profileWithId);
+        setSelectedProfile(profile.name);
+        navigation.navigate('KarmaAnalysis', { chartId: profileWithId.id });
       } else {
         // Normal selection flow
         await storage.setBirthDetails(profileWithId);
@@ -437,7 +442,7 @@ export default function SelectNativeScreen({ navigation, route }) {
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.subtitle}>
-              {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : 'Choose a profile for astrological analysis'}
+              {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : returnTo === 'KarmaAnalysis' ? 'Select native for karma analysis' : 'Choose a profile for astrological analysis'}
             </Text>
             <Text style={styles.instructionText}>👈 Swipe left for options</Text>
 

@@ -16,14 +16,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "50",
+      "buildNumber": "55",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
+      "bitcode": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "UILaunchScreen": {}
       }
     },
     "android": {

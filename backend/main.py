@@ -65,6 +65,7 @@ from transits.routes import router as transits_router
 from Dashas.routes.chara_dasha_routes import router as chara_dasha_router
 from charts.routes import router as charts_router
 from birth_charts.routes import router as birth_charts_router
+from karma_analysis.routes import router as karma_router
 import math
 from datetime import timedelta
 import signal
@@ -247,6 +248,7 @@ app.include_router(transits_router, prefix="/api")
 app.include_router(chara_dasha_router, prefix="/api")
 app.include_router(mundane_router)
 app.include_router(financial_router)
+app.include_router(karma_router, prefix="/api", tags=["karma"])
 
 
 
