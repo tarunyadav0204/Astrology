@@ -15,85 +15,109 @@ from .nakshatra_calculator import NakshatraCalculator
 class KarmaContextBuilder:
     """Comprehensive Past Life Karma and Soul Mission Analysis"""
     
-    # Complete 60 Shashtiamsa Deities (D60)
-    SHASHTIAMSA_DEITIES = {
-        0: ("Ghora", "Cruel", "Past life aggression, severe challenges, warrior karma"),
-        1: ("Rakshasa", "Demonic", "Overindulgence, ego-driven pursuits, material obsession"),
-        2: ("Deva", "Divine", "Merit from selfless service, worship, spiritual practices"),
-        3: ("Kubera", "Wealthy", "Resource management, charity, wealth stewardship"),
-        4: ("Yaksha", "Guardian", "Protection of family values, secret knowledge keeper"),
-        5: ("Kinnara", "Celestial Musician", "Arts, culture, music, creative expression"),
-        6: ("Brahma", "Creator", "Knowledge creation, teaching, intellectual pursuits"),
-        7: ("Vishnu", "Preserver", "Dharma protection, justice, maintaining order"),
-        8: ("Rudra", "Destroyer", "Transformation, destruction of evil, intense change"),
-        9: ("Kala", "Time", "Patience, timing mastery, understanding cycles"),
-        10: ("Yama", "Death Lord", "Justice, karmic balance, life-death understanding"),
-        11: ("Kinnara", "Half-human", "Dual nature, adaptability, artistic soul"),
-        12: ("Pitru", "Ancestor", "Ancestral blessings, lineage karma, family duties"),
-        13: ("Matru", "Mother", "Nurturing, maternal energy, emotional healing"),
-        14: ("Indra", "King of Gods", "Leadership, authority, royal karma"),
-        15: ("Agni", "Fire", "Purification, transformation, spiritual fire"),
-        16: ("Vayu", "Wind", "Movement, change, communication, breath of life"),
-        17: ("Varuna", "Water", "Emotional depth, healing, flow, adaptability"),
-        18: ("Mitra", "Friend", "Friendship, alliances, social connections"),
-        19: ("Aryama", "Nobility", "Noble conduct, aristocratic karma, refinement"),
-        20: ("Bhaga", "Fortune", "Luck, prosperity, divine grace"),
-        21: ("Vivasvan", "Sun", "Illumination, clarity, soul consciousness"),
-        22: ("Pushan", "Nourisher", "Nourishment, growth, sustenance provider"),
-        23: ("Tvashtri", "Craftsman", "Skill, craftsmanship, technical mastery"),
-        24: ("Vishvakarma", "Divine Architect", "Building, construction, design"),
-        25: ("Soma", "Moon Nectar", "Bliss, contentment, spiritual nourishment"),
-        26: ("Ashwini", "Horse Twins", "Healing, speed, medical knowledge"),
-        27: ("Yama", "Restraint", "Self-control, discipline, moral strength"),
-        28: ("Gandharva", "Celestial Singer", "Music, arts, divine entertainment"),
-        29: ("Apsara", "Celestial Dancer", "Beauty, grace, artistic performance"),
-        30: ("Naga", "Serpent", "Kundalini, occult knowledge, hidden wisdom"),
-        31: ("Sarpa", "Snake", "Transformation, shedding old patterns"),
-        32: ("Preta", "Ghost", "Unfinished business, attachments, past regrets"),
-        33: ("Pishacha", "Demon", "Addictions, obsessions, lower desires"),
-        34: ("Deva", "God", "Divine blessings, spiritual merit"),
-        35: ("Daitya", "Titan", "Power struggles, ambition, material strength"),
-        36: ("Danava", "Demon", "Opposition, challenges, adversarial karma"),
-        37: ("Manushya", "Human", "Balanced karma, human experiences"),
-        38: ("Vanara", "Monkey", "Service, devotion, loyalty (Hanuman energy)"),
-        39: ("Poornachandra", "Full Moon", "Complete emotional fulfillment, lunar blessings, nurturing mastery"),
-        40: ("Kimpurusha", "Half-man", "Dual nature, transformation"),
-        41: ("Siddha", "Perfected Being", "Spiritual attainment, mastery"),
-        42: ("Vidyadhara", "Knowledge Holder", "Wisdom, learning, teaching"),
-        43: ("Charana", "Wanderer", "Travel, exploration, seeking"),
-        44: ("Gandharva", "Celestial", "Music, arts, divine connection"),
-        45: ("Yaksha", "Nature Spirit", "Nature connection, elemental wisdom"),
-        46: ("Rakshasa", "Protector", "Fierce protection, guardian energy"),
-        47: ("Pishacha", "Spirit", "Subtle realm, psychic abilities"),
-        48: ("Preta", "Ancestor Spirit", "Ancestral connection, lineage"),
-        49: ("Brahma", "Creator", "Creative power, manifestation"),
-        50: ("Vishnu", "Sustainer", "Preservation, maintenance, stability"),
-        51: ("Maheshwara", "Great Lord", "Transcendence, liberation"),
-        52: ("Surya", "Sun", "Vitality, life force, consciousness"),
-        53: ("Chandra", "Moon", "Emotions, mind, receptivity"),
-        54: ("Angaraka", "Mars", "Courage, action, warrior spirit"),
-        55: ("Budha", "Mercury", "Intelligence, communication, trade"),
-        56: ("Guru", "Jupiter", "Wisdom, teaching, expansion"),
-        57: ("Shukra", "Venus", "Love, beauty, relationships"),
-        58: ("Shani", "Saturn", "Discipline, karma, service"),
-        59: ("Indu", "Moon Nectar", "Comfort, nourishment, emotional fulfillment")
-    }
+    # Complete 60 Shashtiamsa Deities (D60) - BPHS Authentic List
+    # For ODD signs (Aries, Gemini, Leo, Libra, Sagittarius, Aquarius): Direct indexing 1-60
+    # For EVEN signs (Taurus, Cancer, Virgo, Scorpio, Capricorn, Pisces): Reverse indexing 60-1
+    SHASHTIAMSA_DEITIES = [
+        ("Ghora", "Malefic", "Past life aggression, severe challenges, warrior karma"),
+        ("Rakshasa", "Malefic", "Overindulgence, ego-driven pursuits, material obsession"),
+        ("Deva", "Benefic", "Merit from selfless service, worship, spiritual practices"),
+        ("Kubera", "Benefic", "Resource management, charity, wealth stewardship"),
+        ("Yaksha", "Benefic", "Protection of family values, secret knowledge keeper"),
+        ("Kinnara", "Benefic", "Arts, culture, music, creative expression"),
+        ("Bhrashta", "Malefic", "Fallen from grace, loss of status, degradation"),
+        ("Kulaghna", "Malefic", "Family destroyer, lineage breaker, ancestral curse"),
+        ("Garala", "Malefic", "Poison, toxic relationships, harmful actions"),
+        ("Vahni", "Malefic", "Fire, destruction, burning karma, intense purification"),
+        ("Maya", "Malefic", "Illusion, deception, false appearances"),
+        ("Pureesha", "Malefic", "Impurity, waste, degradation, low actions"),
+        ("Apampati", "Benefic", "Water lord, emotional healing, purification"),
+        ("Marutwan", "Benefic", "Wind lord, movement, change, communication"),
+        ("Kaala", "Malefic", "Time destroyer, delays, obstacles, karmic timing"),
+        ("Sarpa", "Malefic", "Serpent, kundalini blocks, hidden enemies"),
+        ("Amrita", "Benefic", "Nectar of immortality, divine blessings, healing"),
+        ("Indu", "Benefic", "Moon, emotional fulfillment, nurturing"),
+        ("Mridu", "Benefic", "Soft, gentle, compassionate actions"),
+        ("Komala", "Benefic", "Tender, delicate, refined nature"),
+        ("Heramba", "Benefic", "Ganesha energy, obstacle removal, wisdom"),
+        ("Brahma", "Benefic", "Creator, knowledge, teaching, intellectual pursuits"),
+        ("Vishnu", "Benefic", "Preserver, dharma protection, maintaining order"),
+        ("Maheshwara", "Benefic", "Shiva energy, transformation, liberation"),
+        ("Deva", "Benefic", "Divine beings, spiritual merit, celestial blessings"),
+        ("Ardra", "Benefic", "Moist, nourishing, growth-promoting"),
+        ("Kalinasha", "Benefic", "Destroyer of darkness, remover of negativity"),
+        ("Kshitishwara", "Benefic", "Earth lord, stability, grounding"),
+        ("Kamalakara", "Benefic", "Lotus creator, beauty, purity, spiritual growth"),
+        ("Gulika", "Malefic", "Saturn's son, obstacles, delays, suffering"),
+        ("Mrityu", "Malefic", "Death, endings, severe transformations"),
+        ("Kaala", "Malefic", "Time, destruction, karmic retribution"),
+        ("Daavagni", "Malefic", "Forest fire, uncontrolled destruction"),
+        ("Ghora", "Malefic", "Terrible, frightening, severe karma"),
+        ("Yama", "Malefic", "Death lord, judgment, karmic justice"),
+        ("Kantaka", "Malefic", "Thorn, pain, obstacles, suffering"),
+        ("Sudha", "Benefic", "Nectar, purity, divine essence"),
+        ("Amrita", "Benefic", "Immortal nectar, healing, blessings"),
+        ("Poornachandra", "Benefic", "Full moon, complete fulfillment, emotional mastery"),
+        ("Vishadagdha", "Malefic", "Burnt by poison, severe suffering"),
+        ("Kulanasha", "Malefic", "Family destruction, lineage ending"),
+        ("Vamshakshaya", "Malefic", "Dynasty destruction, ancestral curse"),
+        ("Utpata", "Malefic", "Calamity, disaster, upheaval"),
+        ("Kaalaroopa", "Malefic", "Form of time, death-like transformation"),
+        ("Saumya", "Benefic", "Gentle, pleasant, beneficial"),
+        ("Komala", "Benefic", "Soft, tender, compassionate"),
+        ("Sheetala", "Benefic", "Cool, soothing, healing"),
+        ("Karaladamshtra", "Malefic", "Terrible fangs, fierce, aggressive"),
+        ("Chandramukhi", "Benefic", "Moon-faced, beautiful, attractive"),
+        ("Praveena", "Benefic", "Skilled, expert, accomplished"),
+        ("Kaalpavaka", "Malefic", "Fire of time, destructive transformation"),
+        ("Dandayudha", "Malefic", "Armed with staff, punishment, discipline"),
+        ("Nirmala", "Benefic", "Pure, clean, unblemished"),
+        ("Saumya", "Benefic", "Gentle, beneficial, auspicious"),
+        ("Krura", "Malefic", "Cruel, harsh, severe"),
+        ("Atisheetala", "Benefic", "Very cool, extremely soothing"),
+        ("Amrita", "Benefic", "Nectar, divine blessing, immortality"),
+        ("Payodhi", "Benefic", "Ocean of milk, abundance, nourishment"),
+        ("Brahman", "Malefic", "Ultimate reality (but harsh path to it)"),
+        ("Chandrarekha", "Benefic", "Moon's crescent, beauty, grace, divine feminine")
+    ]
     
-    # D60 Deity Benefic/Malefic Classification (BPHS)
-    DEITY_NATURE = {
-        # Malefic Deities (Past Life Negative Karma)
-        0: "Malefic", 1: "Malefic", 8: "Malefic", 10: "Malefic", 27: "Malefic",
-        32: "Malefic", 33: "Malefic", 35: "Malefic", 36: "Malefic", 46: "Malefic", 47: "Malefic",
+    @staticmethod
+    def get_shashtiamsa_deity(degree_in_sign: float, sign_number: int) -> tuple:
+        """
+        Get D60 deity based on BPHS rules
+        Args:
+            degree_in_sign: 0-30 degrees within the sign
+            sign_number: 1-12 (1=Aries, 2=Taurus, etc.)
+        Returns:
+            (deity_name, nature, description)
+        """
+        print(f"\n🔮 DEITY CALCULATION")
+        print(f"Input: degree_in_sign={degree_in_sign:.4f}°, sign_number={sign_number}")
         
-        # Benefic Deities (Past Life Positive Karma)
-        2: "Benefic", 3: "Benefic", 6: "Benefic", 7: "Benefic", 12: "Benefic", 13: "Benefic",
-        14: "Benefic", 20: "Benefic", 21: "Benefic", 25: "Benefic", 34: "Benefic", 41: "Benefic",
-        42: "Benefic", 49: "Benefic", 50: "Benefic", 51: "Benefic", 52: "Benefic", 53: "Benefic",
-        56: "Benefic", 57: "Benefic", 59: "Benefic",
+        # Calculate index (0-59) based on degree
+        index = int(degree_in_sign * 2)  # Each deity rules 0.5 degrees
+        print(f"Raw index calculation: int({degree_in_sign:.4f} × 2) = {index}")
         
-        # Mixed/Neutral Deities
-        # All others default to "Mixed"
-    }
+        if index > 59:
+            print(f"Index {index} > 59, capping to 59")
+            index = 59
+        
+        # Check if sign is odd or even
+        is_odd_sign = sign_number % 2 == 1
+        print(f"Sign {sign_number} is {'ODD' if is_odd_sign else 'EVEN'}")
+        
+        if is_odd_sign:
+            # Odd signs: Direct indexing (1st deity = index 0)
+            print(f"Using DIRECT indexing: deity_index = {index}")
+            deity = KarmaContextBuilder.SHASHTIAMSA_DEITIES[index]
+        else:
+            # Even signs: Reverse indexing (1st deity = index 59, last = index 0)
+            reversed_index = 59 - index
+            print(f"Using REVERSE indexing: deity_index = 59 - {index} = {reversed_index}")
+            deity = KarmaContextBuilder.SHASHTIAMSA_DEITIES[reversed_index]
+        
+        print(f"Result: {deity[0]} ({deity[1]}) - {deity[2]}")
+        return deity
     
     # Nakshatra Past Life Occupations
     NAKSHATRA_KARMA = {
@@ -204,52 +228,97 @@ class KarmaContextBuilder:
     
     def _analyze_d60_essence(self) -> Dict:
         """D60 Shashtiamsa - Soul's essence from past karma"""
+        print(f"\n{'='*80}")
+        print(f"🔮 D60 ESSENCE ANALYSIS - LAGNA DEITY")
+        print(f"{'='*80}")
+        
         d60_data = self.divisional_charts.get('d60_shashtiamsa', {})
         
         if not d60_data:
+            print("❌ D60 chart not available")
             return {"available": False, "message": "D60 chart not calculated"}
         
-        d60_asc = d60_data.get('ascendant', 0) % 30
-        deity_idx = int(d60_asc / 0.5)  # 0.5° per deity, 60 divisions in 30°
+        # CRITICAL: Use D1 ascendant degree, NOT D60 ascendant degree (per BPHS)
+        d1_asc_full = self.chart_data.get('ascendant', 0)
+        print(f"D1 Ascendant (full longitude): {d1_asc_full:.4f}°")
         
-        deity_name, nature, theme = self.SHASHTIAMSA_DEITIES.get(
-            deity_idx, ("Unknown", "Neutral", "General karma")
-        )
+        d1_asc_sign = int(d1_asc_full / 30)
+        d1_asc_degree = d1_asc_full % 30
+        print(f"D1 Ascendant sign: {d1_asc_sign} (0=Aries)")
+        print(f"D1 Ascendant degree in sign: {d1_asc_degree:.4f}°")
+        
+        # For reference, also show D60 position
+        d60_asc_full = d60_data.get('ascendant', 0)
+        print(f"\n[Reference] D60 Ascendant: {d60_asc_full:.4f}° ({(d60_asc_full % 30):.4f}° in sign)")
+        
+        deity_idx = int(d1_asc_degree / 0.5)  # 0.5° per deity, 60 divisions in 30°
+        print(f"\nDeity index calculation: int({d1_asc_degree:.4f} / 0.5) = {deity_idx}")
+        
+        if deity_idx >= len(self.SHASHTIAMSA_DEITIES):
+            print(f"⚠️ Deity index {deity_idx} out of range, capping to {len(self.SHASHTIAMSA_DEITIES)-1}")
+            deity_idx = len(self.SHASHTIAMSA_DEITIES) - 1
+        
+        deity_name, nature, theme = self.SHASHTIAMSA_DEITIES[deity_idx]
+        print(f"\n✅ LAGNA DEITY: {deity_name}")
+        print(f"   Nature: {nature}")
+        print(f"   Theme: {theme}")
         
         # Get deity benefic/malefic classification
-        deity_classification = self.DEITY_NATURE.get(deity_idx, "Mixed")
+        deity_classification = getattr(self, 'DEITY_NATURE', {}).get(deity_idx, nature)
+        print(f"   Classification: {deity_classification}")
         
         result = {
             "lagna_deity": deity_name,
             "lagna_nature": nature,
             "lagna_theme": theme,
             "lagna_classification": deity_classification,
-            "ascendant_degree": round(d60_asc, 2),
+            "d1_ascendant_degree": round(d1_asc_degree, 2),
+            "d60_ascendant_degree": round(d60_asc_full % 30, 2),
             "deity_index": deity_idx,
-            "significance": "D60 Lagna shows the vessel, Atmakaraka shows the soul within (BPHS Ch.6)"
+            "significance": "Deity determined from D1 degree per BPHS - D60 Lagna shows the vessel, Atmakaraka shows the soul within"
         }
         
         # Add Atmakaraka in D60 with nakshatra
+        print(f"\n{'='*80}")
+        print(f"🔮 D60 ESSENCE ANALYSIS - ATMAKARAKA DEITY")
+        print(f"{'='*80}")
+        
         ak_data = self.chara_karaka_calc.get_atmakaraka()
         if ak_data:
             ak_planet = ak_data['planet']
-            print(f"DEBUG: AK planet = {ak_planet}")
-            print(f"DEBUG: d60_data keys = {d60_data.keys()}")
-            print(f"DEBUG: d60_data.get('planets') = {d60_data.get('planets')}")
+            print(f"Atmakaraka planet: {ak_planet}")
             
             if d60_data.get('planets'):
                 ak_d60 = d60_data['planets'].get(ak_planet, {})
-                print(f"DEBUG: ak_d60 = {ak_d60}")
                 ak_longitude = ak_d60.get('longitude', 0)
-                print(f"DEBUG: ak_longitude = {ak_longitude}")
+                print(f"AK D60 longitude: {ak_longitude:.4f}°")
                 
                 if ak_longitude > 0:
-                    ak_degree = ak_longitude % 30
-                    ak_deity_idx = int(ak_degree / 0.5)
-                    ak_deity_name, ak_nature, ak_theme = self.SHASHTIAMSA_DEITIES.get(
-                        ak_deity_idx, ("Unknown", "Neutral", "General karma")
-                    )
-                    ak_classification = self.DEITY_NATURE.get(ak_deity_idx, "Mixed")
+                    # CRITICAL: Use D1 degree of AK, NOT D60 degree (per BPHS)
+                    d1_planets = self.chart_data.get('planets', {})
+                    ak_d1_longitude = d1_planets.get(ak_planet, {}).get('longitude', 0)
+                    ak_d1_sign = int(ak_d1_longitude / 30)
+                    ak_d1_degree = ak_d1_longitude % 30
+                    
+                    print(f"AK D1 longitude: {ak_d1_longitude:.4f}°")
+                    print(f"AK D1 sign: {ak_d1_sign} (0=Aries)")
+                    print(f"AK D1 degree in sign: {ak_d1_degree:.4f}°")
+                    print(f"\n[Reference] AK D60 longitude: {ak_longitude:.4f}° ({(ak_longitude % 30):.4f}° in sign)")
+                    
+                    ak_deity_idx = int(ak_d1_degree / 0.5)
+                    print(f"\nAK Deity index: int({ak_d1_degree:.4f} / 0.5) = {ak_deity_idx}")
+                    
+                    if ak_deity_idx >= len(self.SHASHTIAMSA_DEITIES):
+                        print(f"⚠️ AK Deity index {ak_deity_idx} out of range, capping to {len(self.SHASHTIAMSA_DEITIES)-1}")
+                        ak_deity_idx = len(self.SHASHTIAMSA_DEITIES) - 1
+                    
+                    ak_deity_name, ak_nature, ak_theme = self.SHASHTIAMSA_DEITIES[ak_deity_idx]
+                    print(f"\n✅ ATMAKARAKA DEITY: {ak_deity_name}")
+                    print(f"   Nature: {ak_nature}")
+                    print(f"   Theme: {ak_theme}")
+                    
+                    ak_classification = getattr(self, 'DEITY_NATURE', {}).get(ak_deity_idx, ak_nature)
+                    print(f"   Classification: {ak_classification}")
                     
                     # Calculate nakshatra from longitude
                     nakshatra_span = 360 / 27
@@ -260,6 +329,7 @@ class KarmaContextBuilder:
                                  'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
                                  'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati']
                     ak_d60_nakshatra = nakshatras[min(nakshatra_index, 26)]
+                    print(f"   D60 Nakshatra: {ak_d60_nakshatra}")
                     
                     result["atmakaraka_deity"] = ak_deity_name
                     result["atmakaraka_nature"] = ak_nature
@@ -267,7 +337,20 @@ class KarmaContextBuilder:
                     result["atmakaraka_classification"] = ak_classification
                     result["atmakaraka_planet"] = ak_planet
                     result["atmakaraka_d60_nakshatra"] = ak_d60_nakshatra
-                    result["karmic_balance"] = self._calculate_karmic_balance(deity_classification, ak_classification)
+                    
+                    karmic_balance = self._calculate_karmic_balance(deity_classification, ak_classification)
+                    result["karmic_balance"] = karmic_balance
+                    print(f"\n📊 KARMIC BALANCE:")
+                    print(f"   Score: {karmic_balance.get('score')}")
+                    print(f"   Verdict: {karmic_balance.get('verdict')}")
+                else:
+                    print(f"⚠️ AK longitude is 0, skipping deity calculation")
+            else:
+                print(f"⚠️ No planets data in D60 chart")
+        else:
+            print(f"⚠️ No Atmakaraka data available")
+        
+        print(f"{'='*80}\n")
         
         return result
     

@@ -478,7 +478,17 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
         asc_sign = int(chart_data['ascendant'] / 30)
         asc_degree = chart_data['ascendant'] % 30
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
-        divisional_data['ascendant'] = divisional_asc_sign * 30 + 15  # Middle of sign
+        
+        # Calculate degree within divisional sign - USE RATIO METHOD FOR ALL DIVISIONS
+        EPS = 1e-9
+        part_size = 30.0 / division_number
+        part_index = int((asc_degree + EPS) / part_size)
+        degree_within_part = (asc_degree + EPS) - (part_index * part_size)
+        scaled_asc_degree = (degree_within_part / part_size) * 30.0
+        divisional_data['ascendant'] = divisional_asc_sign * 30 + scaled_asc_degree
+        
+        if division_number == 60:
+            print(f"🏠🏠🏠 D60_ASC D1={asc_degree:.6f}° part={part_index} within={degree_within_part:.6f}° scaled={scaled_asc_degree:.6f}° in sign {divisional_asc_sign}")
         
         print(f"[BACKEND] D{division_number}: Original ASC={chart_data['ascendant']:.2f} (Sign {asc_sign}, {asc_degree:.2f}°) -> Divisional ASC Sign={divisional_asc_sign}")
         
@@ -512,12 +522,15 @@ async def calculate_divisional_chart(request: dict, current_user: User = Depends
                     
                     divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
                     
-                    # Calculate the actual degree within the divisional sign
+                    # Calculate the actual degree within the divisional sign - USE RATIO METHOD
                     EPS = 1e-9
                     part_size = 30.0 / division_number
                     part_index = int((planet_degree + EPS) / part_size)
-                    degree_within_part = (planet_degree + EPS) % part_size
+                    degree_within_part = (planet_degree + EPS) - (part_index * part_size)
                     actual_degree = (degree_within_part / part_size) * 30.0
+                    
+                    if division_number == 60:
+                        print(f"🪐🪐🪐 D60_CALC [{planet}] D1={planet_degree:.6f}° part={part_index} within={degree_within_part:.6f}° scaled={actual_degree:.6f}° in sign {divisional_sign}")
                     
                     divisional_longitude = divisional_sign * 30 + actual_degree
                     

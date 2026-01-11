@@ -134,14 +134,22 @@ class DivisionalChartCalculator(BaseCalculator):
         asc_degree = self.chart_data['ascendant'] % 30
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
         
-        print(f"⚙️ [BACKEND] D1 Ascendant: sign={asc_sign}, degree={asc_degree:.2f}")
-        print(f"✅ [BACKEND] D{division_number} Ascendant sign: {divisional_asc_sign}")
+        print(f"⚙️⚙️⚙️ D60_INPUT [BACKEND] D1 Ascendant: sign={asc_sign}, degree={asc_degree:.2f}")
+        print(f"✅✅✅ D60_OUTPUT [BACKEND] D{division_number} Ascendant sign: {divisional_asc_sign}")
         
-        # Scaled degree calculation with epsilon buffer
+        # Scaled degree calculation - Keep standard 0-30° format
         EPS = 1e-9
         part_size = 30.0 / division_number
-        scaled_asc_degree = ((asc_degree + EPS) % part_size) * division_number
+        part_index = int((asc_degree + EPS) / part_size)
+        # FIXED: Calculate degree within part correctly (not using modulo)
+        degree_within_part = (asc_degree + EPS) - (part_index * part_size)
+        # Scale the degree within part to full sign (0-30 degrees)
+        scaled_asc_degree = (degree_within_part / part_size) * 30.0
         divisional_data['ascendant'] = (divisional_asc_sign * 30) + scaled_asc_degree
+        
+        # For D60: Store raw arc position for deity analysis
+        if division_number == 60:
+            divisional_data['ascendant_varga_arc'] = degree_within_part
         
         # Calculate divisional houses with house numbers
         for i in range(12):
@@ -168,10 +176,23 @@ class DivisionalChartCalculator(BaseCalculator):
                 # Calculate the actual degree within the divisional sign with proper scaling
                 EPS = 1e-9
                 part_size = 30.0 / division_number
-                part_index = int((planet_degree + EPS) / part_size)  # Buffer here
-                degree_within_part = (planet_degree + EPS) % part_size  # Buffer here
+                part_index = int((planet_degree + EPS) / part_size)
+                # FIXED: Calculate degree within part correctly (not using modulo)
+                degree_within_part = (planet_degree + EPS) - (part_index * part_size)
+                
+                # LOG: D60 degree calculation
+                if division_number == 60:
+                    print(f"🪐🪐🪐 D60_CALC [{planet}] D1: {planet_degree:.6f}° | part_index: {part_index} | part_size: {part_size:.6f}° | degree_within_part: {degree_within_part:.6f}°")
+                
                 # Scale the degree within part to full sign (0-30 degrees)
                 actual_degree = (degree_within_part / part_size) * 30.0
+                
+                # LOG: Final scaled degree
+                if division_number == 60:
+                    print(f"   ➡️➡️➡️ D60_SCALED: {actual_degree:.6f}° in sign {divisional_sign}")
+                
+                # For D60: Also store the raw arc position for deity analysis
+                varga_arc_position = degree_within_part if division_number == 60 else None
                 
                 divisional_longitude = divisional_sign * 30 + actual_degree
                 
@@ -190,14 +211,23 @@ class DivisionalChartCalculator(BaseCalculator):
                     'sign': divisional_sign,
                     'sign_name': sign_names[divisional_sign],
                     'degree': actual_degree,
+                    'varga_arc_position': varga_arc_position,  # Raw 0-0.5° position for D60 deity
                     'retrograde': planet_data.get('retrograde', False),
                     'house': house_number,
                     **dignity_info
                 }
         
-        print(f"📊 [BACKEND] D{division_number} Result:")
-        print(f"  - Ascendant: {divisional_data['ascendant']:.2f} (sign {divisional_asc_sign})")
-        print(f"  - Houses: {[{'house': h['house_number'], 'sign': h['sign']} for h in divisional_data['houses'][:3]]}...")
+        if division_number == 60:
+            print(f"\n📊📊📊 D60_SUMMARY [BACKEND] D60 Summary:")
+            print(f"  - Ascendant: {divisional_data['ascendant']:.2f}° (sign {divisional_asc_sign})")
+            for p in ['Sun', 'Moon', 'Mars']:
+                if p in divisional_data['planets']:
+                    pd = divisional_data['planets'][p]
+                    print(f"  - {p}: {pd['degree']:.2f}° in {pd['sign_name']}")
+        else:
+            print(f"📊 [BACKEND] D{division_number} Result:")
+            print(f"  - Ascendant: {divisional_data['ascendant']:.2f} (sign {divisional_asc_sign})")
+            print(f"  - Houses: {[{'house': h['house_number'], 'sign': h['sign']} for h in divisional_data['houses'][:3]]}...")
         
         return {
             'divisional_chart': divisional_data,

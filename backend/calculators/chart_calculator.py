@@ -48,8 +48,8 @@ class ChartCalculator(BaseCalculator):
         ephe_end = time.time()
         # print(f"[CALC] Ephemeris setup took {ephe_end - ephe_start:.3f}s")
         
-        # CRITICAL: Use Mode 27 (True Chitra Paksha) for AstroSage parity
-        swe.set_sid_mode(27, 0, 0)  # Mode 27 = True Chitra Paksha
+        # CRITICAL: Use Lahiri Ayanamsa (Mode 1) for DrikPanchang parity
+        swe.set_sid_mode(swe.SIDM_LAHIRI)  # Mode 1 = Lahiri/Chitra
         
         # Calculate Julian Day with high precision for exact AstroSage matching
         jd_start = time.time()
@@ -214,9 +214,9 @@ class ChartCalculator(BaseCalculator):
     
     def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Bhav Chalit using Placidus house system (professional KP/Sripati method)"""
-        # Ensure geocentric mode and Mode 27 for house calculations
+        # Ensure geocentric mode and Lahiri ayanamsa for house calculations
         swe.set_topo(0, 0, 0)
-        swe.set_sid_mode(27, 0, 0)
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
         try:
             # Use Placidus house system (P) for accurate unequal houses
             cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
@@ -279,9 +279,9 @@ class ChartCalculator(BaseCalculator):
     
     def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa):
         """Calculate Gulika and Mandi based on actual sunrise/sunset (Dinamaan)"""
-        # Ensure geocentric mode and Mode 27 for upagraha calculations
+        # Ensure geocentric mode and Lahiri ayanamsa for upagraha calculations
         swe.set_topo(0, 0, 0)
-        swe.set_sid_mode(27, 0, 0)
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
         try:
             # Get sunrise and sunset for the day (single call)
             sun_transit = swe.rise_trans(jd, swe.SUN, '', swe.FLG_SWIEPH, lon, lat, 0)
