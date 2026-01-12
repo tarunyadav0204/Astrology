@@ -41,8 +41,9 @@ export const authAPI = {
   sendResetCode: (data) => api.post(getEndpoint('/send-reset-code'), data),
   verifyResetCode: (data) => api.post(getEndpoint('/verify-reset-code'), data),
   resetPasswordWithToken: (data) => api.post(getEndpoint('/reset-password-with-token'), data),
-  updateSelfBirthChart: (birthData, clearExisting = true) => {
-    const params = clearExisting ? '?clear_existing=true' : '?clear_existing=false';
+  updateSelfBirthChart: (birthData, clearExisting = true, chartId = null) => {
+    let params = clearExisting ? '?clear_existing=true' : '?clear_existing=false';
+    if (chartId) params += `&chart_id=${chartId}`;
     return api.put(getEndpoint('/user/self-birth-chart') + params, birthData);
   },
   getSelfBirthChart: () => api.get(getEndpoint('/user/self-birth-chart')),
@@ -157,8 +158,31 @@ export const chartAPI = {
       });
   },
   calculateYogi: (birthData) => api.post(getEndpoint('/calculate-yogi'), birthData),
-  calculateCascadingDashas: (birthData, targetDate) => 
-    api.post(getEndpoint('/calculate-cascading-dashas'), { birth_data: birthData, target_date: targetDate }),
+  calculateCascadingDashas: (birthData, targetDate) => {
+    console.log('\n' + '='.repeat(60));
+    console.log('🔍 MOBILE: Calling calculateCascadingDashas');
+    console.log('='.repeat(60));
+    console.log('Birth Data:', JSON.stringify(birthData, null, 2));
+    console.log('Target Date:', targetDate);
+    console.log('Endpoint:', getEndpoint('/calculate-cascading-dashas'));
+    
+    return api.post(getEndpoint('/calculate-cascading-dashas'), { birth_data: birthData, target_date: targetDate })
+      .then(response => {
+        console.log('\n✅ MOBILE: Dasha Response Received');
+        console.log('Response keys:', Object.keys(response.data));
+        console.log('Maha dashas count:', response.data.maha_dashas?.length || 0);
+        console.log('Antar dashas count:', response.data.antar_dashas?.length || 0);
+        if (response.data.maha_dashas?.length > 0) {
+          console.log('First maha:', response.data.maha_dashas[0]);
+        }
+        return response;
+      })
+      .catch(error => {
+        console.error('❌ MOBILE: Dasha API Error:', error.message);
+        console.error('Error details:', error.response?.data || error);
+        throw error;
+      });
+  },
   calculateDasha: (birthData) => api.post(getEndpoint('/calculate-dasha'), birthData),
   calculateYoginiDasha: (birthData, years = 5) => 
     api.post(getEndpoint('/yogini-dasha'), { ...birthData, years }),

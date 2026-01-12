@@ -318,12 +318,12 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
     
     try {
       if (editingChart) {
+        const chartData = await apiService.calculateChartOnly(formData);
         await apiService.updateChart(editingChart.id, formData);
         toast.success('Chart updated successfully!');
         loadExistingCharts(searchQuery);
         cancelEdit();
       } else {
-        // FINAL CHECK: Absolutely prevent API call without coordinates
         if (!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null) {
           throw new Error('Coordinates missing - select from suggestions required');
         }
@@ -333,7 +333,6 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
           apiService.calculateYogi(formData)
         ]);
         
-        // Merge Yogi data into chart data
         const enhancedChartData = {
           ...chartData,
           yogiData: yogiData

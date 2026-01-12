@@ -50,13 +50,13 @@ class DashaCalculator:
             elif tz_offset is None:
                 tz_offset = 5.5  # IST fallback
             
+            # Convert to UTC - julday handles negative hours
             utc_hour = hour - tz_offset
-            jd = swe.julday(
-                int(birth_data['date'].split('-')[0]),
-                int(birth_data['date'].split('-')[1]),
-                int(birth_data['date'].split('-')[2]),
-                utc_hour
-            )
+            year = int(birth_data['date'].split('-')[0])
+            month = int(birth_data['date'].split('-')[1])
+            day = int(birth_data['date'].split('-')[2])
+            
+            jd = swe.julday(year, month, day, utc_hour)
             
             # Use geocentric mode (same as chart calculator)
             swe.set_topo(0, 0, 0)  # Reset to geocentric (center of Earth)
@@ -69,17 +69,9 @@ class DashaCalculator:
             moon_result = swe.calc_ut(jd, swe.MOON, flags)
             moon_pos = moon_result[0][0]
             
-            # Convert to degrees, minutes, seconds and log
-            degrees = int(moon_pos)
-            minutes = int((moon_pos - degrees) * 60)
-            seconds = int(((moon_pos - degrees) * 60 - minutes) * 60)
-            # print(f"DASHA CALCULATOR - Moon position: {degrees}° {minutes}' {seconds}'' (decimal: {moon_pos:.6f})")
-            # print(f"DASHA CALCULATOR - Birth data: {birth_data.get('date')} {birth_data.get('time')} at {birth_data.get('latitude')}, {birth_data.get('longitude')}")
-            
             # Calculate nakshatra and lord
             nakshatra_index = int(moon_pos / 13.333333333333334)
             moon_lord = self.NAKSHATRA_LORDS[nakshatra_index]
-            # print(f"DASHA CALCULATOR - Nakshatra: {nakshatra_index + 1}, Moon Lord: {moon_lord}")
             
             # Calculate balance using high-precision arc-minutes
             # Nakshatra span = 13°20' = 800 arc-minutes

@@ -1469,9 +1469,9 @@ async def get_self_birth_chart(current_user: User = Depends(get_current_user)):
 
 
 @app.put("/api/user/self-birth-chart")
-async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = True, current_user: User = Depends(get_current_user)):
+async def update_self_birth_chart(birth_data: BirthData, chart_id: int = None, clear_existing: bool = True, current_user: User = Depends(get_current_user)):
     """Update user's self birth chart"""
-    print(f"DEBUG: update_self_birth_chart called for user {current_user.userid}, clear_existing={clear_existing}")
+    print(f"DEBUG: update_self_birth_chart called for user {current_user.userid}, chart_id={chart_id}, clear_existing={clear_existing}")
     print(f"DEBUG: Birth data - name: {birth_data.name}, date: {birth_data.date}")
     
     conn = None
@@ -1479,7 +1479,7 @@ async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = 
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
         
-        # Prepare encrypted data for comparison
+        # Prepare encrypted data
         if encryptor:
             enc_name = encryptor.encrypt(birth_data.name)
             enc_date = encryptor.encrypt(birth_data.date)
@@ -1491,26 +1491,31 @@ async def update_self_birth_chart(birth_data: BirthData, clear_existing: bool = 
             enc_name, enc_date, enc_time = birth_data.name, birth_data.date, birth_data.time
             enc_lat, enc_lon, enc_place = str(birth_data.latitude), str(birth_data.longitude), birth_data.place or ''
         
-        # Find existing chart with matching encrypted data
-        cursor.execute('''
-            SELECT id FROM birth_charts 
-            WHERE userid = ? AND name = ? AND date = ? AND time = ? 
-            AND latitude = ? AND longitude = ?
-        ''', (current_user.userid, enc_name, enc_date, enc_time, enc_lat, enc_lon))
-        
-        existing_chart = cursor.fetchone()
-        
-        if existing_chart:
-            # Update existing chart to set relation = 'self'
-            if clear_existing:
-                cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
+        # If chart_id provided, update that specific chart
+        if chart_id:
+            # Verify chart belongs to user
+            cursor.execute('SELECT id FROM birth_charts WHERE id = ? AND userid = ?', (chart_id, current_user.userid))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Chart not found or access denied")
             
-            cursor.execute("UPDATE birth_charts SET relation = 'self' WHERE id = ?", (existing_chart[0],))
-            print(f"DEBUG: Updated existing chart {existing_chart[0]} to relation='self'")
-            birth_chart_id = existing_chart[0]
-        else:
+            # Clear other self charts if requested
             if clear_existing:
-                # Only change other charts from 'self' to 'other', don't delete them
+                cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self' AND id != ?", 
+                             (current_user.userid, chart_id))
+            
+            # Update the specified chart
+            cursor.execute('''
+                UPDATE birth_charts 
+                SET name=?, date=?, time=?, latitude=?, longitude=?, timezone=?, place=?, gender=?, relation='self'
+                WHERE id=? AND userid=?
+            ''', (enc_name, enc_date, enc_time, enc_lat, enc_lon, birth_data.timezone, enc_place, 
+                  birth_data.gender or '', chart_id, current_user.userid))
+            
+            print(f"DEBUG: Updated chart {chart_id} to relation='self'")
+            birth_chart_id = chart_id
+        else:
+            # No chart_id provided - create new chart
+            if clear_existing:
                 cursor.execute("UPDATE birth_charts SET relation = 'other' WHERE userid = ? AND relation = 'self'", (current_user.userid,))
             
             cursor.execute('''
@@ -2216,12 +2221,23 @@ async def calculate_cascading_dashas(request: dict):
     try:
         from shared.dasha_calculator import DashaCalculator
         
-        print(f"🔍 Cascading dasha request: {request.keys()}")
+        print(f"\n{'='*60}")
+        print(f"🔍 DASHA REQUEST RECEIVED")
+        print(f"{'='*60}")
+        print(f"Request keys: {request.keys()}")
+        print(f"Birth data keys: {request.get('birth_data', {}).keys()}")
+        print(f"Target date: {request.get('target_date', 'Not provided')}")
         
         birth_data = BirthData(**request['birth_data'])
         target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
         
-        print(f"📊 Processing cascading dashas for: {birth_data.name}, timezone: {birth_data.timezone}")
+        print(f"\n📊 BIRTH DATA PARSED:")
+        print(f"  Name: {birth_data.name}")
+        print(f"  Date: {birth_data.date}")
+        print(f"  Time: {birth_data.time}")
+        print(f"  Timezone: {birth_data.timezone}")
+        print(f"  Lat/Lon: {birth_data.latitude}, {birth_data.longitude}")
+        print(f"  Target Date: {target_date}")
         
     except Exception as e:
         print(f"❌ Input validation error: {str(e)}")
@@ -2248,13 +2264,23 @@ async def calculate_cascading_dashas(request: dict):
     calculator = DashaCalculator()
     
     # Get current dashas for target date
-    print(f"🔄 Calling calculate_current_dashas with target_date: {target_date}")
+    print(f"\n🔄 CALLING DASHA CALCULATOR")
+    print(f"  Target date: {target_date}")
     current_dashas = calculator.calculate_current_dashas(birth_dict, target_date)
-    print(f"📊 Current dashas result keys: {list(current_dashas.keys())}")
-    print(f"📊 Maha dashas in result: {len(current_dashas.get('maha_dashas', []))}")
+    print(f"\n📊 CALCULATOR RESPONSE:")
+    print(f"  Result keys: {list(current_dashas.keys())}")
+    print(f"  Moon Nakshatra: {current_dashas.get('moon_nakshatra', 'N/A')}")
+    print(f"  Moon Lord (Birth Mahadasha): {current_dashas.get('moon_lord', 'N/A')}")
+    print(f"  Maha dashas count: {len(current_dashas.get('maha_dashas', []))}")
     
     if current_dashas.get('maha_dashas'):
-        print(f"📊 First maha dasha: {current_dashas['maha_dashas'][0]}")
+        first_maha = current_dashas['maha_dashas'][0]
+        print(f"  First maha dasha: {first_maha.get('planet')} ({first_maha.get('start')} to {first_maha.get('end')})")
+        print(f"\n📋 ALL MAHA DASHAS:")
+        for i, maha in enumerate(current_dashas['maha_dashas']):
+            is_current = maha['start'] <= target_date <= maha['end']
+            marker = "👉 CURRENT" if is_current else ""
+            print(f"  {i+1}. {maha['planet']}: {maha['start']} to {maha['end']} {marker}")
     
     # Get all maha dashas
     maha_dashas = []
@@ -2274,7 +2300,11 @@ async def calculate_cascading_dashas(request: dict):
             current_maha = maha
             break
     
-    print(f"📈 Got {len(maha_dashas)} maha dashas from calculator")
+    print(f"\n📈 MAHA DASHAS PROCESSED: {len(maha_dashas)}")
+    print(f"Current date being checked: {target_date}")
+    for i, maha in enumerate(maha_dashas):
+        marker = "👉 CURRENT" if maha['current'] else ""
+        print(f"  {i+1}. {maha['planet']}: {maha['start']} to {maha['end']} (current: {maha['current']}) {marker}")
     
     result = {
         'maha_dashas': maha_dashas,
@@ -2285,7 +2315,9 @@ async def calculate_cascading_dashas(request: dict):
         'current_dashas': current_dashas.get('current_dashas', {})
     }
     
-    print(f"🎯 Current maha found: {current_maha['planet'] if current_maha else 'None'}")
+    print(f"\n🎯 CURRENT MAHA: {current_maha['planet'] if current_maha else 'None'}")
+    if current_maha:
+        print(f"  Period: {current_maha['start']} to {current_maha['end']}")
     
     if current_maha:
         # Calculate all antar dashas for current maha
@@ -2365,7 +2397,16 @@ async def calculate_cascading_dashas(request: dict):
                     result['prana_dashas'] = prana_result['sub_dashas']
                     print(f"🎪 Got {len(result['prana_dashas'])} prana dashas")
     
-    print(f"✅ Cascading dasha calculation complete. Returning {len(result['maha_dashas'])} maha, {len(result['antar_dashas'])} antar, {len(result['pratyantar_dashas'])} pratyantar, {len(result['sookshma_dashas'])} sookshma, {len(result['prana_dashas'])} prana dashas")
+    print(f"\n{'='*60}")
+    print(f"✅ DASHA CALCULATION COMPLETE")
+    print(f"{'='*60}")
+    print(f"Maha dashas: {len(result['maha_dashas'])}")
+    print(f"Antar dashas: {len(result['antar_dashas'])}")
+    print(f"Pratyantar dashas: {len(result['pratyantar_dashas'])}")
+    print(f"Sookshma dashas: {len(result['sookshma_dashas'])}")
+    print(f"Prana dashas: {len(result['prana_dashas'])}")
+    print(f"\nRETURNING RESULT TO CLIENT")
+    print(f"{'='*60}\n")
     return result
 
 @app.post("/api/calculate-sub-dashas")

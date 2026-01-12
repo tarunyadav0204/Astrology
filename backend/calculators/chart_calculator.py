@@ -73,15 +73,17 @@ class ChartCalculator(BaseCalculator):
         
         # Convert local time to UTC with high precision
         utc_hour = float(hour) - float(tz_offset)
-        print(f"DEBUG: Local time: {hour}, UTC time: {utc_hour}, Timezone offset: {tz_offset}, Coordinates: ({birth_data.latitude}, {birth_data.longitude})")
         
-        # High-precision Julian Day calculation
-        jd = swe.julday(
-            int(birth_data.date.split('-')[0]),
-            int(birth_data.date.split('-')[1]),
-            int(birth_data.date.split('-')[2]),
-            float(utc_hour)
-        )
+        # DON'T adjust day - let julday() handle it
+        year = int(birth_data.date.split('-')[0])
+        month = int(birth_data.date.split('-')[1])
+        day = int(birth_data.date.split('-')[2])
+        
+        print(f"DEBUG: Local time: {hour}, UTC time: {utc_hour}, Timezone offset: {tz_offset}, Coordinates: ({birth_data.latitude}, {birth_data.longitude})")
+        print(f"DEBUG: Using date: {year}-{month:02d}-{day:02d} with UTC hour: {utc_hour}")
+        
+        # High-precision Julian Day calculation - julday handles negative/overflow hours
+        jd = swe.julday(year, month, day, float(utc_hour))
         jd_end = time.time()
         # print(f"[CALC] Julian Day calculation took {jd_end - jd_start:.3f}s")
         
@@ -119,6 +121,15 @@ class ChartCalculator(BaseCalculator):
                 'degree': longitude % 30,
                 'retrograde': is_retrograde
             }
+            
+            # Log Moon position for dasha debugging
+            if planet_names[i] == 'Moon':
+                print(f"\n🌙 CHART CALCULATOR - MOON POSITION:")
+                print(f"  Calculating for: {year}-{month:02d}-{day:02d} {utc_hour:.4f} UTC")
+                print(f"  Original birth: {birth_data.date} {birth_data.time} IST")
+                print(f"  Moon Sidereal Longitude: {longitude:.6f}°")
+                print(f"  JD: {jd:.6f}")
+                print(f"  Ayanamsa: {swe.get_ayanamsa_ut(jd):.6f}°\n")
         planets_end = time.time()
         # print(f"[CALC] Planetary calculations took {planets_end - planets_start:.3f}s")
 

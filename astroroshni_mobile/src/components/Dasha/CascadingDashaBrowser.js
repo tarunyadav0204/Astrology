@@ -169,10 +169,16 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   const fetchCascadingDashas = async () => {
     try {
+      console.log('\n' + '='.repeat(60));
+      console.log('📱 COMPONENT: fetchCascadingDashas called');
+      console.log('='.repeat(60));
+      
       setLoading(true);
       setError(null);
       
       const targetDate = transitDate.toISOString().split('T')[0];
+      console.log('Transit Date:', transitDate);
+      console.log('Target Date (formatted):', targetDate);
       
       const formattedBirthData = {
         name: birthData.name,
@@ -183,24 +189,41 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         place: birthData.place || 'Unknown'
       };
       
+      console.log('Formatted Birth Data:', JSON.stringify(formattedBirthData, null, 2));
       
       const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
       
+      console.log('\n✅ COMPONENT: Response received');
+      console.log('Response data keys:', Object.keys(response.data));
+      console.log('Has error:', !!response.data.error);
+      
       if (response.data.error) {
+        console.error('❌ Error in response:', response.data.error);
         setError(`Vimshottari calculation failed: ${response.data.error}`);
         return;
       }
       
       // Check if we have maha_dashas in the response
       const mahadashas = response.data.maha_dashas || [];
+      console.log('Maha dashas count:', mahadashas.length);
       
       if (mahadashas.length === 0) {
+        console.warn('⚠️ No maha dashas in response');
         setError('Vimshottari calculation returned no dasha periods.');
         return;
       }
       
+      console.log('First 3 maha dashas:');
+      mahadashas.slice(0, 3).forEach((m, i) => {
+        console.log(`  ${i+1}. ${m.planet}: ${m.start} to ${m.end} (current: ${m.current})`);
+      });
+      
+      console.log('\n💾 Setting cascading data in state');
       setCascadingData(response.data);
+      console.log('✅ State updated successfully\n');
     } catch (err) {
+      console.error('❌ COMPONENT: Error in fetchCascadingDashas:', err);
+      console.error('Error details:', err.message);
       setError('Failed to load cascading dasha data');
     } finally {
       setLoading(false);

@@ -13,7 +13,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { API_BASE_URL, getEndpoint, COLORS } from '../../utils/constants';
 import { useFocusEffect } from '@react-navigation/native';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
@@ -33,6 +35,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [selectedChartId, setSelectedChartId] = useState(chartId);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [showProgress, setShowProgress] = useState(false);
+  const [progressTimer, setProgressTimer] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -60,25 +66,30 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   const loadBirthData = async () => {
     try {
+      console.log('[KarmaAnalysis] Loading birth data...');
       const birthDetails = await storage.getBirthDetails();
+      console.log('[KarmaAnalysis] Birth details:', birthDetails);
+      
       if (birthDetails?.name) {
         setNativeName(birthDetails.name);
       }
       if (birthDetails?.id) {
-        // If chartId changed, reset analysis and load new one
-        if (birthDetails.id !== selectedChartId) {
-          setSelectedChartId(birthDetails.id);
+        console.log('[KarmaAnalysis] Setting selectedChartId to:', birthDetails.id);
+        setSelectedChartId(birthDetails.id);
+        // Reset analysis if chart changed
+        if (birthDetails.id !== selectedChartId && selectedChartId) {
+          console.log('[KarmaAnalysis] Chart changed, resetting analysis');
           setAnalysis(null);
           setError(null);
         }
       }
     } catch (err) {
-      console.error('Error loading birth data:', err);
+      console.error('[KarmaAnalysis] Error loading birth data:', err);
     }
   };
 
   useEffect(() => {
-    if (selectedChartId) {
+    if (selectedChartId && !loading) {
       checkExistingAnalysis();
     }
     Animated.timing(fadeAnim, {
@@ -109,6 +120,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           setAnalysis(data.data);
           await saveAnalysis(data.data);
         } else if (data.status === 'pending' || data.status === 'processing') {
+          startProgressBar();
           startPolling();
           return;
         }
@@ -140,10 +152,17 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     setShowStartModal(true);
   };
 
-  const confirmStartAnalysis = () => {
+  const confirmStartAnalysis = async () => {
     setShowStartModal(false);
     setLoading(true);
-    initiateAnalysis(false);
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+    startProgressBar();
+    await initiateAnalysis(false);
   };
 
   const handleRegenerate = () => {
@@ -168,6 +187,13 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     }
     setAnalysis(null);
     setLoading(true);
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+    startProgressBar();
     setTimeout(() => initiateAnalysis(true), 100);
   };
 
@@ -193,6 +219,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       const data = await response.json();
       
       if (data.status === 'complete') {
+        stopProgressBar();
         setAnalysis(data.data);
         await saveAnalysis(data.data);
         await fetchBalance();
@@ -203,9 +230,39 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         throw new Error('Unexpected response status');
       }
     } catch (err) {
+      stopProgressBar();
       setError(err.message);
       setLoading(false);
     }
+  };
+
+  const startProgressBar = () => {
+    setProgress(0);
+    setShowProgress(true);
+    const duration = 60000; // 60 seconds
+    const steps = 600; // Update every 100ms
+    let currentStep = 0;
+    
+    const timer = setInterval(() => {
+      currentStep++;
+      setProgress((currentStep / steps) * 100);
+      
+      if (currentStep >= steps) {
+        clearInterval(timer);
+        setShowProgress(false);
+      }
+    }, duration / steps);
+    
+    setProgressTimer(timer);
+  };
+
+  const stopProgressBar = () => {
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      setProgressTimer(null);
+    }
+    setShowProgress(false);
+    setProgress(0);
   };
 
   const startPolling = () => {
@@ -220,24 +277,194 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
         const data = await response.json();
         
         if (data.status === 'complete') {
+          stopProgressBar();
           setAnalysis(data.data);
           await saveAnalysis(data.data);
           await fetchBalance();
           setLoading(false);
           clearInterval(interval);
+          setPollingInterval(null);
         } else if (data.status === 'error') {
+          stopProgressBar();
           setError(data.error);
           setLoading(false);
           clearInterval(interval);
+          setPollingInterval(null);
         }
       } catch (err) {
+        console.error('[KarmaAnalysis] Polling error:', err);
+        stopProgressBar();
         setError(err.message);
         setLoading(false);
         clearInterval(interval);
+        setPollingInterval(null);
       }
     }, 2000);
     
     setPollingInterval(interval);
+  };
+
+  const generateKarmaPDF = async () => {
+    if (!analysis) return;
+    
+    try {
+      setGeneratingPDF(true);
+      console.log('[PDF] Starting generation...');
+      
+      const sections = analysis.sections || {};
+      let contentHTML = '';
+      
+      Object.entries(sections).forEach(([title, content]) => {
+        // Format content with bold and italic
+        let formattedContent = content
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
+          .replace(/\n/g, '<br>');
+        
+        contentHTML += `
+          <div class="karma-section">
+            <h2 class="section-title">🕉️ ${title}</h2>
+            <div class="section-content">${formattedContent}</div>
+          </div>
+        `;
+      });
+      
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: white;
+                padding: 20px;
+                color: #1a1a1a;
+                line-height: 1.6;
+              }
+              .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 20px;
+                padding: 30px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+                border: 2px solid #FFD700;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 3px solid #FFD700;
+              }
+              .logo { font-size: 48px; margin-bottom: 10px; }
+              .title {
+                font-size: 32px;
+                font-weight: 700;
+                color: #1a0033;
+                margin-bottom: 5px;
+                letter-spacing: 1px;
+              }
+              .subtitle {
+                font-size: 16px;
+                color: #4a0080;
+                font-style: italic;
+              }
+              .native-name {
+                font-size: 18px;
+                color: #1a0033;
+                margin-top: 10px;
+                font-weight: 600;
+              }
+              .timestamp {
+                font-size: 12px;
+                color: #666;
+                margin-top: 5px;
+              }
+              .karma-section {
+                background: #fef7f0;
+                border-radius: 16px;
+                padding: 20px;
+                margin: 20px 0;
+                border: 2px solid #FFD700;
+              }
+              .section-title {
+                font-size: 20px;
+                font-weight: 700;
+                color: #1a0033;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+              }
+              .section-content {
+                font-size: 15px;
+                line-height: 1.8;
+                color: #1a1a1a;
+                text-align: justify;
+              }
+              strong {
+                font-weight: 700;
+                color: #1a0033;
+              }
+              em {
+                font-style: italic;
+                color: #4a0080;
+              }
+              .footer {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 2px solid #FFD700;
+                text-align: center;
+                color: #666;
+                font-size: 12px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="logo">🕉️</div>
+                <div class="title">Past Life Karma Analysis</div>
+                <div class="subtitle">Your Soul's Eternal Journey</div>
+                <div class="native-name">${nativeName}</div>
+                <div class="timestamp">${new Date().toLocaleString()}</div>
+              </div>
+              ${contentHTML}
+              <div class="footer">
+                ✨ Analyzed by AstroRoshni<br>
+                Artificial Intelligence • Vedic Astrology
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+      
+      console.log('[PDF] HTML generated, calling printToFileAsync...');
+      const { uri } = await Promise.race([
+        Print.printToFileAsync({ html }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('PDF generation timeout after 30s')), 30000)
+        )
+      ]);
+      
+      console.log('[PDF] Generated successfully:', uri);
+      console.log('[PDF] Sharing...');
+      
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Karma Analysis',
+        UTI: 'com.adobe.pdf',
+      });
+      
+      console.log('[PDF] Share completed');
+      setGeneratingPDF(false);
+    } catch (error) {
+      console.error('[PDF] Error:', error);
+      setGeneratingPDF(false);
+      Alert.alert('Error', `Failed to generate PDF: ${error.message}`);
+    }
   };
 
   if (loading) {
@@ -258,7 +485,17 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           </View>
           <ActivityIndicator size="large" color="#FFD700" style={styles.spinner} />
           <Text style={styles.loadingTitle}>Accessing Akashic Records</Text>
-          <Text style={styles.loadingSubtitle}>Analyzing your soul's journey through time...</Text>
+          <Text style={styles.loadingSubtitle}>
+            {showProgress ? 'Analyzing your soul\'s journey through time...' : 'This is taking longer than usual...'}
+          </Text>
+          {showProgress && (
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarBackground}>
+                <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{Math.round(progress)}%</Text>
+            </View>
+          )}
           <View style={styles.dotsContainer}>
             <View style={[styles.dot, styles.dot1]} />
             <View style={[styles.dot, styles.dot2]} />
@@ -346,9 +583,14 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
             <Text style={styles.nameChipText}>{nativeName}</Text>
             <Text style={styles.nameChipIcon}>▼</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleRegenerate} style={styles.regenerateButton}>
-            <Text style={styles.regenerateIcon}>↻</Text>
-          </TouchableOpacity>
+          <View style={styles.topBarActions}>
+            <TouchableOpacity onPress={generateKarmaPDF} style={styles.shareButton} disabled={generatingPDF}>
+              <Text style={styles.shareIcon}>{generatingPDF ? '⏳' : '📤'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleRegenerate} style={styles.regenerateButton}>
+              <Text style={styles.regenerateIcon}>↻</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <CreditModal
           visible={showRegenerateModal}
@@ -421,17 +663,77 @@ const KarmaCard = ({ title, content, index }) => {
     : { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderColor: 'rgba(255, 255, 255, 0.3)' };
 
   const formatContent = (text) => {
-    return text
-      .replace(/###\s*(.+?)\n/g, '\n$1\n')
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(.+?)\*/g, '$1')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/^\s*[-*]\s+/gm, '• ')
-      .replace(/^\s*(\d+\.\s+)/gm, '$1')
-      .replace(/^(•.+)$/gm, '$1\n')
-      .replace(/^(\d+\..+)$/gm, '$1\n')
-      .replace(/\n{3,}/g, '\n\n');
+    // Clean up text first
+    const cleanText = text.trim();
+    
+    // Split by markdown patterns while preserving them
+    const parts = [];
+    let lastIndex = 0;
+    
+    // Match **bold** and *italic* patterns (non-greedy, must have closing tag)
+    const regex = /\*\*(.+?)\*\*|\*([^*]+?)\*/g;
+    let match;
+    
+    while ((match = regex.exec(cleanText)) !== null) {
+      // Add text before match
+      if (match.index > lastIndex) {
+        parts.push({ text: cleanText.slice(lastIndex, match.index), style: 'normal' });
+      }
+      
+      // Add matched text with style
+      if (match[1]) {
+        // Bold (**text**)
+        parts.push({ text: match[1], style: 'bold' });
+      } else if (match[2]) {
+        // Italic (*text*)
+        parts.push({ text: match[2], style: 'italic' });
+      }
+      
+      lastIndex = regex.lastIndex;
+    }
+    
+    // Add remaining text
+    if (lastIndex < cleanText.length) {
+      parts.push({ text: cleanText.slice(lastIndex), style: 'normal' });
+    }
+    
+    // Clean up standalone asterisks in normal text parts only
+    return parts.map(part => {
+      if (part.style === 'normal') {
+        // Replace asterisks with space, then clean up multiple spaces
+        return { ...part, text: part.text.replace(/\*/g, ' ').replace(/\s+/g, ' ') };
+      }
+      return part;
+    });
+  };
+
+  const renderFormattedText = (text) => {
+    // Split by single or double newlines to get paragraphs
+    const paragraphs = text.split(/\n+/).filter(p => p.trim().length > 0);
+    
+    return (
+      <View>
+        {paragraphs.map((para, paraIndex) => {
+          const parts = formatContent(para);
+          return (
+            <Text key={paraIndex} style={[styles.cardContent, paraIndex > 0 && styles.paragraphSpacing]}>
+              {parts.map((part, index) => (
+                <Text
+                  key={index}
+                  style={[
+                    styles.cardContent,
+                    part.style === 'bold' && (isIntroduction ? styles.introBoldText : styles.boldText),
+                    part.style === 'italic' && (isIntroduction ? styles.introItalicText : styles.italicText),
+                  ]}
+                >
+                  {index === 0 ? part.text.trimStart() : part.text}
+                </Text>
+              ))}
+            </Text>
+          );
+        })}
+      </View>
+    );
   };
 
   return (
@@ -445,13 +747,13 @@ const KarmaCard = ({ title, content, index }) => {
           <View style={[styles.iconCircle, isIntroduction && styles.introIconCircle]}>
             <Text style={styles.cardIcon}>{icons[index % icons.length]}</Text>
           </View>
-          <Text style={styles.cardTitle} numberOfLines={2}>{formatContent(title)}</Text>
+          <Text style={styles.cardTitle}>{title}</Text>
           <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
         </TouchableOpacity>
         {expanded && (
           <View style={styles.cardContentContainer}>
             <View style={styles.contentDivider} />
-            <Text style={styles.cardContent}>{formatContent(content)}</Text>
+            {renderFormattedText(content)}
           </View>
         )}
       </View>
@@ -513,6 +815,24 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     fontSize: 10,
   },
+  topBarActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  shareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 215, 0, 0.5)',
+  },
+  shareIcon: {
+    fontSize: 20,
+    color: '#FFD700',
+  },
   regenerateButton: {
     width: 40,
     height: 40,
@@ -564,6 +884,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  progressBarContainer: {
+    width: width * 0.7,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  progressBarBackground: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFD700',
+    borderRadius: 4,
+  },
+  progressText: {
+    color: '#FFD700',
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '600',
   },
   dotsContainer: {
     flexDirection: 'row',
@@ -676,6 +1019,25 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'justify',
+  },
+  boldText: {
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  italicText: {
+    fontStyle: 'italic',
+    color: 'rgba(255, 215, 0, 0.9)',
+  },
+  introBoldText: {
+    fontWeight: '700',
+    color: '#4a0080',
+  },
+  introItalicText: {
+    fontStyle: 'italic',
+    color: '#4a0080',
+  },
+  paragraphSpacing: {
+    marginTop: 12,
   },
   footerContainer: {
     marginTop: 30,

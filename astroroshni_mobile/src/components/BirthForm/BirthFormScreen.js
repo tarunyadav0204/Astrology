@@ -334,14 +334,23 @@ export default function BirthFormScreen({ navigation, route }) {
       // console.log('🔍 [BIRTH_FORM_DEBUG] - editProfile?.relation:', editProfile?.relation);
       // console.log('🔍 [BIRTH_FORM_DEBUG] - Final relation value:', birthData.relation);
 
-      // 1. Calculate chart for validation
-      const [chartData, yogiData] = await Promise.all([
-        chartAPI.calculateChart(birthData),
-        chartAPI.calculateYogi(birthData)
-      ]);
-
-      // The calculateChart endpoint already saves to database, so we just need the ID from response
-      let birthChartId = chartData.birth_chart_id || editProfile?.id || Date.now() + Math.random();
+      // 1. Calculate chart and handle save/update
+      let chartData, birthChartId;
+      
+      if (editProfile?.id) {
+        // EDIT MODE: Calculate chart only (no DB save) and update existing record
+        console.log('✏️ Edit mode: Updating existing chart ID:', editProfile.id);
+        chartData = await chartAPI.calculateChartOnly(birthData);
+        await chartAPI.updateChart(editProfile.id, birthData);
+        birthChartId = editProfile.id;
+      } else {
+        // CREATE MODE: Calculate and save new chart
+        console.log('➕ Create mode: Saving new chart');
+        chartData = await chartAPI.calculateChart(birthData);
+        birthChartId = chartData.birth_chart_id || Date.now() + Math.random();
+      }
+      
+      const yogiData = await chartAPI.calculateYogi(birthData);
 
       // 3. Create profile data with REAL ID from database
       const profileData = {

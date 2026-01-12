@@ -13,6 +13,16 @@ except ImportError:
 # Simple cache for timezone lookups to avoid repeated expensive operations
 _timezone_cache = {}
 
+# Reusable TimezoneFinder instance (expensive to create, should be singleton)
+_timezone_finder = None
+
+def _get_timezone_finder():
+    """Get or create singleton TimezoneFinder instance"""
+    global _timezone_finder
+    if _timezone_finder is None:
+        _timezone_finder = TimezoneFinder()
+    return _timezone_finder
+
 def get_timezone_from_coordinates(lat: float, lon: float) -> str:
     """
     Professional timezone detection from coordinates using timezonefinder + pytz
@@ -36,8 +46,8 @@ def get_timezone_from_coordinates(lat: float, lon: float) -> str:
         return _timezone_cache[cache_key]
     
     try:
-        # Get IANA timezone name from coordinates
-        tf = TimezoneFinder()
+        # Get IANA timezone name from coordinates using singleton instance
+        tf = _get_timezone_finder()
         iana_timezone = tf.timezone_at(lat=lat, lng=lon)
         
         if not iana_timezone:
@@ -107,7 +117,7 @@ def parse_timezone_offset(timezone_str, latitude: float = None, longitude: float
             try:
                 detected_tz = get_timezone_from_coordinates(latitude, longitude)
                 timezone_str = detected_tz
-                print(f"🌍 TIMEZONE: Detected '{detected_tz}' from coordinates ({latitude}, {longitude})")
+                # Removed log - already logged in main.py
             except Exception as e:
                 print(f"⚠️ TIMEZONE: Failed to detect from coordinates: {e}")
                 return 0.0  # Fall back to UTC
