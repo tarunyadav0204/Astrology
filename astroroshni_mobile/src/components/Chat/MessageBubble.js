@@ -921,6 +921,13 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
         
+        {/* Beta Notice for Timeline Predictions */}
+        {message.role === 'assistant' && !isClarification && (
+          <View style={styles.betaNotice}>
+            <Text style={styles.betaNoticeText}>⚠️ BETA NOTICE: Timeline predictions are experimental. Please use logic and discretion.</Text>
+          </View>
+        )}
+        
         {/* Summary Image */}
         {message.summary_image && (
           <View style={{ marginBottom: 15, alignItems: 'center' }}>
@@ -1514,5 +1521,19 @@ const styles = StyleSheet.create({
   voiceModalCloseText: {
     color: 'white',
     fontWeight: '600',
+  },
+  betaNotice: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  betaNoticeText: {
+    fontSize: 12,
+    color: '#E65100',
+    fontWeight: '600',
+    lineHeight: 16,
   },
 });

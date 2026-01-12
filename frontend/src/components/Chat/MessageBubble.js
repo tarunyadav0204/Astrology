@@ -407,6 +407,22 @@ const MessageBubble = ({ message, language = 'english', onFollowUpClick, onChart
 
             
             <div className="message-content">
+                {/* Beta Notice for Timeline Predictions */}
+                {message.role === 'assistant' && !message.isTyping && !message.isProcessing && message.message_type !== 'clarification' && (
+                    <div style={{
+                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                        borderLeft: '3px solid #FF9800',
+                        borderRadius: '8px',
+                        padding: '10px',
+                        marginBottom: '12px',
+                        fontSize: '12px',
+                        color: '#E65100',
+                        fontWeight: '600',
+                        lineHeight: '16px'
+                    }}>
+                        ⚠️ BETA NOTICE: Timeline predictions are experimental. Please use logic and discretion.
+                    </div>
+                )}
                 {message.role === 'assistant' && !message.isTyping && !message.isProcessing && textToSpeech.isSupported && message.content && (
                     <div style={{ clearfix: 'both', marginBottom: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <select 

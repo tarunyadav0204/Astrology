@@ -39,12 +39,19 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(false);
   const [progressTimer, setProgressTimer] = useState(null);
+  const [isChangingChart, setIsChangingChart] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       loadBirthData();
       fetchKarmaCost();
-    }, [])
+      // Don't restart if already loading/polling
+      if (!loading && !pollingInterval) {
+        if (selectedChartId) {
+          checkExistingAnalysis();
+        }
+      }
+    }, [loadBirthData])
   );
 
   const fetchKarmaCost = async () => {
@@ -64,7 +71,7 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     }
   };
 
-  const loadBirthData = async () => {
+  const loadBirthData = useCallback(async () => {
     try {
       console.log('[KarmaAnalysis] Loading birth data...');
       const birthDetails = await storage.getBirthDetails();
@@ -75,21 +82,28 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
       }
       if (birthDetails?.id) {
         console.log('[KarmaAnalysis] Setting selectedChartId to:', birthDetails.id);
-        setSelectedChartId(birthDetails.id);
         // Reset analysis if chart changed
         if (birthDetails.id !== selectedChartId && selectedChartId) {
-          console.log('[KarmaAnalysis] Chart changed, resetting analysis');
+          console.log('[KarmaAnalysis] Chart changed, clearing analysis');
+          setIsChangingChart(true);
+          // Clear immediately
           setAnalysis(null);
           setError(null);
+          setLoading(false);
+        }
+        setSelectedChartId(birthDetails.id);
+        // Reset flag after state updates
+        if (birthDetails.id !== selectedChartId && selectedChartId) {
+          setTimeout(() => setIsChangingChart(false), 50);
         }
       }
     } catch (err) {
       console.error('[KarmaAnalysis] Error loading birth data:', err);
     }
-  };
+  }, [selectedChartId]);
 
   useEffect(() => {
-    if (selectedChartId && !loading) {
+    if (selectedChartId && !loading && !isChangingChart) {
       checkExistingAnalysis();
     }
     Animated.timing(fadeAnim, {
@@ -100,11 +114,14 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     return () => {
       if (pollingInterval) clearInterval(pollingInterval);
     };
-  }, [selectedChartId]);
+  }, [selectedChartId, isChangingChart]);
 
   const checkExistingAnalysis = async () => {
     try {
-      if (!selectedChartId) return;
+      if (!selectedChartId) {
+        setError('Chart not found. Please select a native from the home screen.');
+        return;
+      };
       
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -123,11 +140,18 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           startProgressBar();
           startPolling();
           return;
+        } else {
+          // No analysis exists - keep analysis as null
+          setAnalysis(null);
         }
+      } else {
+        // No analysis exists - keep analysis as null
+        setAnalysis(null);
       }
       setLoading(false);
     } catch (err) {
       console.error('Error checking existing analysis:', err);
+      setAnalysis(null);
       setLoading(false);
     }
   };
@@ -198,7 +222,11 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   };
 
   const initiateAnalysis = async (forceRegenerate = false) => {
-    if (!selectedChartId) return;
+    if (!selectedChartId) {
+      setError('Chart not found. Please select a native from the home screen.');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -542,9 +570,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconButton}>
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-          <View style={styles.nameChip}>
+          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={styles.nameChip}>
             <Text style={styles.nameChipText}>{nativeName}</Text>
-          </View>
+            <Text style={styles.nameChipIcon}>▼</Text>
+          </TouchableOpacity>
           <View style={styles.regenerateButton} />
         </View>
         <View style={styles.startContainer}>
