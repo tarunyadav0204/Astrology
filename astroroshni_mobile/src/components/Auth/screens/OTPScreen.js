@@ -87,7 +87,8 @@ export default function OTPScreen({
     if (resendTimer > 0) return;
     
     try {
-      const response = await authAPI.sendRegistrationOtp({ phone: formData.phone });
+      const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
+      const response = await authAPI.sendRegistrationOtp({ phone: fullPhone });
       setResendTimer(30);
       
       // Show dev OTP code if available
@@ -137,7 +138,7 @@ export default function OTPScreen({
           <Text style={styles.title}>Enter OTP</Text>
           <Text style={styles.subtitle}>
             We've sent a 6-digit code to{"\n"}
-            +91 {formData.phone}
+            {formData.countryCode} {formData.phone}
           </Text>
           {devOtpCode && (
             <View style={styles.devCodeContainer}>

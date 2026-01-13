@@ -6,7 +6,25 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
-  const { chartData } = route.params;
+  const { chartData, birthData } = route.params;
+  const [karakas, setKarakas] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    loadKarakas();
+  }, []);
+
+  const loadKarakas = async () => {
+    try {
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.calculateCharaKarakas(chartData, birthData);
+      setKarakas(response.data.karakas || response.data.chara_karakas || response.data);
+    } catch (error) {
+      console.error('Error loading karakas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
                       'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
@@ -16,7 +34,9 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const planetEmojis = {
     'Sun': '☉', 'Moon': '☽', 'Mars': '♂', 'Mercury': '☿',
     'Jupiter': '♃', 'Venus': '♀', 'Saturn': '♄',
-    'Rahu': '☊', 'Ketu': '☋'
+    'Rahu': '☊', 'Ketu': '☋', 'Gulika': '🌑', 'Mandi': '⚫',
+    'Indu Lagna': '🌙', 'Bhava Lagna': '🏠', 'Hora Lagna': '⏰',
+    'Ascendant (Lagna)': '⬆️'
   };
 
   const getNakshatra = (longitude) => {
@@ -47,6 +67,44 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       pada: getNakshatraPada(chartData.planets[name].longitude)
     }));
 
+  // Special points from chartData.planets
+  const specialPoints = [
+    {
+      name: 'Ascendant (Lagna)',
+      longitude: chartData.ascendant,
+      sign: Math.floor(chartData.ascendant / 30),
+      degree: chartData.ascendant % 30,
+      house: 1,
+      nakshatra: getNakshatra(chartData.ascendant),
+      pada: getNakshatraPada(chartData.ascendant)
+    }
+  ];
+  
+  if (chartData.planets?.Gulika) {
+    specialPoints.push({
+      name: 'Gulika',
+      ...chartData.planets.Gulika,
+      nakshatra: getNakshatra(chartData.planets.Gulika.longitude),
+      pada: getNakshatraPada(chartData.planets.Gulika.longitude)
+    });
+  }
+  if (chartData.planets?.Mandi) {
+    specialPoints.push({
+      name: 'Mandi',
+      ...chartData.planets.Mandi,
+      nakshatra: getNakshatra(chartData.planets.Mandi.longitude),
+      pada: getNakshatraPada(chartData.planets.Mandi.longitude)
+    });
+  }
+  if (chartData.planets?.InduLagna) {
+    specialPoints.push({
+      name: 'Indu Lagna',
+      ...chartData.planets.InduLagna,
+      nakshatra: getNakshatra(chartData.planets.InduLagna.longitude),
+      pada: getNakshatraPada(chartData.planets.InduLagna.longitude)
+    });
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -64,6 +122,31 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           </View>
 
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            {/* Jaimini Karakas Section */}
+            {karakas && (
+              <View style={styles.karakasSection}>
+                <Text style={styles.sectionTitle}>🔱 Jaimini Karakas</Text>
+                <View style={styles.karakasGrid}>
+                  {Object.entries(karakas).map(([karaka, value]) => {
+                    let displayName = 'Unknown';
+                    if (typeof value === 'string') {
+                      displayName = value;
+                    } else if (value && typeof value === 'object') {
+                      displayName = value.planet || value.name || 'Unknown';
+                    }
+                    return (
+                      <View key={karaka} style={styles.karakaCard}>
+                        <Text style={styles.karakaName}>{karaka}</Text>
+                        <Text style={styles.karakaPlanet}>{planetEmojis[displayName] || '⭐'} {displayName}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Planetary Positions */}
+            <Text style={styles.sectionTitle}>🪐 Planetary Positions</Text>
             {planets.map((planet, index) => (
               <View key={planet.name} style={styles.card}>
                 <LinearGradient
@@ -109,6 +192,55 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
                 </LinearGradient>
               </View>
             ))}
+
+            {/* Special Points */}
+            {specialPoints.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>✨ Special Points</Text>
+                {specialPoints.map((point, index) => (
+                  <View key={point.name} style={styles.card}>
+                    <LinearGradient
+                      colors={['#f0f9ff', '#e0f2fe']}
+                      style={styles.cardGradient}
+                    >
+                      <View style={styles.cardHeader}>
+                        <View style={styles.planetInfo}>
+                          <Text style={styles.planetEmoji}>{planetEmojis[point.name]}</Text>
+                          <View>
+                            <Text style={styles.planetName}>{point.name}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.houseTag}>
+                          <Text style={styles.houseText}>House {point.house}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.divider} />
+
+                      <View style={styles.detailsGrid}>
+                        <View style={styles.detailItem}>
+                          <Text style={styles.detailLabel}>Rashi</Text>
+                          <View style={styles.rashiContainer}>
+                            <Text style={styles.rashiIcon}>{rashiIcons[point.sign]}</Text>
+                            <Text style={styles.detailValue}>{rashiNames[point.sign]}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.detailItem}>
+                          <Text style={styles.detailLabel}>Degree</Text>
+                          <Text style={styles.detailValue}>{point.degree.toFixed(2)}°</Text>
+                        </View>
+
+                        <View style={styles.detailItemFull}>
+                          <Text style={styles.detailLabel}>Nakshatra</Text>
+                          <Text style={styles.detailValue}>{point.nakshatra} - Pada {point.pada}</Text>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                ))}
+              </>
+            )}
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
@@ -236,6 +368,41 @@ const styles = StyleSheet.create({
   },
   rashiIcon: {
     fontSize: 16,
+  },
+  karakasSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  karakasGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  karakaCard: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderRadius: 12,
+    padding: 12,
+    minWidth: '48%',
+    flexGrow: 1,
+  },
+  karakaName: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  karakaPlanet: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    fontWeight: '700',
   },
 });
 

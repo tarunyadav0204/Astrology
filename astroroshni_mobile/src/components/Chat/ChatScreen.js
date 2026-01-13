@@ -20,12 +20,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
 import FeedbackComponent from './FeedbackComponent';
 import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
 import CalibrationCard from './CalibrationCard';
+import PremiumAnalysisModal from './PremiumAnalysisModal';
 import { storage } from '../../services/storage';
 import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,6 +58,9 @@ export default function ChatScreen({ navigation, route }) {
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showPremiumTooltip, setShowPremiumTooltip] = useState(true);
+  const tooltipResetRef = useRef(true);
   const glowAnim = useRef(new Animated.Value(0)).current;
   const badgeFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -1624,6 +1629,7 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={styles.premiumToggleButton}
                 onPress={() => setIsPremiumAnalysis(!isPremiumAnalysis)}
+                onLongPress={() => setShowPremiumModal(true)}
               >
                 <Animated.View
                   style={[
@@ -1648,6 +1654,9 @@ export default function ChatScreen({ navigation, route }) {
                   ) : (
                     <View style={styles.premiumIconInactive}>
                       <Text style={styles.premiumIconTextInactive}>⚡</Text>
+                      <View style={styles.premiumBadge}>
+                        <Text style={styles.premiumBadgeText}>?</Text>
+                      </View>
                     </View>
                   )}
                 </Animated.View>
@@ -1683,6 +1692,34 @@ export default function ChatScreen({ navigation, route }) {
               >
                 <Text style={styles.lowCreditText}>💳 Get more credits to continue</Text>
               </TouchableOpacity>
+            )}
+            
+            {showPremiumTooltip && !isPremiumAnalysis && (
+              <View style={styles.premiumTooltip}>
+                <TouchableOpacity 
+                  style={styles.tooltipClose}
+                  onPress={() => {
+                    console.log('❌ Tooltip closed');
+                    tooltipResetRef.current = true;
+                    setShowPremiumTooltip(false);
+                  }}
+                >
+                  <Text style={styles.tooltipCloseText}>✕</Text>
+                </TouchableOpacity>
+                <Text style={styles.tooltipText}>⚡ Premium Analysis</Text>
+                <Text style={styles.tooltipSubtext}>Get deeper insights</Text>
+                <TouchableOpacity 
+                  style={styles.tooltipButton}
+                  onPress={() => {
+                    console.log('💡 Learn More clicked');
+                    tooltipResetRef.current = true;
+                    setShowPremiumTooltip(false);
+                    setShowPremiumModal(true);
+                  }}
+                >
+                  <Text style={styles.tooltipButtonText}>Learn More</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         )}
@@ -2579,6 +2616,13 @@ export default function ChatScreen({ navigation, route }) {
         </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      
+      <PremiumAnalysisModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        premiumCost={premiumChatCost}
+        standardCost={chatCost}
+      />
       </LinearGradient>
     </View>
   );
@@ -3467,5 +3511,72 @@ const styles = StyleSheet.create({
   },
   partnershipBadgeIcon: {
     marginLeft: 2,
+  },
+  premiumTooltip: {
+    position: 'absolute',
+    bottom: 80,
+    right: 10,
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    width: 180,
+    zIndex: 1000,
+  },
+  tooltipText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  tooltipSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  tooltipButton: {
+    backgroundColor: '#ff6b35',
+    padding: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  tooltipButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tooltipClose: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    padding: 4,
+    zIndex: 1001,
+  },
+  tooltipCloseText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ff6b35',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1a0033',
+  },
+  premiumBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

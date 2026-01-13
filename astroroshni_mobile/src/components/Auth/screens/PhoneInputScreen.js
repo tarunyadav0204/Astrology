@@ -9,11 +9,27 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
+
+const COUNTRY_CODES = [
+  { code: '+1', country: 'US/CA', flag: '🇺🇸', name: 'United States/Canada' },
+  { code: '+44', country: 'UK', flag: '🇬🇧', name: 'United Kingdom' },
+  { code: '+91', country: 'IN', flag: '🇮🇳', name: 'India' },
+  { code: '+61', country: 'AU', flag: '🇦🇺', name: 'Australia' },
+  { code: '+971', country: 'AE', flag: '🇦🇪', name: 'UAE' },
+  { code: '+65', country: 'SG', flag: '🇸🇬', name: 'Singapore' },
+  { code: '+60', country: 'MY', flag: '🇲🇾', name: 'Malaysia' },
+  { code: '+81', country: 'JP', flag: '🇯🇵', name: 'Japan' },
+  { code: '+86', country: 'CN', flag: '🇨🇳', name: 'China' },
+  { code: '+49', country: 'DE', flag: '🇩🇪', name: 'Germany' },
+  { code: '+33', country: 'FR', flag: '🇫🇷', name: 'France' },
+];
 
 export default function PhoneInputScreen({ 
   formData, 
@@ -23,6 +39,10 @@ export default function PhoneInputScreen({
 }) {
   const [loading, setLoading] = useState(false);
   const [isValid, setIsValid] = useState(false);
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(
+    COUNTRY_CODES.find(c => c.code === formData.countryCode) || COUNTRY_CODES[2]
+  );
   
   const inputAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(50)).current;
@@ -43,29 +63,35 @@ export default function PhoneInputScreen({
   }, []);
 
   useEffect(() => {
-    setIsValid(formData.phone.length >= 10);
-  }, [formData.phone]);
+    const minLength = selectedCountry.code === '+1' ? 10 : 8;
+    setIsValid(formData.phone.length >= minLength);
+  }, [formData.phone, selectedCountry]);
 
   const handleContinue = async () => {
     if (!isValid) return;
     
+    // Construct full phone number with country code
+    const fullPhone = `${selectedCountry.code}${formData.phone}`;
+    
+    console.log('📱 Phone Input - handleContinue');
+    console.log('  Local phone:', formData.phone);
+    console.log('  Country code:', selectedCountry.code);
+    console.log('  Full phone:', fullPhone);
+    console.log('  Is login:', isLogin);
+    
+    // Store country code separately
+    updateFormData('countryCode', selectedCountry.code);
+    
     if (isLogin) {
+      console.log('  → Navigating to password screen');
       navigateToScreen('password');
     } else {
       // Check if phone exists by trying to send registration OTP
       setLoading(true);
-      // console.log('🔍 Starting phone validation for:', formData.phone);
-      // console.log('📡 API Request - Phone:', formData.phone);
-      // console.log('🌐 Network info - API Base URL:', require('../../../utils/constants').API_BASE_URL);
       
       const startTime = Date.now();
       try {
-        // console.log('⏱️ Sending API request at:', new Date().toISOString());
-        
-        // Add network connectivity check
-        // console.log('🔍 Checking network connectivity...');
-        
-        const response = await authAPI.sendRegistrationOtp({ phone: formData.phone });
+        const response = await authAPI.sendRegistrationOtp({ phone: fullPhone });
         const endTime = Date.now();
         
         // console.log('✅ API Response received in', endTime - startTime, 'ms');
@@ -147,18 +173,22 @@ export default function PhoneInputScreen({
           ]}
         >
           <View style={[styles.inputWrapper, isValid && styles.inputValid]}>
-            <View style={styles.countryCode}>
-              <Text style={styles.countryText}>🇮🇳 +91</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.countryCode}
+              onPress={() => setShowCountryPicker(true)}
+            >
+              <Text style={styles.countryText}>{selectedCountry.flag} {selectedCountry.code}</Text>
+              <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
             <TextInput
               style={styles.input}
               placeholder="Phone Number"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={formData.phone}
-              onChangeText={(value) => updateFormData('phone', value)}
+              onChangeText={(value) => updateFormData('phone', value.replace(/[^0-9]/g, ''))}
               keyboardType="phone-pad"
               autoFocus
-              maxLength={10}
+              maxLength={15}
             />
             {isValid && (
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
@@ -203,6 +233,46 @@ export default function PhoneInputScreen({
           </Text>
         </Text>
       </View>
+
+      <Modal
+        visible={showCountryPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCountryPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={COUNTRY_CODES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.countryItem}
+                  onPress={() => {
+                    setSelectedCountry(item);
+                    setShowCountryPicker(false);
+                  }}
+                >
+                  <Text style={styles.countryFlag}>{item.flag}</Text>
+                  <View style={styles.countryInfo}>
+                    <Text style={styles.countryName}>{item.name}</Text>
+                    <Text style={styles.countryCodeText}>{item.code}</Text>
+                  </View>
+                  {selectedCountry.code === item.code && (
+                    <Ionicons name="checkmark" size={24} color="#4CAF50" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -264,6 +334,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
   },
   countryCode: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingRight: 12,
     borderRightWidth: 1,
     borderRightColor: 'rgba(255, 255, 255, 0.2)',
@@ -273,6 +345,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  countryFlag: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  countryInfo: {
+    flex: 1,
+  },
+  countryName: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  countryCodeText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   input: {
     flex: 1,

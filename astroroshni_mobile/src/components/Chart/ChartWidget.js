@@ -648,7 +648,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
           
           <TouchableOpacity 
             style={styles.quickActionButton}
-            onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData() })}
+            onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData(), birthData })}
           >
             <Text style={styles.quickActionIcon}>📋</Text>
             <Text style={styles.quickActionText}>Positions</Text>

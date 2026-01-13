@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "56",
+      "buildNumber": "58",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "bitcode": false,

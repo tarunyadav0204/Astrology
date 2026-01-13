@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  FlatList,
   StatusBar,
   Animated,
   Dimensions,
@@ -37,10 +38,11 @@ export default function ChartScreen({ navigation, route }) {
   
   const chartTypes = [
     { id: 'lagna', name: 'Lagna (D1)', icon: '🏠', description: 'Main Birth Chart' },
+    { id: 'navamsa', name: 'Navamsa (D9)', icon: '💎', description: 'Marriage & Spirituality' },
+    { id: 'transit', name: 'Transit', icon: '🪐', description: 'Live Planetary Positions' },
     { id: 'hora', name: 'Hora (D2)', icon: '💰', description: 'Wealth & Family' },
     { id: 'drekkana', name: 'Drekkana (D3)', icon: '👫', description: 'Siblings & Happiness' },
     { id: 'chaturthamsa', name: 'Chaturthamsa (D4)', icon: '🏡', description: 'Destiny & Assets' },
-    { id: 'navamsa', name: 'Navamsa (D9)', icon: '💎', description: 'Marriage & Spirituality' },
     { id: 'dashamsa', name: 'Dashamsa (D10)', icon: '💼', description: 'Career & Profession' },
     { id: 'dwadashamsa', name: 'Dwadashamsa (D12)', icon: '👨👩👧👦', description: 'Parents & Ancestry' },
     { id: 'shodamsa', name: 'Shodamsa (D16)', icon: '🚗', description: 'Vehicles & Comforts' },
@@ -50,7 +52,6 @@ export default function ChartScreen({ navigation, route }) {
     { id: 'khavedamsa', name: 'Khavedamsa (D40)', icon: '🍀', description: 'Auspicious & Inauspicious' },
     { id: 'akshavedamsa', name: 'Akshavedamsa (D45)', icon: '🎭', description: 'Character & Conduct' },
     { id: 'shashtyamsa', name: 'Shashtyamsa (D60)', icon: '⏰', description: 'Past Life Karma' },
-    { id: 'transit', name: 'Transit', icon: '🪐', description: 'Live Planetary Positions' },
   ];
   const chartWidgetRef = useRef(null);
   
@@ -113,9 +114,11 @@ export default function ChartScreen({ navigation, route }) {
   
   const scrollToActiveTab = useCallback((index) => {
     if (bottomNavScrollRef.current) {
-      const tabWidth = 76;
-      const scrollX = Math.max(0, (index * tabWidth) - (width / 2) + (tabWidth / 2));
-      bottomNavScrollRef.current.scrollTo({ x: scrollX, animated: true });
+      try {
+        bottomNavScrollRef.current.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch (e) {
+        // Fallback if scrollToIndex fails
+      }
     }
   }, []);
 
@@ -298,33 +301,33 @@ export default function ChartScreen({ navigation, route }) {
             </GestureHandlerRootView>
             
             {/* Floating Bottom Navigation */}
-            <View style={styles.bottomNav}>
-              <ScrollView 
-                ref={bottomNavScrollRef}
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.navContent}
-              >
-                {chartTypes.map((chart, index) => (
-                  <TouchableOpacity
-                    key={chart.id}
-                    style={[
-                      styles.navPill, 
-                      currentChartIndex === index && styles.navPillActive
-                    ]}
-                    onPress={() => changeChart(index)}
-                    disabled={false}
-                  >
-                    <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>
-                      {chart.icon}
-                    </Text>
-                    <Text style={[styles.navText, currentChartIndex === index && styles.navTextActive]}>
-                      {chart.name.split(' ')[0]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+            <FlatList
+              ref={bottomNavScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={chartTypes}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item: chart, index }) => (
+                <TouchableOpacity
+                  key={chart.id}
+                  style={[
+                    styles.navPill, 
+                    currentChartIndex === index && styles.navPillActive
+                  ]}
+                  onPress={() => changeChart(index)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>
+                    {chart.icon}
+                  </Text>
+                  <Text style={[styles.navText, currentChartIndex === index && styles.navTextActive]}>
+                    {chart.name.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={styles.navContent}
+              style={styles.bottomNav}
+            />
           </View>
         ) : (
           <View style={styles.emptyContainer}>
@@ -488,11 +491,9 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
   },
   navContent: {
-    alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 4,
   },
   navPill: {
     paddingHorizontal: 12,

@@ -28,6 +28,7 @@ export default function ModernAuthFlow({ navigation }) {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     phone: '',
+    countryCode: '+91',
     password: '',
     name: '',
     email: '',

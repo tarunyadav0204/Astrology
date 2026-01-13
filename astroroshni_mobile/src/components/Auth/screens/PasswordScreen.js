@@ -69,13 +69,41 @@ export default function PasswordScreen({
   const handleContinue = async () => {
     if (!isValid) return;
     
+    // Combine country code with phone for API calls
+    const fullPhone = `${formData.countryCode || ''}${formData.phone}`;
+    
+    console.log('🔐 Password Screen - handleContinue');
+    console.log('  formData.phone:', formData.phone);
+    console.log('  formData.countryCode:', formData.countryCode);
+    console.log('  fullPhone:', fullPhone);
+    console.log('  isLogin:', isLogin);
+    
     setLoading(true);
     try {
       if (isLogin) {
-        const response = await authAPI.login({ 
-          phone: formData.phone, 
-          password: formData.password 
-        });
+        console.log('  📤 Calling login API with phone:', fullPhone);
+        
+        let response;
+        try {
+          // Try with country code first
+          response = await authAPI.login({ 
+            phone: fullPhone, 
+            password: formData.password 
+          });
+        } catch (error) {
+          // If 401, try without country code for legacy users
+          if (error.response?.status === 401) {
+            console.log('  🔄 Retrying without country code:', formData.phone);
+            response = await authAPI.login({ 
+              phone: formData.phone, 
+              password: formData.password 
+            });
+          } else {
+            throw error;
+          }
+        }
+        
+        console.log('  ✅ Login successful');
         
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
@@ -105,7 +133,7 @@ export default function PasswordScreen({
         try {
           const response = await authAPI.registerWithBirth({
             name: formData.name,
-            phone: formData.phone,
+            phone: fullPhone,
             password: formData.password,
             email: formData.email,
             role: 'user'
@@ -127,6 +155,9 @@ export default function PasswordScreen({
         }
       }
     } catch (error) {
+      console.log('  ❌ Error in handleContinue:', error.message);
+      console.log('  Error response:', error.response?.data);
+      console.log('  Error status:', error.response?.status);
       Alert.alert('Error', error.response?.data?.detail || 'Authentication failed');
     } finally {
       setLoading(false);
