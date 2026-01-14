@@ -322,7 +322,9 @@ class GeminiChatAnalyzer:
             print(f"\n🔍 RESPONSE PARSER DEBUG:")
             print(f"   Terms found: {parsed_response['terms']}")
             print(f"   Glossary keys: {list(parsed_response['glossary'].keys())}")
-            print(f"   Summary image prompt: {parsed_response.get('summary_image_prompt', 'None')[:100] if parsed_response.get('summary_image_prompt') else 'None'}...")
+            print(f"   Summary image prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
+            if parsed_response.get('summary_image_prompt'):
+                print(f"   Summary image prompt preview: {parsed_response.get('summary_image_prompt', '')[:100]}...")
             print(f"   Content preview: {parsed_response['content'][:200]}...")
             
             # Generate summary image if prompt exists
@@ -335,9 +337,16 @@ class GeminiChatAnalyzer:
                     print(f"   Prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
                     print(f"   Prompt preview: {parsed_response.get('summary_image_prompt', '')[:150]}...")
                     
-                    summary_image_url = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
+                    image_result = await self.flux_service.generate_image(parsed_response['summary_image_prompt'])
                     
-                    if summary_image_url:
+                    print(f"\n🔍 IMAGE SERVICE RESPONSE:")
+                    print(f"   Type: {type(image_result)}")
+                    print(f"   Value: {image_result}")
+                    print(f"   Is string: {isinstance(image_result, str)}")
+                    print(f"   Is truthy: {bool(image_result)}")
+                    
+                    if image_result:
+                        summary_image_url = image_result
                         print(f"   ✅ SUMMARY IMAGE SUCCESS: {summary_image_url}")
                     else:
                         print(f"   ❌ SUMMARY IMAGE FAILED: No URL returned")
@@ -347,6 +356,8 @@ class GeminiChatAnalyzer:
                     print(f"      Error type: {type(e).__name__}")
                     print(f"      Error message: {str(e)}")
                     print(f"      Full error: {repr(e)}")
+                    import traceback
+                    print(f"      Stack trace: {traceback.format_exc()}")
             else:
                 print(f"\n🎨 SUMMARY IMAGE SKIPPED:")
                 print(f"   Premium analysis: {premium_analysis}")

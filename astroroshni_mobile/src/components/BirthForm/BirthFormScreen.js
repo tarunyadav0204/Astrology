@@ -12,6 +12,7 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -225,39 +226,138 @@ export default function BirthFormScreen({ navigation, route }) {
     }
   };
 
+  // Geocoding service configuration - change 'photon' to 'nominatim' to switch back
+  const GEOCODING_SERVICE = 'photon'; // Options: 'photon' or 'nominatim'
+
+  const formatPlaceName = (item, service = GEOCODING_SERVICE) => {
+    if (service === 'photon') {
+      // Photon format
+      const properties = item.properties || {};
+      const parts = [];
+      
+      const city = properties.city || properties.name;
+      const state = properties.state;
+      const country = properties.country;
+      
+      if (city) parts.push(city);
+      if (state && state !== city) parts.push(state);
+      if (country) parts.push(country);
+      
+      return parts.length > 0 ? parts.join(', ') : properties.name || 'Unknown';
+    } else {
+      // Nominatim format
+      const addressParts = item.address || {};
+      const parts = [];
+      
+      const mainPlace = addressParts.city || addressParts.town || addressParts.village || 
+                        addressParts.municipality || addressParts.county || addressParts.state_district;
+      const state = addressParts.state || addressParts.region;
+      const country = addressParts.country;
+      
+      if (mainPlace) {
+        parts.push(mainPlace);
+        if (state && state !== mainPlace && !mainPlace.includes(state)) {
+          parts.push(state);
+        }
+      } else if (state) {
+        parts.push(state);
+      }
+      
+      if (country) parts.push(country);
+      
+      return parts.length > 0 ? parts.join(', ') : item.display_name.split(',').slice(0, 3).join(',');
+    }
+  };
+
   const searchPlaces = async (query) => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
-        { headers: { 'User-Agent': 'AstrologyApp/1.0' } }
-      );
-      const data = await response.json();
-      const places = data.map(item => {
-        const lat = parseFloat(item.lat);
-        const lng = parseFloat(item.lon);
-        return {
-          id: item.place_id,
-          name: item.display_name,
-          latitude: lat,
-          longitude: lng
-        };
-      });
-      setSuggestions(places);
-      setShowSuggestions(true);
-    } catch (error) {}
+      let url, headers, data;
+      
+      if (GEOCODING_SERVICE === 'photon') {
+        // Photon API
+        url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`;
+        headers = {};
+        const response = await fetch(url, { headers });
+        const json = await response.json();
+        data = json.features || [];
+        
+        const timestamp = Date.now();
+        const places = data.map((item, index) => {
+          const coords = item.geometry?.coordinates || [0, 0];
+          const properties = item.properties || {};
+          
+          return {
+            id: `photon_${timestamp}_${index}`,
+            name: formatPlaceName(item, 'photon'),
+            fullName: properties.name || '',
+            latitude: coords[1],
+            longitude: coords[0]
+          };
+        });
+        
+        // Remove duplicates based on name
+        const uniquePlaces = places.filter((place, index, self) =>
+          index === self.findIndex(p => p.name === place.name)
+        );
+        
+        setSuggestions(uniquePlaces.slice(0, 5));
+        setShowSuggestions(true);
+        
+      } else {
+        // Nominatim API
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=10&addressdetails=1`;
+        headers = { 'User-Agent': 'AstrologyApp/1.0' };
+        const response = await fetch(url, { headers });
+        data = await response.json();
+        
+        const queryLower = query.toLowerCase();
+        const places = data.map(item => {
+          const lat = parseFloat(item.lat);
+          const lng = parseFloat(item.lon);
+          const formattedName = formatPlaceName(item, 'nominatim');
+          const formattedNameLower = formattedName.toLowerCase();
+          
+          const startsWithQuery = formattedNameLower.startsWith(queryLower);
+          const parts = formattedNameLower.split(',').map(p => p.trim());
+          const anyPartStartsWith = parts.some(part => part.startsWith(queryLower));
+          
+          return {
+            id: item.place_id,
+            name: formattedName,
+            fullName: item.display_name,
+            latitude: lat,
+            longitude: lng,
+            priority: startsWithQuery ? 0 : (anyPartStartsWith ? 1 : 2)
+          };
+        });
+        
+        places.sort((a, b) => a.priority - b.priority);
+        
+        // Remove duplicates based on name
+        const uniquePlaces = places.filter((place, index, self) =>
+          index === self.findIndex(p => p.name === place.name)
+        );
+        
+        setSuggestions(uniquePlaces.slice(0, 5));
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
   };
 
 
 
   const handlePlaceSelect = (place) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
     setFormData(prev => ({
       ...prev,
       place: place.name,
       latitude: place.latitude,
       longitude: place.longitude
     }));
-    setShowSuggestions(false);
-    setSuggestions([]);
+    setTimeout(() => Keyboard.dismiss(), 100);
   };
 
   const validateStep = () => {
@@ -443,7 +543,12 @@ export default function BirthFormScreen({ navigation, route }) {
               <Text style={styles.progressText}>Step {step} of 5</Text>
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.scrollView} 
+              contentContainerStyle={styles.scrollContent} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+            >
               <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }, { translateX: shakeAnim }] }]}>
                 
                 {/* Step Icon */}
@@ -466,6 +571,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       placeholder="Enter your full name"
                       placeholderTextColor="rgba(255, 255, 255, 0.5)"
                       autoFocus
+                      autoCorrect={false}
                     />
                   </View>
                 )}
@@ -547,6 +653,14 @@ export default function BirthFormScreen({ navigation, route }) {
                         onChangeText={(value) => handleInputChange('place', value)}
                         placeholder="City, State, Country"
                         placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                        autoCorrect={false}
+                        onBlur={() => {
+                          // Delay hiding suggestions to allow tap to register
+                          setTimeout(() => setShowSuggestions(false), 200);
+                        }}
+                        onFocus={() => {
+                          if (suggestions.length > 0) setShowSuggestions(true);
+                        }}
                       />
                       {showSuggestions && suggestions.length > 0 && (
                         <View style={styles.suggestionsList}>
@@ -555,13 +669,24 @@ export default function BirthFormScreen({ navigation, route }) {
                               key={suggestion.id}
                               style={styles.suggestionItem}
                               onPress={() => handlePlaceSelect(suggestion)}
+                              activeOpacity={0.7}
                             >
-                              <Text style={styles.suggestionText} numberOfLines={1}>📍 {suggestion.name}</Text>
+                              <Text style={styles.suggestionText}>📍 {suggestion.name}</Text>
                             </TouchableOpacity>
                           ))}
                         </View>
                       )}
                     </View>
+                    {formData.latitude && formData.longitude && (
+                      <View style={styles.locationDetails}>
+                        <Text style={styles.locationDetailsTitle}>📍 Selected Location</Text>
+                        <Text style={styles.locationDetailsText}>{formData.place}</Text>
+                        <View style={styles.coordinatesRow}>
+                          <Text style={styles.coordinateText}>Lat: {formData.latitude.toFixed(4)}</Text>
+                          <Text style={styles.coordinateText}>Long: {formData.longitude.toFixed(4)}</Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 )}
 
@@ -951,6 +1076,39 @@ const styles = StyleSheet.create({
   suggestionText: {
     fontSize: 14,
     color: COLORS.white,
+  },
+  locationDetails: {
+    marginTop: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  locationDetailsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  locationDetailsText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  coordinatesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  coordinateText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
   },
   navigationContainer: {
     flexDirection: 'row',
