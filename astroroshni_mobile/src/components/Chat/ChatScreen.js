@@ -1729,6 +1729,14 @@ export default function ChatScreen({ navigation, route }) {
           <View style={styles.quickActionsBar}>
             <TouchableOpacity 
               style={styles.quickActionButton}
+              onPress={() => setShowLanguageModal(true)}
+            >
+              <Ionicons name="language-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
+              <Text style={styles.quickActionText}>Language</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickActionButton}
               onPress={() => navigation.navigate('Chart', { birthData })}
             >
               <Ionicons name="pie-chart-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
@@ -1741,22 +1749,6 @@ export default function ChatScreen({ navigation, route }) {
             >
               <Ionicons name="time-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
               <Text style={styles.quickActionText}>Dasha</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => setShowEventPeriods(true)}
-            >
-              <Ionicons name="calendar-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.quickActionText}>Events</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => navigation.navigate('AnalysisHub')}
-            >
-              <Ionicons name="analytics-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.quickActionText}>Analysis</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 

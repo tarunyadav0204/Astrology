@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "58",
+      "buildNumber": "60",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "bitcode": false,
@@ -34,6 +34,7 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
+      "versionCode": 60,
       "newArchEnabled": false
     },
     "web": {
