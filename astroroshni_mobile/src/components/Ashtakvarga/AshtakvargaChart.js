@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
-const AshtakvargaChart = ({ chartData, ashtakvargaData, onHousePress, cosmicTheme = true }) => {
+const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, onHousePress, cosmicTheme = true }) => {
   
   const getBinduColor = (bindus) => {
     if (bindus >= 30) return '#81C784'; // Strong - Darker Green
@@ -25,6 +25,10 @@ const AshtakvargaChart = ({ chartData, ashtakvargaData, onHousePress, cosmicThem
           const signName = getSignName(signIndex);
           const binduColor = getBinduColor(bindus);
           
+          // Calculate difference from birth chart if available
+          const birthBindus = birthAshtakvargaData?.[houseNumber.toString()]?.bindus || 0;
+          const difference = birthAshtakvargaData ? bindus - birthBindus : null;
+          
           return (
             <TouchableOpacity
               key={houseNumber}
@@ -32,7 +36,14 @@ const AshtakvargaChart = ({ chartData, ashtakvargaData, onHousePress, cosmicThem
               onPress={() => onHousePress?.(houseNumber, bindus, signName)}
             >
               <Text style={styles.houseNumber}>{houseNumber}</Text>
-              <Text style={styles.bindus}>{bindus}</Text>
+              <View style={styles.bindusRow}>
+                <Text style={styles.bindus}>{bindus}</Text>
+                {difference !== null && difference !== 0 && (
+                  <Text style={[styles.difference, { color: difference > 0 ? '#FFFFFF' : '#FFFFFF' }]}>
+                    ({difference > 0 ? '+' : ''}{difference})
+                  </Text>
+                )}
+              </View>
               <Text style={styles.signName}>{signName}</Text>
             </TouchableOpacity>
           );
@@ -71,11 +82,20 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 4,
   },
+  bindusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   bindus: {
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
-    marginBottom: 2,
+    marginRight: 4,
+  },
+  difference: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   signName: {
     fontSize: 10,

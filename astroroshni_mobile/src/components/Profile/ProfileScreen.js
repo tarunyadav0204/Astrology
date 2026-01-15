@@ -471,16 +471,6 @@ export default function ProfileScreen({ navigation }) {
                 
                 <TouchableOpacity style={styles.settingItem}>
                   <View style={styles.settingLeft}>
-                    <Ionicons name="language-outline" size={22} color="#4a90e2" />
-                    <Text style={styles.settingText}>Language</Text>
-                  </View>
-                  <Text style={styles.settingValue}>English</Text>
-                </TouchableOpacity>
-                
-                <View style={styles.settingDivider} />
-                
-                <TouchableOpacity style={styles.settingItem}>
-                  <View style={styles.settingLeft}>
                     <Ionicons name="notifications-outline" size={22} color="#9c27b0" />
                     <Text style={styles.settingText}>Notifications</Text>
                   </View>

@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storage } from '../../services/storage';
 import { chartAPI, authAPI } from '../../services/api';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
+import locationCache from '../../services/locationCache';
 
 const { width } = Dimensions.get('window');
 
@@ -271,78 +272,48 @@ export default function BirthFormScreen({ navigation, route }) {
 
   const searchPlaces = async (query) => {
     try {
-      let url, headers, data;
-      
-      if (GEOCODING_SERVICE === 'photon') {
-        // Photon API
-        url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`;
-        headers = {};
-        const response = await fetch(url, { headers });
+      // Use hybrid cache strategy
+      const results = await locationCache.searchLocations(query, async (q) => {
+        // Photon API fallback
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10`;
+        const response = await fetch(url);
         const json = await response.json();
-        data = json.features || [];
+        const data = json.features || [];
         
         const timestamp = Date.now();
-        const places = data.map((item, index) => {
+        return data.map((item, index) => {
           const coords = item.geometry?.coordinates || [0, 0];
           const properties = item.properties || {};
+          const parts = [];
+          
+          const city = properties.city || properties.name;
+          const state = properties.state;
+          const country = properties.country;
+          
+          if (city) parts.push(city);
+          if (state && state !== city) parts.push(state);
+          if (country) parts.push(country);
+          
+          const name = parts.length > 0 ? parts.join(', ') : properties.name || 'Unknown';
           
           return {
             id: `photon_${timestamp}_${index}`,
-            name: formatPlaceName(item, 'photon'),
-            fullName: properties.name || '',
+            name,
             latitude: coords[1],
             longitude: coords[0]
           };
         });
-        
-        // Remove duplicates based on name
-        const uniquePlaces = places.filter((place, index, self) =>
-          index === self.findIndex(p => p.name === place.name)
-        );
-        
-        setSuggestions(uniquePlaces.slice(0, 5));
-        setShowSuggestions(true);
-        
-      } else {
-        // Nominatim API
-        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=10&addressdetails=1`;
-        headers = { 'User-Agent': 'AstrologyApp/1.0' };
-        const response = await fetch(url, { headers });
-        data = await response.json();
-        
-        const queryLower = query.toLowerCase();
-        const places = data.map(item => {
-          const lat = parseFloat(item.lat);
-          const lng = parseFloat(item.lon);
-          const formattedName = formatPlaceName(item, 'nominatim');
-          const formattedNameLower = formattedName.toLowerCase();
-          
-          const startsWithQuery = formattedNameLower.startsWith(queryLower);
-          const parts = formattedNameLower.split(',').map(p => p.trim());
-          const anyPartStartsWith = parts.some(part => part.startsWith(queryLower));
-          
-          return {
-            id: item.place_id,
-            name: formattedName,
-            fullName: item.display_name,
-            latitude: lat,
-            longitude: lng,
-            priority: startsWithQuery ? 0 : (anyPartStartsWith ? 1 : 2)
-          };
-        });
-        
-        places.sort((a, b) => a.priority - b.priority);
-        
-        // Remove duplicates based on name
-        const uniquePlaces = places.filter((place, index, self) =>
-          index === self.findIndex(p => p.name === place.name)
-        );
-        
-        setSuggestions(uniquePlaces.slice(0, 5));
-        setShowSuggestions(true);
-      }
+      });
+      
+      // Remove duplicates
+      const uniquePlaces = results.filter((place, index, self) =>
+        index === self.findIndex(p => p.name === place.name)
+      );
+      
+      setSuggestions(uniquePlaces.slice(0, 5));
+      setShowSuggestions(true);
     } catch (error) {
-      console.error('Geocoding error:', error);
+      console.error('Location search error:', error);
     }
   };
 
@@ -663,8 +634,12 @@ export default function BirthFormScreen({ navigation, route }) {
                         }}
                       />
                       {showSuggestions && suggestions.length > 0 && (
-                        <View style={styles.suggestionsList}>
-                          {suggestions.slice(0, 3).map(suggestion => (
+                        <ScrollView 
+                          style={styles.suggestionsList}
+                          keyboardShouldPersistTaps="always"
+                          nestedScrollEnabled={true}
+                        >
+                          {suggestions.map(suggestion => (
                             <TouchableOpacity
                               key={suggestion.id}
                               style={styles.suggestionItem}
@@ -674,7 +649,7 @@ export default function BirthFormScreen({ navigation, route }) {
                               <Text style={styles.suggestionText}>📍 {suggestion.name}</Text>
                             </TouchableOpacity>
                           ))}
-                        </View>
+                        </ScrollView>
                       )}
                     </View>
                     {formData.latitude && formData.longitude && (

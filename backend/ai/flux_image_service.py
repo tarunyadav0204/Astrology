@@ -13,8 +13,17 @@ class FluxImageService:
     def __init__(self):
         api_token = os.getenv("REPLICATE_API_TOKEN")
         if not api_token:
+            print(f"❌ FluxImageService: REPLICATE_API_TOKEN not found")
+            print(f"   Environment variables checked: REPLICATE_API_TOKEN")
+            print(f"   Available env vars: {[k for k in os.environ.keys() if 'REPLICATE' in k.upper()]}")
             raise ValueError("REPLICATE_API_TOKEN environment variable not set")
+        
+        print(f"✅ FluxImageService: Initializing with token")
+        print(f"   Token length: {len(api_token)}")
+        print(f"   Token prefix: {api_token[:10]}...")
+        
         self.client = replicate.Client(api_token=api_token)
+        print(f"✅ FluxImageService: Client initialized successfully")
     
     async def generate_image(self, prompt: str, aspect_ratio: str = "1:1") -> Optional[str]:
         """Generate image using Flux model"""

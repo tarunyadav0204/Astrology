@@ -34,10 +34,20 @@ class GeminiChatAnalyzer:
         
         # Initialize Flux image service
         try:
-            self.flux_service = FluxImageService()
-            print("✅ Flux image service initialized")
+            replicate_token = os.getenv('REPLICATE_API_TOKEN')
+            if replicate_token:
+                self.flux_service = FluxImageService()
+                print(f"✅ Flux image service initialized successfully")
+                print(f"   Token present: {bool(replicate_token)}")
+                print(f"   Token length: {len(replicate_token) if replicate_token else 0}")
+            else:
+                self.flux_service = None
+                print(f"⚠️ REPLICATE_API_TOKEN not found in environment")
+                print(f"   Image generation will be disabled")
         except Exception as e:
-            print(f"⚠️ Flux service unavailable: {e}")
+            print(f"⚠️ Flux service initialization failed: {e}")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   Image generation will be disabled")
             self.flux_service = None
         
         # Standard models (try in order of preference)

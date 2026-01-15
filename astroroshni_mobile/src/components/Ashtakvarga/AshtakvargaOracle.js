@@ -18,6 +18,7 @@ import { storage } from '../../services/storage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AshtakvargaChart from './AshtakvargaChart';
+import DateNavigator from '../Common/DateNavigator';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,11 +26,13 @@ export default function AshtakvargaOracle({ navigation }) {
   const [activeTab, setActiveTab] = useState(0);
   const [birthData, setBirthData] = useState(null);
   const [oracleData, setOracleData] = useState(null);
+  const [birthOracleData, setBirthOracleData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedPillar, setSelectedPillar] = useState(null);
   const [showSecretScroll, setShowSecretScroll] = useState(false);
   const [completeOracleData, setCompleteOracleData] = useState(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -42,6 +45,12 @@ export default function AshtakvargaOracle({ navigation }) {
     loadBirthData();
     startAnimations();
   }, []);
+  
+  useEffect(() => {
+    if (birthData) {
+      fetchAshtakvargaData(birthData, selectedDate);
+    }
+  }, [selectedDate]);
 
   const startAnimations = () => {
     Animated.loop(
@@ -82,7 +91,9 @@ export default function AshtakvargaOracle({ navigation }) {
       
       if (data) {
         setBirthData(data);
-        await fetchAshtakvargaData(data);
+        // Set selected date to birth date initially
+        setSelectedDate(new Date(data.date));
+        await fetchAshtakvargaData(data, new Date(data.date));
       } else {
         console.log('No birth data found in storage');
       }
@@ -93,12 +104,36 @@ export default function AshtakvargaOracle({ navigation }) {
     }
   };
 
-  const fetchAshtakvargaData = async (birth) => {
+  const fetchAshtakvargaData = async (birth, date = null) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
       
       if (!token || !birth) {
         throw new Error('Missing authentication token or birth data');
+      }
+      
+      // Compare dates properly - check if selected date matches birth date
+      const birthDate = new Date(birth.date);
+      const selectedDate = date || birthDate;
+      
+      // Compare only date parts (ignore time)
+      const isSameDate = birthDate.getFullYear() === selectedDate.getFullYear() &&
+                        birthDate.getMonth() === selectedDate.getMonth() &&
+                        birthDate.getDate() === selectedDate.getDate();
+      
+      const requestBody = {
+        birth_data: {
+          name: birth.name,
+          date: birth.date,
+          time: birth.time,
+          latitude: birth.latitude,
+          longitude: birth.longitude
+        },
+        chart_type: isSameDate ? 'lagna' : 'transit'
+      };
+      
+      if (!isSameDate) {
+        requestBody.transit_date = selectedDate.toISOString().split('T')[0];
       }
       
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/calculate-ashtakavarga')}`, {
@@ -107,22 +142,17 @@ export default function AshtakvargaOracle({ navigation }) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          birth_data: {
-            name: birth.name,
-            date: birth.date,
-            time: birth.time,
-            latitude: birth.latitude,
-            longitude: birth.longitude
-          },
-          chart_type: 'lagna'
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
         const data = await response.json();
-        // console.log('Ashtakvarga data received:', data);
         setOracleData(data);
+        
+        // Store birth chart data for comparison if this is birth chart
+        if (isSameDate) {
+          setBirthOracleData(data);
+        }
       } else {
         throw new Error(`Failed to fetch ashtakvarga data: ${response.status}`);
       }
@@ -277,10 +307,18 @@ export default function AshtakvargaOracle({ navigation }) {
           <Text style={styles.mapSubtitle}>Tap any house to see its cosmic strength</Text>
         </View>
         
+        <DateNavigator 
+          date={selectedDate}
+          onDateChange={setSelectedDate}
+          cosmicTheme={true}
+          resetDate={birthData ? new Date(birthData.date) : new Date()}
+        />
+        
         <View style={styles.chartContainer}>
           <AshtakvargaChart 
             chartData={oracleData.chart_data}
             ashtakvargaData={oracleData.chart_ashtakavarga}
+            birthAshtakvargaData={birthOracleData?.chart_ashtakavarga}
             onHousePress={(houseNum, bindus, signName) => {
               openSecretScroll(signName, bindus, houseNum - 1);
             }}
@@ -383,6 +421,9 @@ export default function AshtakvargaOracle({ navigation }) {
   const [loadingLifePredictions, setLoadingLifePredictions] = useState(false);
   const [showLifePredictions, setShowLifePredictions] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [yearlyStrength, setYearlyStrength] = useState(null);
+  const [loadingYearly, setLoadingYearly] = useState(false);
+  const [yearlyProgress, setYearlyProgress] = useState(0);
 
   const startLoadingAnimation = () => {
     setLoadingProgress(0);
@@ -420,7 +461,7 @@ export default function AshtakvargaOracle({ navigation }) {
     try {
       const token = await AsyncStorage.getItem('authToken');
       
-      const response = await fetch(`${API_BASE_URL}/api/ashtakavarga/life-predictions`, {
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/ashtakavarga/life-predictions')}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -457,6 +498,62 @@ export default function AshtakvargaOracle({ navigation }) {
       setTimeout(() => {
         setLoadingLifePredictions(false);
         setLoadingProgress(0);
+      }, 500);
+    }
+  };
+
+  const fetchYearlyStrength = async (houseNumber) => {
+    setLoadingYearly(true);
+    setYearlyProgress(0);
+    
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      
+      // Simulate progress (actual calculation happens on backend)
+      const progressInterval = setInterval(() => {
+        setYearlyProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 2;
+        });
+      }, 500);
+      
+      const response = await fetch(`${API_BASE_URL}${getEndpoint('/ashtakavarga/yearly-house-strength')}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          birth_data: {
+            name: birthData.name,
+            date: birthData.date,
+            time: birthData.time,
+            latitude: birthData.latitude,
+            longitude: birthData.longitude
+          },
+          house_number: houseNumber,
+          year: new Date().getFullYear()
+        })
+      });
+      
+      clearInterval(progressInterval);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setYearlyProgress(100);
+        setYearlyStrength(data);
+      } else {
+        console.error('Failed to fetch yearly strength:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching yearly strength:', error);
+    } finally {
+      setTimeout(() => {
+        setLoadingYearly(false);
+        setYearlyProgress(0);
       }, 500);
     }
   };
@@ -581,7 +678,10 @@ export default function AshtakvargaOracle({ navigation }) {
             visible={showSecretScroll && selectedPillar !== null}
             transparent
             animationType="slide"
-            onRequestClose={() => setShowSecretScroll(false)}
+            onRequestClose={() => {
+              setShowSecretScroll(false);
+              setYearlyStrength(null);
+            }}
           >
             <View style={styles.modalOverlay}>
               <View style={styles.secretScroll}>
@@ -591,7 +691,10 @@ export default function AshtakvargaOracle({ navigation }) {
                 >
                   <TouchableOpacity 
                     style={styles.closeButton}
-                    onPress={() => setShowSecretScroll(false)}
+                    onPress={() => {
+                      setShowSecretScroll(false);
+                      setYearlyStrength(null);
+                    }}
                   >
                     <Ionicons name="close" size={24} color={COLORS.white} />
                   </TouchableOpacity>
@@ -620,7 +723,7 @@ export default function AshtakvargaOracle({ navigation }) {
                       </Text>
                     </>
                   ) : (
-                    <>
+                    <ScrollView showsVerticalScrollIndicator={false}>
                       <Text style={styles.scrollTitle}>
                         {selectedPillar?.sign || 'Unknown'} Sector
                       </Text>
@@ -638,7 +741,58 @@ export default function AshtakvargaOracle({ navigation }) {
                           : 'Loading cosmic insights...'
                          )}
                       </Text>
-                    </>
+                      
+                      {!yearlyStrength && !loadingYearly && (
+                        <TouchableOpacity 
+                          style={styles.yearlyButton}
+                          onPress={() => fetchYearlyStrength(selectedPillar?.index + 1)}
+                        >
+                          <LinearGradient
+                            colors={['#ff6b35', '#ffd700']}
+                            style={styles.yearlyButtonGradient}
+                          >
+                            <Text style={styles.yearlyButtonText}>📊 View Yearly Strength</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      )}
+                      
+                      {loadingYearly && (
+                        <View style={styles.loadingYearlyContainer}>
+                          <Text style={styles.loadingYearlyText}>Calculating 365 days...</Text>
+                          <View style={styles.progressBar}>
+                            <View style={[styles.progressFill, { width: `${yearlyProgress}%` }]} />
+                          </View>
+                          <Text style={styles.progressText}>{Math.round(yearlyProgress)}%</Text>
+                        </View>
+                      )}
+                      
+                      {yearlyStrength && (
+                        <View style={styles.yearlyStrengthContainer}>
+                          <Text style={styles.yearlyTitle}>House {yearlyStrength.house} - {yearlyStrength.year} Strength</Text>
+                          <Text style={styles.yearlySubtitle}>Birth Chart: {yearlyStrength.birth_bindus} bindus</Text>
+                          
+                          <ScrollView style={styles.yearlyDataScroll} showsVerticalScrollIndicator={true}>
+                            {yearlyStrength.daily_data && yearlyStrength.daily_data.map((day, index) => (
+                              <View key={index} style={[
+                                styles.dayRow,
+                                day.category === 'strong' && styles.strongDay,
+                                day.category === 'weak' && styles.weakDay
+                              ]}>
+                                <Text style={styles.dayDate}>{day.date}</Text>
+                                <Text style={styles.dayBindus}>{day.bindus} bindus</Text>
+                                <Text style={[
+                                  styles.dayDiff,
+                                  day.difference > 0 ? styles.positiveDiff : styles.negativeDiff
+                                ]}>
+                                  {day.difference > 0 ? '+' : ''}{day.difference}
+                                </Text>
+                                <Text style={styles.dayCategory}>{day.category}</Text>
+                              </View>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </ScrollView>
                   )}
                 </LinearGradient>
               </View>
@@ -1131,5 +1285,108 @@ const styles = {
     lineHeight: 18,
     marginBottom: 6,
     paddingLeft: 10,
+  },
+  yearlyButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 20,
+  },
+  yearlyButtonGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  yearlyButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  loadingYearlyContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loadingYearlyText: {
+    fontSize: 14,
+    color: COLORS.white,
+    marginBottom: 12,
+  },
+  yearlyStrengthContainer: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    maxHeight: 400,
+  },
+  yearlyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  yearlySubtitle: {
+    fontSize: 13,
+    color: '#ffd700',
+    marginBottom: 16,
+  },
+  yearlyDataScroll: {
+    maxHeight: 300,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+  },
+  strongDay: {
+    backgroundColor: 'rgba(0,255,0,0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#00ff00',
+  },
+  weakDay: {
+    backgroundColor: 'rgba(255,0,0,0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff6b6b',
+  },
+  dayDate: {
+    fontSize: 11,
+    color: COLORS.white,
+    flex: 2,
+  },
+  dayBindus: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffd700',
+    flex: 1,
+    textAlign: 'center',
+  },
+  dayDiff: {
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+  },
+  positiveDiff: {
+    color: '#00ff00',
+  },
+  negativeDiff: {
+    color: '#ff6b6b',
+  },
+  dayCategory: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+    flex: 1,
+    textAlign: 'right',
+    textTransform: 'capitalize',
+  },
+  yearlyNote: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 20,
   },
 };
