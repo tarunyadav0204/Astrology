@@ -17,10 +17,12 @@ import Icon from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { storage } from '../../services/storage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const SkeletonCard = () => {
+  const { theme } = useTheme();
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -55,6 +57,7 @@ const SkeletonCard = () => {
 };
 
 export default function ChatHistoryScreen({ navigation }) {
+  const { theme, colors } = useTheme();
   const [chatSessions, setChatSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -275,7 +278,7 @@ export default function ChatHistoryScreen({ navigation }) {
           activeOpacity={0.9}
         >
           <LinearGradient
-            colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+            colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
             style={styles.sessionGradient}
           >
             <View style={styles.sessionHeader}>
@@ -290,9 +293,9 @@ export default function ChatHistoryScreen({ navigation }) {
               <View style={styles.sessionInfo}>
                 <View style={styles.sessionTitleRow}>
                   {item.native_name && (
-                    <Text style={styles.nativeName}>{item.native_name}</Text>
+                    <Text style={[styles.nativeName, { color: colors.text }]}>{item.native_name}</Text>
                   )}
-                  <Text style={styles.sessionDate}>{getRelativeTime(item.created_at)}</Text>
+                  <Text style={[styles.sessionDate, { color: colors.textSecondary }]}>{getRelativeTime(item.created_at)}</Text>
                 </View>
                 {item.unread && (
                   <Animated.View style={[styles.unreadBadge, { transform: [{ scale: pulseAnim }] }]}>
@@ -302,12 +305,12 @@ export default function ChatHistoryScreen({ navigation }) {
               </View>
             </View>
 
-            <Text style={styles.sessionPreview} numberOfLines={2}>
+            <Text style={[styles.sessionPreview, { color: colors.textSecondary }]} numberOfLines={2}>
               {item.preview || 'Chat conversation'}
             </Text>
 
             <View style={styles.sessionFooter}>
-              <Text style={styles.sessionTime}>
+              <Text style={[styles.sessionTime, { color: colors.textSecondary }]}>
                 {new Date(item.created_at).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit'
@@ -365,30 +368,30 @@ export default function ChatHistoryScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea}>
           
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Icon name="arrow-back" size={24} color={COLORS.white} />
+            <TouchableOpacity style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]} onPress={() => navigation.goBack()}>
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Chat History</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Chat History</Text>
             <View style={styles.placeholder} />
           </View>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
             <LinearGradient
-              colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+              colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
               style={styles.searchGradient}
             >
-              <Icon name="search" size={20} color="rgba(255, 255, 255, 0.6)" />
+              <Icon name="search" size={20} color={colors.textSecondary} />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Search conversations..."
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />

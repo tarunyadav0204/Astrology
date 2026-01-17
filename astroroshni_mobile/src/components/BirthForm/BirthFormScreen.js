@@ -24,10 +24,12 @@ import { storage } from '../../services/storage';
 import { chartAPI, authAPI } from '../../services/api';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import locationCache from '../../services/locationCache';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 export default function BirthFormScreen({ navigation, route }) {
+  const { theme, colors } = useTheme();
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
   const updateGender = route?.params?.updateGender;
@@ -488,30 +490,30 @@ export default function BirthFormScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea}>
           <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             
             {/* Header */}
             <View style={styles.header}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <Ionicons name="person" size={20} color="#ff6b35" />
-                <Text style={styles.headerTitle}>{updateGender ? 'Update Gender' : editProfile ? 'Edit Profile' : 'Birth Details'}</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{updateGender ? 'Update Gender' : editProfile ? 'Edit Profile' : 'Birth Details'}</Text>
               </View>
               <View style={styles.placeholder} />
             </View>
 
             {/* Progress Bar */}
             <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
+              <View style={[styles.progressBar, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)' }]}>
                 <Animated.View style={[styles.progressFill, { width: progressWidth }]}>
                   <LinearGradient colors={['#ff6b35', '#ffd700']} style={styles.progressGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
                 </Animated.View>
               </View>
-              <Text style={styles.progressText}>Step {step} of 5</Text>
+              <Text style={[styles.progressText, { color: colors.textSecondary }]}>Step {step} of 5</Text>
             </View>
 
             <ScrollView 
@@ -530,17 +532,17 @@ export default function BirthFormScreen({ navigation, route }) {
                 </View>
 
                 {/* Step Title */}
-                <Text style={styles.stepTitle}>{getStepTitle()}</Text>
+                <Text style={[styles.stepTitle, { color: colors.text }]}>{getStepTitle()}</Text>
 
                 {/* Step Content */}
                 {step === 1 && (
                   <View style={styles.inputContainer}>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { color: colors.text, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]}
                       value={formData.name}
                       onChangeText={(value) => handleInputChange('name', value)}
                       placeholder="Enter your full name"
-                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      placeholderTextColor={colors.textSecondary}
                       autoFocus
                       autoCorrect={false}
                     />
@@ -554,12 +556,12 @@ export default function BirthFormScreen({ navigation, route }) {
                       onPress={() => handleInputChange('gender', 'Male')}
                     >
                       <LinearGradient
-                        colors={formData.gender === 'Male' ? ['#ff6b35', '#ff8c5a'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.genderGradient}
+                        colors={formData.gender === 'Male' ? ['#ff6b35', '#ff8c5a'] : theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']}
+                        style={[styles.genderGradient, { borderColor: formData.gender === 'Male' ? 'rgba(255, 107, 53, 0.5)' : theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
                       >
                         <Text style={styles.genderIcon}>♂️</Text>
-                        <Text style={styles.genderText}>Male</Text>
-                        {formData.gender === 'Male' && <Text style={styles.selectedIndicator}>✓</Text>}
+                        <Text style={[styles.genderText, { color: colors.text }]}>Male</Text>
+                        {formData.gender === 'Male' && <Text style={[styles.selectedIndicator, { color: colors.text }]}>✓</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -567,12 +569,12 @@ export default function BirthFormScreen({ navigation, route }) {
                       onPress={() => handleInputChange('gender', 'Female')}
                     >
                       <LinearGradient
-                        colors={formData.gender === 'Female' ? ['#ff6b35', '#ff8c5a'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.genderGradient}
+                        colors={formData.gender === 'Female' ? ['#ff6b35', '#ff8c5a'] : theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']}
+                        style={[styles.genderGradient, { borderColor: formData.gender === 'Female' ? 'rgba(255, 107, 53, 0.5)' : theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
                       >
                         <Text style={styles.genderIcon}>♀️</Text>
-                        <Text style={styles.genderText}>Female</Text>
-                        {formData.gender === 'Female' && <Text style={styles.selectedIndicator}>✓</Text>}
+                        <Text style={[styles.genderText, { color: colors.text }]}>Female</Text>
+                        {formData.gender === 'Female' && <Text style={[styles.selectedIndicator, { color: colors.text }]}>✓</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -581,9 +583,9 @@ export default function BirthFormScreen({ navigation, route }) {
                 {step === 3 && (
                   <View style={styles.dateTimeContainer}>
                     <TouchableOpacity style={styles.dateTimeCard} onPress={() => setShowDatePicker(true)}>
-                      <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']} style={styles.dateTimeGradient}>
+                      <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={[styles.dateTimeGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}>
                         <Text style={styles.dateTimeIcon}>📅</Text>
-                        <Text style={styles.dateTimeValue}>
+                        <Text style={[styles.dateTimeValue, { color: colors.text }]}>
                           {formData.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </Text>
                       </LinearGradient>
@@ -605,9 +607,9 @@ export default function BirthFormScreen({ navigation, route }) {
                       setTempPeriod(hours >= 12 ? 'PM' : 'AM');
                       setShowTimePicker(true);
                     }}>
-                      <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']} style={styles.dateTimeGradient}>
+                      <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={[styles.dateTimeGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}>
                         <Text style={styles.dateTimeIcon}>🕐</Text>
-                        <Text style={styles.dateTimeValue}>
+                        <Text style={[styles.dateTimeValue, { color: colors.text }]}>
                           {formData.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                         </Text>
                       </LinearGradient>
@@ -619,11 +621,11 @@ export default function BirthFormScreen({ navigation, route }) {
                   <View style={styles.inputContainer}>
                     <View style={styles.locationInputWrapper}>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.text, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]}
                         value={formData.place}
                         onChangeText={(value) => handleInputChange('place', value)}
                         placeholder="City, State, Country"
-                        placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                        placeholderTextColor={colors.textSecondary}
                         autoCorrect={false}
                         onBlur={() => {
                           // Delay hiding suggestions to allow tap to register
@@ -635,30 +637,30 @@ export default function BirthFormScreen({ navigation, route }) {
                       />
                       {showSuggestions && suggestions.length > 0 && (
                         <ScrollView 
-                          style={styles.suggestionsList}
+                          style={[styles.suggestionsList, { backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]}
                           keyboardShouldPersistTaps="always"
                           nestedScrollEnabled={true}
                         >
                           {suggestions.map(suggestion => (
                             <TouchableOpacity
                               key={suggestion.id}
-                              style={styles.suggestionItem}
+                              style={[styles.suggestionItem, { borderBottomColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]}
                               onPress={() => handlePlaceSelect(suggestion)}
                               activeOpacity={0.7}
                             >
-                              <Text style={styles.suggestionText}>📍 {suggestion.name}</Text>
+                              <Text style={[styles.suggestionText, { color: colors.text }]}>📍 {suggestion.name}</Text>
                             </TouchableOpacity>
                           ))}
                         </ScrollView>
                       )}
                     </View>
                     {formData.latitude && formData.longitude && (
-                      <View style={styles.locationDetails}>
-                        <Text style={styles.locationDetailsTitle}>📍 Selected Location</Text>
-                        <Text style={styles.locationDetailsText}>{formData.place}</Text>
-                        <View style={styles.coordinatesRow}>
-                          <Text style={styles.coordinateText}>Lat: {formData.latitude.toFixed(4)}</Text>
-                          <Text style={styles.coordinateText}>Long: {formData.longitude.toFixed(4)}</Text>
+                      <View style={[styles.locationDetails, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                        <Text style={[styles.locationDetailsTitle, { color: colors.text }]}>📍 Selected Location</Text>
+                        <Text style={[styles.locationDetailsText, { color: colors.text }]}>{formData.place}</Text>
+                        <View style={[styles.coordinatesRow, { borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                          <Text style={[styles.coordinateText, { color: colors.textSecondary }]}>Lat: {formData.latitude.toFixed(4)}</Text>
+                          <Text style={[styles.coordinateText, { color: colors.textSecondary }]}>Long: {formData.longitude.toFixed(4)}</Text>
                         </View>
                       </View>
                     )}
@@ -672,9 +674,9 @@ export default function BirthFormScreen({ navigation, route }) {
             <View style={styles.navigationContainer}>
               {step > 1 && (
                 <TouchableOpacity style={styles.navButton} onPress={prevStep}>
-                  <LinearGradient colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']} style={styles.navGradient}>
-                    <Ionicons name="arrow-back" size={20} color={COLORS.white} />
-                    <Text style={styles.navText}>Back</Text>
+                  <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={styles.navGradient}>
+                    <Ionicons name="arrow-back" size={20} color={colors.text} />
+                    <Text style={[styles.navText, { color: colors.text }]}>Back</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -853,7 +855,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
   },
   placeholder: { width: 40 },
   progressContainer: {
@@ -862,7 +863,6 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 8,
@@ -876,7 +876,6 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
   scrollView: { flex: 1 },
@@ -913,7 +912,6 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 40,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -928,13 +926,10 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 16,
     padding: 18,
     fontSize: 18,
-    color: COLORS.white,
     textAlign: 'center',
   },
   genderContainer: {
@@ -970,7 +965,6 @@ const styles = StyleSheet.create({
   genderText: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
   },
   genderDebugText: {
     fontSize: 14,
@@ -980,7 +974,6 @@ const styles = StyleSheet.create({
   },
   selectedIndicator: {
     fontSize: 24,
-    color: COLORS.white,
     fontWeight: 'bold',
     marginTop: 8,
   },
@@ -1013,7 +1006,6 @@ const styles = StyleSheet.create({
   dateTimeValue: {
     fontSize: 20,
     fontWeight: '600',
-    color: COLORS.white,
   },
   zodiacWheel: {
     alignItems: 'center',
@@ -1029,12 +1021,10 @@ const styles = StyleSheet.create({
     bottom: '100%',
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(30, 30, 30, 0.95)',
     borderRadius: 12,
     marginBottom: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
     zIndex: 1001,
     maxHeight: 200,
     shadowColor: '#000',
@@ -1046,30 +1036,24 @@ const styles = StyleSheet.create({
   suggestionItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   suggestionText: {
     fontSize: 14,
-    color: COLORS.white,
   },
   locationDetails: {
     marginTop: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
     padding: 20,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   locationDetailsTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 12,
     textAlign: 'center',
   },
   locationDetailsText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -1078,11 +1062,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   coordinateText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '600',
   },
   navigationContainer: {
@@ -1118,7 +1100,6 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
   },
   navTextPrimary: {
     fontSize: 18,

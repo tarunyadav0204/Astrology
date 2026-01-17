@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, onHousePress, cosmicTheme = true }) => {
+  const { theme, colors } = useTheme();
   
   const getBinduColor = (bindus) => {
     if (bindus >= 30) return '#81C784'; // Strong - Darker Green
@@ -32,19 +34,19 @@ const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, on
           return (
             <TouchableOpacity
               key={houseNumber}
-              style={[styles.houseBox, { backgroundColor: binduColor }]}
+              style={[styles.houseBox, { backgroundColor: binduColor, borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
               onPress={() => onHousePress?.(houseNumber, bindus, signName)}
             >
-              <Text style={styles.houseNumber}>{houseNumber}</Text>
+              <Text style={[styles.houseNumber, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{houseNumber}</Text>
               <View style={styles.bindusRow}>
-                <Text style={styles.bindus}>{bindus}</Text>
+                <Text style={[styles.bindus, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{bindus}</Text>
                 {difference !== null && difference !== 0 && (
-                  <Text style={[styles.difference, { color: difference > 0 ? '#FFFFFF' : '#FFFFFF' }]}>
+                  <Text style={[styles.difference, { color: theme === 'dark' ? '#FFFFFF' : '#1a1a1a' }]}>
                     ({difference > 0 ? '+' : ''}{difference})
                   </Text>
                 )}
               </View>
-              <Text style={styles.signName}>{signName}</Text>
+              <Text style={[styles.signName, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{signName}</Text>
             </TouchableOpacity>
           );
         })}
@@ -55,7 +57,6 @@ const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, on
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 10,
   },
   grid: {
@@ -64,9 +65,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   houseBox: {
-    width: '30%',
+    width: '28%',
     aspectRatio: 1,
-    margin: '1.5%',
+    margin: '2%',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

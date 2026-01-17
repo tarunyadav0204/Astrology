@@ -31,6 +31,7 @@ import FinancialDashboard from './src/components/Financial/FinancialDashboard';
 import SectorDetailScreen from './src/components/Financial/SectorDetailScreen';
 import AllOpportunitiesScreen from './src/components/Financial/AllOpportunitiesScreen';
 import { CreditProvider } from './src/credits/CreditContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { storage } from './src/services/storage';
 
 const Stack = createStackNavigator();
@@ -100,8 +101,9 @@ export default function App() {
   
   return (
     <SafeAreaProvider>
-      <CreditProvider>
-        <NavigationContainer>
+      <ThemeProvider>
+        <CreditProvider>
+          <NavigationContainer>
         <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator
           initialRouteName={initialRoute}
@@ -250,6 +252,7 @@ export default function App() {
         </Stack.Navigator>
         </NavigationContainer>
       </CreditProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
+import { useTheme } from '../../context/ThemeContext';
 
 const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null }) => {
+  const { theme, colors } = useTheme();
   
   // console.log('NorthIndianChart - showKarakas:', showKarakas, 'karakas:', karakas ? Object.keys(karakas) : 'null');
   
@@ -102,8 +104,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
     if (status === 'exalted') return '#22c55e';
     if (status === 'debilitated') return '#ef4444';
     
-    // For cosmic theme, use white for normal planets
-    return cosmicTheme ? 'rgba(255, 255, 255, 0.95)' : '#2d3436';
+    // Use theme colors for normal planets
+    return cosmicTheme ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)') : (theme === 'dark' ? '#fff' : '#2d3436');
   };
 
   const getPlanetSymbolWithStatus = (planet) => {
@@ -210,11 +212,17 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
       <Svg viewBox="0 0 400 400" style={styles.svg}>
         <Defs>
           <LinearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            {cosmicTheme ? [
+            {cosmicTheme ? (
+              theme === 'dark' ? [
                 <Stop key="0" offset="0%" stopColor="rgba(255, 255, 255, 0.15)" />,
                 <Stop key="50" offset="50%" stopColor="rgba(255, 255, 255, 0.08)" />,
                 <Stop key="100" offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
               ] : [
+                <Stop key="0" offset="0%" stopColor="rgba(249, 115, 22, 0.15)" />,
+                <Stop key="50" offset="50%" stopColor="rgba(249, 115, 22, 0.08)" />,
+                <Stop key="100" offset="100%" stopColor="rgba(249, 115, 22, 0.12)" />
+              ]
+            ) : [
                 <Stop key="0" offset="0%" stopColor="rgba(255, 255, 255, 0.9)" />,
                 <Stop key="50" offset="50%" stopColor="rgba(248, 250, 252, 0.95)" />,
                 <Stop key="100" offset="100%" stopColor="rgba(241, 245, 249, 0.9)" />
@@ -285,8 +293,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
                    houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
                 fontSize="18" 
                 fill={cosmicTheme ? 
-                  (rashiIndex === chartData.houses[0].sign ? "#ff6b35" : "rgba(255, 255, 255, 0.9)") :
-                  (rashiIndex === chartData.houses[0].sign ? "#e91e63" : "#333")} 
+                  (rashiIndex === chartData.houses[0].sign ? "#ff6b35" : (theme === 'dark' ? "rgba(255, 255, 255, 0.9)" : "rgba(0, 0, 0, 0.8)")) :
+                  (rashiIndex === chartData.houses[0].sign ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333"))} 
                 fontWeight={rashiIndex === chartData.houses[0].sign ? "900" : "bold"}
                 onPress={() => handleRashiPress(rashiIndex)}>
                 {rashiIndex + 1}
@@ -309,7 +317,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
                       x={houseData.center.x + 25} 
                       y={houseData.center.y + 50} 
                       fontSize="8" 
-                      fill={cosmicTheme ? "rgba(255, 255, 255, 0.7)" : "#666"} 
+                      fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} 
                       fontWeight="500" 
                       textAnchor="middle">
                       {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
@@ -655,7 +663,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
                         x={planetX} 
                         y={planetY + 8} 
                         fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
-                        fill={cosmicTheme ? "rgba(255, 255, 255, 0.7)" : "#666"}
+                        fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")}
                         fontWeight="500"
                         textAnchor="middle"
                         onPress={() => handlePlanetPress(planet)}>
@@ -672,7 +680,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
       
       {/* Planet Tooltip */}
       {tooltip.show && (
-        <View style={styles.tooltip}>
+        <View style={[styles.tooltip, { backgroundColor: theme === 'dark' ? 'rgba(233, 30, 99, 0.9)' : 'rgba(249, 115, 22, 0.9)' }]}>
           <Text style={styles.tooltipText}>{tooltip.text}</Text>
         </View>
       )}
@@ -689,23 +697,23 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
           activeOpacity={1}
           onPress={() => setContextMenu({ show: false, rashiIndex: null, signName: null })}
         >
-          <View style={styles.contextMenuContainer}>
-            <Text style={styles.contextMenuTitle}>{contextMenu.signName}</Text>
+          <View style={[styles.contextMenuContainer, { backgroundColor: theme === 'dark' ? '#1a1a1a' : 'white' }]}>
+            <Text style={[styles.contextMenuTitle, { color: theme === 'dark' ? '#ff6b35' : '#e91e63' }]}>{contextMenu.signName}</Text>
             <TouchableOpacity
-              style={styles.contextMenuItem}
+              style={[styles.contextMenuItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
               onPress={() => {
                 onRotate?.(contextMenu.rashiIndex);
                 setContextMenu({ show: false, rashiIndex: null, signName: null });
               }}
             >
               <Text style={styles.contextMenuIcon}>🔄</Text>
-              <Text style={styles.contextMenuText}>Make Ascendant</Text>
+              <Text style={[styles.contextMenuText, { color: colors.text }]}>Make Ascendant</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
       
-      <Text style={[styles.instructionText, cosmicTheme && styles.instructionTextCosmic]}>
+      <Text style={[styles.instructionText, { color: theme === 'dark' ? (cosmicTheme ? 'rgba(255, 255, 255, 0.7)' : '#666') : (cosmicTheme ? 'rgba(0, 0, 0, 0.6)' : '#666') }]}>
         Touch any sign to make it ascendant
       </Text>
     </View>
@@ -728,7 +736,6 @@ const styles = StyleSheet.create({
     top: 20,
     left: 20,
     right: 20,
-    backgroundColor: 'rgba(233, 30, 99, 0.9)',
     padding: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -746,7 +753,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contextMenuContainer: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     minWidth: 200,
@@ -759,7 +765,6 @@ const styles = StyleSheet.create({
   contextMenuTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e91e63',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -768,7 +773,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     gap: 12,
   },
@@ -778,17 +782,12 @@ const styles = StyleSheet.create({
   contextMenuText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   instructionText: {
     textAlign: 'center',
     fontSize: 12,
-    color: '#666',
     fontStyle: 'italic',
     marginTop: 8,
-  },
-  instructionTextCosmic: {
-    color: 'rgba(255, 255, 255, 0.7)',
   },
 });
 

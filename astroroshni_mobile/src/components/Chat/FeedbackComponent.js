@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
+  const { theme, colors } = useTheme();
   const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
   const [visible, setVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -89,12 +91,16 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+    <Animated.View style={[styles.container, { 
+      opacity: fadeAnim,
+      backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.05)' : 'rgba(249, 115, 22, 0.1)',
+      borderColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.3)'
+    }]}>
       {feedback.submitted ? (
-        <Text style={styles.thanksText}>Thanks for your feedback! 🙏</Text>
+        <Text style={[styles.thanksText, { color: colors.primary }]}>Thanks for your feedback! 🙏</Text>
       ) : (
         <>
-          <Text style={styles.title}>How was this answer?</Text>
+          <Text style={[styles.title, { color: colors.text }]}>How was this answer?</Text>
           <View style={styles.starsContainer}>
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity
@@ -112,9 +118,13 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
           {feedback.rating > 0 && (
             <>
               <TextInput
-                style={styles.commentInput}
+                style={[styles.commentInput, { 
+                  color: colors.text,
+                  borderColor: theme === 'dark' ? '#E0E0E0' : 'rgba(249, 115, 22, 0.3)',
+                  backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(249, 115, 22, 0.05)'
+                }]}
                 placeholder="Tell us more (optional)"
-                placeholderTextColor="#999"
+                placeholderTextColor={theme === 'dark' ? '#999' : 'rgba(0, 0, 0, 0.4)'}
                 multiline
                 value={feedback.comment}
                 onChangeText={(text) => setFeedback(prev => ({ ...prev, comment: text }))}
@@ -124,7 +134,7 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
                   <Text style={styles.submitButtonText}>Submit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-                  <Text style={styles.skipButtonText}>Skip</Text>
+                  <Text style={[styles.skipButtonText, { color: colors.text }]}>Skip</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -139,15 +149,12 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 8,
     padding: 12,
-    backgroundColor: 'rgba(249, 115, 22, 0.05)',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.2)',
     marginHorizontal: 16,
   },
   title: {
     fontSize: 13,
-    color: 'white',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -164,14 +171,12 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
     borderRadius: 6,
     padding: 8,
     marginTop: 8,
     minHeight: 60,
     textAlignVertical: 'top',
     fontSize: 14,
-    color: 'white',
   },
   buttonsContainer: {
     flexDirection: 'row',
@@ -197,15 +202,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: 'rgba(249, 115, 22, 0.3)',
   },
   skipButtonText: {
-    color: 'white',
     textAlign: 'center',
   },
   thanksText: {
     fontSize: 14,
-    color: '#ff6b35',
     textAlign: 'center',
     fontWeight: '600',
   },

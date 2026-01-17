@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 const NativeSelectorChip = ({ 
@@ -11,6 +12,7 @@ const NativeSelectorChip = ({
   maxLength = 12,
   showIcon = true 
 }) => {
+  const { theme, colors } = useTheme();
   if (!birthData) return null;
 
   const displayName = birthData.name?.slice(0, maxLength) + 
@@ -19,14 +21,21 @@ const NativeSelectorChip = ({
   return (
     <TouchableOpacity 
       onPress={onPress} 
-      style={[styles.nameChip, style]}
+      style={[
+        styles.nameChip,
+        {
+          backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.15)',
+          borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+        },
+        style
+      ]}
       activeOpacity={0.7}
     >
       {showIcon && <Text style={styles.chipIcon}>👤</Text>}
-      <Text style={[styles.nameChipText, textStyle]}>
+      <Text style={[styles.nameChipText, { color: colors.textSecondary }, textStyle]}>
         {displayName}
       </Text>
-      <Ionicons name="chevron-down" size={12} color="rgba(255, 255, 255, 0.7)" style={styles.dropdownIcon} />
+      <Ionicons name="chevron-down" size={12} color={colors.textTertiary} style={styles.dropdownIcon} />
     </TouchableOpacity>
   );
 };
@@ -54,7 +63,6 @@ const styles = StyleSheet.create({
   nameChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
   },
   dropdownIcon: {
     marginLeft: 4,

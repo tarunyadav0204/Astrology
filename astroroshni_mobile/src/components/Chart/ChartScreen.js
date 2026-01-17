@@ -22,10 +22,12 @@ import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ChartScreen({ navigation, route }) {
+  const { theme, colors } = useTheme();
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -215,16 +217,16 @@ export default function ChartScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.container}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
         {/* Compact Header */}
         <View style={styles.compactHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
-            <Ionicons name="close" size={20} color={COLORS.white} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
+            <Ionicons name="close" size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={styles.chartName}>{chartTypes[currentChartIndex]?.name}</Text>
+            <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
             {birthData && (
               <NativeSelectorChip 
                 birthData={birthData}
@@ -236,8 +238,8 @@ export default function ChartScreen({ navigation, route }) {
               />
             )}
           </View>
-          <View style={styles.chartPosition}>
-            <Text style={styles.positionText}>{currentChartIndex + 1}/{chartTypes.length}</Text>
+          <View style={[styles.chartPosition, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
+            <Text style={[styles.positionText, { color: colors.text }]}>{currentChartIndex + 1}/{chartTypes.length}</Text>
           </View>
         </View>
 
@@ -252,8 +254,8 @@ export default function ChartScreen({ navigation, route }) {
                   <Text style={styles.loadingOrbIcon}>✨</Text>
                 </LinearGradient>
               </Animated.View>
-              <Text style={styles.loadingText}>Calculating Cosmic Alignments...</Text>
-              <Text style={styles.loadingSubtext}>Reading planetary positions</Text>
+              <Text style={[styles.loadingText, { color: colors.text }]}>Calculating Cosmic Alignments...</Text>
+              <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>Reading planetary positions</Text>
             </View>
           </View>
         ) : chartData && birthData ? (
@@ -311,8 +313,9 @@ export default function ChartScreen({ navigation, route }) {
                 <TouchableOpacity
                   key={chart.id}
                   style={[
-                    styles.navPill, 
-                    currentChartIndex === index && styles.navPillActive
+                    styles.navPill,
+                    { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.4)' : 'rgba(249, 115, 22, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' },
+                    currentChartIndex === index && (theme === 'dark' ? styles.navPillActive : styles.navPillActiveLight)
                   ]}
                   onPress={() => changeChart(index)}
                   activeOpacity={0.7}
@@ -320,7 +323,7 @@ export default function ChartScreen({ navigation, route }) {
                   <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>
                     {chart.icon}
                   </Text>
-                  <Text style={[styles.navText, currentChartIndex === index && styles.navTextActive]}>
+                  <Text style={[styles.navText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }, currentChartIndex === index && styles.navTextActive]}>
                     {chart.name.split(' ')[0]}
                   </Text>
                 </TouchableOpacity>
@@ -332,8 +335,8 @@ export default function ChartScreen({ navigation, route }) {
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📊</Text>
-            <Text style={styles.emptyTitle}>No Chart Data</Text>
-            <Text style={styles.emptyText}>Please add birth details to view charts</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Chart Data</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Please add birth details to view charts</Text>
           </View>
         )}
         </SafeAreaView>
@@ -364,7 +367,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -375,21 +377,17 @@ const styles = StyleSheet.create({
   chartName: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
   },
   nativeChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   nativeChipText: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   chartPosition: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -397,7 +395,6 @@ const styles = StyleSheet.create({
   positionText: {
     fontSize: 11,
     fontWeight: '600',
-    color: COLORS.white,
   },
   
   // Loading Styles
@@ -434,13 +431,11 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 8,
   },
   loadingSubtext: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
   
@@ -499,12 +494,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     minWidth: 60,
     opacity: 1,
   },
@@ -517,6 +510,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+  navPillActiveLight: {
+    backgroundColor: '#f97316',
+    borderColor: '#f97316',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
 
   navIcon: {
     fontSize: 16,
@@ -528,12 +530,11 @@ const styles = StyleSheet.create({
   },
   navText: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
     textAlign: 'center',
   },
   navTextActive: {
-    color: COLORS.white,
+    color: '#fff',
     fontWeight: '700',
   },
   
@@ -548,12 +549,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
 });

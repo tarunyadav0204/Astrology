@@ -17,12 +17,14 @@ import Svg, { Rect, Line, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
+import { useTheme } from '../../context/ThemeContext';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NorthIndianChart from '../Chart/NorthIndianChart';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }) {
+  const { theme, toggleTheme, colors } = useTheme();
   const { credits } = useCredits();
   const [userData, setUserData] = useState(null);
   const [birthData, setBirthData] = useState(null);
@@ -219,8 +221,8 @@ export default function ProfileScreen({ navigation }) {
         style={styles.statGradient}
       >
         <Text style={[styles.statIcon, { color }]}>{icon}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
+        <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
       </LinearGradient>
     </Animated.View>
   );
@@ -245,15 +247,15 @@ export default function ProfileScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
       <LinearGradient
-        colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+        colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>My Profile</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>My Profile</Text>
             <View style={styles.editButton} />
           </View>
 
@@ -281,8 +283,8 @@ export default function ProfileScreen({ navigation }) {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.userName}>{userData?.name || 'User'}</Text>
-              <Text style={styles.userSubtitle}>
+              <Text style={[styles.userName, { color: colors.text }]}>{userData?.name || 'User'}</Text>
+              <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>
                 {birthData?.date ? new Date(birthData.date).toLocaleDateString('en-US', { 
                   month: 'long', 
                   day: 'numeric', 
@@ -290,7 +292,7 @@ export default function ProfileScreen({ navigation }) {
                 }) : 'Birth date not set'}
               </Text>
               {birthData?.time && (
-                <Text style={styles.userSubtitle}>🕐 {birthData.time}</Text>
+                <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>🕐 {birthData.time}</Text>
               )}
               {!birthData?.date && (
                 <TouchableOpacity 
@@ -306,7 +308,7 @@ export default function ProfileScreen({ navigation }) {
                 </TouchableOpacity>
               )}
               {birthData?.place && (
-                <Text style={styles.userLocation}>📍 {birthData.place}</Text>
+                <Text style={[styles.userLocation, { color: colors.textSecondary }]}>📍 {birthData.place}</Text>
               )}
             </Animated.View>
 
@@ -339,10 +341,10 @@ export default function ProfileScreen({ navigation }) {
             </View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-              <Text style={styles.sectionTitle}>✨ Birth Chart Essence</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>✨ Birth Chart Essence</Text>
               <View style={styles.chartSummaryCard}>
                 <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
+                  colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
                   style={styles.chartSummaryGradient}
                 >
                   <TouchableOpacity 
@@ -364,27 +366,27 @@ export default function ProfileScreen({ navigation }) {
                       <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
                       <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
                     </Svg>
-                    <Text style={styles.miniChartText}>View Full Chart</Text>
+                    <Text style={[styles.miniChartText, { color: colors.text }]}>View Full Chart</Text>
                   </TouchableOpacity>
                   
                   <View style={styles.chartDetails}>
                     <View style={styles.chartDetailRow}>
-                      <Text style={styles.chartDetailLabel}>☀️ Sun Sign</Text>
-                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}</Text>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>☀️ Sun Sign</Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}</Text>
                     </View>
                     <View style={styles.chartDetailRow}>
-                      <Text style={styles.chartDetailLabel}>🌙 Moon Sign</Text>
-                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}</Text>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>🌙 Moon Sign</Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}</Text>
                     </View>
                     <View style={styles.chartDetailRow}>
-                      <Text style={styles.chartDetailLabel}>⬆️ Ascendant</Text>
-                      <Text style={styles.chartDetailValue}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>⬆️ Ascendant</Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
                     </View>
                   </View>
                   
                   {/* Current Running Dashas */}
-                  <View style={styles.dashasContainer}>
-                    <Text style={styles.dashasTitle}>Current Running Dashas</Text>
+                  <View style={[styles.dashasContainer, { borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
+                    <Text style={[styles.dashasTitle, { color: colors.textSecondary }]}>Current Running Dashas</Text>
                     <View style={styles.dashasRow}>
                       {loadingDashas ? (
                         <Text style={styles.dashasLoading}>Loading...</Text>
@@ -398,8 +400,8 @@ export default function ProfileScreen({ navigation }) {
                         ].map((dasha, index) => {
                           const planetColor = getPlanetColor(dasha.data?.planet);
                           return (
-                            <View key={index} style={[styles.dashaChip, { borderColor: planetColor }]}>
-                              <Text style={styles.dashaLevel}>{dasha.level}</Text>
+                            <View key={index} style={[styles.dashaChip, { borderColor: planetColor, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                              <Text style={[styles.dashaLevel, { color: colors.textSecondary }]}>{dasha.level}</Text>
                               <Text style={[styles.dashaPlanet, { color: planetColor }]}>
                                 {dasha.data?.planet || '...'}
                               </Text>
@@ -414,7 +416,7 @@ export default function ProfileScreen({ navigation }) {
             </Animated.View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-              <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>⚡ Quick Actions</Text>
               <View style={styles.actionsGrid}>
                 <ActionButton 
                   icon="chatbubbles" 
@@ -457,40 +459,50 @@ export default function ProfileScreen({ navigation }) {
             </Animated.View>
 
             <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-              <Text style={styles.sectionTitle}>⚙️ Settings</Text>
-              <View style={styles.settingsCard}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>⚙️ Settings</Text>
+              <View style={[styles.settingsCard, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
+                <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color="#ffd700" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+                
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+                
                 <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('BirthForm', { editProfile: birthData })}>
                   <View style={styles.settingLeft}>
                     <Ionicons name="person-outline" size={22} color="#ff6b35" />
-                    <Text style={styles.settingText}>Edit Birth Details</Text>
+                    <Text style={[styles.settingText, { color: colors.text }]}>Edit Birth Details</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
                 
-                <View style={styles.settingDivider} />
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
                 
                 <TouchableOpacity style={styles.settingItem}>
                   <View style={styles.settingLeft}>
                     <Ionicons name="notifications-outline" size={22} color="#9c27b0" />
-                    <Text style={styles.settingText}>Notifications</Text>
+                    <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
                 
-                <View style={styles.settingDivider} />
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
                 
                 <TouchableOpacity style={styles.settingItem}>
                   <View style={styles.settingLeft}>
                     <Ionicons name="share-social-outline" size={22} color="#4caf50" />
-                    <Text style={styles.settingText}>Share Profile</Text>
+                    <Text style={[styles.settingText, { color: colors.text }]}>Share Profile</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </Animated.View>
 
             <TouchableOpacity 
-              style={styles.logoutButton}
+              style={[styles.logoutButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.2)' : 'rgba(255, 107, 53, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.5)' : 'rgba(255, 107, 53, 0.4)' }]}
               onPress={async () => {
                 await storage.clearAll();
                 navigation.navigate('Login');
@@ -519,7 +531,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: COLORS.white },
+  headerTitle: { fontSize: 20, fontWeight: '700' },
   editButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
@@ -529,9 +541,9 @@ const styles = StyleSheet.create({
   ringGradient: { width: '100%', height: '100%', borderRadius: 60, opacity: 0.3 },
   avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255, 255, 255, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255, 255, 255, 0.3)' },
   avatarText: { fontSize: 48 },
-  userName: { fontSize: 28, fontWeight: '700', color: COLORS.white, marginBottom: 4 },
-  userSubtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.7)', marginBottom: 4 },
-  userLocation: { fontSize: 13, color: 'rgba(255, 255, 255, 0.6)' },
+  userName: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  userSubtitle: { fontSize: 14, marginBottom: 4 },
+  userLocation: { fontSize: 13 },
   creditsCard: { marginBottom: 24, borderRadius: 20, overflow: 'hidden', shadowColor: '#ff6b35', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   creditsGradient: { padding: 24 },
   creditsContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -546,17 +558,17 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 24, fontWeight: '700', color: COLORS.white, marginBottom: 4 },
   statLabel: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)' },
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white, marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
   chartSummaryCard: { borderRadius: 16, overflow: 'hidden' },
   chartSummaryGradient: { padding: 20 },
   miniChart: { alignItems: 'center', marginBottom: 20, paddingVertical: 20, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
   miniChartIcon: { width: 48, height: 48, marginBottom: 8 },
   miniChartIcon: { fontSize: 48, marginBottom: 8 },
-  miniChartText: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
+  miniChartText: { fontSize: 14, fontWeight: '600' },
   chartDetails: { gap: 12 },
   chartDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chartDetailLabel: { fontSize: 14, color: 'rgba(255, 255, 255, 0.7)' },
-  chartDetailValue: { fontSize: 14, fontWeight: '600', color: COLORS.white },
+  chartDetailLabel: { fontSize: 14 },
+  chartDetailValue: { fontSize: 14, fontWeight: '600' },
   dashasContainer: {
     marginTop: 12,
     paddingTop: 12,
@@ -605,10 +617,10 @@ const styles = StyleSheet.create({
   actionGradient: { padding: 12, justifyContent: 'center' },
   actionContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   actionLabel: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
-  settingsCard: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 16, padding: 4 },
+  settingsCard: { borderRadius: 16, padding: 4 },
   settingItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
   settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  settingText: { fontSize: 16, color: COLORS.white, fontWeight: '500' },
+  settingText: { fontSize: 16, fontWeight: '500' },
   settingValue: { fontSize: 14, color: 'rgba(255, 255, 255, 0.6)' },
   settingDivider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', marginHorizontal: 16 },
   logoutButton: { backgroundColor: 'rgba(255, 107, 53, 0.2)', borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.5)', borderRadius: 16, padding: 16, alignItems: 'center', marginTop: 12 },

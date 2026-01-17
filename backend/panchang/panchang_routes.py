@@ -335,21 +335,43 @@ async def calculate_inauspicious_times(request: InauspiciousTimesRequest):
 @router.post("/calculate-rahu-kaal")
 async def calculate_rahu_kaal(request: SunriseSunsetRequest):
     try:
-        # Use professional MonthlyPanchangCalculator instead of amateur math
+        # Auto-detect timezone from coordinates
+        from utils.timezone_service import get_timezone_from_coordinates
+        timezone = get_timezone_from_coordinates(request.latitude, request.longitude)
+        print(f"[DEBUG] Rahu Kaal - Auto-detected timezone: {timezone}")
+        
+        # Use professional MonthlyPanchangCalculator
         daily_panchang = monthly_panchang_calc.calculate_daily_panchang(
             request.date,
             request.latitude,
             request.longitude,
-            "UTC+0"  # Default timezone for Rahu Kaal
+            timezone
         )
         
         special_times = daily_panchang.get('special_times', {})
         rahu_kalam = special_times.get('rahu_kalam', {})
         
+        # Convert time strings to ISO datetime for mobile app
+        rahu_start = rahu_kalam.get('start')
+        rahu_end = rahu_kalam.get('end')
+        
+        rahu_start_iso = None
+        rahu_end_iso = None
+        
+        if rahu_start and rahu_end:
+            try:
+                # Parse "08:33 AM" format and convert to ISO datetime
+                start_dt = datetime.strptime(f"{request.date} {rahu_start}", '%Y-%m-%d %I:%M %p')
+                end_dt = datetime.strptime(f"{request.date} {rahu_end}", '%Y-%m-%d %I:%M %p')
+                rahu_start_iso = start_dt.isoformat()
+                rahu_end_iso = end_dt.isoformat()
+            except Exception as e:
+                print(f"[ERROR] Failed to parse Rahu Kaal times: {e}")
+        
         return {
-            'rahu_kaal_start': rahu_kalam.get('start'),
-            'rahu_kaal_end': rahu_kalam.get('end'),
-            'duration_minutes': int(daily_panchang['sunrise_sunset']['day_duration'] * 60 / 8) if daily_panchang['sunrise_sunset']['day_duration'] else 90,
+            'rahu_kaal_start': rahu_start_iso,
+            'rahu_kaal_end': rahu_end_iso,
+            'duration_minutes': int(daily_panchang['sunrise_sunset']['day_duration'] * 60 / 8) if daily_panchang.get('sunrise_sunset', {}).get('day_duration') else 90,
             'avoid_activities': ['New ventures', 'Important meetings', 'Travel', 'Ceremonies']
         }
         
@@ -485,13 +507,22 @@ async def get_daily_detailed_panchang(
     date: str,
     latitude: float,
     longitude: float,
-    timezone: str
+    timezone: Optional[str] = None
 ):
     """Get detailed panchang for a single day with all elements and timezone support"""
     try:
+        # Auto-detect timezone if not provided
+        if timezone is None or timezone == '':
+            from utils.timezone_service import get_timezone_from_coordinates
+            timezone = get_timezone_from_coordinates(float(latitude), float(longitude))
+            print(f"[DEBUG] Auto-detected timezone: {timezone}")
+        
         result = monthly_panchang_calc.calculate_daily_panchang(
             date, float(latitude), float(longitude), timezone
         )
         return result
     except Exception as e:
+        print(f"[ERROR] Daily detailed panchang failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))

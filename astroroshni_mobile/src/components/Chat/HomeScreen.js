@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, G, Defs, RadialGradient, Stop, Path, Line, Rect, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
@@ -24,6 +25,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
+  const { theme, colors } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -548,7 +550,7 @@ const loadHomeData = async (nativeData = null) => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+        colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]}
         style={styles.gradient}
       >
         {starAnims.map((anim, index) => {
@@ -567,7 +569,7 @@ const loadHomeData = async (nativeData = null) => {
                 },
               ]}
             >
-              <Text style={styles.starText}>✨</Text>
+              <Text style={[styles.starText, { color: theme === 'dark' ? '#FFD700' : '#c2410c' }]}>✦</Text>
             </Animated.View>
           );
         })}
@@ -581,7 +583,7 @@ const loadHomeData = async (nativeData = null) => {
           <View style={styles.avatarContainer}>
             <Animated.View style={[styles.zodiacRing, { transform: [{ rotate: pulseAnim.interpolate({ inputRange: [1, 1.05], outputRange: ['0deg', '360deg'] }) }] }]}>
               <LinearGradient
-                colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                colors={[colors.primary, colors.accent, colors.primary]}
                 style={styles.ringGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -597,21 +599,27 @@ const loadHomeData = async (nativeData = null) => {
             </Animated.View>
           </View>
           
-          <Text style={styles.greetingTitle}>
+          <Text style={[styles.greetingTitle, { color: colors.text }]}>
             Welcome, {displayData?.name}!
           </Text>
-          <View style={styles.birthInfoCard}>
-            <Text style={styles.birthInfoText}>
+          <View style={[
+            styles.birthInfoCard,
+            {
+              backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+              borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+            }
+          ]}>
+            <Text style={[styles.birthInfoText, { color: colors.textSecondary }]}>
               📅 {displayData?.date ? new Date(displayData.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown date'}
             </Text>
-            <Text style={styles.birthInfoText}>
+            <Text style={[styles.birthInfoText, { color: colors.textSecondary }]}>
               🕐 {time}
             </Text>
-            <Text style={styles.birthInfoText}>
+            <Text style={[styles.birthInfoText, { color: colors.textSecondary }]}>
               📍 {place}
             </Text>
           </View>
-          <Text style={styles.greetingSubtext}>
+          <Text style={[styles.greetingSubtext, { color: colors.textSecondary }]}>
             Your cosmic blueprint awaits. Choose your path to enlightenment.
           </Text>
         </Animated.View>
@@ -626,7 +634,7 @@ const loadHomeData = async (nativeData = null) => {
         /> */}
 
         <Animated.View style={[styles.optionsContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.optionsTitle}>Choose Your Path</Text>
+          <Text style={[styles.optionsTitle, { color: colors.text }]}>Choose Your Path</Text>
           {options.map((option, index) => (
             <OptionCard
               key={option.id}
@@ -639,7 +647,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Life Analysis Options */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.analysisTitle}>🧘 Life Analysis</Text>
+          <Text style={[styles.analysisTitle, { color: colors.text }]}>🧘 Life Analysis</Text>
           <View style={styles.lifeAnalysisGrid}>
             {analysisOptions.slice(0, 6).map((option, index) => (
               <LifeAnalysisCard
@@ -654,7 +662,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Timing Planners */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.analysisTitle}>⏰ Timing Planners</Text>
+          <Text style={[styles.analysisTitle, { color: colors.text }]}>⏰ Timing Planners</Text>
           {analysisOptions.slice(6).map((option, index) => (
             <AnalysisCard
               key={option.id}
@@ -669,7 +677,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Magical Dashboard Cards - Moved to Bottom */}
         <Animated.View style={[styles.dashboardContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.dashboardTitle}>✨ Your Cosmic Dashboard</Text>
+          <Text style={[styles.dashboardTitle, { color: colors.text }]}>✨ Your Cosmic Dashboard</Text>
           
 
 
@@ -706,7 +714,7 @@ const loadHomeData = async (nativeData = null) => {
           {/* Current Dasha Chips - Under Birth Chart */}
           {dashData && (
             <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-              <Text style={styles.dashaSectionTitle}>⏰ Current Dasha Periods</Text>
+              <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>⏰ Current Dasha Periods</Text>
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -727,8 +735,8 @@ const loadHomeData = async (nativeData = null) => {
                       style={[styles.dashaChip, { backgroundColor: planetColor + '20', borderColor: planetColor }]}
                     >
                       <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
-                      <Text style={styles.dashaChipDates}>{startDate}</Text>
-                      <Text style={styles.dashaChipDates}>{endDate}</Text>
+                      <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
+                      <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                     </View>
                   );
                 }}
@@ -742,21 +750,27 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Astrology Tools Section */}
           <View style={styles.toolsSection}>
-            <Text style={styles.toolsSectionTitle}>🔧 Astrology Tools</Text>
+            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>🔧 Astrology Tools</Text>
             <View style={styles.toolsGrid}>
               <TouchableOpacity 
                 style={styles.toolCard}
                 onPress={() => navigation.navigate('Chart', { birthData })}
                 activeOpacity={0.8}
               >
-                <View style={styles.toolGlassmorphism}>
+                <View style={[
+                  styles.toolGlassmorphism,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                  }
+                ]}>
                   <Svg width="28" height="28" viewBox="0 0 48 48" style={{ marginBottom: 8 }}>
                     <Rect x="2" y="2" width="44" height="44" fill="none" stroke="#ffffff" strokeWidth="2" />
                     <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke="#ffd700" strokeWidth="1.5" />
                     <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
                     <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
                   </Svg>
-                  <Text style={styles.toolTitle}>Charts</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Charts</Text>
                 </View>
               </TouchableOpacity>
               
@@ -765,9 +779,15 @@ const loadHomeData = async (nativeData = null) => {
                 onPress={() => setShowDashaBrowser(true)}
                 activeOpacity={0.8}
               >
-                <View style={styles.toolGlassmorphism}>
+                <View style={[
+                  styles.toolGlassmorphism,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                  }
+                ]}>
                   <Text style={styles.toolEmoji}>⏰</Text>
-                  <Text style={styles.toolTitle}>Dashas</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Dashas</Text>
                 </View>
               </TouchableOpacity>
               
@@ -776,9 +796,15 @@ const loadHomeData = async (nativeData = null) => {
                 onPress={() => navigation.navigate('AshtakvargaOracle')}
                 activeOpacity={0.8}
               >
-                <View style={styles.toolGlassmorphism}>
+                <View style={[
+                  styles.toolGlassmorphism,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                  }
+                ]}>
                   <Text style={styles.toolEmoji}>⊞</Text>
-                  <Text style={styles.toolTitle}>Ashtak-{"\n"}varga</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Ashtak-{"\n"}varga</Text>
                 </View>
               </TouchableOpacity>
               
@@ -787,9 +813,15 @@ const loadHomeData = async (nativeData = null) => {
                 onPress={() => chartData && navigation.navigate('PlanetaryPositions', { chartData })}
                 activeOpacity={0.8}
               >
-                <View style={styles.toolGlassmorphism}>
+                <View style={[
+                  styles.toolGlassmorphism,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                  }
+                ]}>
                   <Text style={styles.toolEmoji}>🌌</Text>
-                  <Text style={styles.toolTitle}>Positions</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Positions</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -797,7 +829,7 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Zodiac Wheel - Vibrant Design */}
           <View style={styles.planetarySection}>
-            <Text style={styles.planetarySectionTitle}>🪐 Current Planetary Transits</Text>
+            <Text style={[styles.planetarySectionTitle, { color: colors.text }]}>🪐 Current Planetary Transits</Text>
             {!transitData ? (
               <Text style={styles.loadingText}>Loading transits...</Text>
             ) : !transitData.planets ? (
@@ -809,9 +841,9 @@ const loadHomeData = async (nativeData = null) => {
                     styles.planetCard,
                     { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
                   ]}>
-                    <Text style={styles.planetName}>{planet}</Text>
-                    <Text style={styles.planetSign}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
-                    <Text style={styles.planetDegree}>{data.degree.toFixed(1)}°</Text>
+                    <Text style={[styles.planetName, { color: colors.text }]}>{planet}</Text>
+                    <Text style={[styles.planetSign, { color: colors.textSecondary }]}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
+                    <Text style={[styles.planetDegree, { color: colors.textSecondary }]}>{data.degree.toFixed(1)}°</Text>
                   </View>
                 ))}
               </View>
@@ -820,68 +852,74 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Panchang Timeline */}
           {panchangData && (
-            <View style={styles.panchangCard}>
-              <Text style={[styles.panchangTitle, { textAlign: 'center', marginBottom: 20 }]}>🌅 Today's Panchang</Text>
+            <View style={[
+              styles.panchangCard,
+              {
+                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+              }
+            ]}>
+              <Text style={[styles.panchangTitle, { textAlign: 'center', marginBottom: 20, color: colors.text }]}>🌅 Today's Panchang</Text>
               <View style={styles.sunTimesRow}>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌅</Text>
-                  <Text style={styles.sunTimeLabel}>Sunrise</Text>
-                  <Text style={styles.sunTimeValue}>{panchangData.sunrise ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:30 AM'}</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.sunrise ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:30 AM'}</Text>
                 </View>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌇</Text>
-                  <Text style={styles.sunTimeLabel}>Sunset</Text>
-                  <Text style={styles.sunTimeValue}>{panchangData.sunset ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:45 PM'}</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.sunset ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:45 PM'}</Text>
                 </View>
               </View>
               
               <View style={styles.sunTimesRow}>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌙</Text>
-                  <Text style={styles.sunTimeLabel}>Moonrise</Text>
-                  <Text style={styles.sunTimeValue}>{panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || '7:53 AM'}</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Moonrise</Text>
+                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || '7:53 AM'}</Text>
                 </View>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌚</Text>
-                  <Text style={styles.sunTimeLabel}>Moonset</Text>
-                  <Text style={styles.sunTimeValue}>{panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || '6:06 PM'}</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Moonset</Text>
+                  <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || '6:06 PM'}</Text>
                 </View>
               </View>
               
               {/* Panchang Elements Section */}
               {panchangData.daily_panchang && (
                 <View style={styles.panchangElementsSection}>
-                  <Text style={styles.panchangElementsTitle}>🕉️ Panchang Elements</Text>
+                  <Text style={[styles.panchangElementsTitle, { color: colors.primary }]}>🕉️ Panchang Elements</Text>
                   
                   {/* Nakshatra */}
                   {panchangData.daily_panchang.nakshatra && (
                     <View style={styles.panchangElement}>
-                      <Text style={styles.elementLabel}>⭐ Nakshatra:</Text>
-                      <Text style={styles.elementValue}>{panchangData.daily_panchang.nakshatra.name}</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>⭐ Nakshatra:</Text>
+                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.nakshatra.name}</Text>
                     </View>
                   )}
                   
                   {/* Tithi */}
                   {panchangData.daily_panchang.tithi && (
                     <View style={styles.panchangElement}>
-                      <Text style={styles.elementLabel}>🌙 Tithi:</Text>
-                      <Text style={styles.elementValue}>{panchangData.daily_panchang.tithi.name}</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>🌙 Tithi:</Text>
+                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.tithi.name}</Text>
                     </View>
                   )}
                   
                   {/* Yoga */}
                   {panchangData.daily_panchang.yoga && (
                     <View style={styles.panchangElement}>
-                      <Text style={styles.elementLabel}>🧘 Yoga:</Text>
-                      <Text style={styles.elementValue}>{panchangData.daily_panchang.yoga.name}</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>🧘 Yoga:</Text>
+                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.yoga.name}</Text>
                     </View>
                   )}
                   
                   {/* Karana */}
                   {panchangData.daily_panchang.karana && (
                     <View style={styles.panchangElement}>
-                      <Text style={styles.elementLabel}>⚡ Karana:</Text>
-                      <Text style={styles.elementValue}>{panchangData.daily_panchang.karana.name}</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>⚡ Karana:</Text>
+                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.karana.name}</Text>
                     </View>
                   )}
                 </View>
@@ -891,8 +929,8 @@ const loadHomeData = async (nativeData = null) => {
               
               {/* Row 1: Moon Phase Text and Illumination */}
               <View style={styles.moonPhaseTextRow}>
-                <Text style={styles.moonPhaseText}>{panchangData.moon_phase || 'Full Moon'}</Text>
-                <Text style={styles.moonIllumination}>{panchangData.moon_illumination ? `${panchangData.moon_illumination.toFixed(1)}%` : '98.5%'}</Text>
+                <Text style={[styles.moonPhaseText, { color: colors.text }]}>{panchangData.moon_phase || 'Full Moon'}</Text>
+                <Text style={[styles.moonIllumination, { color: colors.textSecondary }]}>{panchangData.moon_illumination ? `${panchangData.moon_illumination.toFixed(1)}%` : '98.5%'}</Text>
               </View>
               
               {/* Row 2: Big Moon SVG Only */}
@@ -967,13 +1005,13 @@ const loadHomeData = async (nativeData = null) => {
                     );
                   })()}
                 </View>
-                <Text style={styles.progressLabel}>Day Progress</Text>
+                <Text style={[styles.progressLabel, { color: colors.textTertiary }]}>Day Progress</Text>
               </View>
               
               <View style={styles.muhurtaSection}>
                 <Text style={styles.muhurtaTitle}>🕉️ Auspicious Times</Text>
                 <View style={styles.muhurtaRow}>
-                  <Text style={styles.muhurtaLabel}>Brahma Muhurta:</Text>
+                  <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>Brahma Muhurta:</Text>
                   <Text style={styles.muhurtaTime}>
                     {panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end ? 
                       `${new Date(panchangData.brahma_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.brahma_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
@@ -982,7 +1020,7 @@ const loadHomeData = async (nativeData = null) => {
                   </Text>
                 </View>
                 <View style={styles.muhurtaRow}>
-                  <Text style={styles.muhurtaLabel}>Abhijit Muhurta:</Text>
+                  <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>Abhijit Muhurta:</Text>
                   <Text style={styles.muhurtaTime}>
                     {panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end ? 
                       `${new Date(panchangData.abhijit_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.abhijit_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
@@ -998,7 +1036,7 @@ const loadHomeData = async (nativeData = null) => {
                   
                   {panchangData.rahu_kaal && (
                     <View style={styles.muhurtaRow}>
-                      <Text style={styles.muhurtaLabel}>Rahu Kaal:</Text>
+                      <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>Rahu Kaal:</Text>
                       <Text style={styles.inauspiciousTime}>
                         {panchangData.rahu_kaal.rahu_kaal_start && panchangData.rahu_kaal.rahu_kaal_end ? 
                           `${new Date(panchangData.rahu_kaal.rahu_kaal_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.rahu_kaal.rahu_kaal_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
@@ -1010,7 +1048,7 @@ const loadHomeData = async (nativeData = null) => {
                   
                   {panchangData.inauspicious_times?.dur_muhurta?.map((period, index) => (
                     <View key={`dur-${index}`} style={styles.muhurtaRow}>
-                      <Text style={styles.muhurtaLabel}>Dur Muhurta:</Text>
+                      <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>Dur Muhurta:</Text>
                       <Text style={styles.inauspiciousTime}>
                         {period.start_time && period.end_time ? 
                           `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
@@ -1022,7 +1060,7 @@ const loadHomeData = async (nativeData = null) => {
                   
                   {panchangData.inauspicious_times?.varjyam?.map((period, index) => (
                     <View key={`varjyam-${index}`} style={styles.muhurtaRow}>
-                      <Text style={styles.muhurtaLabel}>Varjyam:</Text>
+                      <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>Varjyam:</Text>
                       <Text style={styles.inauspiciousTime}>
                         {period.start_time && period.end_time ? 
                           `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
@@ -1055,6 +1093,7 @@ const loadHomeData = async (nativeData = null) => {
 
 // Separate component to avoid hooks order violation
 function OptionCard({ option, index, onOptionSelect }) {
+  const { theme, colors } = useTheme();
   const cardDelay = (index + 1) * 200;
   const cardAnim = useRef(new Animated.Value(0)).current;
   
@@ -1105,7 +1144,9 @@ function OptionCard({ option, index, onOptionSelect }) {
         activeOpacity={0.9}
       >
         <LinearGradient
-          colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+          colors={theme === 'dark' 
+            ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+            : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
           style={styles.optionGradient}
         >
           <View style={styles.optionIconContainer}>
@@ -1117,10 +1158,10 @@ function OptionCard({ option, index, onOptionSelect }) {
             </LinearGradient>
           </View>
           <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>{option.title}</Text>
-            <Text style={styles.optionDescription}>{option.description}</Text>
+            <Text style={[styles.optionTitle, { color: colors.text }]}>{option.title}</Text>
+            <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{option.description}</Text>
           </View>
-          <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.6)" />
+          <Icon name="chevron-forward" size={24} color={colors.textTertiary} />
         </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
@@ -1129,6 +1170,7 @@ function OptionCard({ option, index, onOptionSelect }) {
 
 // Life Analysis Card - 3 per row
 function LifeAnalysisCard({ option, index, onOptionSelect }) {
+  const { colors } = useTheme();
   const cardDelay = (index + 3) * 200;
   const cardAnim = useRef(new Animated.Value(0)).current;
   
@@ -1186,6 +1228,7 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
 
 // Full width Analysis Card for Timing Planners
 function AnalysisCard({ option, index, onOptionSelect }) {
+  const { theme, colors } = useTheme();
   const cardDelay = (index + 9) * 200;
   const cardAnim = useRef(new Animated.Value(0)).current;
   
@@ -1234,15 +1277,21 @@ function AnalysisCard({ option, index, onOptionSelect }) {
         }}
         activeOpacity={0.9}
       >
-        <View style={styles.analysisGlassmorphism}>
+        <View style={[
+          styles.analysisGlassmorphism,
+          {
+            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+            borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+          }
+        ]}>
           <View style={styles.analysisIconContainer}>
             <Text style={styles.analysisEmoji}>{option.icon}</Text>
           </View>
           <View style={styles.analysisContent}>
-            <Text style={styles.analysisCardTitle}>{option.title}</Text>
-            <Text style={styles.analysisDescription}>{option.description}</Text>
+            <Text style={[styles.analysisCardTitle, { color: colors.text }]}>{option.title}</Text>
+            <Text style={[styles.analysisDescription, { color: colors.textSecondary }]}>{option.description}</Text>
           </View>
-          <Icon name="chevron-forward" size={24} color="rgba(255, 255, 255, 0.9)" />
+          <Icon name="chevron-forward" size={24} color={colors.textTertiary} />
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -1313,7 +1362,6 @@ const styles = StyleSheet.create({
   greetingTitle: {
     fontSize: 32,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 16,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -1330,13 +1378,11 @@ const styles = StyleSheet.create({
   },
   birthInfoText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     marginVertical: 2,
   },
   greetingSubtext: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
@@ -1347,7 +1393,6 @@ const styles = StyleSheet.create({
   optionsTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 24,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -1387,12 +1432,10 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 6,
   },
   optionDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     lineHeight: 20,
   },
   quickQuestionsContainer: {
@@ -1407,21 +1450,13 @@ const styles = StyleSheet.create({
   quickQuestionsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
     textAlign: 'center',
     marginBottom: 8,
-    textShadowColor: 'rgba(255, 255, 255, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   quickQuestionsSubtext: {
     fontSize: 14,
-    color: '#2d2d2d',
     textAlign: 'center',
     lineHeight: 20,
-    textShadowColor: 'rgba(255, 255, 255, 0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
   },
   analysisContainer: {
     marginBottom: 30,
@@ -1429,7 +1464,6 @@ const styles = StyleSheet.create({
   analysisTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 24,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -1470,18 +1504,15 @@ const styles = StyleSheet.create({
   analysisCardTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 6,
   },
   analysisDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 20,
     marginBottom: 6,
   },
   analysisCost: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '600',
   },
   // Life Analysis Grid Styles
@@ -1516,21 +1547,20 @@ const styles = StyleSheet.create({
   lifeAnalysisTitle: {
     fontSize: 10,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 6,
     textAlign: 'center',
     lineHeight: 12,
+    color: '#ffffff',
   },
   lifeAnalysisDescription: {
     fontSize: 8,
-    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 10,
     paddingHorizontal: 2,
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   lifeAnalysisCost: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '600',
   },
   // Dashboard Cards Styles
@@ -1540,7 +1570,6 @@ const styles = StyleSheet.create({
   dashboardTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 20,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -1607,7 +1636,6 @@ dashaSection: {
   dashaSectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 12,
     paddingHorizontal: 4,
     textAlign: 'center',
@@ -1636,7 +1664,6 @@ dashaChip: {
   },
   dashaChipDates: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
   },
 
@@ -1688,7 +1715,6 @@ dashaChip: {
   toolsSectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 12,
     paddingHorizontal: 4,
     textAlign: 'center',
@@ -1721,7 +1747,6 @@ dashaChip: {
   toolTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
   },
   
@@ -1733,7 +1758,6 @@ dashaChip: {
   planetarySectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 12,
     paddingHorizontal: 4,
     textAlign: 'center',
@@ -1755,17 +1779,14 @@ dashaChip: {
   planetName: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 4,
   },
   planetSign: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 2,
   },
   planetDegree: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
   },
 
@@ -1782,16 +1803,13 @@ dashaChip: {
   // Panchang Card Styles
   panchangCard: {
     marginBottom: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   panchangTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 12,
     paddingHorizontal: 4,
@@ -1811,13 +1829,11 @@ dashaChip: {
   },
   sunTimeLabel: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 4,
   },
   sunTimeValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
   },
   dayProgressBar: {
     alignItems: 'center',
@@ -1848,7 +1864,6 @@ dashaChip: {
   },
   progressLabel: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.6)',
   },
   muhurtaSection: {
     marginTop: 20,
@@ -1878,7 +1893,6 @@ dashaChip: {
   },
   muhurtaLabel: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
   },
   muhurtaTime: {
@@ -1913,7 +1927,6 @@ dashaChip: {
   panchangElementsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#ffd700',
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -1931,13 +1944,11 @@ dashaChip: {
   },
   elementLabel: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
   },
   elementValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#ffd700',
   },
   moonPhaseTextRow: {
     flexDirection: 'row',
@@ -1952,12 +1963,10 @@ dashaChip: {
   moonPhaseText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 4,
   },
   moonIllumination: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   
   // Header Styles

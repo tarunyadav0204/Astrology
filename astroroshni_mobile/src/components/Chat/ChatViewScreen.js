@@ -16,10 +16,12 @@ import Icon from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MessageBubble from './MessageBubble';
 import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 export default function ChatViewScreen({ route, navigation }) {
+  const { theme, colors } = useTheme();
   const { session } = route.params;
   const [messages, setMessages] = useState(session.messages || []);
   
@@ -144,8 +146,8 @@ export default function ChatViewScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
         
         {/* Twinkling Stars */}
         {starAnims.map((anim, index) => {
@@ -173,7 +175,7 @@ export default function ChatViewScreen({ route, navigation }) {
           {/* Header */}
           <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Icon name="arrow-back" size={24} color={COLORS.white} />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             
             <View style={styles.headerInfo}>
@@ -187,31 +189,31 @@ export default function ChatViewScreen({ route, navigation }) {
               </View>
               <View style={styles.headerTextContainer}>
                 {session.native_name && (
-                  <Text style={styles.nativeName}>{session.native_name}</Text>
+                  <Text style={[styles.nativeName, { color: colors.text }]}>{session.native_name}</Text>
                 )}
-                <Text style={styles.headerTitle}>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
                   {getRelativeTime(session.created_at)}
                 </Text>
-                <Text style={styles.headerSubtitle}>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                   {conversationCount} {conversationCount === 1 ? 'conversation' : 'conversations'}
                 </Text>
               </View>
             </View>
             
             <TouchableOpacity style={styles.shareButton} onPress={shareChat}>
-              <Icon name="share-outline" size={24} color={COLORS.white} />
+              <Icon name="share-outline" size={24} color={colors.text} />
             </TouchableOpacity>
           </Animated.View>
 
           {/* Info Card */}
           <Animated.View style={[styles.infoCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <LinearGradient
-              colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+              colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
               style={styles.infoGradient}
             >
               <View style={styles.infoItem}>
-                <Icon name="calendar-outline" size={16} color="rgba(255, 255, 255, 0.8)" />
-                <Text style={styles.infoText}>
+                <Icon name="calendar-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {(() => {
                     const firstMsg = messages.find(m => m.sender === 'user');
                     const timestamp = firstMsg?.timestamp || session.created_at;
@@ -227,8 +229,8 @@ export default function ChatViewScreen({ route, navigation }) {
               </View>
               <View style={styles.infoDivider} />
               <View style={styles.infoItem}>
-                <Icon name="time-outline" size={16} color="rgba(255, 255, 255, 0.8)" />
-                <Text style={styles.infoText}>
+                <Icon name="time-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {(() => {
                     const firstMsg = messages.find(m => m.sender === 'user');
                     const timestamp = firstMsg?.timestamp || session.created_at;
@@ -250,8 +252,8 @@ export default function ChatViewScreen({ route, navigation }) {
               </View>
               <View style={styles.infoDivider} />
               <View style={styles.infoItem}>
-                <Icon name="chatbubbles-outline" size={16} color="rgba(255, 255, 255, 0.8)" />
-                <Text style={styles.infoText}>{conversationCount}</Text>
+                <Icon name="chatbubbles-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>{conversationCount}</Text>
               </View>
             </LinearGradient>
           </Animated.View>
@@ -317,7 +319,7 @@ export default function ChatViewScreen({ route, navigation }) {
                 colors={['rgba(255, 107, 53, 0.6)', 'rgba(255, 140, 90, 0.5)']}
                 style={styles.floatingButtonGradient}
               >
-                <Icon name="share-outline" size={20} color={COLORS.white} />
+                <Icon name="share-outline" size={20} color={colors.text} />
                 <Text style={styles.floatingButtonText}>Share</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -328,9 +330,9 @@ export default function ChatViewScreen({ route, navigation }) {
                   colors={['#ff6b35', '#ff8c5a']}
                   style={styles.floatingButtonGradient}
                 >
-                  <Icon name="chatbubbles" size={20} color={COLORS.white} />
+                  <Icon name="chatbubbles" size={20} color={colors.text} />
                   <Text style={styles.floatingButtonTextPrimary}>Continue Chat</Text>
-                  <Icon name="arrow-forward" size={20} color={COLORS.white} />
+                  <Icon name="arrow-forward" size={20} color={colors.text} />
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>

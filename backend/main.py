@@ -44,6 +44,7 @@ from health.health_routes import router as health_router
 from wealth.wealth_routes import router as wealth_router
 from chat.chat_routes import router as chat_router
 from chat.feedback_routes import router as chat_feedback_router
+from calculators.event_predictor.routes import router as event_prediction_router
 from nakshatra.nakshatra_routes import router as nakshatra_router
 from festivals.routes import router as festivals_router
 from chat_history.routes import router as chat_history_router, init_chat_tables
@@ -251,6 +252,7 @@ app.include_router(mundane_router)
 app.include_router(financial_router)
 app.include_router(karma_router, prefix="/api", tags=["karma"])
 app.include_router(ashtakavarga_router, prefix="/api", tags=["ashtakavarga"])
+app.include_router(event_prediction_router)
 
 
 

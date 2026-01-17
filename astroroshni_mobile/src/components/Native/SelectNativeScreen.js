@@ -20,8 +20,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 
-const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMore, getZodiacSign }) => {
+const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMore, getZodiacSign, theme, colors }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const [isRevealed, setIsRevealed] = useState(false);
 
@@ -103,9 +104,11 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
             colors={
               selectedProfile === profile.name
                 ? ['rgba(255, 107, 53, 0.3)', 'rgba(255, 107, 53, 0.1)']
-                : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+                : theme === 'dark' 
+                  ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+                  : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']
             }
-            style={styles.cardGradient}
+            style={[styles.cardGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
           >
             <View style={styles.profileInfo}>
               <View style={styles.profileLeft}>
@@ -114,14 +117,14 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
                 </View>
                 <View style={styles.profileDetails}>
                   <View style={styles.nameRow}>
-                    <Text style={styles.profileName}>{profile.name}</Text>
+                    <Text style={[styles.profileName, { color: colors.text }]}>{profile.name}</Text>
                     {profile.isSelf && (
                       <View style={styles.selfBadge}>
                         <Text style={styles.selfBadgeText}>You</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={styles.profileDate}>
+                  <Text style={[styles.profileDate, { color: colors.textSecondary }]}>
                     {new Date(profile.date).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -129,7 +132,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
                     })} • {profile.time}
                   </Text>
                   {profile.place && (
-                    <Text style={styles.profilePlace}>📍 {profile.place}</Text>
+                    <Text style={[styles.profilePlace, { color: colors.textSecondary }]}>📍 {profile.place}</Text>
                   )}
                 </View>
               </View>
@@ -137,7 +140,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
                 {selectedProfile === profile.name ? (
                   <Ionicons name="checkmark-circle" size={24} color="#ff6b35" />
                 ) : (
-                  <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 )}
               </View>
             </View>
@@ -149,6 +152,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
 };
 
 export default function SelectNativeScreen({ navigation, route }) {
+  const { theme, colors } = useTheme();
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [profileCharts, setProfileCharts] = useState({});
@@ -417,22 +421,22 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} translucent={false} />
       <LinearGradient
-        colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+        colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => returnTo ? navigation.navigate(returnTo) : navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Select Native</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Select Native</Text>
             <TouchableOpacity 
               onPress={() => navigation.navigate('BirthForm')} 
               style={styles.addButton}
             >
-              <Ionicons name="add" size={24} color={COLORS.white} />
+              <Ionicons name="add" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -441,10 +445,10 @@ export default function SelectNativeScreen({ navigation, route }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : returnTo === 'KarmaAnalysis' ? 'Select native for karma analysis' : 'Choose a profile for astrological analysis'}
             </Text>
-            <Text style={styles.instructionText}>👈 Swipe left for options</Text>
+            <Text style={[styles.instructionText, { color: colors.textSecondary }]}>👈 Swipe left for options</Text>
 
             {profiles.map((profile) => (
               <SwipeableProfileCard
@@ -455,14 +459,16 @@ export default function SelectNativeScreen({ navigation, route }) {
                 onEdit={handleEdit}
                 onMore={handleMore}
                 getZodiacSign={getZodiacSign}
+                theme={theme}
+                colors={colors}
               />
             ))}
 
             {profiles.length === 0 && (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>👤</Text>
-                <Text style={styles.emptyTitle}>No Profiles Found</Text>
-                <Text style={styles.emptyText}>Add your birth details to get started</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No Profiles Found</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Add your birth details to get started</Text>
                 <TouchableOpacity 
                   style={styles.addProfileButton}
                   onPress={() => navigation.navigate('BirthForm')}
@@ -491,12 +497,12 @@ export default function SelectNativeScreen({ navigation, route }) {
           activeOpacity={1} 
           onPress={closeBottomSheet}
         >
-          <View style={styles.bottomSheet}>
+          <View style={[styles.bottomSheet, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
             <View style={styles.bottomSheetHandle} />
-            <Text style={styles.bottomSheetTitle}>Options</Text>
+            <Text style={[styles.bottomSheetTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Options</Text>
             
             <TouchableOpacity 
-              style={styles.bottomSheetItem}
+              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -505,11 +511,11 @@ export default function SelectNativeScreen({ navigation, route }) {
               }}
             >
               <Ionicons name="person" size={22} color="#2196F3" />
-              <Text style={styles.bottomSheetItemText}>Connect to My Profile</Text>
+              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Connect to My Profile</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.bottomSheetItem}
+              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -518,11 +524,11 @@ export default function SelectNativeScreen({ navigation, route }) {
               }}
             >
               <Ionicons name="share-social" size={22} color="#4CAF50" />
-              <Text style={styles.bottomSheetItemText}>Share</Text>
+              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Share</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.bottomSheetItem}
+              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
               onPress={() => {
                 closeBottomSheet();
                 if (selectedProfileForMenu) {
@@ -531,14 +537,14 @@ export default function SelectNativeScreen({ navigation, route }) {
               }}
             >
               <Ionicons name="trash" size={22} color="#f44336" />
-              <Text style={styles.bottomSheetItemText}>Delete</Text>
+              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Delete</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.bottomSheetCancel}
               onPress={closeBottomSheet}
             >
-              <Text style={styles.bottomSheetCancelText}>Cancel</Text>
+              <Text style={[styles.bottomSheetCancelText, { color: colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -555,26 +561,27 @@ export default function SelectNativeScreen({ navigation, route }) {
         }}
       >
         <View style={styles.shareModalOverlay}>
-          <View style={styles.shareModalContent}>
+          <View style={[styles.shareModalContent, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
             <View style={styles.shareModalHeader}>
-              <Text style={styles.shareModalTitle}>Share Chart</Text>
+              <Text style={[styles.shareModalTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Share Chart</Text>
               <TouchableOpacity onPress={() => {
                 setShowShareModal(false);
                 setSearchQuery('');
                 setSearchResults([]);
                 setSelectedProfileForMenu(null);
               }}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.shareModalSubtitle}>Search user by name or phone (min 4 characters)</Text>
+            <Text style={[styles.shareModalSubtitle, { color: colors.textSecondary }]}>Search user by name or phone (min 4 characters)</Text>
 
-            <View style={styles.searchInputContainer}>
+            <View style={[styles.searchInputContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}>
               <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Type name or phone number..."
+                placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={(text) => {
                   setSearchQuery(text);
@@ -587,17 +594,17 @@ export default function SelectNativeScreen({ navigation, route }) {
 
             <View style={styles.searchResultsContainer}>
               {searchQuery.length < 4 && (
-                <Text style={styles.searchHint}>Type at least 4 characters to search</Text>
+                <Text style={[styles.searchHint, { color: colors.textSecondary }]}>Type at least 4 characters to search</Text>
               )}
               
               {searchQuery.length >= 4 && searchResults.length === 0 && !searching && (
-                <Text style={styles.noResults}>No users found</Text>
+                <Text style={[styles.noResults, { color: colors.textSecondary }]}>No users found</Text>
               )}
 
               {searchResults.length > 0 && searchResults.map((user) => (
                 <TouchableOpacity
                   key={user.userid}
-                  style={styles.userResultItem}
+                  style={[styles.userResultItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f9f9f9' }]}
                   onPress={() => handleShareWithUser(user)}
                   disabled={sharing}
                 >
@@ -606,8 +613,8 @@ export default function SelectNativeScreen({ navigation, route }) {
                       <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <View>
-                      <Text style={styles.userResultName}>{user.name}</Text>
-                      <Text style={styles.userResultPhone}>****{user.phone}</Text>
+                      <Text style={[styles.userResultName, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>{user.name}</Text>
+                      <Text style={[styles.userResultPhone, { color: colors.textSecondary }]}>****{user.phone}</Text>
                     </View>
                   </View>
                   {sharing ? (
@@ -646,8 +653,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { 
     fontSize: 20, 
-    fontWeight: '700', 
-    color: COLORS.white 
+    fontWeight: '700'
   },
   addButton: { 
     width: 40, 
@@ -661,13 +667,11 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     marginBottom: 8,
   },
   instructionText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     marginBottom: 24,
     fontStyle: 'italic',
@@ -731,7 +735,6 @@ const styles = StyleSheet.create({
   bottomSheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1a1a1a',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -746,7 +749,6 @@ const styles = StyleSheet.create({
   },
   bottomSheetItemText: {
     fontSize: 16,
-    color: '#1a1a1a',
     marginLeft: 16,
     fontWeight: '600',
   },
@@ -757,7 +759,6 @@ const styles = StyleSheet.create({
   },
   bottomSheetCancelText: {
     fontSize: 16,
-    color: '#666',
     fontWeight: '600',
   },
   shareModalOverlay: {
@@ -783,11 +784,9 @@ const styles = StyleSheet.create({
   shareModalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1a1a1a',
   },
   shareModalSubtitle: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 16,
   },
   searchInputContainer: {
@@ -805,20 +804,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1a1a1a',
   },
   searchResultsContainer: {
     minHeight: 200,
   },
   searchHint: {
     textAlign: 'center',
-    color: '#999',
     fontSize: 14,
     marginTop: 20,
   },
   noResults: {
     textAlign: 'center',
-    color: '#999',
     fontSize: 14,
     marginTop: 20,
   },
@@ -854,11 +850,9 @@ const styles = StyleSheet.create({
   userResultName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
   },
   userResultPhone: {
     fontSize: 12,
-    color: '#666',
     marginTop: 2,
   },
   selectedCard: {
@@ -905,7 +899,6 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
     marginRight: 8,
   },
   selfBadge: {
@@ -921,12 +914,10 @@ const styles = StyleSheet.create({
   },
   profileDate: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: 2,
   },
   profilePlace: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
   },
   profileRight: {
     marginLeft: 16,
@@ -942,12 +933,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     marginBottom: 24,
   },

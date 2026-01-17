@@ -33,6 +33,7 @@ import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
+import { useTheme } from '../../context/ThemeContext';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -45,6 +46,7 @@ const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
 export default function ChatScreen({ navigation, route }) {
+  const { theme, colors } = useTheme();
   const { credits, partnershipCost, fetchBalance } = useCredits();
   
   // Mundane mode state
@@ -1308,14 +1310,14 @@ export default function ChatScreen({ navigation, route }) {
       style={styles.suggestionButton}
       onPress={() => setInputText(item)}
     >
-      <Text style={styles.suggestionText}>{item}</Text>
+      <Text style={[styles.suggestionText, { color: colors.text }]}>{item}</Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" translucent={false} />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradientBg}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradientBg}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
@@ -1325,30 +1327,37 @@ export default function ChatScreen({ navigation, route }) {
         {/* Header */}
         <View style={styles.headerContainer}>
           <LinearGradient
-            colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-            style={styles.header}
+            colors={theme === 'dark' 
+              ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+              : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
+            style={[
+              styles.header,
+              {
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+              }
+            ]}
           >
             {!showGreeting && (
               <TouchableOpacity
-                style={styles.backButton}
+                style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
                 onPress={() => {
                   setShowGreeting(true);
                   if (isMundane) setIsMundane(false);
                 }}
               >
-                <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+                <Ionicons name="arrow-back" size={20} color={colors.text} />
               </TouchableOpacity>
             )}
             
             <View style={styles.headerCenter}>
               {showGreeting ? (
                 <>
-                  <Text style={styles.headerTitle}>🌟 AstroRoshni</Text>
+                  <Text style={[styles.headerTitle, { color: colors.text }]}>🌟 AstroRoshni</Text>
                   {birthData && (
                     <NativeSelectorChip 
                       birthData={birthData}
                       onPress={() => navigation.navigate('SelectNative')}
-                      maxLength={8}
+                      maxLength={7}
                     />
                   )}
                 </>
@@ -1358,7 +1367,7 @@ export default function ChatScreen({ navigation, route }) {
                     onPress={() => setShowCountryPicker(true)} 
                     style={[styles.nameChip, styles.compactChip]}
                   >
-                    <Text style={styles.compactChipText}>
+                    <Text style={[styles.compactChipText, { color: colors.textSecondary }]}>
                       {selectedCountry.name}
                     </Text>
                   </TouchableOpacity>
@@ -1366,19 +1375,19 @@ export default function ChatScreen({ navigation, route }) {
                     onPress={() => setShowYearPicker(true)} 
                     style={[styles.nameChip, styles.compactChip]}
                   >
-                    <Text style={styles.compactChipText}>
+                    <Text style={[styles.compactChipText, { color: colors.textSecondary }]}>
                       {selectedYear}
                     </Text>
                   </TouchableOpacity>
                 </View>
               ) : !partnershipMode ? (
                 <>
-                  <Text style={styles.headerTitle}>Chat</Text>
+                  <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
                   {birthData && (
                     <NativeSelectorChip 
                       birthData={birthData}
                       onPress={() => navigation.navigate('SelectNative')}
-                      maxLength={12}
+                      maxLength={7}
                     />
                   )}
                 </>
@@ -1415,7 +1424,7 @@ export default function ChatScreen({ navigation, route }) {
                 style={[styles.creditButton, isPremiumAnalysis && styles.creditButtonPremium]}
                 onPress={() => navigation.navigate('Credits')}
               >
-                <Text style={styles.creditText}>
+                <Text style={[styles.creditText, { color: colors.text }]}>
                   {isPremiumAnalysis ? '⚡' : '💳'} {credits}
                 </Text>
               </TouchableOpacity>
@@ -1436,7 +1445,7 @@ export default function ChatScreen({ navigation, route }) {
                   });
                 }}
               >
-                <Ionicons name="menu" size={20} color={COLORS.white} />
+                <Ionicons name="menu" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -1466,7 +1475,7 @@ export default function ChatScreen({ navigation, route }) {
                 colors={['#ec4899', '#f472b6']}
                 style={styles.partnershipBadgeGradient}
               >
-                <Text style={styles.partnershipBadgeText}>👥 Partnership Mode</Text>
+                <Text style={[styles.partnershipBadgeText, { color: colors.text }]}>👥 Partnership Mode</Text>
                 <Ionicons name="close-circle" size={16} color={COLORS.white} style={styles.partnershipBadgeIcon} />
               </LinearGradient>
             </TouchableOpacity>
@@ -1490,26 +1499,26 @@ export default function ChatScreen({ navigation, route }) {
             {birthData && (
               <View style={styles.signsContainer}>
                 <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
+                  colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
                   style={styles.signsGradient}
                 >
-                  <Text style={styles.signsTitle}>✨ {birthData.name}'s Chart Essence</Text>
+                  <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {birthData.name}'s Chart Essence</Text>
                   <View style={styles.signsRow}>
                     <View style={styles.signItem}>
-                      <Text style={styles.signLabel}>☀️ Sun</Text>
-                      <Text style={styles.signValue}>
+                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ Sun</Text>
+                      <Text style={[styles.signValue, { color: colors.text }]}>
                         {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}
                       </Text>
                     </View>
                     <View style={styles.signItem}>
-                      <Text style={styles.signLabel}>🌙 Moon</Text>
-                      <Text style={styles.signValue}>
+                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 Moon</Text>
+                      <Text style={[styles.signValue, { color: colors.text }]}>
                         {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}
                       </Text>
                     </View>
                     <View style={styles.signItem}>
-                      <Text style={styles.signLabel}>⬆️ Ascendant</Text>
-                      <Text style={styles.signValue}>
+                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ Ascendant</Text>
+                      <Text style={[styles.signValue, { color: colors.text }]}>
                         {loadingChart ? '...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}
                       </Text>
                     </View>
@@ -1535,13 +1544,17 @@ export default function ChatScreen({ navigation, route }) {
                           const endDate = new Date(dasha.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
                           return (
                             <TouchableOpacity 
-                              style={[styles.dashaChip, { backgroundColor: planetColor + '20', borderColor: planetColor }]}
+                              style={[styles.dashaChip, { 
+                                backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
+                                borderColor: planetColor,
+                                borderWidth: 2
+                              }]}
                               onPress={() => setShowDashaBrowser(true)}
                               activeOpacity={0.8}
                             >
                               <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
-                              <Text style={styles.dashaChipDates}>{startDate}</Text>
-                              <Text style={styles.dashaChipDates}>{endDate}</Text>
+                              <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
+                              <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                             </TouchableOpacity>
                           );
                         }}
@@ -1598,7 +1611,7 @@ export default function ChatScreen({ navigation, route }) {
                     colors={['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']}
                     style={styles.suggestionChipGradient}
                   >
-                    <Text style={styles.suggestionChipText}>{item}</Text>
+                    <Text style={[styles.suggestionChipText, { color: colors.text }]}>{item}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               ))}
@@ -1612,15 +1625,15 @@ export default function ChatScreen({ navigation, route }) {
         {!showGreeting && (
           <View style={styles.unifiedInputContainer}>
             <LinearGradient
-              colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-              style={styles.inputBarGradient}
+              colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+              style={[styles.inputBarGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
             >
               <TextInput
-                style={styles.modernTextInput}
+                style={[styles.modernTextInput, { color: colors.text }]}
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder={loading ? "Analyzing..." : credits < chatCost ? "Insufficient credits" : isMundane ? "Ask about markets, politics, events..." : "Ask me anything..."}
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                placeholderTextColor={theme === 'dark' ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)"}
                 maxLength={500}
                 editable={!loading && credits >= chatCost}
                 multiline
@@ -1731,32 +1744,32 @@ export default function ChatScreen({ navigation, route }) {
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}
             >
-              <Ionicons name="language-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.quickActionText}>Language</Text>
+              <Ionicons name="language-outline" size={18} color={colors.text} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Language</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('Chart', { birthData })}
             >
-              <Ionicons name="pie-chart-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.quickActionText}>Chart</Text>
+              <Ionicons name="pie-chart-outline" size={18} color={colors.text} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Chart</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => setShowDashaBrowser(true)}
             >
-              <Ionicons name="time-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.quickActionText}>Dasha</Text>
+              <Ionicons name="time-outline" size={18} color={colors.text} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Dasha</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('ChatHistory')}
             >
-              <Ionicons name="chatbubbles-outline" size={18} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.quickActionText}>History</Text>
+              <Ionicons name="chatbubbles-outline" size={18} color={colors.text} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>History</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1826,7 +1839,7 @@ export default function ChatScreen({ navigation, route }) {
               onStartShouldSetResponder={() => true}
             >
               <LinearGradient
-                colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+                colors={theme === 'dark' ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35'] : ['#fefcfb', '#fefcfb', '#fefcfb', '#fefcfb']}
                 style={styles.drawerGradient}
               >
                 <View style={styles.drawerHeader}>
@@ -1840,8 +1853,8 @@ export default function ChatScreen({ navigation, route }) {
                       <Text style={styles.orbIconSmall}>🔮</Text>
                     </LinearGradient>
                   </View>
-                  <Text style={styles.drawerTitle}>Cosmic Menu</Text>
-                  <Text style={styles.drawerSubtitle}>Navigate Your Journey</Text>
+                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Cosmic Menu</Text>
+                  <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>Navigate Your Journey</Text>
                 </View>
 
                 <ScrollView 
@@ -1865,8 +1878,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -1876,8 +1889,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>✨</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>My Profile</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>My Profile</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -1895,8 +1908,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -1906,8 +1919,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>👤</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Select Native</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Select Native</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -1925,8 +1938,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -1936,8 +1949,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>➕</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>New Native</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>New Native</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -1955,8 +1968,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -1966,8 +1979,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>📊</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>View Chart</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>View Chart</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -1985,8 +1998,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -1996,8 +2009,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Dasha Browser</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Dasha Browser</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2015,8 +2028,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2026,8 +2039,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⊞</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Ashtakvarga</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Ashtakvarga</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2045,8 +2058,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2056,8 +2069,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Life Analysis</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Life Analysis</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2075,8 +2088,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2086,8 +2099,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🕉️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Past Life Regression</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Past Life Regression</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2105,8 +2118,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2116,8 +2129,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🔢</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Numerology</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Numerology</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2135,19 +2148,19 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
                           colors={['#667eea', '#764ba2']}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🔢</Text>
+                          <Text style={styles.menuEmoji}>💬</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Numerology</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Chat History</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2191,7 +2204,7 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <LinearGradient
                         colors={partnershipMode ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.menuGradient}
+                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
@@ -2201,8 +2214,8 @@ export default function ChatScreen({ navigation, route }) {
                             <Text style={styles.menuEmoji}>👥</Text>
                           </LinearGradient>
                         </View>
-                        <Text style={styles.menuText}>Partnership {partnershipMode ? 'ON' : 'OFF'}</Text>
-                        <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Partnership {partnershipMode ? 'ON' : 'OFF'}</Text>
+                        <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
@@ -2221,8 +2234,8 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                      style={styles.menuGradient}
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2232,8 +2245,8 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>💳</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={styles.menuText}>Credits</Text>
-                      <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.6)" />
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Credits</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -2252,7 +2265,7 @@ export default function ChatScreen({ navigation, route }) {
                   >
                     <LinearGradient
                       colors={['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
-                      style={styles.menuGradient}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2262,7 +2275,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🚪</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: '#ff6b60' }]}>Logout</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ff6b60' : '#dc2626' }]}>Logout</Text>
                       <Ionicons name="chevron-forward" size={20} color="rgba(255, 107, 96, 0.6)" />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2638,7 +2651,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 2,
   },
@@ -2652,7 +2664,6 @@ const styles = StyleSheet.create({
   nameChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
   partnershipChipsContainer: {
@@ -2675,7 +2686,6 @@ const styles = StyleSheet.create({
   compactChipText: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
   headerRight: {
@@ -2696,7 +2706,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 0, 0.4)',
   },
   creditText: {
-    color: COLORS.white,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -3034,7 +3043,6 @@ const styles = StyleSheet.create({
   drawerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 6,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -3043,7 +3051,6 @@ const styles = StyleSheet.create({
   },
   drawerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
   menuScrollView: {
@@ -3115,7 +3122,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
   },
   modalCloseButton: {
     backgroundColor: COLORS.accent,
@@ -3508,7 +3514,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   tooltipButtonText: {
-    color: '#fff',
+    color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -3537,7 +3543,7 @@ const styles = StyleSheet.create({
     borderColor: '#1a0033',
   },
   premiumBadgeText: {
-    color: '#fff',
+    color: COLORS.white,
     fontSize: 10,
     fontWeight: 'bold',
   },

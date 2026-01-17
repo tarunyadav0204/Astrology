@@ -19,10 +19,12 @@ import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AshtakvargaChart from './AshtakvargaChart';
 import DateNavigator from '../Common/DateNavigator';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function AshtakvargaOracle({ navigation }) {
+  const { theme, colors } = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [birthData, setBirthData] = useState(null);
   const [oracleData, setOracleData] = useState(null);
@@ -241,8 +243,8 @@ export default function AshtakvargaOracle({ navigation }) {
             end={{ x: 1, y: 1 }}
           >
             <Animated.View style={[styles.weatherContent, { transform: [{ scale: pulseAnim }] }]}>
-              <Text style={styles.cosmicTheme}>{weather.theme}</Text>
-              <Text style={styles.cosmicSubtext}>Today's Cosmic Pulse</Text>
+              <Text style={[styles.cosmicTheme, { color: colors.text }]}>{weather.theme}</Text>
+              <Text style={[styles.cosmicSubtext, { color: colors.textSecondary }]}>Today's Cosmic Pulse</Text>
               <View style={styles.strengthIndicator}>
                 <Text style={styles.strengthValue}>{Math.round((oracleData.ashtakavarga.total_bindus / 337) * 100)}%</Text>
                 <Text style={styles.strengthLabel}>Cosmic Alignment</Text>
@@ -253,12 +255,12 @@ export default function AshtakvargaOracle({ navigation }) {
 
         <Animated.View style={[styles.narrativeCard, { opacity: fadeAnim }]}>
           <LinearGradient
-            colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+            colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
             style={styles.narrativeGradient}
           >
-            <Text style={styles.narrativeTitle}>Today's Oracle</Text>
+            <Text style={[styles.narrativeTitle, { color: colors.text }]}>Today's Oracle</Text>
             {completeOracleData ? (
-              <Text style={styles.narrativeText}>
+              <Text style={[styles.narrativeText, { color: colors.textSecondary }]}>
                 {completeOracleData.oracle_message}
               </Text>
             ) : (
@@ -281,12 +283,12 @@ export default function AshtakvargaOracle({ navigation }) {
         </Animated.View>
 
         <View style={styles.powerActionsContainer}>
-          <Text style={styles.powerActionsTitle}>Power Actions</Text>
+          <Text style={[styles.powerActionsTitle, { color: colors.text }]}>Power Actions</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsContainer}>
             {(completeOracleData?.power_actions || []).map((action, index) => (
               <TouchableOpacity key={index} style={[styles.actionPill, action.type === 'avoid' ? styles.avoidPill : styles.doPill]}>
                 <Text style={styles.pillIcon}>{action.type === 'avoid' ? '🔴' : '🟢'}</Text>
-                <Text style={styles.pillText}>{action.text}</Text>
+                <Text style={[styles.pillText, { color: colors.text }]}>{action.text}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -301,10 +303,10 @@ export default function AshtakvargaOracle({ navigation }) {
     }
 
     return (
-      <View style={styles.tabContent}>
+      <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
         <View style={styles.titleContainer}>
-          <Text style={styles.mapTitle}>Sarvashtakvarga Chart</Text>
-          <Text style={styles.mapSubtitle}>Tap any house to see its cosmic strength</Text>
+          <Text style={[styles.mapTitle, { color: colors.text }]}>Sarvashtakvarga Chart</Text>
+          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>Tap any house to see its cosmic strength</Text>
         </View>
         
         <DateNavigator 
@@ -314,7 +316,7 @@ export default function AshtakvargaOracle({ navigation }) {
           resetDate={birthData ? new Date(birthData.date) : new Date()}
         />
         
-        <View style={styles.chartContainer}>
+        <View style={[styles.chartContainer, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)', borderRadius: 16 }]}>
           <AshtakvargaChart 
             chartData={oracleData.chart_data}
             ashtakvargaData={oracleData.chart_ashtakavarga}
@@ -327,7 +329,7 @@ export default function AshtakvargaOracle({ navigation }) {
         </View>
 
         <View style={styles.planetaryToggle}>
-          <Text style={styles.toggleTitle}>Bhinnashtakvarga Charts</Text>
+          <Text style={[styles.toggleTitle, { color: colors.text }]}>Bhinnashtakvarga Charts</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].map(planet => {
               const planetChart = oracleData?.ashtakavarga?.individual_charts?.[planet];
@@ -335,12 +337,12 @@ export default function AshtakvargaOracle({ navigation }) {
               return (
                 <TouchableOpacity 
                   key={planet} 
-                  style={styles.planetButton}
+                  style={[styles.planetButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.15)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
                   onPress={() => openPlanetChart(planet, planetChart)}
                 >
                   <Text style={styles.planetIcon}>{getPlanetIcon(planet)}</Text>
-                  <Text style={styles.planetName}>{planet}</Text>
-                  <Text style={styles.planetBindus}>{totalBindus}</Text>
+                  <Text style={[styles.planetName, { color: colors.text }]}>{planet}</Text>
+                  <Text style={[styles.planetBindus, { color: colors.primary }]}>{totalBindus}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -396,7 +398,7 @@ export default function AshtakvargaOracle({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -571,11 +573,11 @@ export default function AshtakvargaOracle({ navigation }) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d']} style={styles.loadingGradient}>
+        <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd] : [colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.loadingGradient}>
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <Text style={styles.loadingText}>🔮</Text>
           </Animated.View>
-          <Text style={styles.loadingSubtext}>Consulting the Oracle...</Text>
+          <Text style={[styles.loadingSubtext, { color: colors.text }]}>Consulting the Oracle...</Text>
         </LinearGradient>
       </View>
     );
@@ -583,14 +585,14 @@ export default function AshtakvargaOracle({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d']} style={styles.gradient}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Ashtakvarga Oracle</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Ashtakvarga</Text>
             <View style={styles.headerRight} />
           </View>
 
@@ -612,58 +614,58 @@ export default function AshtakvargaOracle({ navigation }) {
                     style={styles.closeButton}
                     onPress={() => setShowLifePredictions(false)}
                   >
-                    <Ionicons name="close" size={24} color={COLORS.white} />
+                    <Ionicons name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                   
                   <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text style={styles.predictionsTitle}>Life Predictions</Text>
-                    <Text style={styles.predictionsSubtitle}>{lifePredictions?.methodology || "Vinay Aditya's Dots of Destiny"}</Text>
+                    <Text style={[styles.predictionsTitle, { color: colors.text }]}>Life Predictions</Text>
+                    <Text style={[styles.predictionsSubtitle, { color: colors.primary }]}>{lifePredictions?.methodology || "Vinay Aditya's Dots of Destiny"}</Text>
                     
                     <View style={styles.predictionsContent}>
                       {lifePredictions?.predictions?.current_life_phase && (
                         <>
-                          <Text style={styles.sectionTitle}>Current Life Phase</Text>
-                          <Text style={styles.sectionText}>{lifePredictions.predictions.current_life_phase}</Text>
+                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Current Life Phase</Text>
+                          <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{lifePredictions.predictions.current_life_phase}</Text>
                         </>
                       )}
                       
                       {lifePredictions?.predictions?.sav_strength_analysis?.strong_areas && (
                         <>
-                          <Text style={styles.sectionTitle}>Strong Areas</Text>
+                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Strong Areas</Text>
                           {lifePredictions.predictions.sav_strength_analysis.strong_areas.map((area, index) => (
-                            <Text key={index} style={styles.bulletPoint}>• {area}</Text>
+                            <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {area}</Text>
                           ))}
                         </>
                       )}
                       
                       {lifePredictions?.predictions?.sav_strength_analysis?.challenging_areas && (
                         <>
-                          <Text style={styles.sectionTitle}>Challenging Areas</Text>
+                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Challenging Areas</Text>
                           {lifePredictions.predictions.sav_strength_analysis.challenging_areas.map((area, index) => (
-                            <Text key={index} style={styles.bulletPoint}>• {area}</Text>
+                            <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {area}</Text>
                           ))}
                         </>
                       )}
                       
                       {lifePredictions?.predictions?.life_predictions?.next_6_months && (
                         <>
-                          <Text style={styles.sectionTitle}>Next 6 Months</Text>
-                          <Text style={styles.sectionText}>{lifePredictions.predictions.life_predictions.next_6_months}</Text>
+                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Next 6 Months</Text>
+                          <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{lifePredictions.predictions.life_predictions.next_6_months}</Text>
                         </>
                       )}
                       
                       {lifePredictions?.predictions?.life_predictions?.next_year && (
                         <>
-                          <Text style={styles.sectionTitle}>Next Year</Text>
-                          <Text style={styles.sectionText}>{lifePredictions.predictions.life_predictions.next_year}</Text>
+                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Next Year</Text>
+                          <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{lifePredictions.predictions.life_predictions.next_year}</Text>
                         </>
                       )}
                       
                       {lifePredictions?.predictions?.remedial_measures && (
                         <>
-                          <Text style={styles.sectionTitle}>Remedial Measures</Text>
+                          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Remedial Measures</Text>
                           {lifePredictions.predictions.remedial_measures.map((remedy, index) => (
-                            <Text key={index} style={styles.bulletPoint}>• {remedy}</Text>
+                            <Text key={index} style={[styles.bulletPoint, { color: colors.textSecondary }]}>• {remedy}</Text>
                           ))}
                         </>
                       )}
@@ -684,9 +686,17 @@ export default function AshtakvargaOracle({ navigation }) {
             }}
           >
             <View style={styles.modalOverlay}>
+              <TouchableOpacity 
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                activeOpacity={1}
+                onPress={() => {
+                  setShowSecretScroll(false);
+                  setYearlyStrength(null);
+                }}
+              />
               <View style={styles.secretScroll}>
                 <LinearGradient
-                  colors={['rgba(26, 0, 51, 0.95)', 'rgba(45, 27, 78, 0.9)']}
+                  colors={theme === 'dark' ? ['rgba(26, 0, 51, 0.95)', 'rgba(45, 27, 78, 0.9)'] : ['rgba(254, 252, 251, 0.98)', 'rgba(254, 252, 251, 0.95)']}
                   style={styles.scrollGradient}
                 >
                   <TouchableOpacity 
@@ -696,41 +706,41 @@ export default function AshtakvargaOracle({ navigation }) {
                       setYearlyStrength(null);
                     }}
                   >
-                    <Ionicons name="close" size={24} color={COLORS.white} />
+                    <Ionicons name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                   
                   {selectedPillar?.type === 'planet' ? (
                     <>
-                      <Text style={styles.scrollTitle}>
+                      <Text style={[styles.scrollTitle, { color: colors.text }]}>
                         {selectedPillar.planet} Bhinnashtakvarga
                       </Text>
-                      <Text style={styles.scrollBindus}>
+                      <Text style={[styles.scrollBindus, { color: colors.primary }]}>
                         {selectedPillar.planetChart.total} Total Points
                       </Text>
                       <View style={styles.planetChartGrid}>
                         {Object.entries(selectedPillar.planetChart.bindus).map(([sign, bindus]) => {
                           const signs = ['Ari', 'Tau', 'Gem', 'Can', 'Leo', 'Vir', 'Lib', 'Sco', 'Sag', 'Cap', 'Aqu', 'Pis'];
                           return (
-                            <View key={sign} style={styles.miniPillar}>
-                              <Text style={styles.miniBindus}>{bindus}</Text>
-                              <Text style={styles.miniSign}>{signs[parseInt(sign)]}</Text>
+                            <View key={sign} style={[styles.miniPillar, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.15)', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}>
+                              <Text style={[styles.miniBindus, { color: colors.primary }]}>{bindus}</Text>
+                              <Text style={[styles.miniSign, { color: colors.textSecondary }]}>{signs[parseInt(sign)]}</Text>
                             </View>
                           );
                         })}
                       </View>
-                      <Text style={styles.scrollDescription}>
+                      <Text style={[styles.scrollDescription, { color: colors.textSecondary }]}>
                         This shows where {selectedPillar.planet} receives support from other planets. Higher numbers indicate stronger beneficial influences in those zodiac signs.
                       </Text>
                     </>
                   ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
-                      <Text style={styles.scrollTitle}>
+                      <Text style={[styles.scrollTitle, { color: colors.text }]}>
                         {selectedPillar?.sign || 'Unknown'} Sector
                       </Text>
-                      <Text style={styles.scrollBindus}>
+                      <Text style={[styles.scrollBindus, { color: colors.primary }]}>
                         {selectedPillar?.bindus || 0} Cosmic Points
                       </Text>
-                      <Text style={styles.scrollDescription}>
+                      <Text style={[styles.scrollDescription, { color: colors.textSecondary }]}>
                         {completeOracleData?.pillar_insights?.[selectedPillar?.index] || 
                          (selectedPillar && selectedPillar.bindus >= 30 
                           ? `${selectedPillar.sign} is your fortress of power. With ${selectedPillar.bindus} points, this sector provides strong karmic protection and opportunities for growth.`
@@ -758,7 +768,7 @@ export default function AshtakvargaOracle({ navigation }) {
                       
                       {loadingYearly && (
                         <View style={styles.loadingYearlyContainer}>
-                          <Text style={styles.loadingYearlyText}>Calculating 365 days...</Text>
+                          <Text style={[styles.loadingYearlyText, { color: colors.text }]}>Calculating 365 days...</Text>
                           <View style={styles.progressBar}>
                             <View style={[styles.progressFill, { width: `${yearlyProgress}%` }]} />
                           </View>
@@ -767,26 +777,27 @@ export default function AshtakvargaOracle({ navigation }) {
                       )}
                       
                       {yearlyStrength && (
-                        <View style={styles.yearlyStrengthContainer}>
-                          <Text style={styles.yearlyTitle}>House {yearlyStrength.house} - {yearlyStrength.year} Strength</Text>
-                          <Text style={styles.yearlySubtitle}>Birth Chart: {yearlyStrength.birth_bindus} bindus</Text>
+                        <View style={[styles.yearlyStrengthContainer, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
+                          <Text style={[styles.yearlyTitle, { color: colors.text }]}>House {yearlyStrength.house} - {yearlyStrength.year} Strength</Text>
+                          <Text style={[styles.yearlySubtitle, { color: colors.primary }]}>Birth Chart: {yearlyStrength.birth_bindus} bindus</Text>
                           
                           <ScrollView style={styles.yearlyDataScroll} showsVerticalScrollIndicator={true}>
                             {yearlyStrength.daily_data && yearlyStrength.daily_data.map((day, index) => (
                               <View key={index} style={[
                                 styles.dayRow,
+                                { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)' },
                                 day.category === 'strong' && styles.strongDay,
                                 day.category === 'weak' && styles.weakDay
                               ]}>
-                                <Text style={styles.dayDate}>{day.date}</Text>
-                                <Text style={styles.dayBindus}>{day.bindus} bindus</Text>
+                                <Text style={[styles.dayDate, { color: colors.text }]}>{day.date}</Text>
+                                <Text style={[styles.dayBindus, { color: colors.primary }]}>{day.bindus} bindus</Text>
                                 <Text style={[
                                   styles.dayDiff,
                                   day.difference > 0 ? styles.positiveDiff : styles.negativeDiff
                                 ]}>
                                   {day.difference > 0 ? '+' : ''}{day.difference}
                                 </Text>
-                                <Text style={styles.dayCategory}>{day.category}</Text>
+                                <Text style={[styles.dayCategory, { color: colors.textSecondary }]}>{day.category}</Text>
                               </View>
                             ))}
                           </ScrollView>
@@ -864,7 +875,6 @@ const styles = {
   tabContent: { 
     flex: 1, 
     paddingHorizontal: 20,
-    justifyContent: 'space-between'
   },
   
   titleContainer: {
@@ -1056,15 +1066,16 @@ const styles = {
     marginBottom: 10,
   },
   chartContainer: {
-    flex: 1,
-    maxHeight: height * 0.45, // Responsive height based on screen
-    marginBottom: 10,
+    marginBottom: 2,
     paddingHorizontal: 5,
+    paddingTop: 8,
+    paddingBottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
   
   planetaryToggle: { 
+    marginTop: 16,
     marginBottom: 8,
     paddingVertical: 5
   },
@@ -1102,6 +1113,7 @@ const styles = {
     width: '15%',
     alignItems: 'center',
     marginBottom: 8,
+    marginHorizontal: 4,
   },
   miniBindus: {
     fontSize: 14,
@@ -1313,7 +1325,6 @@ const styles = {
   yearlyStrengthContainer: {
     marginTop: 20,
     padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     maxHeight: 400,
   },
@@ -1338,7 +1349,6 @@ const styles = {
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginBottom: 4,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 8,
   },
   strongDay: {

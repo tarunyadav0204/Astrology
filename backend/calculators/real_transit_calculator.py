@@ -48,6 +48,22 @@ class RealTransitCalculator:
         except:
             return None
     
+    def is_planet_retrograde(self, date: datetime, planet: str) -> bool:
+        """Check if planet is retrograde on given date"""
+        try:
+            jd = swe.julday(date.year, date.month, date.day, 12.0)
+            planet_num = self.planet_numbers.get(planet)
+            
+            if planet_num is None or planet in ['Rahu', 'Ketu']:  # Nodes always retrograde
+                return True
+                
+            result = swe.calc_ut(jd, planet_num, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+            speed = result[0][3]  # Speed is 4th element
+            
+            return speed < 0
+        except:
+            return False
+    
     def calculate_house_from_longitude(self, longitude: float, ascendant_longitude: float) -> int:
         """Calculate house number from longitude using whole sign houses"""
         planet_sign = int(longitude / 30)
