@@ -10,6 +10,7 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -21,7 +22,7 @@ import { useTheme } from '../../context/ThemeContext';
 const { width } = Dimensions.get('window');
 
 export default function ChatViewScreen({ route, navigation }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, getCardElevation } = useTheme();
   const { session } = route.params;
   const [messages, setMessages] = useState(session.messages || []);
   
@@ -206,7 +207,14 @@ export default function ChatViewScreen({ route, navigation }) {
           </Animated.View>
 
           {/* Info Card */}
-          <Animated.View style={[styles.infoCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <Animated.View style={[
+            styles.infoCard,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+              elevation: getCardElevation(5),
+            }
+          ]}>
             <LinearGradient
               colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
               style={styles.infoGradient}
@@ -314,7 +322,7 @@ export default function ChatViewScreen({ route, navigation }) {
 
           {/* Floating Action Buttons */}
           <Animated.View style={[styles.floatingButtons, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <TouchableOpacity style={styles.floatingButtonSecondary} onPress={shareChat}>
+            <TouchableOpacity style={[styles.floatingButtonSecondary, { elevation: getCardElevation(5) }]} onPress={shareChat}>
               <LinearGradient
                 colors={['rgba(255, 107, 53, 0.6)', 'rgba(255, 140, 90, 0.5)']}
                 style={styles.floatingButtonGradient}
@@ -325,7 +333,7 @@ export default function ChatViewScreen({ route, navigation }) {
             </TouchableOpacity>
 
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity style={styles.floatingButtonPrimary} onPress={continueConversation}>
+              <TouchableOpacity style={[styles.floatingButtonPrimary, { elevation: getCardElevation(8) }]} onPress={continueConversation}>
                 <LinearGradient
                   colors={['#ff6b35', '#ff8c5a']}
                   style={styles.floatingButtonGradient}
@@ -414,11 +422,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
   },
   infoGradient: {
     flexDirection: 'row',
@@ -481,21 +495,33 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
   },
   floatingButtonPrimary: {
     flex: 2,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#ff6b35',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 12,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
   },
   floatingButtonGradient: {
     flexDirection: 'row',

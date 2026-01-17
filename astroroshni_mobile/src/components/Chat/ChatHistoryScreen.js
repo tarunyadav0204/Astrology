@@ -11,6 +11,7 @@ import {
   TextInput,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -57,7 +58,7 @@ const SkeletonCard = () => {
 };
 
 export default function ChatHistoryScreen({ navigation }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, getCardElevation } = useTheme();
   const [chatSessions, setChatSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -273,7 +274,7 @@ export default function ChatHistoryScreen({ navigation }) {
         ]}
       >
         <TouchableOpacity
-          style={styles.sessionCard}
+          style={[styles.sessionCard, { elevation: getCardElevation(8) }]}
           onPress={() => viewChatSession(item)}
           activeOpacity={0.9}
         >
@@ -516,11 +517,17 @@ const styles = StyleSheet.create({
   sessionCard: {
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
   },
   sessionGradient: {
     padding: 20,

@@ -29,7 +29,7 @@ import { useTheme } from '../../context/ThemeContext';
 const { width } = Dimensions.get('window');
 
 export default function BirthFormScreen({ navigation, route }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, getCardElevation } = useTheme();
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
   const updateGender = route?.params?.updateGender;
@@ -525,7 +525,7 @@ export default function BirthFormScreen({ navigation, route }) {
               <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }, { translateX: shakeAnim }] }]}>
                 
                 {/* Step Icon */}
-                <View style={styles.iconContainer}>
+                <View style={[styles.iconContainer, { elevation: getCardElevation(10) }]}>
                   <LinearGradient colors={['#ff6b35', '#ffd700', '#ff6b35']} style={styles.iconGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                     <Text style={styles.stepIcon}>{getStepIcon()}</Text>
                   </LinearGradient>
@@ -552,7 +552,7 @@ export default function BirthFormScreen({ navigation, route }) {
                 {step === 2 && (
                   <View style={styles.genderContainer}>
                     <TouchableOpacity
-                      style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected]}
+                      style={[styles.genderCard, formData.gender === 'Male' && styles.genderCardSelected, { elevation: getCardElevation(8) }]}
                       onPress={() => handleInputChange('gender', 'Male')}
                     >
                       <LinearGradient
@@ -565,7 +565,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       </LinearGradient>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.genderCard, formData.gender === 'Female' && styles.genderCardSelected]}
+                      style={[styles.genderCard, formData.gender === 'Female' && styles.genderCardSelected, { elevation: getCardElevation(8) }]}
                       onPress={() => handleInputChange('gender', 'Female')}
                     >
                       <LinearGradient
@@ -582,7 +582,7 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 3 && (
                   <View style={styles.dateTimeContainer}>
-                    <TouchableOpacity style={styles.dateTimeCard} onPress={() => setShowDatePicker(true)}>
+                    <TouchableOpacity style={[styles.dateTimeCard, { elevation: getCardElevation(8) }]} onPress={() => setShowDatePicker(true)}>
                       <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={[styles.dateTimeGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}>
                         <Text style={styles.dateTimeIcon}>📅</Text>
                         <Text style={[styles.dateTimeValue, { color: colors.text }]}>
@@ -599,7 +599,7 @@ export default function BirthFormScreen({ navigation, route }) {
 
                 {step === 4 && (
                   <View style={styles.dateTimeContainer}>
-                    <TouchableOpacity style={styles.dateTimeCard} onPress={() => {
+                    <TouchableOpacity style={[styles.dateTimeCard, { elevation: getCardElevation(8) }]} onPress={() => {
                       const hours = formData.time.getHours();
                       const minutes = formData.time.getMinutes();
                       setTempHour(hours % 12 || 12);
@@ -637,7 +637,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       />
                       {showSuggestions && suggestions.length > 0 && (
                         <ScrollView 
-                          style={[styles.suggestionsList, { backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]}
+                          style={[styles.suggestionsList, { backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', elevation: getCardElevation(10) }]}
                           keyboardShouldPersistTaps="always"
                           nestedScrollEnabled={true}
                         >
@@ -673,14 +673,14 @@ export default function BirthFormScreen({ navigation, route }) {
             {/* Navigation Buttons */}
             <View style={styles.navigationContainer}>
               {step > 1 && (
-                <TouchableOpacity style={styles.navButton} onPress={prevStep}>
+                <TouchableOpacity style={[styles.navButton, { elevation: getCardElevation(5) }]} onPress={prevStep}>
                   <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={styles.navGradient}>
                     <Ionicons name="arrow-back" size={20} color={colors.text} />
                     <Text style={[styles.navText, { color: colors.text }]}>Back</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={[styles.navButton, styles.navButtonPrimary, step === 1 && styles.navButtonFull]} onPress={nextStep} disabled={loading}>
+              <TouchableOpacity style={[styles.navButton, styles.navButtonPrimary, step === 1 && styles.navButtonFull, { elevation: getCardElevation(5) }]} onPress={nextStep} disabled={loading}>
                 <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.navGradient}>
                   <Text style={styles.navTextPrimary}>{loading ? 'Processing...' : step === 5 ? 'Complete' : 'Next'}</Text>
                   {step < 5 && <Ionicons name="arrow-forward" size={20} color={COLORS.white} />}
@@ -891,11 +891,14 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     marginBottom: 24,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#ff6b35',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.6,
+        shadowRadius: 20,
+      },
+    }),
   },
   iconGradient: {
     width: '100%',
@@ -941,11 +944,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+    }),
   },
   genderCardSelected: {
     shadowColor: '#ff6b35',
@@ -985,11 +991,14 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+    }),
     marginBottom: 24,
   },
   dateTimeGradient: {
@@ -1027,11 +1036,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     zIndex: 1001,
     maxHeight: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   suggestionItem: {
     padding: 16,
@@ -1077,11 +1089,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   navButtonFull: {
     flex: 1,

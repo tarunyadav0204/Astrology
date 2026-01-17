@@ -334,13 +334,14 @@ export default function AshtakvargaOracle({ navigation }) {
             {['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].map(planet => {
               const planetChart = oracleData?.ashtakavarga?.individual_charts?.[planet];
               const totalBindus = planetChart?.total || 0;
+              const iconColor = theme === 'dark' ? '#ffd700' : '#c2410c';
               return (
                 <TouchableOpacity 
                   key={planet} 
                   style={[styles.planetButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.15)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
                   onPress={() => openPlanetChart(planet, planetChart)}
                 >
-                  <Text style={styles.planetIcon}>{getPlanetIcon(planet)}</Text>
+                  <Text style={[styles.planetIcon, { color: iconColor }]}>{getPlanetIcon(planet)}</Text>
                   <Text style={[styles.planetName, { color: colors.text }]}>{planet}</Text>
                   <Text style={[styles.planetBindus, { color: colors.primary }]}>{totalBindus}</Text>
                 </TouchableOpacity>
@@ -1093,7 +1094,7 @@ const styles = {
     borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  planetIcon: { fontSize: 20, marginBottom: 4, color: '#ffd700' },
+  planetIcon: { fontSize: 20, marginBottom: 4 },
   planetName: {
     fontSize: 12,
     color: COLORS.white,

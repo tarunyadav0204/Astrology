@@ -46,7 +46,7 @@ const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
 export default function ChatScreen({ navigation, route }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, getCardElevation } = useTheme();
   const { credits, partnershipCost, fetchBalance } = useCredits();
   
   // Mundane mode state
@@ -289,6 +289,11 @@ export default function ChatScreen({ navigation, route }) {
       console.error('Calibration error:', error);
     }
   };
+
+  const getMenuOptionStyle = () => [
+    styles.menuOption,
+    { elevation: getCardElevation(3) }
+  ];
 
   const suggestions = [
     "What does my birth chart say about my career?",
@@ -1333,7 +1338,8 @@ export default function ChatScreen({ navigation, route }) {
             style={[
               styles.header,
               {
-                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)',
+                elevation: getCardElevation(3),
               }
             ]}
           >
@@ -1547,12 +1553,13 @@ export default function ChatScreen({ navigation, route }) {
                               style={[styles.dashaChip, { 
                                 backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
                                 borderColor: planetColor,
-                                borderWidth: 2
+                                borderWidth: 2,
+                                elevation: getCardElevation(3),
                               }]}
                               onPress={() => setShowDashaBrowser(true)}
                               activeOpacity={0.8}
                             >
-                              <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
+                              <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{dasha.planet}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                             </TouchableOpacity>
@@ -1626,7 +1633,13 @@ export default function ChatScreen({ navigation, route }) {
           <View style={styles.unifiedInputContainer}>
             <LinearGradient
               colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-              style={[styles.inputBarGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
+              style={[
+                styles.inputBarGradient,
+                {
+                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
+                  elevation: getCardElevation(5),
+                }
+              ]}
             >
               <TextInput
                 style={[styles.modernTextInput, { color: colors.text }]}
@@ -1865,7 +1878,7 @@ export default function ChatScreen({ navigation, route }) {
                   nestedScrollEnabled={true}
                 >
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -1895,7 +1908,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -1925,7 +1938,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -1955,7 +1968,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -1985,7 +1998,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2015,7 +2028,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2045,7 +2058,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2075,7 +2088,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2105,7 +2118,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2135,7 +2148,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2166,7 +2179,7 @@ export default function ChatScreen({ navigation, route }) {
 
                   {!isMundane && !showGreeting && (
                     <TouchableOpacity
-                      style={styles.menuOption}
+                      style={getMenuOptionStyle()}
                       onPress={() => {
                         if (!partnershipMode) {
                           Alert.alert(
@@ -2221,7 +2234,7 @@ export default function ChatScreen({ navigation, route }) {
                   )}
 
                   <TouchableOpacity
-                    style={styles.menuOption}
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2251,7 +2264,7 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.menuOption, styles.menuOptionLast]}
+                    style={[getMenuOptionStyle(), styles.menuOptionLast]}
                     onPress={() => {
                       Animated.timing(drawerAnim, {
                         toValue: 300,
@@ -2628,12 +2641,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   backButton: {
     width: 36,
@@ -2763,12 +2781,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
   },
   modernTextInput: {
     flex: 1,
@@ -2941,11 +2964,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 8,
     width: cardWidth,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
   },
   dashaChipPlanet: {
     fontSize: fontSize,
@@ -3087,11 +3116,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   menuOptionLast: {
     marginTop: 8,

@@ -10,6 +10,7 @@ import {
   Alert,
   FlatList,
   AppState,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +26,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, getCardElevation } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -550,7 +551,9 @@ const loadHomeData = async (nativeData = null) => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]}
+        colors={theme === 'dark' 
+          ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] 
+          : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#fef3c7']}
         style={styles.gradient}
       >
         {starAnims.map((anim, index) => {
@@ -589,7 +592,7 @@ const loadHomeData = async (nativeData = null) => {
                 end={{ x: 1, y: 1 }}
               />
             </Animated.View>
-            <Animated.View style={[styles.avatar, { transform: [{ scale: pulseAnim }] }]}>
+            <Animated.View style={[styles.avatar, { transform: [{ scale: pulseAnim }], elevation: getCardElevation(10) }]}>
               <Text key={chartData ? 'chart-loaded' : 'chart-loading'} style={styles.avatarText}>
                 {chartData ? (() => {
                   const signIndex = chartData?.houses?.[0]?.sign || 0;
@@ -605,8 +608,8 @@ const loadHomeData = async (nativeData = null) => {
           <View style={[
             styles.birthInfoCard,
             {
-              backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-              borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+              backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
+              borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
             }
           ]}>
             <Text style={[styles.birthInfoText, { color: colors.textSecondary }]}>
@@ -683,7 +686,7 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Big 3 Signs Row */}
           <View style={styles.bigThreeRow}>
-            <View style={styles.signCard}>
+            <View style={[styles.signCard, { elevation: getCardElevation(6) }]}>
               <LinearGradient colors={['#1E3A8A', '#3B82F6']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>⬆️</Text>
                 <Text style={styles.signLabel}>Ascendant</Text>
@@ -694,7 +697,7 @@ const loadHomeData = async (nativeData = null) => {
               </LinearGradient>
             </View>
             
-            <View style={styles.signCard}>
+            <View style={[styles.signCard, { elevation: getCardElevation(6) }]}>
               <LinearGradient colors={['#7C2D12', '#DC2626']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>🌙</Text>
                 <Text style={styles.signLabel}>Moon</Text>
@@ -702,7 +705,7 @@ const loadHomeData = async (nativeData = null) => {
               </LinearGradient>
             </View>
             
-            <View style={styles.signCard}>
+            <View style={[styles.signCard, { elevation: getCardElevation(6) }]}>
               <LinearGradient colors={['#B45309', '#F59E0B']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>☀️</Text>
                 <Text style={styles.signLabel}>Sun</Text>
@@ -760,8 +763,8 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[
                   styles.toolGlassmorphism,
                   {
-                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
                   }
                 ]}>
                   <Svg width="28" height="28" viewBox="0 0 48 48" style={{ marginBottom: 8 }}>
@@ -782,8 +785,8 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[
                   styles.toolGlassmorphism,
                   {
-                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
                   }
                 ]}>
                   <Text style={styles.toolEmoji}>⏰</Text>
@@ -799,8 +802,8 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[
                   styles.toolGlassmorphism,
                   {
-                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
                   }
                 ]}>
                   <Text style={styles.toolEmoji}>⊞</Text>
@@ -816,8 +819,8 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[
                   styles.toolGlassmorphism,
                   {
-                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                    backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
                   }
                 ]}>
                   <Text style={styles.toolEmoji}>🌌</Text>
@@ -855,8 +858,8 @@ const loadHomeData = async (nativeData = null) => {
             <View style={[
               styles.panchangCard,
               {
-                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.12)',
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
               }
             ]}>
               <Text style={[styles.panchangTitle, { textAlign: 'center', marginBottom: 20, color: colors.text }]}>🌅 Today's Panchang</Text>
@@ -1146,7 +1149,7 @@ function OptionCard({ option, index, onOptionSelect }) {
         <LinearGradient
           colors={theme === 'dark' 
             ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-            : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.05)']}
+            : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)']}
           style={styles.optionGradient}
         >
           <View style={styles.optionIconContainer}>
@@ -1170,7 +1173,7 @@ function OptionCard({ option, index, onOptionSelect }) {
 
 // Life Analysis Card - 3 per row
 function LifeAnalysisCard({ option, index, onOptionSelect }) {
-  const { colors } = useTheme();
+  const { colors, getCardElevation } = useTheme();
   const cardDelay = (index + 3) * 200;
   const cardAnim = useRef(new Animated.Value(0)).current;
   
@@ -1206,6 +1209,7 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
               }),
             },
           ],
+          elevation: getCardElevation(6),
         },
       ]}
     >
@@ -1280,8 +1284,8 @@ function AnalysisCard({ option, index, onOptionSelect }) {
         <View style={[
           styles.analysisGlassmorphism,
           {
-            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-            borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.2)'
+            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
+            borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
           }
         ]}>
           <View style={styles.analysisIconContainer}>
@@ -1350,11 +1354,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#ff6b35',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.6,
+        shadowRadius: 20,
+      },
+    }),
   },
   avatarText: {
     fontSize: 48,
@@ -1527,11 +1534,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   lifeAnalysisGradient: {
     padding: 8,
@@ -1580,11 +1590,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+    }),
   },
 loadingText: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -1648,11 +1661,6 @@ dashaChip: {
     alignItems: 'center',
     marginRight: 8,
     width: 110,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   dashaFlatListContent: {
     paddingHorizontal: 4,
@@ -1679,11 +1687,14 @@ dashaChip: {
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   signGradient: {
     padding: 16,

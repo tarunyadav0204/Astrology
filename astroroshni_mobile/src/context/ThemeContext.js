@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const ThemeContext = createContext();
 
@@ -26,24 +27,24 @@ export const THEMES = {
     statusBarStyle: 'light-content',
   },
   light: {
-    background: '#fefcfb',
-    backgroundSecondary: '#fef7f0',
-    backgroundTertiary: '#fed7d7',
-    surface: 'rgba(249, 115, 22, 0.05)',
+    background: '#fff5f0',
+    backgroundSecondary: '#ffe8dc',
+    backgroundTertiary: '#ffd4c8',
+    surface: 'rgba(249, 115, 22, 0.08)',
     text: '#1a1a1a',
-    textSecondary: '#6b7280',
-    textTertiary: '#9ca3af',
+    textSecondary: '#7c2d12',
+    textTertiary: '#9a3412',
     primary: '#f97316',
     secondary: '#ec4899',
-    accent: '#f97316',
+    accent: '#fb923c',
     success: '#22c55e',
     error: '#ef4444',
     warning: '#f59e0b',
-    gradientStart: '#fefcfb',
-    gradientMid: '#fefcfb',
-    gradientEnd: '#fefcfb',
+    gradientStart: '#fff7ed',
+    gradientMid: '#ffedd5',
+    gradientEnd: '#fed7aa',
     cardBackground: '#ffffff',
-    cardBorder: 'rgba(249, 115, 22, 0.1)',
+    cardBorder: 'rgba(249, 115, 22, 0.2)',
     statusBarStyle: 'dark-content',
   },
 };
@@ -81,8 +82,16 @@ export const ThemeProvider = ({ children }) => {
 
   const colors = THEMES[theme];
 
+  // Helper function to get card elevation based on theme
+  const getCardElevation = (defaultElevation = 3) => {
+    if (Platform.OS === 'android' && theme === 'light') {
+      return 0;
+    }
+    return defaultElevation;
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, colors, toggleTheme, isLoading }}>
+    <ThemeContext.Provider value={{ theme, colors, toggleTheme, isLoading, getCardElevation }}>
       {children}
     </ThemeContext.Provider>
   );
