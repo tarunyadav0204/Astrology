@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT } from '../utils/constants';
+import { Alert } from 'react-native';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -21,13 +22,61 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Global error handler
+let errorHandlerCallback = null;
+
+export const setGlobalErrorHandler = (callback) => {
+  errorHandlerCallback = callback;
+};
+
 // Handle response errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      AsyncStorage.removeItem('authToken');
+  async (error) => {
+    // Network error (no internet or backend down)
+    if (!error.response && error.message === 'Network Error') {
+      if (errorHandlerCallback) {
+        errorHandlerCallback({
+          type: 'network',
+          message: 'No internet connection. Please check your network and try again.'
+        });
+      }
+      return Promise.reject(error);
     }
+
+    // Backend timeout
+    if (error.code === 'ECONNABORTED') {
+      if (errorHandlerCallback) {
+        errorHandlerCallback({
+          type: 'timeout',
+          message: 'Request timed out. Please try again.'
+        });
+      }
+      return Promise.reject(error);
+    }
+
+    // Backend down (5xx errors)
+    if (error.response?.status >= 500) {
+      if (errorHandlerCallback) {
+        errorHandlerCallback({
+          type: 'server',
+          message: 'Server is temporarily unavailable. Please try again later.'
+        });
+      }
+      return Promise.reject(error);
+    }
+
+    // Unauthorized - clear token
+    if (error.response?.status === 401) {
+      await AsyncStorage.removeItem('authToken');
+      if (errorHandlerCallback) {
+        errorHandlerCallback({
+          type: 'auth',
+          message: 'Session expired. Please login again.'
+        });
+      }
+    }
+
     return Promise.reject(error);
   }
 );

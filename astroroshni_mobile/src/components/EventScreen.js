@@ -371,9 +371,9 @@ export default function EventScreen({ route }) {
   }, [selectedYear, analysisStarted]);
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchMonthlyGuide(selectedYear).then(() => setRefreshing(false));
-  }, [selectedYear]);
+    // Prevent accidental regeneration - do nothing on pull-to-refresh
+    setRefreshing(false);
+  }, []);
 
   const years = React.useMemo(() => Array.from({length: 101}, (_, i) => START_YEAR + i), []);
 
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: { 
-    fontSize: 22, 
+    fontSize: 20, 
     fontWeight: '700', 
     color: '#FFD700', 
     textAlign: 'center',
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0f'
   },
   selectionTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
     color: '#FFD700',
     textAlign: 'center',

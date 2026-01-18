@@ -30,8 +30,11 @@ import NumerologyScreen from './src/components/Numerology/NumerologyScreen';
 import FinancialDashboard from './src/components/Financial/FinancialDashboard';
 import SectorDetailScreen from './src/components/Financial/SectorDetailScreen';
 import AllOpportunitiesScreen from './src/components/Financial/AllOpportunitiesScreen';
+import GlobalErrorHandler from './src/components/GlobalErrorHandler';
+import ErrorOverlay from './src/components/ErrorOverlay';
 import { CreditProvider } from './src/credits/CreditContext';
 import { ThemeProvider } from './src/context/ThemeContext';
+import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 
 const Stack = createStackNavigator();
@@ -102,9 +105,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <CreditProvider>
-          <NavigationContainer>
-        <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
+        <ErrorProvider>
+          <CreditProvider>
+            <NavigationContainer>
+              <GlobalErrorHandler />
+              <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{
@@ -250,8 +255,10 @@ export default function App() {
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
+        <ErrorOverlay />
         </NavigationContainer>
       </CreditProvider>
+      </ErrorProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

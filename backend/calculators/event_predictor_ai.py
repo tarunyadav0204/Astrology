@@ -27,10 +27,10 @@ class EventPredictor:
             genai.configure(api_key=api_key)
             try:
                 self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
-                print("✅ EventPredictor using Gemini 3.0 Flash  Exp")
+                print("✅ EventPredictor using models/gemini-3-flash-preview")
             except:
                 try:
-                    self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                    self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
                     print("✅ EventPredictor using Gemini 2.0 Flash Exp (fallback)")
                 except:
                     self.model = genai.GenerativeModel('gemini-pro')
@@ -213,7 +213,7 @@ NEVER count houses from a planetary cluster. This is Western astrology logic.
 - WRONG: "Sun is 2nd from your natal cluster"
 - RIGHT: "Sun transits 10th house from Lagna"
 
-### 1. THE "RULE OF THREE" MANIFESTATION SPECTRUM
+**7. THE "RULE OF THREE" MANIFESTATION SPECTRUM:**
 For every High/Medium intensity event, you MUST provide comprehensive scenarios in the `possible_manifestations` array:
 - Include scenarios covering Material/Artha (Career, Money, Property, Status)
 - Include scenarios covering Internal/Emotional (Family, Peace of Mind, Relationships)
@@ -222,13 +222,13 @@ For every High/Medium intensity event, you MUST provide comprehensive scenarios 
 
 **The goal is MAXIMUM COMPREHENSIVE coverage. Generate AS MANY manifestations as the house activations allow - there is NO UPPER LIMIT.**
 
-### 2. THE MULTI-HOUSE SYNTHESIS ENGINE (BPHS LOGIC)
+**8. THE MULTI-HOUSE SYNTHESIS ENGINE (BPHS LOGIC):**
 A planet is a bridge. You are forbidden from predicting an isolated house result.
 **Synthesis Formula:** [Planet] = ([Natal Lordship Houses] + [Transit House]) acting upon [Aspected Houses].
 - *Example:* Jupiter (rules 6, 9) transiting 1H and aspecting 5H.
 - *Synthesis:* "Your luck/fortune (9L) and service (6L) physically manifest (1H) to bring gains through creativity or children (5H aspect)."
 
-### 3. STRICT ACTIVATION HIERARCHY (DASHA-FIRST LOGIC)
+**9. STRICT ACTIVATION HIERARCHY (DASHA-FIRST LOGIC):**
 The Sun is only a timer; the Dasha Lords are the source.
 1. **PRIMARY TRIGGER:** The PD Lord moves into a new house or hits a Natal Planet.
 2. **SECONDARY TRIGGER:** A fast planet (Sun/Mars/Venus) conjuncts or aspects the current MD, AD, or PD Lord.
@@ -236,7 +236,7 @@ The Sun is only a timer; the Dasha Lords are the source.
 4. **THE "STUN" TRIGGER:** Transit Saturn and Transit Jupiter both aspect the same house (Double Transit). If this occurs, intensity is ALWAYS 'High'.
 5. **THE DOUBLE-ASPECT RULE:** If two slow planets (Saturn/Jupiter/Rahu/Ketu) aspect the same house, that house is 'ON FIRE'. Predict a major life milestone for that house, even if the Sun is not there.
 
-### 4. THE "STUNNING" PATTERN DETECTOR (Year-Independent)
+**10. THE "STUNNING" PATTERN DETECTOR (Year-Independent):**
 You are required to scan the provided transit data for the following "High-Certainty" patterns:
 
 * **Pattern 1: The Double Transit (The King Maker):** Check if Transit Saturn and Transit Jupiter both aspect the same house at any point in the year.
@@ -246,7 +246,7 @@ You are required to scan the provided transit data for the following "High-Certa
     - This marks a "Karmic Reset" year.
 * **Pattern 3: Dasha Chhidra (The Threshold):** If the user is in the last 3 months of a Mahadasha or Antardasha, predict "Sudden Endings/New Chapters."
 
-### 5. MANDATORY TRIGGER REASONING (No Guesswork)
+**11. MANDATORY TRIGGER REASONING (No Guesswork):**
 For every month, you must justify the prediction using this exact chain:
 1. **Source:** Identify the Dasha Lord (MD/AD/PD) acting this month.
 2. **Timer:** Identify the fast planet (Sun/Mars/etc.) hitting that Dasha Lord or its ruled house.
@@ -257,18 +257,16 @@ For every month, you must justify the prediction using this exact chain:
 **CRITICAL SUN DEMOTION RULE:**
 If a month contains a PRIMARY Trigger (PD Lord sign change) or a SECONDARY Trigger (any planet hitting a Dasha Lord), you are FORBIDDEN from mentioning the Sun's ingress in the trigger_logic. The Sun should only be used as a secondary 'timer' to pinpoint the 5-day window, NOT as the primary reason for the event.
 
-### 6. THE MANIFESTATION SPECTRUM (Comprehensive Coverage Rule)
-For every event, the `possible_manifestations` array should contain AS MANY scenarios as the house activations allow:
-- **NO UPPER LIMIT** - Generate as many manifestations as possible
-- **Minimum 8 scenarios** for High intensity events
-- **Minimum 5 scenarios** for Medium intensity events  
-- **Minimum 3 scenarios** for Low intensity events
+**12. THE MANIFESTATION SPECTRUM (Comprehensive Coverage Rule):**
+For every event, the `possible_manifestations` array MUST contain AT LEAST 6 scenarios:
+- **MINIMUM 6 manifestations** for ALL intensity levels (High, Medium, Low)
+- Generate MORE than 6 if multiple houses are activated through lordship, transit, aspects, conjunctions, and Nakshatra Return
 - Each scenario should combine different house significations
 - Cover Material (career, money, property), Emotional (relationships, family), and Physical (health, vitality) domains
-- Include additional scenarios for specialized house combinations (e.g., 3H+8H+12H = "Secret foreign correspondence")
-- Explore EVERY possible combination of activated houses through lordship, transit, aspects, and conjunctions
+- Include scenarios for specialized house combinations (e.g., 3H+8H+12H = "Secret foreign correspondence")
+- Explore ALL combinations of activated houses - aim for comprehensive coverage
 
-### 7. ASTRONOMICAL INTEGRITY & ASPECT RULES
+**13. ASTRONOMICAL INTEGRITY & ASPECT RULES:**
 If you hallucinate an impossible aspect, the analysis is invalid.
 - **Saturn:** 3rd, 7th, 10th aspects ONLY. (Saturn in 9H DOES NOT aspect 7H).
 - **Mars:** 4th, 7th, 8th aspects ONLY.
@@ -277,7 +275,7 @@ If you hallucinate an impossible aspect, the analysis is invalid.
 
 **ASTRONOMICAL GUARDRAIL:** If a planet is in House X, it can only affect Houses [X+2, X+6, X+9] for Saturn, [X+3, X+6, X+7] for Mars, and [X+4, X+6, X+8] for Jupiter. Any other house citation is an error.
 
-### 8. TRANSIT SUN DEPENDENCY RULE
+**14. TRANSIT SUN DEPENDENCY RULE:**
 The Sun is a TIMER, not a SOURCE. Fast-moving planets (Sun, Moon, Mercury, Venus, Mars) can only be PRIMARY triggers if:
 1. They directly aspect or conjoin a Dasha Lord (MD/AD/PD)
 2. They activate the natal position of a Dasha Lord
@@ -289,7 +287,7 @@ The Sun is a TIMER, not a SOURCE. Fast-moving planets (Sun, Moon, Mercury, Venus
 - WRONG: "Transit Sun enters Cancer in July" (when Jupiter also enters Cancer that month)
 - RIGHT: "Jupiter (PD Lord) enters Cancer (10th house), amplified by Sun joining the same sign"
 
-### 9. FINAL GUARDRAIL: ASPECT MATH (MANDATORY)
+**15. FINAL GUARDRAIL: ASPECT MATH (MANDATORY):**
 Perform this calculation for every aspect citation to prevent hallucinations:
 
 **Saturn Aspects (3rd, 7th, 10th only):**
@@ -339,7 +337,7 @@ Perform this calculation for every aspect citation to prevent hallucinations:
 
 **CRITICAL:** If your prediction mentions an aspect not on this list, it is a hallucination. DELETE IT.
 
-### 10. THE "SOURCE vs TIMER" ENFORCEMENT (CRITICAL)
+**16. THE "SOURCE vs TIMER" ENFORCEMENT (CRITICAL):**
 The Sun is never the "Why," only the "When."
 - **Source Identification:** Every event MUST start by identifying which Dasha Lord (MD/AD/PD) or Heavyweight (Jup/Sat) is "owning" that house this month.
 - **The Sun's Role:** Use the Sun ingress ONLY to define the specific 5-day window.
@@ -355,20 +353,20 @@ Then the intensity for that month MUST be labeled 'Low' and the prediction shoul
 
 **Example:** "March: While the Sun transits your 10th house, this is NOT a career breakthrough month because your MD Lord Saturn is in the 9th house aspecting the 6th house (service). The real focus is on structured service work, not career elevation."
 
-### 11. VEDIC ASPECT HARD-CODING
+**17. VEDIC ASPECT HARD-CODING:**
 You are forbidden from calculating aspects. Use this fixed logic:
 - **Saturn:** Aspects [X+2, X+6, X+9] signs from its position.
 - **Mars:** Aspects [X+3, X+6, X+7] signs from its position.
 - **Jupiter:** Aspects [X+4, X+6, X+8] signs from its position.
 If Saturn is in House 9, it aspects 11, 3, and 6. It CANNOT aspect House 4 or 7.
 
-### 12. THE "GOLDEN HOUSE" DETECTOR (Double Transit Stunner)
+**18. THE "GOLDEN HOUSE" DETECTOR (Double Transit Stunner):**
 Search for any house receiving aspects from BOTH Transit Saturn AND Transit Jupiter. If found, this is the "Golden House" of the year.
 - Label this in macro_trends as "The Million Dollar Window" or "Major Life Milestone Zone"
 - Scenario A for that month MUST be a major life milestone (e.g., Wealth explosion, Birth, Property acquisition, Marriage)
 - Explain the contrast: Saturn brings structure/discipline, Jupiter brings expansion/luck, together they create CONCRETE MANIFESTATION
 
-### 13. COMPREHENSIVE MANIFESTATION ENGINE
+**19. COMPREHENSIVE MANIFESTATION ENGINE:**
 For the `possible_manifestations` array, generate AS MANY predictions as possible by examining ALL activated houses:
 
 **STEP 1: Identify ALL Activated Houses**
@@ -381,10 +379,10 @@ For the triggering planet, list:
 **STEP 2: Generate Predictions for EACH House Combination**
 For every combination of activated houses, create a distinct manifestation scenario.
 
-**MANDATORY MINIMUM COUNTS (NO UPPER LIMIT):**
-- **High Intensity:** MINIMUM 8 manifestations - generate AS MANY as possible by exploring all house combinations
-- **Medium Intensity:** MINIMUM 5 manifestations - generate more if multiple houses are activated
-- **Low Intensity:** MINIMUM 3 manifestations
+**MANDATORY COUNTS:**
+- **ALL Intensities:** MINIMUM 6 manifestations per month
+- Generate MORE if multiple houses are activated
+- Cover ALL activated houses through lordship, transit, aspects, and conjunctions
 
 **Example:** Mercury (3L, 12L) transits 8H, aspects 2H, conjoins Sun (2L):
 - "Short travel (3L) for hidden financial matters (8H/2H)"
@@ -402,9 +400,9 @@ For every combination of activated houses, create a distinct manifestation scena
 
 **GOAL:** Generate MAXIMUM manifestations by exploring EVERY possible house combination. There is NO upper limit.
 
-**QUALITY CHECK:** Before finalizing, count your manifestations. If High intensity has < 8, you MUST add more. If you can generate 12-15 manifestations, DO IT.
+**QUALITY CHECK:** Before finalizing, count your manifestations. EVERY month must have AT LEAST 6 manifestations. Generate more if multiple houses are involved.
 
-### 14. THE CONVICTION ENGINE (FORBIDDEN LOGIC ERRORS)
+**20. THE CONVICTION ENGINE (FORBIDDEN LOGIC ERRORS):**
 To sell the user on this product, you must prove you are tracking their specific Dasha Lords:
 
 - **MD/AD/PD Overlordship:** Identify the current MD Lord, AD Lord, and PD Lord from the provided dasha data.
@@ -412,7 +410,7 @@ To sell the user on this product, you must prove you are tracking their specific
 - **The "Timer" Demotion:** The Sun's ingress is only relevant if it hits a Dasha Lord (MD/AD/PD). If the Sun enters a house with no Dasha Lord activity, label the month as "Routine Maintenance" and focus on the MD/AD/PD Lord's long-term aspect instead.
 - **Example:** "Even though the Sun is in House 4, the REAL story this month is your MD Lord Saturn's 10th aspect on House 6, creating a bridge between your philosophy (9H) and your service (6H)."
 
-### 15. THE DOUBLE-ASPECT WEALTH ANCHOR
+**21. THE DOUBLE-ASPECT WEALTH ANCHOR:**
 If two slow planets (Saturn/Jupiter/Rahu/Ketu) aspect the same house, that house is 'ON FIRE'.
 - **Requirement:** Scan for houses receiving aspects from BOTH Transit Saturn AND Transit Jupiter using the EXACT aspect tables from Section 9.
 - **Action:** Highlight this house in EVERY monthly prediction from the month it begins as a secondary 'Wealth Anchor' or 'Life Milestone Zone'.
@@ -425,7 +423,7 @@ Before claiming a double-aspect, you MUST verify using Section 9 tables:
 - Saturn in House 9 aspects: 11, 3, 6 (NOT 7)
 - If your calculation shows a different result, it is WRONG. Use the table.
 
-### 16. THE MULTI-VARGA VERIFICATION (MANDATORY)
+**22. THE MULTI-VARGA VERIFICATION (MANDATORY):**
 You MUST use the Divisional Charts to 'Audit' the D1 transit prediction:
 
 **VARGA AUDIT PROTOCOL:**
@@ -443,7 +441,7 @@ In the trigger_logic field, you MUST cite the Varga confirmation:
 
 **RULE:** If D1 suggests a material event but the corresponding Varga shows weakness, you MUST reduce the intensity and predict obstacles/delays instead of success.
 
-### 17. ASHTAKAVARGA INTENSITY FILTER (MANDATORY)
+**23. ASHTAKAVARGA INTENSITY FILTER (MANDATORY):**
 Verify EVERY prediction using the Sarvashtakavarga bindu scores from `ashtakavarga['d1_rashi']['sarvashtakavarga']`:
 
 **BINDU INTERPRETATION:**
@@ -460,7 +458,7 @@ In the trigger_logic field, you MUST cite the Bindu count for the transit sign:
 
 **CRITICAL RULE:** If a transit enters a sign with < 25 bindus, you are FORBIDDEN from predicting "High Intensity" events. The house lacks the strength to deliver results. Predict delays, obstacles, or internal processing instead.
 
-### 18. JAIMINI KARAKA RESONANCE (MANDATORY)
+**24. JAIMINI KARAKA RESONANCE (MANDATORY):**
 Use the Chara Karakas from `static_context['chara_karakas']` to identify "Resonance Points":
 
 **KARAKA ACTIVATION:**
@@ -483,7 +481,7 @@ In the trigger_logic field, cite Karaka activations:
 
 **RULE:** If a transit hits a Chara Karaka, the intensity should be boosted by one level (Low→Medium, Medium→High) due to the soul-level significance.
 
-### 19. NAKSHATRA RETURN ACTIVATION (SUPREME TRIGGER)
+**25. NAKSHATRA RETURN ACTIVATION (SUPREME TRIGGER):**
 When a Dasha Lord (MD/AD/PD) transits through its own NATAL NAKSHATRA, this creates a "Nakshatra Return" - the most powerful resonance activation.
 
 **NAKSHATRA RETURN DETECTION:**
@@ -528,7 +526,7 @@ If Transit Rahu/Ketu are in opposite signs from Natal Rahu/Ketu, this is a "Reve
 - Example: "Reverse Nodal Return: Rahu in 8H (inherited wealth) ↔ Ketu in 2H (earned wealth) = A karmic reset of your relationship with money - what you inherit vs. what you earn."
 - DO NOT use generic phrases like "significant reset" - be SPECIFIC about which houses are involved
 
-### 20. SUDARSHANA CHAKRA TRIPLE VERIFICATION (MANDATORY)
+**26. SUDARSHANA CHAKRA TRIPLE VERIFICATION (MANDATORY):**
 For every High/Medium intensity event, verify activation from THREE perspectives:
 
 **THE THREE CHARTS:**
@@ -594,29 +592,45 @@ In trigger_logic field:
 **CRITICAL:** The example above shows 8 manifestations for a High-intensity event. You MUST generate AT LEAST this many.
 
 **CRITICAL MANIFESTATION FORMAT:**
-Each item in possible_manifestations MUST be a simple STRING (2-3 lines maximum):
-- Format: "[House combination]: [Concise prediction in 2-3 lines]"
-- NO reasoning field - just the prediction
-- Be direct and specific
+Each item in possible_manifestations MUST be an object with TWO fields:
+1. **"scenario"**: A DETAILED prediction (3-5 sentences) describing:
+   - WHAT will happen (the event itself)
+   - HOW it will unfold (the process/sequence)
+   - WHEN during the period it's most likely
+   - WHO or WHAT will be involved
+   - The OUTCOME or result
 
-**MANDATORY MINIMUM COUNTS (NO UPPER LIMIT):**
-- **High Intensity:** MINIMUM 10 manifestations - generate AS MANY as possible by exploring all house combinations
-- **Medium Intensity:** MINIMUM 7 manifestations - generate more if multiple houses are activated
-- **Low Intensity:** MINIMUM 4 manifestations
+2. **"reasoning"**: A COMPREHENSIVE explanation (4-6 sentences) citing ALL relevant astrological factors:
+   - Start with the primary planet and its complete lordship (e.g., "Mercury, ruling your 3rd house of communication and 12th house of expenses...")
+   - Explain the transit house and its significations in detail
+   - Describe which houses are aspected and why that matters
+   - Cite the nakshatra and its lord's influence on the manifestation
+   - Include the Ashtakavarga bindu score and what it means for this specific event
+   - Mention Varga confirmation if relevant (D10 for career, D9 for marriage, etc.)
+   - Explain the Dasha activation if the Dasha Lord is involved
+   - Connect all factors into a coherent astrological narrative
+
+**FORBIDDEN:** Short, cryptic reasoning like "Mercury (3L, 12L) transits 8H." This is TOO BRIEF.
+
+**REQUIRED:** Detailed, educational reasoning that teaches the user WHY this prediction is valid.
 
 **EXAMPLE OF CORRECT FORMAT:**
-[
-    "Career advancement through foreign connections. Your 10th house lord transits 12th house creating opportunities abroad or with international companies.",
-    "Sudden expenses on property renovation. 4th house activation with 12th lord suggests spending on home improvements or real estate matters.",
-    "Communication breakthrough in research. 3rd house lord in 8th house indicates success in deep investigation or occult studies.",
-    "Sibling health concerns requiring attention. 3rd lord in 6th/8th houses suggests medical issues with brothers/sisters.",
-    "Hidden income from past investments. 8th house activation with 2nd lord brings unexpected money from inheritance or joint assets.",
-    "Travel for confidential business meetings. 3rd and 12th house combination indicates short trips for secretive professional matters.",
-    "Transformation in communication style. 8th house influence on 3rd lord changes how you express yourself.",
-    "Expenses on education or spiritual learning. 12th lord with 5th/9th houses suggests spending on courses or pilgrimages.",
-    "Joint venture discussions with partners. 7th and 8th house activation indicates business collaborations involving shared resources.",
-    "Research project gains recognition. 8th house depth combined with 10th house visibility brings acclaim for investigative work."
-]
+{{
+    "scenario": "You may embark on a short journey for confidential financial matters involving inheritance or joint assets. This occurs mid-month when Moon transits supportive signs, requiring discretion with documents and family meetings.",
+    "reasoning": "Mercury (3L communication, 12L expenses) transits 8H (secrets/inheritance) aspecting 2H (family wealth), creating a 2-3-8-12 house combination. Transit in Mrigashira nakshatra (Mars-ruled) adds urgency. Aquarius has 22 bindus indicating moderate resistance."
+}}
+
+**LENGTH REQUIREMENTS:**
+- Scenario: 30-40 words (concise, specific prediction)
+- Reasoning: 40-50 words (brief astrological justification)
+- Both fields must be clear and direct
+
+**MANDATORY COUNTS (STRICTLY ENFORCED):**
+- High Intensity: MINIMUM 6 manifestations (generate more if many houses activated)
+- Medium Intensity: MINIMUM 6 manifestations (generate more if many houses activated)
+- Low Intensity: MINIMUM 6 manifestations
+
+**CRITICAL:** EVERY month must have AT LEAST 6 manifestations covering ALL activated houses through lordship, transit, aspects, and conjunctions.
 
 **CRITICAL:** Count your manifestations before finalizing. If you have fewer than the minimum, you MUST add more by exploring additional house combinations.
 """
@@ -693,8 +707,25 @@ Each item in possible_manifestations MUST be a simple STRING (2-3 lines maximum)
             
             # Handle if Gemini returns a list instead of dict
             if isinstance(parsed_response, list):
-                print(f"⚠️ WARNING: Gemini returned a list instead of dict, wrapping it")
-                parsed_response = {"macro_trends": [], "monthly_predictions": parsed_response if parsed_response else []}
+                print(f"⚠️ WARNING: Gemini returned a list instead of dict")
+                print(f"   - List length: {len(parsed_response)}")
+                if parsed_response:
+                    print(f"   - First item type: {type(parsed_response[0])}")
+                    if isinstance(parsed_response[0], dict):
+                        print(f"   - First item keys: {list(parsed_response[0].keys())}")
+                        # Check if first item has the expected structure
+                        if 'macro_trends' in parsed_response[0] and 'monthly_predictions' in parsed_response[0]:
+                            print(f"   - Detected wrapped response, extracting first item")
+                            parsed_response = parsed_response[0]
+                        elif 'month_id' in parsed_response[0]:
+                            print(f"   - Detected month objects, wrapping as monthly_predictions")
+                            parsed_response = {"macro_trends": [], "monthly_predictions": parsed_response}
+                        else:
+                            print(f"   - Unknown structure, returning empty")
+                            parsed_response = {"macro_trends": [], "monthly_predictions": []}
+                else:
+                    print(f"   - Empty list, returning empty structure")
+                    parsed_response = {"macro_trends": [], "monthly_predictions": []}
             
             print(f"   - Keys in response: {list(parsed_response.keys())}")
             
