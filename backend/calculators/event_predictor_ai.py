@@ -26,8 +26,8 @@ class EventPredictor:
         if api_key:
             genai.configure(api_key=api_key)
             try:
-                self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
-                print("✅ EventPredictor using Gemini 3.0 Flash")
+                self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                print("✅ EventPredictor using Gemini 2.0 Flash Exp")
             except:
                 try:
                     self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
@@ -684,16 +684,16 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             
             response_text = resp.text
             
-            # print("\n📥 FULL RESPONSE FROM GEMINI:")
-            # print("="*100)
-            # print("RESPONSE START")
-            # print("="*100)
-            # print(response_text)
-            # print("="*100)
-            # print("RESPONSE END")
-            # print("="*100)
-            # print(f"Response length: {len(response_text)} characters")
-            # print("="*100)
+            print("\n📥 FULL RESPONSE FROM GEMINI:")
+            print("="*100)
+            print("RESPONSE START")
+            print("="*100)
+            print(response_text)
+            print("="*100)
+            print("RESPONSE END")
+            print("="*100)
+            print(f"Response length: {len(response_text)} characters")
+            print("="*100)
             
             return response_text
 
@@ -704,12 +704,19 @@ Each item in possible_manifestations MUST be an object with TWO fields:
             print("\n🔄 Parsing JSON response...")
             parsed_response = json.loads(resp_text)
             print(f"✅ JSON parsed successfully")
+            
+            # Handle if Gemini returns a list instead of dict
+            if isinstance(parsed_response, list):
+                print(f"⚠️ WARNING: Gemini returned a list instead of dict, wrapping it")
+                parsed_response = {"macro_trends": [], "monthly_predictions": parsed_response if parsed_response else []}
+            
             print(f"   - Keys in response: {list(parsed_response.keys())}")
             
-            if 'macro_trends' in parsed_response:
-                print(f"   - macro_trends count: {len(parsed_response['macro_trends'])}")
-            if 'monthly_predictions' in parsed_response:
-                print(f"   - monthly_predictions count: {len(parsed_response['monthly_predictions'])}")
+            if isinstance(parsed_response, dict):
+                if 'macro_trends' in parsed_response:
+                    print(f"   - macro_trends count: {len(parsed_response['macro_trends'])}")
+                if 'monthly_predictions' in parsed_response:
+                    print(f"   - monthly_predictions count: {len(parsed_response['monthly_predictions'])}")
             
             print("\n✅ GEMINI CALL SUCCESSFUL - Returning parsed response")
             return parsed_response

@@ -220,7 +220,7 @@ export default function EventScreen({ route }) {
           
           if (status === 'completed') {
             clearInterval(pollInterval);
-            console.log('✅ Analysis completed, setting monthlyData:', statusResponse.data.data);
+            console.log('✅ Analysis completed, setting monthlyData:', JSON.stringify(statusResponse.data.data, null, 2));
             setMonthlyData(statusResponse.data.data);
             fetchBalance();
             setLoadingMonthly(false);
@@ -748,6 +748,12 @@ export default function EventScreen({ route }) {
                   onChatPress={() => navigateToChat({...month, month: getMonthName(month.month_id)}, 'monthly')}
                 />
               ))}
+            </View>
+          </View>
+        ) : monthlyData ? (
+          <View style={styles.section}>
+            <View style={styles.loadingContainer}>
+              <Text style={[styles.loadingText, { color: colors.text }]}>⚠️ No predictions generated. Please try regenerating.</Text>
             </View>
           </View>
         ) : null}
