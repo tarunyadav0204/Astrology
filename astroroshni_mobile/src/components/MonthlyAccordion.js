@@ -71,7 +71,7 @@ export default function MonthlyAccordion({ data, onChatPress }) {
 
           {/* Events List */}
           <View style={styles.eventsList}>
-            {events.map((event, index) => {
+            {events.map((event, index) => (
               <View key={index} style={styles.eventItem}>
                 <View style={[styles.intensityDot, { backgroundColor: getIntensityColor(event.intensity) }]} />
                 <View style={{flex: 1}}>
@@ -97,10 +97,10 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                                 </View>
                                 <View style={{flex: 1}}>
                                   {scenario ? <Text style={[styles.manifestationText, { color: colors.text }]}>{scenario}</Text> : null}
-                                  {reasoning ? (
+                                  {reasoning && (
                                     <View style={styles.reasoningContainer}>
                                       <Text style={[styles.reasoningLabel, { color: colors.accent }]}>Why:</Text>
-                                      <Text style={[styles.reasoningText, { color: colors.textSecondary }]} numberOfLines={0}>{reasoning}</Text>
+                                      <Text style={[styles.reasoningText, { color: colors.textSecondary }]}>{reasoning}</Text>
                                     </View>
                                   )}
                                 </View>

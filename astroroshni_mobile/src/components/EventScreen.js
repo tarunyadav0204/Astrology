@@ -220,6 +220,7 @@ export default function EventScreen({ route }) {
           
           if (status === 'completed') {
             clearInterval(pollInterval);
+            console.log('✅ Analysis completed, setting monthlyData:', statusResponse.data.data);
             setMonthlyData(statusResponse.data.data);
             fetchBalance();
             setLoadingMonthly(false);
@@ -736,7 +737,7 @@ export default function EventScreen({ route }) {
               )}
             </View>
           </View>
-        ) : monthlyData?.monthly_predictions ? (
+        ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.accent }]}>📅 Monthly Guide</Text>
             <View style={styles.accordionContainer}>
