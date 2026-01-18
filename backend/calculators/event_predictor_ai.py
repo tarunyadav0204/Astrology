@@ -26,8 +26,8 @@ class EventPredictor:
         if api_key:
             genai.configure(api_key=api_key)
             try:
-                self.model = genai.GenerativeModel('models/gemini-3-pro-preview')
-                print("✅ EventPredictor using Gemini 3.0 Pro Preview")
+                self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
+                print("✅ EventPredictor using Gemini 3.0 Flash")
             except:
                 try:
                     self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')

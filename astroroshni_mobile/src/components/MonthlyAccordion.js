@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, ScrollView, Platform, UIManager } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function MonthlyAccordion({ data, onChatPress }) {
   const [expanded, setExpanded] = useState(false);
   const { colors } = useTheme();
 
   const toggleExpand = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(!expanded);
   };
 
+  // Safety checks
+  if (!data) return null;
+  
   // Get all focus tags (no limit)
   const tags = data.focus_areas || [];
+  const events = data.events || [];
 
   return (
     <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
@@ -63,7 +71,7 @@ export default function MonthlyAccordion({ data, onChatPress }) {
 
           {/* Events List */}
           <View style={styles.eventsList}>
-            {data.events?.map((event, index) => (
+            {events.map((event, index) => {
               <View key={index} style={styles.eventItem}>
                 <View style={[styles.intensityDot, { backgroundColor: getIntensityColor(event.intensity) }]} />
                 <View style={{flex: 1}}>
@@ -78,8 +86,8 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                       <View style={styles.manifestationsList}>
                         {event.possible_manifestations.map((item, idx) => {
                           // Handle both old string format and new object format
-                          const scenario = typeof item === 'string' ? item : item.scenario;
-                          const reasoning = typeof item === 'object' ? item.reasoning : null;
+                          const scenario = typeof item === 'string' ? item : (item?.scenario || '');
+                          const reasoning = typeof item === 'object' && item !== null ? item.reasoning : null;
                           
                           return (
                             <View key={idx} style={[styles.manifestationCard, { backgroundColor: colors.surface, borderLeftColor: colors.accent }]}>
@@ -88,8 +96,8 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                                   <Text style={[styles.scenarioNumberText, { color: colors.background }]}>{idx + 1}</Text>
                                 </View>
                                 <View style={{flex: 1}}>
-                                  <Text style={[styles.manifestationText, { color: colors.text }]} numberOfLines={0}>{scenario}</Text>
-                                  {reasoning && (
+                                  {scenario ? <Text style={[styles.manifestationText, { color: colors.text }]}>{scenario}</Text> : null}
+                                  {reasoning ? (
                                     <View style={styles.reasoningContainer}>
                                       <Text style={[styles.reasoningLabel, { color: colors.accent }]}>Why:</Text>
                                       <Text style={[styles.reasoningText, { color: colors.textSecondary }]} numberOfLines={0}>{reasoning}</Text>
