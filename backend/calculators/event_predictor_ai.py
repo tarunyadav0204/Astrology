@@ -26,11 +26,11 @@ class EventPredictor:
         if api_key:
             genai.configure(api_key=api_key)
             try:
-                self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                print("✅ EventPredictor using Gemini 2.0 Flash Exp")
+                self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
+                print("✅ EventPredictor using Gemini 3.0 Flash  Exp")
             except:
                 try:
-                    self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+                    self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
                     print("✅ EventPredictor using Gemini 2.0 Flash Exp (fallback)")
                 except:
                     self.model = genai.GenerativeModel('gemini-pro')
@@ -594,43 +594,29 @@ In trigger_logic field:
 **CRITICAL:** The example above shows 8 manifestations for a High-intensity event. You MUST generate AT LEAST this many.
 
 **CRITICAL MANIFESTATION FORMAT:**
-Each item in possible_manifestations MUST be an object with TWO fields:
-1. **"scenario"**: A DETAILED prediction (3-5 sentences) describing:
-   - WHAT will happen (the event itself)
-   - HOW it will unfold (the process/sequence)
-   - WHEN during the period it's most likely
-   - WHO or WHAT will be involved
-   - The OUTCOME or result
+Each item in possible_manifestations MUST be a simple STRING (2-3 lines maximum):
+- Format: "[House combination]: [Concise prediction in 2-3 lines]"
+- NO reasoning field - just the prediction
+- Be direct and specific
 
-2. **"reasoning"**: A COMPREHENSIVE explanation (4-6 sentences) citing ALL relevant astrological factors:
-   - Start with the primary planet and its complete lordship (e.g., "Mercury, ruling your 3rd house of communication and 12th house of expenses...")
-   - Explain the transit house and its significations in detail
-   - Describe which houses are aspected and why that matters
-   - Cite the nakshatra and its lord's influence on the manifestation
-   - Include the Ashtakavarga bindu score and what it means for this specific event
-   - Mention Varga confirmation if relevant (D10 for career, D9 for marriage, etc.)
-   - Explain the Dasha activation if the Dasha Lord is involved
-   - Connect all factors into a coherent astrological narrative
-
-**FORBIDDEN:** Short, cryptic reasoning like "Mercury (3L, 12L) transits 8H." This is TOO BRIEF.
-
-**REQUIRED:** Detailed, educational reasoning that teaches the user WHY this prediction is valid.
+**MANDATORY MINIMUM COUNTS (NO UPPER LIMIT):**
+- **High Intensity:** MINIMUM 10 manifestations - generate AS MANY as possible by exploring all house combinations
+- **Medium Intensity:** MINIMUM 7 manifestations - generate more if multiple houses are activated
+- **Low Intensity:** MINIMUM 4 manifestations
 
 **EXAMPLE OF CORRECT FORMAT:**
-{{
-    "scenario": "You may embark on a short-distance journey related to confidential financial matters, possibly involving inheritance, joint assets, or hidden family wealth. This travel could occur during the second week of the month when the Moon transits supportive signs. The trip might involve meetings with financial advisors, lawyers, or family members to discuss sensitive monetary topics. You'll need to maintain discretion and handle documents carefully. The outcome will likely involve uncovering previously unknown financial information that requires immediate attention and decision-making.",
-    "reasoning": "This prediction arises from Mercury's dual lordship and complex transit pattern. Mercury rules your 3rd house of short journeys and communication, as well as your 12th house of expenses and hidden matters. When Mercury transits through your 8th house of joint resources, inheritance, and secrets, it creates a bridge between communication (3H), hidden affairs (12H), and transformative finances (8H). Additionally, Mercury aspects your 2nd house of family wealth from this position, activating a four-house combination (2-3-8-12) that specifically indicates travel for financial matters involving family secrets or inheritance. The transit occurs in Mrigashira nakshatra, ruled by Mars, which adds urgency and impulsiveness to the communication. However, Aquarius (the sign of transit) has only 22 Ashtakavarga bindus in your chart, indicating moderate resistance - meaning this journey will require extra effort and may face obstacles like delayed meetings or incomplete information. The D2 (Hora) chart shows Mercury in a neutral position, suggesting the financial outcome will be neither extremely positive nor negative, but rather informative and necessary for future planning."
-}}
-
-**LENGTH REQUIREMENTS:**
-- Scenario: MINIMUM 60 words, MAXIMUM 100 words (reduced for token efficiency)
-- Reasoning: MINIMUM 80 words, MAXIMUM 120 words (reduced for token efficiency)
-- Both fields must be detailed and educational, but concise
-
-**MANDATORY COUNTS (STRICTLY ENFORCED):**
-- High Intensity: MINIMUM 8 manifestations (aim for 8-10)
-- Medium Intensity: MINIMUM 5 manifestations (aim for 5-7)
-- Low Intensity: MINIMUM 3 manifestations (aim for 3-5)
+[
+    "Career advancement through foreign connections. Your 10th house lord transits 12th house creating opportunities abroad or with international companies.",
+    "Sudden expenses on property renovation. 4th house activation with 12th lord suggests spending on home improvements or real estate matters.",
+    "Communication breakthrough in research. 3rd house lord in 8th house indicates success in deep investigation or occult studies.",
+    "Sibling health concerns requiring attention. 3rd lord in 6th/8th houses suggests medical issues with brothers/sisters.",
+    "Hidden income from past investments. 8th house activation with 2nd lord brings unexpected money from inheritance or joint assets.",
+    "Travel for confidential business meetings. 3rd and 12th house combination indicates short trips for secretive professional matters.",
+    "Transformation in communication style. 8th house influence on 3rd lord changes how you express yourself.",
+    "Expenses on education or spiritual learning. 12th lord with 5th/9th houses suggests spending on courses or pilgrimages.",
+    "Joint venture discussions with partners. 7th and 8th house activation indicates business collaborations involving shared resources.",
+    "Research project gains recognition. 8th house depth combined with 10th house visibility brings acclaim for investigative work."
+]
 
 **CRITICAL:** Count your manifestations before finalizing. If you have fewer than the minimum, you MUST add more by exploring additional house combinations.
 """

@@ -85,9 +85,8 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                       </View>
                       <View style={styles.manifestationsList}>
                         {event.possible_manifestations.map((item, idx) => {
-                          // Handle both old string format and new object format
+                          // Handle both old object format and new string format
                           const scenario = typeof item === 'string' ? item : (item?.scenario || '');
-                          const reasoning = typeof item === 'object' && item !== null ? item.reasoning : null;
                           
                           return (
                             <View key={idx} style={[styles.manifestationCard, { backgroundColor: colors.surface, borderLeftColor: colors.accent }]}>
@@ -97,12 +96,6 @@ export default function MonthlyAccordion({ data, onChatPress }) {
                                 </View>
                                 <View style={{flex: 1}}>
                                   {scenario ? <Text style={[styles.manifestationText, { color: colors.text }]}>{scenario}</Text> : null}
-                                  {reasoning && (
-                                    <View style={styles.reasoningContainer}>
-                                      <Text style={[styles.reasoningLabel, { color: colors.accent }]}>Why:</Text>
-                                      <Text style={[styles.reasoningText, { color: colors.textSecondary }]}>{reasoning}</Text>
-                                    </View>
-                                  )}
                                 </View>
                               </View>
                             </View>
