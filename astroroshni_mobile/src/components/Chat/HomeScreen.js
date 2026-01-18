@@ -449,13 +449,14 @@ const loadHomeData = async (nativeData = null) => {
       description: 'Analyze world events, stock markets, politics, and economic trends',
       action: 'mundane'
     },
-    {
-      id: 'periods',
-      icon: '🎯',
-      title: 'Find Event Periods',
-      description: 'Discover high-probability periods when specific events might happen',
-      action: 'periods'
-    },
+    // Commented out in favor of Event Timeline tile for now
+    // {
+    //   id: 'periods',
+    //   icon: '🎯',
+    //   title: 'Find Event Periods',
+    //   description: 'Discover high-probability periods when specific events might happen',
+    //   action: 'periods'
+    // },
     {
       id: 'events',
       icon: '🌟',

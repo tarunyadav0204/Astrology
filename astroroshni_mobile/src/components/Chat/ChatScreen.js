@@ -411,9 +411,18 @@ export default function ChatScreen({ navigation, route }) {
     
     // Handle start chat param
     if (route.params?.startChat) {
-      navigation.setParams({ startChat: undefined });
+      const initialMsg = route.params?.initialMessage;
+      navigation.setParams({ startChat: undefined, initialMessage: undefined });
+      
       // Use the same logic as greeting option select for question action
       handleGreetingOptionSelect({ action: 'question' });
+      
+      // Set initial message after a delay to ensure chat is ready
+      if (initialMsg) {
+        setTimeout(() => {
+          setInputText(initialMsg);
+        }, 500);
+      }
     }
     
     // Handle mundane mode param

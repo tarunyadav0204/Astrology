@@ -9,6 +9,15 @@ class RealTransitCalculator:
     def __init__(self):
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         
+        # Nakshatra names
+        self.nakshatra_names = [
+            'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+            'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+            'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+            'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+            'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
+        ]
+        
         # Traditional Vedic aspects for each planet
         self.vedic_aspects = {
             'Sun': [1, 7],
@@ -47,6 +56,23 @@ class RealTransitCalculator:
             return longitude
         except:
             return None
+    
+    def get_nakshatra_from_longitude(self, longitude: float) -> Dict:
+        """Calculate nakshatra name and pada from longitude"""
+        # Each nakshatra is 13°20' (13.333°)
+        nakshatra_index = int(longitude / 13.333333)
+        nakshatra_name = self.nakshatra_names[nakshatra_index % 27]
+        
+        # Calculate pada (1-4) within the nakshatra
+        # Each pada is 3°20' (3.333°)
+        position_in_nakshatra = longitude % 13.333333
+        pada = int(position_in_nakshatra / 3.333333) + 1
+        
+        return {
+            'name': nakshatra_name,
+            'pada': pada,
+            'index': nakshatra_index % 27
+        }
     
     def is_planet_retrograde(self, date: datetime, planet: str) -> bool:
         """Check if planet is retrograde on given date"""
@@ -381,6 +407,10 @@ class RealTransitCalculator:
                     segment_num = segment_count.get(prev_sign, 1)
                     is_retrograde_return = segment_num > 1
                     
+                    # Get nakshatra at start of period
+                    start_longitude = self.get_planet_position(period_start, planet)
+                    nakshatra_data = self.get_nakshatra_from_longitude(start_longitude) if start_longitude else {'name': 'Unknown', 'pada': 0}
+                    
                     planet_transits.append({
                         'planet': planet,
                         'sign': sign_names[prev_sign],
@@ -388,7 +418,9 @@ class RealTransitCalculator:
                         'start_date': period_start.strftime('%Y-%m-%d'),
                         'end_date': (current_date - timedelta(days=1)).strftime('%Y-%m-%d'),
                         'segment': segment_num,
-                        'retrograde_return': is_retrograde_return
+                        'retrograde_return': is_retrograde_return,
+                        'nakshatra': nakshatra_data['name'],
+                        'pada': nakshatra_data['pada']
                     })
                     
                     prev_sign = current_sign
@@ -403,6 +435,10 @@ class RealTransitCalculator:
                 segment_num = segment_count.get(prev_sign, 1)
                 is_retrograde_return = segment_num > 1
                 
+                # Get nakshatra at start of final period
+                start_longitude = self.get_planet_position(period_start, planet)
+                nakshatra_data = self.get_nakshatra_from_longitude(start_longitude) if start_longitude else {'name': 'Unknown', 'pada': 0}
+                
                 planet_transits.append({
                     'planet': planet,
                     'sign': sign_names[prev_sign],
@@ -410,7 +446,9 @@ class RealTransitCalculator:
                     'start_date': period_start.strftime('%Y-%m-%d'),
                     'end_date': end_date.strftime('%Y-%m-%d'),
                     'segment': segment_num,
-                    'retrograde_return': is_retrograde_return
+                    'retrograde_return': is_retrograde_return,
+                    'nakshatra': nakshatra_data['name'],
+                    'pada': nakshatra_data['pada']
                 })
             
             transits[planet] = planet_transits

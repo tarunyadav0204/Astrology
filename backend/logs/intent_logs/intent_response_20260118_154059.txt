@@ -1,0 +1,62 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-18T15:41:03.344789
+Question: Jan Predictions:
+
+Event 1: Low Intensity - Preparation
+A quiet start to the year focusing on behind-the-scenes preparation and resource management.
+Period: 2026-01-01 to 2026-01-31
+
+Possible Scenarios (3):
+1. You may experience a period of voluntary or involuntary isolation where you feel compelled to withdraw from social obligations to focus on a hidden project or spiritual practice. This is a time for introspection rather than public launch.
+2. Unexpected expenses related to foreign travel or long-distance communication may arise. These aren't necessarily negative but will require you to dip into savings.
+3. A minor health issue related to sleep or feet may prompt a check-up, leading to a new wellness routine.
+
+Please explain these predictions in more detail.
+Processing Time: 3.476s
+Response Length: 517 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best explain these predictions, could you tell me what area is of most interest to you? For example, are you most curious about your health, finances, or general well-being during this period?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best explain these predictions, could you tell me what area is of most interest to you? For example, are you most curious about your health, finances, or general well-being during this period?",
+  "mode": "annual",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January"
+      ]
+    }
+  }
+}

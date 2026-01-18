@@ -24,6 +24,7 @@ import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ const SIDE_PADDING = (width - ITEM_WIDTH) / 2;
 export default function EventScreen({ route }) {
   const navigation = useNavigation();
   const { credits, fetchBalance } = useCredits();
+  const { theme, colors } = useTheme();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [monthlyData, setMonthlyData] = useState(null);
   
@@ -123,7 +125,7 @@ export default function EventScreen({ route }) {
   useEffect(() => {
     const fetchCreditCost = async () => {
       try {
-        console.log('💰 Fetching credit cost from:', API_BASE_URL + '/api/credits/settings/event-timeline-cost');
+        // console.log('💰 Fetching credit cost from:', API_BASE_URL + '/api/credits/settings/event-timeline-cost');
         const response = await creditAPI.getEventTimelineCost();
         console.log('✅ Credit cost response:', response.data);
         if (response.data.cost) {
@@ -157,10 +159,8 @@ export default function EventScreen({ route }) {
     let elapsed = 0;
     progressIntervalRef.current = setInterval(() => {
       elapsed += 100;
-      if (elapsed <= 60000) {
-        setLoadingProgress((elapsed / 60000) * 90);
-      } else if (elapsed <= 90000) {
-        setLoadingProgress(90);
+      if (elapsed <= 100000) {
+        setLoadingProgress((elapsed / 100000) * 90);
       } else {
         setLoadingProgress(-1);
       }
@@ -170,7 +170,7 @@ export default function EventScreen({ route }) {
       const birthData = await getBirthDetails();
       if (!birthData) return;
       
-      console.log('👤 Birth data loaded:', { id: birthData.id, name: birthData.name?.substring(0, 5) });
+      // console.log('👤 Birth data loaded:', { id: birthData.id, name: birthData.name?.substring(0, 5) });
       
       if (!birthData.id) {
         Alert.alert('Error', 'Birth chart ID not found. Please re-select your birth chart from Select Native screen.');
@@ -183,13 +183,13 @@ export default function EventScreen({ route }) {
         return;
       }
       
-      console.log('🚀 Starting monthly events request for year:', year);
+      // console.log('🚀 Starting monthly events request for year:', year);
       const startResponse = await chatAPI.getMonthlyEvents({
         ...birthData,
         selectedYear: year,
         birth_chart_id: birthData.id
       });
-      console.log('✅ Monthly events response:', startResponse.data);
+      // console.log('✅ Monthly events response:', startResponse.data);
       
       // Check if we got the old format (direct data) or new format (job_id)
       if (startResponse.data?.data && !startResponse.data?.job_id) {
@@ -317,11 +317,11 @@ export default function EventScreen({ route }) {
         const birthData = await getBirthDetails();
         if (!birthData) return;
         
-        console.log('🔍 Checking cache with:', { 
-          birth_chart_id: birthData.id, 
-          selectedYear: selectedYear,
-          name: birthData.name 
-        });
+        // console.log('🔍 Checking cache with:', { 
+        //   birth_chart_id: birthData.id, 
+        //   selectedYear: selectedYear,
+        //   name: birthData.name 
+        // });
         
         const cacheResponse = await chatAPI.getCachedMonthlyEvents({
           ...birthData,
@@ -329,7 +329,7 @@ export default function EventScreen({ route }) {
           birth_chart_id: birthData.id
         });
         
-        console.log('📦 Cache response:', cacheResponse.data);
+        // console.log('📦 Cache response:', cacheResponse.data);
         
         if (cacheResponse.data?.cached && cacheResponse.data?.data) {
           setMonthlyData(cacheResponse.data.data);
@@ -401,10 +401,39 @@ export default function EventScreen({ route }) {
   };
 
   const navigateToChat = (context, type) => {
-    navigation.navigate('ChatScreen', {
-      initialMessage: `I want to know more about the ${type} prediction for ${context.title || context.month}.`,
-      contextData: context,
-      contextType: type
+    // Build detailed prediction text from context
+    console.log('📋 Context data:', JSON.stringify(context, null, 2));
+    console.log('📋 Events count:', context.events?.length);
+    
+    let predictionText = `${context.month} Predictions:\n\n`;
+    
+    if (context.events && context.events.length > 0) {
+      context.events.forEach((event, idx) => {
+        predictionText += `Event ${idx + 1}: ${event.type}\n`;
+        predictionText += `${event.prediction}\n`;
+        if (event.start_date && event.end_date) {
+          predictionText += `Period: ${event.start_date} to ${event.end_date}\n`;
+        }
+        
+        // Include manifestations if available
+        if (event.possible_manifestations && event.possible_manifestations.length > 0) {
+          predictionText += `\nPossible Scenarios (${event.possible_manifestations.length}):\n`;
+          event.possible_manifestations.forEach((manifest, mIdx) => {
+            const scenario = typeof manifest === 'string' ? manifest : manifest.scenario;
+            predictionText += `${mIdx + 1}. ${scenario}\n`;
+          });
+        }
+        predictionText += `\n`;
+      });
+    }
+    
+    predictionText += `Please explain these predictions in more detail.`;
+    
+    console.log('📋 Final prediction text:', predictionText);
+    
+    navigation.navigate('Home', {
+      startChat: true,
+      initialMessage: predictionText
     });
   };
 
@@ -496,7 +525,7 @@ export default function EventScreen({ route }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Regenerate Confirmation Modal */}
       <Modal
         visible={showRegenerateModal}
@@ -505,34 +534,34 @@ export default function EventScreen({ route }) {
         onRequestClose={() => setShowRegenerateModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Ionicons name="refresh-circle" size={48} color="#FFD700" style={styles.modalIcon} />
-            <Text style={styles.modalTitle}>Regenerate Predictions?</Text>
-            <Text style={styles.modalText}>This will cost {creditCost} credits to generate fresh predictions for {selectedYear}.</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
+            <Ionicons name="refresh-circle" size={48} color={colors.accent} style={styles.modalIcon} />
+            <Text style={[styles.modalTitle, { color: colors.accent }]}>Regenerate Predictions?</Text>
+            <Text style={[styles.modalText, { color: colors.textSecondary }]}>This will cost {creditCost} credits to generate fresh predictions for {selectedYear}.</Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.modalButtonCancel]} 
+                style={[styles.modalButton, styles.modalButtonCancel, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]} 
                 onPress={() => setShowRegenerateModal(false)}
               >
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                <Text style={[styles.modalButtonTextCancel, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.modalButtonConfirm]} 
+                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.accent }]} 
                 onPress={handleRegenerateConfirm}
               >
-                <Text style={styles.modalButtonTextConfirm}>Confirm</Text>
+                <Text style={[styles.modalButtonTextConfirm, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>Confirm</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => analysisStarted ? setAnalysisStarted(false) : navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+      <View style={[styles.header, { backgroundColor: colors.backgroundSecondary, borderBottomColor: colors.cardBorder }]}>
+        <TouchableOpacity onPress={() => analysisStarted ? setAnalysisStarted(false) : navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.surface }]}>
+          <Ionicons name="arrow-back" size={24} color={colors.accent} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{analysisStarted ? `${selectedYear} Predictions` : 'Major Life Events'}</Text>
+          <Text style={[styles.headerTitle, { color: colors.accent }]}>{analysisStarted ? `${selectedYear} Predictions` : 'Major Life Events'}</Text>
           {birthData && (
             <NativeSelectorChip 
               birthData={birthData}
@@ -543,13 +572,13 @@ export default function EventScreen({ route }) {
         </View>
         <View style={styles.headerRight}>
           {analysisStarted && monthlyData && (
-            <TouchableOpacity onPress={() => setShowRegenerateModal(true)} style={styles.regenerateButton}>
-              <Ionicons name="refresh" size={20} color="white" />
+            <TouchableOpacity onPress={() => setShowRegenerateModal(true)} style={[styles.regenerateButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Ionicons name="refresh" size={22} color={colors.accent} />
             </TouchableOpacity>
           )}
           {analysisStarted && (
-            <TouchableOpacity onPress={() => setAnalysisStarted(false)} style={styles.settingsButton}>
-              <Ionicons name="settings-outline" size={24} color="white" />
+            <TouchableOpacity onPress={() => setAnalysisStarted(false)} style={[styles.settingsButton, { backgroundColor: colors.surface }]}>
+              <Ionicons name="settings-outline" size={24} color={colors.accent} />
             </TouchableOpacity>
           )}
         </View>
@@ -557,9 +586,9 @@ export default function EventScreen({ route }) {
       </View>
 
       {!analysisStarted ? (
-        <View style={styles.selectionContainer}>
-          <Text style={styles.selectionTitle}>🌟 Select Your Year</Text>
-          <Text style={styles.selectionSubtitle}>Which year would you like to explore?</Text>
+        <View style={[styles.selectionContainer, { backgroundColor: colors.background }]}>
+          <Text style={[styles.selectionTitle, { color: colors.accent }]}>🌟 Select Your Year</Text>
+          <Text style={[styles.selectionSubtitle, { color: colors.textSecondary }]}>Which year would you like to explore?</Text>
           
           {/* Year Picker - Horizontal Chips */}
           <View style={styles.yearChipsContainer}>
@@ -591,14 +620,16 @@ export default function EventScreen({ route }) {
                   <TouchableOpacity
                     style={[
                       styles.yearChip,
-                      selectedYear === item && styles.yearChipSelected,
+                      { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder },
+                      selectedYear === item && { backgroundColor: colors.accent, borderColor: colors.accent },
                       { width: ITEM_WIDTH }
                     ]}
                     onPress={() => handleYearChange(item)}
                   >
                     <Text style={[
                       styles.yearChipText,
-                      selectedYear === item && styles.yearChipTextSelected
+                      { color: colors.textSecondary },
+                      selectedYear === item && { color: theme === 'dark' ? colors.background : '#1a1a1a' }
                     ]}>
                       {item}
                     </Text>
@@ -611,103 +642,103 @@ export default function EventScreen({ route }) {
           {/* Quick Select */}
           <View style={styles.quickSelectContainer}>
             <TouchableOpacity 
-              style={styles.quickSelectButton}
+              style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
               onPress={() => handleYearChange(new Date().getFullYear())}
             >
-              <Text style={styles.quickSelectText}>This Year</Text>
+              <Text style={[styles.quickSelectText, { color: colors.accent }]}>This Year</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.quickSelectButton}
+              style={[styles.quickSelectButton, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
               onPress={() => handleYearChange(new Date().getFullYear() + 1)}
             >
-              <Text style={styles.quickSelectText}>Next Year</Text>
+              <Text style={[styles.quickSelectText, { color: colors.accent }]}>Next Year</Text>
             </TouchableOpacity>
           </View>
 
           {/* What's Included */}
-          <View style={styles.featuresContainer}>
-            <Text style={styles.featuresTitle}>What's Included:</Text>
+          <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.featuresTitle, { color: colors.accent }]}>What's Included:</Text>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#FFD700" />
-              <Text style={styles.featureText}>12 Monthly Forecasts</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              <Text style={[styles.featureText, { color: colors.text }]}>12 Monthly Forecasts</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#FFD700" />
-              <Text style={styles.featureText}>Major Life Events</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              <Text style={[styles.featureText, { color: colors.text }]}>Major Life Events</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#FFD700" />
-              <Text style={styles.featureText}>Timing Guidance</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              <Text style={[styles.featureText, { color: colors.text }]}>Timing Guidance</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#FFD700" />
-              <Text style={styles.featureText}>AI-Powered Insights</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+              <Text style={[styles.featureText, { color: colors.text }]}>AI-Powered Insights</Text>
             </View>
           </View>
 
           {/* Continue Button */}
           <View style={styles.unlockButtonContainer}>
             <TouchableOpacity style={styles.unlockButton} onPress={handleContinue}>
-              <LinearGradient colors={['#FFD700', '#FFA500']} style={styles.unlockGradient}>
-                <Text style={styles.unlockButtonText}>Continue</Text>
-                <Ionicons name="arrow-forward" size={20} color="#000" />
+              <LinearGradient colors={[colors.accent, colors.primary]} style={styles.unlockGradient}>
+                <Text style={[styles.unlockButtonText, { color: theme === 'dark' ? colors.background : '#1a1a1a' }]}>Continue</Text>
+                <Ionicons name="arrow-forward" size={22} color={theme === 'dark' ? colors.background : '#1a1a1a'} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
         <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="white" />}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
         {/* Native Name */}
         {nativeName && (
           <View style={styles.nameContainer}>
-            <Text style={styles.nameText}>{nativeName}</Text>
+            <Text style={[styles.nameText, { color: colors.accent }]}>{nativeName}</Text>
           </View>
         )}
 
         {/* Macro Trends (The "Vibe") */}
         {monthlyData?.macro_trends && (
-          <LinearGradient colors={['#2A2A40', '#1F1F30']} style={styles.macroCard}>
+          <View style={[styles.macroCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
             <View style={styles.macroHeader}>
-              <Ionicons name="planet" size={18} color="#FFD700" />
-              <Text style={styles.macroTitle}>The Vibe of {selectedYear}</Text>
+              <Ionicons name="planet" size={18} color={colors.accent} />
+              <Text style={[styles.macroTitle, { color: colors.accent }]}>The Vibe of {selectedYear}</Text>
             </View>
             {monthlyData.macro_trends.map((trend, index) => (
               <View key={index} style={styles.trendRow}>
-                <Text style={styles.bullet}>•</Text>
-                <Text style={styles.trendText}>{trend}</Text>
+                <Text style={[styles.bullet, { color: colors.accent }]}>•</Text>
+                <Text style={[styles.trendText, { color: colors.text }]}>{trend}</Text>
               </View>
             ))}
-          </LinearGradient>
+          </View>
         )}
 
         {/* SECTION 3: Monthly Guide (The "Details") */}
         {loadingMonthly ? (
           <View style={styles.section}>
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FFD700" />
+              <ActivityIndicator size="large" color={colors.accent} />
               <Text style={styles.loadingIcon}>{loadingMessages[loadingMessageIndex].icon}</Text>
-              <Text style={styles.loadingText}>{loadingMessages[loadingMessageIndex].text}</Text>
+              <Text style={[styles.loadingText, { color: colors.text }]}>{loadingMessages[loadingMessageIndex].text}</Text>
               
               {loadingProgress >= 0 ? (
                 <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBarTrack}>
-                    <View style={[styles.progressBarFill, { width: `${loadingProgress}%` }]} />
+                  <View style={[styles.progressBarTrack, { backgroundColor: colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
+                    <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.accent }]} />
                   </View>
-                  <Text style={styles.progressPercentText}>
+                  <Text style={[styles.progressPercentText, { color: colors.accent }]}>
                     {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : 'Almost there...'}
                   </Text>
                 </View>
               ) : (
-                <Text style={styles.takingLongerText}>Taking longer than usual...</Text>
+                <Text style={[styles.takingLongerText, { color: colors.textSecondary }]}>Taking longer than usual...</Text>
               )}
             </View>
           </View>
         ) : monthlyData?.monthly_predictions ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📅 Monthly Guide</Text>
+            <Text style={[styles.sectionTitle, { color: colors.accent }]}>📅 Monthly Guide</Text>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
                 <MonthlyAccordion 
@@ -727,71 +758,91 @@ export default function EventScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
+  container: { flex: 1, backgroundColor: '#0a0a0f' },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#1E1E2E',
+    paddingVertical: 16,
+    backgroundColor: '#1a1a2e',
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: 'rgba(255, 215, 0, 0.1)',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    elevation: 4,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4
   },
   backButton: {
-    padding: 4
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)'
   },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
   },
   headerTitle: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
-    color: 'white', 
+    fontSize: 22, 
+    fontWeight: '700', 
+    color: '#FFD700', 
     textAlign: 'center',
-    marginBottom: 4
+    marginBottom: 4,
+    letterSpacing: 0.5
   },
   headerSpacer: { width: 32 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   regenerateButton: { 
-    width: 36, 
-    height: 36, 
-    borderRadius: 18, 
-    backgroundColor: 'rgba(255, 255, 255, 0.2)', 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: 'rgba(255, 215, 0, 0.15)', 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)'
   },
-  settingsButton: { padding: 4 },
+  settingsButton: { 
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)'
+  },
   
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: { paddingBottom: 40, backgroundColor: '#0a0a0f' },
   
-  section: { marginTop: 20, marginBottom: 20 },
-  sectionHeader: { paddingHorizontal: 20, marginBottom: 15 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: 'white', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 13, color: '#AAA' },
+  section: { marginTop: 24, marginBottom: 24 },
+  sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '700', color: '#FFD700', marginBottom: 6, letterSpacing: 0.3 },
+  sectionSubtitle: { fontSize: 14, color: '#b8b8c8', lineHeight: 20 },
   
   macroCard: {
     margin: 20,
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#333'
+    borderColor: 'rgba(255, 215, 0, 0.2)',
+    backgroundColor: '#16162a',
+    elevation: 3,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8
   },
-  macroHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  macroTitle: { fontSize: 16, fontWeight: 'bold', color: '#FFD700' },
-  trendRow: { flexDirection: 'row', marginBottom: 6 },
-  bullet: { color: '#FFD700', marginRight: 8, fontSize: 16 },
-  trendText: { color: '#DDD', fontSize: 14, lineHeight: 20, flex: 1 },
+  macroHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
+  macroTitle: { fontSize: 18, fontWeight: '700', color: '#FFD700', letterSpacing: 0.3 },
+  trendRow: { flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' },
+  bullet: { color: '#FFD700', marginRight: 10, fontSize: 18, marginTop: 2 },
+  trendText: { color: '#e8e8f0', fontSize: 15, lineHeight: 22, flex: 1 },
   
   loadingContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
-  loadingIcon: { fontSize: 48, marginTop: 16, marginBottom: 8, color: 'white' },
-  loadingText: { color: 'white', marginTop: 12, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 24 },
-  progressBarContainer: { width: '100%', marginTop: 24, alignItems: 'center' },
-  progressBarTrack: { width: '100%', height: 6, backgroundColor: '#333', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 3 },
-  progressPercentText: { color: '#FFD700', fontSize: 14, fontWeight: '600', marginTop: 8 },
-  takingLongerText: { color: '#AAA', fontSize: 14, marginTop: 24, fontStyle: 'italic' },
+  loadingIcon: { fontSize: 56, marginTop: 20, marginBottom: 12 },
+  loadingText: { color: '#e8e8f0', marginTop: 16, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 26 },
+  progressBarContainer: { width: '100%', marginTop: 28, alignItems: 'center' },
+  progressBarTrack: { width: '100%', height: 8, backgroundColor: '#1a1a2e', borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.2)' },
+  progressBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 4 },
+  progressPercentText: { color: '#FFD700', fontSize: 15, fontWeight: '700', marginTop: 10 },
+  takingLongerText: { color: '#b8b8c8', fontSize: 14, marginTop: 28, fontStyle: 'italic' },
   
   waitingContainer: { 
     flex: 1, 
@@ -809,161 +860,173 @@ const styles = StyleSheet.create({
   
   selectionContainer: {
     flex: 1,
-    padding: 20
+    padding: 20,
+    backgroundColor: '#0a0a0f'
   },
   selectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#FFD700',
     textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 4
+    marginTop: 20,
+    marginBottom: 8,
+    letterSpacing: 0.5
   },
   selectionSubtitle: {
-    fontSize: 14,
-    color: '#AAA',
+    fontSize: 15,
+    color: '#b8b8c8',
     textAlign: 'center',
-    marginBottom: 20
+    marginBottom: 28,
+    lineHeight: 22
   },
   yearChipsContainer: {
-    marginBottom: 20,
-    height: 60
+    marginBottom: 24,
+    height: 64
   },
   yearChipsContent: {
     paddingHorizontal: (width - 80) / 2
   },
   yearChip: {
-    paddingVertical: 12,
-    backgroundColor: '#2A2A40',
-    borderRadius: 12,
+    paddingVertical: 14,
+    backgroundColor: '#16162a',
+    borderRadius: 14,
     borderWidth: 2,
-    borderColor: '#444',
+    borderColor: 'rgba(255, 215, 0, 0.2)',
     alignItems: 'center',
     justifyContent: 'center'
   },
   yearChipSelected: {
     backgroundColor: '#FFD700',
-    borderColor: '#FFD700'
+    borderColor: '#FFD700',
+    elevation: 4,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6
   },
   yearChipText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#AAA'
+    color: '#b8b8c8'
   },
   yearChipTextSelected: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000'
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0a0a0f'
   },
   quickSelectContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16
+    marginBottom: 24
   },
   quickSelectButton: {
     flex: 1,
-    paddingVertical: 10,
-    backgroundColor: '#2A2A40',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#444'
+    paddingVertical: 12,
+    backgroundColor: '#16162a',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 215, 0, 0.3)'
   },
   quickSelectText: {
     color: '#FFD700',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    textAlign: 'center'
+    textAlign: 'center',
+    letterSpacing: 0.3
   },
   featuresContainer: {
-    backgroundColor: '#1E1E2E',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16
+    backgroundColor: '#16162a',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.15)'
   },
   featuresTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 10
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFD700',
+    marginBottom: 14,
+    letterSpacing: 0.3
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    gap: 8
+    marginBottom: 12,
+    gap: 12
   },
   featureText: {
-    fontSize: 14,
-    color: '#DDD'
+    fontSize: 15,
+    color: '#e8e8f0',
+    lineHeight: 20
   },
   unlockButtonContainer: {
-    marginTop: 'auto'
+    marginTop: 'auto',
+    paddingTop: 20
   },
   unlockButton: {
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10
   },
   unlockGradient: {
-    paddingVertical: 16,
+    paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8
+    gap: 10
   },
   unlockButtonText: {
-    color: '#000',
-    fontSize: 17,
-    fontWeight: 'bold'
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5
   },
   nameContainer: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8
+    paddingTop: 20,
+    paddingBottom: 12
   },
   nameText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFD700',
-    textAlign: 'center'
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.5
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20
   },
   modalContent: {
-    backgroundColor: '#1E1E2E',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    padding: 28,
     width: '100%',
     maxWidth: 340,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333'
+    elevation: 10
   },
   modalIcon: {
-    marginBottom: 16
+    marginBottom: 20
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 12,
-    textAlign: 'center'
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 14,
+    textAlign: 'center',
+    letterSpacing: 0.3
   },
   modalText: {
-    fontSize: 14,
-    color: '#AAA',
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24
+    lineHeight: 22,
+    marginBottom: 28
   },
   modalButtons: {
     flexDirection: 'row',
@@ -972,26 +1035,24 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center'
   },
   modalButtonCancel: {
-    backgroundColor: '#2A2A40',
-    borderWidth: 1,
-    borderColor: '#444'
+    borderWidth: 1.5
   },
   modalButtonConfirm: {
-    backgroundColor: '#FFD700'
+    elevation: 4
   },
   modalButtonTextCancel: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '600'
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3
   },
   modalButtonTextConfirm: {
-    color: '#000',
-    fontSize: 15,
-    fontWeight: 'bold'
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3
   }
 });

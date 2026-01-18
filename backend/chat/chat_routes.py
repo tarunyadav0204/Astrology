@@ -20,7 +20,7 @@ from ai.gemini_chat_analyzer import GeminiChatAnalyzer
 from ai.intent_router import IntentRouter
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
-from calculators.event_predictor import EventPredictor
+from calculators.event_predictor_ai import EventPredictor
 from calculators.ashtakavarga import AshtakavargaCalculator
 from shared.dasha_calculator import DashaCalculator
 
@@ -1000,16 +1000,27 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
     """Background task to process event timeline"""
     import sqlite3
     
+    print("\n" + "*"*100)
+    print(f"🚀 BACKGROUND TASK STARTED: process_event_timeline")
+    print(f"   - Job ID: {job_id}")
+    print(f"   - Birth Chart ID: {birth_chart_id}")
+    print(f"   - Target Year: {target_year}")
+    print(f"   - User ID: {user_id}")
+    print(f"   - Cost: {cost} credits")
+    print("*"*100 + "\n")
+    
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
     
     try:
         # Update status to processing
+        print("🔄 Updating job status to 'processing'...")
         cursor.execute(
             "UPDATE event_timeline_jobs SET status = ?, started_at = ? WHERE job_id = ?",
             ('processing', datetime.now(), job_id)
         )
         conn.commit()
+        print("✅ Job status updated")
         
         # Fetch birth data from database
         print(f"🔍 Fetching birth chart {birth_chart_id} from database...")
@@ -1062,7 +1073,13 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         dasha_calc = DashaCalculator()
         
         predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
+        
+        print(f"\n🚀 Calling predict_yearly_events for year {target_year}...")
         predictions = await predictor.predict_yearly_events(birth_data_dict, target_year)
+        
+        print(f"\n📦 Predictions received:")
+        print(f"   - Status: {predictions.get('status')}")
+        print(f"   - Keys: {list(predictions.keys())}")
         
         if predictions.get('status') == 'success':
             # Deduct credits
@@ -1077,16 +1094,21 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
                 raise Exception("Credit deduction failed")
             
             # Save result
+            print(f"\n💾 Saving result to database...")
+            result_json = json.dumps(predictions)
+            print(f"   - Result JSON length: {len(result_json)} characters")
+            
             cursor.execute(
                 "UPDATE event_timeline_jobs SET status = ?, result_data = ?, completed_at = ? WHERE job_id = ?",
                 ('completed', json.dumps(predictions), datetime.now(), job_id)
             )
             conn.commit()
+            print(f"✅ Result saved, task completed")
         else:
             raise Exception(predictions.get('error', 'Prediction failed'))
         
     except Exception as e:
-        print(f"❌ Background task error: {str(e)}")
+        print(f"\n❌ BACKGROUND TASK ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
         cursor.execute(
@@ -1096,3 +1118,4 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         conn.commit()
     finally:
         conn.close()
+        print(f"\n🔒 Database connection closed for job {job_id}\n")
