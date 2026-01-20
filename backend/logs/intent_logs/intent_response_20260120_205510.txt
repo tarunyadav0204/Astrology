@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T20:55:14.057631
+Question: What are my health vulnerabilities?
+Processing Time: 3.986s
+Response Length: 497 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best understand your health vulnerabilities, are you concerned about any specific areas of your health, such as your heart, digestion, or nervous system? Or are you looking for insights into your overall well-being and potential areas to focus on for preventative care?",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand your health vulnerabilities, are you concerned about any specific areas of your health, such as your heart, digestion, or nervous system? Or are you looking for insights into your overall well-being and potential areas to focus on for preventative care?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

@@ -1,0 +1,29 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T20:36:54.076213
+Question: I don't have saturn mercury dasha what are you talking about.
+Processing Time: 3.079s
+Response Length: 136 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

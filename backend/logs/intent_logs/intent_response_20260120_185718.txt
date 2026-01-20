@@ -1,0 +1,39 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T18:57:21.499651
+Question: employed
+Processing Time: 2.695s
+Response Length: 242 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "category": "job",
+    "mode": "birth",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ],
+    "extracted_context": {
+        "area": "job"
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "job",
+  "mode": "birth",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ],
+  "extracted_context": {
+    "area": "job"
+  }
+}

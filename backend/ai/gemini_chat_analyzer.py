@@ -68,7 +68,7 @@ class GeminiChatAnalyzer:
                 self.model = genai.GenerativeModel(
                     model_name,
                     generation_config=genai.GenerationConfig(
-                        temperature=0.7,
+                        temperature=1,
                         top_p=0.95,
                         top_k=40
                     )
@@ -84,7 +84,7 @@ class GeminiChatAnalyzer:
             self.premium_model = genai.GenerativeModel(
                 'models/gemini-3-pro-preview',
                 generation_config=genai.GenerationConfig(
-                    temperature=0.7,
+                    temperature=1,
                     top_p=0.95,
                     top_k=40
                 )

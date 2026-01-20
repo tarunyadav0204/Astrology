@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T19:58:23.823128
+Question: What does my birth chart say about my career?
+Processing Time: 3.292s
+Response Length: 371 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "What specific aspect of your career at Amazon would you like to explore - promotion timing, salary growth, job change, or overall career direction?",
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "What specific aspect of your career at Amazon would you like to explore - promotion timing, salary growth, job change, or overall career direction?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

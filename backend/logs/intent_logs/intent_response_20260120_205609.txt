@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T20:56:12.717768
+Question: I don't have a problem right now just want to know overall if you see all is good or you see some serious concern.
+Processing Time: 3.544s
+Response Length: 383 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand what you're looking for, are you interested in a general outlook on your physical well-being, or are you more curious about potential mental or emotional challenges?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand what you're looking for, are you interested in a general outlook on your physical well-being, or are you more curious about potential mental or emotional challenges?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

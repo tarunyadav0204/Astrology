@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T19:59:04.643953
+Question: Is my job safe right now
+Processing Time: 3.572s
+Response Length: 347 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best assess your job security at Amazon, are you concerned about potential layoffs, performance reviews, or something else?",
+    "mode": "birth",
+    "category": "job",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best assess your job security at Amazon, are you concerned about potential layoffs, performance reviews, or something else?",
+  "mode": "birth",
+  "category": "job",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T19:04:03.684943
+Question: I am employed in Amazon as a Senior Software Development Manager.
+Processing Time: 3.014s
+Response Length: 189 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "category": "career",
+    "mode": "birth",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "career",
+  "mode": "birth",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

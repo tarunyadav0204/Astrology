@@ -1,0 +1,135 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T19:38:01.909178
+Question: What are my health vulnerabilities?
+Processing Time: 5.331s
+Response Length: 1442 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "clarification_question": null,
+    "extracted_context": null,
+    "mode": "birth",
+    "category": "health",
+    "year": null,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2028,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2027": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2028": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "clarification_question": null,
+  "extracted_context": null,
+  "mode": "birth",
+  "category": "health",
+  "year": null,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2028,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2028": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

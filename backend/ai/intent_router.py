@@ -14,11 +14,12 @@ class IntentRouter:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
         
-    async def classify_intent(self, user_question: str, chat_history: list = None) -> Dict[str, str]:
+    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None) -> Dict[str, str]:
         """
         Returns: {'status': 'CLARIFY' | 'READY', 'mode': 'birth' | 'annual', 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}, 'extracted_context': {...}}
         """
         chat_history = chat_history or []
+        user_facts = user_facts or {}
         import time
         from datetime import datetime
         
@@ -37,9 +38,29 @@ class IntentRouter:
             for msg in chat_history[-3:]:  # Last 3 exchanges
                 history_text += f"Q: {msg.get('question', '')}\nA: {msg.get('response', '')}\n"
         
+        # Build user facts context
+        facts_text = ""
+        if user_facts:
+            facts_text = "\n\nKNOWN USER BACKGROUND:\n"
+            for category, items in user_facts.items():
+                fact_str = ", ".join(items) if isinstance(items, list) else str(items)
+                facts_text += f"- {category.upper()}: {fact_str}\n"
+            facts_text += "\nIMPORTANT: Do NOT ask for information already present in the user background.\n"
+        
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
         {history_text}
+        {facts_text}
+        
+        🚨🚨🚨 BLOCKING RULE - READ THIS FIRST 🚨🚨🚨
+        Before generating ANY clarification question, you MUST:
+        1. Read the "KNOWN USER BACKGROUND" section above
+        2. Check if the information you want to ask is ALREADY THERE
+        3. If it IS there, DO NOT ask for it - skip to asking about the specific aspect instead
+        
+        Example: User background shows "CAREER: Employed in Amazon as a Senior Software Development Manager"
+        ❌ WRONG: "Are you currently employed or running a business?"
+        ✅ CORRECT: "What specific aspect of your career would you like to explore - promotion timing, salary growth, job change, or career direction?"
         
         Current question: "{user_question}"
         
@@ -91,19 +112,27 @@ class IntentRouter:
            - A clear focus or timeframe
            Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
         
-        3. Clarification questions should be CONTEXTUAL and help gather facts. Use these examples as inspiration:
-           - "Tell me about my kids" → "I'd love to help! How many children do you have, and what specific aspect would you like to know - their education, health, career prospects, or timing of children if you're planning?"
-           - "How is my 2026?" → "To provide the most accurate guidance, which area would you like me to focus on? Career, Health, Relationships, Finance, or another specific area?"
-           - "Tell me about my career" → "I can help with that! Are you currently employed or running a business? And what specifically would you like to know - job change timing, promotion prospects, salary growth, or career direction?"
-           - "What about my marriage" → "I'd be happy to analyze that! Are you currently married, engaged, or looking for marriage? And what aspect concerns you - timing, compatibility, challenges, or harmony?"
+        3. When clarification is needed, craft a natural, conversational question that:
            
-           Generate similar contextual questions that:
-           - Gather factual information (number of kids, marital status, employment status, etc.)
-           - Narrow down the specific concern within that topic
-           - Sound warm and conversational, not robotic
-           - Are tailored to the user's specific question
+           🚨 CRITICAL: ALWAYS check the KNOWN USER BACKGROUND section first.
+           - DO NOT ask for information already present in the user background
+           - Example: If background shows "CAREER: Employed in Amazon", skip asking about employment status
+           - Example: If background shows "FAMILY: Married in 2020", skip asking about marital status
+           
+           Your clarification question should:
+           - Focus on narrowing down the SPECIFIC aspect they want to know (timing, prospects, challenges, etc.)
+           - Gather NEW factual information NOT in the user background
+           - Sound warm, natural, and conversational (not templated)
+           - Be tailored to their exact question
+           - Help you provide a more accurate astrological analysis
+           
+           💡 FACT EXTRACTION BONUS:
+           The MORE specific facts you can extract in your clarification question, the BETTER our future responses will be.
+           - Instead of just asking "What aspect?", try to extract concrete details
+           - Examples of valuable facts: specific job titles, company names, years of experience, number of children, ages, education levels, health conditions, locations, dates of major events
+           - These facts will be stored and used to personalize ALL future astrological guidance for this user
         
-        4. Max 2 clarifications per session - after that, return READY with available info
+        4. Max 3 clarifications per session - after that, return READY with available info
         
         MODES:
         1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
@@ -194,6 +223,12 @@ class IntentRouter:
         
         try:
             gemini_start = time.time()
+            print(f"\n{'='*80}")
+            print(f"📤 INTENT ROUTER PROMPT TO GEMINI")
+            print(f"{'='*80}")
+            print(prompt)
+            print(f"{'='*80}\n")
+            
             response = await self.model.generate_content_async(prompt)
             gemini_time = time.time() - gemini_start
             

@@ -438,6 +438,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             session_data = cursor.fetchone()
             birth_chart_id = session_data[0] if session_data else None
         
+        # Get user facts for intent routing
+        user_facts = {}
+        if birth_chart_id:
+            fact_extractor = FactExtractor()
+            user_facts = fact_extractor.get_facts(birth_chart_id)
+            if user_facts:
+                print(f"📚 Retrieved {len(user_facts)} fact categories for intent routing")
+        
         # Use birth data from request (required)
         if not birth_details:
             raise Exception("Birth details are required for chat analysis")
@@ -518,7 +526,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 clarification_count = state_row[0] if state_row else 0
             
             intent_router = IntentRouter()
-            intent = await intent_router.classify_intent(question, history)
+            intent = await intent_router.classify_intent(question, history, user_facts)
             
             print(f"🔍 CLARIFICATION CHECK:")
             print(f"   Intent status: {intent.get('status')}")

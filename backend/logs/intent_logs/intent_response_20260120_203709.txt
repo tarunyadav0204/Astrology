@@ -1,0 +1,31 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T20:37:13.292922
+Question: I don't have saturn mercury dasha what are you talking about.
+Processing Time: 3.530s
+Response Length: 385 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "Could you please clarify what you're referring to regarding the Saturn-Mercury Dasha? Are you asking about a specific prediction, or are you unsure about whether you are currently in that Dasha period?",
+    "mode": "birth",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "Could you please clarify what you're referring to regarding the Saturn-Mercury Dasha? Are you asking about a specific prediction, or are you unsure about whether you are currently in that Dasha period?",
+  "mode": "birth",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

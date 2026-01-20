@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T20:37:54.723760
+Question: What are my health vulnerabilities?
+Processing Time: 3.081s
+Response Length: 189 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-20T19:03:24.321641
+Question: Tell me about my career right now. What's going on.
+Processing Time: 3.158s
+Response Length: 487 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can definitely help you with your career! To give you the best advice, can you tell me if you're currently employed, self-employed, or looking for a job? Also, what specifically are you concerned about - job security, potential for growth, changes in your career path, or something else?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I can definitely help you with your career! To give you the best advice, can you tell me if you're currently employed, self-employed, or looking for a job? Also, what specifically are you concerned about - job security, potential for growth, changes in your career path, or something else?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
