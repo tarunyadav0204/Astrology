@@ -272,6 +272,10 @@ class IntentRouter:
             # Add fallback values if missing
             if 'status' not in result:
                 result['status'] = 'READY'  # Default to ready
+            if 'mode' not in result:
+                result['mode'] = 'birth'  # Default to birth mode
+            if 'category' not in result:
+                result['category'] = 'general'  # Default category
             if 'extracted_context' not in result:
                 result['extracted_context'] = {}
             if 'needs_transits' not in result:
