@@ -723,27 +723,42 @@ GLOSSARY_END
             if premium_analysis:
                 image_instructions = """
 SUMMARY IMAGE - MANDATORY:
-Create a prompt for a COMPOSITE NARRATIVE SKETCH. This image must act as a visual storyboard of your entire analysis.
+Create a prompt for a VISUAL NARRATIVE COMPOSITION that captures the essence of your astrological analysis.
 
-🚨 STRUCTURE: 
-The sketch should be divided into 3 distinct "vignettes" or small scenes within the same frame:
-1. LEFT SCENE: Represents the "Current Challenge" (e.g., a person walking through a misty path).
-2. CENTER SCENE: Represents the "Core Prediction/Verdict" (e.g., a large golden sun rising over a mountain).
-3. RIGHT SCENE: Represents the "Future Outcome" (e.g., a harvest of fruit or a successful journey).
+🎨 STRUCTURE: 
+Create a multi-panel composition with AS MANY SCENES AS NEEDED to represent the key aspects of your analysis.
+- Each panel should represent a distinct theme, prediction, or life area from your analysis
+- Minimum 3 panels, maximum 6 panels depending on the complexity of the reading
+- Arrange panels in a flowing, organic layout (not rigid grid)
+
+📋 PANEL CONTENT:
+Each panel should symbolically represent:
+- A specific prediction or insight from your analysis
+- A life area being discussed (career, relationships, health, etc.)
+- A timing phase (current challenge, transition period, future outcome)
+- A karmic theme or spiritual lesson
 
 ✅ VISUAL STYLE:
-- Professional hand-drawn pencil sketch with watercolor washes.
-- Use symbolic colors: Deep indigo for challenges, vibrant gold for success, and emerald green for growth.
-- Minimalist and clean; avoid clutter.
+- Professional hand-drawn pencil sketch with watercolor washes
+- Use symbolic imagery and metaphors (avoid literal representations)
+- Color palette: Deep indigo for challenges, vibrant gold for success, emerald green for growth, soft purple for spirituality, warm orange for relationships
+- Minimalist and elegant; avoid clutter
+- Each panel should flow into the next, creating a cohesive narrative
 
 🔤 TEXT LABELS:
-- Use EXACTLY THREE short labels (one for each scene).
-- Use ALL CAPS and specify "Clear, elegant, hand-lettered serif font."
-- Examples: "CHALLENGE", "SUCCESS", "GROWTH".
+- Add a short label to each panel (1-3 words in ALL CAPS)
+- Use "Clear, elegant, hand-lettered serif font"
+- Labels should capture the essence of that panel's theme
+- Examples: "TRANSFORMATION", "CAREER RISE", "INNER PEACE", "PARTNERSHIP", "BREAKTHROUGH"
 
 Format:
 SUMMARY_IMAGE_START
-[Detailed prompt describing the three specific scenes, the visual style, and the three text labels.]
+[Detailed prompt describing:
+1. The number of panels and their layout
+2. What each panel represents symbolically
+3. The visual style and color scheme
+4. The text labels for each panel
+5. How the panels connect to tell a cohesive story]
 SUMMARY_IMAGE_END
 """
             

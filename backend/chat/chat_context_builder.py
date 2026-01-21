@@ -146,6 +146,37 @@ Tone: Empathetic, insightful, objective, and solution-oriented.
 Philosophy: Astrology indicates "Karma," not "Fate." Hard aspects show challenges to be managed, not doom to be feared.
 Objective: Provide accurate, actionable guidance based on the JSON data provided.
 
+## CLASSICAL TEXT AUTHORITY (MANDATORY CITATIONS)
+Your interpretations MUST align with and cite these authoritative Vedic texts:
+
+**Core Foundational Texts:**
+- **BPHS (Brihat Parashara Hora Shastra)**: Foundational principles, Vimshottari Dasha, divisional charts, planetary dignities
+- **Jataka Parijata**: Predictive techniques, planetary combinations, and yogas
+- **Saravali**: Comprehensive horoscopy, house significations, and yoga interpretations
+
+**Essential Predictive Texts:**
+- **Phaladeepika**: Timing of events, practical predictions, and result manifestation
+- **Jaimini Sutras**: Chara Dasha system, Karakas, Jaimini aspects, and Argala
+- **Uttara Kalamrita**: Advanced divisional chart analysis and synthesis techniques
+- **Hora Sara**: Classical planetary significations and strength calculations
+
+**Specialized Systems:**
+- **Bhrigu Sutras**: Nadi linkages and specific event nature determination
+- **Tajika Neelakanthi**: Prashna/Horary analysis and Ithasala yogas
+- **Chamatkar Chintamani**: Special yogas and rare combinations
+- **Sarvartha Chintamani**: Comprehensive yoga analysis and effects
+
+**MANDATORY CITATION RULE:**
+When identifying yogas, making predictions, or explaining astrological principles, you MUST cite the relevant classical text. Format: "According to [Text Name], [principle/yoga/prediction]."
+
+Examples:
+- "According to BPHS, a debilitated planet in the 10th house..."
+- "Jaimini Sutras state that when the Atmakaraka..."
+- "As per Phaladeepika, this combination indicates..."
+- "Saravali describes this yoga as..."
+
+This establishes authority and authenticity in your predictions.
+
 ## 🧠 USER MEMORY INTEGRATION
 You have access to a "KNOWN USER BACKGROUND" section containing facts extracted from previous conversations.
 - ALWAYS cross-reference these facts with the chart analysis
@@ -218,6 +249,11 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
   3. ONLY the Sign IDs listed in that specific array are aspected.
   4. If an ID is not in that list, you MUST NOT claim an aspect exists.
 - **Example:** If sign_aspects[9] = [0, 3, 6], then Capricorn (ID 9) aspects ONLY Aries, Cancer, and Libra. It does NOT aspect Aquarius (ID 10).
+- **CRITICAL VERIFICATION RULE:** Before stating "Sign A aspects Sign B" or "[Sign Name] Chara Dasha activates the [house] axis":
+  1. Convert sign names to IDs (Aries=0, Taurus=1... Pisces=11)
+  2. Check `sign_aspects[ID_A]` in the JSON
+  3. If ID_B is NOT in that array, you are HALLUCINATING - DO NOT make the claim
+  4. Your training data on Jaimini aspects is WRONG - trust ONLY the JSON sign_aspects mapping
 - **Verification:** If a sign ID is not in that list, there is NO Jaimini aspect. Never imply an aspect exists if it is not explicitly mapped in the JSON.
 - **Jaimini Raj Yogas:** Check `jaimini_full_analysis['raj_yogas']` for powerful combinations:
     - **Jaimini Raj Yoga (AK+AmK):** Soul + Career connection = High status and authority
@@ -364,6 +400,13 @@ You are an interface for the provided JSON data, NOT a standalone astrologer.
    - Use `macro_transits_timeline` for the "Big Picture" (which sign/house Jupiter/Saturn are in).
    - Use `transit_activations` for specific month-to-month triggers.
    - ⚠️ **PROHIBITION**: If a planet is NOT in these JSON blocks, you are forbidden from stating its position. You must not use your internal knowledge to guess where Saturn or Rahu is in 2026.
+   - 🔴 **NAVATARA (TARA BALA) RULE**: If `navatara_warnings` exists in the JSON and a planet is flagged in a malefic Tara (Vipat/Pratyak/Naidhana), you MUST:
+     * Explicitly name the Tara in your analysis (e.g., "Saturn is in Vipat Tara")
+     * Use the exact Tara name as a label: "This is your [Tara Name] Tara for [Planet]"
+     * Provide a specific caution in the Manifestations section
+     * Explain that despite favorable sign/house placement, the Nakshatra position creates karmic obstacles
+     * Example: "While Jupiter transits your 5th house (good for children), it is in Naidhana Tara - this is your Naidhana (Destruction) Tara for Jupiter, indicating delays or unexpected endings. Exercise patience and avoid hasty decisions."
+     * MANDATORY FORMAT: "[Planet] is transiting in [Nakshatra Name], which is your [Tara Name] Tara from your birth Moon. This creates [specific karmic effect]."
 
 2. **HOUSE ID SUPREMACY**:
    - Never count houses yourself. If `macro_transits_timeline` says "Jupiter: House 12", then Jupiter is in the 12th House. Do not attempt to "correct" this based on your training data.
@@ -392,6 +435,51 @@ You MUST include a subsection titled **'#### Timing Synthesis (Multi-System)'** 
    - Mudda Dasha monthly periods
 
 **Mandatory Template:** "This timing is confirmed by [Sign] Chara Dasha, [Yogini Lord] Yogini, and your [Planet] Pratyantardasha in the [House] house, creating [specific outcome]."
+
+### S. SPECIAL POINTS ANALYSIS - SENSITIVE DEGREES & KARMIC MARKERS
+You MUST include a subsection titled **'#### Special Points (Gandanta & Yogi)'** in your Astrological Analysis when `special_points` data is present.
+
+**Available Data:**
+- `special_points['gandanta_analysis']`: Contains planets in Gandanta zones (critical junction points between water and fire signs)
+- `special_points['yogi_points']['yogi']`: The Yogi point (fortune point calculated from Sun + Moon)
+- `special_points['yogi_points']['avayogi']`: The Avayogi point (obstacle point)
+- `special_points['yogi_points']['dagdha_rashi']`: The Dagdha Rashi (burnt sign)
+- `special_points['yogi_points']['tithi_shunya_rashi']`: The Tithi Shunya Rashi (void sign based on lunar day)
+
+**Your Task:**
+Analyze ALL of these special points using your astrological knowledge:
+
+1. **Gandanta Analysis**: Check if any planets are in Gandanta zones and explain their karmic implications
+2. **Yogi Point**: Analyze the Yogi lord (sign lord of the Yogi point) and how it brings fortune
+3. **Avayogi Point**: Analyze the Avayogi lord (sign lord of the Avayogi point) and how it creates obstacles
+4. **Dagdha Rashi**: Check if any planets (especially Moon) are in the Dagdha Rashi and explain the sensitivity
+5. **Tithi Shunya Rashi**: Check if any planets are in the Tithi Shunya Rashi and explain delayed/unexpected results
+
+You MUST analyze both Yogi AND Avayogi, as well as Dagdha Rashi and Tithi Shunya if relevant.
+
+Use the subsection header: `#### Special Points (Gandanta & Yogi)`
+
+### U. PROGRESSIVE NADI AGE ACTIVATION (THE DESTINY TRIGGER)
+In Nadi Astrology, planets and Nakshatras "wake up" at specific ages. You MUST check the user's current age against their Natal Nakshatra placements.
+
+**Age-Star Activation:** Check if `nadi_age_activation` exists in the context. If present, the user's current age matches activation years for specific Nakshatras.
+
+**Key Activation Ages:**
+- **Magha (45-46):** Ancestors, inheritance, authority, and lineage responsibilities
+- **Swati (30, 46, 69):** Transformation, scattering of old paths, and sudden new directions
+- **Pushya (24, 36, 65):** Fructification of efforts, nourishing results, and mentorship
+- **Rohini (16, 36, 83):** Growth in wealth, magnetic personality, and family expansion
+
+**Karmic Wake-up Call:** If the activated Nakshatra contains 2+ natal planets ("Cluster"), you MUST prioritize the results of those houses as "Destined Life Events."
+
+**Mandatory Citation:** In your analysis, you MUST state: "NADI AGE TRIGGER: Age [X] activates [Nakshatra Name]. [Planet(s)] in this nakshatra MUST manifest [House Number] themes as destined karmic events this year."
+
+**Analysis Protocol:**
+1. Check `nadi_age_activation['activated_planets']` for planets in activated nakshatras
+2. For each activated planet, analyze its house placement and lordships
+3. Predict SPECIFIC life events based on house significations
+4. Emphasize that this is NOT just a transit - it's a KARMIC DESTINY TRIGGER that overrides normal timing rules
+5. If multiple planets are activated (cluster), predict MAJOR LIFE PIVOT YEAR
 
 ### K. DIVISIONAL CHARTS (VARGA) - MASTER ANALYSIS PROTOCOL
 You have access to specific Divisional Charts (D-Charts) in the `divisional_charts` object. You must use them as the "Final Verdict" for their specific domains.
@@ -595,18 +683,20 @@ For every user query, structure your response exactly as follows:
 
 **Key Insights**: Multiple bullet points highlighting the key analysis findings.
 - **The Jaimini/Yogini Confirmation:** [MANDATORY bullet using specific terms like 'Aquarius Period' or 'Sankata Vibe' from the data]
+- **Classical Reference:** [MANDATORY bullet citing relevant classical text for the main prediction]
 
 **Detailed Analysis**:
-- **The Promise (Chart Analysis):** Planetary positions and Yogas.
-- **The Master Clock (Vimshottari):** What the main Dasha indicates.
-- **Timing Synthesis (Multi-System):** [MANDATORY] You MUST cite the Chara Sign and Yogini Lord from the JSON here. Format: "This is confirmed by [Sign] Chara Dasha and [Lord] Yogini."
+- **The Promise (Chart Analysis):** Planetary positions and Yogas. MUST cite classical text when identifying yogas (e.g., "According to Saravali, this forms...")
+- **The Master Clock (Vimshottari):** What the main Dasha indicates. Cite BPHS for dasha interpretations.
+- **Timing Synthesis (Multi-System):** [MANDATORY] You MUST cite the Chara Sign and Yogini Lord from the JSON here. Format: "This is confirmed by [Sign] Chara Dasha and [Lord] Yogini." Reference Jaimini Sutras for Chara Dasha principles.
 - **The Triple Perspective (Sudarshana):** [MANDATORY] Cross-check the event from Moon (Mind) and Sun (Soul).
+- **Special Points (Gandanta & Yogi):** [MANDATORY IF DATA EXISTS] Analyze Gandanta crisis zones, Yogi/Avayogi fortune/obstacles, and Dagdha Rashi. Use the format specified in Section S.
 - **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction.
-- **The Synthesis:** How D9 modifies the final outcome.
+- **The Synthesis:** How D9 modifies the final outcome. Cite Uttara Kalamrita for divisional chart synthesis.
 
 **Practical Guidance**: Actionable advice or cautions and Remedies.
 
-**Final Thoughts**: Summary and outlook.
+**Final Thoughts**: Summary and outlook with classical wisdom reference.
 """
     
     # Class-level constants
@@ -1286,6 +1376,18 @@ For every user query, structure your response exactly as follows:
             context['yogini_dasha']
         )
         
+        # Add Special Points Analysis (Gandanta, Yogi, Avayogi, Dagdha Rashi)
+        from calculators.gandanta_calculator import GandantaCalculator
+        from calculators.yogi_calculator import YogiCalculator
+        
+        yogi_calc = YogiCalculator(chart_data)
+        gandanta_calc = GandantaCalculator(chart_data)
+        
+        context['special_points'] = {
+            'yogi_points': yogi_calc.calculate_yogi_points(birth_data),
+            'gandanta_analysis': gandanta_calc.calculate_gandanta_analysis()
+        }
+        
         # Add Varshphal if question is about a specific year
         if intent_result and intent_result.get('transit_request'):
             req = intent_result['transit_request']
@@ -1409,6 +1511,116 @@ For every user query, structure your response exactly as follows:
         except Exception as e:
             # print(f"❌ Macro transits calculation failed: {e}")
             context['macro_transits_timeline'] = {}
+        
+        # Add Navatara (Tara Bala) filtering for transit analysis
+        try:
+            from calculators.navatara_calculator import NavataraCalculator
+            
+            # Get Moon's birth nakshatra from planetary analysis
+            birth_hash = self._create_birth_hash(birth_data)
+            planetary_analysis = self.static_cache[birth_hash].get('planetary_analysis', {})
+            moon_data = planetary_analysis.get('Moon', {})
+            moon_nakshatra = moon_data.get('basic_info', {}).get('nakshatra')
+            
+            print(f"\n🌙 NAVATARA DEBUG:")
+            print(f"   Moon nakshatra from planetary_analysis: {moon_nakshatra}")
+            
+            # Get nakshatra number (0-26)
+            moon_nakshatra_number = None
+            if moon_nakshatra:
+                try:
+                    moon_nakshatra_number = self.NAKSHATRA_NAMES.index(moon_nakshatra)
+                    print(f"   Moon nakshatra number: {moon_nakshatra_number}")
+                except ValueError:
+                    print(f"   ❌ Moon nakshatra '{moon_nakshatra}' not found in NAKSHATRA_NAMES")
+            else:
+                print(f"   ❌ Moon nakshatra is None or empty")
+            
+            if moon_nakshatra_number is not None and 'macro_transits_timeline' in context:
+                navatara_calc = NavataraCalculator(moon_nakshatra_number)
+                print(f"   ✅ NavataraCalculator initialized with Moon nakshatra {moon_nakshatra_number}")
+                
+                # Analyze each transit planet's nakshatra position
+                navatara_warnings = {}
+                for planet, periods in context['macro_transits_timeline'].items():
+                    if periods and len(periods) > 0:
+                        # Get current/first period's nakshatra
+                        current_period = periods[0]
+                        transit_nakshatra_number = current_period.get('nakshatra_number')
+                        transit_nakshatra_name = current_period.get('nakshatra', 'Unknown')
+                        
+                        print(f"   {planet}: transit_nakshatra_number={transit_nakshatra_number}, name={transit_nakshatra_name}")
+                        
+                        if transit_nakshatra_number is not None:
+                            tara_info = navatara_calc.calculate_tara(transit_nakshatra_number)
+                            print(f"      Tara: {tara_info['name']} (effect: {tara_info['effect']})")
+                            
+                            if tara_info['effect'] == 'bad':
+                                navatara_warnings[planet] = {
+                                    'tara': tara_info['name'],
+                                    'tara_number': tara_info['number'],
+                                    'effect': tara_info['description'],
+                                    'transit_nakshatra': transit_nakshatra_name,
+                                    'birth_moon_nakshatra': moon_nakshatra,
+                                    'warning': f"Karmic Obstacle: {planet} in {tara_info['name']} Tara",
+                                    'mandatory_statement': f"{planet} is transiting in {transit_nakshatra_name}, which is your {tara_info['name']} Tara from your birth Moon in {moon_nakshatra}. This creates {tara_info['description'].lower()}."
+                                }
+                                print(f"      ⚠️ MALEFIC TARA DETECTED: {planet} in {tara_info['name']}")
+                        else:
+                            print(f"      ⚠️ transit_nakshatra_number is None")
+                
+                context['navatara_warnings'] = navatara_warnings
+                print(f"   ✅ Navatara analysis complete: {len(navatara_warnings)} malefic positions detected")
+                print(f"   navatara_warnings: {navatara_warnings}")
+            else:
+                print(f"   ❌ Skipping Navatara: moon_nakshatra_number={moon_nakshatra_number}, has_macro_transits={'macro_transits_timeline' in context}")
+                context['navatara_warnings'] = {}
+        except Exception as e:
+            print(f"❌ Navatara calculation failed: {e}")
+            import traceback
+            traceback.print_exc()
+            context['navatara_warnings'] = {}
+        
+        # Add Progressive Nadi Age Activation
+        try:
+            dob = datetime.strptime(birth_data['date'], '%Y-%m-%d')
+            current_age = datetime.now().year - dob.year
+            
+            # Comprehensive Nadi Age Activation Map
+            nadi_age_map = {
+                16: 'Rohini', 24: 'Pushya', 30: 'Swati', 36: ['Rohini', 'Pushya'],
+                45: 'Magha', 46: ['Magha', 'Swati'], 65: 'Pushya', 69: 'Swati', 83: 'Rohini'
+            }
+            
+            activated_stars = nadi_age_map.get(current_age)
+            if activated_stars:
+                if not isinstance(activated_stars, list):
+                    activated_stars = [activated_stars]
+                
+                # Get planetary analysis to find planets in activated nakshatras
+                birth_hash = self._create_birth_hash(birth_data)
+                planetary_analysis = self.static_cache[birth_hash].get('planetary_analysis', {})
+                
+                activated_planets = []
+                for planet, data in planetary_analysis.items():
+                    planet_nakshatra = data.get('basic_info', {}).get('nakshatra')
+                    if planet_nakshatra in activated_stars:
+                        house = data.get('basic_info', {}).get('house')
+                        activated_planets.append({
+                            'planet': planet,
+                            'nakshatra': planet_nakshatra,
+                            'house': house
+                        })
+                
+                context['nadi_age_activation'] = {
+                    'age': current_age,
+                    'activated_nakshatras': activated_stars,
+                    'activated_planets': activated_planets,
+                    'instruction': f"NADI AGE TRIGGER: Age {current_age} activates {', '.join(activated_stars)} nakshatra(s). Planets in these nakshatras MUST manifest their karma this year."
+                }
+        except Exception as e:
+            # print(f"❌ Nadi age activation failed: {e}")
+            context['nadi_age_activation'] = None
         
         # Add transit data availability info with enhanced methodology
         current_year = datetime.now().year
@@ -1569,7 +1781,6 @@ For every user query, structure your response exactly as follows:
                                         # Find the AD that covers the start of transit period
                                         ad_sign_name = chara_period.get('sign_name', 'Unknown')  # Default to MD
                                         antardashas = chara_period.get('antardashas', [])
-                                        # print(f"   DEBUG: Chara MD {chara_period.get('sign_name')}, ADs available: {len(antardashas)}")
                                         
                                         if antardashas:
                                             for ad in antardashas:
@@ -1577,11 +1788,7 @@ For every user query, structure your response exactly as follows:
                                                 ad_end = datetime.strptime(ad['end_date'], "%Y-%m-%d")
                                                 if ad_start <= start_date_obj < ad_end:
                                                     ad_sign_name = ad.get('sign_name', 'Unknown')
-                                                    # print(f"   DEBUG: Found AD {ad_sign_name} for transit start {start_date_obj}")
                                                     break
-                                        else:
-                                            print(f"   DEBUG: No antardashas for this MD, using MD sign as AD")
-                                        
                                         chara_periods_for_range.append({
                                             'mahadasha_sign': chara_period.get('sign_name', 'Unknown'),
                                             'antardasha_sign': ad_sign_name,

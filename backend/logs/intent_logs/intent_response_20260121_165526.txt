@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-21T16:55:29.640411
+Question: I already said health
+Processing Time: 2.905s
+Response Length: 423 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To give you the most helpful insights, could you tell me more about what you'd like to explore regarding your health? Are you interested in potential vulnerabilities, specific areas of concern, or perhaps a general overview?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To give you the most helpful insights, could you tell me more about what you'd like to explore regarding your health? Are you interested in potential vulnerabilities, specific areas of concern, or perhaps a general overview?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

@@ -13,6 +13,7 @@ import {
   Modal,
   Image,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -31,6 +32,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   // Debug logging
   useEffect(() => {
@@ -203,7 +205,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, ' ');
+      .replace(/&nbsp;/g, ' ')
+      // Remove standalone # at end of lines (trailing markdown artifacts)
+      .replace(/\n\s*#\s*$/gm, '')
+      .replace(/\n\s*#\s*\n/g, '\n');
     
     // Process term tooltips FIRST, after HTML entity decoding
     if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
@@ -756,7 +761,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     let listCounter = 0;
     
     // Split by headers and paragraphs - include markdown headers
-    const parts = text.split(/(<h3>.*?<\/h3>|##\s+.+|###\s+.+|\n\n+)/).filter(part => part.trim());
+    const parts = text.split(/(<h3>.*?<\/h3>|##\s+.+|###\s+.+|\n\n+)/).filter(part => {
+      const trimmed = part.trim();
+      // Filter out standalone # symbols
+      return trimmed && trimmed !== '#';
+    });
     
     for (const part of parts) {
       if (part.match(/<h3>(.*?)<\/h3>/)) {
@@ -924,13 +933,26 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         {/* Beta Notice for Timeline Predictions */}
         {message.role === 'assistant' && !isClarification && (
           <View style={styles.betaNotice}>
-            <Text style={styles.betaNoticeText}>⚠️ BETA NOTICE: Timeline predictions are experimental. Please use logic and discretion.</Text>
+            <Text style={styles.betaNoticeText}>⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.</Text>
+          </View>
+        )}
+        
+        {/* Legal Disclaimer */}
+        {message.role === 'assistant' && !isClarification && (
+          <View style={styles.disclaimerNotice}>
+            <Text style={styles.disclaimerNoticeText}>
+              ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
+            </Text>
           </View>
         )}
         
         {/* Summary Image */}
         {message.summary_image && (
-          <View style={{ marginBottom: 15, alignItems: 'center' }}>
+          <TouchableOpacity 
+            style={{ marginBottom: 15, alignItems: 'center' }}
+            onPress={() => setShowImageModal(true)}
+            activeOpacity={0.8}
+          >
             <Image 
               source={{ uri: message.summary_image }}
               style={{ width: '100%', maxWidth: 400, height: 250, borderRadius: 12 }}
@@ -938,7 +960,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               onError={(e) => console.log('❌ Image load error:', e.nativeEvent.error)}
               onLoad={() => console.log('✅ Image loaded successfully')}
             />
-          </View>
+            <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>Tap to enlarge</Text>
+          </TouchableOpacity>
         )}
         
         <View style={styles.messageContent}>
@@ -1074,6 +1097,28 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               <Text style={styles.tooltipModalCloseText}>Close</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+      
+      {/* Image Zoom Modal */}
+      <Modal
+        visible={showImageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImageModal(false)}
+      >
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity 
+            style={styles.imageModalCloseButton}
+            onPress={() => setShowImageModal(false)}
+          >
+            <Ionicons name="close-circle" size={36} color="white" />
+          </TouchableOpacity>
+          <Image 
+            source={{ uri: message.summary_image }}
+            style={styles.imageModalImage}
+            resizeMode="contain"
+          />
         </View>
       </Modal>
     </Animated.View>
@@ -1535,5 +1580,35 @@ const styles = StyleSheet.create({
     color: '#E65100',
     fontWeight: '600',
     lineHeight: 16,
+  },
+  disclaimerNotice: {
+    backgroundColor: 'rgba(156, 39, 176, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#9C27B0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  disclaimerNoticeText: {
+    fontSize: 11,
+    color: '#6A1B9A',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  imageModalImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.8,
   },
 });

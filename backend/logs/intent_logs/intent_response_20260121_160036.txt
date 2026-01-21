@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-21T16:00:39.778469
+Question: Job satisfaction
+Processing Time: 3.029s
+Response Length: 421 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "What specific aspect of job satisfaction are you most interested in exploring? For example, are you looking for more fulfillment, better work-life balance, or perhaps career advancement opportunities within your current role?",
+  "mode": "birth",
+  "category": "job",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "What specific aspect of job satisfaction are you most interested in exploring? For example, are you looking for more fulfillment, better work-life balance, or perhaps career advancement opportunities within your current role?",
+  "mode": "birth",
+  "category": "job",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

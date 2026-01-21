@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-21T16:06:44.149196
+Question: Career advancement
+Processing Time: 2.060s
+Response Length: 461 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best assist you with career advancement, could you share what specific aspects you're most interested in? Are you looking for insights on timing for a promotion, strategies for salary growth, or perhaps guidance on transitioning to a different role or company?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best assist you with career advancement, could you share what specific aspects you're most interested in? Are you looking for insights on timing for a promotion, strategies for salary growth, or perhaps guidance on transitioning to a different role or company?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

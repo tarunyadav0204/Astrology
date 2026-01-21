@@ -528,13 +528,17 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             intent_router = IntentRouter()
             intent = await intent_router.classify_intent(question, history, user_facts)
             
+            # CLARIFICATION LIMIT: Set to 3 to allow more clarifications before forcing answer
+            MAX_CLARIFICATIONS = 3
+            
             print(f"🔍 CLARIFICATION CHECK:")
             print(f"   Intent status: {intent.get('status')}")
             print(f"   Clarification count: {clarification_count}")
-            print(f"   Will clarify: {intent.get('status') == 'CLARIFY' and clarification_count < 2}")
+            print(f"   Max allowed: {MAX_CLARIFICATIONS}")
+            print(f"   Will clarify: {intent.get('status') == 'CLARIFY' and clarification_count < MAX_CLARIFICATIONS}")
             
             # Check if clarification needed and under limit
-            if intent.get('status') == 'CLARIFY' and clarification_count < 2:
+            if intent.get('status') == 'CLARIFY' and clarification_count < MAX_CLARIFICATIONS:
                 print(f"✅ RETURNING CLARIFICATION QUESTION")
                 # Return clarification question
                 with sqlite3.connect('astrology.db') as conn:

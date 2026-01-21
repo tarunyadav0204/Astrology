@@ -32,9 +32,8 @@ class CharaDashaCalculator:
             is_current = start_date <= current_time < end_date
             
             # Calculate antardashas for current mahadasha
-            antardashas = []
-            if is_current:
-                antardashas = self._calculate_antardashas(sign_idx, years, start_date, current_time)
+            # ALWAYS calculate antardashas for transit analysis to work correctly
+            antardashas = self._calculate_antardashas(sign_idx, years, start_date, current_time)
             
             dasha_periods.append({
                 "sign_id": sign_idx,

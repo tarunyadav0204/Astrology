@@ -1,0 +1,303 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-21T23:44:35.284100
+Question: What does my birth chart say about my career?
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 24798 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+
+Previous conversation:
+Q: When is a good time for marriage?
+A: What does my birth chart say about my career?
+Q: What are my health vulnerabilities?
+A: <div class="quick-answer-card">**Quick Answer**: The stars align powerfully for marriage in **mid-2026**, specifically after **June 2026**.
+
+This timing is driven by a massive "Destiny Convergence":
+1.  **The Master Clock**: You enter the **Capricorn Chara Dasha** in April 2026, which is your Natal 7th House (Marriage).
+2.  **The Nadi Trigger**: Your 46th year (starting April 2026) activates the **2nd House** (Family/Kutumba), forcing a change in family status.
+3.  **The Divine Blessing**: Jupiter enters your Ascendant in **June 2026**, casting a direct protective aspect on your 7th House of marriage.
+
+**Confidence Level**: 95% (Major Life Milestone) due to the simultaneous activation of Vimshottari, Jaimini, and Nadi systems.</div>
+
+### Key Insights
+• **The Jaimini Confirmation**: In April 2026, you shift from the Aquarius period into the **Capricorn Period**. Since Capricorn is your **7th House** (the house of marriage itself), this shift explicitly activates partnership karma for the next 5 years.
+• **Classical Reference**: According to *Phaladeepika*, when the Mahadasha Lord (Saturn) rules the 7th House and is conjunct the Antardasha Lord (Rahu), relationships manifest with strong karmic intensity.
+
+### Astrological Analysis
+
+#### The Parashari View
+Your **7th House** (Marriage) is ruled by **Saturn**, which sits in the **2nd House** (Family) in a massive planetary cluster with Mars, Jupiter, and Rahu.
+*   **The Promise**: The 7th Lord in the 2nd House strongly links marriage to family wealth and lineage. However, the presence of **Mars and Rahu** here indicates that while marriage is destined, it may come with initial family friction or unconventional circumstances.
+*   **The Dasha**: You are currently in the **Saturn Mahadasha** (7th Lord) and **Rahu Antardasha** (conjunct 7th Lord). This combination is the primary activator for relationships. Rahu acts as a catalyst, accelerating events that Saturn (the Lord of Marriage) has promised.
+
+#### Jaimini Sutra Deep-Dive (MANDATORY)
+*   **Dasha Activation**: As mentioned, the shift to **Capricorn Chara Dasha** in April 2026 is the definitive timer. Capricorn is your 7th house.
+*   **Darakaraka (Spouse Indicator)**: Your Darakaraka is **Mars**, placed in Leo. From your upcoming Capricorn Dasha, Mars falls in the 8th house. This suggests the partner may bring a transformative financial or emotional change to your life.
+*   **Upapada Lagna (UL)**: Your UL is in **Taurus**. The current Aquarius dasha was 10th from UL (sustaining), but the incoming Capricorn dasha is **9th from UL** (Trine/Fortune), which is excellent for formalizing unions.
+
+#### Nadi Precision (The Nature of Marriage)
+Your chart reveals specific Nadi connections that define the *nature* of your partner and timing:
+
+*   **The "Age 46" Trigger:** The Nadi data confirms that your 46th year (2026) activates the **Magha** nakshatra in your 2nd House. Since this house contains **Saturn** (7th Lord) and **Mars** (Spouse Planet), this is a "Destined Event" year. The universe effectively "wakes up" your marriage karma at this specific age.
+*   **The "Karma-Dharma" Link (Saturn + Jupiter):** Saturn (your self/career) is conjunct Jupiter (Dharma/Husband for women/Wisdom). This indicates a partner who is likely **well-educated, possibly working in management, law, or advisory roles**, and brings a sense of structure to your life.
+*   **The "Foreign/Unconventional" Link (Saturn + Rahu):** This connection suggests the partner may be from a different cultural background, caste, or simply have a very modern/unconventional outlook on life.
+
+#### Timing Synthesis (Multi-System)
+*   **Vimshottari**: **Saturn-Rahu-Mercury** (June 2026) is the trigger. Mercury rules your Navamsa 7th House, acting as the final "deal closer."
+*   **Transits**:
+    *   **Jupiter**: Moves into **Cancer** (your Ascendant) in **June 2026**. From here, it casts a direct 7th aspect onto your 7th House of Marriage. This is the classic "Jupiter's Blessing" required for wedding ceremonies.
+    *   **Ashtakavarga**: Jupiter will be aspecting your 7th House (Capricorn), which has **27 Ashtakavarga points**. This indicates "Good strength" – the transit will be effective and support a stable union.
+*   **Yogini**: You are running the **Ulka (Saturn)** Antardasha until July 2026. Since Saturn is your 7th Lord, this aligns perfectly with the event window.
+
+#### Triple Perspective (Sudarshana)
+*   **Lagna (Cancer)**: 7th House is Capricorn (Ruled by Saturn).
+*   **Moon (Libra)**: 7th House is Aries (Ruled by Mars). Mars is with Saturn.
+*   **Sun (Pisces)**: 7th House is Virgo.
+*   **Synthesis**: The convergence of Saturn and Mars in the 2nd house affects the marriage houses from both Lagna and Moon, confirming that the event will deeply impact your family structure and home life (2nd & 4th house matters).
+
+#### Divisional Chart Analysis (D9 Navamsa)
+In the **Navamsa (D9)**, your 7th House is **Virgo**, ruled by Mercury.
+*   **Mercury** sits in Aries in the D9.
+*   **Venus** (Karaka of Marriage) is in **Aquarius** in the D9.
+*   **Key Strength**: Your D1 7th Lord (Saturn) goes to **Sagittarius** in D9, a friendly sign. This stabilizes the volatility seen in the D1 (where Saturn is with Rahu/Mars), suggesting that while the process of getting married might be stressful (planning/family), the marriage itself has staying power.
+
+### Nakshatra Insights
+Your 7th Lord Saturn is in **Uttara Phalguni** (ruled by Sun). This indicates a partner who is authoritative, reliable, and possibly connected to government or large organizations. The Sun is in your 9th house (Dharma), further reinforcing that this marriage fulfills a spiritual or social duty.
+
+### Timing & Guidance
+**Primary Window**: **June 2026 – November 2026**
+This period has the triple support of Jupiter's transit, Saturn's Dasha, and the new Capricorn Chara Dasha.
+
+**Practical Advice**:
+1.  **Family Mediation**: With the heavy cluster (Mars/Rahu/Saturn) in your 2nd House of family, expect some friction or heated debates regarding wedding details or partner choice. Navigate this with patience; the stars support the *union*, even if the *process* is noisy.
+2.  **Focus on Communication**: The 2nd house also rules speech. During the Rahu Antardasha, misunderstandings can escalate quickly. Be hyper-clear in your communication with your future partner.
+3.  **Remedy**: Since Rahu is active in the marriage setup, donating to causes that support the underprivileged or performing a **Durga Saptashati** path can help smooth out the "Rahu noise" (confusion/anxiety).
+
+<div class="final-thoughts-card">**Final Thoughts**: 2026 is a definitive landmark year for you. The shift into the Capricorn period marks the end of a "waiting" cycle and the beginning of a "partnership" cycle. The planetary alignment in June 2026 is rare and specifically supportive of formalizing a long-term commitment.</div>
+Q: What are my health vulnerabilities?
+A: <div class="quick-answer-card">**Quick Answer**: Your health profile is defined by a critical **Gandanta (Karmic Knot)** placement at your Ascendant and a massive planetary cluster in your 2nd House.
+
+You are currently in a high-alert phase for health. Your **Saturn-Rahu-Jupiter** Dasha (active now) triggers the 6th Lord (Disease) and 8th Lord (Chronic Issues) simultaneously. Combined with **Rahu transiting your 8th House** (which has weak Ashtakavarga strength), this creates vulnerabilities in the **throat/face region, digestive fire, and nervous system**.
+
+The presence of the Ascendant in the **Ashlesha-Magha Gandanta** indicates that your physical constitution is sensitive to stress and requires deeper "unwinding" than others.</div>
+
+### Key Insights
+• **The Gandanta Factor**: Your Ascendant is at **29.88° Cancer**, placing it in the "Extreme" zone of the Ashlesha-Magha <term id="key">Gandanta</term>. This is a spiritual and physical "knot" where Water meets Fire, often manifesting as unexplainable autoimmune sensitivity or nervous system "short-circuits."
+• **The Leo Cluster (Maraka Danger)**: A rare 4-planet conjunction (Saturn, Mars, Jupiter, Rahu) sits in your 2nd House (Leo). Since the 2nd House is a <term id="key">Maraka</term> (Death-inflicting/Critical) house, this area is the "Ground Zero" for your health vulnerabilities.
+• **The Jaimini Confirmation**: You are in the **Aquarius Chara Dasha** (2020–2026). Aquarius aspects your Lagna (Cancer), directly activating physical body issues during this window.
+
+### Astrological Analysis
+
+#### The Parashari View
+Your chart features a high-intensity "Maraka" activation involving the 6th and 8th Lords:
+1.  **The 2nd House Congestion**: Leo (the sign of the heart, spine, and vitality) contains **Saturn** (8th Lord of longevity), **Jupiter** (6th Lord of disease), **Mars**, and **Rahu**. This combination creates a "pressure cooker" effect. Vulnerabilities include:
+    *   **Throat/Thyroid**: 2nd House rules the throat.
+    *   **Dental/Facial**: 2nd House rules the face/teeth.
+    *   **Acidity/Ulcers**: Leo rules the upper stomach; Mars + Rahu here creates high heat (Pitta).
+2.  **Lagna Lord Status**: The Moon (Lagna Lord) is in the 4th House (Libra). While angular (good), it is aspected by the Saturn/Rahu/Mars cluster from the 2nd house. This means your physical health (Lagna Lord) is constantly under pressure from the toxicity of the 2nd house elements.
+
+#### Jaimini Sutra Deep-Dive (MANDATORY)
+The Jaimini system confirms the timing of these vulnerabilities:
+*   **Current Period**: You are in the **Aquarius** Chara Dasha (until April 2026).
+*   **Aspect Activation**: From the `sign_aspects` logic, Aquarius (ID 10) aspects **Cancer (ID 3)**, which is your Ascendant. This creates a direct link between the current time period and your physical body.
+*   **Relative View**: From the perspective of Aquarius, the massive malefic cluster (Saturn/Mars/Rahu) falls in the **7th House** (Leo). In Jaimini, the 7th house is also a Maraka point. This "Double Maraka" activation (Parashari 2nd + Jaimini 7th) confirms this is a peak period for health maintenance.
+*   **Atmakaraka (Soul)**: Saturn is your Atmakaraka. Being involved in the affliction suggests these health challenges are karmically destined to teach endurance and discipline.
+
+#### Nadi Precision (The Nature of Health)
+Your chart reveals specific Nadi connections that define the *nature* of these issues:
+*   **The "Moon-Ketu" Link**: Your Moon (Mind/Body fluid) is in a trine with Ketu. This creates a **Psychosomatic Link**, meaning your physical symptoms are often triggered by emotional withdrawal or anxiety. It specifically indicates issues with fluids (lymphatic) or "drying up" of energy.
+*   **The "Saturn-Mars-Rahu" Link**: This combination in Leo suggests "Fire and Wind" imbalance. In Nadi, this often points to inflammation that arises suddenly (Mars) and is hard to diagnose (Rahu). It can also indicate surgery or dental interventions.
+
+#### Timing Synthesis (Multi-System)
+The timing for health caution is **NOW**:
+*   **Vimshottari**: You are in **Saturn-Rahu-Jupiter**.
+    *   **Saturn (MD)**: 8th Lord (Chronic).
+    *   **Rahu (AD)**: Amplifies the 2nd house ailments.
+    *   **Jupiter (PD)**: The **Jupiter Pratyantardasha**, sitting in your **2nd House** (Leo), brings the 6th Lord's (Disease) energy directly into the Maraka zone for this month.
+*   **Transits**: **Rahu** is currently transiting your **8th House** (Aquarius).
+    *   *Ashtakavarga Check*: The Ashtakavarga shows only **22 points** for your 8th house, indicating **weak resistance** to chronic issues. Rahu here is unsupervised and can cause sudden, hidden complications.
+*   **Yogini**: You are in the **Ulka (Saturn)** Antardasha within Bhadrika Mahadasha. Ulka specifically signifies "grief or bodily pain," aligning with the Vimshottari prediction.
+
+#### Triple Perspective (Sudarshana)
+*   **From Lagna (Cancer)**: The affliction is in the 2nd House (Face/Throat).
+*   **From Moon (Libra)**: The cluster falls in the **11th House** (Leo). This is actually positive for *recovery*—Planets in the 11th from Moon suggest that with the right treatment, you have the resilience to overcome these issues.
+*   **From Sun (Pisces)**: The cluster falls in the **6th House** (Leo). This confirms **digestive inflammation** and enemies (disease) being a primary focus.
+*   **Verdict**: 2 out of 3 views show health stress (Lagna/Sun), but the Moon view promises recovery capability. **Confidence: 80% (Serious but manageable).**
+
+#### Special Points (Gandanta & Yogi)
+*   **Gandanta Crisis**: Both your **Ascendant (Cancer)** and **Mars (Leo)** are in the Ashlesha-Magha Gandanta zone. This double Gandanta creates a "physical knot."
+    *   *Manifestation*: Sudden spikes in temperature, blood pressure, or allergic reactions that confuse doctors. The transition from Water (Ashlesha) to Fire (Magha) suggests a system that overheats easily.
+*   **D30 (Trimsamsa) Confirmation**: In the D30 chart of misfortune, the **6th House (Aries)** contains Rahu, Mars, and Ketu. This is an extremely intense combination confirming susceptibility to cuts, surgeries, or acute inflammation.
+
+### Nakshatra Insights
+*   **Ascendant in Ashlesha**: Ruled by the Nagas (Serpents). This creates a sensitivity to toxins and pharmaceuticals. You may have strong reactions to medication. The "coiling" energy of Ashlesha affects the nervous system.
+*   **Cluster in Magha**: Saturn, Mars, and Rahu are in Magha (The Throne). This nakshatra is genetic/ancestral. Health issues may be hereditary, passed down from the father's side (Sun/Leo).
+
+### Timing & Guidance
+**Critical Period**: The current **Saturn-Rahu** period (ending mid-2026) is the peak vulnerability window. The transit of Jupiter into Cancer (your Lagna) in mid-2026 will bring significant relief and healing.
+
+**Actionable Advice**:
+1.  **Dietary Cooling**: With the fiery Leo cluster, avoid spicy, acidic, and heat-producing foods (Pitta pacification).
+2.  **Throat Care**: The 2nd house affliction targets the throat. Regular thyroid checks and vocal rest are recommended.
+3.  **Gandanta Remedy**: The "Knot" needs loosening. Cranio-sacral therapy, acupuncture, or deep tissue work is far more effective for you than standard exercise.
+4.  **Rahu Monitor**: With Rahu in the 8th (Weak Ashtakavarga), do not ignore "minor" symptoms related to elimination or circulation. Early detection is key.
+
+<div class="final-thoughts-card">**Final Thoughts**: Your body is a high-sensitivity instrument due to the Gandanta Lagna. While the current 2nd House cluster looks intimidating, the 11th-from-Moon position shows you have the resilience to heal. Treat your nervous system with extreme care until Jupiter enters Cancer in mid-2026.</div>
+
+        
+
+KNOWN USER BACKGROUND:
+- HEALTH: health
+- CAREER: Employed
+
+IMPORTANT: Do NOT ask for information already present in the user background.
+
+        
+        🚨🚨🚨 BLOCKING RULE - READ THIS FIRST 🚨🚨🚨
+        Before generating ANY clarification question, you MUST:
+        1. Read the "KNOWN USER BACKGROUND" section above
+        2. Check if the information you want to ask is ALREADY THERE
+        3. If it IS there, DO NOT ask for it - skip to asking about the specific aspect instead
+        
+        Example: User background shows "CAREER: Employed in Amazon as a Senior Software Development Manager"
+        ❌ WRONG: "Are you currently employed or running a business?"
+        ✅ CORRECT: "What specific aspect of your career would you like to explore - promotion timing, salary growth, job change, or career direction?"
+        
+        Current question: "What does my birth chart say about my career?"
+        
+        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+        - Extract the area from the user's response
+        - Return status: "READY" with the extracted category
+        - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. When clarification is needed, craft a natural, conversational question that:
+           
+           🚨 CRITICAL: ALWAYS check the KNOWN USER BACKGROUND section first.
+           - DO NOT ask for information already present in the user background
+           - Example: If background shows "CAREER: Employed in Amazon", skip asking about employment status
+           - Example: If background shows "FAMILY: Married in 2020", skip asking about marital status
+           
+           Your clarification question should:
+           - Focus on narrowing down the SPECIFIC aspect they want to know (timing, prospects, challenges, etc.)
+           - Gather NEW factual information NOT in the user background
+           - Sound warm, natural, and conversational (not templated)
+           - Be tailored to their exact question
+           - Help you provide a more accurate astrological analysis
+           
+           💡 FACT EXTRACTION BONUS:
+           The MORE specific facts you can extract in your clarification question, the BETTER our future responses will be.
+           - Instead of just asking "What aspect?", try to extract concrete details
+           - Examples of valuable facts: specific job titles, company names, years of experience, number of children, ages, education levels, health conditions, locations, dates of major events
+           - These facts will be stored and used to personalize ALL future astrological guidance for this user
+        
+        4. Max 3 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Questions involving 'when', 'growth', or 'timing' → ALWAYS set needs_transits: true
+        - Career questions about promotions/hikes → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

@@ -420,6 +420,7 @@ class RealTransitCalculator:
                         'segment': segment_num,
                         'retrograde_return': is_retrograde_return,
                         'nakshatra': nakshatra_data['name'],
+                        'nakshatra_number': nakshatra_data.get('index', 0),
                         'pada': nakshatra_data['pada']
                     })
                     
@@ -448,6 +449,7 @@ class RealTransitCalculator:
                     'segment': segment_num,
                     'retrograde_return': is_retrograde_return,
                     'nakshatra': nakshatra_data['name'],
+                    'nakshatra_number': nakshatra_data.get('index', 0),
                     'pada': nakshatra_data['pada']
                 })
             

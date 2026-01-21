@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-21T20:02:34.131091
+Question: What are my health vulnerabilities?
+Processing Time: 5.221s
+Response Length: 401 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best understand your health vulnerabilities, could you tell me what concerns you most? Are you worried about specific conditions, family history, or just overall well-being?",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand your health vulnerabilities, could you tell me what concerns you most? Are you worried about specific conditions, family history, or just overall well-being?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

@@ -1,0 +1,31 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-21T16:31:40.040217
+Question: What does my birth chart say about my career?
+Processing Time: 2.549s
+Response Length: 165 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "category": "job",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "job",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

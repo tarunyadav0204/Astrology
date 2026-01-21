@@ -229,13 +229,14 @@ export const generatePDF = async (message) => {
     console.log('📄 [PDF] HTML generated, length:', html.length);
     console.log('📄 [PDF] Calling Print.printToFileAsync...');
 
-    // Generate PDF without image first (image causes hanging)
-    const htmlWithoutImage = html.replace(/<img[^>]*class="summary-image"[^>]*>/g, '');
-    
+    // Generate PDF with image included
     const { uri } = await Promise.race([
-      Print.printToFileAsync({ html: htmlWithoutImage }),
+      Print.printToFileAsync({ 
+        html,
+        base64: false
+      }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('PDF generation timeout')), 30000)
+        setTimeout(() => reject(new Error('PDF generation timeout')), 45000)
       )
     ]);
     

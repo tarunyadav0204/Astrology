@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-21T16:55:11.196178
+Question: General overview
+Processing Time: 2.824s
+Response Length: 390 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide a helpful general overview, could you please specify which area of your life you're most interested in? For example, are you curious about career, relationships, finances, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide a helpful general overview, could you please specify which area of your life you're most interested in? For example, are you curious about career, relationships, finances, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
