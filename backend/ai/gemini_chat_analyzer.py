@@ -26,7 +26,7 @@ class GeminiChatAnalyzer:
     """Gemini AI integration for astrological chat conversations"""
     
     def __init__(self):
-        api_key = os.getenv('GEMINI_API_KEY1')
+        api_key = os.getenv('GEMINI_API_KEY')
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
         
