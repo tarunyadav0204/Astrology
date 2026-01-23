@@ -351,4 +351,15 @@ export const lifeEventsAPI = {
     }),
 };
 
+export const chatErrorAPI = {
+  logError: (errorType, errorMessage, userQuestion = null, stackTrace = null) => 
+    api.post(getEndpoint('/chat/log-error'), {
+      error_type: errorType,
+      error_message: errorMessage,
+      user_question: userQuestion,
+      stack_trace: stackTrace,
+      platform: 'mobile'
+    }),
+};
+
 export default api;

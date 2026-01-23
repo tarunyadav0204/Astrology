@@ -1197,6 +1197,19 @@ export default function ChatScreen({ navigation, route }) {
       console.error('❌ Error sending message:', error);
       clearInterval(loadingInterval);
       
+      // Log error to backend for developer monitoring
+      try {
+        const { chatErrorAPI } = require('../../services/api');
+        await chatErrorAPI.logError(
+          error.name || 'ChatError',
+          error.message || 'Unknown error',
+          messageText,
+          error.stack
+        );
+      } catch (logError) {
+        console.error('Failed to log error:', logError);
+      }
+      
       // Replace processing message with error
       setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 

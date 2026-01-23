@@ -26,7 +26,7 @@ class GeminiChatAnalyzer:
     """Gemini AI integration for astrological chat conversations"""
     
     def __init__(self):
-        api_key = os.getenv('GEMINI_API_KEY')
+        api_key = os.getenv('GEMINI_API_KEY1')
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
         
@@ -405,7 +405,20 @@ class GeminiChatAnalyzer:
             print(f"❌ Error in generate_chat_response: {type(e).__name__}: {str(e)}")
             print(f"❌ Full error details: {repr(e)}")
             import traceback
-            print(f"❌ Stack trace: {traceback.format_exc()}")
+            stack_trace = traceback.format_exc()
+            print(f"❌ Stack trace: {stack_trace}")
+            
+            # Log error to database
+            try:
+                self._log_backend_error(
+                    user_question=user_question,
+                    error=e,
+                    stack_trace=stack_trace,
+                    astrological_context=astrological_context,
+                    user_context=user_context
+                )
+            except Exception as log_error:
+                print(f"⚠️ Failed to log error to database: {log_error}")
             
             # More specific error handling
             error_message = "I'm having trouble processing your question right now. Please try rephrasing it or try again later."
@@ -523,6 +536,18 @@ class GeminiChatAnalyzer:
     def _extract_image_prompts(self, response_text: str) -> dict:
         """DEPRECATED: Extract image prompts from Gemini response (old inline method)"""
         return {}
+    
+    
+    def _log_backend_error(self, user_question: str, error: Exception, stack_trace: str, astrological_context: Dict, user_context: Dict = None):
+        """Log backend errors to database for admin monitoring"""
+        from utils.error_logger import log_chat_error
+        
+        user_id = user_context.get('user_id') if user_context else None
+        username = user_context.get('user_name', 'Unknown') if user_context else 'Unknown'
+        phone = user_context.get('user_phone', '') if user_context else ''
+        birth_data = astrological_context.get('birth_details', {})
+        
+        log_chat_error(user_id, username, phone, error, user_question, birth_data, 'backend')
     
     def _prune_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """

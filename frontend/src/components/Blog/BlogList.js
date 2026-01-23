@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
 import './BlogList.css';
 
 const BlogList = () => {
@@ -63,6 +64,12 @@ const BlogList = () => {
 
     return (
         <>
+            <SEOHead 
+                title="Vedic Astrology Blog - Insights & Predictions | AstroRoshni"
+                description="Explore our collection of Vedic astrology articles, predictions, and cosmic insights. Learn about nakshatras, planetary transits, and astrological wisdom."
+                keywords="astrology blog, vedic astrology articles, astrology insights, planetary transits, nakshatra articles, astrology predictions"
+                canonical="https://astroroshni.com/blog"
+            />
             <NavigationHeader />
             <div className="blog-list-container">
             <div className="blog-header">

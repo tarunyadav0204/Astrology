@@ -712,7 +712,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             context['extracted_context'] = intent['extracted_context']
         
         # Generate response
-        analyzer = GeminiChatAnalyzer()
+        try:
+            analyzer = GeminiChatAnalyzer()
+        except Exception as init_error:
+            from utils.error_logger import log_chat_error
+            log_chat_error(user_id, birth_data.get('name', 'Unknown'), '', init_error, question, birth_data, 'backend')
+            raise init_error
+        
         result = await analyzer.generate_chat_response(
             user_question=question,
             astrological_context=context,

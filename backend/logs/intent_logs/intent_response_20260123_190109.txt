@@ -1,0 +1,31 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-23T19:01:12.098687
+Question: Navigating challenges with colleagues
+Processing Time: 2.934s
+Response Length: 167 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "category": "career",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import NavigationHeader from '../Shared/NavigationHeader';
+import SEOHead from '../SEO/SEOHead';
 import './BlogPost.css';
 
 const BlogPost = () => {
@@ -121,6 +122,34 @@ const BlogPost = () => {
 
     return (
         <>
+            <SEOHead 
+                title={`${post.title} | AstroRoshni Blog`}
+                description={post.excerpt || post.content.substring(0, 160)}
+                keywords={post.tags ? post.tags.join(', ') : 'vedic astrology, astrology blog'}
+                canonical={`https://astroroshni.com/blog/${post.slug}`}
+                ogImage={post.featured_image || 'https://astroroshni.com/og-image.jpg'}
+                structuredData={{
+                    "@context": "https://schema.org",
+                    "@type": "BlogPosting",
+                    "headline": post.title,
+                    "description": post.excerpt,
+                    "image": post.featured_image,
+                    "datePublished": post.created_at,
+                    "dateModified": post.updated_at,
+                    "author": {
+                        "@type": "Organization",
+                        "name": "AstroRoshni"
+                    },
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "AstroRoshni",
+                        "logo": {
+                            "@type": "ImageObject",
+                            "url": "https://astroroshni.com/logo.png"
+                        }
+                    }
+                }}
+            />
             <NavigationHeader />
             <div className="blog-post-container" style={{paddingTop: '230px'}}>
             <article className="blog-post">
