@@ -10,69 +10,74 @@ const PolicyPage = () => {
     }}>
       <NavigationHeader />
       <div style={{ padding: '220px 20px 60px 20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ color: '#e91e63', marginBottom: '30px' }}>Privacy Policy & Terms</h1>
+      <h1 style={{ color: '#e91e63', marginBottom: '10px' }}>AstroRoshni Privacy Policy</h1>
+      <p style={{ color: '#666', marginBottom: '30px' }}>Last Updated: January 24, 2026</p>
       
       <section style={{ marginBottom: '30px' }}>
-        <h2>Privacy Policy</h2>
-        <div style={{ background: '#e8f5e8', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '2px solid #4caf50' }}>
-          <h3 style={{ color: '#2e7d32', margin: '0 0 10px 0' }}>🔒 End-to-End Encryption</h3>
-          <p style={{ margin: '0', fontWeight: 'bold', color: '#2e7d32' }}>ALL data we collect is protected with end-to-end encryption. Your personal information, birth details, and chat messages are encrypted and secure.</p>
-        </div>
-        <p>We collect birth details for astrological calculations and protect your personal information with appropriate security measures.</p>
-        
-        <h3>Information We Collect</h3>
-        <ul>
-          <li>Birth details (date, time, place)</li>
-          <li>Contact information (name, email)</li>
-          <li>Chat messages and consultation history</li>
-        </ul>
-        
-        <h3>AI Processing Disclosure</h3>
-        <div style={{ background: '#fff3e0', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '2px solid #ff9800' }}>
-          <p style={{ margin: '0', fontWeight: 'bold', color: '#e65100' }}>🤖 We use advanced Artificial Intelligence (AI) models to analyze your astrological data. While your data is encrypted, it is processed through secure API channels to generate insights. No personal identifiers (like your name) are shared with the AI models.</p>
-        </div>
-        
-        <h3>How We Use Information</h3>
-        <ul>
-          <li>Provide astrological services</li>
-          <li>Generate personalized reports</li>
-          <li>Improve user experience</li>
-        </ul>
-        
-        <h3>Data Deletion & Right to be Forgotten</h3>
-        <p>Users have the right to request the total deletion of their birth profile, chat history, and account data at any time via the settings menu or by contacting support.</p>
+        <h2>1. Introduction</h2>
+        <p>Welcome to AstroRoshni. This Privacy Policy explains how we collect, use, and protect your personal data when you use our mobile application and website (astroroshni.com).</p>
       </section>
 
       <section style={{ marginBottom: '30px' }}>
-        <h2>Terms of Service</h2>
-        <p>AstroRoshni provides astrological services for entertainment and guidance purposes.</p>
-        
-        <h3>Age Restriction</h3>
-        <p><strong>Users must be 18 years of age or older to use the consultation and chat services.</strong></p>
-        
-        <h3>User Responsibilities</h3>
+        <h2>2. Data Controller</h2>
+        <p>For the purposes of the General Data Protection Regulation (GDPR) and the Digital Personal Data Protection Act (DPDP India), the data controller is:</p>
+        <p><strong>Amber Yadav</strong><br />Email: help@astroroshni.com</p>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>3. Information We Collect</h2>
+        <p>We collect the following data to provide astrological services:</p>
         <ul>
-          <li>Provide accurate information</li>
-          <li>Use services lawfully</li>
-          <li>Respect intellectual property</li>
+          <li><strong>Personal Identifiers:</strong> Name, Email address, Phone Number.</li>
+          <li><strong>Birth Data:</strong> Date of birth, Time of birth, Place of birth (Longitude/Latitude).</li>
+          <li><strong>App Activity:</strong> Chat history, consultation logs, horoscopes, Vedic Life Analysis, and preferences.</li>
+          <li><strong>Device Info:</strong> IP address, device model, and OS version (for security and crash reporting).</li>
         </ul>
-        
-        <h3>Fate vs. Freewill Clause</h3>
-        <div style={{ background: '#f3e5f5', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '2px solid #9c27b0' }}>
-          <p style={{ margin: '0', fontWeight: 'bold', color: '#6a1b9a' }}>⚖️ Astrology provides indicators of cosmic energy, not deterministic outcomes. Users retain absolute freewill. AstroRoshni is not responsible for any actions taken or not taken by the user based on the information provided.</p>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>4. How We Use Your Data</h2>
+        <ul>
+          <li><strong>Service Functionality:</strong> To calculate birth charts and generate predictions.</li>
+          <li><strong>Personalization:</strong> To tailor AI insights to your specific planetary positions.</li>
+          <li><strong>Account Management:</strong> To allow you to access your history across devices.</li>
+        </ul>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>5. AI Processing & Encryption</h2>
+        <div style={{ background: '#fff3e0', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '2px solid #ff9800' }}>
+          <p style={{ margin: '0', fontWeight: 'bold', color: '#e65100' }}>🤖 We use Google Gemini API for astrological analysis. No personally identifiable information (Name/Email) is sent to the AI. Only birth coordinates and chat queries are processed.</p>
         </div>
-        
-        <h3>Ethical Boundaries & Prohibited Topics</h3>
-        <p>Our services strictly prohibit and will not provide predictions related to:</p>
+        <div style={{ background: '#e8f5e8', padding: '15px', borderRadius: '8px', border: '2px solid #4caf50' }}>
+          <p style={{ margin: '0', fontWeight: 'bold', color: '#2e7d32' }}>🔒 All data is kept <strong>End-to-End Encrypted</strong>. Data is <strong>Encrypted in Transit</strong> (HTTPS/TLS) and <strong>Encrypted at Rest</strong> using industry-standard encryption protocols.</p>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>6. Data Sharing</h2>
+        <p><strong>We do not sell your data.</strong> Data is only shared with:</p>
         <ul>
-          <li>Determining the exact time or date of death</li>
-          <li>Specific medical diagnoses or treatment outcomes</li>
-          <li>Illegal activities or gambling advice</li>
-          <li>Paternity or sensitive family disputes</li>
+          <li><strong>Service Providers:</strong> Google Cloud/Firebase (Hosting) and Google Gemini (AI processing) under strict confidentiality.</li>
+          <li><strong>Legal Necessity:</strong> Only if required by Indian Law.</li>
         </ul>
-        
-        <h3>Disclaimer</h3>
-        <p>Services are for entertainment purposes. Not professional advice for medical, legal, financial, or mental health decisions. In case of emergency, contact appropriate emergency services.</p>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>7. Your Rights & Data Deletion</h2>
+        <p>You have the <strong>"Right to be Forgotten."</strong> You can request total deletion of your data via the <strong>App Settings &gt; Delete Account</strong> or by emailing help@astroroshni.com. We will process deletions within 72 hours.</p>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>8. Children's Privacy</h2>
+        <p><strong>AstroRoshni is not intended for users under 18 years of age.</strong> We do not knowingly collect data from minors.</p>
+      </section>
+
+      <section style={{ marginBottom: '30px' }}>
+        <h2>9. Disclaimer</h2>
+        <div style={{ background: '#f3e5f5', padding: '15px', borderRadius: '8px', border: '2px solid #9c27b0' }}>
+          <p style={{ margin: '0', fontWeight: 'bold', color: '#6a1b9a' }}>⚖️ Astrology is for guidance and entertainment. We do not provide medical, legal, or financial advice.</p>
+        </div>
       </section>
 
       <section>
