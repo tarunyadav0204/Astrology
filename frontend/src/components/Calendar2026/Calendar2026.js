@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from '../Shared/NavigationHeader';
+import { APP_CONFIG } from '../../config/app.config';
 
 const Calendar2026 = ({ user, onLogout, onLogin }) => {
   const [currentMonth, setCurrentMonth] = useState(0);
@@ -33,10 +34,14 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
       const year = 2026;
       const month = currentMonth + 1;
       
+      const API_BASE_URL = process.env.NODE_ENV === 'production' 
+        ? APP_CONFIG.api.prod 
+        : APP_CONFIG.api.dev;
+      
       const [panchangResponse, festivalResponse, transitResponse] = await Promise.all([
-        fetch(`/api/panchang/monthly?year=${year}&month=${month}&latitude=${location.lat}&longitude=${location.lon}`),
-        fetch(`/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${userTimezone}`),
-        fetch(`/api/transits/monthly/${year}/${month}`)
+        fetch(`${API_BASE_URL}/api/panchang/monthly?year=${year}&month=${month}&latitude=${location.lat}&longitude=${location.lon}&timezone=${encodeURIComponent(userTimezone)}`),
+        fetch(`${API_BASE_URL}/api/festivals/month/${year}/${month}?lat=${location.lat}&lon=${location.lon}&timezone=${encodeURIComponent(userTimezone)}`),
+        fetch(`${API_BASE_URL}/api/transits/monthly/${year}/${month}`)
       ]);
       
       if (panchangResponse.ok && festivalResponse.ok) {
