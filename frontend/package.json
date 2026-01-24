@@ -19,9 +19,30 @@
   },
   "scripts": {
     "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && react-snap",
     "build:dev": "NODE_ENV=development react-scripts build",
-    "build:prod": "NODE_ENV=production react-scripts build"
+    "build:prod": "NODE_ENV=production react-scripts build && react-snap"
+  },
+  "reactSnap": {
+    "include": [
+      "/",
+      "/marriage-analysis",
+      "/career-guidance",
+      "/health-analysis",
+      "/wealth-analysis",
+      "/panchang",
+      "/muhurat-finder",
+      "/nakshatras",
+      "/blog"
+    ],
+    "crawl": true,
+    "waitFor": 5000,
+    "puppeteerArgs": ["--no-sandbox", "--disable-setuid-sandbox"],
+    "minifyHtml": {
+      "collapseWhitespace": false,
+      "removeComments": false
+    },
+    "skipThirdPartyRequests": true
   },
   "browserslist": {
     "production": [
@@ -32,5 +53,8 @@
       "last 1 chrome version"
     ]
   },
-  "proxy": "http://localhost:8001"
+  "proxy": "http://localhost:8001",
+  "devDependencies": {
+    "react-snap": "^1.23.0"
+  }
 }
