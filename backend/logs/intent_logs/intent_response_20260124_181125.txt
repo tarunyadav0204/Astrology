@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-24T18:11:28.427617
+Question: What are my strengths and weaknesses?
+Processing Time: 3.014s
+Response Length: 190 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D27"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D27"
+  ]
+}

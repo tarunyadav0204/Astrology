@@ -1,5 +1,6 @@
 .native-selector {
-  margin-bottom: 20px;
+  margin-bottom: 0;
+  align-self: center;
 }
 
 .current-native {

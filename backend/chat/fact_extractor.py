@@ -43,7 +43,14 @@ RULES:
    - "I'm planning to move to Canada" → location/preferences fact
    - "I have two children" → family fact
 
-3. DO NOT extract:
+3. CRITICAL - TEMPORAL CONTEXT:
+   - If user mentions time-sensitive events ("I have surgery today", "I'm traveling next week"), include the temporal context
+   - Format: "Surgery scheduled (mentioned on [current date])"
+   - For ongoing states without dates ("I work as engineer"), no date needed
+   - For past events with dates ("married in 2020"), include the year
+   - For future plans ("planning to move"), mark as "planned" or "upcoming"
+
+4. DO NOT extract:
    - Astrological predictions ("you will face challenges")
    - Chart interpretations ("partnerships are important for you")
    - Future forecasts ("2026 will be good for career")
@@ -52,16 +59,18 @@ RULES:
 Categories:
 - career: Job, profession, work experience, industry
 - family: Marital status, children, parents, siblings
-- health: Medical conditions, health concerns
+- health: Medical conditions, health concerns, surgeries, treatments
 - location: Current city, country, places lived
 - preferences: Interests, hobbies, goals
 - education: Degrees, studies, institutions
 - relationships: Dating status, engagement, divorce
 - major_events: Significant life events with dates
+- temporary_events: Time-sensitive events (surgeries, trips, interviews)
 
 Return ONLY a JSON array of facts:
 [
   {{"category": "career", "fact": "Software Engineer with 2 years experience", "confidence": 0.9}},
+  {{"category": "temporary_events", "fact": "Surgery scheduled (mentioned on {datetime.now().strftime('%Y-%m-%d')})", "confidence": 1.0}},
   {{"category": "family", "fact": "Married in 2020", "confidence": 1.0}}
 ]
 
@@ -100,12 +109,14 @@ If no USER-STATED facts found, return empty array: []
         conn.close()
     
     def get_facts(self, birth_chart_id: int) -> Dict[str, List[str]]:
-        """Retrieve all facts for a birth chart"""
+        """Retrieve all facts for a birth chart, filtering out old temporary events"""
+        from datetime import datetime, timedelta
+        
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT category, fact FROM user_facts
+            SELECT category, fact, extracted_at FROM user_facts
             WHERE birth_chart_id = ?
             ORDER BY extracted_at DESC
         """, (birth_chart_id,))
@@ -114,7 +125,18 @@ If no USER-STATED facts found, return empty array: []
         conn.close()
         
         facts_by_category = {}
-        for category, fact in rows:
+        cutoff_date = datetime.now() - timedelta(days=7)  # Filter temporary events older than 7 days
+        
+        for category, fact, extracted_at in rows:
+            # Skip old temporary events
+            if category == 'temporary_events':
+                try:
+                    fact_date = datetime.fromisoformat(extracted_at)
+                    if fact_date < cutoff_date:
+                        continue  # Skip this old temporary event
+                except:
+                    pass  # If date parsing fails, include it
+            
             if category not in facts_by_category:
                 facts_by_category[category] = []
             facts_by_category[category].append(fact)

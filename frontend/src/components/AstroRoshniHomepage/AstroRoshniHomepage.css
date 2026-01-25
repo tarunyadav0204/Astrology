@@ -1501,6 +1501,187 @@
 
 /* AstroRoshni Advertisement */
 .astroroshni-ad {
+  padding: 80px 0;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+/* Karma Analysis Section */
+.karma-analysis-section {
+  padding: 80px 0;
+  background: linear-gradient(135deg, #fff9e6 0%, #ffe8cc 50%, #ffd9b3 100%);
+}
+
+.karma-analysis-section .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Karma Analysis Cosmic Card */
+.karma-cosmic-card {
+  position: relative;
+  background: linear-gradient(135deg, #fff 0%, #fff9e6 50%, #ffe8cc 100%);
+  border-radius: 24px;
+  padding: 40px;
+  margin-bottom: 40px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 20px 60px rgba(210, 105, 30, 0.2);
+  border: 2px solid rgba(210, 105, 30, 0.2);
+}
+
+.karma-cosmic-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 30px 80px rgba(210, 105, 30, 0.3);
+}
+
+.karma-cosmic-glow {
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(255, 140, 0, 0.2) 0%, transparent 70%);
+  animation: karmaGlow 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes karmaGlow {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.5; }
+  50% { transform: scale(1.2) rotate(180deg); opacity: 0.8; }
+}
+
+.karma-cosmic-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.karma-om-symbol {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: karmaPulse 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(255, 140, 0, 0.4));
+}
+
+@keyframes karmaPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.karma-title {
+  font-size: 42px;
+  font-weight: 800;
+  color: #d2691e;
+  margin: 0 0 12px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 30px rgba(210, 105, 30, 0.3);
+}
+
+.karma-subtitle {
+  font-size: 20px;
+  color: #666;
+  margin: 0 0 30px;
+  font-style: italic;
+  font-weight: 300;
+}
+
+.karma-features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.karma-features span {
+  background: rgba(255, 140, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 140, 0, 0.3);
+  padding: 12px 24px;
+  border-radius: 30px;
+  color: #d2691e;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.karma-features span:hover {
+  background: rgba(255, 140, 0, 0.2);
+  border-color: rgba(255, 140, 0, 0.6);
+  transform: translateY(-2px);
+}
+
+.karma-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.karma-badge {
+  background: linear-gradient(135deg, #ff8c00, #ff6347);
+  color: white;
+  padding: 14px 32px;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(255, 140, 0, 0.4);
+  animation: karmaShine 2s ease-in-out infinite;
+}
+
+@keyframes karmaShine {
+  0%, 100% { box-shadow: 0 8px 24px rgba(255, 140, 0, 0.4); }
+  50% { box-shadow: 0 8px 32px rgba(255, 140, 0, 0.7); }
+}
+
+.karma-arrow {
+  font-size: 32px;
+  color: #d2691e;
+  animation: karmaArrow 1.5s ease-in-out infinite;
+}
+
+@keyframes karmaArrow {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+
+@media (max-width: 768px) {
+  .karma-cosmic-card {
+    padding: 30px 20px;
+  }
+  
+  .karma-om-symbol {
+    font-size: 60px;
+  }
+  
+  .karma-title {
+    font-size: 28px;
+  }
+  
+  .karma-subtitle {
+    font-size: 16px;
+  }
+  
+  .karma-features {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .karma-features span {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+  
+  .karma-cta {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+.astroroshni-ad {
   padding: 40px 0;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   margin: 20px 0;

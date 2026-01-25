@@ -1,0 +1,131 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-24T18:04:06.808235
+Question: When is a good time for marriage?
+Processing Time: 5.018s
+Response Length: 1565 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "Are you wondering about the timing of a first marriage, or are you looking for insights into a current relationship? Also, is there a specific period you're curious about?",
+    "mode": "birth",
+    "category": "marriage",
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D7"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2028,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2027": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ],
+            "2028": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "Are you wondering about the timing of a first marriage, or are you looking for insights into a current relationship? Also, is there a specific period you're curious about?",
+  "mode": "birth",
+  "category": "marriage",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D7"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2028,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2027": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "2028": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

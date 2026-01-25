@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-24T17:57:26.161075
+Question: career growth
+Processing Time: 2.860s
+Response Length: 352 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you on career growth, are you wondering about timing for promotions, skill development, exploring new roles, or something else specifically?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you on career growth, are you wondering about timing for promotions, skill development, exploring new roles, or something else specifically?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

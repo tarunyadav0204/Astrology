@@ -1314,6 +1314,30 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         </div>
       </section>
 
+      {/* Karma Analysis Section */}
+      <section className="karma-analysis-section">
+        <div className="container">
+          <div className="karma-cosmic-card" onClick={() => window.location.href = '/karma-analysis'}>
+            <div className="karma-cosmic-glow"></div>
+            <div className="karma-cosmic-content">
+              <div className="karma-om-symbol">🕉️</div>
+              <h2 className="karma-title">Past Life Karma Analysis</h2>
+              <p className="karma-subtitle">Discover Your Soul's Eternal Journey</p>
+              <div className="karma-features">
+                <span>✨ Akashic Records Access</span>
+                <span>🔮 Past Life Patterns</span>
+                <span>⚖️ Karmic Debts & Blessings</span>
+                <span>🌟 Soul Purpose Revelation</span>
+              </div>
+              <div className="karma-cta">
+                <span className="karma-badge">AI-Powered Deep Analysis</span>
+                <span className="karma-arrow">→</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* AstroRoshni Software Advertisement */}
       <section className="astroroshni-ad">
         <div className="container">

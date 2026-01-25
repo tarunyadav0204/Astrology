@@ -1,0 +1,77 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-24T18:04:48.151709
+Question: I am already married, tell me how is my marriage life in 2026
+Processing Time: 4.215s
+Response Length: 932 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best understand what you're looking for regarding your marriage life in 2026, are you most interested in the overall happiness, potential challenges, or specific areas of growth within your marriage during that year?",
+    "mode": "annual",
+    "category": "marriage",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D7"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand what you're looking for regarding your marriage life in 2026, are you most interested in the overall happiness, potential challenges, or specific areas of growth within your marriage during that year?",
+  "mode": "annual",
+  "category": "marriage",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D7"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ]
+    }
+  }
+}

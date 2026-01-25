@@ -4,7 +4,7 @@ import { useCredits } from '../../context/CreditContext';
 import SearchBar from '../Search/SearchBar';
 import './NavigationHeader.css';
 
-const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData }) => {
+const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector, zodiacSigns, selectedZodiac, onZodiacChange, user, onAdminClick, onLogout, onLogin, showLoginButton, onCreditsClick, onHomeClick, onChangeNative, birthData }) => {
   const navigate = useNavigate();
   const { credits, loading: creditsLoading } = useCredits();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -39,6 +39,108 @@ const NavigationHeader = ({ onPeriodChange, showZodiacSelector, zodiacSigns, sel
 
 
 
+  if (compact) {
+    return (
+      <header className="main-header compact">
+        <div className="compact-nav">
+          <div className="container">
+            <button className="logo-text" onClick={onHomeClick || (() => navigate('/'))}>
+              <span className="logo-full">🔮 AstroRoshni</span>
+              <span className="logo-short">🔮 AR</span>
+            </button>
+            
+            <nav className="compact-menu">
+              <button onClick={onHomeClick || (() => navigate('/'))}>Home</button>
+              <div className={`dropdown ${activeDropdown === 'horoscope' ? 'active' : ''}`}>
+                <a href="#horoscope" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('horoscope', e); }}>Horoscope</a>
+              </div>
+              <a href="/#astrology">Astrology</a>
+              <div className={`dropdown ${activeDropdown === 'yourlife' ? 'active' : ''}`}>
+                <a href="#yourlife" className="dropdown-toggle" onClick={(e) => { e.preventDefault(); toggleDropdown('yourlife', e); }}>Your Life</a>
+              </div>
+              <button onClick={() => navigate('/panchang')}>Panchang</button>
+              <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
+              <button onClick={() => navigate('/festivals')}>Festivals</button>
+            </nav>
+            
+            <div className="compact-actions">
+              {user ? (
+                <>
+                  {!creditsLoading && onCreditsClick && (
+                    <button className="credits-btn" onClick={onCreditsClick}>
+                      💳 {credits}
+                    </button>
+                  )}
+                  {birthData && birthData.name && onChangeNative && (
+                    <button className="change-native-btn" onClick={onChangeNative}>
+                      👤 {birthData.name} ▼
+                    </button>
+                  )}
+                </>
+              ) : showLoginButton ? (
+                <button className="auth-btn" onClick={onLogin}>Sign In</button>
+              ) : null}
+              <button className="mobile-menu-btn" onClick={() => setShowMobileMenu(true)}>☰</button>
+            </div>
+          </div>
+        </div>
+        
+        {activeDropdown === 'horoscope' && (
+          <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+            <button onClick={() => { navigate('/horoscope?period=daily'); setActiveDropdown(null); }}>📅 Daily Horoscope</button>
+            <button onClick={() => { navigate('/horoscope?period=weekly'); setActiveDropdown(null); }}>📊 Weekly Horoscope</button>
+            <button onClick={() => { navigate('/horoscope?period=monthly'); setActiveDropdown(null); }}>🗓️ Monthly Horoscope</button>
+            <button onClick={() => { navigate('/horoscope?period=yearly'); setActiveDropdown(null); }}>📆 Yearly Horoscope</button>
+          </div>
+        )}
+        
+        {activeDropdown === 'yourlife' && (
+          <div className="dropdown-content" style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}>
+            <button onClick={() => { user ? navigate('/career-guidance') : onLogin(); setActiveDropdown(null); }}>💼 Your Career</button>
+            <button onClick={() => { user ? navigate('/marriage-analysis') : onLogin(); setActiveDropdown(null); }}>💍 Your Marriage</button>
+            <button onClick={() => { user ? navigate('/education') : (onLogin && onLogin()); setActiveDropdown(null); }}>🎓 Your Education</button>
+            <button onClick={() => { user ? navigate('/health-analysis') : onLogin(); setActiveDropdown(null); }}>🏥 Your Health</button>
+            <button onClick={() => { user ? navigate('/wealth-analysis') : onLogin(); setActiveDropdown(null); }}>💰 Your Wealth</button>
+          </div>
+        )}
+        
+        {showMobileMenu && (
+          <div className="mobile-menu-modal" onClick={() => setShowMobileMenu(false)}>
+            <div className="mobile-menu-content" onClick={(e) => e.stopPropagation()}>
+              <div className="mobile-menu-header">
+                <h3>Menu</h3>
+                <button className="close-menu-btn" onClick={() => setShowMobileMenu(false)}>×</button>
+              </div>
+              <div className="mobile-menu-items">
+                {user ? (
+                  <>
+                    {!creditsLoading && onCreditsClick && (
+                      <button className="mobile-menu-item" onClick={() => { onCreditsClick(); setShowMobileMenu(false); }}>
+                        💳 Credits: {credits}
+                      </button>
+                    )}
+                    {birthData && birthData.name && onChangeNative && (
+                      <button className="mobile-menu-item" onClick={() => { onChangeNative(); setShowMobileMenu(false); }}>
+                        👤 Change Native: {birthData.name}
+                      </button>
+                    )}
+                    <button className="mobile-menu-item" onClick={() => { navigate('/profile'); setShowMobileMenu(false); }}>👤 Profile</button>
+                    {user.role === 'admin' && (
+                      <button className="mobile-menu-item" onClick={() => { onAdminClick(); setShowMobileMenu(false); }}>⚙️ Admin Panel</button>
+                    )}
+                    <button className="mobile-menu-item logout" onClick={() => { onLogout(); setShowMobileMenu(false); }}>🚪 Logout</button>
+                  </>
+                ) : showLoginButton ? (
+                  <button className="mobile-menu-item" onClick={() => { onLogin(); setShowMobileMenu(false); }}>🔑 Sign In / Sign Up</button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+    );
+  }
+  
   return (
     <header className="main-header">
       <div className="top-bar">

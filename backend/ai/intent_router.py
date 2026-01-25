@@ -64,10 +64,18 @@ class IntentRouter:
         
         Current question: "{user_question}"
         
-        CRITICAL: If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
-        - Extract the area from the user's response
-        - Return status: "READY" with the extracted category
-        - Combine the original question context with the user's clarification response
+        CRITICAL FOLLOW-UP DETECTION:
+        1. If the PREVIOUS assistant message was a FULL ANSWER (not a clarification question), and the current user message is:
+           - A correction ("that's wrong", "incorrect", "planet position is wrong")
+           - A follow-up ("tell me more", "what about...", "and...")
+           - A clarification request ("what do you mean", "explain")
+           - A short response referring to previous context ("yes", "no", "okay", single words)
+           Then: Return status: "READY" immediately WITHOUT asking clarification. This is a continuation of the previous conversation.
+        
+        2. If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+           - Extract the area from the user's response
+           - Return status: "READY" with the extracted category
+           - Combine the original question context with the user's clarification response
         
         DIVISIONAL CHART DETECTION:
         Based on the question topic, determine which divisional charts are needed:
@@ -132,7 +140,7 @@ class IntentRouter:
            - Examples of valuable facts: specific job titles, company names, years of experience, number of children, ages, education levels, health conditions, locations, dates of major events
            - These facts will be stored and used to personalize ALL future astrological guidance for this user
         
-        4. Max 3 clarifications per session - after that, return READY with available info
+        4. Max 2 clarifications per session - after that, return READY with available info
         
         MODES:
         1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")

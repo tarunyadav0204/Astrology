@@ -42,9 +42,25 @@ class ResponseParser:
                 glossary_part = text.split("GLOSSARY_START")[1].split("GLOSSARY_END")[0].strip()
                 # Clean markers and potential backticks/markdown
                 glossary_json = re.sub(r'^```(?:json)?\s*|```$', '', glossary_part).strip()
-                parsed_glossary = json.loads(glossary_json)
-                # Normalize all keys to lowercase and strip whitespace
-                result['glossary'] = {k.strip().lower(): v for k, v in parsed_glossary.items()}
+                
+                # Try parsing as single JSON object first
+                try:
+                    parsed_glossary = json.loads(glossary_json)
+                    # Normalize all keys to lowercase and strip whitespace
+                    result['glossary'] = {k.strip().lower(): v for k, v in parsed_glossary.items()}
+                except json.JSONDecodeError:
+                    # If that fails, try parsing multiple JSON objects (one per line)
+                    result['glossary'] = {}
+                    for line in glossary_json.split('\n'):
+                        line = line.strip()
+                        if line and line.startswith('{'):
+                            try:
+                                obj = json.loads(line)
+                                if 'term' in obj and 'definition' in obj:
+                                    result['glossary'][obj['term'].strip().lower()] = obj['definition']
+                            except:
+                                continue
+                
                 result['terms'] = list(result['glossary'].keys())
                 # Remove the glossary block from the visible content
                 result['content'] = text.split("GLOSSARY_START")[0].strip()
@@ -86,6 +102,7 @@ class ResponseParser:
                 # Remove ONLY the image prompt block from visible content, keep everything else
                 cleaned_text = re.sub(r'SUMMARY_IMAGE_START.*?SUMMARY_IMAGE_END', '', cleaned_text, flags=re.DOTALL).strip()
                 print(f"   ✅ Extracted summary image prompt: {len(summary_image_prompt)} chars")
+                print(f"   Preview: {summary_image_prompt[:100]}...")
                 print(f"   ✅ Cleaned text after image removal: {len(cleaned_text)} chars")
                 print(f"   Has GLOSSARY after cleaning: {'GLOSSARY_START' in cleaned_text}")
             except Exception as e:

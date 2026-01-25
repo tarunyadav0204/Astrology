@@ -472,7 +472,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             cursor.execute('''
                 SELECT sender, content FROM chat_messages 
                 WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                  AND (sender = 'user' OR message_type = 'answer')
                 ORDER BY timestamp DESC LIMIT 6
             ''', (session_id,))
             
@@ -509,7 +508,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 cursor.execute('''
                     SELECT sender, content FROM chat_messages 
                     WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                      AND (sender = 'user' OR message_type = 'answer')
                     ORDER BY timestamp DESC LIMIT 6
                 ''', (session_id,))
                 
@@ -687,7 +685,6 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             cursor.execute('''
                 SELECT sender, content FROM chat_messages 
                 WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                  AND (sender = 'user' OR message_type = 'answer')
                 ORDER BY timestamp DESC LIMIT 6
             ''', (session_id,))
             

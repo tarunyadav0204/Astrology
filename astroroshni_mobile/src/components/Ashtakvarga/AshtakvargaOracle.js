@@ -23,6 +23,57 @@ import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
+const HOUSE_SIGNIFICATIONS = {
+  0: { // House 1
+    name: "Self & Personality",
+    significations: "Physical body, appearance, personality, self-expression, vitality, overall health, life path, and how you present yourself to the world."
+  },
+  1: { // House 2
+    name: "Wealth & Family",
+    significations: "Accumulated wealth, family values, speech, food habits, early childhood, face, eyes, right eye, financial security, and material possessions."
+  },
+  2: { // House 3
+    name: "Courage & Siblings",
+    significations: "Siblings, courage, short travels, communication skills, hobbies, neighbors, hands, arms, shoulders, and self-efforts."
+  },
+  3: { // House 4
+    name: "Home & Mother",
+    significations: "Mother, home, property, vehicles, emotional peace, education, chest, heart, domestic happiness, and inner contentment."
+  },
+  4: { // House 5
+    name: "Children & Creativity",
+    significations: "Children, creativity, intelligence, romance, speculation, past life merits, stomach, education, and spiritual practices."
+  },
+  5: { // House 6
+    name: "Health & Enemies",
+    significations: "Diseases, enemies, debts, obstacles, service, daily work, pets, maternal relatives, digestive system, and competitive abilities."
+  },
+  6: { // House 7
+    name: "Marriage & Partnership",
+    significations: "Spouse, marriage, business partnerships, public relations, sexual organs, lower abdomen, and long-term relationships."
+  },
+  7: { // House 8
+    name: "Transformation & Longevity",
+    significations: "Longevity, sudden events, inheritance, occult knowledge, research, chronic diseases, reproductive organs, and transformative experiences."
+  },
+  8: { // House 9
+    name: "Fortune & Dharma",
+    significations: "Father, luck, higher education, long journeys, spirituality, religion, philosophy, thighs, and life purpose."
+  },
+  9: { // House 10
+    name: "Career & Status",
+    significations: "Career, profession, reputation, authority, government, knees, public image, and social standing."
+  },
+  10: { // House 11
+    name: "Gains & Aspirations",
+    significations: "Income, gains, elder siblings, friends, social networks, left ear, fulfillment of desires, and large organizations."
+  },
+  11: { // House 12
+    name: "Liberation & Expenses",
+    significations: "Expenses, losses, foreign lands, spirituality, isolation, sleep, feet, bed pleasures, and final liberation (moksha)."
+  }
+};
+
 export default function AshtakvargaOracle({ navigation }) {
   const { theme, colors } = useTheme();
   const [activeTab, setActiveTab] = useState(0);
@@ -736,19 +787,27 @@ export default function AshtakvargaOracle({ navigation }) {
                   ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
                       <Text style={[styles.scrollTitle, { color: colors.text }]}>
-                        {selectedPillar?.sign || 'Unknown'} Sector
+                        House {(selectedPillar?.index || 0) + 1}: {HOUSE_SIGNIFICATIONS[selectedPillar?.index || 0]?.name}
                       </Text>
                       <Text style={[styles.scrollBindus, { color: colors.primary }]}>
                         {selectedPillar?.bindus || 0} Cosmic Points
                       </Text>
+                      
+                      <View style={[styles.significationBox, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)', borderRadius: 12, padding: 16, marginBottom: 20 }]}>
+                        <Text style={[styles.significationTitle, { color: colors.primary }]}>House Significations:</Text>
+                        <Text style={[styles.significationText, { color: colors.textSecondary }]}>
+                          {HOUSE_SIGNIFICATIONS[selectedPillar?.index || 0]?.significations}
+                        </Text>
+                      </View>
+                      
                       <Text style={[styles.scrollDescription, { color: colors.textSecondary }]}>
                         {completeOracleData?.pillar_insights?.[selectedPillar?.index] || 
                          (selectedPillar && selectedPillar.bindus >= 30 
-                          ? `${selectedPillar.sign} is your fortress of power. With ${selectedPillar.bindus} points, this sector provides strong karmic protection and opportunities for growth.`
+                          ? `With ${selectedPillar.bindus} points, this house is strongly supported. Matters related to ${HOUSE_SIGNIFICATIONS[selectedPillar?.index || 0]?.name.toLowerCase()} will flourish with ease and bring positive results.`
                           : selectedPillar && selectedPillar.bindus <= 25
-                          ? `${selectedPillar.sign} requires careful attention. With only ${selectedPillar.bindus} points, this area may present challenges that require patience and wisdom.`
+                          ? `With ${selectedPillar.bindus} points, this house needs attention. Matters of ${HOUSE_SIGNIFICATIONS[selectedPillar?.index || 0]?.name.toLowerCase()} may require extra effort and patience.`
                           : selectedPillar
-                          ? `${selectedPillar.sign} offers moderate support. With ${selectedPillar.bindus} points, steady progress is possible through consistent effort.`
+                          ? `With ${selectedPillar.bindus} points, this house offers moderate support. Steady progress in ${HOUSE_SIGNIFICATIONS[selectedPillar?.index || 0]?.name.toLowerCase()} is possible through consistent effort.`
                           : 'Loading cosmic insights...'
                          )}
                       </Text>
@@ -1392,6 +1451,18 @@ const styles = {
     flex: 1,
     textAlign: 'right',
     textTransform: 'capitalize',
+  },
+  significationBox: {
+    marginVertical: 16,
+  },
+  significationTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  significationText: {
+    fontSize: 14,
+    lineHeight: 22,
   },
   yearlyNote: {
     fontSize: 12,

@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-24T17:57:52.392636
+Question: All
+Processing Time: 1.818s
+Response Length: 164 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

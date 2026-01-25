@@ -10,6 +10,122 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* Compact Navigation Styles */
+.main-header.compact {
+  background: linear-gradient(135deg, #e91e63 0%, #ff6f00 100%);
+}
+
+.compact-nav {
+  padding: 12px 0;
+}
+
+.compact-nav .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+}
+
+.compact-menu {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  flex: 1;
+  justify-content: center;
+}
+
+.compact-menu button,
+.compact-menu a {
+  background: none;
+  border: none;
+  color: white;
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.compact-menu button:hover,
+.compact-menu a:hover {
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.compact-menu .dropdown {
+  position: relative;
+}
+
+.compact-menu .dropdown-toggle::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-top: 4px solid;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  transition: transform 0.3s;
+}
+
+.compact-menu .dropdown.active .dropdown-toggle::after {
+  transform: rotate(180deg);
+}
+
+.compact-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.compact-actions .auth-btn {
+  background: transparent;
+  border: 2px solid #fff;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.compact-actions .auth-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.compact-actions .mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 968px) {
+  .compact-menu {
+    display: none;
+  }
+  
+  .compact-actions .credits-btn,
+  .compact-actions .change-native-btn,
+  .compact-actions .auth-btn {
+    display: none;
+  }
+  
+  .compact-actions .mobile-menu-btn {
+    display: flex;
+  }
+}
+
+@media (max-width: 768px) {
+  .compact-nav .container {
+    padding: 0 10px;
+    gap: 10px;
+  }
+}
+
 .top-bar {
   background: rgba(233, 30, 99, 0.9);
   padding: 8px 0;

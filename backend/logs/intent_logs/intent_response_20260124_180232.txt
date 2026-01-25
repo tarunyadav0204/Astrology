@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-24T18:02:35.673823
+Question: Are you sure about age 46 activation?
+Processing Time: 3.010s
+Response Length: 189 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}

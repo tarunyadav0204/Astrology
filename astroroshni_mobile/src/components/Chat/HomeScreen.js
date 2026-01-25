@@ -443,6 +443,13 @@ const loadHomeData = async (nativeData = null) => {
       action: 'question'
     },
     {
+      id: 'partnership',
+      icon: '👥',
+      title: 'Partnership Analysis',
+      description: 'Analyze compatibility and relationship dynamics between two people',
+      action: 'partnership'
+    },
+    {
       id: 'mundane',
       icon: '🌍',
       title: 'Global Markets & Events',

@@ -113,7 +113,8 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         latitude: chart.latitude,
         longitude: chart.longitude,
         place: chart.place || '',
-        gender: chart.gender || ''
+        gender: chart.gender || '',
+        chart_id: chart.id
       };
       
       const [chartData, yogiData] = await Promise.all([
@@ -124,7 +125,8 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
       // Merge Yogi data into chart data
       const enhancedChartData = {
         ...chartData,
-        yogiData: yogiData
+        yogiData: yogiData,
+        id: chart.id
       };
       
       setBirthData({
@@ -133,7 +135,8 @@ const BirthForm = ({ onSubmit, onLogout, prefilledData, showCloseButton, onClose
         time: chart.time,
         place: `${chart.latitude}, ${chart.longitude}`,
         latitude: chart.latitude,
-        longitude: chart.longitude
+        longitude: chart.longitude,
+        chart_id: chart.id
       });
       
       setChartData(enhancedChartData);

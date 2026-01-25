@@ -629,7 +629,24 @@ export default function ChatScreen({ navigation, route }) {
 
   const handleGreetingOptionSelect = async (option) => {
     
-    if (option.action === 'mundane') {
+    if (option.action === 'partnership') {
+      Alert.alert(
+        'Partnership Mode',
+        `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Continue', 
+            onPress: () => {
+              setPartnershipMode(true);
+              setNativeChart(birthData);
+              setShowGreeting(false);
+              setShowChartPicker(true);
+            }
+          }
+        ]
+      );
+    } else if (option.action === 'mundane') {
       setIsMundane(true);
       setShowGreeting(false);
       const welcomeMsg = {
@@ -1116,8 +1133,16 @@ export default function ChatScreen({ navigation, route }) {
         language: language || 'english',
         response_style: 'detailed',
         premium_analysis: isPremiumAnalysis,
-        native_name: birthData?.name,
-        birth_details: {
+        native_name: partnershipMode ? nativeChart?.name : birthData?.name,
+        birth_details: partnershipMode ? {
+          name: nativeChart.name,
+          date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
+          time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
+          latitude: parseFloat(nativeChart.latitude),
+          longitude: parseFloat(nativeChart.longitude),
+          place: nativeChart.place || '',
+          gender: nativeChart.gender || ''
+        } : {
           name: birthData.name,
           date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
           time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
@@ -1800,6 +1825,36 @@ export default function ChatScreen({ navigation, route }) {
             </TouchableOpacity>
             
             <TouchableOpacity 
+              style={[styles.quickActionButton, partnershipMode && styles.quickActionButtonActive]}
+              onPress={() => {
+                if (!partnershipMode) {
+                  Alert.alert(
+                    'Partnership Mode',
+                    `Partnership mode uses ${partnershipCost} credits per question for comprehensive compatibility analysis. Continue?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { 
+                        text: 'Continue', 
+                        onPress: () => {
+                          setPartnershipMode(true);
+                          setNativeChart(birthData);
+                          setShowChartPicker(true);
+                        }
+                      }
+                    ]
+                  );
+                } else {
+                  setPartnershipMode(false);
+                  setNativeChart(null);
+                  setPartnerChart(null);
+                }
+              }}
+            >
+              <Ionicons name="people-outline" size={18} color={colors.text} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Partner</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('ChatHistory')}
             >
@@ -2213,6 +2268,7 @@ export default function ChatScreen({ navigation, route }) {
                                 text: 'Continue', 
                                 onPress: () => {
                                   setPartnershipMode(true);
+                                  setNativeChart(birthData);
                                   Animated.timing(drawerAnim, {
                                     toValue: 300,
                                     duration: 250,
@@ -2712,12 +2768,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   nativeChip: {
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.5)',
+    backgroundColor: 'rgba(59, 130, 246, 0.25)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(59, 130, 246, 0.8)',
   },
   partnerChip: {
-    borderWidth: 1,
-    borderColor: 'rgba(236, 72, 153, 0.5)',
+    backgroundColor: 'rgba(236, 72, 153, 0.25)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(236, 72, 153, 0.8)',
   },
   compactChip: {
     paddingHorizontal: 10,
@@ -2725,8 +2783,9 @@ const styles = StyleSheet.create({
   },
   compactChipText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
+    color: '#ffffff',
   },
   headerRight: {
     flexDirection: 'row',
@@ -2914,6 +2973,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     opacity: 0.8,
+  },
+  quickActionButtonActive: {
+    opacity: 1,
   },
   quickActionText: {
     fontSize: 11,
