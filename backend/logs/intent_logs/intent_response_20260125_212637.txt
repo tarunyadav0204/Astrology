@@ -1,0 +1,59 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T21:26:41.019501
+Question: Tell me about my health over next 3 months.
+Processing Time: 3.502s
+Response Length: 377 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "mode": "annual",
+  "category": "health",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "annual",
+  "category": "health",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March",
+        "April"
+      ]
+    }
+  }
+}

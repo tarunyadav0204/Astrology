@@ -39,6 +39,7 @@ export const generatePDF = async (message) => {
               padding: 20px;
               color: #2c3e50;
               line-height: 1.6;
+              font-size: 22px;
             }
             
             .container {
@@ -70,7 +71,7 @@ export const generatePDF = async (message) => {
             }
             
             .timestamp {
-              font-size: 12px;
+              font-size: 18px;
               color: #6b7280;
             }
             
@@ -86,14 +87,23 @@ export const generatePDF = async (message) => {
             
             .content {
               margin-top: 20px;
+              font-size: 22px;
+            }
+            
+            .content div {
+              font-size: 22px;
+            }
+            
+            .content span {
+              font-size: 22px;
             }
             
             .quick-answer-card {
-              background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+              background-color: #FFF9E6 !important;
               border-radius: 16px;
               padding: 20px;
               margin: 20px 0;
-              border: 1px solid rgba(255, 215, 0, 0.3);
+              border: 2px solid #FFD700;
               box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
             }
             
@@ -101,6 +111,7 @@ export const generatePDF = async (message) => {
               display: flex;
               align-items: center;
               margin-bottom: 12px;
+              background: transparent !important;
             }
             
             .lightning {
@@ -109,24 +120,26 @@ export const generatePDF = async (message) => {
             }
             
             .card-title {
-              font-size: 16px;
+              font-size: 22px;
               font-weight: 700;
               color: #2c3e50;
+              background: transparent !important;
             }
             
             .card-text {
-              font-size: 14px;
+              font-size: 22px;
               color: #2c3e50;
               line-height: 1.8;
+              background: transparent !important;
             }
             
             .final-thoughts-card {
-              background: linear-gradient(135deg, #E6F3FF 0%, #B0E0E6 100%);
+              background-color: #E6F3FF !important;
               border-radius: 16px;
               padding: 20px;
               margin: 20px 0;
-              border: 1px solid rgba(65, 105, 225, 0.3);
-              box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+              border: 2px solid #B0E0E6;
+              box-shadow: 0 4px 12px rgba(176, 224, 230, 0.3);
             }
             
             .section-header {
@@ -145,7 +158,7 @@ export const generatePDF = async (message) => {
             }
             
             .section-title {
-              font-size: 17px;
+              font-size: 22px;
               font-weight: 700;
               color: ${COLORS.primary};
             }
@@ -174,23 +187,38 @@ export const generatePDF = async (message) => {
             
             .list-text {
               flex: 1;
-              font-size: 15px;
-              line-height: 1.6;
+              font-size: 22px;
+              line-height: 1.8;
             }
             
             p {
               margin: 12px 0;
-              font-size: 15px;
-              line-height: 1.6;
+              font-size: 22px;
+              line-height: 1.8;
+              background: transparent;
+            }
+            
+            .quick-answer-card p,
+            .quick-answer-card div,
+            .quick-answer-card span {
+              background: transparent !important;
+            }
+            
+            .final-thoughts-card p,
+            .final-thoughts-card div,
+            .final-thoughts-card span {
+              background: transparent !important;
             }
             
             strong, b {
               font-weight: 700;
               color: #1a1a1a;
+              font-size: 22px;
             }
             
             em, i {
               font-style: italic;
+              font-size: 22px;
             }
             
             .footer {
@@ -199,7 +227,7 @@ export const generatePDF = async (message) => {
               border-top: 2px solid #f0f0f0;
               text-align: center;
               color: #6b7280;
-              font-size: 12px;
+              font-size: 18px;
             }
           </style>
         </head>
@@ -250,7 +278,6 @@ export const generatePDF = async (message) => {
 
 const formatContentForPDF = (content) => {
   let formatted = content;
-  let listCounter = 0;
   
   // Handle Quick Answer cards
   formatted = formatted.replace(
@@ -262,12 +289,12 @@ const formatContentForPDF = (content) => {
         .replace(/^:\s*/, '')
         .trim();
       return `
-        <div class="quick-answer-card">
-          <div class="quick-answer-header">
-            <span class="lightning">⚡</span>
-            <span class="card-title">Quick Answer</span>
+        <div style="background-color: #FFF9E6; border-radius: 16px; padding: 20px; margin: 20px 0; border: 2px solid #FFD700;">
+          <div style="display: flex; align-items: center; margin-bottom: 12px; background: transparent;">
+            <span style="font-size: 20px; margin-right: 8px;">⚡</span>
+            <span style="font-size: 22px; font-weight: 700; color: #2c3e50;">Quick Answer</span>
           </div>
-          <div class="card-text">${cleanContent}</div>
+          <div style="font-size: 22px; color: #2c3e50; line-height: 1.8; background: transparent;">${cleanContent}</div>
         </div>
       `;
     }
@@ -282,44 +309,59 @@ const formatContentForPDF = (content) => {
         .replace(/Final Thoughts/g, '')
         .trim();
       return `
-        <div class="final-thoughts-card">
-          <div class="card-title">◆ Final Thoughts</div>
-          <div class="card-text">${cleanContent}</div>
+        <div style="background-color: #E6F3FF; border-radius: 16px; padding: 20px; margin: 20px 0; border: 2px solid #B0E0E6;">
+          <div style="font-size: 22px; font-weight: 700; color: #2c3e50; margin-bottom: 8px;">◆ Final Thoughts</div>
+          <div style="font-size: 22px; color: #2c3e50; line-height: 1.8; background: transparent;">${cleanContent}</div>
         </div>
       `;
     }
   );
   
-  // Handle markdown headers (## and ###)
-  formatted = formatted.replace(/^##\s+(.+)$/gm, (match, headerText) => {
+  // Handle markdown headers and bullet points with section-based counter reset
+  let sectionCounter = {};
+  let currentSection = 'default';
+  
+  // Replace headers and track sections
+  formatted = formatted.replace(/^(####|###|##)\s+(.+)$/gm, (match, level, headerText) => {
     const symbol = getHeaderSymbol(headerText);
+    currentSection = headerText;
+    sectionCounter[currentSection] = 0;
     return `
-      <div class="section-header">
+      <div class="section-header" data-section="${currentSection}">
         <span class="section-icon">${symbol}</span>
         <span class="section-title">${headerText}</span>
       </div>
     `;
   });
   
-  formatted = formatted.replace(/^###\s+(.+)$/gm, (match, headerText) => {
-    const symbol = getHeaderSymbol(headerText);
-    return `
-      <div class="section-header">
-        <span class="section-icon">${symbol}</span>
-        <span class="section-title">${headerText}</span>
-      </div>
-    `;
-  });
-  
-  // Handle bullet points
-  formatted = formatted.replace(/^[•\-]\s+(.+)$/gm, (match, text) => {
-    listCounter++;
-    return `
+  // Handle bullet points with section-aware counter
+  formatted = formatted.replace(/^[•\-]\s+(.+)$/gm, (match, text, offset) => {
+    // Find the last section header before this bullet
+    const beforeText = formatted.substring(0, offset);
+    const lastSectionMatch = beforeText.match(/data-section="([^"]+)"/g);
+    
+    if (lastSectionMatch) {
+      const lastSection = lastSectionMatch[lastSectionMatch.length - 1].match(/data-section="([^"]+)"/)[1];
+      if (!sectionCounter[lastSection]) sectionCounter[lastSection] = 0;
+      sectionCounter[lastSection]++;
+      const num = sectionCounter[lastSection];
+      
+      return `
       <div class="list-item">
-        <div class="number-circle">${listCounter}</div>
+        <div class="number-circle">${num}</div>
         <div class="list-text">${text}</div>
       </div>
     `;
+    } else {
+      if (!sectionCounter['default']) sectionCounter['default'] = 0;
+      sectionCounter['default']++;
+      return `
+      <div class="list-item">
+        <div class="number-circle">${sectionCounter['default']}</div>
+        <div class="list-text">${text}</div>
+      </div>
+    `;
+    }
   });
   
   // Handle bold text
@@ -328,9 +370,9 @@ const formatContentForPDF = (content) => {
   // Handle italic text
   formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
   
-  // Handle paragraphs
-  formatted = formatted.replace(/\n\n+/g, '</p><p>');
-  formatted = `<p>${formatted}</p>`;
+  // Handle paragraphs - use div instead of p to avoid white background issues
+  formatted = formatted.replace(/\n\n+/g, '</div><div style="margin: 12px 0; font-size: 22px; line-height: 1.8;">');
+  formatted = `<div style="margin: 12px 0; font-size: 22px; line-height: 1.8;">${formatted}</div>`;
   
   return formatted;
 };

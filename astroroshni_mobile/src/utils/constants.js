@@ -45,7 +45,7 @@ const getApiUrl = () => {
   }
   
   // Production (works on real devices)
-  // return 'https://astroroshni.com';
+  // return 'https://astroroshni.com'; 
 };
 
 export const API_BASE_URL = getApiUrl();

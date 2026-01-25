@@ -28,62 +28,18 @@ from calculators.kalachakra_dasha_calculator import KalachakraDashaCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
+from calculators.kota_chakra_calculator import KotaChakraCalculator
 from calculators.prashna_calculator import PrashnaCalculator
 from calculators.varshphal_calculator import VarshphalCalculator
 from calculators.chara_dasha_calculator import CharaDashaCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator
 from calculators.jaimini_full_analyzer import JaiminiFullAnalyzer
 from calculators.nadi_linkage_calculator import NadiLinkageCalculator
+from calculators.pushkara_calculator import PushkaraCalculator
 from calculators.sudarshana_chakra_calculator import SudarshanaChakraCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
-    
-    # Prashna System Instruction for Horary Analysis
-    PRASHNA_SYSTEM_INSTRUCTION = """
-You are an expert in **Tajik Neelakanthi (Prashna Shastra)**. You are analyzing a Horary Chart cast for the exact moment of a user's question to provide a deterministic, binary answer.
-
-Objective: Provide a clear "Yes", "No", or "Conditional" verdict based on the positions of the Lagna Lord (Querent) and the Karyesha (Object of Inquiry).
-
-## CRITICAL: CATEGORY FOCUS
-The context contains `prashna_focus_category` which indicates the question type. You MUST use the corresponding pre-calculated analysis:
-- If category is "job" → Use `prashna_tools['analysis_job']`
-- If category is "love" → Use `prashna_tools['analysis_love']`
-- If category is "health" → Use `prashna_tools['analysis_health']`
-- If category is "finance" → Use `prashna_tools['analysis_finance']`
-- And so on...
-
-The pre-calculated analysis contains the verdict, yoga type, timing, and all necessary details. Base your response on this specific analysis.
-
-## CORE PRASHNA RULES (TAJIK SHASTRA)
-1. **Identify the Players:**
-   - Lagna Lord = The User (Querent).
-   - Moon = The Mind/Flow of events.
-   - Karyesha = The Lord of the House related to the question (e.g., 10th for Job, 7th for Love, 6th for Illness).
-2. **The Verdict Logic:**
-   - Strong Ithasala (Applying Aspect) between Lagna Lord & Karyesha = **YES**.
-   - Easarpha (Separating Aspect) = **NO/Past Event**.
-   - Moon transferring light (Nakta) = **YES**.
-   - Combustion or Retrograde Karyesha = **DELAY/FAILURE**.
-
-## RESPONSE FORMAT (STRICT)
-<div class="quick-answer-card">**Verdict**: **[YES / NO / DELAYED]**. [2-sentence summary of the outcome based on the yoga.]</div>
-
-### Key Insights
-- **The Querent:** [Planet] in [Sign].
-- **The Objective:** [Planet] in [Sign].
-- **The Yoga:** Describe the connection (Ithasala, Easarpha, etc.).
-
-### Prashna Analysis
-- **Planetary Dynamics:** Is the aspect applying or separating?
-- **Moon's Flow:** What is the Moon connecting to next?
-
-### Timing & Guidance
-- **Timing:** Estimate time based on degrees.
-- **Advice:** What action to take now?
-
-<div class="final-thoughts-card">**Final Outlook**: [One sentence conclusion].</div>
-"""
     
     # Synastry System Instruction for Partnership Analysis
     SYNASTRY_SYSTEM_INSTRUCTION = """
@@ -231,6 +187,53 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
     - **Ulka (Saturn):** Predict Labor, Workload, or Sudden Changes.
 - **Synthesis:** If Vimshottari says "Career Change" and Yogini says "Sankata," predict a "Forced or stressful job change." If Yogini says "Siddha," predict a "Smooth and lucky transition."
 
+### E. The "Kota Chakra" Rule (Uttara Kalamrita Fortress Analysis)
+- **Purpose:** Use Kota Chakra (found in context as `kota_chakra`) to detect malefic siege and vulnerability periods for health/legal crises.
+- **What is Kota:** A static fortress grid from Uttara Kalamrita that maps 28 nakshatras (including Abhijit) into 4 sections (Stambha/Madhya/Prakaara/Bahya) from Janma Nakshatra to analyze malefic positions.
+- **Fortress Sections:**
+    - **Stambha (Inner Pillar):** Most critical - malefics here create severe health/legal threats
+    - **Madhya (Middle Fort):** Moderate pressure and obstacles
+    - **Prakaara (Boundary Wall):** External challenges, manageable
+    - **Bahya (Outer Zone):** Minimal impact, distant threats
+- **Motion Direction (TRUST THE JSON):**
+    - Trust the `motion` key in the JSON above your own calculation of planetary speed
+    - If JSON says `'entering'`, the siege is active regardless of retrograde status
+    - **Entering:** Malefic attacking the fortress - IMMEDIATE danger, crisis building within 3-6 months
+    - **Exiting:** Malefic leaving the fortress - Recovery phase, threat dissolving
+- **Guard Status (Kota Paala):**
+    - If Kota Paala is in Stambha/Madhya = Guard is protecting, reduces vulnerability
+    - If Kota Paala is in Bahya = Guard has left the post, no protection
+- **The Benefic Shield (Divine Protection):**
+    - If Jupiter or Venus is in Stambha, predict "Divine Protection" - the native will find the right doctor or legal loophole even under heavy attack
+    - Benefics in Stambha = Miraculous save despite High Vulnerability score
+- **Interpretation Keys:**
+    - **High Vulnerability:** Malefics entering Stambha + weak Kota Swami + no guard = Red Alert for health/legal crisis
+    - **Moderate Caution:** Malefics in Madhya or weak Kota Swami = Vigilance needed
+    - **Protected:** No malefics in inner sections + strong Kota Swami + guard present = Natural protection
+- **Verdict Requirement (Use Fortress Metaphor):**
+    - **Siege:** Malefics entering Stambha
+    - **Breach:** Malefics already in Stambha while Kota Swami is weak
+    - **Reinforcement:** Benefics entering the Fort
+    - **The Shield:** Kota Paala (Guard) is active in the center
+- **REJECTION CRITERION:** Do NOT predict health crisis if malefic is marked as `motion: 'exiting'`. Exiting malefics signify RECOVERY, not attack.
+- **Mandatory Citation:** When Kota Chakra shows High Vulnerability, you MUST warn in Health/Crisis Analysis:
+    - Format: "Kota Chakra Alert: {malefic_planets} {entering/exiting} Stambha (Inner Pillar) with {kota_swami} as {weak/strong} Kota Swami and Kota Paala {guarding/absent}. {specific_health_legal_warning}."
+    - Example: "Kota Chakra Alert: Saturn entering Stambha with debilitated Mars as weak Kota Swami and Kota Paala absent from inner fortress. Immediate health crisis risk - avoid surgery, legal disputes, and high-risk activities."
+- **When to Emphasize:**
+    - User asks about health crises or legal troubles
+    - Malefics transiting Stambha nakshatras (check transit data)
+    - Entering motion detected = Predict crisis within 3-6 months
+    - Exiting motion detected = Predict recovery/resolution
+- **Synthesis with Transits (TIME-AWARE ANALYSIS):**
+    - **CRITICAL:** Kota Chakra in context shows NATAL fortress status only
+    - For time-specific questions ("Will I have crisis in 2026?"), you MUST check `transit_activations` data
+    - Look for transiting Saturn/Mars/Rahu/Ketu entering Stambha nakshatras during the requested period
+    - **Natal Kota + Transit Kota = Complete Picture:**
+        - Natal shows inherent vulnerability pattern
+        - Transits show when the siege actually activates
+    - **Example:** If natal Kota shows "Protected" but transit Saturn enters Stambha in 2026, predict "Normally protected, but 2026 brings temporary siege requiring vigilance"
+    - **Timing Precision:** When transit malefic enters Stambha nakshatra, crisis window = entry date + 3-6 months
+
 ### F. Jaimini Points Logic
 - **Arudha Lagna (AL):** Use this for questions about FAME, STATUS, and REPUTATION. (e.g., "Will I be famous?" → Check AL).
 - **Upapada Lagna (UL):** Use this for questions about MARRIAGE and SPOUSE.
@@ -367,6 +370,36 @@ In your "Astrological Analysis" section, you MUST include a specific paragraph t
 - **One out of three:** "Subjective Experience" - 40% confidence
 
 **Verdict Template:** "Since this [yoga/event] appears in [X] out of 3 charts (Lagna/Moon/Sun), the confidence level is [percentage] - expect [outcome certainty]."
+
+### K. THE "PUSHKARA NAVAMSA" RULE (Degrees of Miracles)
+You have access to `pushkara_navamsa` which identifies planets in blessed degrees that receive divine grace.
+
+**CRITICAL INSTRUCTION:** Only mention Pushkara when `has_pushkara: true`. Do NOT discuss it if no planets are in Pushkara.
+
+**Pushkara Intensity Levels:**
+- **Extreme (Pushkara Bhaga):** Planet within 1° of exact miracle degree - "Wish-Fulfilling Planet"
+- **High (Pushkara Navamsa):** Planet in 3°20' blessed arc - "Nourishing Planet"
+
+**Interpretation Protocol:**
+1. Check `pushkara_planets` array for any planets
+2. Each planet includes `ruled_houses` array showing which houses it governs
+3. **Override Rule:** Even if planet is afflicted/debilitated, Pushkara grants "Phoenix-like rise"
+4. **Mandatory Statement:** "Your {planet} (lord of {houses}) sits in Pushkara {Navamsa/Bhaga} - the Degree of {Miracles/Nourishment}. Despite {affliction}, the {house domains} will provide eventual miraculous recovery/success."
+
+**Dasha Interaction (PRIORITY RULE):**
+- If Pushkara planet is current Mahadasha/Antardasha/Pratyantardasha lord, predict "Active miracle period - divine grace manifesting NOW"
+- If Pushkara planet's dasha is upcoming, predict "Miracle window opens in {year} when {planet} dasha begins"
+- Pushkara + Active Dasha = Highest probability of wish fulfillment
+
+**Example:** "Your Jupiter (lord of 10th house career) sits in Pushkara Bhaga (Degree of Miracles). You're currently in Jupiter Mahadasha - this is your ACTIVE MIRACLE PERIOD for career. Expect effortless promotions and divine opportunities through 2028."
+
+**When to Emphasize:**
+- User struggling in life area ruled by Pushkara planet
+- Afflicted planet in Pushkara = Predict "Miraculous save" or "Divine intervention"
+- Pushkara Bhaga (Extreme) = Predict "Wish fulfillment" in ruled houses
+- Pushkara planet in active dasha = "Miracle manifesting NOW"
+
+**Synthesis Rule:** If Pushkara planet is also in good dasha, predict "Effortless success." If in bad dasha, predict "Success through unexpected divine help."
 
 ## DOMAIN-SPECIFIC LOGIC
 ### If the user asks about HEALTH:
@@ -706,7 +739,34 @@ When high-impact convergences are detected, you MUST highlight them prominently:
 
 **Template:** "EXCEPTIONAL CONVERGENCE DETECTED: [Type] with [Confidence Level] - [Specific Reason]. This is not ordinary astrology - multiple systems confirm a [life-changing outcome]."
 
-## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
+### R. THE "MRITYU BHAGA" RULE (Death Degree - Karmic Landmine)
+You have access to `sniper_points['mrityu_bhaga']` which identifies planets or Lagna on the classical Death Degree.
+
+**CRITICAL INSTRUCTION:** Each sign has ONE specific degree (e.g., 26° Cancer, 6° Libra) that is 'poisonous' per BPHS/Phaladeepika.
+
+**Mrityu Bhaga Protocol:**
+- If `has_affliction: true`, check `afflicted_points` array for planets or Ascendant
+- Each afflicted point includes: planet/point name, exact degree, orb, intensity (Critical/High/Strong)
+- **Interpretation:** Planet acts like a wounded soldier - it may have high rank (exalted status), but it CANNOT fight or protect the user in its house's domain
+- **Ascendant on Mrityu Bhaga:** Structural vulnerability in vitality and self-protection - native must work harder to maintain health
+- **Planet on Mrityu Bhaga:** Planet loses ability to protect its house significations - results are neutralized or delayed
+
+**Intensity Levels:**
+- **Critical (orb ≤ 0.25°):** Exact hit - planet completely wounded, requires immediate remedies
+- **High/Strong (orb ≤ 1.0°):** Significant affliction - planet weakened but can recover with effort
+
+**Mandatory Citation Format:**
+When Mrityu Bhaga is detected, you MUST state: "KARMIC LANDMINE: Your [Planet/Ascendant] at [Degree]° [Sign] falls on the Mrityu Bhaga (Death Degree) with [Orb]° orb. This creates a karmic wound - the [planet/point] cannot fully protect [house significations]. [Specific impact based on planet's role]."
+
+**Example:** "KARMIC LANDMINE: Your Jupiter at 13.2° Gemini falls on the Mrityu Bhaga (Death Degree) with 0.2° orb (Critical intensity). This creates a karmic wound - Jupiter cannot fully protect your 5th house (children) and 8th house (longevity) significations. Despite being a natural benefic, expect delays in childbirth and need for extra caution in health matters."
+
+**When to Emphasize:**
+- User asks about health, longevity, or chronic issues
+- Afflicted planet rules important houses (1st, 5th, 7th, 9th, 10th)
+- Ascendant itself is on Mrityu Bhaga (affects overall vitality)
+- Planet is also in dasha period (double vulnerability)
+
+**Remedy Guidance:** Always suggest strengthening remedies for the afflicted planet (gemstone, mantra, charity) to mitigate the karmic wound.
 
 ## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
 - NO DEATH PREDICTIONS: Never predict the exact date of death or use words like "Fatal end." Use phrases like "Critical health period," "End of a cycle," or "Period of high physical vulnerability."
@@ -789,105 +849,6 @@ For every user query, structure your response exactly as follows:
             base_context['analysis_error'] = f"Annual calculation failed: {str(e)}"
             
         return base_context
-    
-    def build_prashna_context(self, user_location_data: Dict, user_question: str, category: str = 'general') -> Dict[str, Any]:
-        """Build Horary (Prashna) context based on CURRENT time and User's Location."""
-        from types import SimpleNamespace
-        from calculators.panchang_calculator import PanchangCalculator
-        import time
-        import json
-        
-        prashna_start = time.time()
-        # print(f"\n{'='*80}")
-        # print(f"🔮 PRASHNA CONTEXT BUILDING STARTED")
-        # print(f"{'='*80}")
-        # print(f"Question: {user_question}")
-        # print(f"Category: {category}")
-        # print(f"Location: {user_location_data}")
-        
-        # 1. Get "Right Now" Data
-        now = datetime.now()
-        prashna_data = {
-            'name': 'Prashna',
-            'date': now.strftime('%Y-%m-%d'),
-            'time': now.strftime('%H:%M'),
-            'latitude': user_location_data.get('latitude', 28.6139),
-            'longitude': user_location_data.get('longitude', 77.2090),
-            'place': user_location_data.get('place', 'Query Location')
-        }
-        # print(f"\n⏰ Question Time: {prashna_data['date']} {prashna_data['time']}")
-        
-        # 2. Calculate the Chart for NOW
-        chart_start = time.time()
-        prashna_obj = SimpleNamespace(**prashna_data)
-        chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(prashna_obj)
-        chart_time = time.time() - chart_start
-        # print(f"✅ Chart calculation: {chart_time:.3f}s")
-        
-        # 3. Add Sign Names
-        chart_data_enriched = self._add_sign_names_to_chart_copy(chart_data)
-        # print(f"✅ Chart enrichment complete")
-        
-        # 4. Run the Physics Engine (Tajik Aspects)
-        tajik_start = time.time()
-        prashna_calc = PrashnaCalculator(chart_data_enriched)
-        # print(f"\n🔬 TAJIK PHYSICS ENGINE INITIALIZED")
-        # print(f"Lagna: {chart_data_enriched.get('ascendant', 0):.2f}°")
-        # print(f"Lagna Lord: {prashna_calc.lagna_lord_name}")
-        
-        # 5. Pre-calculate multiple categories for Gemini to choose from
-        # print(f"\n📊 CALCULATING PRASHNA TOOLS...")
-        categories_to_calc = ['job', 'love', 'health', 'wealth', 'lost_item', 'travel', 'property', 'education']
-        prashna_tools = {}
-        
-        for cat in categories_to_calc:
-            cat_start = time.time()
-            analysis = prashna_calc.analyze_question(cat)
-            cat_time = time.time() - cat_start
-            prashna_tools[f'analysis_{cat}'] = analysis
-            
-            # Log focused category with full details
-            if cat == category:
-                # print(f"\n⭐ FOCUSED CATEGORY: {cat.upper()}")
-                # print(f"   Verdict: {analysis['verdict']}")
-                # print(f"   Confidence: {analysis['confidence']}")
-                # print(f"   Summary: {analysis['summary']}")
-                # print(f"   Yoga: {analysis['analysis']['yoga']['name']} ({analysis['analysis']['yoga']['aspect']})")
-                # print(f"   Timing: {analysis['timing']['prediction']}")
-                print(f"   Calculation time: {cat_time:.3f}s")
-            else:
-                print(f"   {cat}: {analysis['verdict']} ({cat_time:.3f}s)")
-        
-        tajik_time = time.time() - tajik_start
-        # print(f"\n✅ All Tajik calculations: {tajik_time:.3f}s")
-        
-        # 6. Get current panchang
-        panchang_start = time.time()
-        pc = PanchangCalculator()
-        current_panchang = pc.calculate_birth_panchang(prashna_data)
-        panchang_time = time.time() - panchang_start
-        # print(f"✅ Panchang calculation: {panchang_time:.3f}s")
-        
-        # 7. Build the Context Payload
-        context = {
-            'analysis_type': 'prashna',
-            'prashna_focus_category': category,
-            'question_time': prashna_data,
-            'd1_chart': chart_data_enriched,
-            'prashna_tools': prashna_tools,
-            'current_panchang': current_panchang
-        }
-        
-        total_time = time.time() - prashna_start
-        context_size = len(json.dumps(context, default=str))
-        
-        # print(f"\n✅ PRASHNA CONTEXT COMPLETE")
-        # print(f"Total time: {total_time:.3f}s")
-        # print(f"Context size: {context_size:,} characters")
-        # print(f"{'='*80}\n")
-        
-        return context
     
     def build_complete_context(self, birth_data: Dict, user_question: str = "", target_date: Optional[datetime] = None, requested_period: Optional[Dict] = None, intent_result: Optional[Dict] = None) -> Dict[str, Any]:
         """Build complete astrological context for chat"""
@@ -1201,6 +1162,13 @@ For every user query, structure your response exactly as follows:
             # print(f"   ❌ Sudarshana calculation error: {e}")
             sudarshana_data = {}
         
+        # Calculate Pushkara Navamsa (blessed degrees)
+        try:
+            pushkara_calc = PushkaraCalculator()
+            pushkara_data = pushkara_calc.analyze_chart(chart_data_original, ascendant_sign_num)
+        except Exception as e:
+            pushkara_data = {'has_pushkara': False, 'pushkara_planets': []}
+        
         context.update({
             # Key divisional charts
             "divisional_charts": divisional_charts,
@@ -1218,6 +1186,9 @@ For every user query, structure your response exactly as follows:
             
             # Sudarshana Chakra
             "sudarshana_chakra": sudarshana_data,
+            
+            # Pushkara Navamsa (blessed degrees)
+            "pushkara_navamsa": pushkara_data,
             
             # Planetary analysis
             "planetary_analysis": {},  # D1 (Rashi)
@@ -1414,6 +1385,16 @@ For every user query, structure your response exactly as follows:
         yogini_calc = YoginiDashaCalculator()
         moon_lon = chart_data['planets']['Moon']['longitude']
         context['yogini_dasha'] = yogini_calc.calculate_current_yogini(birth_data, moon_lon, target_date)
+        
+        # Add Kota Chakra (Uttara Kalamrita fortress grid)
+        try:
+            kota_calc = KotaChakraCalculator(chart_data)
+            kota_data = kota_calc.calculate()
+            if kota_data and 'error' not in kota_data:
+                context['kota_chakra'] = kota_data
+                # print(f"✅ Kota Chakra calculated: {kota_data['protection_score']['status']}")
+        except Exception as e:
+            print(f"❌ Kota Chakra calculation failed: {e}")
         
         # Add Dasha Conflict Analysis
         context['dasha_conflicts'] = self._analyze_dasha_conflicts(

@@ -4,6 +4,12 @@ from calculators.base_calculator import BaseCalculator
 class SniperPointsCalculator(BaseCalculator):
     """Calculator for Sniper Points - critical degrees that trigger sudden events"""
     
+    # Classical Mrityu Bhaga - ONE universal degree per sign (BPHS/Phaladeepika)
+    MRITYU_BHAGA_DEGREES = {
+        0: 19, 1: 9, 2: 13, 3: 26, 4: 24, 5: 11,
+        6: 6, 7: 14, 8: 13, 9: 25, 10: 4, 11: 12
+    }
+    
     def __init__(self, d1_chart: Dict, d3_chart: Dict, d9_chart: Dict):
         self.d1_chart = d1_chart
         self.d3_chart = d3_chart
@@ -301,10 +307,61 @@ class SniperPointsCalculator(BaseCalculator):
                 'error': str(e)
             }
     
+    def calculate_mrityu_bhaga(self) -> Dict[str, Any]:
+        """Check if planets or Lagna fall on Death Degree (Mrityu Bhaga)"""
+        try:
+            afflicted_points = []
+            
+            # Check Ascendant
+            asc_long = self.d1_chart.get('ascendant', 0)
+            asc_sign = int(asc_long / 30)
+            asc_deg = asc_long % 30
+            mb_deg = self.MRITYU_BHAGA_DEGREES[asc_sign]
+            orb = abs(asc_deg - mb_deg)
+            
+            if orb <= 1.0:
+                afflicted_points.append({
+                    'point': 'Ascendant',
+                    'degree': round(asc_deg, 2),
+                    'mb_degree': mb_deg,
+                    'orb': round(orb, 2),
+                    'intensity': 'Critical' if orb <= 0.25 else 'High',
+                    'impact': 'Structural vulnerability in vitality and self-protection'
+                })
+            
+            # Check Planets
+            for planet, data in self.d1_chart.get('planets', {}).items():
+                p_sign = data.get('sign')
+                p_long = data.get('longitude', 0)
+                p_deg = p_long % 30
+                mb_deg = self.MRITYU_BHAGA_DEGREES[p_sign]
+                orb = abs(p_deg - mb_deg)
+                
+                if orb <= 1.0:
+                    afflicted_points.append({
+                        'planet': planet,
+                        'house': data.get('house'),
+                        'degree': round(p_deg, 2),
+                        'mb_degree': mb_deg,
+                        'orb': round(orb, 2),
+                        'intensity': 'Critical' if orb <= 0.25 else 'Strong',
+                        'impact': 'Planet wounded - cannot protect house significations'
+                    })
+            
+            return {
+                'point_name': 'Mrityu Bhaga (Death Degree)',
+                'has_affliction': len(afflicted_points) > 0,
+                'afflicted_points': afflicted_points,
+                'source': 'BPHS/Phaladeepika'
+            }
+        except Exception as e:
+            return {'error': f'Mrityu Bhaga calculation failed: {e}'}
+    
     def get_all_sniper_points(self) -> Dict[str, Any]:
         """Get all sniper points"""
         return {
             'kharesh': self.calculate_kharesh_point(),
             'navamsa_64th': self.calculate_64th_navamsa(),
-            'bhrigu_bindu': self.calculate_bhrigu_bindu()
+            'bhrigu_bindu': self.calculate_bhrigu_bindu(),
+            'mrityu_bhaga': self.calculate_mrityu_bhaga()
         }

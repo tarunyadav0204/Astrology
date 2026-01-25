@@ -30,6 +30,8 @@ class IntentRouter:
         print(f"Question: {user_question}")
         
         current_year = datetime.now().year
+        current_month = datetime.now().strftime('%B')
+        current_date = datetime.now().strftime('%Y-%m-%d')
         
         # Build conversation context
         history_text = ""
@@ -54,6 +56,14 @@ class IntentRouter:
         
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+        CURRENT DATE CONTEXT:
+        - Today's Date: {current_date}
+        - Current Year: {current_year}
+        - Current Month: {current_month}
+        
+        IMPORTANT: When user asks about "next 3 months", "next 6 months", or relative time periods, calculate from TODAY'S DATE ({current_date}).
+        Example: If today is 2024-12-20 and user asks "next 3 months", that means January-March 2025, NOT 2024.
         {history_text}
         {facts_text}
         {clarification_limit_text}
