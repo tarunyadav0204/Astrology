@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T13:04:00.881199
+Question: Tell me about my lifespan, how long will I live.
+Processing Time: 2.905s
+Response Length: 376 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "Lifespan is a broad topic. Are you interested in general longevity, potential health challenges, or specific periods that might impact your well-being?",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "Lifespan is a broad topic. Are you interested in general longevity, potential health challenges, or specific periods that might impact your well-being?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

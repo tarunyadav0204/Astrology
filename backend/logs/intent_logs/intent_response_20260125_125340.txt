@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T12:53:43.593978
+Question: Tell me about longevity
+Processing Time: 3.080s
+Response Length: 406 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "Longevity can relate to various aspects of life. Are you interested in your general lifespan, or are you more curious about the longevity of your health, career, or something else?",
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D60"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "Longevity can relate to various aspects of life. Are you interested in your general lifespan, or are you more curious about the longevity of your health, career, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D60"
+  ]
+}

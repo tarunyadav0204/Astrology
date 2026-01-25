@@ -14,7 +14,7 @@ class IntentRouter:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
         
-    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None) -> Dict[str, str]:
+    async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0) -> Dict[str, str]:
         """
         Returns: {'status': 'CLARIFY' | 'READY', 'mode': 'birth' | 'annual', 'category': 'job'|'love'|..., 'needs_transits': bool, 'transit_request': {...}, 'extracted_context': {...}}
         """
@@ -47,10 +47,16 @@ class IntentRouter:
                 facts_text += f"- {category.upper()}: {fact_str}\n"
             facts_text += "\nIMPORTANT: Do NOT ask for information already present in the user background.\n"
         
+        # Add clarification limit enforcement
+        clarification_limit_text = ""
+        if clarification_count >= 2:
+            clarification_limit_text = f"\n\n🚨 CRITICAL LIMIT REACHED: You have already asked {clarification_count} clarification questions in this conversation. You MUST return status: 'READY' immediately. DO NOT ask another clarification question.\n"
+        
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
         {history_text}
         {facts_text}
+        {clarification_limit_text}
         
         🚨🚨🚨 BLOCKING RULE - READ THIS FIRST 🚨🚨🚨
         Before generating ANY clarification question, you MUST:

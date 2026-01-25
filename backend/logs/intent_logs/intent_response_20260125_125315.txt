@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T12:53:19.210132
+Question: Tell me about longevity
+Processing Time: 3.270s
+Response Length: 537 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To give you the most insightful reading on longevity, could you please specify which aspects of your health and lifespan you're most curious about? Are you interested in understanding potential health challenges, ways to improve your overall well-being, or perhaps strategies for maintaining vitality as you age?",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To give you the most insightful reading on longevity, could you please specify which aspects of your health and lifespan you're most curious about? Are you interested in understanding potential health challenges, ways to improve your overall well-being, or perhaps strategies for maintaining vitality as you age?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

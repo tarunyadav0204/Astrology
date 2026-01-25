@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T12:50:19.782984
+Question: At what age will I die
+Processing Time: 3.102s
+Response Length: 490 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "I understand you're curious about longevity. While astrology isn't suited for predicting the exact time of passing, it can offer insights into overall health and potential life challenges. Would you like me to focus on analyzing your birth chart for insights into your health and well-being?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "I understand you're curious about longevity. While astrology isn't suited for predicting the exact time of passing, it can offer insights into overall health and potential life challenges. Would you like me to focus on analyzing your birth chart for insights into your health and well-being?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

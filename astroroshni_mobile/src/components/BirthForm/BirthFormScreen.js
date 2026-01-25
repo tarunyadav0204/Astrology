@@ -420,7 +420,22 @@ export default function BirthFormScreen({ navigation, route }) {
         // CREATE MODE: Calculate and save new chart
         console.log('➕ Create mode: Saving new chart');
         chartData = await chartAPI.calculateChart(birthData);
-        birthChartId = chartData.birth_chart_id || Date.now() + Math.random();
+        console.log('📦 Received chartData:', JSON.stringify({
+          has_birth_chart_id: !!chartData.birth_chart_id,
+          birth_chart_id: chartData.birth_chart_id,
+          data_keys: Object.keys(chartData.data || chartData)
+        }));
+        
+        // Check if response is wrapped in data property
+        const actualData = chartData.data || chartData;
+        birthChartId = actualData.birth_chart_id;
+        
+        if (!birthChartId) {
+          console.error('❌ No birth_chart_id returned from API. Full response:', JSON.stringify(chartData, null, 2));
+          throw new Error('Failed to get birth chart ID from server');
+        }
+        
+        console.log('✅ Got birth_chart_id:', birthChartId);
       }
       
       const yogiData = await chartAPI.calculateYogi(birthData);

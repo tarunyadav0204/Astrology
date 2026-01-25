@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T13:04:27.601843
+Question: General longevity
+Processing Time: 3.197s
+Response Length: 446 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "Are you curious about your overall vitality, potential health challenges, or the typical length of life for people with a similar birth chart? Is there anything in particular that makes you concerned about your longevity?",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "Are you curious about your overall vitality, potential health challenges, or the typical length of life for people with a similar birth chart? Is there anything in particular that makes you concerned about your longevity?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

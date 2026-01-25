@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T13:43:36.512146
+Question: Timing of potential health challenges
+Processing Time: 3.042s
+Response Length: 346 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand your question, are you interested in specific types of potential health challenges, or are you looking for a specific time frame?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand your question, are you interested in specific types of potential health challenges, or are you looking for a specific time frame?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

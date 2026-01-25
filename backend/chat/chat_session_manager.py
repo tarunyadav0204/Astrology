@@ -19,6 +19,7 @@ class ChatSessionManager:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 birth_hash TEXT,
                 conversation_data TEXT,
+                clarification_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -149,5 +150,40 @@ class ChatSessionManager:
                 (birth_hash, json.dumps(conversation_data))
             )
         
+        conn.commit()
+        conn.close()
+
+    
+    def get_clarification_count(self, birth_hash: str) -> int:
+        """Get current clarification count for session"""
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT clarification_count FROM chat_conversations WHERE birth_hash = ?',
+            (birth_hash,)
+        )
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else 0
+    
+    def increment_clarification_count(self, birth_hash: str):
+        """Increment clarification count"""
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE chat_conversations SET clarification_count = clarification_count + 1 WHERE birth_hash = ?',
+            (birth_hash,)
+        )
+        conn.commit()
+        conn.close()
+    
+    def reset_clarification_count(self, birth_hash: str):
+        """Reset clarification count to 0"""
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE chat_conversations SET clarification_count = 0 WHERE birth_hash = ?',
+            (birth_hash,)
+        )
         conn.commit()
         conn.close()

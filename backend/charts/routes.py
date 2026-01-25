@@ -649,7 +649,13 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
         chart_data['d9_chart'] = div_calculator.calculate_divisional_chart(9)
         chart_data['d10_chart'] = div_calculator.calculate_divisional_chart(10)
         
-        print(f"✅ Chart calculation completed successfully using new calculators")
+        # Add birth_chart_id to response
+        chart_data['birth_chart_id'] = new_chart_id
+        
+        print(f"✅ Chart calculation completed successfully with birth_chart_id: {new_chart_id}")
+        print(f"📦 Returning chart_data keys: {list(chart_data.keys())}")
+        print(f"🎯 birth_chart_id in response: {chart_data.get('birth_chart_id')}")
+        
         return chart_data
         
     except HTTPException:

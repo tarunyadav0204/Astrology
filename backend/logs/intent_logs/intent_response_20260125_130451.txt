@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T13:04:56.855432
+Question: Length of life with people with similar charts
+Processing Time: 5.007s
+Response Length: 463 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "Are you curious about the potential lifespan similarities or differences among people who share similar birth charts with you? Also, is there a specific area of life, such as health, lifestyle, or family history, that you'd like to consider when exploring longevity factors?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "Are you curious about the potential lifespan similarities or differences among people who share similar birth charts with you? Also, is there a specific area of life, such as health, lifestyle, or family history, that you'd like to consider when exploring longevity factors?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

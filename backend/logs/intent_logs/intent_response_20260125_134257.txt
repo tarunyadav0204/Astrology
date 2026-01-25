@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T13:43:01.012026
+Question: Specific periods of health conditions.
+Processing Time: 3.203s
+Response Length: 466 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you, could you tell me what specific health concerns or aspects you're most interested in exploring? For example, are you curious about the timing of potential health challenges, specific types of conditions, or overall well-being during certain periods?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you, could you tell me what specific health concerns or aspects you're most interested in exploring? For example, are you curious about the timing of potential health challenges, specific types of conditions, or overall well-being during certain periods?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

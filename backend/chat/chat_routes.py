@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict
 import sys
 import os
@@ -58,8 +58,8 @@ class ChatRequest(BaseModel):
 
 class ClearChatRequest(BaseModel):
     name: Optional[str] = None
-    date: str
-    time: str
+    date: Optional[str] = None
+    time: Optional[str] = None
     place: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -67,6 +67,14 @@ class ClearChatRequest(BaseModel):
     gender: Optional[str] = None
     selectedYear: Optional[int] = None
     birth_chart_id: Optional[int] = None
+    id: Optional[int] = None
+    
+    @field_validator('birth_chart_id', 'id', mode='before')
+    @classmethod
+    def coerce_to_int(cls, v):
+        if v is None:
+            return v
+        return int(float(v)) if isinstance(v, (int, float, str)) else v
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -163,10 +171,19 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             
             birth_hash = session_manager.create_birth_hash(birth_data)
             
+            # Get or initialize clarification count from session
+            clarification_count = session_manager.get_clarification_count(birth_hash)
+            
             # Use Intent Router to classify question and determine transit needs
-            print(f"\n🧠 CLASSIFYING INTENT FOR: {request.question}")
-            intent_result = await intent_router.classify_intent(request.question)
+            print(f"\n🧠 CLASSIFYING INTENT FOR: {request.question} (clarification_count: {clarification_count})")
+            intent_result = await intent_router.classify_intent(request.question, clarification_count=clarification_count)
             print(f"✅ INTENT CLASSIFICATION RESULT: {intent_result}")
+            
+            # Update clarification count based on result
+            if intent_result.get('status') == 'CLARIFY':
+                session_manager.increment_clarification_count(birth_hash)
+            elif intent_result.get('status') == 'READY':
+                session_manager.reset_clarification_count(birth_hash)
             
             # Set selected period if provided
             if request.selected_period:
@@ -944,26 +961,29 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
     
     try:
         target_year = request.selectedYear or datetime.now().year
+        # Handle both birth_chart_id and id fields, convert float to int
+        birth_chart_id = request.birth_chart_id or request.id
+        if birth_chart_id is not None:
+            birth_chart_id = int(birth_chart_id)
         
-        print(f"🔍 Checking cache for user {current_user.userid}, birth_chart_id {request.birth_chart_id}, year {target_year}")
+        print(f"🔍 Checking cache for user {current_user.userid}, birth_chart_id {birth_chart_id}, year {target_year}")
         
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        birth_chart_id = request.birth_chart_id
         if not birth_chart_id:
             print(f"⚠️ No birth_chart_id provided for cache lookup")
             return {"cached": False}
         
-        # Debug: Show all jobs for this user and birth_chart
-        cursor.execute('''
-            SELECT job_id, birth_chart_id, selected_year, status
-            FROM event_timeline_jobs
-            WHERE user_id = ? AND birth_chart_id = ?
-            ORDER BY created_at DESC
-        ''', (current_user.userid, birth_chart_id))
-        all_jobs = cursor.fetchall()
-        print(f"📊 All jobs for user {current_user.userid}, birth_chart {birth_chart_id}: {all_jobs}")
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        
+        # Verify birth chart belongs to user
+        cursor.execute(
+            "SELECT id FROM birth_charts WHERE id = ? AND userid = ?",
+            (birth_chart_id, current_user.userid)
+        )
+        if not cursor.fetchone():
+            conn.close()
+            print(f"❌ Birth chart {birth_chart_id} not found for user {current_user.userid}")
+            return {"cached": False}
         
         # Find most recent completed job for this user/birth_chart/year
         cursor.execute('''
@@ -973,8 +993,6 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
             ORDER BY completed_at DESC
             LIMIT 1
         ''', (current_user.userid, birth_chart_id, target_year))
-        
-        print(f"🔎 Cache query params: user_id={current_user.userid}, birth_chart_id={birth_chart_id}, year={target_year}")
         
         result = cursor.fetchone()
         conn.close()

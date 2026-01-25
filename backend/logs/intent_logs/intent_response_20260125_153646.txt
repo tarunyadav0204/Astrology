@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T15:36:49.722571
+Question: What does my birth chart say about my career?
+Processing Time: 3.120s
+Response Length: 418 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best understand your career aspirations, what specific aspect would you like me to focus on? Are you wondering about job changes, promotions, starting a business, or something else entirely?",
+    "mode": "birth",
+    "category": "career",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D10"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand your career aspirations, what specific aspect would you like me to focus on? Are you wondering about job changes, promotions, starting a business, or something else entirely?",
+  "mode": "birth",
+  "category": "career",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D10"
+  ]
+}
