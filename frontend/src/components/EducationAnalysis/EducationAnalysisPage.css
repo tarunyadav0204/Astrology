@@ -6,7 +6,7 @@
 .education-header {
   display: flex;
   align-items: center;
-  padding: 240px 40px 40px;
+  padding: 140px 40px 40px;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   position: relative;

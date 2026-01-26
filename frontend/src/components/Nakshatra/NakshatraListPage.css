@@ -1,7 +1,7 @@
 .nakshatra-list-page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 180px 20px 20px 20px;
+  padding: 80px 20px 20px 20px;
   font-family: Arial, sans-serif;
 }
 
@@ -44,67 +44,76 @@
 }
 
 .nakshatra-card {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  padding: 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 243, 224, 0.95) 100%);
+  border: none;
+  border-radius: 20px;
+  padding: 25px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 15px rgba(233, 30, 99, 0.1);
   position: relative;
   overflow: hidden;
+  border-left: 5px solid #e91e63;
 }
 
 .nakshatra-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-  border-color: #e91e63;
+  transform: translateY(-8px);
+  box-shadow: 0 12px 35px rgba(233, 30, 99, 0.25);
+  border-left-color: #ff6f00;
 }
 
 .nakshatra-number {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  background: #e91e63;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #e91e63, #ff6f00);
   color: white;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
 }
 
 .nakshatra-content {
   margin-bottom: 15px;
+  padding-right: 60px;
 }
 
 .nakshatra-name {
-  color: #2c3e50;
-  font-size: 1.4em;
-  margin-bottom: 15px;
+  color: #e91e63;
+  font-size: 1.5em;
+  margin-bottom: 0px;
   font-weight: bold;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  background: none;
+  padding: 0;
 }
 
 .nakshatra-symbol {
-  font-size: 1.2em;
+  font-size: 1.3em;
 }
 
 .nakshatra-details {
+  margin-top: 10px;
   margin-bottom: 15px;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 15px;
+  border-radius: 12px;
 }
 
 .detail-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(233, 30, 99, 0.1);
 }
 
 .detail-row:last-child {
@@ -119,33 +128,38 @@
 
 .detail-row .value {
   color: #e91e63;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
 }
 
 .nakshatra-description {
   color: #555;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   margin: 15px 0;
   font-style: italic;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #ff6f00;
 }
 
 .view-calendar {
-  background: #f8f9fa;
-  color: #e91e63;
-  padding: 10px;
+  background: linear-gradient(135deg, #e91e63, #ff6f00);
+  color: white;
+  padding: 12px;
   text-align: center;
-  border-radius: 6px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 14px;
   margin-top: 15px;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
 }
 
 .nakshatra-card:hover .view-calendar {
-  background: #e91e63;
-  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 6px 18px rgba(233, 30, 99, 0.4);
 }
 
 .page-footer {

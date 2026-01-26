@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T22:08:43.862364
+Question: In general
+Processing Time: 3.365s
+Response Length: 474 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best guide you, could you please specify what aspects of your studies you're most curious about? For example, are you wondering about your academic performance, potential challenges, the best time to pursue higher education, or something else?",
+    "mode": "birth",
+    "category": "education",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D24"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you, could you please specify what aspects of your studies you're most curious about? For example, are you wondering about your academic performance, potential challenges, the best time to pursue higher education, or something else?",
+  "mode": "birth",
+  "category": "education",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D24"
+  ]
+}

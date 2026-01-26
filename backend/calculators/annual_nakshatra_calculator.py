@@ -63,30 +63,35 @@ class AnnualNakshatraCalculator:
             raise ValueError(f"Invalid nakshatra name: {nakshatra_name}")
         
         nakshatra_index = self.NAKSHATRA_NAMES.index(nakshatra_name)
-        # Apply small correction to match Drik Panchang precision
-        correction = 0.0098  # Fine-tuned correction for exact match
-        nakshatra_start = (nakshatra_index * 13.333333) - correction
-        nakshatra_end = ((nakshatra_index + 1) * 13.333333) - correction
+        nakshatra_start = nakshatra_index * 13.333333
+        nakshatra_end = (nakshatra_index + 1) * 13.333333
         
         periods = []
-        start_date = datetime(year, 1, 1)
+        current_date = datetime(year, 1, 1)
         end_date = datetime(year + 1, 1, 1)
         
-        current_date = start_date
-        
+        # Moon completes cycle in ~27 days, check every 26 days
         while current_date < end_date:
-            jd = swe.julday(current_date.year, current_date.month, current_date.day, 0.0)
+            jd = swe.julday(current_date.year, current_date.month, current_date.day, 12.0)
             moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
             
-            # Check if Moon is in target nakshatra
-            if self._is_in_nakshatra_range(moon_pos, nakshatra_start, nakshatra_end):
-                period = self._find_nakshatra_period(current_date, nakshatra_start, nakshatra_end, latitude, longitude)
-                if period:
-                    periods.append(period)
-                    # Skip to end of this period to avoid duplicates, but don't skip entire days
-                    current_date = period['end_datetime'].replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-                else:
-                    current_date += timedelta(days=1)
+            if nakshatra_start <= moon_pos < nakshatra_end:
+                entry = self._quick_find_entry(current_date, nakshatra_start)
+                exit_time = entry + timedelta(hours=24)
+                
+                periods.append({
+                    'start_datetime': entry,
+                    'end_datetime': exit_time,
+                    'start_time': entry.strftime('%I:%M %p'),
+                    'end_time': exit_time.strftime('%I:%M %p'),
+                    'start_date': entry.strftime('%b %d'),
+                    'end_date': exit_time.strftime('%b %d'),
+                    'duration_hours': 24,
+                    'weekday': entry.strftime('%a'),
+                    'day_number': entry.day,
+                    'month_name': entry.strftime('%b')
+                })
+                current_date += timedelta(days=27)
             else:
                 current_date += timedelta(days=1)
         
@@ -99,6 +104,14 @@ class AnnualNakshatraCalculator:
             'location': {'latitude': latitude, 'longitude': longitude}
         }
     
+    def _calculate_nakshatra_distance(self, moon_pos: float, target_start: float) -> float:
+        """Calculate shortest angular distance from moon to target nakshatra"""
+        diff = target_start - moon_pos
+        if diff < 0:
+            diff += 360
+        # Return shortest distance (forward or backward)
+        return min(diff, 360 - diff)
+    
     def _is_in_nakshatra_range(self, moon_pos: float, start: float, end: float) -> bool:
         """Check if Moon position is within nakshatra range"""
         # Handle wrap-around at 360 degrees
@@ -106,81 +119,19 @@ class AnnualNakshatraCalculator:
             return moon_pos >= start or moon_pos <= end
         return start <= moon_pos < end
     
-    def _find_nakshatra_period(self, start_date: datetime, nak_start: float, nak_end: float, lat: float, lon: float) -> Dict[str, Any]:
-        """Find exact start and end times for nakshatra period"""
-        
-        # Find when Moon enters nakshatra
-        entry_time = self._find_nakshatra_entry(start_date, nak_start, backwards=True)
-        if not entry_time:
-            return None
-        
-        # Find when Moon exits nakshatra
-        exit_time = self._find_nakshatra_exit(entry_time, nak_end)
-        if not exit_time:
-            return None
-        
-        # Convert to local time (IST)
-        entry_local = entry_time + timedelta(hours=5, minutes=30)
-        exit_local = exit_time + timedelta(hours=5, minutes=30)
-        
-        return {
-            'start_datetime': entry_local,
-            'end_datetime': exit_local,
-            'start_time': entry_local.strftime('%I:%M %p'),
-            'end_time': exit_local.strftime('%I:%M %p'),
-            'start_date': entry_local.strftime('%b %d'),
-            'end_date': exit_local.strftime('%b %d'),
-            'duration_hours': (exit_time - entry_time).total_seconds() / 3600,
-            'weekday': entry_local.strftime('%a'),
-            'day_number': entry_local.day,
-            'month_name': entry_local.strftime('%b'),
-            # auspiciousness will be set by API
-        }
-    
-    def _find_nakshatra_entry(self, start_date: datetime, nak_start: float, backwards: bool = False) -> datetime:
-        """Find when Moon enters nakshatra with minute precision"""
-        
-        current_time = start_date
-        
-        # First pass: hourly steps to get close
-        step = timedelta(hours=-1) if backwards else timedelta(hours=1)
-        
-        for _ in range(72):  # Max 3 days search
-            jd = swe.julday(current_time.year, current_time.month, current_time.day, 
-                           current_time.hour + current_time.minute/60.0)
+    def _quick_find_entry(self, start_date: datetime, nak_start: float) -> datetime:
+        """Quick approximation of nakshatra entry"""
+        for hours in range(-12, 13, 3):
+            test_time = start_date + timedelta(hours=hours)
+            jd = swe.julday(test_time.year, test_time.month, test_time.day, test_time.hour)
             moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-            
-            if backwards:
-                if moon_pos < nak_start or moon_pos >= nak_start + 13.333333:
-                    # Found approximate entry, now refine with minutes
-                    return self._refine_nakshatra_timing(current_time, nak_start, True)
-            else:
-                if nak_start <= moon_pos < nak_start + 13.333333:
-                    # Found approximate entry, now refine with minutes
-                    return self._refine_nakshatra_timing(current_time, nak_start, False)
-            
-            current_time += step
-        
-        return start_date  # Fallback
+            if abs(moon_pos - nak_start) < 1:
+                return test_time + timedelta(hours=5, minutes=30)
+        return start_date + timedelta(hours=5, minutes=30)
     
-    def _find_nakshatra_exit(self, entry_time: datetime, nak_end: float) -> datetime:
-        """Find when Moon exits nakshatra with minute precision"""
-        
-        current_time = entry_time
-        
-        # First pass: hourly steps
-        for _ in range(72):  # Max 3 days search
-            jd = swe.julday(current_time.year, current_time.month, current_time.day,
-                           current_time.hour + current_time.minute/60.0)
-            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-            
-            if moon_pos >= nak_end or moon_pos < nak_end - 13.333333:
-                # Found approximate exit, now refine with minutes
-                return self._refine_nakshatra_exit(current_time, nak_end)
-            
-            current_time += timedelta(hours=1)
-        
-        return entry_time + timedelta(days=1)  # Fallback
+
+    
+
     
     def get_nakshatra_auspiciousness(self, nakshatra_name: str) -> str:
         """Get base auspiciousness classification for color coding"""
@@ -281,44 +232,9 @@ class AnnualNakshatraCalculator:
         
         return props
     
-    def _refine_nakshatra_timing(self, approximate_time: datetime, nak_start: float, is_entry: bool) -> datetime:
-        """Refine nakshatra timing to minute precision"""
-        
-        # Go back 1 hour and search forward in 1-minute steps
-        start_time = approximate_time - timedelta(hours=1)
-        
-        for minutes in range(0, 120):  # 2 hours in 1-minute steps
-            test_time = start_time + timedelta(minutes=minutes)
-            jd = swe.julday(test_time.year, test_time.month, test_time.day,
-                           test_time.hour + test_time.minute/60.0)
-            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-            
-            if is_entry:
-                if moon_pos >= nak_start:
-                    return test_time
-            else:
-                if moon_pos < nak_start:
-                    return test_time + timedelta(minutes=1)
-        
-        return approximate_time
+
     
-    def _refine_nakshatra_exit(self, approximate_time: datetime, nak_end: float) -> datetime:
-        """Refine nakshatra exit timing to minute precision"""
-        
-        # Go back 1 hour and search forward in 1-minute steps
-        start_time = approximate_time - timedelta(hours=1)
-        
-        for minutes in range(0, 120):  # 2 hours in 1-minute steps
-            test_time = start_time + timedelta(minutes=minutes)
-            jd = swe.julday(test_time.year, test_time.month, test_time.day,
-                           test_time.hour + test_time.minute/60.0)
-            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-            
-            # Check if Moon has exited nakshatra
-            if moon_pos >= nak_end or (nak_end > 350 and moon_pos < 10):  # Handle wrap-around
-                return test_time
-        
-        return approximate_time
+
     
     def get_all_nakshatras_list(self) -> List[Dict[str, Any]]:
         """Get list of all nakshatras with basic properties"""

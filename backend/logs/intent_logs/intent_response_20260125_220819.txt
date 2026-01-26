@@ -1,0 +1,59 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T22:08:22.178405
+Question: Just in general how will be my studies.
+Processing Time: 2.943s
+Response Length: 664 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you with your studies over the next 3 months (January to March 2026), could you tell me what specific aspect you're most interested in? For example, are you wondering about exam performance, learning new skills, starting a new course, or something else?",
+  "mode": "annual",
+  "category": "education",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D24"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March"
+      ]
+    }
+  }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you with your studies over the next 3 months (January to March 2026), could you tell me what specific aspect you're most interested in? For example, are you wondering about exam performance, learning new skills, starting a new course, or something else?",
+  "mode": "annual",
+  "category": "education",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D24"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March"
+      ]
+    }
+  }
+}

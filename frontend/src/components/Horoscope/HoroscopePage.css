@@ -2,12 +2,12 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   padding: 0;
-  padding-top: 200px;
+  padding-top: 100px;
 }
 
 @media (max-width: 768px) {
   .horoscope-page {
-    padding-top: 150px;
+    padding-top: 80px;
   }
 }
 

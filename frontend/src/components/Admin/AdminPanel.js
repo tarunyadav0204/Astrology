@@ -22,6 +22,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [activeTab, setActiveTab] = useState('users');
   const [activeSubTab, setActiveSubTab] = useState('management');
   const [users, setUsers] = useState([]);
+  const [userFacts, setUserFacts] = useState([]);
+  const [factsSearch, setFactsSearch] = useState('');
+  const [factsPage, setFactsPage] = useState(1);
+  const [factsTotalPages, setFactsTotalPages] = useState(1);
+  const [factsLoading, setFactsLoading] = useState(false);
   const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -46,8 +51,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
   useEffect(() => {
     if (activeTab === 'users') {
-      fetchUsers();
-      fetchSubscriptionPlans();
+      if (activeSubTab === 'management') {
+        fetchUsers();
+        fetchSubscriptionPlans();
+      } else if (activeSubTab === 'facts') {
+        fetchUserFacts();
+      }
     } else if (activeTab === 'charts') {
       fetchCharts();
     } else if (activeTab === 'credits') {
@@ -124,6 +133,23 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setUsers([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserFacts = async () => {
+    setFactsLoading(true);
+    try {
+      const response = await fetch(`/api/admin/facts?search=${factsSearch}&page=${factsPage}&limit=20`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      setUserFacts(data.facts || []);
+      setFactsTotalPages(data.total_pages || 1);
+    } catch (error) {
+      console.error('Error fetching user facts:', error);
+      setUserFacts([]);
+    } finally {
+      setFactsLoading(false);
     }
   };
 
@@ -451,6 +477,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   return (
     <div className="admin-panel">
       <NavigationHeader 
+        compact={true}
         showZodiacSelector={false}
         user={user}
         onAdminClick={onAdminClick}
@@ -546,6 +573,27 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         </div>
       )}
 
+      {/* Users Sub-tabs */}
+      {activeTab === 'users' && (
+        <div className="admin-subtabs">
+          <button 
+            className={`subtab ${activeSubTab === 'management' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('management')}
+          >
+            User Management
+          </button>
+          <button 
+            className={`subtab ${activeSubTab === 'facts' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveSubTab('facts');
+              setFactsPage(1);
+            }}
+          >
+            Facts
+          </button>
+        </div>
+      )}
+
       {/* Analysis Sub-tabs */}
       {activeTab === 'analysis' && (
         <div className="admin-subtabs">
@@ -559,7 +607,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       )}
 
       <div className="admin-content">
-        {activeTab === 'users' && (
+        {activeTab === 'users' && activeSubTab === 'management' && (
           <div className="users-management">
             <h2>User Management</h2>
             {loading ? (
@@ -684,6 +732,74 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'users' && activeSubTab === 'facts' && (
+          <div className="facts-management">
+            <h2>User Facts</h2>
+            
+            <div className="facts-search">
+              <input
+                type="text"
+                placeholder="Search by username, phone, or native name..."
+                value={factsSearch}
+                onChange={(e) => setFactsSearch(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && fetchUserFacts()}
+              />
+              <button onClick={fetchUserFacts}>Search</button>
+            </div>
+
+            {factsLoading ? (
+              <div className="loading">Loading facts...</div>
+            ) : userFacts.length === 0 ? (
+              <p>No facts found</p>
+            ) : (
+              <div className="facts-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Phone</th>
+                      <th>Native Name</th>
+                      <th>Category</th>
+                      <th>Fact</th>
+                      <th>Extracted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userFacts.map((fact, idx) => (
+                      <tr key={idx}>
+                        <td>{fact.username}</td>
+                        <td>{fact.phone}</td>
+                        <td>{fact.native_name}</td>
+                        <td><span className={`category-badge ${fact.category}`}>{fact.category}</span></td>
+                        <td>{fact.fact}</td>
+                        <td>{new Date(fact.extracted_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {factsTotalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  onClick={() => setFactsPage(p => Math.max(1, p - 1))}
+                  disabled={factsPage === 1}
+                >
+                  Previous
+                </button>
+                <span>Page {factsPage} of {factsTotalPages}</span>
+                <button 
+                  onClick={() => setFactsPage(p => Math.min(factsTotalPages, p + 1))}
+                  disabled={factsPage === factsTotalPages}
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>

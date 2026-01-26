@@ -61,6 +61,8 @@ const NavigationHeader = ({ compact = false, onPeriodChange, showZodiacSelector,
               <button onClick={() => navigate('/panchang')}>Panchang</button>
               <button onClick={() => navigate('/muhurat-finder')}>Muhurat</button>
               <button onClick={() => navigate('/festivals')}>Festivals</button>
+              <button onClick={() => navigate('/nakshatras')}>Nakshatras</button>
+              <button onClick={() => navigate('/blog')}>Blogs</button>
             </nav>
             
             <div className="compact-actions">

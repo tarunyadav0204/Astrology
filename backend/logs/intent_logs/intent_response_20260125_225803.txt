@@ -1,0 +1,57 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T22:58:07.218187
+Question: Tell me about my studies in next 3 months. Will I do good, I am preparing for 10th Board exams.
+Processing Time: 3.466s
+Response Length: 445 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "annual",
+    "category": "education",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D24"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "annual",
+  "category": "education",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D24"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March"
+      ]
+    }
+  }
+}

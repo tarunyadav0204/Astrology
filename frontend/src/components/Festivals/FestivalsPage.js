@@ -219,6 +219,7 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
   return (
     <div className="festivals-page">
       <NavigationHeader 
+        compact={true}
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}

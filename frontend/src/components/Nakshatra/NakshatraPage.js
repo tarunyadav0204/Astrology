@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import NavigationHeader from '../Shared/NavigationHeader';
 import SEOHead from '../SEO/SEOHead';
 import ColorLegend from './ColorLegend';
 import './NakshatraPage.css';
@@ -68,6 +69,7 @@ const NakshatraPage = () => {
 
   return (
     <div className="nakshatra-page">
+      <NavigationHeader compact={true} />
       <SEOHead 
         title={nakshatraData.seo?.title}
         description={nakshatraData.seo?.description}

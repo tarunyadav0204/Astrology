@@ -43,6 +43,7 @@ const CareerGuidancePage = ({ user, onLogout, onAdminClick, onLogin, showLoginBu
         }}
       />
       <NavigationHeader 
+        compact={true}
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}
         user={user}

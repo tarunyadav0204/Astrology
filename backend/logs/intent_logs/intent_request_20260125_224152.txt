@@ -1,0 +1,277 @@
+INTENT ROUTER REQUEST
+Timestamp: 2026-01-25T22:41:52.180763
+Question: Tell me about my studies in next 3 months. Will I do good, I am preparing for 10th Board exams.
+Model: models/gemini-2.0-flash-exp
+Prompt Length: 26780 characters
+================================================================================
+
+        You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
+        
+        CURRENT DATE CONTEXT:
+        - Today's Date: 2026-01-25
+        - Current Year: 2026
+        - Current Month: January
+        
+        IMPORTANT: When user asks about "next 3 months", "next 6 months", or relative time periods, calculate from TODAY'S DATE (2026-01-25).
+        Example: If today is 2024-12-20 and user asks "next 3 months", that means January-March 2025, NOT 2024.
+        
+
+Previous conversation:
+Q: Tell me about my studies in next 3 months. Will I do good, I am preparing for 10th Board exams.
+A: Tell me about my studies in next 3 months. Will I do good, I am preparing for 10th Board exams.
+Q: Tell me about my studies in next 3 months. Will I do good, I am preparing for 10th Board exams.
+A: <div class="quick-answer-card">**Quick Answer**: Your 10th Board exam preparation is entering a high-impact phase where your innate intelligence is fortified by divine grace, yet tested by a demand for extreme discipline. According to **Phaladeepika**, your <term id="lagna-lord">Lagna Lord</term> <term id="jupiter">Jupiter</term> is exceptionally strong in its <term id="own-sign">Own Sign</term> (Pisces) in the 4th house, forming a <term id="hamsa-yoga">Hamsa Yoga</term> which provides deep conceptual understanding. However, the next three months (Jan-March 2026) are dominated by a **Saturn-Jupiter Karmic Trigger**, meaning "Success through Structured Hardship." You will perform well, but you must overcome a tendency for mental distraction caused by <term id="rahu">Rahu</term>'s presence in your <term id="lagna">Lagna</term>. The Jaimini Arudha status is strong, indicating your reputation among peers will rise significantly following these results.</div>
+
+### Key Insights
+• **The Jaimini Secret**: Your <term id="amatyakaraka">Amatyakaraka</term> (<term id="moon">Moon</term>) is involved in a high-strength **Jaimini Raj Yoga** with your <term id="atmakaraka">Atmakaraka</term> (<term id="mars">Mars</term>), ensuring that your career path (starting with these boards) has the "Soul-Power" to reach high authority levels.
+• **Academic Convergence**: The <term id="varshphal">Varshphal</term> places your **Muntha** in the 4th house (Education) for 2026, making this the inescapable focal point of your destiny this year.
+• **Classical Verdict**: According to **BPHS**, a benefic <term id="mahadasha">Mahadasha</term> lord (Jupiter) in a <term id="kendra">Kendra</term> ensures that despite obstacles, the "Fruit" of your efforts will be sweet and enduring.
+
+### Astrological Analysis
+The fundamental strength of your academic potential lies in the 4th house of basic education. With 30 <term id="ashtakavarga">Ashtakavarga</term> points, this house shows robust support for learning. However, the 5th house of "Exam Performance" (Aries) holds only 23 points, indicating that your biggest challenge is not *knowing* the material, but *delivering* it under pressure without making "silly mistakes."
+
+#### The Parashari View
+Your 5th lord <term id="mars">Mars</term> is placed in the 11th house of gains, conjunct <term id="mercury">Mercury</term> and <term id="venus">Venus</term>. This creates a powerful **Kendra-Trikona Raj Yoga**. According to **Saravali**, this combination indicates a sharp, analytical mind capable of handling complex scientific or mathematical data. However, <term id="mercury">Mercury</term> (significator of logic) is <term id="combust">Combust</term>, suggesting you may feel mentally exhausted or "burnt out" as the exams approach in March.
+
+#### Jaimini Sutra Deep-Dive
+Your current **Sagittarius Chara Antardasha** (Sign ID 8) is highly significant. According to the **Jaimini Sutras**, this sign aspects Gemini (ID 2), Virgo (ID 5), and Pisces (ID 11). This activation of **Pisces** (your 4th house) brings your <term id="darakaraka">Darakaraka</term> (Jupiter) into play, providing the wisdom of a mentor. Since your **Amatyakaraka Lagna** is Aquarius, the current period falls in the 11th house from it, promising gains through intelligence.
+
+#### Nadi Precision (The Nature of Studies)
+Your chart reveals a specific **Nadi Link** between <term id="saturn">Saturn</term> and <term id="mercury">Mercury</term>/<term id="mars">Mars</term>. This indicates that your "Karma" in education is linked to **Technical or Logical mastery**. You are likely better at subjects requiring rules and structures (Maths/Science) rather than abstract arts. The <term id="saturn">Saturn</term> influence demands "Rote Memorization" and repetitive practice this month to overcome the <term id="rahu">Rahu</term> confusion in your 1st house.
+
+#### Timing Synthesis (Multi-System)
+The timing for your Board Exams is precisely mapped across three systems:
+1. **Vimshottari**: You are in **Jupiter-Rahu-Mercury** until Feb 2026. The <term id="pratyantardasha">Pratyantardasha</term> lord **Mercury** sits in your 11th house, bringing networking and intellectual gains. The transition to **Ketu PD** in March requires caution against "over-confidence" or technical glitches with exam tools.
+2. **Chara Dasha**: The **Sagittarius** sign (ID 8) is active, which houses your natal <term id="rahu">Rahu</term>. This confirms a high-pressure environment where you feel the weight of expectations.
+3. **Yogini**: You are in **Siddha** (<term id="venus">Venus</term>) dasha. As per **Phaladeepika**, the Siddha period is the "Giver of Accomplishments," specifically in the realms of knowledge and luxury. This is your primary "Success Shield."
+
+#### The Triple Perspective (Sudarshana)
+- **Lagna Chart**: Focus is on the 4th house (Deep Study).
+- **Chandra Lagna**: The 10th house from Moon contains <term id="saturn">Saturn</term>, indicating a "Professional" approach to your revision is required.
+- **Surya Lagna**: The 5th house from Sun contains <term id="jupiter">Jupiter</term>, providing the "Soul's Confidence" that you will eventually succeed.
+Since the focus on education appears in 3 out of 3 charts, the confidence level for academic success is **99%**—provided the work is put in.
+
+#### Special Points (Gandanta & Yogi)
+Your **Yogi Point** lord is the <term id="sun">Sun</term>, located in your 11th house. This means your "Fortune" in exams comes through your ability to stay visible and authoritative in your answers. However, your **Avayogi** (Obstacle Point) lord is <term id="saturn">Saturn</term>. This confirms that **laziness or procrastination** is your only true enemy over the next 90 days.
+
+### Nakshatra Insights
+Your birth <term id="nakshatra">Nakshatra</term> is **Purva Bhadrapada**, ruled by <term id="jupiter">Jupiter</term>. This makes you a "Transformative Learner." You have the ability to go from zero to mastery very quickly. However, **Saturn is currently transiting Uttara Bhadrapada**, which is your **Vipat (Danger) Tara**. This creates karmic obstacles; expect minor delays or health-related lethargy in February. You must maintain a strict sleep schedule to mitigate this "Vipat" influence.
+
+### Timing & Guidance
+**Phase 1: Jan 25 - Feb 3 (Mudda Rahu)**
+Confusion and high pressure. The **Ashtakavarga** shows 34 points for your 1st house (Sagittarius), giving you the physical stamina to study long hours, but Rahu may scatter your focus. Avoid starting entirely new topics; consolidate what you know.
+
+**Phase 2: Feb 4 - March 24 (Mudda Jupiter)**
+**Peak Performance Window.** As you enter the **Jupiter Mudda Dasha**, the "Hamsa Yoga" in your natal chart fully activates. This is the period of maximum clarity. Your **Sudarshana Year-Clock** is in the 5th house (Intelligence), making this the perfect time for mock tests.
+
+**Phase 3: The Board Exam Month (March)**
+**Karmic Trigger Alert**: Transit <term id="saturn">Saturn</term> is exactly hitting your natal <term id="jupiter">Jupiter</term> in your 4th house. This is "Wisdom through Hardship." The exams will feel "tough" or "lengthy," but your preparation will carry you through. The **Sarvashtakavarga** for Pisces is a healthy 30 points, providing a solid foundation.
+
+<div class="final-thoughts-card">**Final Thoughts**: You are currently a "Warrior-Scholar." While the <term id="rahu">Rahu</term> <term id="antardasha">Antardasha</term> creates smoke and mirrors, the underlying **Jupiter Mahadasha** is a rock-solid foundation of success. Trust your memory, respect the discipline of <term id="saturn">Saturn</term>, and the Jaimini Raj Yoga in your chart will manifest as a stellar result. As the **Saravali** states, "One with Jupiter in a quadrant (Kendra) becomes a protector of his kin and a master of sciences."</div>
+Q: In general
+A: <div class="quick-answer-card">**Quick Answer**: Your academic outlook for the next three months is exceptionally promising but demands disciplined labor over mere luck. According to **Phaladeepika**, the placement of your <term id="lagna-lord">Lagna Lord</term> <term id="jupiter">Jupiter</term> in its <term id="own-sign">Own Sign</term> (Pisces) in the 4th house forms a powerful <term id="hamsa-yoga">Hamsa Yoga</term>, granting you the wisdom and mental clarity needed for high-stakes examinations. This is further bolstered by your **Varshphal 2026** which places the **Muntha** in the 4th house, specifically focusing your destiny on education this year. While your <term id="vimshottari">Vimshottari Dasha</term> of Jupiter-Rahu can occasionally create mental "smoke" or distractions, the current **Mercury Pratyantardasha** (sitting in your 11th house) provides the intellectual "gains" and networking support needed to excel. Expect a "Karmic Trigger" as transit <term id="saturn">Saturn</term> crosses your natal Jupiter in your 4th house—this indicates that while the workload will be heavy and "Saturnine" in its pressure, the resulting "Wisdom through Hardship" will ensure a very strong performance in your 10th Board exams.</div>
+
+### Key Insights
+• **Academic Focus**: The **Muntha** in the 4th house (Education) confirms that 2026 is a pivotal year for your academic foundation.
+• **The Jaimini Secret**: Your <term id="amatyakaraka">Amatyakaraka</term> (<term id="moon">Moon</term>) sits in the 3rd house of "Personal Efforts," indicating that your success is directly tied to your writing skills and repeated practice.
+• **Karmic Activation**: Transit Saturn is currently hitting your natal Jupiter at 1.02° Pisces. This is a once-in-30-years "Wisdom Trigger," forcing you to master your subjects through deep discipline.
+• **Ashtakavarga Warning**: Your 5th house (Aries) holds only **23 bindus**, indicating low natural support for "easy" learning; you must not rely on shortcuts.
+
+### Astrological Analysis
+The root of your success lies in the strength of your 4th and 11th houses. According to **BPHS**, a strong 4th house ensures a solid grasp of fundamentals, while the 11th house (where your 5th lord <term id="mars">Mars</term> resides) ensures the fruition of your desires.
+
+#### The Parashari View
+Your <term id="lagna">Lagna</term> is Sagittarius, with <term id="jupiter">Jupiter</term> in the 4th house. This creates a highly stable mental environment. The 5th lord of intelligence, <term id="mars">Mars</term>, is placed in the 11th house of gains, forming a <term id="raj-yoga">Kendra-Trikona Raj Yoga</term> with <term id="mercury">Mercury</term> (7th and 10th lord). According to **Saravali**, this combination indicates "one who is highly intelligent and gains through his own mental prowess." The <term id="ashtakavarga">Ashtakavarga</term> shows **30 points** for the 4th house, indicating strong support for academic environment, though the 5th house at **23 points** warns of potential fatigue or lack of concentration if not managed.
+
+#### Jaimini Sutra Deep-Dive
+You are currently running the **Libra Chara Mahadasha** and the **Sagittarius Chara Antardasha** (Sign ID 8). According to the **Jaimini Sutras**, the Sagittarius period aspects your 4th house of Pisces (ID 11), your 7th house of Gemini (ID 2), and your 9th house of Leo (ID 5). 
+- **Confirmation**: The aspect on Pisces activates your <term id="darakaraka">Darakaraka</term> (Jupiter), which in Jaimini acts as a "supportive partner" to your soul's goals.
+- **Talent**: With <term id="mercury">Mercury</term> and <term id="venus">Venus</term> in the 11th from <term id="arudha-lagna">Arudha Lagna</term> (Capricorn), your "Dhana Yoga Status" is strong, meaning your intelligence will eventually lead to significant status.
+
+#### Nadi Precision (The Nature of Studies)
+Your chart reveals a specific Nadi connection between **Saturn and Jupiter**. This is the **"Dharma-Karma Adhipati" Link**, suggesting that your studies are not just for marks, but for a higher purpose. 
+- **The "Intellectual Cluster" Link (Sun + Mercury + Mars + Venus)**: In your 11th house, this cluster indicates a "Multi-tasker" mindset. You have the ability to switch between subjects (Mercury) with the aggression of a competitor (Mars). 
+- **NADI AGE TRIGGER**: At age 15-16, your chart enters the **Rohini** activation zone. Since <term id="jupiter">Jupiter</term> is internally strong, this age triggers a "growth spurt" in your cognitive abilities.
+
+#### Timing Synthesis
+This academic success is confirmed by your **Sagittarius Chara Dasha** activating your 4th house and your **Siddha Yogini Dasha** (Lord: <term id="venus">Venus</term>), which brings "Success, Luxury, and Knowledge."
+- **Vimshottari PD**: Your **Mercury Pratyantardasha** (sitting in your 11th house) runs through the end of January, bringing a sharp focus on logic. 
+- **Mudda Dasha (Varshphal)**: From Feb 3rd to March 24th, you enter the **Jupiter Mudda Dasha**. Since Jupiter is your Year Lord's friend and your natal Lagna Lord, this 7-week window is your "Golden Period" for exam preparation.
+- **Verdict**: Since this success appears in **3 out of 3 charts** (Lagna/Moon/Sun), the confidence level is **95%**—expect a breakthrough result if you maintain discipline.
+
+#### Triple Perspective (Sudarshana)
+- **Lagna Chart**: Shows physical effort in the 11th house (Mars/Sun).
+- **Chandra Lagna**: Examines the mind. From the Moon (Aquarius), your 5th house of studies (Gemini) contains <term id="ketu">Ketu</term>. This warns of "silly mistakes" or lack of attention to detail.
+- **Surya Lagna**: From the Sun (Libra), the 10th house of "Result" (Cancer) contains the <term id="indu-lagna">Indu Lagna</term>, promising a "wealth" of success in the final outcome.
+
+#### Divisional Chart Analysis (D24)
+In your **D24 (Chaturvimsamsa)**, the chart of specific knowledge, **Jupiter is Exalted** in the 1st house. According to **Uttara Kalamrita**, an exalted planet in the D24 Lagna indicates "one who becomes a master of his chosen field." However, **Mars is debilitated** there, suggesting that while you have the knowledge (Jupiter), you might struggle with the "speed" or "aggression" (Mars) of the exam environment. Practice timed mock tests to overcome this.
+
+### Nakshatra Insights
+Your birth <term id="nakshatra">Nakshatra</term> is **Purva Bhadrapada**, ruled by Jupiter. According to **Hora Sara**, those born under this star are "skilled in earning through intellectual means." 
+- **Current Transit**: Saturn is transiting **Uttara Bhadrapada**, which is your **Vipat Tara** (Danger/Obstacle). **Saturn is transiting in Uttara Bhadrapada, which is your Vipat Tara from your birth Moon in Shatabhisha. This creates danger and obstacles.** This specifically warns against overconfidence. Treat every mark as a battle to be won.
+
+### Timing & Guidance
+• **Feb 3 - March 24**: Your highest-performing window. This is the **Jupiter Mudda Dasha**. Complete your most difficult subjects during this time.
+• **March 24 onwards**: The **Saturn Mudda Dasha** begins. The pressure will feel heavy. Avoid burnout by maintaining a strict sleep schedule.
+• **Remedy**: Since your 5th house is weak in Ashtakavarga, offer water to the Sun (<term id="surya-arghya">Surya Arghya</term>) daily to boost your "Atma-Bala" (Self-confidence).
+
+<div class="final-thoughts-card">**Final Thoughts**: You are currently in a "Sudarshana Triple Hit" phase where your Dasha, Varshphal Muntha, and Divisional Strength all point toward academic excellence. The only hurdle is the "Vipat Tara" influence of Saturn—manage your time with military discipline, and the Hamsa Yoga will deliver a result that sets the stage for a brilliant future.</div>
+
+        
+        
+        
+        🚨🚨🚨 BLOCKING RULE - READ THIS FIRST 🚨🚨🚨
+        Before generating ANY clarification question, you MUST:
+        1. Read the "KNOWN USER BACKGROUND" section above
+        2. Check if the information you want to ask is ALREADY THERE
+        3. If it IS there, DO NOT ask for it - skip to asking about the specific aspect instead
+        
+        Example: User background shows "CAREER: Employed in Amazon as a Senior Software Development Manager"
+        ❌ WRONG: "Are you currently employed or running a business?"
+        ✅ CORRECT: "What specific aspect of your career would you like to explore - promotion timing, salary growth, job change, or career direction?"
+        
+        Current question: "Tell me about my studies in next 3 months. Will I do good, I am preparing for 10th Board exams."
+        
+        CRITICAL FOLLOW-UP DETECTION:
+        1. If the PREVIOUS assistant message was a FULL ANSWER (not a clarification question), and the current user message is:
+           - A correction ("that's wrong", "incorrect", "planet position is wrong")
+           - A follow-up ("tell me more", "what about...", "and...")
+           - A clarification request ("what do you mean", "explain")
+           - A short response referring to previous context ("yes", "no", "okay", single words)
+           Then: Return status: "READY" immediately WITHOUT asking clarification. This is a continuation of the previous conversation.
+        
+        2. If the PREVIOUS assistant message was a clarification question asking which area to focus on, and the current user message is answering that (e.g., "career", "about my career", "health"), then:
+           - Extract the area from the user's response
+           - Return status: "READY" with the extracted category
+           - Combine the original question context with the user's clarification response
+        
+        DIVISIONAL CHART DETECTION:
+        Based on the question topic, determine which divisional charts are needed:
+        - D1 (Rashi): Always include for basic analysis
+        - D3 (Drekkana): Siblings, courage, communication, short travels
+        - D4 (Chaturthamsa): Property, home, mother, education, vehicles
+        - D7 (Saptamsa): Children, creativity, progeny
+        - D9 (Navamsa): Marriage, spouse, dharma, spiritual strength (always include)
+        - D10 (Dasamsa): Career, profession, reputation, father
+        - D12 (Dwadasamsa): Parents, ancestry, past life
+        - D16 (Shodasamsa): Vehicles, happiness, luxuries
+        - D20 (Vimsamsa): Spirituality, religious practices
+        - D24 (Chaturvimsamsa): Education, learning, knowledge
+        - D27 (Nakshatramsa): Strengths, weaknesses, general fortune
+        - D30 (Trimsamsa): Misfortunes, diseases, enemies
+        - D40 (Khavedamsa): Maternal relatives, auspicious/inauspicious events
+        - D45 (Akshavedamsa): Character, conduct, general behavior
+        - D60 (Shashtiamsa): General fortune, karmic patterns
+        
+        Examples:
+        - "When will I get married?" → ["D1", "D9", "D7"]
+        - "How is my career?" → ["D1", "D9", "D10"]
+        - "Tell me about my siblings" → ["D1", "D3", "D9"]
+        - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
+        - "Children prospects?" → ["D1", "D7", "D9"]
+        - "Health issues?" → ["D1", "D9", "D30"]
+        - "Education/learning?" → ["D1", "D9", "D24"]
+        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        
+        CRITICAL RULES FOR CLARIFICATION:
+        
+        1. ALWAYS return status: "CLARIFY" for these types of questions:
+           - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
+           - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
+           - "What about [year]?" (e.g., "What about 2026?")
+           - "Tell me about my [topic]" without specifics (e.g., "Tell me about my career", "Tell me about marriage")
+           - "What about [topic]?" without specifics (e.g., "What about my health?")
+           - Any question asking about a year/period WITHOUT mentioning a specific life area
+        
+        2. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.)
+           - A clear focus or timeframe
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        
+        3. When clarification is needed, craft a natural, conversational question that:
+           
+           🚨 CRITICAL: ALWAYS check the KNOWN USER BACKGROUND section first.
+           - DO NOT ask for information already present in the user background
+           - Example: If background shows "CAREER: Employed in Amazon", skip asking about employment status
+           - Example: If background shows "FAMILY: Married in 2020", skip asking about marital status
+           
+           Your clarification question should:
+           - Focus on narrowing down the SPECIFIC aspect they want to know (timing, prospects, challenges, etc.)
+           - Gather NEW factual information NOT in the user background
+           - Sound warm, natural, and conversational (not templated)
+           - Be tailored to their exact question
+           - Help you provide a more accurate astrological analysis
+           
+           💡 FACT EXTRACTION BONUS:
+           The MORE specific facts you can extract in your clarification question, the BETTER our future responses will be.
+           - Instead of just asking "What aspect?", try to extract concrete details
+           - Examples of valuable facts: specific job titles, company names, years of experience, number of children, ages, education levels, health conditions, locations, dates of major events
+           - These facts will be stored and used to personalize ALL future astrological guidance for this user
+        
+        4. Max 2 clarifications per session - after that, return READY with available info
+        
+        MODES:
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
+        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+
+        TRANSIT DETECTION:
+        - "When will..." questions → needs_transits: true
+        - "What period is good for..." → needs_transits: true
+        - "How is 2025/next year..." → needs_transits: true
+        - "Marriage timing" → needs_transits: true
+        - Questions involving 'when', 'growth', or 'timing' → ALWAYS set needs_transits: true
+        - Career questions about promotions/hikes → needs_transits: true
+        - Personality/yoga/general questions → needs_transits: false
+
+        CRITICAL: For ANY mode requiring transits, set startYear and endYear to ONLY the specific year/period mentioned in the question.
+        - If question mentions "2026", use startYear: 2026, endYear: 2026
+        - If question mentions "Q1 2026", use startYear: 2026, endYear: 2026, months: ["January", "February", "March"]
+        - If question mentions "March-June 2025", use startYear: 2025, endYear: 2025, months: ["March", "April", "May", "June"]
+        - If question mentions "next year", use startYear: 2027, endYear: 2027
+        - For general timing questions without specific year, use startYear: 2026, endYear: 2028
+
+        Return ONLY a JSON object:
+        {
+            "status": "CLARIFY" or "READY",
+            "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "extracted_context": {"timeframe": "2025", "aspect": "promotion"},
+            "mode": "annual" or "birth",
+            "category": "category_name",
+            "year": SPECIFIC_YEAR_FROM_QUESTION (only for annual mode),
+            "needs_transits": true or false,
+            "divisional_charts": ["D3", "D9", "D10"],
+            "transit_request": {
+                "startYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "endYear": SPECIFIC_YEAR_FROM_QUESTION,
+                "yearMonthMap": {
+                    "SPECIFIC_YEAR_FROM_QUESTION": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                }
+            }
+        }
+
+        EXAMPLES (use these to identify similar patterns):
+        
+        Question: "How is my 2026?"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}
+        
+        Question: "Tell me about next year"
+        Response: {"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2027}
+        
+        Question: "How is my health in 2026?"
+        Response: {"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}
+        
+        Question: "When will I get married?"
+        Response: {"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}
+        
+        Question: "Tell me about my siblings"
+        Response: {"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}
+        
+        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {"2026": [all 12 months]}
+        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {"2026": ["January", "February", "March"]}
+        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {"2025": ["March", "April", "May", "June"]}
+        - "What are my strengths?" → needs_transits: false
+        - "When will I get married?" → startYear: 2026, endYear: 2028 (general timing)
+        
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        

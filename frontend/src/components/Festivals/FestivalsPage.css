@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
   padding: 0 20px 20px 20px;
-  padding-top: 180px; /* Account for fixed header */
+  padding-top: 80px; /* Account for fixed header */
 }
 
 .festivals-header {

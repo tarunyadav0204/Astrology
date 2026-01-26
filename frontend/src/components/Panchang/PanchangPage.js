@@ -244,6 +244,7 @@ const PanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, showLog
         }}
       />
       <NavigationHeader 
+        compact={true}
         showZodiacSelector={false}
         user={user}
         onAdminClick={handleAdminClick}

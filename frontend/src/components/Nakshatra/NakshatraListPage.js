@@ -75,6 +75,7 @@ const NakshatraListPage = () => {
         keywords="nakshatras, vedic astrology, moon signs, nakshatra list, astrology guide"
       />
       <NavigationHeader 
+        compact={true}
         user={user}
         onLogin={() => navigate('/')}
         onLogout={() => {

@@ -1,0 +1,59 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T22:07:39.767439
+Question: Tell me about my studies over next 3 months.
+Processing Time: 2.818s
+Response Length: 764 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best guide you about your studies over the next three months (January, February, and March 2026), could you tell me what aspect you're most interested in? For example, are you wondering about exam results, new learning opportunities, challenges in your studies, or something else?",
+    "mode": "annual",
+    "category": "education",
+    "year": 2026,
+    "needs_transits": true,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D24"
+    ],
+    "transit_request": {
+        "startYear": 2026,
+        "endYear": 2026,
+        "yearMonthMap": {
+            "2026": [
+                "January",
+                "February",
+                "March"
+            ]
+        }
+    }
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best guide you about your studies over the next three months (January, February, and March 2026), could you tell me what aspect you're most interested in? For example, are you wondering about exam results, new learning opportunities, challenges in your studies, or something else?",
+  "mode": "annual",
+  "category": "education",
+  "year": 2026,
+  "needs_transits": true,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D24"
+  ],
+  "transit_request": {
+    "startYear": 2026,
+    "endYear": 2026,
+    "yearMonthMap": {
+      "2026": [
+        "January",
+        "February",
+        "March"
+      ]
+    }
+  }
+}

@@ -11,8 +11,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../utils/constants';
 import { chartAPI } from '../../services/api';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 const DashaBrowser = ({ visible, onClose, birthData }) => {
+  useAnalytics('DashaBrowser');
+  
   const [transitDate, setTransitDate] = useState(new Date());
   const [cascadingData, setCascadingData] = useState(null);
   const [selectedDashas, setSelectedDashas] = useState({});
@@ -21,6 +25,7 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
   useEffect(() => {
     if (visible && birthData) {
       loadDashaData(new Date());
+      trackAstrologyEvent.dashaViewed('cascading');
     }
   }, [visible, birthData]);
 
@@ -74,6 +79,7 @@ const DashaBrowser = ({ visible, onClose, birthData }) => {
     newDate.setDate(newDate.getDate() + days);
     setTransitDate(newDate);
     loadDashaData(newDate);
+    trackAstrologyEvent.transitViewed(newDate.toISOString().split('T')[0]);
   };
 
   const resetToToday = () => {

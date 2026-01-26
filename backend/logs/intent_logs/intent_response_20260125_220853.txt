@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-25T22:08:56.394325
+Question: In general
+Processing Time: 2.831s
+Response Length: 399 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide a focused astrological reading, could you please specify which area of your life you'd like insights on? For example, are you interested in career, relationships, finances, health, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide a focused astrological reading, could you please specify which area of your life you'd like insights on? For example, are you interested in career, relationships, finances, health, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

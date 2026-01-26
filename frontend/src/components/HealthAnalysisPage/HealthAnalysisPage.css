@@ -1,7 +1,7 @@
 .health-analysis-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #f0f8f0 0%, #e8f5e8 50%, #d4f1d4 100%);
-  padding-top: 180px;
+  padding-top: 80px;
 }
 
 .page-content {

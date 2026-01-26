@@ -59,6 +59,7 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
         }}
       />
       <NavigationHeader 
+        compact={true}
         showZodiacSelector={false}
         zodiacSigns={ZODIAC_SIGNS}
         user={user}

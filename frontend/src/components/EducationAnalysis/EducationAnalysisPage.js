@@ -116,6 +116,7 @@ const EducationAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogi
   return (
     <div className="education-analysis-page">
       <NavigationHeader 
+        compact={true}
         user={user}
         onLogout={onLogout}
         onAdminClick={onAdminClick}

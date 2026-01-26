@@ -24,6 +24,7 @@ class FactExtractor:
     
     async def extract_facts(self, question: str, response: str, birth_chart_id: int):
         """Extract facts from Q&A pair and store them"""
+        from datetime import datetime
         
         if not self.model:
             print("⚠️ Fact extraction skipped - model not initialized")

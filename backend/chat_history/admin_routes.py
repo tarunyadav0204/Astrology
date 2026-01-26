@@ -237,3 +237,79 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
         return {"message": "Setting updated", "key": key, "value": setting.value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating setting: {str(e)}")
+
+@router.get("/admin/facts")
+async def get_all_user_facts(
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    current_user: dict = Depends(require_admin)
+):
+    """Get all facts in flat table format"""
+    try:
+        from encryption_utils import EncryptionManager
+        encryption = EncryptionManager()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Build WHERE clause
+        where_clause = ""
+        params = []
+        if search:
+            where_clause = " WHERE (u.name LIKE ? OR u.phone LIKE ? OR bc.name LIKE ?)"
+            params = [f"%{search}%", f"%{search}%", f"%{search}%"]
+        
+        # Get total count
+        count_query = f"""
+            SELECT COUNT(*) as total
+            FROM user_facts uf
+            INNER JOIN birth_charts bc ON bc.id = uf.birth_chart_id
+            INNER JOIN users u ON u.userid = bc.userid
+            {where_clause}
+        """
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()['total']
+        
+        # Get facts with user and birth chart info
+        query = f"""
+            SELECT 
+                u.userid, COALESCE(u.name, u.phone) as username, u.phone,
+                bc.id as birth_chart_id, bc.name as native_name,
+                uf.category, uf.fact, uf.extracted_at
+            FROM user_facts uf
+            INNER JOIN birth_charts bc ON bc.id = uf.birth_chart_id
+            INNER JOIN users u ON u.userid = bc.userid
+            {where_clause}
+            ORDER BY u.name, bc.id, uf.category, uf.extracted_at DESC
+            LIMIT ? OFFSET ?
+        """
+        params.extend([limit, (page - 1) * limit])
+        
+        cursor.execute(query, params)
+        facts = []
+        for row in cursor.fetchall():
+            facts.append({
+                'user_id': row['userid'],
+                'username': row['username'],
+                'phone': row['phone'],
+                'birth_chart_id': row['birth_chart_id'],
+                'native_name': encryption.decrypt(row['native_name']),
+                'category': row['category'],
+                'fact': row['fact'],
+                'extracted_at': row['extracted_at']
+            })
+        
+        conn.close()
+        
+        return {
+            'success': True,
+            'facts': facts,
+            'page': page,
+            'limit': limit,
+            'total': total,
+            'total_pages': (total + limit - 1) // limit
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching facts: {str(e)}")

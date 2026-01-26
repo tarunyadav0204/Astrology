@@ -37,6 +37,8 @@ from calculators.jaimini_full_analyzer import JaiminiFullAnalyzer
 from calculators.nadi_linkage_calculator import NadiLinkageCalculator
 from calculators.pushkara_calculator import PushkaraCalculator
 from calculators.sudarshana_chakra_calculator import SudarshanaChakraCalculator
+from calculators.sudarshana_dasha_calculator import SudarshanaDashaCalculator
+from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
 
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
@@ -645,18 +647,24 @@ A planet transiting a traditionally good house (e.g., Jupiter in 11th) can FAIL 
 
 **MANDATORY: YOU MUST EXPLICITLY MENTION ASHTAKAVARGA POINTS IN EVERY TRANSIT PREDICTION.**
 
+**BAV OVERRIDE RULE (CRITICAL):**
+Before declaring a transit 'Benefic' based on high Sarvashtakavarga (SAV) points, you MUST check the `bhinnashtakavarga` for that specific transiting planet.
+- Access: `context['ashtakavarga']['d1_rashi']['bhinnashtakavarga'][planet_name]['house_points'][house_index]`
+- If the planet's individual BAV points in that sign are below 3, predict significant struggle and obstacles regardless of the house's total SAV strength
+- Example: House has 30 SAV points (excellent), but Saturn's BAV = 1 point → Saturn transit will still be difficult
+
 **Mandatory Ashtakavarga Cross-Check:**
-- **28+ points:** "Exceptional results - transit delivers outstanding benefits"
-- **25-27 points:** "Good results - transit delivers as promised"
-- **22-24 points:** "Moderate results - some benefits but also obstacles"
-- **19-21 points:** "Weak results - transit struggles to deliver"
-- **Below 19 points:** "Disappointing results - despite good planetary position, house lacks strength to manifest benefits"
+- **28+ SAV points:** Check BAV - if BAV ≥ 4: "Exceptional results", if BAV < 3: "Mixed results despite house strength"
+- **25-27 SAV points:** Check BAV - if BAV ≥ 4: "Good results", if BAV < 3: "Moderate results with obstacles"
+- **22-24 SAV points:** Check BAV - if BAV ≥ 3: "Moderate results", if BAV < 3: "Weak results"
+- **19-21 SAV points:** Check BAV - if BAV ≥ 3: "Weak results", if BAV < 3: "Disappointing results"
+- **Below 19 SAV points:** Regardless of BAV, predict "Disappointing results"
 
-**REQUIRED FORMAT - Always include this line:**
-"The Ashtakavarga shows [X] points for this house, indicating [strength level] support."
+**REQUIRED FORMAT - Always include BOTH metrics:**
+"The Sarvashtakavarga shows [X] points for this house, and [Planet]'s individual Bhinnashtakavarga contribution is [Y] points, indicating [combined strength assessment]."
 
-**Template for Weak Ashtakavarga:**
-"While [Planet] transits your [House]th house (traditionally beneficial), the Ashtakavarga shows only [X] points, indicating the house lacks strength to fully manifest the promised benefits. Expect [modified prediction] rather than [traditional expectation]."
+**Template for BAV Override:**
+"While the [House]th house has strong Sarvashtakavarga support ([X] points), [Planet]'s individual Bhinnashtakavarga shows only [Y] points in this sign. This creates a paradox - the house is strong, but the planet itself struggles here. Expect [modified prediction based on low BAV]."
 
 **This prevents the #1 complaint: Promising a 'Great Year' that becomes mediocre.**
 
@@ -767,6 +775,108 @@ When Mrityu Bhaga is detected, you MUST state: "KARMIC LANDMINE: Your [Planet/As
 - Planet is also in dasha period (double vulnerability)
 
 **Remedy Guidance:** Always suggest strengthening remedies for the afflicted planet (gemstone, mantra, charity) to mitigate the karmic wound.
+
+---
+
+### Y. THE SUDARSHANA TRIPLE HIT (PRECISION TIMING)
+You have access to `sudarshana_dasha['precision_triggers']`. This is your "Sniper Calendar."
+
+1. **Confirmation Levels**: 
+   - **Triple Hit**: If the JSON shows a planet hit from 3 perspectives within a week, predict an "Unavoidable, life-altering milestone."
+   - **Double Hit**: Predict a "High-probability event" that the user will both experience physically and feel deeply.
+   - **Single Hit**: Treat it as a "Minor trigger" or a specific day of localized focus.
+2. **Mandatory Format**: When a hit occurs, use the following:
+   - "🎯 **Precision Date**: On [Date], your Sudarshana Year-Clock conjuncts your natal [Planet]. Since this is a [Single/Double/Triple] confirmation, expect [Significance]."
+3. **Synthesis with Mrityu Bhaga**: If the clock hits a planet already flagged in `mrityu_bhaga`, escalate the warning to "Maximum Alert."
+
+---
+
+### R2. NAKSHATRA REMEDY HIERARCHY (CLASSICAL UPAYA)
+You have access to `nakshatra_remedies` which contains classical Nakshatra-based remedies for all planets.
+
+**CRITICAL INSTRUCTION**: Nakshatra remedies are SUPERIOR to generic Rashi-based remedies in classical texts.
+
+**The Shakti Rule**:
+- You MUST identify the 'Shakti' (Power) of the target Nakshatra from the JSON
+- Explain how the remedy 'activates' or 'pacifies' this specific power
+- Example: "Mula's Barhana Shakti (Power to root out) is causing mental fog - the Sal tree remedy grounds this destructive energy"
+
+**The Deific Link**:
+- Do NOT suggest generic planetary deities (e.g., "worship Jupiter for Jupiter problems")
+- Use the Nakshatra's specific Devata from the JSON
+- Example: "For your Mula Rahu, worship Nirriti or Ganesha (lord of roots) to stabilize your focus"
+
+**Biological Remedies (Vriksha)**:
+- The 'Vriksha' (Tree) data is the PRIMARY remedy for physical manifestations
+- Nadi texts consider biological remedies superior to mantras for tangible results
+- Format: "Plant or nurture a [Tree Name]. If unavailable, touch its wood or keep its leaf in your study area."
+
+**Sound Remedies (Beej Mantra + Pada Syllable)**:
+- Use the Nakshatra's Beej Mantra (not the planet's mantra)
+- Emphasize the Pada-specific syllable for surgical precision
+- Format: "Chant '[Mantra]' 108 times daily. Focus on the vibration '[Pada Syllable]' representing your specific pada."
+
+**Mandatory Remedy Format**:
+When suggesting remedies, you MUST structure as:
+1. **Biological (Tier 1)**: [Vriksha remedy]
+2. **Sound (Tier 2)**: [Beej Mantra + Pada syllable]
+3. **Ritual (Tier 3)**: [Deific worship/charity]
+4. **Rationale**: Explain the Shakti connection
+
+**Example Response**:
+"🎯 **Classical Upaya for Rahu in Mula**: Your Rahu carries the Barhana Shakti (Power to root out), which is causing destructive mental patterns. Classical Nadi texts recommend:
+1. **Biological**: Plant a Sal tree or keep Sal wood in your workspace
+2. **Sound**: Chant 'Om Naam' 108 times, focusing on 'Bi' (your 4th pada vibration)
+3. **Ritual**: Offer root vegetables to Lord Ganesha on Tuesdays
+4. **Why This Works**: Nirriti (deity of Mula) governs destruction and renewal - these remedies channel the rooting-out power toward obstacles, not your focus."
+
+**When to Emphasize**:
+- User asks for remedies or solutions
+- Afflicted planets (debilitated, combust, in dusthanas)
+- Planets in dasha periods causing difficulties
+- Malefic nakshatras (Mula, Ashlesha, Jyeshtha, Ardra)
+
+---
+You have access to `sudarshana_dasha` which provides date-level precision for event timing.
+
+**THE LONGITUDINAL CLOCK:**
+This is a 1-degree-per-year clock starting from the Lagna degree. It progresses through the entire zodiac in 360 years (12 houses × 30 years each).
+
+**CRITICAL INTEGRATION:**
+1. **The Annual Focus**: Check `active_house` to see which house is activated for the current age
+2. **The Precision Trigger**: Check `precision_triggers` array for exact dates when the clock hits natal planets
+3. **The Hit Significance**: Each trigger includes date, planet, significance, and intensity
+4. **Proximity-Based Confirmation**: Triggers within 7 days for the same planet from different perspectives (Lagna/Moon/Sun) are merged into confirmation levels
+
+**MANDATORY SYNTHESIS IN TIMING SECTION:**
+You MUST cite Sudarshana Dasha to provide date-level precision in your "Timing Synthesis" subsection.
+
+**Template for Timing Synthesis:**
+"This timing is confirmed by [Sign] Chara Dasha and your [Planet] Pratyantardasha. Crucially, your Sudarshana Chakra Dasha clock reaches the exact degree of your natal [Planet] on [Specific Date], marking the peak day of [specific manifestation]."
+
+**Precision Trigger Interpretation:**
+- **Single Confirmation:** Event possible from one perspective (Lagna/Moon/Sun)
+- **Double Confirmation (within 7 days):** High probability - event confirmed from two perspectives within a week
+- **Triple Confirmation (within 7 days):** Guaranteed event - all three perspectives align within a week (mark this prominently)
+- **3-Day Window:** Each trigger includes window_start and window_end (±1.5 days) for orb of influence
+- **Benefic Hit (Jupiter/Venus):** "Day of Grace" - predict specific positive event
+- **Malefic Hit (Mars/Saturn/Rahu/Ketu):** "Critical window" - predict challenge or crisis
+- **Luminaries (Sun/Moon):** "Vitality peak" or "Emotional shift"
+- **Mercury:** "Critical communication" or "Commercial transaction"
+
+**Example Response Format:**
+"Your Sudarshana Year-Clock is currently transiting your [X]th house of [Theme]. TRIPLE CONFIRMATION: Between [Date1] and [Date2], the clock reaches the exact degree of your natal [Planet] from ALL THREE perspectives (Lagna on [Date1], Moon on [Date2], Sun on [Date3]). This is a GUARANTEED [Event Type] - [specific prediction]."
+
+**When to Emphasize:**
+- User asks about timing ("when will...", "what date...")
+- Triple confirmations (ALWAYS highlight these prominently)
+- Multiple triggers in requested period (list all dates with confirmation levels)
+- Critical intensity triggers (warn about specific dates and windows)
+- Benefic triggers during difficult dashas (silver lining dates with windows)
+
+**DUAL APPROACH:**
+1. **Horizontal Integration**: Mention in "Timing Synthesis" subsection alongside other dashas
+2. **Vertical Integration**: Create "Precision Calendar" list in "Timing & Guidance" section with all trigger dates
 
 ## ETHICAL GUARDRAILS (STRICT COMPLIANCE)
 - NO DEATH PREDICTIONS: Never predict the exact date of death or use words like "Fatal end." Use phrases like "Critical health period," "End of a cycle," or "Period of high physical vulnerability."
@@ -1242,7 +1352,10 @@ For every user query, structure your response exactly as follows:
                 context['d1_chart'],  # Use the enriched d1_chart from context
                 divisional_charts.get('d3_drekkana', {}),
                 divisional_charts.get('d9_navamsa', {})
-            ).get_all_sniper_points()
+            ).get_all_sniper_points(),
+            
+            # Nakshatra Remedies (Classical Upaya)
+            "nakshatra_remedies": NakshatraRemedyCalculator().get_chart_remedies({})
         })
         
         # Add planetary analysis for both D1 and D9
@@ -1263,6 +1376,9 @@ For every user query, structure your response exactly as follows:
                     context["d9_planetary_analysis"][planet] = self._filter_planetary_analysis(d9_full, chart_calc)
                 except Exception as e:
                     continue
+        
+        # Generate nakshatra remedies after planetary analysis is complete
+        context["nakshatra_remedies"] = NakshatraRemedyCalculator().get_chart_remedies(context["planetary_analysis"])
         
         return context
     
@@ -1413,6 +1529,23 @@ For every user query, structure your response exactly as follows:
             'yogi_points': yogi_calc.calculate_yogi_points(birth_data),
             'gandanta_analysis': gandanta_calc.calculate_gandanta_analysis()
         }
+        
+        # Add Sudarshana Dasha (Annual Clock with precision triggers)
+        if intent_result and intent_result.get('needs_transits'):
+            try:
+                from datetime import datetime
+                birth_hash = self._create_birth_hash(birth_data)
+                chart_data = self.static_cache[birth_hash]['d1_chart']
+                
+                # Determine target year from intent
+                target_year = datetime.now().year
+                if intent_result.get('transit_request'):
+                    target_year = intent_result['transit_request'].get('startYear', target_year)
+                
+                sudarshana_dasha_calc = SudarshanaDashaCalculator(chart_data, birth_data)
+                context['sudarshana_dasha'] = sudarshana_dasha_calc.calculate_precision_triggers(target_year)
+            except Exception as e:
+                print(f"❌ Sudarshana Dasha calculation failed: {e}")
         
         # Add Varshphal if question is about a specific year
         if intent_result and intent_result.get('transit_request'):
@@ -2439,59 +2572,119 @@ For every user query, structure your response exactly as follows:
         return data
     
     def _apply_ashtakavarga_filter(self, transit_house: int, transit_planet: str, ashtakavarga_data: Dict) -> Dict:
-        """Apply Ashtakavarga filter to transit predictions"""
+        """Apply Ashtakavarga filter to transit predictions with BAV override"""
         if not transit_house or not ashtakavarga_data:
             return {'status': 'no_data', 'strength': 'unknown'}
         
-        # Get Bhinnashtakavarga for the transiting planet
+        # Get Sarvashtakavarga (total points)
         d1_ashtakavarga = ashtakavarga_data.get('d1_rashi', {})
+        sarvashtakavarga = d1_ashtakavarga.get('sarvashtakavarga', {})
+        sav_points = sarvashtakavarga.get('house_points', [])
+        
+        # Get Bhinnashtakavarga for the transiting planet
         bhinnashtakavarga = d1_ashtakavarga.get('bhinnashtakavarga', {})
         planet_ashtakavarga = bhinnashtakavarga.get(transit_planet, {})
         
-        if not planet_ashtakavarga:
-            return {'status': 'no_planet_data', 'strength': 'unknown'}
+        if not sav_points or not planet_ashtakavarga:
+            return {'status': 'no_data', 'strength': 'unknown'}
         
         # Get points for the transit house (convert 1-12 to 0-11 indexing)
         house_index = (transit_house - 1) % 12
-        house_points = planet_ashtakavarga.get('house_points', [])
         
-        if len(house_points) <= house_index:
+        if len(sav_points) <= house_index:
             return {'status': 'no_house_data', 'strength': 'unknown'}
         
-        points = house_points[house_index]
+        sav_house_points = sav_points[house_index]
         
-        # Ashtakavarga strength classification (Classical thresholds)
-        if points >= 28:
-            strength = 'excellent'
-            prediction_modifier = 'exceptional_results'
-        elif points >= 25:
-            strength = 'good'
-            prediction_modifier = 'good_results'
-        elif points >= 22:
-            strength = 'moderate'
-            prediction_modifier = 'mixed_results'
-        elif points >= 19:
-            strength = 'weak'
-            prediction_modifier = 'limited_results'
+        # Get BAV points for this planet in this house
+        bav_house_points_list = planet_ashtakavarga.get('house_points', [])
+        if len(bav_house_points_list) <= house_index:
+            bav_house_points = None
         else:
-            strength = 'very_weak'
-            prediction_modifier = 'disappointing_results'
+            bav_house_points = bav_house_points_list[house_index]
         
-        # Special handling for malefic transits with high points
-        malefic_planets = ['Saturn', 'Mars', 'Rahu', 'Ketu']
-        if transit_planet in malefic_planets and points >= 28:
-            prediction_modifier = 'challenging_but_manageable'
-            strength = f'{strength}_with_support'
+        # SAV strength classification
+        if sav_house_points >= 28:
+            sav_strength = 'excellent'
+        elif sav_house_points >= 25:
+            sav_strength = 'good'
+        elif sav_house_points >= 22:
+            sav_strength = 'moderate'
+        elif sav_house_points >= 19:
+            sav_strength = 'weak'
+        else:
+            sav_strength = 'very_weak'
+        
+        # BAV Override Logic
+        if bav_house_points is not None:
+            if bav_house_points < 3:
+                # Planet struggles despite house strength
+                if sav_strength in ['excellent', 'good']:
+                    final_strength = 'mixed_bav_override'
+                    prediction_modifier = 'paradox_strong_house_weak_planet'
+                else:
+                    final_strength = 'weak_bav_override'
+                    prediction_modifier = 'disappointing_results'
+            elif bav_house_points >= 4:
+                # Planet strong, use SAV classification
+                final_strength = sav_strength
+                if sav_strength == 'excellent':
+                    prediction_modifier = 'exceptional_results'
+                elif sav_strength == 'good':
+                    prediction_modifier = 'good_results'
+                elif sav_strength == 'moderate':
+                    prediction_modifier = 'moderate_results'
+                else:
+                    prediction_modifier = 'weak_results'
+            else:  # BAV 3
+                final_strength = f'{sav_strength}_adequate_bav'
+                prediction_modifier = 'adequate_results'
+        else:
+            # No BAV data, use SAV only
+            final_strength = sav_strength
+            if sav_strength == 'excellent':
+                prediction_modifier = 'exceptional_results'
+            elif sav_strength == 'good':
+                prediction_modifier = 'good_results'
+            elif sav_strength == 'moderate':
+                prediction_modifier = 'mixed_results'
+            elif sav_strength == 'weak':
+                prediction_modifier = 'limited_results'
+            else:
+                prediction_modifier = 'disappointing_results'
         
         return {
             'status': 'calculated',
-            'points': points,
-            'strength': strength,
+            'sav_points': sav_house_points,
+            'bav_points': bav_house_points,
+            'sav_strength': sav_strength,
+            'final_strength': final_strength,
             'prediction_modifier': prediction_modifier,
             'house': transit_house,
             'planet': transit_planet,
-            'interpretation': self._get_ashtakavarga_interpretation(points, transit_planet, transit_house)
+            'interpretation': self._get_combined_ashtakavarga_interpretation(
+                sav_house_points, bav_house_points, transit_planet, transit_house
+            ),
+            'bav_override_active': bav_house_points is not None and bav_house_points < 3 and sav_house_points >= 25
         }
+    
+    def _get_combined_ashtakavarga_interpretation(self, sav_points: int, bav_points: int, planet: str, house: int) -> str:
+        """Get interpretation based on both SAV and BAV points"""
+        if bav_points is None:
+            # Fallback to SAV only
+            return self._get_ashtakavarga_interpretation(sav_points, planet, house)
+        
+        # BAV Override scenarios
+        if bav_points < 3 and sav_points >= 25:
+            return f"{planet} transit through {house}th house creates a paradox: The house has strong Sarvashtakavarga support ({sav_points} points), but {planet}'s individual Bhinnashtakavarga shows only {bav_points} points. The house is strong, but the planet struggles here - expect obstacles and delays despite favorable house strength."
+        elif bav_points >= 4 and sav_points >= 28:
+            return f"{planet} transit through {house}th house has exceptional support: Sarvashtakavarga {sav_points} points + {planet}'s Bhinnashtakavarga {bav_points} points = Outstanding results with smooth manifestation."
+        elif bav_points >= 4 and sav_points >= 25:
+            return f"{planet} transit through {house}th house has good support: Sarvashtakavarga {sav_points} points + {planet}'s Bhinnashtakavarga {bav_points} points = Positive outcomes with steady progress."
+        elif bav_points == 3:
+            return f"{planet} transit through {house}th house has adequate support: Sarvashtakavarga {sav_points} points + {planet}'s Bhinnashtakavarga {bav_points} points = Moderate results requiring effort."
+        else:
+            return f"{planet} transit through {house}th house has weak support: Sarvashtakavarga {sav_points} points + {planet}'s Bhinnashtakavarga {bav_points} points = Limited results with significant challenges."
     
     def _get_ashtakavarga_interpretation(self, points: int, planet: str, house: int) -> str:
         """Get interpretation based on Ashtakavarga points"""

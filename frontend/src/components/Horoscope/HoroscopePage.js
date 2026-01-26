@@ -101,7 +101,7 @@ const HoroscopePage = () => {
           "publisher": { "@type": "Organization", "name": "AstroRoshni" }
         }}
       />
-      <NavigationHeader onPeriodChange={setSelectedPeriod} />
+      <NavigationHeader compact={true} onPeriodChange={setSelectedPeriod} />
       
       <div className="container">
         <div className="horoscope-header">

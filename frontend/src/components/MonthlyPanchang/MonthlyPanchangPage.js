@@ -355,6 +355,7 @@ const MonthlyPanchangPage = ({ user: propUser, onLogout, onAdminClick, onLogin, 
   return (
     <div className="monthly-panchang-page">
       <NavigationHeader 
+        compact={true}
         showZodiacSelector={false}
         user={user}
         onAdminClick={handleAdminClick}

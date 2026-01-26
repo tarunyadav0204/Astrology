@@ -21,11 +21,15 @@ import YoginiDashaTab from './YoginiDashaTab';
 import CharaDashaTab from './CharaDashaTab';
 import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import DateNavigator from '../Common/DateNavigator';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
+  useAnalytics('CascadingDashaBrowser');
+  
   const insets = useSafeAreaInsets();
   const [cascadingData, setCascadingData] = useState(null);
   const [kalchakraData, setKalchakraData] = useState(null);
@@ -89,6 +93,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       } else if (dashaType === 'yogini') {
         fetchYoginiDasha();
       }
+      trackAstrologyEvent.dashaViewed(dashaType);
     }
   }, [visible, birthData, transitDate, dashaType]);
 

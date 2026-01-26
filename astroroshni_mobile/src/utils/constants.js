@@ -38,14 +38,14 @@ import { Platform } from 'react-native';
 // API Configuration for AstroRoshni
 const getApiUrl = () => {
   // Localhost for testing (only works on simulator/emulator)
-  if (Platform.OS === 'ios') {
-    return 'http://localhost:8001';
-  } else {
-    return 'http://10.0.2.2:8001';
-  }
+  // if (Platform.OS === 'ios') {
+  //   return 'http://localhost:8001';
+  // } else {
+  //   return 'http://10.0.2.2:8001';
+  // }
   
   // Production (works on real devices)
-  // return 'https://astroroshni.com'; 
+  return 'https://astroroshni.com'; 
 };
 
 export const API_BASE_URL = getApiUrl();

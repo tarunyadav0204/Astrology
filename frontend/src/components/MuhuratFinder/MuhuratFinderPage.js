@@ -118,6 +118,7 @@ const MuhuratFinderPage = () => {
         }}
       />
       <NavigationHeader 
+        compact={true}
         user={user}
         onLogin={() => navigate('/')}
         onLogout={() => {

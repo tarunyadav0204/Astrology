@@ -4,7 +4,7 @@
 }
 
 .admin-content-wrapper {
-  padding: 200px 20px 20px 20px;
+  padding: 120px 20px 20px 20px;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -211,6 +211,8 @@
   gap: 0;
   margin-bottom: 20px;
   border-bottom: 2px solid #e91e63;
+  position: relative;
+  z-index: 10;
 }
 
 .tab {
@@ -238,6 +240,8 @@
   margin-bottom: 20px;
   border-bottom: 1px solid #ddd;
   margin-left: 20px;
+  position: relative;
+  z-index: 10;
 }
 
 .subtab {
@@ -434,7 +438,7 @@ select {
   }
   
   .admin-content-wrapper {
-    padding-top: 180px;
+    padding-top: 100px;
   }
   
   .admin-header {
@@ -668,4 +672,109 @@ input:checked + .toggle-slider {
 
 input:checked + .toggle-slider:before {
   transform: translateX(26px);
+}
+
+/* Facts Management Styles */
+.facts-management {
+  padding: 20px;
+}
+
+.facts-search {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.facts-search input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.facts-search button {
+  padding: 10px 20px;
+  background: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.facts-table {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.facts-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.facts-table th,
+.facts-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.facts-table th {
+  background: #e91e63;
+  color: white;
+  font-weight: bold;
+}
+
+.facts-table tr:hover {
+  background: rgba(233, 30, 99, 0.05);
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.category-badge.career { background: #e3f2fd; color: #1976d2; }
+.category-badge.family { background: #f3e5f5; color: #7b1fa2; }
+.category-badge.health { background: #ffebee; color: #c62828; }
+.category-badge.location { background: #e8f5e9; color: #388e3c; }
+.category-badge.preferences { background: #fff3e0; color: #f57c00; }
+.category-badge.education { background: #e0f2f1; color: #00796b; }
+.category-badge.relationships { background: #fce4ec; color: #c2185b; }
+.category-badge.major_events { background: #ede7f6; color: #512da8; }
+.category-badge.temporary_events { background: #fff9c4; color: #f57f17; }
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 30px;
+  padding: 20px;
+}
+
+.pagination button {
+  padding: 8px 16px;
+  background: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.pagination button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.pagination span {
+  color: #666;
+  font-weight: 600;
 }

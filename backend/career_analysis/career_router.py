@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from typing import Optional
+from pydantic import BaseModel, validator
 from auth import get_current_user
 from .tenth_house_analyzer import TenthHouseAnalyzer
 from calculators.tenth_house_analyzer import TenthHouseAnalyzer as TenthHouseAnalyzerCalc
@@ -16,10 +17,21 @@ class BirthData(BaseModel):
     time: str
     latitude: float
     longitude: float
-    timezone: str
     place: str = ""
     gender: str = ""
-    relation: str = ""
+    relation: Optional[str] = "other"
+    timezone_str: Optional[str] = None
+    
+    @validator('time')
+    def normalize_time_format(cls, v):
+        if v and ':' in v:
+            parts = v.split(':')
+            if len(parts) == 3:
+                return f"{parts[0]}:{parts[1]}"
+        return v
+    
+    class Config:
+        fields = {'timezone_str': 'timezone'}
 
 @router.post("/career/comprehensive-analysis")
 async def get_comprehensive_analysis(request: dict, current_user = Depends(get_current_user)):
