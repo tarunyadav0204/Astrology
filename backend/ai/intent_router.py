@@ -250,70 +250,18 @@ PROCEED WITH ANALYSIS NOW.
         # print(f"Prompt length: {len(prompt)} characters")
         # print(f"\nFull Prompt:\n{prompt}")
         
-        # LOG COMPLETE REQUEST
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs', 'intent_logs')
-        os.makedirs(log_dir, exist_ok=True)
-        
-        request_log_file = os.path.join(log_dir, f"intent_request_{timestamp}.txt")
-        with open(request_log_file, 'w', encoding='utf-8') as f:
-            f.write(f"INTENT ROUTER REQUEST\n")
-            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-            f.write(f"Question: {user_question}\n")
-            f.write(f"Model: {self.model._model_name if hasattr(self.model, '_model_name') else 'Unknown'}\n")
-            f.write(f"Prompt Length: {len(prompt)} characters\n")
-            f.write(f"{'='*80}\n")
-            f.write(prompt)
-        
-        print(f"📝 INTENT REQUEST LOGGED: {request_log_file}")
         
         try:
             gemini_start = time.time()
-            print(f"\n{'='*80}")
-            print(f"📤 INTENT ROUTER PROMPT TO GEMINI")
-            print(f"{'='*80}")
-            print(prompt)
-            print(f"{'='*80}\n")
             
             response = await self.model.generate_content_async(prompt)
             gemini_time = time.time() - gemini_start
             
-            # print(f"\n📥 INTENT ROUTER RESPONSE:")
-            # print(f"Gemini API time: {gemini_time:.3f}s")
-            # print(f"Raw response: {response.text}")
-            
-            # LOG COMPLETE RESPONSE
-            response_log_file = os.path.join(log_dir, f"intent_response_{timestamp}.txt")
-            with open(response_log_file, 'w', encoding='utf-8') as f:
-                f.write(f"INTENT ROUTER RESPONSE\n")
-                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                f.write(f"Question: {user_question}\n")
-                f.write(f"Processing Time: {gemini_time:.3f}s\n")
-                f.write(f"Response Length: {len(response.text)} characters\n")
-                f.write(f"{'='*80}\n")
-                f.write(f"Raw Response:\n{response.text}\n")
-                f.write(f"{'='*80}\n")
-            
-            print(f"📝 INTENT RESPONSE LOGGED: {response_log_file}")
-            
             cleaned = response.text.replace('```json', '').replace('```', '').strip()
             result = json.loads(cleaned)
             
-            # LOG PARSED RESULT
-            with open(response_log_file, 'a', encoding='utf-8') as f:
-                f.write(f"Parsed Result:\n{json.dumps(result, indent=2)}\n")
-            
             total_time = time.time() - intent_start
-            print(f"\n✅ INTENT CLASSIFICATION COMPLETE")
-            print(f"\n{'='*80}")
-            print(f"📥 INTENT ROUTER RESPONSE")
-            print(f"{'='*80}")
-            print(f"Raw Response: {response.text}")
-            print(f"\nParsed Result: {json.dumps(result, indent=2)}")
-            print(f"Result: {result}")
-            print(f"📊 Divisional Charts Requested: {result.get('divisional_charts', [])}")
-            print(f"Total time: {total_time:.3f}s")
-            print(f"{'='*80}\n")
+            print(f"✅ Intent: {result.get('status')} | Mode: {result.get('mode')} | Category: {result.get('category')} | Time: {total_time:.2f}s")
             
             # Add fallback values if missing
             if 'status' not in result:
