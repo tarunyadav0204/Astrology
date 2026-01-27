@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T19:26:46.040678
+Question: How is my relation with my sister.
+Processing Time: 3.727s
+Response Length: 414 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To best understand the dynamics with your sister, is there a specific aspect you're curious about, such as overall harmony, support in career, or potential challenges in the coming months?",
+    "mode": "birth",
+    "category": "siblings",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D3",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To best understand the dynamics with your sister, is there a specific aspect you're curious about, such as overall harmony, support in career, or potential challenges in the coming months?",
+  "mode": "birth",
+  "category": "siblings",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D3",
+    "D9"
+  ]
+}

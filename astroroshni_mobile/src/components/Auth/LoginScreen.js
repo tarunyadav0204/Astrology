@@ -19,10 +19,12 @@ import { authAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';
 import { useCredits } from '../../credits/CreditContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
+  useAnalytics('LoginScreen');
   const { refreshCredits } = useCredits();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');

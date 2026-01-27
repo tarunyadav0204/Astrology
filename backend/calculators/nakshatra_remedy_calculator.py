@@ -6,6 +6,36 @@ class NakshatraRemedyCalculator:
     Maps 27 Nakshatras to their specific Shakti, Devata, Vriksha, and Beej Mantras.
     """
     
+    ALIGNMENT_MATRIX = {
+        "Ashwini": {"fabric": "Silk", "grain": "Horse Gram", "direction": "South", "activity": "Swift action and healing"},
+        "Bharani": {"fabric": "Cotton", "grain": "Sesame", "direction": "West", "activity": "Letting go and transformation"},
+        "Krittika": {"fabric": "Wool", "grain": "Wheat", "direction": "North", "activity": "Purification and cutting negativity"},
+        "Rohini": {"fabric": "Silk", "grain": "Rice", "direction": "East", "activity": "Growth and nourishment"},
+        "Mrigashira": {"fabric": "Cotton", "grain": "Green Gram (Moong)", "direction": "North-East", "activity": "Seeking and exploration"},
+        "Ardra": {"fabric": "Rough Cotton", "grain": "Black Gram (Urad)", "direction": "South-East", "activity": "Intense effort and transformation"},
+        "Punarvasu": {"fabric": "Soft Cotton", "grain": "Barley", "direction": "North-West", "activity": "Renewal and return to basics"},
+        "Pushya": {"fabric": "Fine Cotton", "grain": "Wheat", "direction": "North", "activity": "Nourishment and spiritual practice"},
+        "Ashlesha": {"fabric": "Silk", "grain": "Sesame", "direction": "South", "activity": "Detachment and serpent wisdom"},
+        "Magha": {"fabric": "Royal Silk", "grain": "Rice", "direction": "West", "activity": "Ancestral worship and authority"},
+        "Purva Phalguni": {"fabric": "Silk", "grain": "Sugarcane/Jaggery", "direction": "East", "activity": "Pleasure and creative expression"},
+        "Uttara Phalguni": {"fabric": "Cotton", "grain": "Milk and Ghee", "direction": "North", "activity": "Service and accumulation"},
+        "Hasta": {"fabric": "Fine Cotton", "grain": "Fruits", "direction": "South", "activity": "Skillful work and craftsmanship"},
+        "Chitra": {"fabric": "Colorful Silk", "grain": "Pomegranate", "direction": "West", "activity": "Artistic creation and beauty"},
+        "Swati": {"fabric": "Light Cotton", "grain": "Green Vegetables", "direction": "North-West", "activity": "Independence and movement"},
+        "Vishakha": {"fabric": "Mixed Fabrics", "grain": "Bengal Gram (Chana)", "direction": "South-West", "activity": "Goal achievement and determination"},
+        "Anuradha": {"fabric": "Soft Silk", "grain": "Lotus Seeds", "direction": "South", "activity": "Devotion and friendship"},
+        "Jyeshtha": {"fabric": "Heavy Silk", "grain": "Red Lentils (Masoor)", "direction": "North", "activity": "Leadership and protection"},
+        "Mula": {"fabric": "Coarse Jute or Wool", "grain": "Root Vegetables and Honey", "direction": "North-West", "activity": "Root-cause analysis and foundational work"},
+        "Purva Ashadha": {"fabric": "Cotton", "grain": "Water-based foods", "direction": "East", "activity": "Invigoration and purification"},
+        "Uttara Ashadha": {"fabric": "White Cotton", "grain": "Jackfruit", "direction": "North", "activity": "Victory and righteous action"},
+        "Shravana": {"fabric": "Fine Cotton", "grain": "Milk Products", "direction": "North", "activity": "Listening and learning"},
+        "Dhanishta": {"fabric": "Silk", "grain": "Sesame", "direction": "East", "activity": "Music and rhythmic activities"},
+        "Shatabhisha": {"fabric": "Silk or Fine Cotton", "grain": "Black Gram (Urad Dal)", "direction": "South", "activity": "Strategic planning and medicinal consumption"},
+        "Purva Bhadrapada": {"fabric": "Wool", "grain": "Mango", "direction": "West", "activity": "Sacrifice and spiritual intensity"},
+        "Uttara Bhadrapada": {"fabric": "Cotton", "grain": "Neem Products", "direction": "North", "activity": "Deep meditation and rain-making"},
+        "Revati": {"fabric": "Soft Silk", "grain": "Sweet Foods and Milk", "direction": "East", "activity": "Nourishment and completion"}
+    }
+
     NAKSHATRA_DATA = {
         "Ashwini": {"devata": "Ashwini Kumaras", "shakti": "Shidravyapani Shakti (Quick Reach)", "vriksha": "Strychnine Tree (Kuchila)", "mantra": "Om Am/Im"},
         "Bharani": {"devata": "Yama", "shakti": "Apabharani Shakti (Removal of burden)", "vriksha": "Amla", "mantra": "Om Lim"},
@@ -69,6 +99,7 @@ class NakshatraRemedyCalculator:
     def get_remedy(self, planet: str, nakshatra: str, pada: int, condition: str = "general") -> Dict[str, Any]:
         """Generates a complete classical remedy payload for a planet in a specific star."""
         star_info = self.NAKSHATRA_DATA.get(nakshatra)
+        alignment = self.ALIGNMENT_MATRIX.get(nakshatra, {})
         if not star_info:
             return {"error": "Nakshatra data not found"}
 
@@ -87,6 +118,10 @@ class NakshatraRemedyCalculator:
             "remedy_tier_1_biological": f"Plant or nurture a {star_info['vriksha']} tree. If unavailable, touch its wood or keep its leaf.",
             "remedy_tier_2_sound": f"Chant the Beej Mantra '{star_info['mantra']}' 108 times. Focus on the vibration '{syllable}' representing your specific pada.",
             "remedy_tier_3_ritual": self._generate_ritual(planet, nakshatra, star_info["devata"]),
+            "remedy_tier_4_dietary": f"Consume or donate {alignment.get('grain', 'appropriate grains')} to align with {nakshatra}'s energy.",
+            "remedy_tier_5_vastra": f"Wear {alignment.get('fabric', 'natural fabrics')} on important days to resonate with {nakshatra}'s texture.",
+            "optimal_direction": alignment.get('direction', 'East'),
+            "aligned_activity": alignment.get('activity', 'Meditation'),
             "rationale": f"Classic texts state {star_info['devata']} controls the results of this star. We are using {star_info['shakti']} to transform the current karma."
         }
         return remedy_payload

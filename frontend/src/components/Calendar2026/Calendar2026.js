@@ -216,13 +216,14 @@ const Calendar2026 = ({ user, onLogout, onLogin }) => {
   return (
     <div style={{ background: '#f8f9fa', minHeight: '100vh', color: '#333333' }}>
       <NavigationHeader 
+        compact={true}
         user={user}
         onLogout={onLogout}
         onLogin={onLogin}
         showLoginButton={!user}
       />
       
-      <div style={{ padding: '160px 20px 40px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ padding: '80px 20px 40px', maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>
             Vedic Calendar <span style={{ color: '#e91e63' }}>2026</span>

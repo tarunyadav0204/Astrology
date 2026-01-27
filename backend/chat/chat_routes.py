@@ -174,14 +174,23 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
             # Get or initialize clarification count from session
             clarification_count = session_manager.get_clarification_count(birth_hash)
             
+            # Get conversation history for intent classification
+            chat_history = session_manager.get_conversation_history(birth_hash, limit=3)
+            
             # Use Intent Router to classify question and determine transit needs
             print(f"\n🧠 CLASSIFYING INTENT FOR: {request.question} (clarification_count: {clarification_count})")
-            intent_result = await intent_router.classify_intent(request.question, clarification_count=clarification_count)
+            intent_result = await intent_router.classify_intent(request.question, chat_history=chat_history, clarification_count=clarification_count)
             print(f"✅ INTENT CLASSIFICATION RESULT: {intent_result}")
             
             # Update clarification count based on result
             if intent_result.get('status') == 'CLARIFY':
                 session_manager.increment_clarification_count(birth_hash)
+                # Return clarification question immediately without calling Gemini
+                clarification_response = intent_result.get('clarification_question', 'Could you please provide more details?')
+                # Save clarification to history (user question + assistant clarification)
+                session_manager.add_message(birth_hash, request.question, clarification_response)
+                yield f"data: {json.dumps({'status': 'clarification', 'message': clarification_response}, ensure_ascii=False)}\n\n"
+                return
             elif intent_result.get('status') == 'READY':
                 session_manager.reset_clarification_count(birth_hash)
             

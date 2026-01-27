@@ -7,7 +7,7 @@
 .monthly-festivals-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 50%, #ffcc80 100%);
-  padding: 180px 20px 20px 20px;
+  padding: 80px 20px 20px 20px;
   margin-bottom: 100px;
   flex: 1;
 }

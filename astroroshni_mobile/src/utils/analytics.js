@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
+import axios from 'axios';
 
 const GA_MEASUREMENT_ID = 'G-M0C9B8LGMR';
+const API_SECRET = 'TY4n2VL_R6qWdmqGc5rGZg'; // Get from GA4 Admin > Data Streams > Measurement Protocol API secrets
 
-// Inject gtag script (web-like approach)
 if (Platform.OS === 'web') {
   const script1 = document.createElement('script');
   script1.async = true;
@@ -25,17 +26,54 @@ const gtag = (...args) => {
   }
 };
 
+const sendToGA4 = async (eventName, params = {}) => {
+  if (Platform.OS === 'web') return;
+  
+  try {
+    const payload = {
+      client_id: `mobile_${Platform.OS}_${Date.now()}`,
+      events: [{
+        name: eventName,
+        params: {
+          ...params,
+          platform: Platform.OS,
+          engagement_time_msec: 100
+        }
+      }]
+    };
+    
+    await axios.post(
+      `https://www.google-analytics.com/mp/collect?measurement_id=${GA_MEASUREMENT_ID}&api_secret=${API_SECRET}`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  } catch (error) {
+    console.error('❌ GA4 tracking error:', error.response?.data || error.message);
+  }
+};
+
 export const trackScreenView = (screenName) => {
   console.log('📊 Screen:', screenName);
-  gtag('event', 'screen_view', { screen_name: screenName });
+  if (Platform.OS === 'web') {
+    gtag('event', 'screen_view', { screen_name: screenName });
+  } else {
+    sendToGA4('screen_view', { screen_name: screenName });
+  }
 };
 
 export const trackEvent = (eventName, params = {}) => {
   console.log('📊 Event:', eventName, params);
-  gtag('event', eventName, params);
+  if (Platform.OS === 'web') {
+    gtag('event', eventName, params);
+  } else {
+    sendToGA4(eventName, params);
+  }
 };
 
-// Astrology-specific event tracking
 export const trackAstrologyEvent = {
   chartGenerated: (chartType) => trackEvent('chart_generated', { chart_type: chartType }),
   horoscopeViewed: (zodiacSign, period) => trackEvent('horoscope_viewed', { zodiac_sign: zodiacSign, period }),

@@ -38,6 +38,7 @@ import { useTheme } from '../../context/ThemeContext';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -46,6 +47,7 @@ const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
 export default function ChatScreen({ navigation, route }) {
+  useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const { credits, partnershipCost, fetchBalance } = useCredits();
   

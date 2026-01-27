@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T15:55:57.166581
+Question: My 2//8 axis is activated since my birth as all dashas had been of 2nd or 8th house only. Why is my health a concern now. Also I am doing a lot of astrology and AI coding, Rahu in 8th will that spend that 8th house energy and will not impact health?
+Processing Time: 2.543s
+Response Length: 165 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

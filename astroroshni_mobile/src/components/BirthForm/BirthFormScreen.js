@@ -25,10 +25,12 @@ import { chartAPI, authAPI } from '../../services/api';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import locationCache from '../../services/locationCache';
 import { useTheme } from '../../context/ThemeContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
 export default function BirthFormScreen({ navigation, route }) {
+  useAnalytics('BirthFormScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;

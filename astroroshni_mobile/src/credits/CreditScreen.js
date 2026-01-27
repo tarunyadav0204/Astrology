@@ -20,10 +20,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../utils/constants';
 import { useCredits } from './CreditContext';
 import { creditAPI } from './creditService';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
 const CreditScreen = ({ navigation }) => {
+  useAnalytics('CreditScreen');
   const { credits, loading, redeemCode, fetchBalance } = useCredits();
   const [promoCode, setPromoCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);

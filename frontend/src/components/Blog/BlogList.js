@@ -70,7 +70,7 @@ const BlogList = () => {
                 keywords="astrology blog, vedic astrology articles, astrology insights, planetary transits, nakshatra articles, astrology predictions"
                 canonical="https://astroroshni.com/blog"
             />
-            <NavigationHeader />
+            <NavigationHeader compact={true} />
             <div className="blog-list-container">
             <div className="blog-header">
                 <h1>AstroRoshni Blog</h1>

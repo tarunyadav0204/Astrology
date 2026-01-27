@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T19:38:16.337281
+Question: What kind of person am I?
+Processing Time: 3.688s
+Response Length: 428 characters
+================================================================================
+Raw Response:
+```json
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide a more insightful reading, could you tell me what specific aspects of your personality you're most interested in exploring? For example, are you curious about your strengths, weaknesses, relationship patterns, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To provide a more insightful reading, could you tell me what specific aspects of your personality you're most interested in exploring? For example, are you curious about your strengths, weaknesses, relationship patterns, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

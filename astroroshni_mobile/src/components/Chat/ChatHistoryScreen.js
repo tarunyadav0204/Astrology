@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { storage } from '../../services/storage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
@@ -58,6 +59,7 @@ const SkeletonCard = () => {
 };
 
 export default function ChatHistoryScreen({ navigation }) {
+  useAnalytics('ChatHistoryScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const [chatSessions, setChatSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);

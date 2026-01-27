@@ -1,0 +1,35 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T19:15:27.158582
+Question: What are my health vulnerabilities?
+Processing Time: 3.484s
+Response Length: 459 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To give you the most relevant insights, could you tell me which specific areas of your health you're most concerned about? For example, are you focusing on physical energy levels, mental well-being, managing stress, or something else?",
+    "mode": "birth",
+    "category": "health",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9",
+        "D30"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To give you the most relevant insights, could you tell me which specific areas of your health you're most concerned about? For example, are you focusing on physical energy levels, mental well-being, managing stress, or something else?",
+  "mode": "birth",
+  "category": "health",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9",
+    "D30"
+  ]
+}

@@ -17,10 +17,12 @@ import { useCredits } from '../../credits/CreditContext';
 import { pricingAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
 export default function AnalysisHubScreen({ navigation }) {
+  useAnalytics('AnalysisHubScreen');
   const { credits } = useCredits();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));

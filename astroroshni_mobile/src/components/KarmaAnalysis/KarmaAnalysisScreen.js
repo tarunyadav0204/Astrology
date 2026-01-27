@@ -19,10 +19,12 @@ import { API_BASE_URL, getEndpoint, COLORS } from '../../utils/constants';
 import { useFocusEffect } from '@react-navigation/native';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width, height } = Dimensions.get('window');
 
 const KarmaAnalysisScreen = ({ route, navigation }) => {
+  useAnalytics('KarmaAnalysisScreen');
   const { chartId } = route.params || {};
   const { credits, fetchBalance } = useCredits();
   const [karmaCost, setKarmaCost] = useState(25);

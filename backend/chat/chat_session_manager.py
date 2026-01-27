@@ -41,26 +41,10 @@ class ChatSessionManager:
         if result:
             conversation_data = json.loads(result[0])
             messages = conversation_data.get('messages', [])
-            # Convert old format to new format if needed
-            formatted_messages = []
-            for msg in messages:
-                if isinstance(msg, dict) and 'question' in msg and 'response' in msg:
-                    # Old format - convert to new
-                    formatted_messages.append({
-                        'role': 'user',
-                        'content': msg['question'],
-                        'timestamp': msg.get('timestamp', datetime.now().isoformat())
-                    })
-                    formatted_messages.append({
-                        'role': 'assistant', 
-                        'content': msg['response'],
-                        'timestamp': msg.get('timestamp', datetime.now().isoformat())
-                    })
-                else:
-                    # New format - use as is
-                    formatted_messages.append(msg)
-            
-            return formatted_messages[-limit*2:] if len(formatted_messages) > limit*2 else formatted_messages
+            # Return messages in {question, response} format, sorted by timestamp
+            # Sort by timestamp to ensure correct order
+            sorted_messages = sorted(messages, key=lambda x: x.get('timestamp', ''))
+            return sorted_messages[-limit:] if len(sorted_messages) > limit else sorted_messages
         
         return []
     

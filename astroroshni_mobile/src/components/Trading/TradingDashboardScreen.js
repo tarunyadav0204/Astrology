@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCredits } from '../../credits/CreditContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const LuckGauge = ({ score, signal }) => {
   const getColor = () => {
@@ -88,6 +89,7 @@ const RiskBadge = ({ risks }) => {
 };
 
 export default function TradingDashboardScreen({ navigation }) {
+  useAnalytics('TradingDashboardScreen');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);

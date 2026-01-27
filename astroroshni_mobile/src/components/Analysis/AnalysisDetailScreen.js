@@ -20,8 +20,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cleanupStorage } from '../../services/storageCleanup';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
+  useAnalytics('AnalysisDetailScreen');
   const { analysisType, title, cost } = route.params;
   const { credits, fetchBalance } = useCredits();
   const [loading, setLoading] = useState(false);

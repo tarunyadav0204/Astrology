@@ -178,7 +178,7 @@ const MonthlyFestivalsPage = () => {
   return (
     <div className="page-wrapper">
       <div className="monthly-festivals-page">
-        <NavigationHeader />
+        <NavigationHeader compact={true} />
         <div className={`unified-header ${monthlyData.is_adhika_month ? 'adhika-month' : ''}`}>
           <div className="header-left">
             <h1>🎊 Monthly Festivals & Vrats</h1>

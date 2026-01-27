@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T19:34:05.505468
+Question: How many kids do I have?
+Processing Time: 3.436s
+Response Length: 187 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "READY",
+    "mode": "birth",
+    "category": "child",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D7",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "READY",
+  "mode": "birth",
+  "category": "child",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D7",
+    "D9"
+  ]
+}

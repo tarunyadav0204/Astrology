@@ -22,10 +22,12 @@ import { chartAPI, panchangAPI, pricingAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
+  useAnalytics('HomeScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;

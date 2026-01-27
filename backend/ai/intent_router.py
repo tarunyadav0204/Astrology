@@ -51,8 +51,27 @@ class IntentRouter:
         
         # Add clarification limit enforcement
         clarification_limit_text = ""
-        if clarification_count >= 2:
-            clarification_limit_text = f"\n\n🚨 CRITICAL LIMIT REACHED: You have already asked {clarification_count} clarification questions in this conversation. You MUST return status: 'READY' immediately. DO NOT ask another clarification question.\n"
+        if clarification_count >= 1:
+            clarification_limit_text = f"""
+
+🚨🚨🚨 CRITICAL: CLARIFICATION LIMIT REACHED 🚨🚨🚨
+
+You have ALREADY asked {clarification_count} clarification question(s).
+The conversation history above shows your previous clarification question.
+The current user message is their ANSWER to your clarification.
+
+You are ABSOLUTELY FORBIDDEN from asking another clarification question.
+
+You MUST:
+1. Return status: "READY" 
+2. Extract the category/timeframe from the user's answer
+3. Set appropriate mode, needs_transits, and transit_request based on the COMBINED context of:
+   - The original question (in conversation history)
+   - The user's clarification answer (current question)
+
+DO NOT generate a "clarification_question" field.
+PROCEED WITH ANALYSIS NOW.
+"""
         
         prompt = f"""
         You are a clarification assistant for an astrology chatbot. Your job is to determine if a question is too vague and needs clarification.
@@ -156,7 +175,10 @@ class IntentRouter:
            - Examples of valuable facts: specific job titles, company names, years of experience, number of children, ages, education levels, health conditions, locations, dates of major events
            - These facts will be stored and used to personalize ALL future astrological guidance for this user
         
-        4. Max 2 clarifications per session - after that, return READY with available info
+        4. 🚨 ABSOLUTE MAXIMUM: 1 clarification per conversation - NO EXCEPTIONS
+           - After 1 clarification, you MUST return status: "READY" regardless of information completeness
+           - The clarification_count parameter tracks how many you've already asked
+           - If clarification_count >= 1, you are FORBIDDEN from asking another question
         
         MODES:
         1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")

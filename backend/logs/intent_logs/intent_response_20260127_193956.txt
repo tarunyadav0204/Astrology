@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T19:39:59.428696
+Question: As per my chart how do I look like. Define it in detail using which someone can create a sketch of me
+Processing Time: 2.907s
+Response Length: 477 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To help me create a detailed astrological portrait for sketching purposes, could you please specify what aspects of your physical appearance you're most interested in? For example, are you curious about your face shape, eye color, hair texture, or overall body type?",
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To help me create a detailed astrological portrait for sketching purposes, could you please specify what aspects of your physical appearance you're most interested in? For example, are you curious about your face shape, eye color, hair texture, or overall body type?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}

@@ -97,8 +97,8 @@ const BlogPost = () => {
     if (loading) {
         return (
             <>
-                <NavigationHeader />
-                <div className="blog-post-container" style={{paddingTop: '230px'}}>
+                <NavigationHeader compact={true} />
+                <div className="blog-post-container" style={{paddingTop: '80px'}}>
                 <div className="loading">Loading post...</div>
             </div>
         </>
@@ -108,8 +108,8 @@ const BlogPost = () => {
     if (error || !post) {
         return (
             <>
-                <NavigationHeader />
-                <div className="blog-post-container" style={{paddingTop: '23000px'}}>
+                <NavigationHeader compact={true} />
+                <div className="blog-post-container" style={{paddingTop: '80px'}}>
                 <div className="error">
                     <h2>Post Not Found</h2>
                     <p>The blog post you're looking for doesn't exist.</p>
@@ -150,8 +150,8 @@ const BlogPost = () => {
                     }
                 }}
             />
-            <NavigationHeader />
-            <div className="blog-post-container" style={{paddingTop: '230px'}}>
+            <NavigationHeader compact={true} />
+            <div className="blog-post-container" style={{paddingTop: '80px'}}>
             <article className="blog-post">
                 <header className="post-header">
                     <Link to="/blog" className="back-link">← Back to Blog</Link>

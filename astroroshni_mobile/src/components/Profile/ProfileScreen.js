@@ -18,12 +18,14 @@ import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NorthIndianChart from '../Chart/NorthIndianChart';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }) {
+  useAnalytics('ProfileScreen');
   const { theme, toggleTheme, colors } = useTheme();
   const { credits } = useCredits();
   const [userData, setUserData] = useState(null);

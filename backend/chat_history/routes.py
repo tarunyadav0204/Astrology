@@ -470,20 +470,31 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         with sqlite3.connect('astrology.db') as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT sender, content FROM chat_messages 
+                SELECT sender, content, message_type FROM chat_messages 
                 WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                  AND (sender = 'user' OR message_type = 'answer')
-                ORDER BY timestamp DESC LIMIT 6
+                  AND content != ''
+                ORDER BY timestamp ASC
             ''', (session_id,))
             
             history_rows = cursor.fetchall()
             history = []
-            for i in range(0, len(history_rows), 2):
-                if i + 1 < len(history_rows):
-                    history.append({
-                        "question": history_rows[i+1][1],
-                        "response": history_rows[i][1]
-                    })
+            
+            # Pair up user questions with assistant responses
+            i = 0
+            while i < len(history_rows) - 1:
+                if history_rows[i][0] == 'user' and history_rows[i+1][0] == 'assistant':
+                    # Only include full answers, not clarifications
+                    if history_rows[i+1][2] == 'answer':
+                        history.append({
+                            "question": history_rows[i][1],
+                            "response": history_rows[i+1][1]
+                        })
+                    i += 2
+                else:
+                    i += 1
+            
+            # Keep only last 3 exchanges
+            history = history[-3:] if len(history) > 3 else history
             
             # Get conversation state
             cursor.execute("SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = ?", (session_id,))
@@ -507,20 +518,31 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             with sqlite3.connect('astrology.db') as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT sender, content FROM chat_messages 
+                    SELECT sender, content, message_type FROM chat_messages 
                     WHERE session_id = ? AND status = 'completed' AND content IS NOT NULL
-                      AND (sender = 'user' OR message_type = 'answer')
-                    ORDER BY timestamp DESC LIMIT 6
+                      AND content != ''
+                    ORDER BY timestamp ASC
                 ''', (session_id,))
                 
                 history_rows = cursor.fetchall()
                 history = []
-                for i in range(0, len(history_rows), 2):
-                    if i + 1 < len(history_rows):
-                        history.append({
-                            "question": history_rows[i+1][1],
-                            "response": history_rows[i][1]
-                        })
+                
+                # Pair up user questions with assistant responses
+                i = 0
+                while i < len(history_rows) - 1:
+                    if history_rows[i][0] == 'user' and history_rows[i+1][0] == 'assistant':
+                        # Only include full answers, not clarifications
+                        if history_rows[i+1][2] == 'answer':
+                            history.append({
+                                "question": history_rows[i][1],
+                                "response": history_rows[i+1][1]
+                            })
+                        i += 2
+                    else:
+                        i += 1
+                
+                # Keep only last 3 exchanges
+                history = history[-3:] if len(history) > 3 else history
                 
                 # Get conversation state
                 cursor.execute("SELECT clarification_count FROM conversation_state WHERE session_id = ?", (session_id,))
@@ -530,8 +552,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             intent_router = IntentRouter()
             intent = await intent_router.classify_intent(question, history, user_facts)
             
-            # CLARIFICATION LIMIT: Set to 3 to allow more clarifications before forcing answer
-            MAX_CLARIFICATIONS = 3
+            # CLARIFICATION LIMIT: Set to 1 to allow only one clarification before forcing answer
+            MAX_CLARIFICATIONS = 1
             
             print(f"🔍 CLARIFICATION CHECK:")
             print(f"   Intent status: {intent.get('status')}")

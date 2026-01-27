@@ -23,10 +23,12 @@ import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useTheme } from '../../context/ThemeContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ChartScreen({ navigation, route }) {
+  useAnalytics('ChartScreen');
   const { theme, colors } = useTheme();
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);

@@ -12,6 +12,7 @@ const ProfilePage = ({ user, onLogout }) => {
   return (
     <div className="profile-page">
       <NavigationHeader 
+        compact={true}
         user={user}
         onLogout={onLogout}
         onHomeClick={() => navigate('/')}

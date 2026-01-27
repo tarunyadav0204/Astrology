@@ -1,0 +1,33 @@
+INTENT ROUTER RESPONSE
+Timestamp: 2026-01-27T19:37:56.078192
+Question: Tell me about me
+Processing Time: 3.465s
+Response Length: 397 characters
+================================================================================
+Raw Response:
+```json
+{
+    "status": "CLARIFY",
+    "clarification_question": "To give you a helpful overview, what specific area of your life are you most curious about right now? For example, are you interested in career, health, relationships, or something else?",
+    "mode": "birth",
+    "category": "general",
+    "needs_transits": false,
+    "divisional_charts": [
+        "D1",
+        "D9"
+    ]
+}
+```
+================================================================================
+Parsed Result:
+{
+  "status": "CLARIFY",
+  "clarification_question": "To give you a helpful overview, what specific area of your life are you most curious about right now? For example, are you interested in career, health, relationships, or something else?",
+  "mode": "birth",
+  "category": "general",
+  "needs_transits": false,
+  "divisional_charts": [
+    "D1",
+    "D9"
+  ]
+}
