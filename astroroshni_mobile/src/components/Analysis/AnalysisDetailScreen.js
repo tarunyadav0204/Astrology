@@ -21,6 +21,7 @@ import { cleanupStorage } from '../../services/storageCleanup';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
   useAnalytics('AnalysisDetailScreen');
@@ -236,6 +237,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           children_count: childrenCount
         })
       };
+      
+      // Track analysis request
+      trackAstrologyEvent.analysisRequested(analysisType);
       
       // console.log('🚀 [DEBUG] Starting analysis:', analysisType);
       // console.log('📊 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
@@ -599,6 +603,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const confirmRegenerate = async () => {
     setShowRegenerateModal(false);
     
+    // Track regeneration
+    trackAstrologyEvent.analysisRequested(`${analysisType}_regenerate`);
+    
     // Clear cached analysis
     try {
       if (birthData?.name) {
@@ -635,6 +642,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const generatePDF = async () => {
     try {
+      // Track PDF generation
+      trackAstrologyEvent.pdfGenerated(analysisType);
+      
       const htmlContent = `
         <html>
           <head>

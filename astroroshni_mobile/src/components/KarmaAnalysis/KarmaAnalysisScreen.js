@@ -20,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -231,6 +232,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     }
     try {
       setLoading(true);
+      
+      // Track karma analysis request
+      trackAstrologyEvent.analysisRequested(forceRegenerate ? 'karma_regenerate' : 'karma');
+      
       const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/karma-analysis')}${forceRegenerate ? '?force_regenerate=true' : ''}`, {
         method: 'POST',
@@ -339,6 +344,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
     
     try {
       setGeneratingPDF(true);
+      
+      // Track PDF generation
+      trackAstrologyEvent.pdfGenerated('karma');
+      
       console.log('[PDF] Starting generation...');
       
       const sections = analysis.sections || {};

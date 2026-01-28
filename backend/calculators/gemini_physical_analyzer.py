@@ -35,8 +35,6 @@ class GeminiPhysicalAnalyzer:
         # Use the same model selection logic as chat analyzer
         model_names = [
             'models/gemini-2.5-flash',
-            'models/gemini-2.0-flash-exp', 
-            'models/gemini-2.0-flash',
             'models/gemini-1.5-flash',
             'models/gemini-flash-latest'
         ]

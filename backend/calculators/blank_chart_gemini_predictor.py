@@ -48,11 +48,7 @@ class BlankChartGeminiPredictor:
             # Try different model versions in order of preference (same as chat analyzer)
             model_names = [
                 'models/gemini-3-pro-preview',  # Premium model first
-                'models/gemini-2.5-flash',
-                'models/gemini-2.0-flash-exp',
-                'models/gemini-2.0-flash',
-                'models/gemini-1.5-flash',
-                'models/gemini-flash-latest'
+                'models/gemini-2.5-flash'
             ]
             
             for model_name in model_names:

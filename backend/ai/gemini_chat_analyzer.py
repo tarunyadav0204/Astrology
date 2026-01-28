@@ -54,10 +54,6 @@ class GeminiChatAnalyzer:
         model_names = [
             'models/gemini-3-flash-preview',
             'models/gemini-2.5-flash',
-            'models/gemini-2.0-flash-exp',
-            'models/gemini-2.0-flash',
-            'models/gemini-1.5-flash',
-            'models/gemini-flash-latest'
         ]
         self.model = None
         self.premium_model = None

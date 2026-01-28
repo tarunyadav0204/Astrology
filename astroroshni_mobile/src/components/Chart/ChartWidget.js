@@ -19,7 +19,7 @@ import DateNavigator from '../Common/DateNavigator';
 
 const { width } = Dimensions.get('window');
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation }, ref) => {
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -48,15 +48,19 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   }, [currentChartType]);
   
   const chartTypes = [
-    'lagna', 'navamsa', 'transit', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
+    'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
     'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa', 
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
+  
+  console.log('[ChartWidget] Available chart types:', chartTypes);
   
   const chartTitles = {
     lagna: 'Birth Chart (Lagna)',
     navamsa: 'Navamsa (D9)',
     transit: 'Transit Chart',
+    karkamsa: 'Karkamsa Chart',
+    swamsa: 'Swamsa Chart',
     saptamsa: 'Saptamsa (D7)',
     dasamsa: 'Dasamsa (D10)',
     dwadasamsa: 'Dwadasamsa (D12)',
@@ -89,7 +93,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   }, []);
   
   const loadKarakas = useCallback(async () => {
-    if (!birthData) return;
+    if (!birthData) return null;
     try {
       // Get D1 chart data - use getChartData for 'lagna' type
       let d1ChartData;
@@ -117,15 +121,18 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       
       if (!d1ChartData) {
         console.log('No D1 chart data available for Karaka calculation');
-        return;
+        return null;
       }
       
-      console.log('Loading Karakas from D1 chart...');
+      console.log('[ChartWidget] Loading Karakas from D1 chart...');
       const response = await chartAPI.calculateCharaKarakas(d1ChartData, birthData);
-      console.log('Karakas loaded:', response.data.chara_karakas);
-      setKarakas(response.data.chara_karakas);
+      console.log('[ChartWidget] Karakas loaded:', response.data.chara_karakas);
+      const loadedKarakas = response.data.chara_karakas;
+      setKarakas(loadedKarakas);
+      return loadedKarakas; // Return the karakas so caller can use them immediately
     } catch (error) {
       console.error('Failed to load Karakas:', error);
+      return null;
     }
   }, [chartData, birthData, chartDataCache.lagna, currentChartType]);
   
@@ -164,15 +171,22 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   }, [chartData, currentChartType]);
   
   useEffect(() => {
+    console.log(`[ChartWidget] useEffect triggered - chartData: ${!!chartData}, currentChartType: ${currentChartType}, division: ${division}`);
     // Only load data if not provided by parent
     if (!chartData) {
+      console.log(`[ChartWidget] chartData is null, loading...`);
       if (currentChartType === 'transit') {
         loadChartData('transit', true);
-      } else if (division) {
+      } else if (currentChartType === 'karkamsa' || currentChartType === 'swamsa') {
+        // Karkamsa and Swamsa are special Jaimini charts, not divisional charts
+        loadChartData(currentChartType, true);
+      } else if (division && division > 1) {
         loadDivisionalChart(division);
       } else {
         loadChartData(currentChartType, true);
       }
+    } else {
+      console.log(`[ChartWidget] chartData provided by parent, not loading`);
     }
   }, [currentChartType, division]);
   
@@ -310,7 +324,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
   };
 
   const loadChartData = async (type, setCurrent = true, customDate = null) => {
+    console.log(`[ChartWidget] loadChartData called for type: ${type}, loading: ${loading}`);
+    
     if (chartDataCache[type] && !(type === 'transit' && customDate)) {
+      console.log(`[ChartWidget] Using cached data for ${type}`);
       if (setCurrent) setCurrentChartData(chartDataCache[type]);
       return;
     }
@@ -322,7 +339,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       return;
     }
     
-    if (!birthData || loading) {
+    if (!birthData) {
+      console.log(`[ChartWidget] Cannot load - no birthData`);
+      return;
+    }
+    
+    // Don't block if already loading - just skip setting loading state
+    if (loading && setCurrent) {
+      console.log(`[ChartWidget] Already loading, skipping ${type}`);
       return;
     }
     
@@ -344,22 +368,57 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, defaul
       let data;
       
       if (chartDivisions[type]) {
+        console.log(`[ChartWidget] Loading divisional chart D${chartDivisions[type]} for ${type}`);
         response = await chartAPI.calculateDivisionalChart(formattedData, chartDivisions[type]);
         data = response.data.divisional_chart;
       } else if (type === 'transit') {
+        console.log(`[ChartWidget] Loading transit chart`);
         const targetDate = customDate || transitDate;
         const dateStr = targetDate.toISOString().split('T')[0];
         response = await chartAPI.calculateTransits(formattedData, dateStr);
         data = response.data;
+      } else if (type === 'karkamsa' || type === 'swamsa') {
+        console.log(`[ChartWidget] Loading ${type} chart - Karakas available: ${!!karakas?.Atmakaraka?.planet}`);
+        let loadedKarakas = karakas;
+        if (!loadedKarakas?.Atmakaraka?.planet) {
+          console.log(`[ChartWidget] Loading Karakas first...`);
+          loadedKarakas = await loadKarakas();
+        }
+        if (loadedKarakas?.Atmakaraka?.planet) {
+          // Use lagnaChartData from parent (ChartScreen always has this)
+          const d1Data = lagnaChartData || chartDataCache.lagna || chartData;
+          
+          if (!d1Data || !d1Data.planets) {
+            console.error(`[ChartWidget] CRITICAL: No D1 chart data available for ${type}`);
+            throw new Error('D1 chart data required for Jaimini charts');
+          }
+          
+          const atmakaraka = loadedKarakas.Atmakaraka.planet;
+          console.log(`[ChartWidget] Using D1 data for ${type} with Atmakaraka: ${atmakaraka}`);
+          
+          if (type === 'karkamsa') {
+            response = await chartAPI.calculateKarkamsaChart(d1Data, atmakaraka);
+            data = response.data.karkamsa?.karkamsa_chart;
+          } else {
+            response = await chartAPI.calculateSwamsaChart(d1Data, atmakaraka);
+            data = response.data.swamsa?.swamsa_chart;
+          }
+        } else {
+          console.log(`[ChartWidget] ERROR: Atmakaraka still not available after loadKarakas`);
+        }
       }
       
       // Only update if user hasn't switched charts while loading
       if (data && activeChartTypeRef.current === typeAtStart) {
+        console.log(`[ChartWidget] Setting chart data for ${type}`);
         setChartDataCache(prev => ({ ...prev, [type]: data }));
         if (setCurrent) setCurrentChartData(data);
+      } else {
+        console.log(`[ChartWidget] Not setting data - data: ${!!data}, typeMatch: ${activeChartTypeRef.current === typeAtStart}`);
       }
     } catch (error) {
-      console.error(`Error loading chart data for ${type}:`, error);
+      console.error(`[ChartWidget] Error loading chart data for ${type}:`, error);
+      console.error(`[ChartWidget] Error details:`, error.response?.data || error.message);
     } finally {
       if (setCurrent && activeChartTypeRef.current === typeAtStart) {
         setLoading(false);

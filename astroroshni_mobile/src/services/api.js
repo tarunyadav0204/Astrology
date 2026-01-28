@@ -241,6 +241,25 @@ export const chartAPI = {
     api.post(getEndpoint('/chara-dasha/antardasha'), { ...birthData, maha_sign_id: mahaSignId }),
   calculateCharaKarakas: (chartData, birthData) => 
     api.post(getEndpoint('/chara-karakas'), { chart_data: chartData, birth_data: birthData }),
+  
+  calculateJaiminiLagnas: (chartData, d9Chart, atmakaraka) =>
+    api.post(getEndpoint('/jaimini-special-lagnas'), { chart_data: chartData, d9_chart: d9Chart, atmakaraka }),
+  
+  calculateYogiPoints: (birthData) =>
+    api.post(getEndpoint('/yogi-points'), { birth_data: birthData }),
+  
+  calculateSniperPoints: (chartData, d3Chart = {}, d9Chart = {}) =>
+    api.post(getEndpoint('/sniper-points'), { chart_data: chartData, d3_chart: d3Chart, d9_chart: d9Chart }),
+  
+  calculatePushkaraNavamsha: (chartData, d9Chart = {}) =>
+    api.post(getEndpoint('/pushkara-analysis'), { chart_data: chartData, d9_chart: d9Chart }),
+  
+  calculateKarkamsaChart: (chartData, atmakaraka) =>
+    api.post(getEndpoint('/karkamsa-chart'), { chart_data: chartData, atmakaraka }),
+  
+  calculateSwamsaChart: (chartData, atmakaraka) =>
+    api.post(getEndpoint('/swamsa-chart'), { chart_data: chartData, atmakaraka }),
+  
   scanPhysicalTraits: (birthData, birthChartId = null) => 
     api.post(getEndpoint('/scan-physical'), { birth_data: birthData, birth_chart_id: birthChartId }),
   

@@ -44,6 +44,8 @@ export default function ChartScreen({ navigation, route }) {
     { id: 'lagna', name: 'Lagna (D1)', icon: '🏠', description: 'Main Birth Chart' },
     { id: 'navamsa', name: 'Navamsa (D9)', icon: '💎', description: 'Marriage & Spirituality' },
     { id: 'transit', name: 'Transit', icon: '🪐', description: 'Live Planetary Positions' },
+    { id: 'karkamsa', name: 'Karkamsa', icon: '🎯', description: 'Spiritual Path & Dharma' },
+    { id: 'swamsa', name: 'Swamsa', icon: '🕉️', description: 'Parental Lineage & Ancestry' },
     { id: 'hora', name: 'Hora (D2)', icon: '💰', description: 'Wealth & Family' },
     { id: 'drekkana', name: 'Drekkana (D3)', icon: '👫', description: 'Siblings & Happiness' },
     { id: 'chaturthamsa', name: 'Chaturthamsa (D4)', icon: '🏡', description: 'Destiny & Assets' },
@@ -57,6 +59,8 @@ export default function ChartScreen({ navigation, route }) {
     { id: 'akshavedamsa', name: 'Akshavedamsa (D45)', icon: '🎭', description: 'Character & Conduct' },
     { id: 'shashtyamsa', name: 'Shashtyamsa (D60)', icon: '⏰', description: 'Past Life Karma' },
   ];
+  
+  console.log('[ChartScreen] Chart types loaded:', chartTypes.map(c => c.id));
   const chartWidgetRef = useRef(null);
   
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -98,21 +102,25 @@ export default function ChartScreen({ navigation, route }) {
   }, [currentChartIndex]);
   
   const getChartDataForType = useCallback((chartType) => {
+    console.log(`[ChartScreen] getChartDataForType called for: ${chartType}`);
     if (!birthData) return null;
     
     // Get from preloader cache
     const cachedChart = chartPreloader.getChart(birthData, chartType);
     if (cachedChart) {
-      // console.log(`Using cached data for ${chartType}`);
+      console.log(`[ChartScreen] Using cached data for ${chartType}`);
       return cachedChart;
     }
     
     // If it's the main chart (lagna), return the state data
-    if (chartType === 'lagna') return chartData;
+    if (chartType === 'lagna') {
+      console.log(`[ChartScreen] Returning lagna chart from state`);
+      return chartData;
+    }
 
     // CRITICAL FIX: Return null for other charts if not cached.
     // This forces ChartWidget to fetch the data itself instead of showing Lagna.
-    // console.log(`No cached data for ${chartType}, returning null`);
+    console.log(`[ChartScreen] No cached data for ${chartType}, returning null`);
     return null; 
   }, [birthData, chartData]);
   
@@ -268,9 +276,9 @@ export default function ChartScreen({ navigation, route }) {
                 <Animated.View style={styles.chartWrapper}>
 
                   <ChartWidget 
-                    key={currentChartIndex}
                     chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
                     birthData={birthData}
+                    lagnaChartData={chartData}
                     defaultStyle="north"
                     showTransits={chartTypes[currentChartIndex].id === 'transit'}
                     disableSwipe={true}

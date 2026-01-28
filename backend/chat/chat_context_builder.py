@@ -242,10 +242,20 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
 - **Upapada Lagna (UL):** Use this for questions about MARRIAGE and SPOUSE.
 - **Hora Lagna (HL):** Use this for questions about WEALTH and FINANCIAL STATUS. Check planets aspecting HL for money sources.
 - **Ghatika Lagna (GL):** Use this for questions about POWER, AUTHORITY, and POLITICAL INFLUENCE.
-- **Swamsa (Navamsa Lagna) & Karkamsa (AK in D9):**
-    - Use **Swamsa** as the reference point for spiritual path and skills.
-    - Check the connection between Atmakaraka and Swamsa.
-    - If user asks about "Talent" or "Soul Purpose", analyze planets in the Karkamsa or Swamsa.
+- **Karkamsa & Swamsa (CRITICAL DISTINCTION):**
+    - **Karkamsa Chart**: Lagna = Atmakaraka's D9 sign, Planets = D1 (Rashi) positions → Physical/Material dimension, worldly achievements
+    - **Swamsa Chart**: Lagna = Atmakaraka's D9 sign, Planets = D9 (Navamsa) positions → Soul/Spiritual dimension, inner evolution
+    - **MANDATORY USAGE:**
+        - For CAREER questions: Analyze Karkamsa chart to see how D1 planets manifest from soul's perspective
+        - For SOUL/SPIRITUALITY questions: Analyze Swamsa chart to see D9 spiritual strengths from soul's perspective
+        - For PURPOSE/DHARMA questions: Synthesize both charts
+    - **Analysis Protocol:**
+        - **The "Jivamsa" Check (1st House):** Identify planets in the 1st house of the Swamsa chart. These represent the specific 'Tools' the soul has brought from past lives to achieve its current purpose. Planets conjunct AK in Swamsa show innate spiritual abilities.
+        - **The "Istha Devata" Gate (12th House):** For Spiritual queries, always check the 12th house from Swamsa Lagna. This reveals the soul's ultimate liberation path (Moksha) and its natural spiritual inclination. Planets here indicate the deity/practice that leads to enlightenment.
+        - Analyze 10th house from Karkamsa for career dharma
+        - Analyze benefics/malefics in Karkamsa/Swamsa for material vs spiritual support
+        - Cite classical interpretations provided in the chart data
+    - **Classical Reference:** According to Jaimini Sutras, Karkamsa shows the physical manifestation of soul's purpose, while Swamsa reveals the soul's true nature and spiritual evolution path.
 
 ### G. Jaimini Full System (Rashi Drishti & Yogas)
 - **Sign Aspects (Rashi Drishti) - THE ID RULE:** You are FORBIDDEN from calculating aspects from memory.
@@ -1075,6 +1085,31 @@ For every user query, structure your response exactly as follows:
                 filtered_divisional_charts['d9_navamsa'] = all_charts['d9_navamsa']
                 # print(f"   ✅ Added mandatory D9 Navamsa")
             
+            # Add Karkamsa/Swamsa if requested
+            if 'Karkamsa' in requested_chart_codes or 'Swamsa' in requested_chart_codes:
+                from calculators.jaimini_chart_calculator import JaiminiChartCalculator
+                
+                # Get Atmakaraka from context
+                karaka_data = full_context.get('chara_karakas', {}).get('chara_karakas', {})
+                atmakaraka_data = karaka_data.get('Atmakaraka', {})
+                atmakaraka_planet = atmakaraka_data.get('planet')
+                
+                if atmakaraka_planet:
+                    birth_hash = self._create_birth_hash(birth_data)
+                    d1_chart = self.static_cache[birth_hash]['d1_chart']
+                    
+                    jaimini_calc = JaiminiChartCalculator(d1_chart, atmakaraka_planet)
+                    
+                    if 'Karkamsa' in requested_chart_codes:
+                        karkamsa_result = jaimini_calc.calculate_karkamsa_chart()
+                        filtered_divisional_charts['karkamsa'] = karkamsa_result
+                        # print(f"   ✅ Added Karkamsa chart (D1 planets from D9 AK lagna)")
+                    
+                    if 'Swamsa' in requested_chart_codes:
+                        swamsa_result = jaimini_calc.calculate_swamsa_chart()
+                        filtered_divisional_charts['swamsa'] = swamsa_result
+                        # print(f"   ✅ Added Swamsa chart (D9 planets from D9 AK lagna)")
+            
             full_context['divisional_charts'] = filtered_divisional_charts
             # print(f"📊 Sending {len(filtered_divisional_charts)} divisional charts to Gemini")
         else:
@@ -1250,9 +1285,11 @@ For every user query, structure your response exactly as follows:
         atmakaraka_planet = atmakaraka_data.get('planet')  # e.g., "Sun"
         
         # 1. Calculate Jaimini Points (static - doesn't depend on date)
+        # Extract D9 chart data correctly to prevent structure mismatch
+        d9_for_jaimini = divisional_charts['d9_navamsa'].get('divisional_chart', divisional_charts['d9_navamsa'])
         jaimini_calc = JaiminiPointCalculator(
             chart_data, 
-            divisional_charts['d9_navamsa'], 
+            d9_for_jaimini, 
             atmakaraka_planet
         )
         jaimini_points = jaimini_calc.calculate_jaimini_points()

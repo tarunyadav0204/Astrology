@@ -35,7 +35,7 @@ class GeminiHealthAnalyzer:
         genai.configure(api_key=api_key)
         
         # Try different model names in order of preference (using available models)
-        model_names = ['models/gemini-2.5-flash', 'models/gemini-2.0-flash', 'models/gemini-flash-latest']
+        model_names = ['models/gemini-2.5-flash', 'models/gemini-flash-latest']
         self.model = None
         
         for model_name in model_names:

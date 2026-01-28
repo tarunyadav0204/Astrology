@@ -30,13 +30,30 @@ const sendToGA4 = async (eventName, params = {}) => {
   if (Platform.OS === 'web') return;
   
   try {
+    // Get userName from AsyncStorage if available
+    let userName = null;
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        userName = userData.name || userData.username || null;
+      }
+    } catch (e) {
+      console.log('Could not retrieve userName from storage');
+    }
+    
     const payload = {
       client_id: `mobile_${Platform.OS}_${Date.now()}`,
+      user_properties: userName ? {
+        user_name: { value: userName }
+      } : undefined,
       events: [{
         name: eventName,
         params: {
           ...params,
           platform: Platform.OS,
+          os_version: `${Platform.OS} ${Platform.Version || 'unknown'}`,
           engagement_time_msec: 100
         }
       }]
@@ -92,6 +109,21 @@ export const setUserProperties = async (properties) => {
   console.log('User properties:', properties);
 };
 
-export const setUserId = async (userId) => {
-  console.log('User ID:', userId);
+export const setUserName = async (userName) => {
+  console.log('📊 Setting User Name:', userName);
+  
+  // Store userName in AsyncStorage for future events
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem('userName', String(userName));
+  } catch (e) {
+    console.error('Failed to store userName:', e);
+  }
+  
+  // Set user property in GA4 for web
+  if (Platform.OS === 'web' && window.gtag) {
+    gtag('set', 'user_properties', {
+      user_name: userName
+    });
+  }
 };

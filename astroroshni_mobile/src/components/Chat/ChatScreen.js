@@ -33,6 +33,7 @@ import { chatAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
+import { trackAstrologyEvent } from '../../utils/analytics';
 import { useTheme } from '../../context/ThemeContext';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
@@ -1017,6 +1018,9 @@ export default function ChatScreen({ navigation, route }) {
       role: 'user',
       timestamp: new Date().toISOString(),
     };
+    
+    // Track chat message sent event
+    trackAstrologyEvent.chatMessageSent('user_question');
     
     setMessagesWithStorage(prev => {
       const newMessages = [...prev, userMessage];

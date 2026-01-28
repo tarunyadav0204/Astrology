@@ -30,8 +30,8 @@ class EventPredictor:
                 print("✅ EventPredictor using models/gemini-3-flash-preview")
             except:
                 try:
-                    self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
-                    print("✅ EventPredictor using Gemini 2.0 Flash Exp (fallback)")
+                    self.model = genai.GenerativeModel('models/gemini-2.5-flash')
+                    print("✅ EventPredictor using Gemini 2.5 Flash (fallback)")
                 except:
                     self.model = genai.GenerativeModel('gemini-pro')
                     print("✅ EventPredictor using Gemini Pro (fallback)")

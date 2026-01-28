@@ -12,7 +12,7 @@ class IntentRouter:
     def __init__(self):
         api_key = os.getenv('GEMINI_API_KEY')
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('models/gemini-2.5-flash')
         
     async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0) -> Dict[str, str]:
         """
@@ -132,13 +132,15 @@ PROCEED WITH ANALYSIS NOW.
         
         Examples:
         - "When will I get married?" → ["D1", "D9", "D7"]
-        - "How is my career?" → ["D1", "D9", "D10"]
+        - "How is my career?" → ["D1", "D9", "D10", "Karkamsa"]
+        - "What does my birth chart say about my career?" → ["D1", "D9", "D10", "Karkamsa"]
         - "Tell me about my siblings" → ["D1", "D3", "D9"]
         - "Property purchase timing?" → ["D1", "D4", "D9", "D12"]
         - "Children prospects?" → ["D1", "D7", "D9"]
         - "Health issues?" → ["D1", "D9", "D30"]
         - "Education/learning?" → ["D1", "D9", "D24"]
-        - "Spiritual growth?" → ["D1", "D9", "D20"]
+        - "Spiritual growth?" → ["D1", "D9", "D20", "Swamsa"]
+        - "What is my life purpose?" → ["D1", "D9", "Karkamsa", "Swamsa"]
         
         CRITICAL RULES FOR CLARIFICATION:
         
@@ -336,10 +338,14 @@ PROCEED WITH ANALYSIS NOW.
         """Get default divisional charts based on question category"""
         chart_mapping = {
             'marriage': ['D1', 'D9', 'D7'],
-            'career': ['D1', 'D9', 'D10'],
-            'job': ['D1', 'D9', 'D10'],
-            'promotion': ['D1', 'D9', 'D10'],
-            'business': ['D1', 'D9', 'D10'],
+            'career': ['D1', 'D9', 'D10', 'Karkamsa'],
+            'job': ['D1', 'D9', 'D10', 'Karkamsa'],
+            'promotion': ['D1', 'D9', 'D10', 'Karkamsa'],
+            'business': ['D1', 'D9', 'D10', 'Karkamsa'],
+            'soul': ['D1', 'D9', 'D20', 'Swamsa'],
+            'spirituality': ['D1', 'D9', 'D20', 'Swamsa'],
+            'purpose': ['D1', 'D9', 'Karkamsa', 'Swamsa'],
+            'dharma': ['D1', 'D9', 'Karkamsa', 'Swamsa'],
             'health': ['D1', 'D9', 'D30'],
             'disease': ['D1', 'D9', 'D30'],
             'children': ['D1', 'D7', 'D9'],

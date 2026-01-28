@@ -10,6 +10,13 @@ from pydantic import BaseModel
 from auth import get_current_user, User
 from calculators.chart_calculator import ChartCalculator
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
+from calculators.jaimini_point_calculator import JaiminiPointCalculator
+from calculators.sniper_points_calculator import SniperPointsCalculator
+from calculators.pushkara_calculator import PushkaraCalculator
+from calculators.gandanta_calculator import GandantaCalculator
+from calculators.yogi_calculator import YogiCalculator
+from calculators.indu_lagna_calculator import InduLagnaCalculator
+from calculators.jaimini_chart_calculator import JaiminiChartCalculator
 from encryption_utils import EncryptionManager
 
 try:
@@ -671,3 +678,227 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
         }
         print(f"❌ Chart calculation error: {error_details}")
         raise HTTPException(status_code=500, detail=f"Chart calculation failed: {str(e)}")
+
+@router.post("/jaimini-special-lagnas")
+async def calculate_jaimini_special_lagnas(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate all Jaimini special lagnas (AL, UL, KL, Swamsa, HL, GL, A7)"""
+    try:
+        chart_data = request.get('chart_data', {})
+        d9_chart = request.get('d9_chart', {})
+        atmakaraka = request.get('atmakaraka')
+        
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+        
+        if not atmakaraka:
+            raise HTTPException(status_code=400, detail="Atmakaraka planet required")
+        
+        if isinstance(atmakaraka, dict):
+            atmakaraka = atmakaraka['planet']
+        
+        if not d9_chart or not d9_chart.get('planets'):
+            from calculators.divisional_chart_calculator import DivisionalChartCalculator
+            div_calc = DivisionalChartCalculator(chart_data)
+            d9_chart = div_calc.calculate_divisional_chart(9)
+        
+        calculator = JaiminiPointCalculator(chart_data, d9_chart, atmakaraka)
+        jaimini_points = calculator.calculate_jaimini_points()
+        
+        return {
+            "success": True,
+            "jaimini_lagnas": jaimini_points
+        }
+    except Exception as e:
+        print(f"Error calculating Jaimini lagnas: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sniper-points")
+async def calculate_sniper_points(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate sniper points (Bhrigu Bindu, Kharesh, 64th Navamsa, Mrityu Bhaga)"""
+    try:
+        d1_chart = request.get('chart_data', {})
+        d3_chart = request.get('d3_chart', {})
+        d9_chart = request.get('d9_chart', {})
+        
+        if not d1_chart or not d1_chart.get('planets'):
+            raise HTTPException(status_code=400, detail="D1 chart data required")
+        
+        from calculators.divisional_chart_calculator import DivisionalChartCalculator
+        div_calc = DivisionalChartCalculator(d1_chart)
+        
+        if not d3_chart or not d3_chart.get('planets'):
+            d3_chart = div_calc.calculate_divisional_chart(3)
+        
+        if not d9_chart or not d9_chart.get('planets'):
+            d9_chart = div_calc.calculate_divisional_chart(9)
+        
+        calculator = SniperPointsCalculator(d1_chart, d3_chart, d9_chart)
+        sniper_points = calculator.get_all_sniper_points()
+        
+        return {
+            "success": True,
+            "sniper_points": sniper_points
+        }
+    except Exception as e:
+        print(f"Error calculating sniper points: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/pushkara-analysis")
+async def calculate_pushkara_analysis(request: dict, current_user: User = Depends(get_current_user)):
+    """Analyze planets for Pushkara Navamsa and Pushkara Bhaga status"""
+    try:
+        chart_data = request.get('chart_data', {})
+        ascendant = chart_data.get('ascendant', 0)
+        ascendant_sign = int(ascendant / 30)
+        
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+        
+        calculator = PushkaraCalculator()
+        pushkara_analysis = calculator.analyze_chart(chart_data, ascendant_sign)
+        
+        return {
+            "success": True,
+            "pushkara_analysis": pushkara_analysis
+        }
+    except Exception as e:
+        print(f"Error calculating Pushkara analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/gandanta-analysis")
+async def calculate_gandanta_analysis(request: dict, current_user: User = Depends(get_current_user)):
+    """Analyze chart for Gandanta positions (planets and lagna)"""
+    try:
+        chart_data = request.get('chart_data', {})
+        
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+        
+        calculator = GandantaCalculator(chart_data)
+        gandanta_analysis = calculator.calculate_gandanta_analysis()
+        
+        return {
+            "success": True,
+            "gandanta_analysis": gandanta_analysis
+        }
+    except Exception as e:
+        print(f"Error calculating Gandanta analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/yogi-points")
+async def calculate_yogi_points(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate Yogi, Avayogi, Dagdha Rashi, and Tithi Shunya Rashi points"""
+    try:
+        birth_data = request.get('birth_data', {})
+        
+        if not birth_data:
+            raise HTTPException(status_code=400, detail="Birth data required")
+        
+        calculator = YogiCalculator({})
+        yogi_points = calculator.calculate_yogi_points(birth_data)
+        
+        return {
+            "success": True,
+            "yogi_points": yogi_points
+        }
+    except Exception as e:
+        print(f"Error calculating Yogi points: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/indu-lagna")
+async def calculate_indu_lagna(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate Indu Lagna (wealth indicator)"""
+    try:
+        chart_data = request.get('chart_data', {})
+        
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+        
+        calculator = InduLagnaCalculator(chart_data)
+        indu_lagna_data = calculator.get_indu_lagna_data()
+        
+        return {
+            "success": True,
+            "indu_lagna": indu_lagna_data
+        }
+    except Exception as e:
+        print(f"Error calculating Indu Lagna: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/karkamsa-chart")
+async def calculate_karkamsa_chart(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate Karkamsa chart (D9 recast with Atmakaraka's D9 sign as ascendant)"""
+    try:
+        chart_data = request.get('chart_data', {})
+        atmakaraka = request.get('atmakaraka')
+        
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+        
+        if not atmakaraka:
+            raise HTTPException(status_code=400, detail="Atmakaraka planet required")
+        
+        if isinstance(atmakaraka, dict):
+            atmakaraka = atmakaraka.get('planet')
+        
+        calculator = JaiminiChartCalculator(chart_data, atmakaraka)
+        karkamsa_result = calculator.calculate_karkamsa_chart()
+        karkamsa_interpretation = calculator.get_karkamsa_interpretation(karkamsa_result['karkamsa_sign'])
+        
+        return {
+            "success": True,
+            "karkamsa": {
+                **karkamsa_result,
+                "interpretation": karkamsa_interpretation
+            }
+        }
+    except Exception as e:
+        print(f"Error calculating Karkamsa chart: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/swamsa-chart")
+async def calculate_swamsa_chart(request: dict, current_user: User = Depends(get_current_user)):
+    """Calculate Swamsa chart (D12 recast with Atmakaraka's D12 sign as ascendant)"""
+    try:
+        chart_data = request.get('chart_data', {})
+        atmakaraka = request.get('atmakaraka')
+        
+        if not chart_data or not chart_data.get('planets'):
+            raise HTTPException(status_code=400, detail="Chart data with planets required")
+        
+        if not atmakaraka:
+            raise HTTPException(status_code=400, detail="Atmakaraka planet required")
+        
+        if isinstance(atmakaraka, dict):
+            atmakaraka = atmakaraka.get('planet')
+        
+        calculator = JaiminiChartCalculator(chart_data, atmakaraka)
+        swamsa_result = calculator.calculate_swamsa_chart()
+        swamsa_interpretation = calculator.get_swamsa_interpretation(swamsa_result['swamsa_sign'])
+        
+        return {
+            "success": True,
+            "swamsa": {
+                **swamsa_result,
+                "interpretation": swamsa_interpretation
+            }
+        }
+    except Exception as e:
+        print(f"Error calculating Swamsa chart: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

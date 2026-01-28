@@ -25,6 +25,8 @@ import MonthlyAccordion from './MonthlyAccordion';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
+import { trackAstrologyEvent } from '../utils/analytics';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +38,7 @@ const TOTAL_ITEM_SIZE = ITEM_WIDTH + ITEM_GAP;
 const SIDE_PADDING = (width - ITEM_WIDTH) / 2;
 
 export default function EventScreen({ route }) {
+  useAnalytics('EventScreen');
   const navigation = useNavigation();
   const { credits, fetchBalance } = useCredits();
   const { theme, colors } = useTheme();
@@ -148,6 +151,9 @@ export default function EventScreen({ route }) {
     setLoadingMonthly(true);
     setMonthlyData(null);
     setLoadingMessageIndex(0);
+    
+    // Track event timeline request
+    trackAstrologyEvent.analysisRequested('event_timeline');
     
     // Start rotating loading messages
     loadingIntervalRef.current = setInterval(() => {
@@ -508,6 +514,10 @@ export default function EventScreen({ route }) {
 
   const handleRegenerateConfirm = async () => {
     setShowRegenerateModal(false);
+    
+    // Track regeneration
+    trackAstrologyEvent.analysisRequested('event_timeline_regenerate');
+    
     await fetchBalance();
     
     const freshBalance = await creditAPI.getBalance();
