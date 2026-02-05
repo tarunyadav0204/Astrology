@@ -32,7 +32,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     if (chartType && chartType !== currentChartType) {
       setCurrentChartType(chartType);
     }
-  }, [chartType]);
+  }, [chartType, currentChartType]);
   const [currentChartData, setCurrentChartData] = useState(chartData);
   const [loading, setLoading] = useState(false);
   const [slideAnim] = useState(new Animated.Value(0));
@@ -75,9 +75,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   };
   
   const chartDivisions = {
-    navamsa: 9, saptamsa: 7, dasamsa: 10, dwadasamsa: 12, shodasamsa: 16,
+    hora: 2, drekkana: 3, chaturthamsa: 4, navamsa: 9, saptamsa: 7, dasamsa: 10, dwadasamsa: 12, shodasamsa: 16,
     vimshamsa: 20, chaturvimshamsa: 24, saptavimshamsa: 27,
-    trimshamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60
+    trimshamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60,
+    // Aliases for consistency with ChartScreen
+    shodamsa: 16, vimsamsa: 20, trimsamsa: 30
   };
 
   const toggleStyle = useCallback(() => {
@@ -104,7 +106,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         d1ChartData = chartDataCache.lagna;
         // If not in cache, calculate it
         if (!d1ChartData) {
-          console.log('D1 chart not in cache, calculating...');
           const formattedData = {
             ...birthData,
             date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
@@ -120,13 +121,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       }
       
       if (!d1ChartData) {
-        console.log('No D1 chart data available for Karaka calculation');
         return null;
       }
       
-      console.log('[ChartWidget] Loading Karakas from D1 chart...');
       const response = await chartAPI.calculateCharaKarakas(d1ChartData, birthData);
-      console.log('[ChartWidget] Karakas loaded:', response.data.chara_karakas);
       const loadedKarakas = response.data.chara_karakas;
       setKarakas(loadedKarakas);
       return loadedKarakas; // Return the karakas so caller can use them immediately
@@ -171,10 +169,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [chartData, currentChartType]);
   
   useEffect(() => {
-    console.log(`[ChartWidget] useEffect triggered - chartData: ${!!chartData}, currentChartType: ${currentChartType}, division: ${division}`);
     // Only load data if not provided by parent
     if (!chartData) {
-      console.log(`[ChartWidget] chartData is null, loading...`);
       if (currentChartType === 'transit') {
         loadChartData('transit', true);
       } else if (currentChartType === 'karkamsa' || currentChartType === 'swamsa') {
@@ -185,8 +181,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       } else {
         loadChartData(currentChartType, true);
       }
-    } else {
-      console.log(`[ChartWidget] chartData provided by parent, not loading`);
     }
   }, [currentChartType, division]);
   
@@ -294,7 +288,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       return;
     }
     
-    const typeAtStart = currentChartType;
+    // Find the chart type that corresponds to this division
+    const targetChartType = Object.keys(chartDivisions).find(type => chartDivisions[type] === divisionNumber);
     
     try {
       setLoading(true);
@@ -309,25 +304,20 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       const response = await chartAPI.calculateDivisionalChart(formattedData, divisionNumber);
       const data = response.data.divisional_chart;
       
-      // Only update if user hasn't switched charts while loading
-      if (data && activeChartTypeRef.current === typeAtStart) {
-        setChartDataCache(prev => ({ ...prev, [currentChartType]: data }));
+      // Cache under the correct chart type and set as current data
+      if (data && targetChartType) {
+        setChartDataCache(prev => ({ ...prev, [targetChartType]: data }));
         setCurrentChartData(data);
       }
     } catch (error) {
-      console.error('Error loading divisional chart:', error);
+      console.error(`Error loading divisional chart D${divisionNumber}:`, error);
     } finally {
-      if (activeChartTypeRef.current === typeAtStart) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
   const loadChartData = async (type, setCurrent = true, customDate = null) => {
-    console.log(`[ChartWidget] loadChartData called for type: ${type}, loading: ${loading}`);
-    
     if (chartDataCache[type] && !(type === 'transit' && customDate)) {
-      console.log(`[ChartWidget] Using cached data for ${type}`);
       if (setCurrent) setCurrentChartData(chartDataCache[type]);
       return;
     }
@@ -340,13 +330,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     }
     
     if (!birthData) {
-      console.log(`[ChartWidget] Cannot load - no birthData`);
       return;
     }
     
     // Don't block if already loading - just skip setting loading state
     if (loading && setCurrent) {
-      console.log(`[ChartWidget] Already loading, skipping ${type}`);
       return;
     }
     
@@ -368,20 +356,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       let data;
       
       if (chartDivisions[type]) {
-        console.log(`[ChartWidget] Loading divisional chart D${chartDivisions[type]} for ${type}`);
         response = await chartAPI.calculateDivisionalChart(formattedData, chartDivisions[type]);
         data = response.data.divisional_chart;
       } else if (type === 'transit') {
-        console.log(`[ChartWidget] Loading transit chart`);
         const targetDate = customDate || transitDate;
         const dateStr = targetDate.toISOString().split('T')[0];
         response = await chartAPI.calculateTransits(formattedData, dateStr);
         data = response.data;
       } else if (type === 'karkamsa' || type === 'swamsa') {
-        console.log(`[ChartWidget] Loading ${type} chart - Karakas available: ${!!karakas?.Atmakaraka?.planet}`);
         let loadedKarakas = karakas;
         if (!loadedKarakas?.Atmakaraka?.planet) {
-          console.log(`[ChartWidget] Loading Karakas first...`);
           loadedKarakas = await loadKarakas();
         }
         if (loadedKarakas?.Atmakaraka?.planet) {
@@ -389,12 +373,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           const d1Data = lagnaChartData || chartDataCache.lagna || chartData;
           
           if (!d1Data || !d1Data.planets) {
-            console.error(`[ChartWidget] CRITICAL: No D1 chart data available for ${type}`);
+            console.error(`CRITICAL: No D1 chart data available for ${type}`);
             throw new Error('D1 chart data required for Jaimini charts');
           }
           
           const atmakaraka = loadedKarakas.Atmakaraka.planet;
-          console.log(`[ChartWidget] Using D1 data for ${type} with Atmakaraka: ${atmakaraka}`);
           
           if (type === 'karkamsa') {
             response = await chartAPI.calculateKarkamsaChart(d1Data, atmakaraka);
@@ -403,22 +386,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             response = await chartAPI.calculateSwamsaChart(d1Data, atmakaraka);
             data = response.data.swamsa?.swamsa_chart;
           }
-        } else {
-          console.log(`[ChartWidget] ERROR: Atmakaraka still not available after loadKarakas`);
         }
       }
       
       // Only update if user hasn't switched charts while loading
       if (data && activeChartTypeRef.current === typeAtStart) {
-        console.log(`[ChartWidget] Setting chart data for ${type}`);
         setChartDataCache(prev => ({ ...prev, [type]: data }));
         if (setCurrent) setCurrentChartData(data);
-      } else {
-        console.log(`[ChartWidget] Not setting data - data: ${!!data}, typeMatch: ${activeChartTypeRef.current === typeAtStart}`);
       }
     } catch (error) {
-      console.error(`[ChartWidget] Error loading chart data for ${type}:`, error);
-      console.error(`[ChartWidget] Error details:`, error.response?.data || error.message);
+      console.error(`Error loading chart data for ${type}:`, error);
     } finally {
       if (setCurrent && activeChartTypeRef.current === typeAtStart) {
         setLoading(false);

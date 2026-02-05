@@ -478,6 +478,7 @@ export default function AshtakvargaOracle({ navigation }) {
   const [yearlyStrength, setYearlyStrength] = useState(null);
   const [loadingYearly, setLoadingYearly] = useState(false);
   const [yearlyProgress, setYearlyProgress] = useState(0);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const startLoadingAnimation = () => {
     setLoadingProgress(0);
@@ -645,7 +646,9 @@ export default function AshtakvargaOracle({ navigation }) {
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Ashtakvarga</Text>
-            <View style={styles.headerRight} />
+            <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
+              <Ionicons name="information-circle-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
           </View>
 
           {renderDestinyMap()}
@@ -871,6 +874,74 @@ export default function AshtakvargaOracle({ navigation }) {
           </Modal>
         </SafeAreaView>
       </LinearGradient>
+
+      <Modal
+        visible={showInfoModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInfoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.infoModal}>
+            <LinearGradient
+              colors={theme === 'dark' ? ['rgba(26, 0, 51, 0.95)', 'rgba(45, 27, 78, 0.9)'] : ['rgba(254, 252, 251, 0.98)', 'rgba(254, 252, 251, 0.95)']}
+              style={styles.infoGradient}
+            >
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowInfoModal(false)}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+              
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Understanding Ashtakvarga</Text>
+                
+                <View style={[styles.infoSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
+                  <Text style={[styles.infoSectionTitle, { color: colors.primary }]}>🎯 What is Ashtakvarga?</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    Ashtakvarga is an ancient Vedic astrology system that measures planetary strength through numerical points called "bindus" or "dots". It provides precise predictions about life events and timing.
+                  </Text>
+                </View>
+
+                <View style={[styles.infoSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
+                  <Text style={[styles.infoSectionTitle, { color: colors.primary }]}>📊 Sarvashtakvarga Chart</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    The main chart you see combines all planetary influences. Each house shows total bindus (points) from all planets. Higher numbers (30+) indicate strength, lower numbers (25-) suggest challenges.
+                  </Text>
+                </View>
+
+                <View style={[styles.infoSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
+                  <Text style={[styles.infoSectionTitle, { color: colors.primary }]}>🪐 Bhinnashtakvarga Charts</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    Individual planet charts (Sun, Moon, Mars, etc.) show where each planet receives support. Tap any planet button to see its specific influence pattern across the zodiac signs.
+                  </Text>
+                </View>
+
+                <View style={[styles.infoSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
+                  <Text style={[styles.infoSectionTitle, { color: colors.primary }]}>🔮 How to Use in Our App</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    • Tap any house in the main chart for detailed insights{"\n"}
+                    • Use the date navigator to see transit effects{"\n"}
+                    • Check individual planet charts for specific influences{"\n"}
+                    • Generate yearly strength analysis for timing{"\n"}
+                    • Higher bindus = favorable periods for that life area
+                  </Text>
+                </View>
+
+                <View style={[styles.infoSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.08)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(249,115,22,0.2)' }]}>
+                  <Text style={[styles.infoSectionTitle, { color: colors.primary }]}>💡 Reading the Colors</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    🟢 Green (30+ bindus): Strong, favorable periods{"\n"}
+                    🟠 Orange (26-29 bindus): Moderate strength{"\n"}
+                    🔴 Red (25- bindus): Challenging, needs extra effort
+                  </Text>
+                </View>
+              </ScrollView>
+            </LinearGradient>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -906,6 +977,14 @@ const styles = {
     color: COLORS.white,
   },
   headerRight: { width: 40 },
+  infoButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   
   tabNavigation: {
     flexDirection: 'row',
@@ -1470,5 +1549,36 @@ const styles = {
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 20,
+  },
+  infoModal: {
+    width: '95%',
+    maxHeight: '85%',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  infoGradient: {
+    padding: 20,
+    paddingTop: 50,
+  },
+  infoTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  infoSection: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  infoSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 };

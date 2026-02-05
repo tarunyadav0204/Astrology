@@ -358,64 +358,88 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
 @router.get("/status/{message_id}")
 async def check_message_status(message_id: int, current_user = Depends(get_current_user)):
     """Poll message status for async processing"""
-    conn = sqlite3.connect('astrology.db')
-    cursor = conn.cursor()
+    import time
+    start_time = time.time()
     
-    cursor.execute('''
-        SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images
-        FROM chat_messages cm
-        JOIN chat_sessions cs ON cm.session_id = cs.session_id
-        WHERE cm.message_id = ?
-    ''', (message_id,))
+    # print(f"🔍 [STATUS CHECK] messageId: {message_id}, user: {current_user.userid}, time: {time.time()}")
     
-    result = cursor.fetchone()
-    conn.close()
-    
-    if not result:
-        raise HTTPException(status_code=404, detail="Message not found")
-    
-    status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image = result
-    
-    # Verify message belongs to user
-    if user_id != current_user.userid:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    response = {"status": status, "message_type": message_type or "answer"}
-    
-    if status == "completed":
-        response["content"] = content
-        response["completed_at"] = completed_at
+    try:
+        conn = sqlite3.connect('astrology.db')
+        db_start = time.time()
+        cursor = conn.cursor()
         
-        # Add terms and glossary if they exist
-        if terms:
-            try:
-                response["terms"] = json.loads(terms)
-            except:
+        cursor.execute('''
+            SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images
+            FROM chat_messages cm
+            JOIN chat_sessions cs ON cm.session_id = cs.session_id
+            WHERE cm.message_id = ?
+        ''', (message_id,))
+        
+        result = cursor.fetchone()
+        db_time = time.time() - db_start
+        # print(f"📊 [DB QUERY] took {db_time:.3f}s for messageId: {message_id}")
+        
+        conn.close()
+        
+        if not result:
+            print(f"❌ [STATUS] Message {message_id} not found")
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image = result
+        
+        # Verify message belongs to user
+        if user_id != current_user.userid:
+            print(f"❌ [STATUS] Access denied for messageId: {message_id}, user: {current_user.userid}")
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        response = {"status": status, "message_type": message_type or "answer"}
+        
+        if status == "completed":
+            response["content"] = content
+            response["completed_at"] = completed_at
+            
+            # Add terms and glossary if they exist
+            if terms:
+                try:
+                    response["terms"] = json.loads(terms)
+                except:
+                    response["terms"] = []
+            else:
                 response["terms"] = []
-        else:
-            response["terms"] = []
-            
-        if glossary:
-            try:
-                response["glossary"] = json.loads(glossary)
-            except:
+                
+            if glossary:
+                try:
+                    response["glossary"] = json.loads(glossary)
+                except:
+                    response["glossary"] = {}
+            else:
                 response["glossary"] = {}
-        else:
-            response["glossary"] = {}
-            
-        # Add summary image if it exists
-        if summary_image:
-            response["summary_image"] = summary_image
-        else:
-            response["summary_image"] = None
-            
-    elif status == "failed":
-        response["error_message"] = error_message or "An error occurred while processing your request"
-    elif status == "processing":
-        response["started_at"] = started_at
-        response["message"] = "Still analyzing your chart..."
-    
-    return response
+                
+            # Add summary image if it exists
+            if summary_image:
+                response["summary_image"] = summary_image
+            else:
+                response["summary_image"] = None
+                
+        elif status == "failed":
+            response["error_message"] = error_message or "An error occurred while processing your request"
+        elif status == "processing":
+            response["started_at"] = started_at
+            response["message"] = "Still analyzing your chart..."
+        
+        total_time = time.time() - start_time
+        # print(f"✅ [STATUS COMPLETE] messageId: {message_id}, status: {status}, total_time: {total_time:.3f}s")
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        total_time = time.time() - start_time
+        print(f"❌ [STATUS ERROR] messageId: {message_id}, error: {str(e)}, total_time: {total_time:.3f}s")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None):
     """Background task to process Gemini response"""
@@ -450,7 +474,35 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if not birth_details:
             raise Exception("Birth details are required for chat analysis")
         
-        birth_data = birth_details
+        # Format birth data same as mobile app to ensure consistent calculations
+        # Use BirthData validator to get proper timezone calculation from lat/lon
+        from main import BirthData
+        
+        # Create BirthData object to get auto-calculated timezone
+        birth_data_obj = BirthData(
+            name=birth_details.get('name', 'User'),
+            date=birth_details['date'].split('T')[0] if 'T' in birth_details['date'] else birth_details['date'],
+            time=birth_details['time'].split('T')[1][:5] if 'T' in birth_details['time'] else birth_details['time'],
+            latitude=float(birth_details['latitude']),
+            longitude=float(birth_details['longitude']),
+            place=birth_details.get('place', 'Unknown')
+        )
+        
+        # Extract data with auto-calculated timezone
+        birth_data = {
+            'name': birth_data_obj.name,
+            'date': birth_data_obj.date,
+            'time': birth_data_obj.time,
+            'latitude': birth_data_obj.latitude,
+            'longitude': birth_data_obj.longitude,
+            'place': birth_data_obj.place,
+            'timezone': birth_data_obj.timezone  # This is auto-calculated from lat/lon
+        }
+        
+        # DEBUG: Log birth data being used in chat
+        print(f"🔍 CHAT BIRTH DATA DEBUG:")
+        print(f"   Raw birth_details: {birth_details}")
+        print(f"   Formatted birth_data: {birth_data}")
         
         # Validate partnership mode data
         if partnership_mode and partner_birth_details:
@@ -600,7 +652,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 print(f"✅ RESET CLARIFICATION COUNT TO 0 (READY status)")
             
             routing_time = time.time() - routing_start
-            print(f"✅ ROUTING DECISION COMPLETE: {intent.get('mode', 'birth').upper()} mode")
+            print(f"✅ ROUTING DECISION COMPLETE: {(intent.get('mode') or 'birth').upper()} mode")
             print(f"Category: {intent.get('category', 'general')}")
             print(f"Routing time: {routing_time:.3f}s")
             print(f"{'='*80}\n")

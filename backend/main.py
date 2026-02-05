@@ -69,6 +69,7 @@ from birth_charts.routes import router as birth_charts_router
 from karma_analysis.routes import router as karma_router
 from ashtakavarga_routes import router as ashtakavarga_router
 from chat_error_logging import router as chat_error_router
+from kota_chakra.routes import router as kota_chakra_router
 import math
 from datetime import timedelta
 import signal
@@ -256,6 +257,7 @@ app.include_router(financial_router)
 app.include_router(karma_router, prefix="/api", tags=["karma"])
 app.include_router(ashtakavarga_router, prefix="/api", tags=["ashtakavarga"])
 app.include_router(chat_error_router, prefix="/api", tags=["chat_errors"])
+app.include_router(kota_chakra_router, prefix="/api")
 app.include_router(event_prediction_router)
 
 
@@ -2230,7 +2232,7 @@ async def calculate_cascading_dashas(request: dict):
         from shared.dasha_calculator import DashaCalculator
         
         print(f"\n{'='*60}")
-        print(f"🔍 DASHA REQUEST RECEIVED")
+        print(f"🔍 API ENDPOINT: calculate-cascading-dashas called")
         print(f"{'='*60}")
         print(f"Request keys: {request.keys()}")
         print(f"Birth data keys: {request.get('birth_data', {}).keys()}")
@@ -2239,7 +2241,7 @@ async def calculate_cascading_dashas(request: dict):
         birth_data = BirthData(**request['birth_data'])
         target_date = datetime.strptime(request.get('target_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
         
-        print(f"\n📊 BIRTH DATA PARSED:")
+        print(f"\n📊 API BIRTH DATA PARSED:")
         print(f"  Name: {birth_data.name}")
         print(f"  Date: {birth_data.date}")
         print(f"  Time: {birth_data.time}")

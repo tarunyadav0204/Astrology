@@ -112,6 +112,7 @@ class RealTransitCalculator:
         ascendant_longitude = natal_positions.get('ascendant_longitude', 0)
         
         # Transit planets that create meaningful aspects
+        # Include Mars for short-term analysis as it can create significant events
         transit_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu', 'Mars']
         natal_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         
@@ -131,15 +132,25 @@ class RealTransitCalculator:
                 )
                 
                 # Check if any natal relationship existed between these planets
-                had_natal_relationship = False
-                for test_aspect in available_aspects:
-                    if self._natal_aspect_existed(transit_planet, natal_planet, test_aspect, natal_positions, ascendant_longitude):
-                        had_natal_relationship = True
-                        break
+                # OR if it's the same planet (self-aspects are always valid)
+                had_natal_relationship = (transit_planet == natal_planet)
+                
+                if transit_planet == 'Mars' and natal_planet in ['Rahu', 'Saturn', 'Jupiter'] and natal_house == 2:
+                    pass  # Logging removed
+                
+                if not had_natal_relationship:
+                    for test_aspect in available_aspects:
+                        if self._natal_aspect_existed(transit_planet, natal_planet, test_aspect, natal_positions, ascendant_longitude):
+                            had_natal_relationship = True
+                            if transit_planet == 'Mars' and natal_planet in ['Rahu', 'Saturn', 'Jupiter']:
+                                print(f"🔴 Found natal relationship: Mars aspect {test_aspect} to {natal_planet}")
+                            break
                 
                 # If planets had any natal relationship, include ALL possible transit aspects
                 if had_natal_relationship:
                     for aspect_num in available_aspects:
+                        if transit_planet == 'Mars' and natal_planet in ['Rahu', 'Saturn', 'Jupiter']:
+                            print(f"🔴 Adding Mars aspect {aspect_num} to natal {natal_planet} in house {natal_house}")
                         aspects.append({
                             'transit_planet': transit_planet,
                             'natal_planet': natal_planet,
@@ -148,6 +159,8 @@ class RealTransitCalculator:
                             'natal_house': natal_house,
                             'ascendant_longitude': ascendant_longitude
                         })
+                elif transit_planet == 'Mars' and natal_planet in ['Rahu', 'Saturn', 'Jupiter']:
+                    print(f"🔴 NO natal relationship found between Mars and {natal_planet} - skipping")
         
         return aspects
     
@@ -165,15 +178,20 @@ class RealTransitCalculator:
         end_date = datetime(start_year + year_range, 12, 31)
         current_date = start_date
         
-        # Adjust sampling frequency based on year range
-        if year_range <= 2:
+        # Adjust sampling frequency based on year range and planet speed
+        if transit_planet == 'Mars':
+            # Mars moves fast, sample daily for accurate detection
+            step_days = 1
+        elif year_range <= 2:
             step_days = 3  # Every 3 days for short periods
         elif year_range <= 5:
             step_days = 7  # Weekly for medium periods
         else:
             step_days = 15  # Bi-weekly for long periods
         
-        # print(f"   Calculating {transit_planet}->{natal_planet} aspect {aspect_number} from {start_year} to {start_year + year_range} (step: {step_days} days)")
+        # print(f"   🔍 Calculating {transit_planet}->{natal_planet} aspect {aspect_number} from {start_year} to {start_year + year_range} (step: {step_days} days)")
+        # if transit_planet == 'Mars' and natal_planet == 'Mars' and aspect_number == 8:
+        #     print(f"   🔴 MARS 8TH ASPECT: Looking for Mars in house 7 aspecting natal Mars in house {natal_house}")
         
         # Check if aspect is already active at start of period
         initial_longitude = self.get_planet_position(start_date, transit_planet)
@@ -222,10 +240,14 @@ class RealTransitCalculator:
                     in_aspect = True
                     aspect_start = current_date
                     aspect_start_house = transit_house  # Capture house when aspect starts
+                    # if transit_planet == 'Mars' and natal_planet == 'Mars' and aspect_number == 8:
+                    #     print(f"   🔴 MARS 8TH ASPECT STARTED: {current_date.strftime('%Y-%m-%d')} - Mars in house {transit_house} aspects natal Mars in house {natal_house}")
                 elif not is_aspecting and in_aspect:
                     # End of aspect period
                     in_aspect = False
                     if aspect_start:
+                        # if transit_planet == 'Mars' and natal_planet == 'Mars' and aspect_number == 8:
+                        #     print(f"   🔴 MARS 8TH ASPECT ENDED: {current_date.strftime('%Y-%m-%d')}")
                         # Get natal positions from birth data
                         natal_positions = self._calculate_natal_positions(birth_data) if birth_data else {}
                         
@@ -349,6 +371,9 @@ class RealTransitCalculator:
             natal_positions[planet2]['longitude'], ascendant_longitude
         )
         
+        if planet1 == 'Mars' and planet2 in ['Rahu', 'Saturn', 'Jupiter']:
+            print(f"🔍 Checking natal: {planet1} in house {planet1_house} -> {planet2} in house {planet2_house} (aspect {aspect_number})")
+        
         # Check if planet1 could aspect planet2 in natal chart
         available_aspects = self.vedic_aspects.get(planet1, [])
         
@@ -356,11 +381,15 @@ class RealTransitCalculator:
             if test_aspect == 1:
                 # Conjunction - same house
                 if planet1_house == planet2_house and aspect_number == 1:
+                    if planet1 == 'Mars' and planet2 in ['Rahu', 'Saturn', 'Jupiter']:
+                        print(f"🔍 FOUND natal conjunction: {planet1} and {planet2} both in house {planet1_house}")
                     return True
             else:
                 # Calculate which house planet1 aspects from its natal position
                 aspected_house = ((planet1_house + test_aspect - 2) % 12) + 1
                 if aspected_house == planet2_house and aspect_number == test_aspect:
+                    if planet1 == 'Mars' and planet2 in ['Rahu', 'Saturn', 'Jupiter']:
+                        print(f"🔍 FOUND natal aspect: {planet1} in house {planet1_house} aspects {planet2} in house {planet2_house} with {test_aspect}th aspect")
                     return True
         
         return False

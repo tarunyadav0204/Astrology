@@ -108,6 +108,47 @@ class ResponseParser:
             except Exception as e:
                 print(f"   ⚠️ Summary image prompt extraction failed: {e}")
         
+        # CRITICAL FIX: Remove glossary JSON blocks from visible content
+        if 'GLOSSARY_START' in cleaned_text and 'GLOSSARY_END' in cleaned_text:
+            # Extract glossary first
+            try:
+                glossary_part = cleaned_text.split("GLOSSARY_START")[1].split("GLOSSARY_END")[0].strip()
+                # Clean markers and potential backticks/markdown
+                glossary_json = re.sub(r'^```(?:json)?\s*|```$', '', glossary_part).strip()
+                
+                # Parse glossary
+                parsed_glossary = {}
+                try:
+                    parsed_glossary = json.loads(glossary_json)
+                    # Normalize all keys to lowercase and strip whitespace
+                    parsed_glossary = {k.strip().lower(): v for k, v in parsed_glossary.items()}
+                except json.JSONDecodeError:
+                    # If that fails, try parsing multiple JSON objects (one per line)
+                    for line in glossary_json.split('\n'):
+                        line = line.strip()
+                        if line and line.startswith('{'):
+                            try:
+                                obj = json.loads(line)
+                                if 'term' in obj and 'definition' in obj:
+                                    parsed_glossary[obj['term'].strip().lower()] = obj['definition']
+                            except:
+                                continue
+                
+                # Remove the ENTIRE glossary block from visible content
+                cleaned_text = re.sub(r'GLOSSARY_START.*?GLOSSARY_END', '', cleaned_text, flags=re.DOTALL).strip()
+                print(f"   ✅ Glossary extracted and removed from content: {len(parsed_glossary)} terms")
+                
+                # Use the standard parser on the cleaned text
+                result = ResponseParser.parse_response(cleaned_text)
+                result['glossary'] = parsed_glossary
+                result['terms'] = list(parsed_glossary.keys())
+                result['summary_image_prompt'] = summary_image_prompt
+                print(f"   Final result - Terms: {len(result['terms'])}, Glossary: {len(result['glossary'])}")
+                return result
+                
+            except Exception as e:
+                print(f"   ⚠️ Glossary extraction failed: {e}")
+        
         # Use the standard parser on the cleaned text
         result = ResponseParser.parse_response(cleaned_text)
         result['summary_image_prompt'] = summary_image_prompt

@@ -75,17 +75,17 @@ class GeminiChatAnalyzer:
                 print(f"⚠️ Model {model_name} not available: {e}")
                 continue
         
-        # Initialize premium model (Gemini 3 Pro Preview)
+        # Initialize premium model (Gemini 3 Flash Preview)
         try:
             self.premium_model = genai.GenerativeModel(
-                'models/gemini-3-pro-preview',
+                'models/gemini-3-flash-preview',
                 generation_config=genai.GenerationConfig(
                     temperature=0,
                     top_p=0.95,
                     top_k=40
                 )
             )
-            print(f"✅ Initialized premium model: gemini-3-pro-preview")
+            print(f"✅ Initialized premium model: gemini-3-flash-preview")
         except Exception as e:
             print(f"⚠️ Premium model not available, using standard: {e}")
             self.premium_model = self.model
@@ -133,7 +133,6 @@ class GeminiChatAnalyzer:
         # Add response format instruction to prevent truncation
         enhanced_context['response_format'] = {
             'instruction': 'Provide complete response. Do not truncate mid-sentence.',
-            'max_length': 'Aim for comprehensive but concise responses under 4000 characters.',
             'format': 'Use proper formatting with **bold** and *italic* text as needed.',
             'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.',
             'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.',
@@ -185,7 +184,8 @@ class GeminiChatAnalyzer:
         try:
             # Select model
             selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
-            model_type = "Premium (Gemini 3.0)" if premium_analysis and self.premium_model else "Standard"
+            model_type = "Premium (Gemini 3.0 Flash)" if premium_analysis and self.premium_model else "Standard"
+            
             
             if debug_logging:
                 print(f"\n=== CALLING GEMINI API (ASYNC) ===")
@@ -203,7 +203,11 @@ class GeminiChatAnalyzer:
                 print(f"{'='*80}\n")
             
 
-            
+                # Log request size before sending to Gemini
+                prompt_size = len(prompt)
+                prompt_char_count = len(prompt)
+                print(f"\n📏 GEMINI REQUEST SIZE: {prompt_char_count:,} characters ({prompt_size / 1024:.1f} KB)")
+                
             # CALL GEMINI ASYNC DIRECTLY with SDK timeout
             response = await asyncio.wait_for(
                 selected_model.generate_content_async(
@@ -327,7 +331,12 @@ class GeminiChatAnalyzer:
             
             print(f"\n🔍 RESPONSE PARSER DEBUG:")
             print(f"   Terms found: {parsed_response['terms']}")
-            print(f"   Glossary keys: {list(parsed_response['glossary'].keys())}")
+            if isinstance(parsed_response['glossary'], dict):
+                print(f"   Glossary keys: {list(parsed_response['glossary'].keys())}")
+            else:
+                print(f"   Glossary type error: {type(parsed_response['glossary'])}, value: {parsed_response['glossary']}")
+                # Fix the glossary if it's not a dict
+                parsed_response['glossary'] = {}
             print(f"   Summary image prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
             if parsed_response.get('summary_image_prompt'):
                 print(f"   Summary image prompt preview: {parsed_response.get('summary_image_prompt', '')[:100]}...")
@@ -567,10 +576,9 @@ class GeminiChatAnalyzer:
                     # Fix B: 'bhinnashtakavarga' is at the chart root
                     chart_data.pop('bhinnashtakavarga', None)
 
-        # 2. Prune Bhav Chalit Redundancy - REMOVED FOR ACCURACY
-        # Bhava Chalit is CRITICAL for house predictions - planets can be in different houses than signs
-        # if 'd1_chart' in clean and 'bhav_chalit' in clean['d1_chart']:
-        #     clean['d1_chart'].pop('bhav_chalit', None)
+        # 2. Prune Bhav Chalit Redundancy
+        if 'd1_chart' in clean and 'bhav_chalit' in clean['d1_chart']:
+            clean['d1_chart'].pop('bhav_chalit', None)
 
         # 3. Prune Methodologies
         if 'transit_data_availability' in clean:
@@ -739,127 +747,15 @@ GLOSSARY_END
 
 """
         else:
-            # Build image instructions based on premium_analysis flag
-            image_instructions = ""
-            if premium_analysis:
-                image_instructions = """
-SUMMARY IMAGE - MANDATORY:
-Create a prompt for a VISUAL NARRATIVE COMPOSITION that captures the essence of your astrological analysis.
-
-🎨 STRUCTURE: 
-Create a multi-panel composition with AS MANY SCENES AS NEEDED to represent the key aspects of your analysis.
-- Each panel should represent a distinct theme, prediction, or life area from your analysis
-- Minimum 3 panels, maximum 6 panels depending on the complexity of the reading
-- Arrange panels in a flowing, organic layout (not rigid grid)
-
-📋 PANEL CONTENT:
-Each panel should symbolically represent:
-- A specific prediction or insight from your analysis
-- A life area being discussed (career, relationships, health, etc.)
-- A timing phase (current challenge, transition period, future outcome)
-- A karmic theme or spiritual lesson
-
-✅ VISUAL STYLE:
-- Professional hand-drawn pencil sketch with watercolor washes
-- Use symbolic imagery and metaphors (avoid literal representations)
-- Color palette: Deep indigo for challenges, vibrant gold for success, emerald green for growth, soft purple for spirituality, warm orange for relationships
-- Minimalist and elegant; avoid clutter
-- Each panel should flow into the next, creating a cohesive narrative
-
-🔤 TEXT LABELS:
-- Add a short label to each panel (1-3 words in ALL CAPS)
-- Use "Clear, elegant, hand-lettered serif font"
-- Labels should capture the essence of that panel's theme
-- Examples: "TRANSFORMATION", "CAREER RISE", "INNER PEACE", "PARTNERSHIP", "BREAKTHROUGH"
-
-Format:
-SUMMARY_IMAGE_START
-[Detailed prompt describing:
-1. The number of panels and their layout
-2. What each panel represents symbolically
-3. The visual style and color scheme
-4. The text labels for each panel
-5. How the panels connect to tell a cohesive story]
-SUMMARY_IMAGE_END
-"""
-            
-            response_format_instruction = f"""
-RESPONSE FORMAT - DETAILED MODE:
-Start with comprehensive Quick Answer then provide full analysis:
-
-⚠️ CRITICAL HEADER FORMATTING RULES - STRICT ENFORCEMENT:
-- Main sections use ### (three hashes): Key Insights, Astrological Analysis, Nakshatra Insights, Timing & Guidance
-- Subsections use #### (four hashes) and MUST be placed INSIDE the Astrological Analysis section
-- ABSOLUTELY FORBIDDEN: Do NOT use # or ## anywhere in your response
-- The Parashari View, Jaimini Sutra Deep-Dive, Timing Synthesis, Nadi Precision, Triple Perspective, and Divisional Chart Analysis are ALL #### subsections
-
-🏛️ JAIMINI QUICK ANSWER RULES:
-- For STATUS/REPUTATION questions: Use `jaimini_full_analysis['wealth_sutras']['dhana_yoga_status']` as the verdict.
-- For MARRIAGE questions: Use `jaimini_full_analysis['marriage_sutras']['marriage_stability']` as the primary answer.
-- If Parashari and Jaimini conflict, the Jaimini Arudha (AL/UL) result is the FINAL VERDICT.
-
-CORRECT FORMAT:
-<div class="quick-answer-card">**Quick Answer**: [Complete summary using Jaimini verdict for status/marriage]</div>
-
-### Key Insights
-[Bullet points with specific predictions]
-• **The Jaimini Secret**: [MANDATORY - Insight from `career_talents` or `wealth_sutras`]
-
-### Astrological Analysis
-You MUST write content directly under this header, then add subsections with ####. DO NOT leave this section empty.
-
-#### The Parashari View
-[Houses/Lords analysis]
-
-#### Jaimini Sutra Deep-Dive (MANDATORY)
-[Explain AL 2nd/11th for wealth, UL 2nd for marriage, Karkamsa planets for talents, Karaka yogas]
-
-#### Nadi Precision (if applicable)
-[Nadi links analysis]
-
-#### Timing Synthesis
-[Vimshottari + Chara Dasha + Yogini]
-
-#### Triple Perspective (if applicable)
-[Sudarshana analysis]
-
-#### Divisional Chart Analysis (if applicable)
-[D10 for career, D7 for children, D24 for education, etc. - use relevant chart based on question]
-
-### Nakshatra Insights
-[Nakshatra analysis with classical authority]
-
-### Timing & Guidance
-[Age-appropriate recommendations]
-
-<div class="final-thoughts-card">**Final Thoughts**: [Balanced conclusion]</div>
-
-TECHNICAL TERMS EDUCATION - MANDATORY:
-Wrap ALL astrological terms in <term id="key">Term</term> format.
-
-{image_instructions}
-
-GLOSSARY FORMAT - CRITICAL:
-At the very end, add JSON glossary:
-
-GLOSSARY_START
-{{"term": "definition"}}
-GLOSSARY_END
-
-FOLLOW-UP QUESTIONS - MANDATORY:
-<div class="follow-up-questions">
-📅 When will this happen?
-🔮 What remedies can help?
-💼 How to maximize success?
-🌟 What should I focus on?
-</div>
-
-"""
+            # Use unified output schema
+            from ai.output_schema import get_output_schema
+            response_format_instruction = get_output_schema(premium_analysis=premium_analysis, analysis_type=context.get('analysis_type', 'birth'))
         
-        # Import the system instruction from ChatContextBuilder
+        # Import the system instruction from modular config
+        from chat.system_instruction_config import build_system_instruction
         from chat.chat_context_builder import ChatContextBuilder
         
-        # Check analysis type
+        # Check analysis type and build appropriate system instruction
         analysis_type = context.get('analysis_type', 'birth')
         
         if analysis_type == 'synastry':
@@ -901,7 +797,7 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
    - **Key Insights:** List 3 wins and 1 challenge for {target_year}.
    - **Monthly Breakdown:** Group the year into phases based on the Mudda Dasha timeline.
 """
-            system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION + "\n\n" + annual_instruction
+            system_instruction = build_system_instruction(include_all=True) + "\n\n" + annual_instruction
             
         elif analysis_type == 'mundane':
             # === MUNDANE MODE ===
@@ -909,46 +805,35 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
             from calculators.mundane.mundane_context_builder import MundaneContextBuilder
             system_instruction = MundaneContextBuilder.MUNDANE_SYSTEM_INSTRUCTION
             
-            # Override response format for mundane
-            response_format_instruction = """
-RESPONSE FORMAT - MUNDANE MODE:
-Start with Executive Summary then provide geopolitical analysis:
-
-<div class="quick-answer-card">**Executive Summary**: [Complete risk assessment and market outlook in clear, professional language. Cover major economic, political, and market trends.]</div>
-
-### Key Risk Factors
-[Bullet points with specific risks and probabilities]
-
-### Economic & Market Analysis
-[Detailed analysis with timing and sectors]
-
-### Geopolitical Outlook
-[Political stability, conflicts, policy changes]
-
-<div class="final-thoughts-card">**Strategic Outlook**: [Balanced conclusion with actionable insights]</div>
-
-FOLLOW-UP QUESTIONS - MANDATORY:
-Generate 3-4 contextually relevant follow-up questions based on the user's query. Examples for mundane analysis:
-<div class="follow-up-questions">
-📊 Which sectors will outperform?
-⚠️ What are the major risk events?
-💱 How will currency markets react?
-🌍 What geopolitical shifts are likely?
-</div>
-"""
+            # Override for mundane analysis
+            if analysis_type == 'mundane':
+                response_format_instruction = get_output_schema(analysis_type='mundane')
             
         else:
-            # Default to Birth Chart
-            system_instruction = ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
+            # Default to optimized modular instruction based on user question
+            # Detect intent category from user question
+            question_lower = user_question.lower()
+            intent_category = None
+            
+            if any(word in question_lower for word in ['career', 'job', 'work', 'profession', 'business']):
+                intent_category = 'career'
+            elif any(word in question_lower for word in ['money', 'wealth', 'finance', 'income', 'rich']):
+                intent_category = 'wealth'
+            elif any(word in question_lower for word in ['health', 'disease', 'illness', 'medical']):
+                intent_category = 'health'
+            elif any(word in question_lower for word in ['marriage', 'spouse', 'partner', 'relationship']):
+                intent_category = 'marriage'
+            elif any(word in question_lower for word in ['education', 'study', 'learning', 'degree']):
+                intent_category = 'education'
+            
+            # Use modular system instruction
+            system_instruction = build_system_instruction(intent_category=intent_category)
+            print(f"\n🎯 OPTIMIZED INSTRUCTION: {intent_category or 'general'} ({len(system_instruction)} chars vs {len(ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION)} original)")
         
-        # REORDERED FOR IMPLICIT CACHING: Static data first, dynamic data last
+        # REORDERED FOR ATTENTION FIX: JSON DATA FIRST, INSTRUCTIONS LAST
         prompt_parts = []
         
-        # 1. STATIC: System Instructions
-        prompt_parts.append(system_instruction)
-        prompt_parts.append(f"{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.")
-        
-        # 2. STATIC: Birth Chart Data (CRITICAL FIX for caching)
+        # 1. CRITICAL FIX: JSON DATA AT TOP (prevents house counting errors)
         # Extract dynamic data to keep the static prefix identical across calls
         import copy
         static_context = copy.deepcopy(context)
@@ -956,21 +841,8 @@ Generate 3-4 contextually relevant follow-up questions based on the user's query
         # Remove transit data from static context to maintain cache consistency
         transits = static_context.pop('transit_activations', None)
         
-        # Log context structure
-        # if is_synastry:
-        #     print(f"\n📋 CONTEXT STRUCTURE (SYNASTRY):")
-        #     print(f"   - analysis_type: {static_context.get('analysis_type')}")
-        #     print(f"   - native.birth_details: {static_context.get('native', {}).get('birth_details', {}).get('name')}")
-        #     print(f"   - partner.birth_details: {static_context.get('partner', {}).get('birth_details', {}).get('name')}")
-        #     print(f"   - native context keys: {list(static_context.get('native', {}).keys())[:10]}...")
-        #     print(f"   - partner context keys: {list(static_context.get('partner', {}).keys())[:10]}...")
-        # else:
-        #     print(f"\n📋 CONTEXT STRUCTURE (SINGLE):")
-        #     print(f"   - birth_details: {static_context.get('birth_details', {}).get('name')}")
-        #     print(f"   - context keys: {list(static_context.keys())[:15]}...")
-        
         # Convert ONLY static context to JSON with deterministic ordering
-        chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=True)
+        chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=False)
         
         # Use appropriate label based on analysis type
         if analysis_type == 'mundane':
@@ -982,7 +854,34 @@ Generate 3-4 contextually relevant follow-up questions based on the user's query
         
         print(f"   - Total context size: {len(chart_json)} characters")
         
-        # 2.5. INJECT USER SEMANTIC MEMORY (if present)
+        # 2. TRANSIT DATA (if present) - Keep with other JSON data
+        if transits:
+            # Log transit durations for analysis
+            transit_durations = []
+            for transit in transits:
+                start_date = transit.get('start_date', '')
+                end_date = transit.get('end_date', '')
+                if start_date and end_date:
+                    try:
+                        from datetime import datetime as dt
+                        start_dt = dt.strptime(start_date, '%Y-%m-%d')
+                        end_dt = dt.strptime(end_date, '%Y-%m-%d')
+                        duration_days = (end_dt - start_dt).days
+                        transit_durations.append(duration_days)
+                    except:
+                        pass
+            
+            if transit_durations:
+                avg_duration = sum(transit_durations) / len(transit_durations)
+                min_duration = min(transit_durations)
+                max_duration = max(transit_durations)
+                print(f"   - Transit durations: avg={avg_duration:.0f} days, min={min_duration} days, max={max_duration} days")
+            
+            transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=False)
+            prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
+            print(f"   - Transit data included: {len(transits)} activations")
+        
+        # 3. USER MEMORY (if present) - Keep with data section
         user_facts = context.get('user_facts')
         if user_facts:
             facts_text = "KNOWN USER BACKGROUND (Long-Term Memory):\n"
@@ -990,17 +889,11 @@ Generate 3-4 contextually relevant follow-up questions based on the user's query
                 for category, items in user_facts.items():
                     fact_str = ", ".join(items) if isinstance(items, list) else str(items)
                     facts_text += f"- {category.upper()}: {fact_str}\n"
+            facts_text += "\n🚨 CRITICAL: Do NOT extract facts that are similar or duplicate to the above. Only extract NEW, UNIQUE facts not already covered.\n"
             prompt_parts.append(facts_text)
             print(f"   - Injected {len(user_facts)} categories of user memory")
         
-        # 3. DYNAMIC: Transit Data (if present) - This breaks cache prefix but that's OK
-        if transits:
-            transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=True)
-            prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
-            print(f"   - Transit data included: {len(transits)} activations")
-
-        
-        # 4. DYNAMIC: Date/Time (MOVED DOWN - breaks cache here)
+        # 4. CURRENT DATE/TIME - Keep with data
         time_context = f"""IMPORTANT CURRENT DATE INFORMATION:
 - Today's Date: {current_date_str}
 - Current Time: {current_time_str}
@@ -1009,6 +902,10 @@ Generate 3-4 contextually relevant follow-up questions based on the user's query
 CRITICAL CHART INFORMATION:
 {ascendant_summary}"""
         prompt_parts.append(time_context)
+        
+        # 5. SYSTEM INSTRUCTIONS (moved to bottom for better attention)
+        prompt_parts.append(system_instruction)
+        prompt_parts.append(f"{language_instruction}{response_format_instruction}{user_context_instruction}You are a master Vedic astrologer with deep knowledge of classical texts like Brihat Parashara Hora Shastra, Jaimini Sutras, and Phaladeepika. You provide insightful, accurate astrological guidance based on authentic Vedic principles.")
         
         # 5. DYNAMIC: History & Question
         # Add reasoning scratchpad and enforcement checklist

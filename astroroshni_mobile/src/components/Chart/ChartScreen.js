@@ -102,25 +102,20 @@ export default function ChartScreen({ navigation, route }) {
   }, [currentChartIndex]);
   
   const getChartDataForType = useCallback((chartType) => {
-    console.log(`[ChartScreen] getChartDataForType called for: ${chartType}`);
     if (!birthData) return null;
     
     // Get from preloader cache
     const cachedChart = chartPreloader.getChart(birthData, chartType);
     if (cachedChart) {
-      console.log(`[ChartScreen] Using cached data for ${chartType}`);
       return cachedChart;
     }
     
     // If it's the main chart (lagna), return the state data
     if (chartType === 'lagna') {
-      console.log(`[ChartScreen] Returning lagna chart from state`);
       return chartData;
     }
 
-    // CRITICAL FIX: Return null for other charts if not cached.
-    // This forces ChartWidget to fetch the data itself instead of showing Lagna.
-    console.log(`[ChartScreen] No cached data for ${chartType}, returning null`);
+    // Return null for other charts if not cached - forces ChartWidget to fetch
     return null; 
   }, [birthData, chartData]);
   

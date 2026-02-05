@@ -45,7 +45,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             <Text style={[
               styles.compactNavText,
               { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
-            ]}>-1M</Text>
+            ]}>-M</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[
             styles.compactNavButton,
@@ -58,7 +58,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             <Text style={[
               styles.compactNavText,
               { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
-            ]}>-1W</Text>
+            ]}>-W</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[
             styles.compactNavButton,
@@ -71,7 +71,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             <Text style={[
               styles.compactNavText,
               { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
-            ]}>-1D</Text>
+            ]}>-D</Text>
           </TouchableOpacity>
         </View>
         
@@ -86,7 +86,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
           <Text style={[
             styles.compactDateText,
             { color: COLORS.white }
-          ]}>{date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</Text>
+          ]}>{date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: '2-digit'})}</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={[
@@ -112,7 +112,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             <Text style={[
               styles.compactNavText,
               { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
-            ]}>+1D</Text>
+            ]}>+D</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[
             styles.compactNavButton,
@@ -125,7 +125,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             <Text style={[
               styles.compactNavText,
               { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
-            ]}>+1W</Text>
+            ]}>+W</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[
             styles.compactNavButton,
@@ -138,7 +138,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             <Text style={[
               styles.compactNavText,
               { color: cosmicTheme ? 'rgba(255, 255, 255, 0.9)' : COLORS.accent }
-            ]}>+1M</Text>
+            ]}>+M</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -193,7 +193,8 @@ const styles = StyleSheet.create({
     top: 50,
     left: -20,
     right: -20,
-    zIndex: 1000,
+    zIndex: 9999,
+    elevation: 9999,
     alignItems: 'center',
   },
   overlayBackground: {
@@ -209,7 +210,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     paddingBottom: 20,
-    zIndex: 1001,
+    zIndex: 10000,
+    elevation: 10000,
     minHeight: 250,
   },
   compactNavRow: {
@@ -224,13 +226,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   compactNavButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 32,
   },
   compactNavText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
   },

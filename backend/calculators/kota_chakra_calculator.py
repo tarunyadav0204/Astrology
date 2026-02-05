@@ -111,16 +111,20 @@ class KotaChakraCalculator(BaseCalculator):
         return lords[nakshatra_num % 27]
     
     def _analyze_malefic_siege(self, fortress_map: Dict[str, List[str]]) -> Dict[str, Any]:
-        """Analyze malefic planet positions in fortress sections with motion direction"""
+        """Analyze malefic and benefic positions in fortress sections"""
         malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu']
+        benefics = ['Jupiter', 'Venus']
         siege_data = {'Stambha': [], 'Madhya': [], 'Prakaara': [], 'Bahya': []}
         
-        for planet_name in malefics:
+        # Check all planets (malefics and benefics)
+        all_planets = malefics + benefics
+        for planet_name in all_planets:
             if planet_name in self.chart_data['planets']:
                 planet_data = self.chart_data['planets'][planet_name]
                 planet_nak = self._get_nakshatra_from_longitude(planet_data.get('longitude', 0))
                 planet_nak_name = self.NAKSHATRAS[planet_nak]
                 is_retrograde = planet_data.get('is_retrograde', False)
+                is_benefic = planet_name in benefics
                 
                 # Determine motion direction
                 motion = 'entering' if is_retrograde else 'exiting'
@@ -132,70 +136,227 @@ class KotaChakraCalculator(BaseCalculator):
                             'planet': planet_name,
                             'nakshatra': planet_nak_name,
                             'motion': motion,
-                            'retrograde': is_retrograde
+                            'retrograde': is_retrograde,
+                            'is_benefic': is_benefic
                         })
                         break
         
         return siege_data
     
     def _calculate_protection_score(self, malefic_siege: Dict[str, Any], kota_swami: str, kota_paala: str) -> Dict[str, Any]:
-        """Calculate vulnerability score based on malefic positions and guard status"""
-        stambha_count = len(malefic_siege['Stambha'])
-        madhya_count = len(malefic_siege['Madhya'])
+        """Calculate vulnerability with benefic shielding and zone significations"""
+        stambha_planets = malefic_siege['Stambha']
+        madhya_planets = malefic_siege['Madhya']
+        prakaara_planets = malefic_siege['Prakaara']
         
-        # Check if Kota Swami is strong
+        # Separate malefics and benefics in Stambha
+        stambha_malefics = [p for p in stambha_planets if not p.get('is_benefic', False)]
+        stambha_benefics = [p for p in stambha_planets if p.get('is_benefic', False)]
+        madhya_malefics = [p for p in madhya_planets if not p.get('is_benefic', False)]
+        
+        # Classical rule: Any malefic in Stambha creates vulnerability
+        stambha_occupied = len(stambha_malefics) > 0
+        
+        # Benefic shielding: Jupiter/Venus in Stambha acts as guardian
+        benefic_shield = len(stambha_benefics) > 0
+        
+        # Check Kota Swami strength
         swami_data = self.chart_data['planets'].get(kota_swami, {})
         swami_strong = swami_data.get('dignity', '') in ['Exalted', 'Own Sign', 'Moolatrikona']
         
-        # Check if Kota Paala (Guard) is inside the fortress
+        # Check if Kota Paala is free
         paala_data = self.chart_data['planets'].get(kota_paala, {})
         paala_nak = self._get_nakshatra_from_longitude(paala_data.get('longitude', 0))
         paala_nak_name = self.NAKSHATRAS[paala_nak]
         
-        paala_guarding = False
+        paala_free = True
         for section in ['Stambha', 'Madhya']:
-            if any(m['nakshatra'] == paala_nak_name for m in malefic_siege.get(section, []) if isinstance(m, dict)):
-                paala_guarding = True
+            if any(m['nakshatra'] == paala_nak_name for m in malefic_siege.get(section, []) if isinstance(m, dict) and not m.get('is_benefic', False)):
+                paala_free = False
                 break
         
-        # Calculate vulnerability
-        vulnerability = stambha_count * 3 + madhya_count * 2
-        if not swami_strong:
-            vulnerability += 2
-        if paala_guarding:
-            vulnerability -= 2  # Guard is protecting
+        # Enhanced vulnerability calculation
+        vulnerability = 0
+        zone_effects = []
         
-        # Check for entering malefics (more dangerous)
-        entering_stambha = sum(1 for m in malefic_siege['Stambha'] if isinstance(m, dict) and m['motion'] == 'entering')
-        if entering_stambha > 0:
-            vulnerability += entering_stambha
+        if stambha_occupied:
+            vulnerability += 4  # Base siege
+            zone_effects.append("Self/Core survival under attack")
+            
+            if benefic_shield:
+                vulnerability -= 2  # Benefic protection
+                zone_effects.append("Guardian benefic provides shield")
+            
+            if swami_strong and paala_free:
+                vulnerability -= 1  # Additional protection
+                zone_effects.append("Strong fortress guardians")
         
-        if vulnerability >= 6:
-            status = "High Vulnerability"
-        elif vulnerability >= 3:
-            status = "Moderate Caution"
+        if len(madhya_malefics) > 0:
+            if not stambha_occupied:
+                vulnerability = 1
+                zone_effects.append("Resources/Family under mild pressure")
+        
+        if len(prakaara_planets) > 0 and vulnerability == 0:
+            zone_effects.append("Social image/reputation effects")
+        
+        # Status determination
+        if vulnerability >= 3:
+            status = "Under Siege"
+        elif vulnerability == 2:
+            status = "Siege with Protection"
+        elif vulnerability == 1:
+            status = "Caution Advised"
         else:
-            status = "Protected"
+            status = "Fortress Protected"
         
         return {
             'status': status,
             'vulnerability_score': vulnerability,
             'kota_swami_strong': swami_strong,
-            'kota_paala_guarding': paala_guarding
+            'kota_paala_guarding': paala_free,
+            'stambha_occupied': stambha_occupied,
+            'benefic_shield': benefic_shield,
+            'zone_effects': zone_effects
         }
     
     def _generate_interpretation(self, malefic_siege: Dict[str, Any], protection_score: Dict[str, Any]) -> str:
-        """Generate interpretation text"""
-        stambha = malefic_siege['Stambha']
+        """Generate synthesis interpretation with zone significations"""
         status = protection_score['status']
+        zone_effects = protection_score.get('zone_effects', [])
+        benefic_shield = protection_score.get('benefic_shield', False)
         
-        if status == "High Vulnerability":
-            planets = [m['planet'] for m in stambha if isinstance(m, dict)]
-            entering = [m['planet'] for m in stambha if isinstance(m, dict) and m['motion'] == 'entering']
-            if entering:
-                return f"Critical Alert: {', '.join(planets)} in Stambha with {', '.join(entering)} entering. Immediate health/legal caution needed."
-            return f"Critical Alert: {', '.join(planets)} in Stambha (Inner Pillar) creates siege. Health/legal caution needed."
-        elif status == "Moderate Caution":
-            return "Moderate pressure from malefics. Maintain vigilance in health and legal matters."
+        stambha_malefics = [p['planet'] for p in malefic_siege['Stambha'] if not p.get('is_benefic', False)]
+        stambha_benefics = [p['planet'] for p in malefic_siege['Stambha'] if p.get('is_benefic', False)]
+        
+        interpretation = ""
+        
+        if status == "Under Siege":
+            interpretation = f"Stambha Siege: {', '.join(stambha_malefics)} attacking core self. "
+            if benefic_shield:
+                interpretation += f"Guardian {', '.join(stambha_benefics)} provides partial shield. "
+        elif status == "Siege with Protection":
+            interpretation = f"Protected Siege: {', '.join(stambha_malefics)} in Stambha but guardians defend. "
+        elif status == "Caution Advised":
+            interpretation = "Madhya pressure on resources/family. Moderate vigilance needed. "
         else:
-            return "Fortress is protected. No major malefic siege detected."
+            interpretation = "Fortress secure. Favorable for health, legal matters, and new ventures. "
+        
+        if zone_effects:
+            interpretation += " ".join(zone_effects)
+        
+    def get_planet_details(self, planet_name: str, kota_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Get contextual details for a specific planet in the fortress"""
+        if planet_name not in self.chart_data['planets']:
+            return {"error": f"Planet {planet_name} not found"}
+        
+        planet_data = self.chart_data['planets'][planet_name]
+        planet_nak = self._get_nakshatra_from_longitude(planet_data.get('longitude', 0))
+        planet_nak_name = self.NAKSHATRAS[planet_nak]
+        
+        # Determine fortress role
+        kota_swami = kota_result.get('kota_swami')
+        kota_paala = kota_result.get('kota_paala')
+        
+        if planet_name == kota_swami:
+            role = "Kota Swami (Fortress Lord)"
+            role_icon = "🛡"
+        elif planet_name == kota_paala:
+            role = "Kota Paala (Fortress Guard)"
+            role_icon = "👮"
+        elif planet_name in ['Saturn', 'Mars', 'Rahu', 'Ketu']:
+            role = "Malefic Attacker"
+            role_icon = "🔴"
+        elif planet_name in ['Jupiter', 'Venus']:
+            role = "Benefic Protector"
+            role_icon = "🔵"
+        else:
+            role = "Neutral Planet"
+            role_icon = "⚪"
+        
+        # Find fortress location
+        fortress_location = "Unknown"
+        fortress_map = kota_result.get('fortress_map', {})
+        for section, nakshatras in fortress_map.items():
+            if planet_nak_name in nakshatras:
+                fortress_location = section
+                break
+        
+        # Get current effect based on role and location
+        effect = self._get_planet_effect(planet_name, role, fortress_location, planet_data)
+        
+        # Get guidance based on role
+        guidance = self._get_planet_guidance(planet_name, role, fortress_location, kota_result)
+        
+        # Get sign name from longitude
+        sign_num = int(planet_data.get('longitude', 0) // 30)
+        sign_names = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
+                     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+        sign_name = sign_names[sign_num] if 0 <= sign_num < 12 else "Unknown"
+        
+        return {
+            "planet": planet_name,
+            "role": role,
+            "role_icon": role_icon,
+            "position": f"{sign_name} {planet_data.get('longitude', 0):.1f}°",
+            "nakshatra": planet_nak_name,
+            "fortress_location": fortress_location,
+            "motion": "Retrograde" if planet_data.get('is_retrograde', False) else "Direct",
+            "effect": effect
+        }
+    
+    def _get_planet_effect(self, planet: str, role: str, location: str, planet_data: Dict) -> str:
+        """Get specific effect based on planet role and location"""
+        if "Fortress Lord" in role:
+            if planet_data.get('dignity', '') in ['Exalted', 'Own Sign', 'Moolatrikona']:
+                return f"Strong lord providing royal protection to fortress"
+            else:
+                return f"Weak lord - fortress defenses compromised"
+        elif "Fortress Guard" in role:
+            if location in ['Stambha', 'Madhya']:
+                return f"Guard compromised - unable to protect effectively"
+            else:
+                return f"Guard positioned well - actively protecting fortress"
+        elif "Malefic Attacker" in role:
+            if location == 'Stambha':
+                return f"Direct siege on core self - health/legal vulnerabilities"
+            elif location == 'Madhya':
+                return f"Attacking resources and family stability"
+            elif location == 'Prakaara':
+                return f"Threatening social image and reputation"
+            else:
+                return f"External pressure from distant sources"
+        elif "Benefic Protector" in role:
+            if location == 'Stambha':
+                return f"Guardian angel providing divine shield to core self"
+            elif location == 'Madhya':
+                return f"Blessing resources and family prosperity"
+            else:
+                return f"Providing protective influence from {location.lower()} zone"
+        else:
+            return f"Neutral influence from {location.lower()} position"
+    
+    def _get_planet_guidance(self, planet: str, role: str, location: str, kota_result: Dict) -> str:
+        """Get actionable guidance based on planet's fortress role"""
+        if "Fortress Lord" in role:
+            strong = kota_result.get('protection_score', {}).get('kota_swami_strong', False)
+            if strong:
+                return f"Your fortress lord is strong - excellent time for important ventures and major decisions"
+            else:
+                return f"Strengthen your lord with {planet} remedies - wear appropriate gemstone, perform {planet} worship"
+        elif "Fortress Guard" in role:
+            guarding = kota_result.get('protection_score', {}).get('kota_paala_guarding', False)
+            if guarding:
+                return f"Your guard is active - favorable period for overcoming enemies and obstacles"
+            else:
+                return f"Guard needs strengthening - perform {planet} mantras and remedies to enhance protection"
+        elif "Malefic Attacker" in role:
+            if location == 'Stambha':
+                return f"Critical period - avoid major health decisions, legal matters, and risky ventures"
+            elif location == 'Madhya':
+                return f"Exercise caution in financial matters and family decisions"
+            else:
+                return f"General vigilance needed - perform {planet} remedies to reduce negative influence"
+        elif "Benefic Protector" in role:
+            return f"Auspicious influence active - enhance with {planet} worship for maximum benefit"
+        else:
+            return f"Neutral period - standard precautions apply"

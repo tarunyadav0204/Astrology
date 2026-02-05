@@ -249,6 +249,18 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                         user_location, request.question, intent_result.get('category', 'general')
                     )
                     print(f"   ✅ Prashna context built successfully")
+                # Check if this is a relationship query that should use bhavam bhavesh analysis
+                elif intent_result and intent_result.get('category') in ['son', 'daughter', 'mother', 'father', 'spouse', 'siblings', 'children', 'family']:
+                    print(f"\n👨👩👧👦 RELATIONSHIP QUERY DETECTED: {intent_result.get('category')}")
+                    print(f"   Using bhavam bhavesh analysis instead of asking for birth details")
+                    
+                    from ai.relationship_ai_context_generator import RelationshipAIContextGenerator
+                    rel_generator = RelationshipAIContextGenerator()
+                    
+                    context = rel_generator.build_relationship_context(
+                        birth_data, intent_result.get('category'), request.question
+                    )
+                    print(f"   ✅ Relationship context built for {intent_result.get('category')} analysis")
                 elif intent_result.get('mode') == 'annual':
                     print(f"\n📅 ANNUAL MODE DETECTED")
                     target_year = intent_result.get('year', datetime.now().year + 1)

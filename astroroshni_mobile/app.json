@@ -2,7 +2,7 @@
   "expo": {
     "name": "AstroRoshni",
     "slug": "astroroshni-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "67",
+      "buildNumber": "68",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "bitcode": false,
@@ -34,7 +34,7 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "versionCode": 67,
+      "versionCode": 68,
       "newArchEnabled": false
     },
     "web": {
@@ -45,7 +45,7 @@
         "projectId": "8e33070b-ac6c-42e0-a089-bd830019bb1a"
       }
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/8e33070b-ac6c-42e0-a089-bd830019bb1a"
     },

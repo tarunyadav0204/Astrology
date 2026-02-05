@@ -22,7 +22,7 @@ import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/con
 import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 import * as Speech from 'expo-speech';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
@@ -34,20 +34,41 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
 
-  // Debug logging
+  // Animated loader for typing indicator
+  const dot1Anim = useRef(new Animated.Value(0)).current;
+  const dot2Anim = useRef(new Animated.Value(0)).current;
+  const dot3Anim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    if (message.sender === 'ai') {
-      console.log('💬 [MessageBubble] Rendering AI message:', {
-        has_terms: !!message.terms,
-        terms_count: message.terms?.length || 0,
-        has_glossary: !!message.glossary,
-        glossary_keys: Object.keys(message.glossary || {}).length,
-        has_summary_image: !!message.summary_image,
-        summary_image_preview: message.summary_image?.substring(0, 100),
-        summary_image_length: message.summary_image?.length || 0
-      });
+    let animationRef = null;
+    
+    if (message.isTyping) {
+      const animateLoader = () => {
+        animationRef = Animated.sequence([
+          Animated.timing(dot1Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot2Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot3Anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot1Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot2Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot3Anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ]);
+        animationRef.start((finished) => {
+          if (finished && message.isTyping) {
+            animateLoader();
+          }
+        });
+      };
+      animateLoader();
     }
-  }, [message]);
+    
+    return () => {
+      if (animationRef) {
+        animationRef.stop();
+      }
+    };
+  }, [message.isTyping]);
+
+
 
   useEffect(() => {
     Animated.parallel([
@@ -198,17 +219,34 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       return '';
     }
     
-    // First decode HTML entities
-    let formatted = content
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      // Remove standalone # at end of lines (trailing markdown artifacts)
-      .replace(/\n\s*#\s*$/gm, '')
-      .replace(/\n\s*#\s*\n/g, '\n');
+    // First decode HTML entities AGGRESSIVELY
+    let formatted = content;
+    
+    // Multiple passes to handle nested encoding
+    for (let i = 0; i < 3; i++) {
+      formatted = formatted
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ');
+    }
+    
+    // Remove glossary JSON blocks that shouldn't be displayed
+    formatted = formatted.replace(/GLOSSARY_START[\s\S]*?GLOSSARY_END/g, '');
+    formatted = formatted.replace(/```json[\s\S]*?```/g, '');
+    formatted = formatted.replace(/\{\s*"[^"]+"\s*:\s*"[^"]*"[\s\S]*?\}/g, '');
+    // Remove glossary headers
+    formatted = formatted.replace(/#### Glossary[\s\S]*?(?=####|$)/gi, '');
+    formatted = formatted.replace(/### Glossary[\s\S]*?(?=###|$)/gi, '');
+    formatted = formatted.replace(/## Glossary[\s\S]*?(?=##|$)/gi, '');
+    
+    // Remove standalone # at end of lines (trailing markdown artifacts)
+    formatted = formatted
+      .replace(/\n\s*#+\s*$/gm, '')
+      .replace(/\n\s*#+\s*\n/g, '\n')
+      .replace(/#+\s*$/, '');
     
     // Process term tooltips FIRST, after HTML entity decoding
     if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
@@ -241,13 +279,22 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
     // Handle markdown tables - convert to simple format
-    formatted = formatted.replace(/\|(.+)\|\n\|[:\s-]+\|\n((?:\|.+\|\n?)+)/g, (match, header, rows) => {
-      return `<table>${header}|||${rows}</table>`;
+    formatted = formatted.replace(/\|(.+?)\|\s*\n\s*\|[:\s-|]+\|\s*\n([\s\S]*?)(?=\n\n|\n###|\n##|$)/g, (match, header, rows) => {
+      // console.log('Table regex match:', { match, header, rows });
+      return `<table>${header.trim()}|||${rows.trim()}</table>`;
     });
     
-    // Handle Follow-up Questions section
+    // Handle Follow-up Questions section - decode HTML entities first
     formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
-      return `<followup>${questions}</followup>`;
+      // Decode HTML entities in the questions content
+      const decodedQuestions = questions
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ');
+      return `<followup>${decodedQuestions}</followup>`;
     });
     
     // Handle Final Thoughts section
@@ -452,20 +499,30 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         
         let questions = [];
         
-        // Try different parsing methods - handle both emoji and text patterns
-        if (questionsText.match(/[🔮🌟⭐💫✨📅💼]/)) {
+        // Split by bullet points first (most common pattern)
+        if (questionsText.includes('* ')) {
           questions = questionsText
-            .split(/(?=[🔮🌟⭐💫✨📅💼])/)
+            .split('* ')
             .map(q => q.trim())
             .filter(q => q.length > 3);
-        } else if (questionsText.includes('\n')) {
+        }
+        // Try emoji patterns
+        else if (questionsText.match(/[🍎📚🧘🔮🌟⭐💫✨📅💼💕🌿💰🕉️]/)) {
+          questions = questionsText
+            .split(/(?=[🍎📚🧘🔮🌟⭐💫✨📅💼💕🌿💰🕉️])/)
+            .map(q => q.trim())
+            .filter(q => q.length > 3);
+        }
+        // Try newline splitting
+        else if (questionsText.includes('\n')) {
           questions = questionsText
             .split('\n')
             .map(q => q.trim())
             .filter(q => q.length > 3 && q.includes('?'));
-        } else if (questionsText.includes('?') && questionsText.length > 10) {
-          // Split by common question patterns
-          const patterns = /(?=When will|What remedies|How to|What should)/g;
+        }
+        // Try question mark patterns
+        else if (questionsText.includes('?') && questionsText.length > 10) {
+          const patterns = /(?=When will|What remedies|How to|What should|Would you|Shall we|Are you)/g;
           if (questionsText.match(patterns)) {
             questions = questionsText.split(patterns).filter(q => q.trim().length > 3);
           } else {
@@ -478,11 +535,12 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             <View key={`followup-${currentIndex++}`} style={styles.followUpContainer}>
               {questions.map((question, index) => {
                 const cleanQuestion = question
-                  .replace(/^[\s🔮🌟⭐💫✨📅💼]+/, '')
+                  .replace(/^[\s🔮🌟⭐💫✨📅💼🍎📚🧘]+/, '')
                   .replace(/&quot;/g, '"')
                   .replace(/&amp;/g, '&')
                   .replace(/&lt;/g, '<')
                   .replace(/&gt;/g, '>')
+                  .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Remove all emojis
                   .trim();
                 if (cleanQuestion.length < 5) return null;
                 return (
@@ -500,35 +558,47 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         }
       } else if (item.type === 'table') {
         // Parse table data
-        const tableData = item.match[1].split('|||');
-        const headerRow = tableData[0].split('|').map(h => h.trim()).filter(h => h);
-        const dataRows = tableData[1].split('\n').filter(r => r.trim() && r.includes('|'));
-        
-        elements.push(
-          <View key={`table-${currentIndex++}`} style={styles.tableContainer}>
-            {/* Header */}
-            <View style={styles.tableHeaderRow}>
-              {headerRow.map((header, idx) => (
-                <Text key={`th-${idx}`} style={[styles.tableHeaderCell, { flex: idx === 0 ? 1.5 : 1 }]}>
-                  {header.replace(/\*\*/g, '')}
-                </Text>
-              ))}
-            </View>
-            {/* Rows */}
-            {dataRows.map((row, rowIdx) => {
-              const cells = row.split('|').map(c => c.trim()).filter(c => c);
-              return (
-                <View key={`tr-${rowIdx}`} style={styles.tableRow}>
-                  {cells.map((cell, cellIdx) => (
-                    <Text key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCell, { flex: cellIdx === 0 ? 1.5 : 1 }]}>
-                      {cell.replace(/\*\*/g, '')}
+        const tableContent = item.match[1];
+        const parts = tableContent.split('|||');
+        if (parts.length >= 2) {
+          const headerRow = parts[0].split('|').map(h => h.trim()).filter(h => h);
+          const rowsText = parts[1].trim();
+          const dataRows = rowsText.split('\n')
+            .map(row => row.trim())
+            .filter(row => row && row.includes('|') && !row.match(/^\s*\|[\s:-]+\|/))
+            .slice(0, 10); // Limit rows to prevent infinite scroll
+          
+          // console.log('Table debug:', { headerRow, dataRows, rowsText, tableContent });
+          
+          if (dataRows.length > 0) {
+            elements.push(
+              <View key={`table-${currentIndex++}`} style={styles.tableContainer}>
+                {/* Header */}
+                <View style={styles.tableHeaderRow}>
+                  {headerRow.map((header, idx) => (
+                    <Text key={`th-${idx}`} style={[styles.tableHeaderCell, { flex: 1 }]}>
+                      {header.replace(/\*\*/g, '')}
                     </Text>
                   ))}
                 </View>
-              );
-            })}
-          </View>
-        );
+                {/* Rows */}
+                {dataRows.map((row, rowIdx) => {
+                  const cells = row.split('|').map(c => c.trim()).filter(c => c);
+                  if (cells.length === 0) return null;
+                  return (
+                    <View key={`tr-${rowIdx}`} style={styles.tableRow}>
+                      {cells.map((cell, cellIdx) => (
+                        <Text key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCell, { flex: 1 }]}>
+                          {cell.replace(/\*\*/g, '')}
+                        </Text>
+                      ))}
+                    </View>
+                  );
+                }).filter(Boolean)}
+              </View>
+            );
+          }
+        }
       }
       
       lastIndex = item.lastIndex;
@@ -895,12 +965,19 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         styles.assistantContainer,
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
       ]}>
-        <View style={[styles.bubble, styles.assistantBubble]}>
+        <View style={[styles.bubble, styles.assistantBubble, styles.typingBubble]}>
           <View style={styles.assistantHeader}>
             <Text style={styles.assistantLabel}>🔮 AstroRoshni</Text>
           </View>
           <View style={styles.messageContent}>
-            <Text style={styles.typingText}>{message.content}</Text>
+            <View style={styles.typingContainer}>
+              <Text style={styles.typingText}>{message.content}</Text>
+              <View style={styles.typingDots}>
+                <Animated.View style={[styles.dot, { opacity: dot1Anim, transform: [{ scale: dot1Anim }] }]} />
+                <Animated.View style={[styles.dot, { opacity: dot2Anim, transform: [{ scale: dot2Anim }] }]} />
+                <Animated.View style={[styles.dot, { opacity: dot3Anim, transform: [{ scale: dot3Anim }] }]} />
+              </View>
+            </View>
           </View>
         </View>
       </Animated.View>
@@ -970,6 +1047,15 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 
         {!message.isTyping && message.messageId && (
           <View style={styles.actionButtons}>
+            {/* Restart Button for timeout messages */}
+            {message.showRestartButton && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restartButton]}
+                onPress={() => onRestart && onRestart(message.messageId)}
+              >
+                <Ionicons name="refresh" size={16} color="#ff6b35" />
+              </TouchableOpacity>
+            )}
             {message.role === 'assistant' && (
               <>
                 <TouchableOpacity
@@ -1084,50 +1170,62 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         visible={tooltipModal.show}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setTooltipModal({ show: false, term: '', definition: '' })}
+        onRequestClose={() => setTooltipModal({ show: false, content: '', position: { x: 0, y: 0 } })}
       >
-        <View style={styles.tooltipModalOverlay}>
-          <View style={styles.tooltipModalContent}>
-            <Text style={styles.tooltipModalTitle}>{tooltipModal.term}</Text>
-            <Text style={styles.tooltipModalDefinition}>{tooltipModal.definition}</Text>
-            <TouchableOpacity
-              style={styles.tooltipModalClose}
-              onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
-            >
-              <Text style={styles.tooltipModalCloseText}>Close</Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tooltipOverlay}
+          activeOpacity={1}
+          onPress={() => setTooltipModal({ show: false, content: '', position: { x: 0, y: 0 } })}
+        >
+          <View style={[
+            styles.tooltipContainer,
+            {
+              left: tooltipModal.position.x - 100,
+              top: tooltipModal.position.y - 60
+            }
+          ]}>
+            <Text style={styles.tooltipText}>{tooltipModal.content}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
       
-      {/* Image Zoom Modal */}
+      {/* Image Modal */}
       <Modal
         visible={showImageModal}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setShowImageModal(false)}
       >
-        <View style={styles.imageModalOverlay}>
-          <TouchableOpacity 
-            style={styles.imageModalCloseButton}
-            onPress={() => setShowImageModal(false)}
-          >
-            <Ionicons name="close-circle" size={36} color="white" />
-          </TouchableOpacity>
-          <Image 
-            source={{ uri: message.summary_image }}
-            style={styles.imageModalImage}
-            resizeMode="contain"
-          />
-        </View>
+        <TouchableOpacity
+          style={styles.imageModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowImageModal(false)}
+        >
+          <View style={styles.imageModalContainer}>
+            {message.summary_image && (
+              <Image
+                source={{ uri: message.summary_image }}
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={styles.closeImageButton}
+              onPress={() => setShowImageModal(false)}
+            >
+              <Text style={styles.closeImageButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </Animated.View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     marginVertical: 4,
+    paddingHorizontal: 16,
   },
   userContainer: {
     alignItems: 'flex-end',
@@ -1136,479 +1234,251 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '88%',
+    maxWidth: '85%',
     borderRadius: 20,
-    padding: 16,
-    marginVertical: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   userBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderBottomRightRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
+    backgroundColor: '#ff6b35',
+    borderBottomRightRadius: 5,
   },
   assistantBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottomLeftRadius: 8,
+    borderBottomLeftRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.1)',
-    borderLeftWidth: 3,
-    borderLeftColor: 'rgba(255, 107, 53, 0.4)',
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  partnershipBubble: {
+    backgroundColor: 'rgba(255, 182, 193, 0.95)',
+    borderColor: 'rgba(255, 20, 147, 0.3)',
+  },
+  clarificationBubble: {
+    backgroundColor: 'rgba(255, 255, 0, 0.1)',
+    borderColor: 'rgba(255, 193, 7, 0.5)',
+  },
+  typingBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   assistantHeader: {
     marginBottom: 8,
   },
   assistantLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255, 107, 53, 0.8)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  messageContent: {
-    paddingBottom: 4,
-  },
-  regularText: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginVertical: 2,
-    color: '#2c3e50',
-  },
-  boldText: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '700',
-    color: '#2c3e50',
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ff6b35',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  headerText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: '#ff6b35',
-    letterSpacing: 0.5,
-    flex: 1,
+    opacity: 0.8,
   },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginVertical: 6,
-  },
-  numberCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#ff6b35',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    marginTop: 3,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  numberText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  listContent: {
-    flex: 1,
-    marginLeft: -2,
-  },
-  listText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#2c3e50',
-  },
-  quickAnswerCard: {
-    borderRadius: 20,
-    padding: 18,
-    marginVertical: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-    overflow: 'hidden',
-  },
-  glassOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    borderRadius: 20,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  betaNotice: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 8,
+    padding: 8,
     marginBottom: 8,
-    zIndex: 1,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ffc107',
   },
-  lightningIcon: {
-    fontSize: 18,
-    marginRight: 8,
-    color: '#FFD700',
-  },
-  finalThoughtsCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 8,
-    shadowColor: '#4169E1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(65, 105, 225, 0.3)',
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#2c3e50',
-    letterSpacing: 0.5,
-  },
-  cardText: {
-    fontSize: 14,
-    color: '#2c3e50',
-    lineHeight: 20,
-    zIndex: 1,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-    gap: 8,
-  },
-  actionButton: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderRadius: 12,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
-  },
-  pdfButton: {
-    backgroundColor: 'rgba(249, 115, 22, 0.15)',
-    borderColor: 'rgba(249, 115, 22, 0.3)',
-  },
-  deleteButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  actionIcon: {
-    fontSize: 16,
-    color: COLORS.accent,
-  },
-  timestamp: {
+  betaNoticeText: {
     fontSize: 11,
-    color: 'rgba(44, 62, 80, 0.6)',
-    textAlign: 'right',
-    marginTop: 6,
+    color: '#856404',
     fontWeight: '500',
   },
-  followUpContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginVertical: 6,
-    gap: 6,
-  },
-  followUpButton: {
-    backgroundColor: 'rgba(255, 107, 53, 0.12)',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  disclaimerNotice: {
+    backgroundColor: 'rgba(108, 117, 125, 0.1)',
+    borderRadius: 8,
+    padding: 8,
     marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6c757d',
   },
-  followUpText: {
-    color: '#ff6b35',
-    fontSize: 13,
-    fontWeight: '600',
+  disclaimerNoticeText: {
+    fontSize: 10,
+    color: '#495057',
+    fontStyle: 'italic',
+    lineHeight: 14,
+  },
+  messageContent: {
+    flex: 1,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#333',
+  },
+  userMessageText: {
+    color: '#fff',
+  },
+  boldText: {
+    fontWeight: 'bold',
+  },
+  italicText: {
+    fontStyle: 'italic',
+  },
+  underlineText: {
+    textDecorationLine: 'underline',
+  },
+  linkText: {
+    color: '#007bff',
+    textDecorationLine: 'underline',
+  },
+  tooltipTrigger: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#ff6b35',
+    borderStyle: 'dotted',
   },
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
   },
   typingText: {
-    fontSize: 15,
-    color: '#2c3e50',
-    flex: 1,
+    fontSize: 16,
+    color: '#666',
     marginRight: 8,
   },
   typingDots: {
     flexDirection: 'row',
-    alignItems: 'center',
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#ff6b35',
-    marginHorizontal: 2,
+    marginHorizontal: 1,
   },
-  partnershipBubble: {
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.partnershipBorder,
-  },
-  partnershipLabel: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: COLORS.partnershipBorder,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    zIndex: 10,
-  },
-  partnershipLabelText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  clarificationBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#FFA726',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 167, 38, 0.3)',
-    shadowColor: '#FFA726',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  tooltipTerm: {
-    backgroundColor: 'rgba(233, 30, 99, 0.15)',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(233, 30, 99, 0.3)',
-  },
-  tooltipText: {
-    color: '#e91e63',
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-    textDecorationStyle: 'dotted',
-    backgroundColor: 'rgba(233, 30, 99, 0.15)',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-  },
-  tooltipModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  tooltipModalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    maxWidth: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  tooltipModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#e91e63',
-    marginBottom: 10,
-  },
-  tooltipModalDefinition: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#333',
-    marginBottom: 15,
-  },
-  tooltipModalClose: {
-    backgroundColor: '#e91e63',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignSelf: 'flex-end',
-  },
-  tooltipModalCloseText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  tableContainer: {
-    marginVertical: 10,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
-  },
-  tableHeaderRow: {
+  actionButtons: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 107, 53, 0.15)',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    flexWrap: 'wrap',
   },
-  tableHeaderCell: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ff6b35',
-    paddingHorizontal: 4,
+  actionButton: {
+    padding: 6,
+    marginLeft: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
-  tableRow: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 107, 53, 0.1)',
+  restartButton: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
   },
-  tableCell: {
+  pdfButton: {
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+  },
+  actionIcon: {
+    fontSize: 14,
+  },
+  timestamp: {
     fontSize: 11,
-    color: '#2c3e50',
-    paddingHorizontal: 4,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'right',
   },
   voiceModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
   voiceModalContent: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
-    maxWidth: '90%',
+    width: '80%',
     maxHeight: '70%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   voiceModalTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#ff6b35',
-    marginBottom: 15,
+    fontWeight: 'bold',
     textAlign: 'center',
+    marginBottom: 15,
+    color: '#333',
   },
   voiceScrollView: {
     maxHeight: 300,
-    marginBottom: 15,
   },
   voiceOption: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 2,
+    backgroundColor: '#f8f9fa',
   },
   selectedVoiceOption: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderColor: '#ff6b35',
+    backgroundColor: '#ff6b35',
   },
   voiceOptionText: {
-    fontSize: 15,
+    fontSize: 16,
     color: '#333',
   },
   selectedVoiceText: {
-    color: '#ff6b35',
-    fontWeight: '600',
+    color: 'white',
+    fontWeight: 'bold',
   },
   voiceModalClose: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignSelf: 'center',
     marginTop: 15,
+    padding: 15,
+    backgroundColor: '#6c757d',
+    borderRadius: 10,
+    alignItems: 'center',
   },
   voiceModalCloseText: {
     color: 'white',
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  betaNotice: {
-    backgroundColor: 'rgba(255, 152, 0, 0.1)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
+  tooltipOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  tooltipContainer: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 8,
     borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    maxWidth: 200,
   },
-  betaNoticeText: {
+  tooltipText: {
+    color: 'white',
     fontSize: 12,
-    color: '#E65100',
-    fontWeight: '600',
-    lineHeight: 16,
-  },
-  disclaimerNotice: {
-    backgroundColor: 'rgba(156, 39, 176, 0.08)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#9C27B0',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  disclaimerNoticeText: {
-    fontSize: 11,
-    color: '#6A1B9A',
-    fontWeight: '600',
-    lineHeight: 16,
+    textAlign: 'center',
   },
   imageModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageModalCloseButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
+  imageModalContainer: {
+    width: '95%',
+    height: '80%',
+    position: 'relative',
   },
-  imageModalImage: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.8,
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  closeImageButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeImageButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
 });

@@ -15,6 +15,7 @@ import {
   BackHandler,
   Animated,
   Dimensions,
+  InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -839,7 +840,7 @@ export default function ChatScreen({ navigation, route }) {
       return;
     }
     
-    const maxPolls = 80; // 4 minutes max
+    const maxPolls = 120; // 4 minutes max
     let pollCount = 0;
     
     // Add to pending messages if not resuming
@@ -856,13 +857,29 @@ export default function ChatScreen({ navigation, route }) {
     ];
     
     const poll = async () => {
+      const pollStartTime = new Date().toISOString();
+      // console.log(`🔍 [POLL START] messageId: ${messageId}, pollCount: ${pollCount}, time: ${pollStartTime}`);
+      
       try {
         const token = await AsyncStorage.getItem('authToken');
         const url = `${API_BASE_URL}${getEndpoint(`/chat-v2/status/${messageId}`)}`;
         
+        // console.log(`🌐 [FETCH START] URL: ${url}, time: ${new Date().toISOString()}`);
+        
+        // Add timeout to prevent long-hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          // console.log(`⏰ [FETCH TIMEOUT] Aborting request for messageId: ${messageId} after 5 seconds`);
+          controller.abort();
+        }, 5000); // 5 second timeout
+        
         const response = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        // console.log(`📡 [FETCH END] Response received for messageId: ${messageId}, status: ${response.status}, time: ${new Date().toISOString()}`);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -870,8 +887,11 @@ export default function ChatScreen({ navigation, route }) {
         }
         
         const status = await response.json();
+        const pollEndTime = new Date().toISOString();
+        // console.log(`📊 [POLL END] messageId: ${messageId}, status: ${status.status}, pollCount: ${pollCount}, startTime: ${pollStartTime}, endTime: ${pollEndTime}`);
         
         if (status.status === 'completed') {
+          // console.log(`✅ [POLL] Message completed! messageId: ${messageId}, took ${Math.round((new Date(pollEndTime) - new Date(pollStartTime)) / 1000)} seconds`);
           // Check if person changed during processing - use more reliable check
           const currentPersonIdNow = birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null;
           
@@ -884,14 +904,14 @@ export default function ChatScreen({ navigation, route }) {
           if (loadingInterval) clearInterval(loadingInterval);
           
           // Update message with response content including terms, glossary, and message_type
-          console.log('📊 [DEBUG] Status received:', {
-            has_terms: !!status.terms,
-            terms_count: status.terms?.length || 0,
-            has_glossary: !!status.glossary,
-            glossary_keys: Object.keys(status.glossary || {}).length,
-            has_summary_image: !!status.summary_image,
-            summary_image: status.summary_image
-          });
+          // console.log('📊 [DEBUG] Status received:', {
+          //   has_terms: !!status.terms,
+          //   terms_count: status.terms?.length || 0,
+          //   has_glossary: !!status.glossary,
+          //   glossary_keys: Object.keys(status.glossary || {}).length,
+          //   has_summary_image: !!status.summary_image,
+          //   summary_image: status.summary_image
+          // });
           
           setMessagesWithStorage(prev => {
             const updated = prev.map(msg => 
@@ -933,12 +953,13 @@ export default function ChatScreen({ navigation, route }) {
         
         // Still processing - update message and continue polling
         if (status.status === 'processing') {
+          console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
           const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
           
           setMessagesWithStorage(prev => {
             const updated = prev.map(msg => 
               msg.messageId === messageId 
-                ? { ...msg, content: randomMessage }
+                ? { ...msg, content: randomMessage, isTyping: true }
                 : msg
             );
             return updated;
@@ -946,8 +967,15 @@ export default function ChatScreen({ navigation, route }) {
           
           pollCount++;
           if (pollCount < maxPolls) {
-            setTimeout(poll, 3000);
+            // Use InteractionManager to ensure polling isn't blocked by UI updates
+            const nextPollTime = new Date(Date.now() + 1500).toISOString();
+            console.log(`⏰ [POLL SCHEDULE] Next poll for messageId: ${messageId} scheduled at: ${nextPollTime}`);
+            setTimeout(() => {
+              // console.log(`🔄 [POLL RETRY] messageId: ${messageId}, pollCount: ${pollCount}`);
+              poll();
+            }, 1500);
           } else {
+            // console.log(`⏰ [POLL TIMEOUT] messageId: ${messageId} reached max polls (${maxPolls})`);
             // Timeout - show restart option
             if (loadingInterval) clearInterval(loadingInterval);
             setMessagesWithStorage(prev => prev.map(msg => 
@@ -967,11 +995,47 @@ export default function ChatScreen({ navigation, route }) {
         }
         
       } catch (error) {
+        console.error('❌ Polling error:', error);
         
         if (loadingInterval) clearInterval(loadingInterval);
+        
+        // Show user-friendly error message based on error type
+        let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
+        
+        // Handle specific error types
+        if (error.name === 'AbortError') {
+          // console.log(`⏰ [POLL TIMEOUT] Fetch timeout for messageId: ${messageId}, pollCount: ${pollCount}`);
+          // Don't show error for timeout, just continue polling
+          pollCount++;
+          if (pollCount < maxPolls) {
+            const nextPollTime = new Date(Date.now() + 1000).toISOString();
+            // console.log(`🔄 [POLL RETRY AFTER TIMEOUT] Next poll for messageId: ${messageId} scheduled at: ${nextPollTime}`);
+            setTimeout(() => {
+              // console.log(`🔄 [POLL RETRY] messageId: ${messageId}, pollCount: ${pollCount}`);
+              poll();
+            }, 1000);
+          } else {
+            // console.log(`⏰ [POLL MAX TIMEOUT] messageId: ${messageId} reached max polls (${maxPolls})`);
+            // Show timeout message
+            setMessagesWithStorage(prev => prev.map(msg => 
+              msg.messageId === messageId 
+                ? { 
+                    ...msg, 
+                    content: 'Analysis is taking longer than expected. The system is still working on your request.', 
+                    isTyping: false,
+                    showRestartButton: true
+                  }
+                : msg
+            ));
+            setLoading(false);
+            setIsTyping(false);
+          }
+          return;
+        }
+        
         setMessagesWithStorage(prev => prev.map(msg => 
           msg.messageId === messageId 
-            ? { ...msg, content: `Connection error: ${error.message}. Please try again.`, isTyping: false }
+            ? { ...msg, content: userMessage, isTyping: false }
             : msg
         ));
         setLoading(false);
@@ -980,8 +1044,8 @@ export default function ChatScreen({ navigation, route }) {
       }
     };
     
-    // Start polling immediately
-    setTimeout(poll, 1000);
+    // Start polling immediately (no delay)
+    poll();
   };
   
   const restartPolling = (messageId) => {
@@ -1172,6 +1236,8 @@ export default function ChatScreen({ navigation, route }) {
       
 
       
+      console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()}`);
+      
       const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
         method: 'POST',
         headers: {
@@ -1181,7 +1247,7 @@ export default function ChatScreen({ navigation, route }) {
         body: JSON.stringify(requestBody)
       });
 
-
+      console.log(`📡 [API RESPONSE] Received response at: ${new Date().toISOString()}, status: ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1191,11 +1257,18 @@ export default function ChatScreen({ navigation, route }) {
       const result = await response.json();
       const { user_message_id, message_id: assistantMessageId } = result;
 
+      console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+
       if (!assistantMessageId) {
         throw new Error('No message ID received from server');
       }
 
-      // Update user message with real DB ID
+      console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+      
+      // Start polling IMMEDIATELY before state updates to avoid delay
+      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval);
+
+      // Update user message with real DB ID (async, non-blocking)
       if (user_message_id) {
         setMessagesWithStorage(prev => {
           const updated = prev.map(msg => {
@@ -1209,7 +1282,7 @@ export default function ChatScreen({ navigation, route }) {
         });
       }
 
-      // Update processing message with messageId
+      // Update processing message with messageId (async, non-blocking)
       setMessagesWithStorage(prev => {
         const updated = prev.map(msg => {
           if (msg.id === processingMessageId) {
@@ -1220,9 +1293,6 @@ export default function ChatScreen({ navigation, route }) {
         });
         return updated;
       });
-
-      // Start polling
-      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval);
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
@@ -1241,10 +1311,22 @@ export default function ChatScreen({ navigation, route }) {
         console.error('Failed to log error:', logError);
       }
       
+      // Show user-friendly error message based on error type
+      let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
+      
+      // Check for specific error patterns
+      if (error.message?.includes('DeadlineExceeded') || error.message?.includes('504') || error.message?.includes('timeout')) {
+        userMessage = 'Your question is quite complex and is taking longer than usual to analyze. Please try asking a more specific question or try again later.';
+      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+        userMessage = 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
+      } else if (error.message?.includes('HTTP 500')) {
+        userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
+      }
+      
       // Replace processing message with error
       setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 
-          ? { ...msg, content: 'Sorry, I encountered an error. Please try again.', isTyping: false }
+          ? { ...msg, content: userMessage, isTyping: false }
           : msg
       ));
       setLoading(false);
@@ -1636,7 +1718,7 @@ export default function ChatScreen({ navigation, route }) {
               return (
                 <View key={item.id}>
                   <View ref={isLastMessage ? lastMessageRef : null}>
-                    <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} />
+                    <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} onRestart={restartPolling} />
                   </View>
                   <FeedbackComponent 
                     message={item} 
@@ -2136,6 +2218,36 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Ashtakvarga</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('KotaChakra', { birthChartId: birthData?.id });
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#795548', '#8D6E63']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🏰</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Kota Chakra</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>

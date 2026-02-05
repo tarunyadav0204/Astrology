@@ -194,6 +194,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         place: birthData.place || 'Unknown'
       };
       
+      // DEBUG: Log birth data being used in mobile app
+      console.log('📱 MOBILE BIRTH DATA DEBUG:');
+      console.log('   Raw birthData:', JSON.stringify(birthData, null, 2));
+      console.log('   Formatted formattedBirthData:', JSON.stringify(formattedBirthData, null, 2));
+      
       console.log('Formatted Birth Data:', JSON.stringify(formattedBirthData, null, 2));
       
       const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);

@@ -12,6 +12,8 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -352,15 +354,15 @@ export default function SelectNativeScreen({ navigation, route }) {
     
     setSearching(true);
     try {
-      console.log('Searching for:', query);
+      // console.log('Searching for:', query);
       const response = await chartAPI.searchUsers(query);
-      console.log('Search response:', response);
-      console.log('Search data:', response.data);
+      // console.log('Search response:', response);
+      // console.log('Search data:', response.data);
       const users = response.data?.users || [];
-      console.log('Users found:', users);
+      // console.log('Users found:', users);
       setSearchResults(users);
     } catch (error) {
-      console.log('Search error:', error);
+      // console.log('Search error:', error);
       console.log('Error response:', error.response);
       setSearchResults([]);
     } finally {
@@ -378,7 +380,7 @@ export default function SelectNativeScreen({ navigation, route }) {
     setSharing(true);
     try {
       const response = await chartAPI.shareChart(selectedProfileForMenu.id, targetUser.userid);
-      console.log('Share response:', response);
+      // console.log('Share response:', response);
       Alert.alert('Success', `Chart shared with ${targetUser.name}`);
       setShowShareModal(false);
       setSearchQuery('');
@@ -560,7 +562,11 @@ export default function SelectNativeScreen({ navigation, route }) {
           setSearchResults([]);
         }}
       >
-        <View style={styles.shareModalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.shareModalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
           <View style={[styles.shareModalContent, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
             <View style={styles.shareModalHeader}>
               <Text style={[styles.shareModalTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Share Chart</Text>
@@ -593,40 +599,42 @@ export default function SelectNativeScreen({ navigation, route }) {
             </View>
 
             <View style={styles.searchResultsContainer}>
-              {searchQuery.length < 4 && (
-                <Text style={[styles.searchHint, { color: colors.textSecondary }]}>Type at least 4 characters to search</Text>
-              )}
-              
-              {searchQuery.length >= 4 && searchResults.length === 0 && !searching && (
-                <Text style={[styles.noResults, { color: colors.textSecondary }]}>No users found</Text>
-              )}
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.searchResultsList}>
+                {searchQuery.length < 4 && (
+                  <Text style={[styles.searchHint, { color: colors.textSecondary }]}>Type at least 4 characters to search</Text>
+                )}
+                
+                {searchQuery.length >= 4 && searchResults.length === 0 && !searching && (
+                  <Text style={[styles.noResults, { color: colors.textSecondary }]}>No users found</Text>
+                )}
 
-              {searchResults.length > 0 && searchResults.map((user) => (
-                <TouchableOpacity
-                  key={user.userid}
-                  style={[styles.userResultItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f9f9f9' }]}
-                  onPress={() => handleShareWithUser(user)}
-                  disabled={sharing}
-                >
-                  <View style={styles.userResultLeft}>
-                    <View style={styles.userAvatar}>
-                      <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+                {searchResults.length > 0 && searchResults.map((user) => (
+                  <TouchableOpacity
+                    key={user.userid}
+                    style={[styles.userResultItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f9f9f9' }]}
+                    onPress={() => handleShareWithUser(user)}
+                    disabled={sharing}
+                  >
+                    <View style={styles.userResultLeft}>
+                      <View style={styles.userAvatar}>
+                        <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.userResultName, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>{user.name}</Text>
+                        <Text style={[styles.userResultPhone, { color: colors.textSecondary }]}>****{user.phone}</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={[styles.userResultName, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>{user.name}</Text>
-                      <Text style={[styles.userResultPhone, { color: colors.textSecondary }]}>****{user.phone}</Text>
-                    </View>
-                  </View>
-                  {sharing ? (
-                    <ActivityIndicator size="small" color="#ff6b35" />
-                  ) : (
-                    <Ionicons name="arrow-forward" size={20} color="#999" />
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {sharing ? (
+                      <ActivityIndicator size="small" color="#ff6b35" />
+                    ) : (
+                      <Ionicons name="arrow-forward" size={20} color="#999" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -773,7 +781,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
     paddingTop: 20,
-    maxHeight: '80%',
+    flex: 1,
+    marginTop: '20%',
   },
   shareModalHeader: {
     flexDirection: 'row',
@@ -806,7 +815,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   searchResultsContainer: {
-    minHeight: 200,
+    flex: 1,
+    minHeight: 150,
+  },
+  searchResultsList: {
+    flex: 1,
   },
   searchHint: {
     textAlign: 'center',

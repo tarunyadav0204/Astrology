@@ -144,7 +144,12 @@ PROCEED WITH ANALYSIS NOW.
         
         CRITICAL RULES FOR CLARIFICATION:
         
-        1. ALWAYS return status: "CLARIFY" for these types of questions:
+        1. RELATIONSHIP QUERIES - BHAVAM BHAVESH ANALYSIS:
+           - If user asks about relatives WITHOUT providing their birth details, DO NOT ask for birth details
+           - Use Bhavam Bhavesh analysis: rotate chart to make relative's house the lagna and analyze from there
+           - Examples: "How will be my son?" → Analyze from 5th house as lagna, "Tell me about my mother" → Analyze from 4th house as lagna
+        
+        2. ALWAYS return status: "CLARIFY" for these types of questions:
            - "Tell me about my [year]" (e.g., "Tell me about my 2026", "Tell me about next year")
            - "How is my [year]?" (e.g., "How is my 2026?", "How is next year?")
            - "What about [year]?" (e.g., "What about 2026?")
@@ -152,12 +157,12 @@ PROCEED WITH ANALYSIS NOW.
            - "What about [topic]?" without specifics (e.g., "What about my health?")
            - Any question asking about a year/period WITHOUT mentioning a specific life area
         
-        2. ONLY return status: "READY" when question has BOTH:
-           - A specific life area (career, health, marriage, finance, etc.)
-           - A clear focus or timeframe
-           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?"
+        3. ONLY return status: "READY" when question has BOTH:
+           - A specific life area (career, health, marriage, finance, etc.) OR a relationship query
+           - A clear focus or timeframe OR relationship analysis request
+           Examples: "When will I get married?", "Will I get promotion in 2025?", "How is my health in 2026?", "How will be my son?", "Tell me about my mother"
         
-        3. When clarification is needed, craft a natural, conversational question that:
+        4. When clarification is needed, craft a natural, conversational question that:
            
            🚨 CRITICAL: ALWAYS check the KNOWN USER BACKGROUND section first.
            - DO NOT ask for information already present in the user background
@@ -183,8 +188,12 @@ PROCEED WITH ANALYSIS NOW.
            - If clarification_count >= 1, you are FORBIDDEN from asking another question
         
         MODES:
-        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?")
-        2. "birth": General life analysis, personality, "When will..." timing questions (e.g. "When will I get married?", "What are my strengths?")
+        1. "annual": YEARLY forecasts, specific calendar years (e.g. "How is my 2026?", "What does next year hold?", "How is my career in 2026?")
+        2. "birth": General life analysis, personality, "When will..." timing questions, DAILY/SPECIFIC DATE questions (e.g. "When will I get married?", "What are my strengths?", "What events on Feb 2nd?", "How is today?", "What about this month?")
+
+        🚨 CRITICAL MODE DISTINCTION:
+        - Questions about SPECIFIC DAYS, DATES, or SHORT PERIODS (today, this week, this month, Feb 2nd, etc.) → ALWAYS use "birth" mode
+        - Questions about ENTIRE YEARS or ANNUAL FORECASTS → use "annual" mode
 
         TRANSIT DETECTION:
         - "When will..." questions → needs_transits: true
@@ -221,30 +230,7 @@ PROCEED WITH ANALYSIS NOW.
             }}
         }}
 
-        EXAMPLES (use these to identify similar patterns):
-        
-        Question: "How is my 2026?"
-        Response: {{"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": 2026}}
-        
-        Question: "Tell me about next year"
-        Response: {{"status": "CLARIFY", "clarification_question": "To provide the most accurate guidance, which area would you like me to focus on?", "mode": "annual", "year": {current_year + 1}}}
-        
-        Question: "How is my health in 2026?"
-        Response: {{"status": "READY", "mode": "annual", "category": "health", "year": 2026, "needs_transits": true, "divisional_charts": ["D1", "D9", "D30"]}}
-        
-        Question: "When will I get married?"
-        Response: {{"status": "READY", "mode": "birth", "category": "marriage", "needs_transits": true, "divisional_charts": ["D1", "D9", "D7"]}}
-        
-        Question: "Tell me about my siblings"
-        Response: {{"status": "READY", "mode": "birth", "category": "siblings", "needs_transits": false, "divisional_charts": ["D1", "D3", "D9"]}}
-        
-        - "Tell me about my health in 2026" -> startYear: 2026, endYear: 2026, yearMonthMap: {{"2026": [all 12 months]}}
-        - "How is Q1 2026 for my career?" → startYear: 2026, endYear: 2026, yearMonthMap: {{"2026": ["January", "February", "March"]}}
-        - "Marriage prospects in March-June 2025?" → startYear: 2025, endYear: 2025, yearMonthMap: {{"2025": ["March", "April", "May", "June"]}}
-        - "What are my strengths?" → needs_transits: false
-        - "When will I get married?" → startYear: {current_year}, endYear: {current_year + 2} (general timing)
-        
-        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family
         """
         
         # print(f"\n📤 INTENT ROUTER REQUEST:")
@@ -260,6 +246,7 @@ PROCEED WITH ANALYSIS NOW.
             gemini_time = time.time() - gemini_start
             
             cleaned = response.text.replace('```json', '').replace('```', '').strip()
+            print(f"🔍 RAW INTENT RESPONSE: {cleaned}")
             result = json.loads(cleaned)
             
             total_time = time.time() - intent_start
@@ -371,7 +358,15 @@ PROCEED WITH ANALYSIS NOW.
             'relationship': ['D1', 'D7', 'D9'],
             'partner': ['D1', 'D7', 'D9'],
             'timing': ['D1', 'D9'],
-            'general': ['D1', 'D9']
+            'general': ['D1', 'D9'],
+            'son': ['D1', 'D7', 'D9'],
+            'daughter': ['D1', 'D7', 'D9'],
+            'mother': ['D1', 'D4', 'D9', 'D12'],
+            'father': ['D1', 'D9', 'D10', 'D12'],
+            'spouse': ['D1', 'D7', 'D9'],
+            'siblings': ['D1', 'D3', 'D9'],
+            'children': ['D1', 'D7', 'D9'],
+            'family': ['D1', 'D9', 'D12']
         }
         
         return chart_mapping.get(category.lower(), ['D1', 'D9'])
