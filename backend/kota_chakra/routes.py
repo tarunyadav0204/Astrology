@@ -269,7 +269,8 @@ async def get_yearly_periods(request: KotaChakraRequest, current_user = Depends(
                     "month": month,
                     "month_name": datetime(year, month, 1).strftime("%B"),
                     "vulnerability_score": vulnerability_score,
-                    "interpretation": kota_result.get('interpretation', '')
+                    "interpretation": kota_result.get('interpretation', ''),
+                    "malefic_siege": kota_result.get('malefic_siege', {})
                 }
                 
                 if vulnerability_score >= 2:

@@ -906,11 +906,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                 <View style={styles.numberCircle}>
                   <Text style={styles.numberText}>{listCounter}</Text>
                 </View>
-                <View style={styles.listContent}>
-                  <Text style={styles.listText}>
-                    {listElements}
-                  </Text>
-                </View>
+                <Text style={styles.listText}>
+                  {listElements}
+                </Text>
               </View>
             );
           } else {
@@ -950,14 +948,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 
 
 
-  if (!message.content || message.content.trim() === '') {
-    return null;
-  }
-
   // Check if this is a clarification message
   const isClarification = message.message_type === 'clarification';
 
-  // Handle typing indicator
+  // Handle typing indicator FIRST
   if (message.isTyping) {
     return (
       <Animated.View style={[
@@ -982,6 +976,11 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         </View>
       </Animated.View>
     );
+  }
+
+  // Handle empty content for non-typing messages
+  if (!message.content || message.content.trim() === '') {
+    return null;
   }
 
   const formattedContent = formatContent(message.content);
@@ -1180,8 +1179,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           <View style={[
             styles.tooltipContainer,
             {
-              left: tooltipModal.position.x - 100,
-              top: tooltipModal.position.y - 60
+              left: (tooltipModal.position?.x || 0) - 100,
+              top: (tooltipModal.position?.y || 0) - 60
             }
           ]}>
             <Text style={styles.tooltipText}>{tooltipModal.content}</Text>
@@ -1225,7 +1224,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
 const styles = StyleSheet.create({
   container: {
     marginVertical: 4,
-    paddingHorizontal: 16,
   },
   userContainer: {
     alignItems: 'flex-end',
@@ -1234,251 +1232,479 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '85%',
+    maxWidth: '88%',
     borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    padding: 16,
+    marginVertical: 6,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   userBubble: {
-    backgroundColor: '#ff6b35',
-    borderBottomRightRadius: 5,
-  },
-  assistantBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottomLeftRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderBottomRightRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.2)',
   },
-  partnershipBubble: {
-    backgroundColor: 'rgba(255, 182, 193, 0.95)',
-    borderColor: 'rgba(255, 20, 147, 0.3)',
-  },
-  clarificationBubble: {
-    backgroundColor: 'rgba(255, 255, 0, 0.1)',
-    borderColor: 'rgba(255, 193, 7, 0.5)',
-  },
-  typingBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  assistantBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderBottomLeftRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(255, 107, 53, 0.4)',
   },
   assistantHeader: {
     marginBottom: 8,
   },
   assistantLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ff6b35',
-    opacity: 0.8,
-  },
-  betaNotice: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ffc107',
-  },
-  betaNoticeText: {
-    fontSize: 11,
-    color: '#856404',
-    fontWeight: '500',
-  },
-  disclaimerNotice: {
-    backgroundColor: 'rgba(108, 117, 125, 0.1)',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#6c757d',
-  },
-  disclaimerNoticeText: {
-    fontSize: 10,
-    color: '#495057',
-    fontStyle: 'italic',
-    lineHeight: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 107, 53, 0.8)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   messageContent: {
-    flex: 1,
+    paddingBottom: 4,
   },
-  messageText: {
-    fontSize: 16,
+  regularText: {
+    fontSize: 15,
     lineHeight: 22,
-    color: '#333',
-  },
-  userMessageText: {
-    color: '#fff',
+    marginVertical: 2,
+    color: '#2c3e50',
   },
   boldText: {
-    fontWeight: 'bold',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#2c3e50',
   },
-  italicText: {
-    fontStyle: 'italic',
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 107, 53, 0.08)',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b35',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  underlineText: {
-    textDecorationLine: 'underline',
+  headerIcon: {
+    fontSize: 20,
+    marginRight: 8,
   },
-  linkText: {
-    color: '#007bff',
-    textDecorationLine: 'underline',
+  headerText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#ff6b35',
+    letterSpacing: 0.5,
+    flex: 1,
   },
-  tooltipTrigger: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#ff6b35',
-    borderStyle: 'dotted',
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 6,
+  },
+  numberCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ff6b35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    marginTop: 3,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  numberText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  listContent: {
+    flex: 1,
+    marginLeft: -2,
+  },
+  listText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#2c3e50',
+  },
+  quickAnswerCard: {
+    borderRadius: 20,
+    padding: 18,
+    marginVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  glassOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 20,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    zIndex: 1,
+  },
+  lightningIcon: {
+    fontSize: 18,
+    marginRight: 8,
+    color: '#FFD700',
+  },
+  finalThoughtsCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: '#4169E1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(65, 105, 225, 0.3)',
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2c3e50',
+    letterSpacing: 0.5,
+  },
+  cardText: {
+    fontSize: 14,
+    color: '#2c3e50',
+    lineHeight: 20,
+    zIndex: 1,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    gap: 8,
+  },
+  actionButton: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderRadius: 12,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  pdfButton: {
+    backgroundColor: 'rgba(249, 115, 22, 0.15)',
+    borderColor: 'rgba(249, 115, 22, 0.3)',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  actionIcon: {
+    fontSize: 16,
+    color: COLORS.accent,
+  },
+  timestamp: {
+    fontSize: 11,
+    color: 'rgba(44, 62, 80, 0.6)',
+    textAlign: 'right',
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  followUpContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginVertical: 6,
+    gap: 6,
+  },
+  followUpButton: {
+    backgroundColor: 'rgba(255, 107, 53, 0.12)',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  followUpText: {
+    color: '#ff6b35',
+    fontSize: 13,
+    fontWeight: '600',
   },
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
   },
   typingText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#2c3e50',
+    flex: 1,
     marginRight: 8,
   },
   typingDots: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#ff6b35',
-    marginHorizontal: 1,
+    marginHorizontal: 2,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-    flexWrap: 'wrap',
+  partnershipBubble: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.partnershipBorder,
   },
-  actionButton: {
-    padding: 6,
-    marginLeft: 4,
+  partnershipLabel: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: COLORS.partnershipBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    zIndex: 10,
   },
-  restartButton: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+  partnershipLabelText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '600',
   },
-  pdfButton: {
-    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  clarificationBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFA726',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 167, 38, 0.3)',
+    shadowColor: '#FFA726',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  deleteButton: {
-    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+  tooltipTerm: {
+    backgroundColor: 'rgba(233, 30, 99, 0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(233, 30, 99, 0.3)',
   },
-  actionIcon: {
-    fontSize: 14,
+  tooltipText: {
+    color: '#e91e63',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'dotted',
+    backgroundColor: 'rgba(233, 30, 99, 0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
   },
-  timestamp: {
+  tooltipModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  tooltipModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    maxWidth: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  tooltipModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#e91e63',
+    marginBottom: 10,
+  },
+  tooltipModalDefinition: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#333',
+    marginBottom: 15,
+  },
+  tooltipModalClose: {
+    backgroundColor: '#e91e63',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+  },
+  tooltipModalCloseText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  tableContainer: {
+    marginVertical: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  tableHeaderCell: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ff6b35',
+    paddingHorizontal: 4,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 107, 53, 0.1)',
+  },
+  tableCell: {
     fontSize: 11,
-    color: '#999',
-    marginTop: 4,
-    textAlign: 'right',
+    color: '#2c3e50',
+    paddingHorizontal: 4,
   },
   voiceModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   voiceModalContent: {
     backgroundColor: 'white',
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 20,
-    width: '80%',
+    maxWidth: '90%',
     maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   voiceModalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: '700',
+    color: '#ff6b35',
     marginBottom: 15,
-    color: '#333',
+    textAlign: 'center',
   },
   voiceScrollView: {
     maxHeight: 300,
+    marginBottom: 15,
   },
   voiceOption: {
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 2,
-    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
   },
   selectedVoiceOption: {
-    backgroundColor: '#ff6b35',
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#ff6b35',
   },
   voiceOptionText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#333',
   },
   selectedVoiceText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#ff6b35',
+    fontWeight: '600',
   },
   voiceModalClose: {
+    backgroundColor: '#ff6b35',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignSelf: 'center',
     marginTop: 15,
-    padding: 15,
-    backgroundColor: '#6c757d',
-    borderRadius: 10,
-    alignItems: 'center',
   },
   voiceModalCloseText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  tooltipOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  tooltipContainer: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: 8,
+  betaNotice: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
     borderRadius: 8,
-    maxWidth: 200,
+    padding: 10,
+    marginBottom: 12,
   },
-  tooltipText: {
-    color: 'white',
+  betaNoticeText: {
     fontSize: 12,
-    textAlign: 'center',
+    color: '#E65100',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  disclaimerNotice: {
+    backgroundColor: 'rgba(156, 39, 176, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#9C27B0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  disclaimerNoticeText: {
+    fontSize: 11,
+    color: '#6A1B9A',
+    fontWeight: '600',
+    lineHeight: 16,
   },
   imageModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageModalContainer: {
-    width: '95%',
-    height: '80%',
-    position: 'relative',
-  },
-  fullScreenImage: {
-    width: '100%',
-    height: '100%',
-  },
-  closeImageButton: {
+  imageModalCloseButton: {
     position: 'absolute',
-    top: 20,
+    top: 50,
     right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    zIndex: 10,
   },
-  closeImageButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+  imageModalImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.8,
   },
 });

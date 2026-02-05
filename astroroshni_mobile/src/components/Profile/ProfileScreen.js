@@ -457,6 +457,18 @@ export default function ProfileScreen({ navigation }) {
                   onPress={() => navigation.navigate('ChatHistory')}
                   color="#4caf50"
                 />
+                <ActionButton 
+                  icon="list" 
+                  label="My Facts" 
+                  onPress={() => {
+                    if (birthData?.id) {
+                      navigation.navigate('Facts', { birthChartId: birthData.id, nativeName: birthData.name });
+                    } else {
+                      Alert.alert('Birth Data Required', 'Please connect your birth chart to manage facts.');
+                    }
+                  }}
+                  color="#e91e63"
+                />
               </View>
             </Animated.View>
 
@@ -477,26 +489,6 @@ export default function ProfileScreen({ navigation }) {
                   <View style={styles.settingLeft}>
                     <Ionicons name="person-outline" size={22} color="#ff6b35" />
                     <Text style={[styles.settingText, { color: colors.text }]}>Edit Birth Details</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                
-                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
-                
-                <TouchableOpacity style={styles.settingItem}>
-                  <View style={styles.settingLeft}>
-                    <Ionicons name="notifications-outline" size={22} color="#9c27b0" />
-                    <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                
-                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
-                
-                <TouchableOpacity style={styles.settingItem}>
-                  <View style={styles.settingLeft}>
-                    <Ionicons name="share-social-outline" size={22} color="#4caf50" />
-                    <Text style={[styles.settingText, { color: colors.text }]}>Share Profile</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>

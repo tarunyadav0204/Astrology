@@ -613,7 +613,7 @@ const loadHomeData = async (nativeData = null) => {
           </View>
           
           <Text style={[styles.greetingTitle, { color: colors.text }]}>
-            Welcome, {displayData?.name}!
+            {displayData?.name}'s Life Path
           </Text>
           <View style={[
             styles.birthInfoCard,
@@ -908,7 +908,7 @@ const loadHomeData = async (nativeData = null) => {
                   {panchangData.daily_panchang.nakshatra && (
                     <View style={styles.panchangElement}>
                       <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>⭐ Nakshatra:</Text>
-                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.nakshatra.name}</Text>
+                      <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.nakshatra.name}</Text>
                     </View>
                   )}
                   
@@ -916,7 +916,7 @@ const loadHomeData = async (nativeData = null) => {
                   {panchangData.daily_panchang.tithi && (
                     <View style={styles.panchangElement}>
                       <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>🌙 Tithi:</Text>
-                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.tithi.name}</Text>
+                      <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.tithi.name}</Text>
                     </View>
                   )}
                   
@@ -924,7 +924,7 @@ const loadHomeData = async (nativeData = null) => {
                   {panchangData.daily_panchang.yoga && (
                     <View style={styles.panchangElement}>
                       <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>🧘 Yoga:</Text>
-                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.yoga.name}</Text>
+                      <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.yoga.name}</Text>
                     </View>
                   )}
                   
@@ -932,7 +932,7 @@ const loadHomeData = async (nativeData = null) => {
                   {panchangData.daily_panchang.karana && (
                     <View style={styles.panchangElement}>
                       <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>⚡ Karana:</Text>
-                      <Text style={[styles.elementValue, { color: colors.textPrimary }]}>{panchangData.daily_panchang.karana.name}</Text>
+                      <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.karana.name}</Text>
                     </View>
                   )}
                 </View>

@@ -53,7 +53,12 @@ const KotaChakraScreen = ({ route, navigation }) => {
         return;
       }
       
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/kota-chakra/calculate')}`, {
+      const url = `${API_BASE_URL}${getEndpoint('/kota-chakra/calculate')}`;
+      console.log('🏰 Fetching Kota Chakra from:', url);
+      console.log('🏰 Birth Chart ID:', birthChartId);
+      console.log('🏰 Date:', selectedDate.toISOString().split('T')[0]);
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,11 +70,17 @@ const KotaChakraScreen = ({ route, navigation }) => {
         })
       });
 
+      console.log('🏰 Response status:', response.status);
+      console.log('🏰 Response ok:', response.ok);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.log('🏰 Error response:', errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('🏰 Response data:', data);
       
       if (data.success) {
         setKotaData(data.kota_chakra);
@@ -157,6 +168,10 @@ const KotaChakraScreen = ({ route, navigation }) => {
       }
 
       const data = await response.json();
+      
+      console.log('📊 Periods API Response:', JSON.stringify(data, null, 2));
+      console.log('📊 Good Periods:', data.good_periods);
+      console.log('📊 Vulnerable Periods:', data.vulnerable_periods);
       
       if (data.success) {
         setPeriodsData(data);

@@ -16,6 +16,7 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
   const getStatusColor = (vulnerabilityScore) => {
     if (vulnerabilityScore >= 6) return colors.error;
     if (vulnerabilityScore >= 3) return colors.warning;
+    if (vulnerabilityScore >= 2) return colors.warning; // Score 2 is caution
     return colors.success;
   };
 
@@ -108,13 +109,13 @@ const PeriodsModal = ({ visible, onClose, type, data, colors }) => {
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
                 <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                  0-2: Protected
+                  0-1: Protected
                 </Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
                 <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                  3-5: Caution
+                  2-5: Caution
                 </Text>
               </View>
               <View style={styles.legendItem}>

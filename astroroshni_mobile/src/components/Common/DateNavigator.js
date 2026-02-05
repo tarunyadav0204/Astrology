@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '../../utils/constants';
 
 const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = null }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(date);
 
   const adjustDate = (days) => {
     const newDate = new Date(date);
@@ -143,28 +144,24 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
         </View>
       </View>
       
-      {showDatePicker && (
-        <View style={styles.datePickerOverlay}>
-          <TouchableOpacity 
-            style={styles.overlayBackground}
-            activeOpacity={1}
-            onPress={() => setShowDatePicker(false)}
-          />
+      <Modal
+        visible={showDatePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
           <View style={styles.datePickerContainer}>
             <DateTimePicker
-              value={date}
+              value={tempDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              textColor="#ffffff"
               onChange={(event, selectedDate) => {
-                if (Platform.OS === 'android') {
-                  setShowDatePicker(false);
-                  if (selectedDate) {
+                if (selectedDate) {
+                  setTempDate(selectedDate);
+                  if (Platform.OS === 'android') {
                     onDateChange(selectedDate);
-                  }
-                } else {
-                  if (selectedDate) {
-                    onDateChange(selectedDate);
+                    setShowDatePicker(false);
                   }
                 }
               }}
@@ -172,14 +169,24 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
             {Platform.OS === 'ios' && (
               <TouchableOpacity 
                 style={styles.doneButton} 
-                onPress={() => setShowDatePicker(false)}
+                onPress={() => {
+                  onDateChange(tempDate);
+                  setShowDatePicker(false);
+                }}
               >
                 <Text style={styles.doneButtonText}>Done</Text>
               </TouchableOpacity>
             )}
           </View>
+          <TouchableOpacity 
+            style={styles.closeOverlay}
+            onPress={() => {
+              setTempDate(date);
+              setShowDatePicker(false);
+            }}
+          />
         </View>
-      )}
+      </Modal>
     </View>
   );
 };
@@ -188,31 +195,28 @@ const styles = StyleSheet.create({
   dateNav: {
     marginBottom: 12,
   },
-  datePickerOverlay: {
-    position: 'absolute',
-    top: 50,
-    left: -20,
-    right: -20,
-    zIndex: 9999,
-    elevation: 9999,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  overlayBackground: {
-    position: 'fixed',
-    top: -1000,
-    left: -1000,
-    right: -1000,
-    bottom: -1000,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  closeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
   },
   datePickerContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     paddingBottom: 20,
-    zIndex: 10000,
-    elevation: 10000,
     minHeight: 250,
+    minWidth: 300,
+    zIndex: 1,
   },
   compactNavRow: {
     flexDirection: 'row',
