@@ -200,7 +200,8 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
         # Combine contexts and apply minification
         full_context = {
             **static_context,
-            **dynamic_context
+            **dynamic_context,
+            'intent': intent_result
         }
         
         # Enrich current_dashas with house and sign info for easy access

@@ -82,77 +82,112 @@ class ResponseParser:
     @staticmethod
     def parse_images_in_chat_response(text: str) -> Dict:
         """
-        Specialized parser for chat responses that extracts single summary image prompt.
+        Specialized, robust parser for chat responses. Extracts summary image, glossary,
+        and terms in a single pass, handling truncated responses gracefully.
         """
-        # Aggressive HTML entity decoding
-        cleaned_text = text
-        while '&lt;' in cleaned_text or '&gt;' in cleaned_text or '&quot;' in cleaned_text:
-            cleaned_text = html.unescape(cleaned_text)
+        print(f"\n🔍 ROBUST PARSER DEBUG:")
         
-        print(f"\n🔍 PARSER DEBUG:")
-        print(f"   Has SUMMARY_IMAGE: {'SUMMARY_IMAGE_START' in cleaned_text}")
-        print(f"   Has GLOSSARY: {'GLOSSARY_START' in cleaned_text}")
-        
-        # Extract summary image prompt WITHOUT removing content
+        content = text
         summary_image_prompt = None
-        if 'SUMMARY_IMAGE_START' in cleaned_text and 'SUMMARY_IMAGE_END' in cleaned_text:
+        parsed_glossary = {}
+        term_ids = []
+
+        # 1. Extract Summary Image Prompt
+        if 'SUMMARY_IMAGE_START' in content and 'SUMMARY_IMAGE_END' in content:
             try:
-                prompt_section = cleaned_text.split('SUMMARY_IMAGE_START')[1].split('SUMMARY_IMAGE_END')[0].strip()
+                prompt_section = content.split('SUMMARY_IMAGE_START')[1].split('SUMMARY_IMAGE_END')[0]
                 summary_image_prompt = prompt_section.strip()
-                # Remove ONLY the image prompt block from visible content, keep everything else
-                cleaned_text = re.sub(r'SUMMARY_IMAGE_START.*?SUMMARY_IMAGE_END', '', cleaned_text, flags=re.DOTALL).strip()
-                print(f"   ✅ Extracted summary image prompt: {len(summary_image_prompt)} chars")
-                print(f"   Preview: {summary_image_prompt[:100]}...")
-                print(f"   ✅ Cleaned text after image removal: {len(cleaned_text)} chars")
-                print(f"   Has GLOSSARY after cleaning: {'GLOSSARY_START' in cleaned_text}")
+                content = re.sub(r'SUMMARY_IMAGE_START.*?SUMMARY_IMAGE_END', '', content, flags=re.DOTALL).strip()
+                print(f"   ✅ Extracted summary image prompt ({len(summary_image_prompt)} chars).")
             except Exception as e:
-                print(f"   ⚠️ Summary image prompt extraction failed: {e}")
-        
-        # CRITICAL FIX: Remove glossary JSON blocks from visible content
-        if 'GLOSSARY_START' in cleaned_text and 'GLOSSARY_END' in cleaned_text:
-            # Extract glossary first
+                print(f"   ⚠️ Summary image extraction failed: {e}")
+
+        # 2. Extract and Parse Glossary (handles truncation)
+        if 'GLOSSARY_START' in content:
             try:
-                glossary_part = cleaned_text.split("GLOSSARY_START")[1].split("GLOSSARY_END")[0].strip()
-                # Clean markers and potential backticks/markdown
-                glossary_json = re.sub(r'^```(?:json)?\s*|```$', '', glossary_part).strip()
+                # Isolate the glossary part, even if it's cut off
+                glossary_part = content.split('GLOSSARY_START')[1]
+                if 'GLOSSARY_END' in glossary_part:
+                    glossary_part = glossary_part.split('GLOSSARY_END')[0]
                 
-                # Parse glossary
-                parsed_glossary = {}
+                # Clean up and find the JSON part
+                glossary_json_str = re.sub(r'^```(?:json)?\s*|```$', '', glossary_part).strip()
+                
+                # Attempt to parse the (potentially partial) JSON
                 try:
-                    parsed_glossary = json.loads(glossary_json)
-                    # Normalize all keys to lowercase and strip whitespace
-                    parsed_glossary = {k.strip().lower(): v for k, v in parsed_glossary.items()}
+                    # Find the start of the JSON object
+                    json_start = glossary_json_str.find('{')
+                    if json_start != -1:
+                        # Find the last valid closing brace for a partial parse
+                        last_brace = glossary_json_str.rfind('}')
+                        json_to_parse = glossary_json_str[json_start : last_brace + 1]
+                        
+                        # In case of truncation, the JSON might be incomplete.
+                        # We can try to fix it by finding the last complete entry.
+                        last_comma = json_to_parse.rfind(',')
+                        if last_comma > json_to_parse.rfind(':'): # Ensure comma is after the last value
+                            json_to_parse = json_to_parse[:last_comma] + '}'
+                        
+                        parsed_glossary = json.loads(json_to_parse)
+                        # Normalize keys
+                        parsed_glossary = {k.strip().lower(): v for k, v in parsed_glossary.items()}
+                        print(f"   ✅ Glossary parsed ({len(parsed_glossary)} terms).")
                 except json.JSONDecodeError:
-                    # If that fails, try parsing multiple JSON objects (one per line)
-                    for line in glossary_json.split('\n'):
-                        line = line.strip()
-                        if line and line.startswith('{'):
-                            try:
-                                obj = json.loads(line)
-                                if 'term' in obj and 'definition' in obj:
-                                    parsed_glossary[obj['term'].strip().lower()] = obj['definition']
-                            except:
-                                continue
-                
-                # Remove the ENTIRE glossary block from visible content
-                cleaned_text = re.sub(r'GLOSSARY_START.*?GLOSSARY_END', '', cleaned_text, flags=re.DOTALL).strip()
-                print(f"   ✅ Glossary extracted and removed from content: {len(parsed_glossary)} terms")
-                
-                # Use the standard parser on the cleaned text
-                result = ResponseParser.parse_response(cleaned_text)
-                result['glossary'] = parsed_glossary
-                result['terms'] = list(parsed_glossary.keys())
-                result['summary_image_prompt'] = summary_image_prompt
-                print(f"   Final result - Terms: {len(result['terms'])}, Glossary: {len(result['glossary'])}")
-                return result
-                
+                    print(f"   ⚠️ JSON decode failed, likely due to truncation. Trying regex fallback.")
+                    # Fallback for severely truncated JSON
+                    entries = re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', glossary_json_str)
+                    for k, v in entries:
+                        parsed_glossary[k.strip().lower()] = v
+                    print(f"   ✅ Glossary recovered via regex ({len(parsed_glossary)} terms).")
+
+                # Clean the glossary block from the final content
+                content = re.sub(r'GLOSSARY_START.*', '', content, flags=re.DOTALL).strip()
+
             except Exception as e:
-                print(f"   ⚠️ Glossary extraction failed: {e}")
+                print(f"   ⚠️ Major glossary processing failure: {e}")
         
-        # Use the standard parser on the cleaned text
-        result = ResponseParser.parse_response(cleaned_text)
-        result['summary_image_prompt'] = summary_image_prompt
-        print(f"   Final result - Terms: {len(result['terms'])}, Glossary: {len(result['glossary'])}")
+        # 3. Extract Term IDs from the content
+        term_ids = re.findall(r'<term id="([^"]+)">', content)
+        # Use glossary keys as the definitive list of terms if available
+        if parsed_glossary:
+            term_ids = list(set(term_ids) | set(parsed_glossary.keys()))
+        else:
+            term_ids = list(set(term_ids))
+            
+        print(f"   ✅ Final term list: {len(term_ids)} unique terms.")
+
+        # 4. Extract Follow-up Questions
+        follow_up_questions = []
+        follow_up_match = re.search(r'<div class="follow-up-questions">(.*?)</div>', content, re.DOTALL)
+        if follow_up_match:
+            follow_up_html = follow_up_match.group(1)
+            # Extract questions from the inner HTML, assuming they are simple text lines
+            questions = [line.strip() for line in follow_up_html.split('\n') if line.strip()]
+            follow_up_questions = questions
+            # Remove the div from the main content
+            content = re.sub(r'<div class="follow-up-questions">.*?</div>', '', content, flags=re.DOTALL).strip()
+            print(f"   ✅ Extracted {len(follow_up_questions)} follow-up questions.")
+
+        # 5. Extract Analysis Steps
+        analysis_steps = []
+        steps_match = re.search(r'### Analysis Steps\s*\n([\s\S]*?)(?=\n###|\Z)', content, re.IGNORECASE)
+        if steps_match:
+            steps_text = steps_match.group(1)
+            analysis_steps = [line.replace('-', '').strip() for line in steps_text.split('\n') if line.strip().startswith('-')]
+            # Remove the section from the main content
+            content = re.sub(r'### Analysis Steps\s*\n([\s\S]*?)(?=\n###|\Z)', '', content, re.IGNORECASE).strip()
+            print(f"   ✅ Extracted {len(analysis_steps)} analysis steps.")
+
+        # 6. Assemble final result
+        result = {
+            'content': content,
+            'terms': term_ids,
+            'glossary': parsed_glossary,
+            'summary_image_prompt': summary_image_prompt,
+            'follow_up_questions': follow_up_questions,
+            'analysis_steps': analysis_steps,
+        }
+        
         return result
     
     @staticmethod

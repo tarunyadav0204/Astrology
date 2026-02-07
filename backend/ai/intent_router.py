@@ -211,10 +211,18 @@ PROCEED WITH ANALYSIS NOW.
         - If question mentions "next year", use startYear: {current_year + 1}, endYear: {current_year + 1}
         - For general timing questions without specific year, use startYear: {current_year}, endYear: {current_year + 2}
 
+        ANALYSIS TYPES:
+        - "EVENT_PREDICTION_MULTIPLE": For questions asking for a list of multiple future events within a timeframe (e.g., "Tell me about my career in 2025", "What are the major events for me next year?").
+        - "EVENT_PREDICTION_SINGLE": For questions about a single, specific event (e.g., "When will I get married?", "Will I get this promotion?").
+        - "ROOT_CAUSE_ANALYSIS": For "why" questions about past or future situations (e.g., "Why am I facing financial problems?", "Why is my health suffering?").
+        - "REMEDIAL_GUIDANCE": For questions seeking remedies or advice (e.g., "What can I do to improve my health?", "How can I improve my finances?").
+        - "CHARACTER_ANALYSIS": For questions about personality and inherent traits (e.g., "What does my chart say about me?", "What are my strengths and weaknesses?").
+
         Return ONLY a JSON object:
         {{
             "status": "CLARIFY" or "READY",
             "clarification_question": "Your clarifying question here (only if status=CLARIFY)",
+            "analysis_type": "EVENT_PREDICTION_MULTIPLE" or "EVENT_PREDICTION_SINGLE" or "ROOT_CAUSE_ANALYSIS" or "REMEDIAL_GUIDANCE" or "CHARACTER_ANALYSIS",
             "extracted_context": {{"timeframe": "2025", "aspect": "promotion"}},
             "mode": "annual" or "birth",
             "category": "category_name",
@@ -233,10 +241,10 @@ PROCEED WITH ANALYSIS NOW.
         Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family
         """
         
-        # print(f"\n📤 INTENT ROUTER REQUEST:")
-        # print(f"Model: {self.model._model_name if hasattr(self.model, '_model_name') else 'Unknown'}")
-        # print(f"Prompt length: {len(prompt)} characters")
-        # print(f"\nFull Prompt:\n{prompt}")
+        print(f"\n📤 INTENT ROUTER REQUEST:")
+        print(f"Model: {self.model._model_name if hasattr(self.model, '_model_name') else 'Unknown'}")
+        print(f"Prompt length: {len(prompt)} characters")
+        print(f"\nFull Prompt:\n{prompt}")
         
         
         try:

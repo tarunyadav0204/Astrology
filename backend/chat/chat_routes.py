@@ -430,7 +430,9 @@ async def ask_question(request: ChatRequest, current_user: User = Depends(get_cu
                             'status': 'complete', 
                             'response': clean_response,
                             'terms': ai_result.get('terms', []),
-                            'glossary': ai_result.get('glossary', {})
+                            'glossary': ai_result.get('glossary', {}),
+                            'follow_up_questions': ai_result.get('follow_up_questions', []),
+                            'analysis_steps': ai_result.get('analysis_steps', [])
                         }
                         
                         # Add images if available (DEPRECATED - use summary_image)

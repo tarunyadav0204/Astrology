@@ -179,7 +179,7 @@ export default function ChatScreen({ navigation, route }) {
       const pendingIds = JSON.parse(stored);
       pendingIds.forEach(messageId => {
         // Resume polling for each pending message
-        pollForResponse(messageId, null, sessionId, null, true); // true = resume mode
+        pollForResponse(messageId, null, sessionId, null, '', true); // true = resume mode
       });
     }
   };
@@ -521,7 +521,8 @@ export default function ChatScreen({ navigation, route }) {
               setIsTyping(true);
               // Use personId directly to avoid timing issues
               setTimeout(() => {
-                pollForResponse(processingMessage.messageId, null, sessionId, null, true);
+                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
+                pollForResponse(processingMessage.messageId, null, sessionId, null, userMessage?.content || '', true);
               }, 100);
             }
           } else {
@@ -620,7 +621,8 @@ export default function ChatScreen({ navigation, route }) {
               if (processingMessage) {
                 setLoading(true);
                 setIsTyping(true);
-                pollForResponse(processingMessage.messageId, null, sessionId, null, true);
+                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
+                pollForResponse(processingMessage.messageId, null, sessionId, null, userMessage?.content || '', true);
               }
             }
           }
@@ -835,7 +837,95 @@ export default function ChatScreen({ navigation, route }) {
     return;
   };
 
-  const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval = null, isResume = false) => {
+
+  const getLoadingMessages = (messageText) => {
+    const lowerCaseMessage = messageText.toLowerCase();
+    
+    // Keywords for different categories
+    const careerKeywords = ['career', 'job', 'profession', 'work', 'employment'];
+    const marriageKeywords = ['marriage', 'spouse', 'partner', 'relationship', 'love'];
+    const healthKeywords = ['health', 'illness', 'disease', 'wellness'];
+    const financeKeywords = ['finance', 'money', 'wealth', 'investment'];
+    const spiritualKeywords = ['spiritual', 'soul', 'karma', 'purpose'];
+
+    if (careerKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
+      return [
+        '💼 Analyzing career prospects in your chart...',
+        '🏢 Evaluating professional strengths and weaknesses...',
+        '📈 Identifying key periods for career growth...',
+        '🌟 Uncovering hidden talents and opportunities...',
+        '🎯 Aligning your career with your life purpose...',
+        '🔮 Predicting potential challenges in your professional life...',
+        '✨ Providing guidance for career advancement...',
+        'Congratulations on taking this important step in your career exploration! I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
+        'I am analyzing the placement of Saturn, the planet of career and responsibility, in your birth chart. This will help me understand your professional potential and challenges.',
+        'I am also looking at the 10th house, which represents your career and public life. This will give me a better understanding of your professional path.',
+        'Your birth chart is a unique cosmic blueprint that holds valuable information about your career. I am now decoding this information to provide you with a detailed analysis of your professional life.',
+        'I am examining the placement of Jupiter, the planet of expansion and opportunities, in your birth chart. This will help me identify potential career opportunities for you.',
+        'I am also looking at the 6th house, which represents your daily work and service. This will give me a better understanding of your work environment and professional relationships.',
+      ];
+    }
+    if (marriageKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
+      return [
+        '💍 Assessing marital compatibility and timing...',
+        '❤️ Exploring romantic connections in your chart...',
+        '💑 Understanding partnership dynamics...',
+        '🔮 Predicting potential challenges in your married life...',
+        '✨ Providing guidance for a harmonious relationship...',
+        'Now, I am delving into the complexities of your birth chart to provide you with a comprehensive analysis of your marital prospects. This is an important step in understanding your future, and I am committed to providing you with the most accurate and personalized insights available.',
+        'I am analyzing the placement of Venus, the planet of love and relationships, in your birth chart. This will help me understand your romantic potential and challenges.',
+        'I am also looking at the 7th house, which represents your marriage and partnerships. This will give me a better understanding of your marital path.',
+        'Your birth chart is a unique cosmic blueprint that holds valuable information about your relationships. I am now decoding this information to provide you with a detailed analysis of your marital life.',
+        'I am examining the placement of Jupiter, the planet of expansion and opportunities, in your birth chart. This will help me identify potential marital opportunities for you.',
+      ];
+    }
+    if (healthKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
+      return [
+        '⚕️ Examining health indicators and vulnerabilities...',
+        '🌿 Looking into planetary influences on your well-being...',
+        '🏃‍♂️ Identifying periods for focusing on health...',
+        'Congratulations on taking this important step in understanding your health from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
+        'I am analyzing the placement of Mars, the planet of energy and vitality, in your birth chart. This will help me understand your physical potential and challenges.',
+        'I am also looking at the 6th house, which represents your health and daily routines. This will give me a better understanding of your health path.',
+        'Your birth chart is a unique cosmic blueprint that holds valuable information about your health. I am now decoding this information to provide you with a detailed analysis of your physical well-being.',
+        'I am examining the placement of Saturn, the planet of limitations and discipline, in your birth chart. This will help me identify potential health challenges for you.',
+      ];
+    }
+    if (financeKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
+        return [
+            '💰 Scrutinizing financial planets and houses...',
+            '🏦 Identifying opportunities for wealth creation...',
+            '💸 Analyzing potential for financial challenges...',
+            'Congratulations on taking this important step in understanding your financial situation from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
+            'I am analyzing the placement of Jupiter, the planet of expansion and opportunities, in your birth chart. This will help me identify potential financial opportunities for you.',
+            'I am also looking at the 2nd house, which represents your wealth and possessions. This will give me a better understanding of your financial path.',
+            'Your birth chart is a unique cosmic blueprint that holds valuable information about your finances. I am now decoding this information to provide you with a detailed analysis of your financial situation.',
+            'I am examining the placement of Saturn, the planet of limitations and discipline, in your birth chart. This will help me identify potential financial challenges for you.',
+        ];
+    }
+    if (spiritualKeywords.some(keyword => lowerCaseMessage.includes(keyword))) {
+        return [
+            '🧘‍♀️ Exploring your spiritual path and purpose...',
+            '🕉️ Examining karmic influences and lessons...',
+            '✨ Delving into your soul\'s journey...',
+            'Congratulations on taking this important step in understanding your spiritual path from an astrological perspective. I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
+            'I am analyzing the placement of Neptune, the planet of spirituality and intuition, in your birth chart. This will help me understand your spiritual potential and challenges.',
+            'I am also looking at the 12th house, which represents your subconscious and spiritual life. This will give me a better understanding of your spiritual path.',
+            'Your birth chart is a unique cosmic blueprint that holds valuable information about your spirituality. I am now decoding this information to provide you with a detailed analysis of your spiritual journey.',
+        ];
+    }
+    
+    // Default messages
+    return [
+      '🔮 Analyzing your birth chart...',
+      '⭐ Consulting the cosmic energies...',
+      '📊 Calculating planetary positions...',
+      '🌟 Interpreting astrological patterns...',
+      '✨ Preparing your personalized insights...'
+    ];
+  };
+
+  const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval = null, userQuestion = '', isResume = false) => {
     if (!messageId) {
       return;
     }
@@ -848,13 +938,7 @@ export default function ChatScreen({ navigation, route }) {
       await addPendingMessage(messageId);
     }
     
-    const loadingMessages = [
-      '🔮 Analyzing your birth chart...',
-      '⭐ Consulting the cosmic energies...',
-      '📊 Calculating planetary positions...',
-      '🌟 Interpreting astrological patterns...',
-      '✨ Preparing your personalized insights...'
-    ];
+    const loadingMessages = getLoadingMessages(userQuestion);
     
     const poll = async () => {
       const pollStartTime = new Date().toISOString();
@@ -891,49 +975,50 @@ export default function ChatScreen({ navigation, route }) {
         // console.log(`📊 [POLL END] messageId: ${messageId}, status: ${status.status}, pollCount: ${pollCount}, startTime: ${pollStartTime}, endTime: ${pollEndTime}`);
         
         if (status.status === 'completed') {
-          // console.log(`✅ [POLL] Message completed! messageId: ${messageId}, took ${Math.round((new Date(pollEndTime) - new Date(pollStartTime)) / 1000)} seconds`);
-          // Check if person changed during processing - use more reliable check
-          const currentPersonIdNow = birthData ? `${birthData.date}_${birthData.time}_${birthData.latitude}_${birthData.longitude}` : null;
-          
-          // Only skip if we have a clear person change (both IDs exist and are different)
-          if (currentPersonId && currentPersonIdNow && currentPersonIdNow !== currentPersonId) {
-            await removePendingMessage(messageId);
-            return;
-          }
-          
           if (loadingInterval) clearInterval(loadingInterval);
-          
-          // Update message with response content including terms, glossary, and message_type
-          // console.log('📊 [DEBUG] Status received:', {
-          //   has_terms: !!status.terms,
-          //   terms_count: status.terms?.length || 0,
-          //   has_glossary: !!status.glossary,
-          //   glossary_keys: Object.keys(status.glossary || {}).length,
-          //   has_summary_image: !!status.summary_image,
-          //   summary_image: status.summary_image
-          // });
-          
-          setMessagesWithStorage(prev => {
-            const updated = prev.map(msg => 
-              msg.messageId === messageId 
-                ? { 
-                    ...msg, 
-                    content: status.content || 'Response received but content is empty', 
-                    isTyping: false,
-                    terms: status.terms || [],
-                    glossary: status.glossary || {},
-                    message_type: status.message_type || 'answer',
-                    summary_image: status.summary_image || null
-                  }
-                : msg
-            );
-            return updated;
-          });
-          
-          setLoading(false);
-          setIsTyping(false);
-          await removePendingMessage(messageId);
-          fetchBalance();
+
+          const showFinalMessage = () => {
+            setMessagesWithStorage(prev => {
+              const updated = prev.map(msg => 
+                msg.messageId === messageId 
+                  ? { 
+                      ...msg, 
+                      content: status.content || 'Response received but content is empty', 
+                      isTyping: false,
+                      terms: status.terms || [],
+                      glossary: status.glossary || {},
+                      message_type: status.message_type || 'answer',
+                      summary_image: status.summary_image || null,
+                      follow_up_questions: status.follow_up_questions || []
+                    }
+                  : msg
+              );
+              return updated;
+            });
+            setLoading(false);
+            setIsTyping(false);
+            removePendingMessage(messageId);
+            fetchBalance();
+          };
+
+          const analysisSteps = status.analysis_steps || [];
+          if (analysisSteps.length > 0) {
+            let stepIndex = 0;
+            const stepInterval = setInterval(() => {
+              if (stepIndex < analysisSteps.length) {
+                const stepMessage = `⚙️ ${analysisSteps[stepIndex]}...`;
+                setMessagesWithStorage(prev => prev.map(msg => 
+                  msg.messageId === messageId ? { ...msg, content: stepMessage } : msg
+                ));
+                stepIndex++;
+              } else {
+                clearInterval(stepInterval);
+                showFinalMessage();
+              }
+            }, 1500);
+          } else {
+            showFinalMessage();
+          }
           
           return;
         }
@@ -1058,7 +1143,9 @@ export default function ChatScreen({ navigation, route }) {
     setLoading(true);
     
     // Restart polling (resume mode)
-    pollForResponse(messageId, null, sessionId, null, true);
+    const processingMessage = messages.find(msg => msg.messageId === messageId);
+    const userMessage = messages.find(msg => msg.id === processingMessage?.userMessageId);
+    pollForResponse(messageId, null, sessionId, null, userMessage?.content || '', true);
   };
 
   const sendMessage = async (messageText = inputText) => {
@@ -1091,14 +1178,17 @@ export default function ChatScreen({ navigation, route }) {
       return newMessages;
     });
 
+    const loadingMessages = getLoadingMessages(messageText);
+
     // Add processing message immediately
     const processingMessageId = Date.now() + '_processing';
     const processingMessage = {
       id: processingMessageId,
-      content: '🔮 Analyzing your birth chart...',
+      content: loadingMessages[0],
       role: 'assistant',
       timestamp: new Date().toISOString(),
       isTyping: true,
+      userMessageId: userMessageId,
     };
     
     setMessagesWithStorage(prev => {
@@ -1120,15 +1210,6 @@ export default function ChatScreen({ navigation, route }) {
         return;
       }
     }
-
-    // Loading messages for cycling
-    const loadingMessages = [
-      '🔮 Analyzing your birth chart...',
-      '⭐ Consulting the cosmic energies...',
-      '📊 Calculating planetary positions...',
-      '🌟 Interpreting astrological patterns...',
-      '✨ Preparing your personalized insights...'
-    ];
 
     // Start cycling through loading messages
     let messageIndex = 0;
@@ -1183,7 +1264,7 @@ export default function ChatScreen({ navigation, route }) {
         ));
         
         // Start polling
-        pollForResponse(messageId, processingMessageId, currentSessionId, loadingInterval);
+        pollForResponse(messageId, processingMessageId, currentSessionId, loadingInterval, messageText);
         return;
       }
       
@@ -1266,7 +1347,7 @@ export default function ChatScreen({ navigation, route }) {
       console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
       
       // Start polling IMMEDIATELY before state updates to avoid delay
-      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval);
+      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval, messageText);
 
       // Update user message with real DB ID (async, non-blocking)
       if (user_message_id) {

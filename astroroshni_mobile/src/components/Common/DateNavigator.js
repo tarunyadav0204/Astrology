@@ -144,29 +144,25 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
         </View>
       </View>
       
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.datePickerContainer}>
-            <DateTimePicker
-              value={tempDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                if (selectedDate) {
-                  setTempDate(selectedDate);
-                  if (Platform.OS === 'android') {
-                    onDateChange(selectedDate);
-                    setShowDatePicker(false);
+      {Platform.OS === 'ios' ? (
+        <Modal
+          visible={showDatePicker}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.datePickerContainer}>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setTempDate(selectedDate);
                   }
-                }
-              }}
-            />
-            {Platform.OS === 'ios' && (
+                }}
+              />
               <TouchableOpacity 
                 style={styles.doneButton} 
                 onPress={() => {
@@ -176,17 +172,31 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
               >
                 <Text style={styles.doneButtonText}>Done</Text>
               </TouchableOpacity>
-            )}
+            </View>
+            <TouchableOpacity 
+              style={styles.closeOverlay}
+              onPress={() => {
+                setTempDate(date);
+                setShowDatePicker(false);
+              }}
+            />
           </View>
-          <TouchableOpacity 
-            style={styles.closeOverlay}
-            onPress={() => {
-              setTempDate(date);
+        </Modal>
+      ) : (
+        showDatePicker && (
+          <DateTimePicker
+            value={tempDate}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
               setShowDatePicker(false);
+              if (selectedDate) {
+                onDateChange(selectedDate);
+              }
             }}
           />
-        </View>
-      </Modal>
+        )
+      )}
     </View>
   );
 };

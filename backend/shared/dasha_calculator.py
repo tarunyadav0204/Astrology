@@ -34,14 +34,14 @@ class DashaCalculator:
             current_date = datetime.now()
             
         # DEBUG: Log input data to shared calculator
-        print(f"\n🔧 SHARED DASHA CALCULATOR DEBUG:")
-        print(f"   Input birth_data keys: {list(birth_data.keys())}")
-        print(f"   Name: {birth_data.get('name', 'N/A')}")
-        print(f"   Date: {birth_data.get('date', 'N/A')}")
-        print(f"   Time: {birth_data.get('time', 'N/A')}")
-        print(f"   Timezone: {birth_data.get('timezone', 'N/A')} (type: {type(birth_data.get('timezone'))})")
-        print(f"   Lat/Lon: {birth_data.get('latitude', 'N/A')}, {birth_data.get('longitude', 'N/A')}")
-        print(f"   Current date: {current_date}")
+        # print(f"\n🔧 SHARED DASHA CALCULATOR DEBUG:")
+        # print(f"   Input birth_data keys: {list(birth_data.keys())}")
+        # print(f"   Name: {birth_data.get('name', 'N/A')}")
+        # print(f"   Date: {birth_data.get('date', 'N/A')}")
+        # print(f"   Time: {birth_data.get('time', 'N/A')}")
+        # print(f"   Timezone: {birth_data.get('timezone', 'N/A')} (type: {type(birth_data.get('timezone'))})")
+        # print(f"   Lat/Lon: {birth_data.get('latitude', 'N/A')}, {birth_data.get('longitude', 'N/A')}")
+        # print(f"   Current date: {current_date}")
             
         try:
             # Calculate birth Julian Day

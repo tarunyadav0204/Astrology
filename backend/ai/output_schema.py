@@ -9,62 +9,56 @@ def get_output_schema(premium_analysis=False, analysis_type='birth'):
     # Base schema for all analysis types
     base_schema = """
 ### 🏛️ RESPONSE STRUCTURE (MANDATORY)
-1. <div class="quick-answer-card">**Quick Answer**: [Comprehensive summary of full analysis. Use Jaimini AL/UL as final verdict for status/marriage.]</div>
-2. ### Key Insights: [3 Bullets + "The Jaimini Secret" bullet using talents/wealth sutras.]
-3. ### Astrological Analysis: [Direct content under header + these #### subsections]:
-   - #### The Parashari View | #### Jaimini Sutra Deep-Dive (AL/UL/KL/Yogas)
-   - #### Nadi Precision (links) | #### Timing Synthesis (Dasha+Chara+Yogini+Mudda)
-   - #### Triple Perspective (Sudarshana) | #### Divisional Chart Analysis
-4. ### Nakshatra Insights: [Classical authority analysis + remedies.]
-5. ### Timing & Guidance: [Actionableroadmap.]
-6. <div class="final-thoughts-card">**Final Thoughts**: [Conclusion.]</div>
+Your response MUST follow this exact sequence:
+1. <div class="quick-answer-card">**Quick Answer**: [Comprehensive summary]</div>
+2. ### Key Insights: [3-4 bullets]
+3. ### Analysis Steps: [A bulleted list of 3-4 key astrological calculation steps taken to generate the response, e.g., "- Analyzing Dasha periods", "- Calculating planetary dignities", "- Cross-referencing Navamsa chart".]
+4. ### Astrological Analysis: [Use #### for all subsections below]
+   - #### The Parashari View: [Bulleted list of predictions]
+   - #### The Jaimini View: [Paragraph for Chara Dasha (MD & AD), then bulleted list for Karakas]
+   - #### Nadi Interpretation: [Bulleted list, one for each planetary combination]
+   - #### Timing Synthesis: [Synthesize all dasha systems]
+   - #### Triple Perspective (Sudarshana): [Analyze from Lagna, Moon, Sun]
+   - #### Divisional Chart Analysis: [Analyze relevant D-chart]
+5. ### Nakshatra Insights: [Analysis + Remedies]
+6. ### Timing & Guidance: [Actionable roadmap]
+7. <div class="final-thoughts-card">**Final Thoughts**: [Conclusion]</div>
+8. GLOSSARY_START
+   [JSON block of all <term> definitions]
+   GLOSSARY_END
+9. <div class="follow-up-questions">[3-4 emoji-led questions]</div>
 
 ### 🚨 FORMATTING RULES
-- [HEADERS]: ONLY ### for main; ONLY #### for subs inside Analysis. No # or ##.
+- [HEADERS]: Use ### for main headers, #### for subsections.
 - [TECH-TERMS]: Wrap all in <term id="key">Term</term>.
-- [GLOSSARY]: End with GLOSSARY_START/END JSON block.
-- [FOLLOW-UP]: End with <div class="follow-up-questions"> + 3-4 emoji-led questions in user format (e.g., "Tell me about my health" instead of "Would you like health analysis?").
 """
 
     # Premium image instructions
     image_instructions = ""
     if premium_analysis:
         image_instructions = """
-### 🎨 SUMMARY IMAGE (MANDATORY)
-Generate a VISUAL NARRATIVE prompt within SUMMARY_IMAGE_START/END tags.
-- [STRUCTURE]: Multi-panel (3-6 organic scenes) representing key themes, predictions, and timing.
-- [CONTENT]: Symbolic metaphors only (no literal figures). Map colors: Indigo (Challenge), Gold (Success), Emerald (Growth), Purple (Soul), Orange (Partnership).
-- [STYLE]: Professional hand-drawn pencil sketch with watercolor washes. Minimalist and cohesive.
-- [LABELS]: Elegant hand-lettered 1-3 word ALL CAPS headers per panel (e.g., "TRANSFORMATION").
-- [PROMPT-REQ]: Must describe layout, symbolism, colors, and narrative flow between panels.
+9. SUMMARY_IMAGE_START
+   [A multi-panel visual narrative prompt for an image generation model.]
+   SUMMARY_IMAGE_END
 """
 
     # Analysis-specific overrides
     if analysis_type == 'mundane':
         return """
 RESPONSE FORMAT - MUNDANE MODE:
-Start with Executive Summary then provide geopolitical analysis:
-
-<div class="quick-answer-card">**Executive Summary**: [Complete risk assessment and market outlook in clear, professional language. Cover major economic, political, and market trends.]</div>
-
+<div class="quick-answer-card">**Executive Summary**: [Risk assessment & market outlook]</div>
 ### Key Risk Factors
-[Bullet points with specific risks and probabilities]
-
+[Bullet points]
 ### Economic & Market Analysis
-[Detailed analysis with timing and sectors]
-
+[Detailed analysis]
 ### Geopolitical Outlook
-[Political stability, conflicts, policy changes]
-
-<div class="final-thoughts-card">**Strategic Outlook**: [Balanced conclusion with actionable insights]</div>
-
-FOLLOW-UP QUESTIONS - MANDATORY:
-Generate 3-4 contextually relevant follow-up questions based on the user's query. Examples for mundane analysis:
+[Political stability, conflicts]
+<div class="final-thoughts-card">**Strategic Outlook**: [Conclusion]</div>
+GLOSSARY_START
+[JSON block of definitions]
+GLOSSARY_END
 <div class="follow-up-questions">
-📊 Which sectors will outperform?
-⚠️ What are the major risk events?
-💱 How will currency markets react?
-🌍 What geopolitical shifts are likely?
+[4 relevant questions]
 </div>
 """
     

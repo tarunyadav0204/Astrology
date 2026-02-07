@@ -112,8 +112,20 @@ class KotaChakraCalculator(BaseCalculator):
     
     def _analyze_malefic_siege(self, fortress_map: Dict[str, List[str]]) -> Dict[str, Any]:
         """Analyze malefic and benefic positions in fortress sections"""
-        malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu']
+        malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun']
         benefics = ['Jupiter', 'Venus']
+        
+        # Handle Moon's phase
+        sun_lon = self.chart_data['planets'].get('Sun', {}).get('longitude', 0)
+        moon_lon = self.chart_data['planets'].get('Moon', {}).get('longitude', 0)
+        if (moon_lon - sun_lon + 360) % 360 > 180:
+            malefics.append('Moon') # Waning Moon
+        else:
+            benefics.append('Moon') # Waxing Moon
+
+        # Handle Mercury's association (simplified for now)
+        benefics.append('Mercury')
+
         siege_data = {'Stambha': [], 'Madhya': [], 'Prakaara': [], 'Bahya': []}
         
         # Check all planets (malefics and benefics)

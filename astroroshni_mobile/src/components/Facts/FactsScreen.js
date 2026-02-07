@@ -10,6 +10,8 @@ import {
   Alert,
   ActivityIndicator,
   SafeAreaView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -240,7 +242,10 @@ const FactsScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { 
+    flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
   header: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   backButton: { padding: 4 },
   title: { fontSize: 20, fontWeight: 'bold', flex: 1 },

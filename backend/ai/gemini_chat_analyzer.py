@@ -384,6 +384,8 @@ class GeminiChatAnalyzer:
                 'terms': parsed_response['terms'],
                 'glossary': parsed_response['glossary'],
                 'summary_image': summary_image_url,
+                'follow_up_questions': parsed_response.get('follow_up_questions', []),
+                'analysis_steps': parsed_response.get('analysis_steps', []),
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
                 'timing': {
@@ -815,20 +817,12 @@ You are generating a "Yearly Roadmap". You must synthesize the Birth Chart (Long
             question_lower = user_question.lower()
             intent_category = None
             
-            if any(word in question_lower for word in ['career', 'job', 'work', 'profession', 'business']):
-                intent_category = 'career'
-            elif any(word in question_lower for word in ['money', 'wealth', 'finance', 'income', 'rich']):
-                intent_category = 'wealth'
-            elif any(word in question_lower for word in ['health', 'disease', 'illness', 'medical']):
-                intent_category = 'health'
-            elif any(word in question_lower for word in ['marriage', 'spouse', 'partner', 'relationship']):
-                intent_category = 'marriage'
-            elif any(word in question_lower for word in ['education', 'study', 'learning', 'degree']):
-                intent_category = 'education'
-            
+            analysis_type = context.get('intent', {}).get('analysis_type') if context.get('intent') else None
+            intent_category = context.get('intent', {}).get('category') if context.get('intent') else 'general'
+
             # Use modular system instruction
-            system_instruction = build_system_instruction(intent_category=intent_category)
-            print(f"\n🎯 OPTIMIZED INSTRUCTION: {intent_category or 'general'} ({len(system_instruction)} chars vs {len(ChatContextBuilder.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION)} original)")
+            system_instruction = build_system_instruction(analysis_type=analysis_type, intent_category=intent_category)
+            print(f"\n🎯 ANALYSIS TYPE: {analysis_type} | CATEGORY: {intent_category} | INSTRUCTION LENGTH: {len(system_instruction)} chars")
         
         # REORDERED FOR ATTENTION FIX: JSON DATA FIRST, INSTRUCTIONS LAST
         prompt_parts = []

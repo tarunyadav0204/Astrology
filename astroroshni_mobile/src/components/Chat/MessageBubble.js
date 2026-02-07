@@ -284,19 +284,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       return `<table>${header.trim()}|||${rows.trim()}</table>`;
     });
     
-    // Handle Follow-up Questions section - decode HTML entities first
-    formatted = formatted.replace(/<div class="follow-up-questions">([\s\S]*?)<\/div>/g, (match, questions) => {
-      // Decode HTML entities in the questions content
-      const decodedQuestions = questions
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ');
-      return `<followup>${decodedQuestions}</followup>`;
-    });
-    
     // Handle Final Thoughts section
     formatted = formatted.replace(/(### Final Thoughts[\s\S]*?)(?=###|$)/g, (match, finalThoughts) => {
       const cleanContent = finalThoughts.replace(/### Final Thoughts\n?/, '').trim();
@@ -319,7 +306,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     const sections = [
       { regex: /<quickanswer>(.*?)<\/quickanswer>/gs, type: 'quick' },
       { regex: /<finalthoughts>(.*?)<\/finalthoughts>/gs, type: 'final' },
-      { regex: /<followup>(.*?)<\/followup>/gs, type: 'followup' },
       { regex: /<table>(.*?)<\/table>/gs, type: 'table' }
     ];
     
@@ -486,76 +472,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             </Text>
           </LinearGradient>
         );
-      } else if (item.type === 'followup') {
-        // Parse follow-up questions
-        let questionsText = item.match[1]
-          .replace(/<[^>]*>/g, '')
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&#39;/g, "'")
-          .trim();
-        
-        let questions = [];
-        
-        // Split by bullet points first (most common pattern)
-        if (questionsText.includes('* ')) {
-          questions = questionsText
-            .split('* ')
-            .map(q => q.trim())
-            .filter(q => q.length > 3);
-        }
-        // Try emoji patterns
-        else if (questionsText.match(/[🍎📚🧘🔮🌟⭐💫✨📅💼💕🌿💰🕉️]/)) {
-          questions = questionsText
-            .split(/(?=[🍎📚🧘🔮🌟⭐💫✨📅💼💕🌿💰🕉️])/)
-            .map(q => q.trim())
-            .filter(q => q.length > 3);
-        }
-        // Try newline splitting
-        else if (questionsText.includes('\n')) {
-          questions = questionsText
-            .split('\n')
-            .map(q => q.trim())
-            .filter(q => q.length > 3 && q.includes('?'));
-        }
-        // Try question mark patterns
-        else if (questionsText.includes('?') && questionsText.length > 10) {
-          const patterns = /(?=When will|What remedies|How to|What should|Would you|Shall we|Are you)/g;
-          if (questionsText.match(patterns)) {
-            questions = questionsText.split(patterns).filter(q => q.trim().length > 3);
-          } else {
-            questions = [questionsText];
-          }
-        }
-        
-        if (questions.length > 0) {
-          elements.push(
-            <View key={`followup-${currentIndex++}`} style={styles.followUpContainer}>
-              {questions.map((question, index) => {
-                const cleanQuestion = question
-                  .replace(/^[\s🔮🌟⭐💫✨📅💼🍎📚🧘]+/, '')
-                  .replace(/&quot;/g, '"')
-                  .replace(/&amp;/g, '&')
-                  .replace(/&lt;/g, '<')
-                  .replace(/&gt;/g, '>')
-                  .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Remove all emojis
-                  .trim();
-                if (cleanQuestion.length < 5) return null;
-                return (
-                  <TouchableOpacity
-                    key={`question-${index}`}
-                    style={styles.followUpButton}
-                    onPress={() => onFollowUpClick && onFollowUpClick(cleanQuestion)}
-                  >
-                    <Text style={styles.followUpText}>{cleanQuestion}</Text>
-                  </TouchableOpacity>
-                );
-              }).filter(Boolean)}
-            </View>
-          );
-        }
       } else if (item.type === 'table') {
         // Parse table data
         const tableContent = item.match[1];
@@ -631,7 +547,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         elements.push(
           <Text
             key={`tooltip-${startIndex}-${i}`}
-            onPress={() => setTooltipModal({ show: true, term: part, definition })}
+            onPress={() => setTooltipModal({ show: true, term: part, definition: definition })}
             style={styles.tooltipText}
           >
             {part}
@@ -1044,6 +960,27 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           {renderedElements}
         </View>
 
+        {/* NEW: Render Follow-up Questions from the dedicated prop */}
+        {message.follow_up_questions && message.follow_up_questions.length > 0 && (
+          <View style={styles.followUpContainer}>
+            {message.follow_up_questions.map((question, index) => {
+              const cleanQuestion = question
+                .replace(/^[\s🔮🌟⭐💫✨📅💼🍎📚🧘*•-]+/, '')
+                .trim();
+              if (cleanQuestion.length < 5) return null;
+              return (
+                <TouchableOpacity
+                  key={`followup-prop-${index}`}
+                  style={styles.followUpButton}
+                  onPress={() => onFollowUpClick && onFollowUpClick(cleanQuestion)}
+                >
+                  <Text style={styles.followUpText}>{cleanQuestion}</Text>
+                </TouchableOpacity>
+              );
+            }).filter(Boolean)}
+          </View>
+        )}
+
         {!message.isTyping && message.messageId && (
           <View style={styles.actionButtons}>
             {/* Restart Button for timeout messages */}
@@ -1169,23 +1106,20 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         visible={tooltipModal.show}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setTooltipModal({ show: false, content: '', position: { x: 0, y: 0 } })}
+        onRequestClose={() => setTooltipModal({ show: false, term: '', definition: '' })}
       >
-        <TouchableOpacity
-          style={styles.tooltipOverlay}
-          activeOpacity={1}
-          onPress={() => setTooltipModal({ show: false, content: '', position: { x: 0, y: 0 } })}
-        >
-          <View style={[
-            styles.tooltipContainer,
-            {
-              left: (tooltipModal.position?.x || 0) - 100,
-              top: (tooltipModal.position?.y || 0) - 60
-            }
-          ]}>
-            <Text style={styles.tooltipText}>{tooltipModal.content}</Text>
+        <View style={styles.tooltipModalOverlay}>
+          <View style={styles.tooltipModalContent}>
+            <Text style={styles.tooltipModalTitle}>{tooltipModal.term}</Text>
+            <Text style={styles.tooltipModalDefinition}>{tooltipModal.definition}</Text>
+            <TouchableOpacity
+              style={styles.tooltipModalClose}
+              onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
+            >
+              <Text style={styles.tooltipModalCloseText}>Close</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
       
       {/* Image Modal */}
@@ -1232,7 +1166,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '88%',
+    maxWidth: '98%',
     borderRadius: 20,
     padding: 16,
     marginVertical: 6,
@@ -1274,12 +1208,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginVertical: 2,
     color: '#2c3e50',
+    flexShrink: 1,
   },
   boldText: {
     fontSize: 15,
     lineHeight: 22,
     fontWeight: '700',
     color: '#2c3e50',
+    flexShrink: 1,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -1341,6 +1277,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#2c3e50',
+    flexShrink: 1,
   },
   quickAnswerCard: {
     borderRadius: 20,
@@ -1463,12 +1400,12 @@ const styles = StyleSheet.create({
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 8,
   },
   typingText: {
     fontSize: 15,
     color: '#2c3e50',
-    flex: 1,
     marginRight: 8,
   },
   typingDots: {
@@ -1481,6 +1418,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#ff6b35',
     marginHorizontal: 2,
+  },
+  typingBubble: {
+    maxWidth: '88%',
   },
   partnershipBubble: {
     borderLeftWidth: 3,
