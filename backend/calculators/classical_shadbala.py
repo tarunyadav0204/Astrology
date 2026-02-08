@@ -911,10 +911,17 @@ def calculate_chesta_bala(planet: str, jd: float) -> float:
         print(f"Error in calculate_chesta_bala for {planet}: {e}")
         return 30.0
 
-def calculate_classical_shadbala(birth_data: Dict, chart_data: Dict) -> Dict:
+def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
     """Main function to calculate complete Shadbala for all planets"""
     try:
         swe.set_sid_mode(swe.SIDM_LAHIRI)
+        
+        # Handle both dict and SimpleNamespace for birth_data
+        if hasattr(birth_data, '__dict__'):
+            # Convert SimpleNamespace to dict
+            birth_dict = vars(birth_data)
+        else:
+            birth_dict = birth_data
         
         # DEBUG: Check what's in chart_data
         print(f"\n=== Chart Data Keys: {list(chart_data.keys())} ===")
@@ -925,8 +932,8 @@ def calculate_classical_shadbala(birth_data: Dict, chart_data: Dict) -> Dict:
             print("Shadbala requires divisional chart data for accurate Saptavargaja Bala calculation.")
         
         # Get Julian Day with validation
-        date_str = birth_data.get('date', '')
-        time_str = birth_data.get('time', '')
+        date_str = birth_dict.get('date', '')
+        time_str = birth_dict.get('time', '')
         
         if not date_str or not time_str:
             raise ValueError("Missing date or time in birth_data")
@@ -983,7 +990,7 @@ def calculate_classical_shadbala(birth_data: Dict, chart_data: Dict) -> Dict:
                 ayan_bala = calculate_ayan_bala(planet_name, jd)
                 
                 dig_bala = calculate_dig_bala(planet_name, longitude, house_cusps)
-                kala_bala = calculate_kala_bala(planet_name, jd, birth_data)
+                kala_bala = calculate_kala_bala(planet_name, jd, birth_dict)
                 chesta_bala = calculate_chesta_bala(planet_name, jd)
                 naisargika_bala = NAISARGIKA_BALA.get(planet_name, 30.0)
                 drik_bala = calculate_drik_bala(planet_name, longitude, planets, house_cusps)
