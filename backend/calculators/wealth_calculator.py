@@ -4,7 +4,7 @@ from .house_analyzer import HouseAnalyzer
 from .house_strength_calculator import HouseStrengthCalculator
 from .aspect_calculator import AspectCalculator
 from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
-from .shadbala_calculator import ShadbalaCalculator
+from .classical_shadbala import calculate_classical_shadbala
 from .yoga_calculator import YogaCalculator
 
 class WealthCalculator(BaseCalculator):
@@ -20,7 +20,7 @@ class WealthCalculator(BaseCalculator):
         self.house_strength_calc = HouseStrengthCalculator(chart_data)
         self.aspect_calc = AspectCalculator(chart_data)
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
-        self.shadbala_calc = ShadbalaCalculator(chart_data)
+        self.shadbala_data = calculate_classical_shadbala(birth_data, chart_data)
         self.yoga_calc = YogaCalculator(chart_data=chart_data)
         
         # Wealth house mappings

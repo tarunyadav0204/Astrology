@@ -17,7 +17,7 @@ sys.path.insert(0, '/Users/tarunydv/Desktop/Code/AstrologyApp/backend')
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from shared.dasha_calculator import DashaCalculator
-from calculators.shadbala_calculator import ShadbalaCalculator
+from calculators.classical_shadbala import calculate_classical_shadbala
 from calculators.ashtakavarga import AshtakavargaCalculator
 from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator
 from calculators.event_predictor.parashari_predictor import ParashariEventPredictor
@@ -52,6 +52,12 @@ print(f"  Ascendant: {chart_data['ascendant']:.2f}° ({['Aries', 'Taurus', 'Gemi
 
 transit_calc = RealTransitCalculator()
 dasha_calc = DashaCalculator()
+class ShadbalaCalculator:
+    def __init__(self, chart_data):
+        self.chart_data = chart_data
+    def calculate_shadbala(self):
+        return calculate_classical_shadbala({'date': '1980-04-02', 'time': '14:55:00', 'latitude': 29.1492, 'longitude': 75.7217, 'timezone': 'Asia/Kolkata'}, self.chart_data)
+
 shadbala_calc = ShadbalaCalculator(chart_data)
 
 # Real dignities calculator

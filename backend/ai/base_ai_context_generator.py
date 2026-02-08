@@ -145,7 +145,7 @@ For every user query, structure your response exactly as follows:
         chara_karaka_calc = CharaKarakaCalculator(chart_data)
         yoga_calc = YogaCalculator(birth_obj, chart_data)
         badhaka_calc = BadhakaCalculator(chart_data)
-        argala_calc = ArgalaCalculator(chart_data)
+        argala_calc = ArgalaCalculator(chart_data, birth_obj)
         planetary_war_calc = PlanetaryWarCalculator(chart_data)
         vargottama_calc = VargottamaCalculator(chart_data, {})
         neecha_bhanga_calc = NeechaBhangaCalculator(chart_data, {})

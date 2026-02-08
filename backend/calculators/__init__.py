@@ -12,18 +12,11 @@ from .chart_calculator import ChartCalculator
 from .transit_calculator import TransitCalculator
 from .panchang_calculator import PanchangCalculator
 from .friendship_calculator import FriendshipCalculator
-from .shadbala_calculator import ShadbalaCalculator
-from .chara_karaka_calculator import CharaKarakaCalculator
-from .nakshatra_calculator import NakshatraCalculator
-from .yoga_calculator import YogaCalculator
-from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
-from .argala_calculator import ArgalaCalculator
-from .profession_calculator import ProfessionCalculator
-from .comprehensive_calculator import ComprehensiveCalculator
+from .classical_shadbala import calculate_classical_shadbala
 
 __all__ = [
     'BaseCalculator',
-    'StrengthCalculator', 
+    'StrengthCalculator',
     'AspectCalculator',
     'HouseStrengthCalculator',
     'HouseRelationshipCalculator',
@@ -36,7 +29,7 @@ __all__ = [
     'TransitCalculator',
     'PanchangCalculator',
     'FriendshipCalculator',
-    'ShadbalaCalculator',
+    'calculate_classical_shadbala',
     'CharaKarakaCalculator',
     'NakshatraCalculator',
     'YogaCalculator',

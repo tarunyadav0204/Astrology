@@ -170,6 +170,9 @@ def get_dig_bala_formula(planet: str, planet_data: dict) -> dict:
 
 def get_kala_bala_formulas(planet: str, planet_data: dict, birth_data: dict, jd: float) -> dict:
     """Get Kala Bala formula explanations with actual values"""
+    if not isinstance(birth_data, dict):
+        birth_data = birth_data.__dict__
+        
     birth_time = birth_data.get('time', '12:00')
     hour = int(birth_time.split(':')[0])
     is_day = 6 <= hour <= 18

@@ -322,7 +322,7 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
         badhaka_calc = BadhakaCalculator(chart_data)
         friendship_calc = FriendshipCalculator()
         yoga_calc = YogaCalculator(birth_obj, chart_data)
-        argala_calc = ArgalaCalculator(chart_data)
+        argala_calc = ArgalaCalculator(chart_data, birth_obj)
         
         # Initialize Ashtakavarga calculator
         from calculators.ashtakavarga import AshtakavargaCalculator
@@ -435,6 +435,13 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
             except Exception as e:
                 # print(f"   ❌ Failed to calculate {chart_code}: {e}")
                 continue
+        
+        # CRITICAL FIX: Add divisions key to chart_data for Shadbala calculator
+        # Include D1 from chart_data itself, then add other divisional charts
+        divisions_data = {'D1': {p: {'sign': d.get('sign', 0), 'house': d.get('house', 1)} 
+                                 for p, d in chart_data.get('planets', {}).items()}}
+        divisions_data.update(self._convert_divisional_charts_to_divisions_format(divisional_charts))
+        chart_data['divisions'] = divisions_data
         
         # Update advanced calculators with divisional charts
         vargottama_calc = VargottamaCalculator(chart_data, divisional_charts)
@@ -1149,32 +1156,33 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
                             end_date = datetime(start_year, month_num + 1, 1) - timedelta(days=1)
                     else:
                         # Multiple months - use range
-                        if len(year_months) == 0:
+                        first_month = None
+                        if len(year_months) > 0:
+                            first_month = year_months[0]
+                            last_month = year_months[-1]
+                        
+                        if not first_month:
                             # Fallback if no months specified
                             start_date = datetime(start_year, 1, 1)
                             end_date = datetime(start_year, 12, 31)
                         else:
-                            first_month = year_months[0]
-                            last_month = year_months[-1]
-                        
-                        first_month_num = {
-                            'January': 1, 'February': 2, 'March': 3, 'April': 4,
-                            'May': 5, 'June': 6, 'July': 7, 'August': 8,
-                            'September': 9, 'October': 10, 'November': 11, 'December': 12
-                        }.get(first_month, 1)
-                        
-                        last_month_num = {
-                            'January': 1, 'February': 2, 'March': 3, 'April': 4,
-                            'May': 5, 'June': 6, 'July': 7, 'August': 8,
-                            'September': 9, 'October': 10, 'November': 11, 'December': 12
-                        }.get(last_month, 12)
-                        
-                        start_date = datetime(start_year, first_month_num, 1)
-                        if last_month_num == 12:
-                            end_date = datetime(start_year + 1, 1, 1) - timedelta(days=1)
-                        else:
-                            end_date = datetime(start_year, last_month_num + 1, 1) - timedelta(days=1)
-                    
+                            first_month_num = {
+                                'January': 1, 'February': 2, 'March': 3, 'April': 4,
+                                'May': 5, 'June': 6, 'July': 7, 'August': 8,
+                                'September': 9, 'October': 10, 'November': 11, 'December': 12
+                            }.get(first_month, 1)
+                            
+                            last_month_num = {
+                                'January': 1, 'February': 2, 'March': 3, 'April': 4,
+                                'May': 5, 'June': 6, 'July': 7, 'August': 8,
+                                'September': 9, 'October': 10, 'November': 11, 'December': 12
+                            }.get(last_month, 12)
+                            
+                            start_date = datetime(start_year, first_month_num, 1)
+                            if last_month_num == 12:
+                                end_date = datetime(start_year + 1, 1, 1) - timedelta(days=1)
+                            else:
+                                end_date = datetime(start_year, last_month_num + 1, 1) - timedelta(days=1)                    
                     # Calculate period-specific dasha activations
                     try:
                         period_activations = self._calculate_period_dasha_activations(start_date, end_date, birth_data)
@@ -1559,6 +1567,48 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
         import hashlib
         birth_string = f"{birth_data.get('date')}_{birth_data.get('time')}_{birth_data.get('latitude')}_{birth_data.get('longitude')}"
         return hashlib.sha256(birth_string.encode()).hexdigest()
+    
+    def _convert_divisional_charts_to_divisions_format(self, divisional_charts: Dict) -> Dict:
+        """Convert divisional_charts dict to divisions format expected by Shadbala calculator.
+        
+        Input format: {'d9_navamsa': {'divisional_chart': {'planets': {...}}}, ...}
+        Output format: {'D9': {'Sun': {'sign': 4, 'house': 10}, 'Moon': {...}}, ...}
+        """
+        divisions = {}
+        
+        # Mapping from chart names to division codes (D1 handled separately)
+        chart_to_division = {
+            'd2_hora': 'D2',
+            'd3_drekkana': 'D3',
+            'd7_saptamsa': 'D7',
+            'd9_navamsa': 'D9',
+            'd10_dasamsa': 'D10',
+            'd12_dwadasamsa': 'D12',
+            'd30_trimsamsa': 'D30'
+        }
+        
+        for chart_name, division_code in chart_to_division.items():
+            if chart_name in divisional_charts:
+                chart_data = divisional_charts[chart_name]
+                
+                # Extract planets from nested structure
+                if 'divisional_chart' in chart_data:
+                    planets_data = chart_data['divisional_chart'].get('planets', {})
+                else:
+                    planets_data = chart_data.get('planets', {})
+                
+                # Convert to simple format
+                division_planets = {}
+                for planet_name, planet_data in planets_data.items():
+                    division_planets[planet_name] = {
+                        'sign': planet_data.get('sign', 0),
+                        'house': planet_data.get('house', 1)
+                    }
+                
+                if division_planets:
+                    divisions[division_code] = division_planets
+        
+        return divisions
     
     def _analyze_dasha_transit_significance(self, transit_planet: str, natal_planet: str, dasha_periods: List[Dict]) -> str:
         """Analyze the significance of transit based on current dasha periods"""

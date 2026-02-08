@@ -8,14 +8,14 @@ class PlanetAnalyzer(BaseCalculator):
         self.birth_data = birth_data
         
         # Initialize existing calculators
-        from .shadbala_calculator import ShadbalaCalculator
+        from .classical_shadbala import calculate_classical_shadbala
         from .planetary_dignities_calculator import PlanetaryDignitiesCalculator
         from .yogi_calculator import YogiCalculator
         from .badhaka_calculator import BadhakaCalculator
         from .friendship_calculator import FriendshipCalculator
         from .gandanta_calculator import GandantaCalculator
         
-        self.shadbala_calc = ShadbalaCalculator(chart_data)
+        self.shadbala_data = calculate_classical_shadbala(birth_data, chart_data)
         self.dignities_calc = PlanetaryDignitiesCalculator(chart_data)
         self.yogi_calc = YogiCalculator(chart_data)
         self.badhaka_calc = BadhakaCalculator(chart_data)
@@ -23,7 +23,6 @@ class PlanetAnalyzer(BaseCalculator):
         self.gandanta_calc = GandantaCalculator(chart_data)
         
         # Get calculated data
-        self.shadbala_data = self.shadbala_calc.calculate_shadbala()
         self.dignities_data = self.dignities_calc.calculate_planetary_dignities()
         self.yogi_data = self.yogi_calc.calculate_yogi_points(birth_data) if birth_data else {}
         # Get ascendant sign for badhaka calculation

@@ -31,6 +31,29 @@ class FriendshipCalculator(BaseCalculator):
             'Ketu': ['Sun', 'Moon', 'Mars']
         }
     
+    def calculate_compound_relation(self, p1: str, p2: str, p1_house: int, p2_house: int) -> str:
+        """Calculates the 5-fold (Panchadha) relationship for Shadbala Sthana Bala."""
+        
+        # 1. Determine Natural Relation
+        natural = 'neutral'
+        if p2 in self.NATURAL_FRIENDS.get(p1, []):
+            natural = 'friend'
+        elif p2 in self.NATURAL_ENEMIES.get(p1, []):
+            natural = 'enemy'
+            
+        # 2. Determine Temporal Relation (Tatkalika)
+        # Rule: 2, 3, 4, 10, 11, 12 houses from planet are friends.
+        diff = (p2_house - p1_house) % 12
+        temporal = 'friend' if diff in [1, 2, 3, 9, 10, 11] else 'enemy'
+        
+        # 3. Compound Logic (Panchadha)
+        if natural == 'friend':
+            return 'great_friend' if temporal == 'friend' else 'neutral'
+        elif natural == 'enemy':
+            return 'neutral' if temporal == 'friend' else 'great_enemy'
+        else:  # natural is neutral
+            return 'friend' if temporal == 'friend' else 'enemy'
+    
     def calculate_friendship(self, birth_data):
         """Calculate planetary friendship matrix"""
         # Handle both dict and object input

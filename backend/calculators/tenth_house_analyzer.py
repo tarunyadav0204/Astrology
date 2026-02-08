@@ -5,7 +5,7 @@ class TenthHouseAnalyzer:
     def __init__(self, chart_data, birth_details):
         self.chart_data = chart_data
         self.birth_details = birth_details
-        self.planet_analyzer = PlanetAnalyzer(chart_data)
+        self.planet_analyzer = PlanetAnalyzer(chart_data, birth_details)
         self.ashtakavarga = AshtakavargaCalculator(birth_details, chart_data)
         
     def analyze_tenth_house(self):

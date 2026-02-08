@@ -32,6 +32,7 @@ import SectorDetailScreen from './src/components/Financial/SectorDetailScreen';
 import AllOpportunitiesScreen from './src/components/Financial/AllOpportunitiesScreen';
 import KotaChakraScreen from './src/components/KotaChakra/KotaChakraScreen';
 import FactsScreen from './src/components/Facts/FactsScreen';
+import ShadbalaScreen from './src/components/Shadbala/ShadbalaScreen';
 import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
 import { CreditProvider } from './src/credits/CreditContext';
@@ -264,6 +265,11 @@ export default function App() {
           <Stack.Screen 
             name="Facts" 
             component={FactsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="Shadbala" 
+            component={ShadbalaScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
