@@ -400,8 +400,16 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             }
             d1_chart['houses'][house_num - 1]['planets'].append(planet_name)
         
+        # Get clarification count from conversation state
+        clarification_count = 0
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT clarification_count FROM conversation_state WHERE session_id = ?", (session_id,))
+            state_row = cursor.fetchone()
+            clarification_count = state_row[0] if state_row else 0
+        
         intent_router = IntentRouter()
-        intent = await intent_router.classify_intent(question, [], user_facts, language=language, force_ready=partnership_mode, d1_chart=d1_chart)
+        intent = await intent_router.classify_intent(question, [], user_facts, clarification_count=clarification_count, language=language, force_ready=partnership_mode, d1_chart=d1_chart)
         chart_insights = intent.get('chart_insights', [])
         print(f"📊 Got {len(chart_insights)} chart insights from intent router")
         

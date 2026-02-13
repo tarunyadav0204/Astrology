@@ -225,6 +225,10 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     # Get the mode directly from the intent context, it's the source of truth.
     # The 'mode' parameter can be unreliable if reset in the call stack.
     intent_mode = context.get('intent', {}).get('mode', mode)
+    
+    # Handle None or empty intent_mode
+    if not intent_mode:
+        intent_mode = mode or 'DEFAULT'
 
     history_text = ""
     if history:
