@@ -1,0 +1,157 @@
+{
+  "quickActions": {
+    "language": "மொழி",
+    "chart": "விளக்கப்படம்",
+    "dasha": "தசா",
+    "partnership": "கூட்டு"
+  },
+  "chartTypes": {
+    "lagna": {
+      "name": "லக்னம் (D1)",
+      "description": "முக்கிய பிறப்பு விளக்கப்படம்"
+    },
+    "navamsa": {
+      "name": "நவாம்சம் (D9)",
+      "description": "திருமணம் மற்றும் ஆன்மீகம்"
+    },
+    "transit": {
+      "name": "கோచారం",
+      "description": "நேரடி கிரக நிலைகள்"
+    },
+    "karkamsa": {
+      "name": "கர்காம்சம்",
+      "description": "ஆன்மீக பாதை மற்றும் தர்மம்"
+    },
+    "swamsa": {
+      "name": "ஸ்வாம்சம்",
+      "description": "பெற்றோர் வம்சம் மற்றும் மூதாதையர்"
+    },
+    "hora": {
+      "name": "ஹோரா (D2)",
+      "description": "செல்வம் மற்றும் குடும்பம்"
+    },
+    "drekkana": {
+      "name": "திரேக்காணம் (D3)",
+      "description": "சகோதரர்கள் மற்றும் மகிழ்ச்சி"
+    },
+    "chaturthamsa": {
+      "name": "சதுர்த்தாம்சம் (D4)",
+      "description": "விதி மற்றும் சொத்துக்கள்"
+    },
+    "dashamsa": {
+      "name": "தசாம்சம் (D10)",
+      "description": "தொழில் மற்றும் தொழில்"
+    },
+    "dwadashamsa": {
+      "name": "துவாதசாம்சம் (D12)",
+      "description": "பெற்றோர் மற்றும் மூதாதையர்"
+    },
+    "shodamsa": {
+      "name": "ஷோடசாம்சம் (D16)",
+      "description": "வாகனங்கள் மற்றும் வசதிகள்"
+    },
+    "vimsamsa": {
+      "name": "விம்சாம்சம் (D20)",
+      "description": "ஆன்மீக பயிற்சிகள்"
+    },
+    "chaturvimsamsa": {
+      "name": "சதுர்விம்சாம்சம் (D24)",
+      "description": "கற்றல் மற்றும் கல்வி"
+    },
+    "trimsamsa": {
+      "name": "திரிம்சாம்சம் (D30)",
+      "description": "துரதிர்ஷ்டங்கள் மற்றும் பிரச்சனைகள்"
+    },
+    "khavedamsa": {
+      "name": "கவேதம்சம் (D40)",
+      "description": "சுபம் மற்றும் அசுபம்"
+    },
+    "akshavedamsa": {
+      "name": "அக்ஷவேதம்சம் (D45)",
+      "description": "குணம் மற்றும் நடத்தை"
+    },
+    "shashtyamsa": {
+      "name": "ஷஷ்டியாம்சம் (D60)",
+      "description": "கடந்தகால வாழ்க்கை கர்மா"
+    }
+  },
+  "chartScreen": {
+    "loadingText": "காஸ்மிக் சீரமைப்புகளைக் கணக்கிடுகிறது...",
+    "loadingSubtext": "கிரக நிலைகளைப் படித்தல்",
+    "emptyTitle": "விளக்கப்படத் தரவு இல்லை",
+    "emptyText": "விளக்கப்படங்களைக் காண பிறப்பு விவரங்களைச் சேர்க்கவும்"
+  },
+  "planets": {
+    "Sun": "சூரியன்",
+    "Moon": "சந்திரன்",
+    "Mars": "செவ்வாய்",
+    "Mercury": "புதன்",
+    "Jupiter": "வியாழன்",
+    "Venus": "வெள்ளி",
+    "Saturn": "சனி"
+  },
+  "shadbalaAnalysis": "ஷட்பல பகுப்பாய்வு",
+  "classicalPlanetaryStrength": "கிளாசிக்கல் பிளானட்டரி வலிமை (7 காணக்கூடிய கிரகங்கள்)",
+  "rupas": "ரூபங்கள்",
+  "points": "புள்ளிகள்",
+  "grades": {
+    "Excellent": "சிறந்தது",
+    "Good": "நல்லது",
+    "Average": "சராசரி",
+    "Weak": "பலவீனமான"
+  },
+  "strengthComponents": "வலிமை கூறுகள்",
+  "components": {
+    "sthana_bala": "ஸ்தான பலம்",
+    "dig_bala": "திக் பலம்",
+    "kala_bala": "கால பலம்",
+    "chesta_bala": "சேஷ்ட பலம்",
+    "naisargika_bala": "நைசர்கிக பலம்",
+    "drik_bala": "दृक् பலம்",
+    "uccha_bala": "உச்ச பலம்",
+    "saptavargaja_bala": "சप्तవర్గజ பலம்",
+    "ojha_yugma_bala": "ஓஜ யுக்ம பலம்",
+    "kendradi_bala": "கேந்திராதி பலம்",
+    "drekkana_bala": "திரேக்காண பலம்"
+  },
+  "sthanaBalaBreakdown": "ஸ்தான பலம் உடைப்பு",
+  "kalaBalaBreakdown": "கால பலம் உடைப்பு",
+  "profile": {
+    "myProfile": "என் சுயவிவரம்",
+    "birthDateNotSet": "பிறந்த தேதி அமைக்கப்படவில்லை",
+    "connectChart": "சுயவிவரத்துடன் விளக்கப்படத்தை இணைக்கவும்",
+    "availableCredits": "கிடைக்கும் வரவுகள்",
+    "add": "+ சேர்",
+    "chats": "அரட்டைகள்",
+    "charts": "விளக்கப்படங்கள்",
+    "days": "நாட்கள்",
+    "birthChartEssence": "பிறப்பு விளக்கப்பட சாரம்",
+    "viewFullChart": "முழு விளக்கப்படத்தைக் காண்க",
+    "sunSign": "சூரிய ராசி",
+    "moonSign": "சந்திர ராசி",
+    "ascendant": "லக்னம்",
+    "calculating": "கணக்கிடப்படுகிறது...",
+    "currentRunningDashas": "தற்போதைய இயங்கும் தசாக்கள்",
+    "loading": " ஏற்றுகிறது...",
+    "quickActions": {
+      "newChat": "புதிய அரட்டை",
+      "viewChart": "விளக்கப்படத்தைக் காண்க",
+      "dashas": "தசாக்கள்",
+      "history": "வரலாறு",
+      "myFacts": "என் உண்மைகள்",
+      "language": "மொழி"
+    },
+    "birthDataRequired": "பிறப்புத் தரவு தேவை",
+    "dashasAlert": "தசாக்களைக் காண உங்கள் பிறப்பு விளக்கப்படத்தை இணைக்கவும்.",
+    "factsAlert": "உண்மைகளை நிர்வகிக்க உங்கள் பிறப்பு விளக்கப்படத்தை இணைக்கவும்.",
+    "settings": "அமைப்புகள்",
+    "lightTheme": "ஒளி தீம்",
+    "darkTheme": "இருண்ட தீம்",
+    "editBirthDetails": "பிறப்பு விவரங்களைத் திருத்து",
+    "logout": "வெளியேறு"
+  },
+  "languageModal": {
+    "title": "மொழியைத் தேர்ந்தெடுக்கவும்",
+    "close": "மூடு"
+  }
+}

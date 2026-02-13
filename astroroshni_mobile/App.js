@@ -4,6 +4,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import i18n from './src/locales/i18n';
+
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
 import ModernAuthFlow from './src/components/Auth/ModernAuthFlow';
 import ChatScreen from './src/components/Chat/ChatScreen';
@@ -48,7 +50,19 @@ export default function App() {
 
   useEffect(() => {
     checkAuthStatus();
+    loadSavedLanguage();
   }, []);
+
+  const loadSavedLanguage = async () => {
+    try {
+      const savedLanguage = await storage.getLanguage();
+      if (savedLanguage) {
+        i18n.changeLanguage(savedLanguage);
+      }
+    } catch (error) {
+      console.log('Error loading saved language:', error);
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {

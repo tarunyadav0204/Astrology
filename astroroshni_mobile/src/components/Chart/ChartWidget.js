@@ -16,10 +16,12 @@ import { COLORS } from '../../utils/constants';
 import NorthIndianChart from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import DateNavigator from '../Common/DateNavigator';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation }, ref) => {
+  const { t } = useTranslation();
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -663,7 +665,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             }}
           >
             <Text style={styles.quickActionIcon}>🪐</Text>
-            <Text style={styles.quickActionText}>Transits</Text>
+            <Text style={styles.quickActionText}>{t('chartScreen.transit', 'Transit')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -671,7 +673,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             onPress={onOpenDasha}
           >
             <Text style={styles.quickActionIcon}>⏰</Text>
-            <Text style={styles.quickActionText}>Dasha</Text>
+            <Text style={styles.quickActionText}>{t('chartScreen.dasha', 'Dasha')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -679,7 +681,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             onPress={toggleKarakas}
           >
             <Text style={styles.quickActionIcon}>🎯</Text>
-            <Text style={styles.quickActionText}>Karakas</Text>
+            <Text style={styles.quickActionText}>{t('chartScreen.karakas', 'Karakas')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -687,7 +689,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData(), birthData })}
           >
             <Text style={styles.quickActionIcon}>📋</Text>
-            <Text style={styles.quickActionText}>Positions</Text>
+            <Text style={styles.quickActionText}>{t('chartScreen.positions', 'Positions')}</Text>
           </TouchableOpacity>
         </View>
       )}

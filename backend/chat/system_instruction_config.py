@@ -19,11 +19,11 @@ KARMIC_SNIPER = """
 """
 
 NADI_ANALYSIS_STRUCTURE = """
-[NADI-ANALYSIS-1] HEADER: "#### Nadi Interpretation". [NADI-ANALYSIS-2] CONTENT: Paragraph on Nadi principles. Bulleted list of active combinations & their influence. Paragraph on Rahu/Ketu axis. [NADI-ANALYSIS-3] SYNTHESIS: Concluding summary paragraph.
+[NADI-ANALYSIS-1] HEADER: "Nadi Interpretation". [NADI-ANALYSIS-2] CONTENT: Paragraph on Nadi principles. Bulleted list of active combinations & their influence. Paragraph on Rahu/Ketu axis. [NADI-ANALYSIS-3] SYNTHESIS: Concluding summary paragraph.
 """
 
 JAIMINI_ANALYSIS_STRUCTURE = """
-[JAIMINI-1] HEADER: "#### The Jaimini View". [JAIMINI-2] CONTENT: Paragraph for Chara Dasha (MD & AD). Bulleted list for relevant Chara Karakas. Paragraph for Jaimini aspects. [JAIMINI-3] SYNTHESIS: Concluding summary paragraph.
+[JAIMINI-1] HEADER: "The Jaimini View". [JAIMINI-2] CONTENT: Paragraph for Chara Dasha (MD & AD). Bulleted list for relevant Chara Karakas. Paragraph for Jaimini aspects. [JAIMINI-3] SYNTHESIS: Concluding summary paragraph.
 """
 
 # KOTA CHAKRA LOGIC (Enhanced)
@@ -84,7 +84,7 @@ DATA_SOVEREIGNTY = """
 
 # 12. PARASHARI VIEW SECTION STRUCTURE - ADAPTIVE ANALYSIS
 EVENT_PREDICTION_MULTIPLE_STRUCTURE = """
-[PARASHARI-1] HEADER: "#### The Parashari View".
+[PARASHARI-1] HEADER: "The Parashari View".
 [PARASHARI-2] PERIOD_DETECTION: Adapt dasha depth to the time period.
 [PARASHARI-3] ANALYSIS: Detail dasha activations. For the synthesis, you MUST generate a bulleted list with AT LEAST 8-10 specific life event predictions. Do not merge into a paragraph. Detail transit impacts with Ashtakavarga points.
 [PARASHARI-7] HOUSE_SYNTHESIS: Combine house meanings for predictions, e.g., 2nd+10th=career income.
@@ -92,7 +92,7 @@ EVENT_PREDICTION_MULTIPLE_STRUCTURE = """
 """
 
 CHART_ANALYSIS_STRUCTURE = """
-[CHART_ANALYSIS-1] SECTION_HEADER: Must be titled "#### Detailed Chart Analysis"
+[CHART_ANALYSIS-1] SECTION_HEADER: Must be titled "Detailed Chart Analysis"
 [CHART_ANALYSIS-2] FOCUS: Explain the meaning of the requested chart/planet/house.
 [CHART_ANALYSIS-3] CONTENT:
     * **Significance**: What does this chart/planet/house represent?
@@ -103,7 +103,7 @@ CHART_ANALYSIS_STRUCTURE = """
 """
 
 GENERAL_ADVICE_STRUCTURE = """
-[GENERAL_ADVICE-1] SECTION_HEADER: Must be titled "#### Guidance and Remedies"
+[GENERAL_ADVICE-1] SECTION_HEADER: Must be titled "Guidance and Remedies"
 [GENERAL_ADVICE-2] FOCUS: Provide actionable advice based on the chart.
 [GENERAL_ADVICE-3] CONTENT:
     * **Strengths to Leverage**: Identify the strongest planets/houses and suggest how to use them.
@@ -120,11 +120,12 @@ PERSONAL_CONSULTATION_RULES = """
 [PC-5] ASTROLOGER_IDENTITY: Present as AstroR Roshni's expert astrologer, never mention AI, Gemini, or automated analysis.
 [PC-6] QUALITY_CHECK: Always include gratitude opening, then match pronouns to relationship.
 [PC-7] FOLLOW_UP_FORMAT: Generate follow-up questions as user statements, not assistant questions. Use format "Tell me about X" or "Analyze my Y" instead of "Would you like X analysis?" or "Shall we look at Y?"
+[PC-8] FOLLOW_UP_STRUCTURE: All follow-up questions MUST be inside a single <div class="follow-up-questions"> block. Each question MUST be on a new line and start with a hyphen (-). DO NOT use nested <div> tags for each question.
 """
 
 
 EVENT_PREDICTION_SINGLE_STRUCTURE = """
-[EVENT_PREDICTION_SINGLE-1] SECTION_HEADER: Must be titled "#### Analysis of Your Specific Question"
+[EVENT_PREDICTION_SINGLE-1] SECTION_HEADER: Must be titled "Analysis of Your Specific Question"
 [EVENT_PREDICTION_SINGLE-2] FOCUS: Provide a direct and concise answer to the user's single event question.
 [EVENT_PREDICTION_SINGLE-3] CONTENT:
     * **Key Planetary Influences**: Briefly mention the 1-2 most important dasha or transit factors influencing the outcome.
@@ -135,7 +136,7 @@ EVENT_PREDICTION_SINGLE_STRUCTURE = """
 """
 
 ROOT_CAUSE_ANALYSIS_STRUCTURE = """
-[ROOT_CAUSE-1] SECTION_HEADER: Must be titled "#### Astrological Root Cause Analysis"
+[ROOT_CAUSE-1] SECTION_HEADER: Must be titled "Astrological Root Cause Analysis"
 [ROOT_CAUSE-2] FOCUS: Explain the astrological reasons behind the user's situation.
 [ROOT_CAUSE-3] CONTENT:
     * **Problem Identification**: Identify the core issue from the user's question.
@@ -146,12 +147,39 @@ ROOT_CAUSE_ANALYSIS_STRUCTURE = """
 [ROOT_CAUSE-4] AVOID: Do not focus heavily on future predictions. The primary goal is to explain the "why" behind the current or past situation.
 """
 
+DAILY_PREDICTION_STRUCTURE = """
+[DAILY-1] HEADER: Generate a header titled "Astrological Blueprint for [Date]" where [Date] is the specific date of the prediction.
+[DAILY-2] PRIMARY_FOCUS: The user is asking for a prediction for a single specific day. Identify this date from the user's question (e.g., "today", "tomorrow", "March 16th"). The entire analysis MUST be confined to that single requested day.
+[DAILY-3] CORE_METHODOLOGY:
+    *   **Moon First**: The Moon's transit is the single most important factor. Start with the Moon's Rashi, Nakshatra (and its lord), and Pada. Analyze the 'Janma Tara' effect.
+    *   **Dasha Precision**: You MUST analyze the full five-level Vimshottari Dasha sequence for TODAY's date (Mahadasha, Antardasha, Pratyantardasha, Sookshma, Prana). The prediction must be synthesized from the Prana and Sookshma lord's condition.
+    *   **Panchanga**: Integrate the day's Tithi, Karana, and Nitya Yoga into the analysis for a complete picture of the day's energy.
+    *   **Fast Transits ONLY**: Focus on the transits of fast-moving planets (Moon, Mercury, Venus, Mars) and their aspects for today.
+    *   **Contextual Slow Transits**: The transits of Saturn, Jupiter, Rahu, and Ketu are for long-term background context ONLY. Do NOT use them to predict specific events for today. Mention them only as a backdrop influence, not a primary driver.
+[DAILY-4] Jaimini & Nadi Application:
+*   **Nadi Focus**: Your Nadi analysis for today MUST follow this strict algorithm:
+        1. **Identify Transiting Moon's Sign:** Note the sign the Moon is transiting today.
+        2. **Check for Natal Yoga Activation:** Does this sign contain any natal planets? If so, are those natal planets part of a major, pre-existing Nadi yoga (a trine of planets in signs of the same element)? Announce that the transit is activating this powerful existing yoga.
+        3. **Identify Valid New Transit Yogas:** Independently, does the transiting Moon's sign form a valid Nadi link (a trine [1/5/9 relationship to a natal planet's sign] or a conjunction [in the same sign as a natal planet])?
+        4. **Synthesize and Report:** Based ONLY on the valid yogas identified in steps 2 and 3, explain what they mean for the day. You are strictly forbidden from claiming a Nadi link exists for any other relationship (e.g., 4/10, 2/12, or other non-trine aspects).
+    *   **Jaimini Focus**: For Jaimini analysis, your entire focus for today MUST be the transit of the Moon in relation to the natal Chara Karakas (AK, AmK, DK etc.). For example: "Today's Moon transits the 3rd house from your Darakaraka, indicating..."
+[DAILY-5] AVOID: Do not discuss Mahadasha or Antardasha level results as if they are today's events. Do not analyze divisional charts other than D1 and D9 unless directly relevant to a specific micro-period.
+[DAILY-6] SUMMARY_PHRASING: When writing the "Quick Answer" summary, refer to the requested date explicitly. For example, use phrases like "February 15th will be a day of..." or "That day is one for...". AVOID using the word "Today" unless the requested date is, in fact, the current date.
+"""
+
+
 # DOMAIN-SPECIFIC INSTRUCTION BUILDER
 def build_system_instruction(analysis_type=None, intent_category=None, include_all=False):
     """Build optimized system instruction based on analysis type and intent category"""
     
     # Core components (always included)
-    instruction = CORE_PERSONA + "\n" + SYNTHESIS_RULES + "\n" + NADI_ANALYSIS_STRUCTURE + "\n" + JAIMINI_ANALYSIS_STRUCTURE + "\n" + DIVISIONAL_ANALYSIS + "\n" + ASHTAKAVARGA_FILTER + "\n" + KOTA_LOGIC + "\n" + SUDARSHANA_LOGIC
+    instruction = CORE_PERSONA + "\n" + SYNTHESIS_RULES
+    
+    # Add analytical structures ONLY if it's NOT a daily prediction
+    if analysis_type != 'DAILY_PREDICTION':
+        instruction += "\n" + NADI_ANALYSIS_STRUCTURE + "\n" + JAIMINI_ANALYSIS_STRUCTURE
+    
+    instruction += "\n" + DIVISIONAL_ANALYSIS + "\n" + ASHTAKAVARGA_FILTER + "\n" + KOTA_LOGIC + "\n" + SUDARSHANA_LOGIC
     
     # Add domain-specific sutras based on intent
     if intent_category == "career" or include_all:
@@ -172,6 +200,8 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
     # Select main response structure based on analysis_type
     if analysis_type == 'EVENT_PREDICTION_MULTIPLE':
         instruction += "\n" + EVENT_PREDICTION_MULTIPLE_STRUCTURE
+    elif analysis_type == 'DAILY_PREDICTION':
+        instruction += "\n" + DAILY_PREDICTION_STRUCTURE
     elif analysis_type == 'EVENT_PREDICTION_SINGLE':
         instruction += "\n" + EVENT_PREDICTION_SINGLE_STRUCTURE
     elif analysis_type == 'ROOT_CAUSE_ANALYSIS':

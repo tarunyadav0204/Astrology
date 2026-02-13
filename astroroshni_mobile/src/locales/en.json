@@ -1,0 +1,483 @@
+{
+  "menu": {
+    "title": "Cosmic Menu",
+    "subtitle": "Navigate Your Journey",
+    "myProfile": "My Profile",
+    "selectNative": "Select Native",
+    "newNative": "New Native",
+    "viewChart": "View Chart",
+    "dashaBrowser": "Dasha Browser",
+    "ashtakvarga": "Ashtakvarga",
+    "shadbala": "Shadbala",
+    "kotaChakra": "Kota Chakra",
+    "lifeAnalysis": "Life Analysis",
+    "pastLifeRegression": "Past Life Regression",
+    "numerology": "Numerology",
+    "chatHistory": "Chat History",
+    "partnershipOn": "Partnership On",
+    "partnershipOff": "Partnership Off",
+    "credits": "Credits",
+    "logout": "Logout"
+  },
+  "quickActions": {
+    "language": "Language",
+    "chart": "Chart",
+    "dasha": "Dasha",
+    "partnership": "Partnership",
+    "partner": "Partnership Analysis",
+    "history": "Chat History"
+  },
+  "chartTypes": {
+    "lagna": {
+      "name": "Lagna (D1)",
+      "description": "Main Birth Chart"
+    },
+    "navamsa": {
+      "name": "Navamsa (D9)",
+      "description": "Marriage & Spirituality"
+    },
+    "transit": {
+      "name": "Transit",
+      "description": "Live Planetary Positions"
+    },
+    "karkamsa": {
+      "name": "Karkamsa",
+      "description": "Spiritual Path & Dharma"
+    },
+    "swamsa": {
+      "name": "Swamsa",
+      "description": "Parental Lineage & Ancestry"
+    },
+    "hora": {
+      "name": "Hora (D2)",
+      "description": "Wealth & Family"
+    },
+    "drekkana": {
+      "name": "Drekkana (D3)",
+      "description": "Siblings & Happiness"
+    },
+    "chaturthamsa": {
+      "name": "Chaturthamsa (D4)",
+      "description": "Destiny & Assets"
+    },
+    "dashamsa": {
+      "name": "Dashamsa (D10)",
+      "description": "Career & Profession"
+    },
+    "dwadashamsa": {
+      "name": "Dwadashamsa (D12)",
+      "description": "Parents & Ancestry"
+    },
+    "shodamsa": {
+      "name": "Shodamsa (D16)",
+      "description": "Vehicles & Comforts"
+    },
+    "vimsamsa": {
+      "name": "Vimsamsa (D20)",
+      "description": "Spiritual Practices"
+    },
+    "chaturvimsamsa": {
+      "name": "Chaturvimsamsa (D24)",
+      "description": "Learning & Education"
+    },
+    "trimsamsa": {
+      "name": "Trimsamsa (D30)",
+      "description": "Misfortunes & Troubles"
+    },
+    "khavedamsa": {
+      "name": "Khavedamsa (D40)",
+      "description": "Auspicious & Inauspicious"
+    },
+    "akshavedamsa": {
+      "name": "Akshavedamsa (D45)",
+      "description": "Character & Conduct"
+    },
+    "shashtyamsa": {
+      "name": "Shashtyamsa (D60)",
+      "description": "Past Life Karma"
+    }
+  },
+  "chartScreen": {
+    "loadingText": "Calculating Cosmic Alignments...",
+    "loadingSubtext": "Reading planetary positions",
+    "emptyTitle": "No Chart Data",
+    "emptyText": "Please add birth details to view charts",
+    "transit": "Transit",
+    "dasha": "Dasha",
+    "karakas": "Karakas",
+    "positions": "Positions"
+  },
+  "planets": {
+    "Sun": "Su",
+    "Moon": "Mo",
+    "Mars": "Ma",
+    "Mercury": "Me",
+    "Jupiter": "Ju",
+    "Venus": "Ve",
+    "Saturn": "Sa",
+    "Rahu": "Ra",
+    "Ketu": "Ke",
+    "Gulika": "Gu",
+    "Mandi": "Mn",
+    "InduLagna": "IL"
+  },
+  "shadbalaAnalysis": "Shadbala Analysis",
+  "classicalPlanetaryStrength": "Classical Planetary Strength (7 Visible Planets)",
+  "rupas": "Rupas",
+  "points": "Points",
+  "grades": {
+    "Excellent": "Excellent",
+    "Good": "Good",
+    "Average": "Average",
+    "Weak": "Weak"
+  },
+  "strengthComponents": "Strength Components",
+  "components": {
+    "sthana_bala": "Sthana Bala",
+    "dig_bala": "Dig Bala",
+    "kala_bala": "Kala Bala",
+    "chesta_bala": "Chesta Bala",
+    "naisargika_bala": "Naisargika Bala",
+    "drik_bala": "Drik Bala",
+    "uccha_bala": "Uccha Bala",
+    "saptavargaja_bala": "Saptavargaja Bala",
+    "ojha_yugma_bala": "Ojha Yugma Bala",
+    "kendradi_bala": "Kendradi Bala",
+    "drekkana_bala": "Drekkana Bala"
+  },
+  "sthanaBalaBreakdown": "Sthana Bala Breakdown",
+  "kalaBalaBreakdown": "Kala Bala Breakdown",
+  "profile": {
+    "myProfile": "My Profile",
+    "birthDateNotSet": "Birth date not set",
+    "connectChart": "Connect Chart to Profile",
+    "availableCredits": "Available Credits",
+    "add": "+ Add",
+    "chats": "Chats",
+    "charts": "Charts",
+    "days": "Days",
+    "birthChartEssence": "Birth Chart Essence",
+    "viewFullChart": "View Full Chart",
+    "sunSign": "Sun Sign",
+    "moonSign": "Moon Sign",
+    "ascendant": "Ascendant",
+    "calculating": "Calculating...",
+    "currentRunningDashas": "Current Running Dashas",
+    "loading": "Loading...",
+    "quickActions": {
+      "newChat": "New Chat",
+      "viewChart": "View Chart",
+      "dashas": "Dashas",
+      "history": "History",
+      "myFacts": "My Facts",
+      "language": "Language"
+    },
+    "birthDataRequired": "Birth Data Required",
+    "dashasAlert": "Please connect your birth chart to view dashas.",
+    "factsAlert": "Please connect your birth chart to manage facts.",
+    "settings": "Settings",
+    "lightTheme": "Light Theme",
+    "darkTheme": "Dark Theme",
+    "editBirthDetails": "Edit Birth Details",
+    "logout": "Logout"
+  },
+  "languageModal": {
+    "title": "Select Language",
+    "close": "Close"
+  },
+  "chat": {
+    "chartEssence": "{{name}}'s Chart Essence",
+    "welcomeMessage": "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\\n\\nFeel free to ask me anything about:\\n\\n• Personality traits and characteristics\\n• Career and professional guidance\\n• Relationships and compatibility\\n• Health and wellness insights\\n• Timing for important decisions\\n• Current planetary transits\\n• Strengths and areas for growth\\n\\nWhat would you like to explore first?",
+    "betaNotice": "⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.",
+    "disclaimerNotice": "⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions."
+  },
+  "home": {
+    "greeting": {
+      "subtitle": "Your cosmic blueprint awaits. Choose your path to enlightenment.",
+      "lifePath": "{{name}}'s Life Path"
+    },
+    "sections": {
+      "choosePath": "Choose Your Path",
+      "lifeAnalysis": "🧘 Life Analysis",
+      "timingPlanners": "⏰ Timing Planners",
+      "cosmicDashboard": "✨ Your Cosmic Dashboard",
+      "currentDasha": "⏰ Current Dasha Periods",
+      "astrologyTools": "🔧 Astrology Tools",
+      "planetaryTransits": "🪐 Current Planetary Transits"
+    },
+    "options": {
+      "question": {
+        "title": "Ask Any Question",
+        "description": "Get insights about your personality, relationships, career, or any astrological topic"
+      },
+      "partnership": {
+        "title": "Partnership Analysis",
+        "description": "Analyze compatibility and relationship dynamics between two people"
+      },
+      "mundane": {
+        "title": "Global Markets & Events",
+        "description": "Analyze world events, stock markets, politics, and economic trends"
+      },
+      "events": {
+        "title": "Event Timeline",
+        "description": "AI-powered yearly predictions with monthly breakdowns and major milestones"
+      }
+    },
+    "analysis": {
+      "career": {
+        "title": "Career Analysis",
+        "description": "Professional success & opportunities"
+      },
+      "wealth": {
+        "title": "Wealth Analysis",
+        "description": "Financial prospects & opportunities"
+      },
+      "health": {
+        "title": "Health Analysis",
+        "description": "Wellness insights & precautions"
+      },
+      "marriage": {
+        "title": "Marriage Analysis",
+        "description": "Relationship compatibility & timing"
+      },
+      "education": {
+        "title": "Education Analysis",
+        "description": "Learning path & career guidance"
+      },
+      "progeny": {
+        "title": "Progeny Analysis",
+        "description": "Fertility potential & family expansion"
+      },
+      "trading": {
+        "title": "Trading Forecast",
+        "description": "Stock market predictions & timing"
+      },
+      "financial": {
+        "title": "Market Astrology",
+        "description": "Sector forecasts & investment timing"
+      },
+      "childbirth": {
+        "title": "Childbirth Planner",
+        "description": "Auspicious dates for delivery"
+      },
+      "muhurat": {
+        "title": "Muhurat Planner",
+        "description": "Auspicious timing for all events"
+      }
+    },
+    "planet_names": {
+        "Sun": "Sun",
+        "Moon": "Moon",
+        "Mars": "Mars",
+        "Mercury": "Mercury",
+        "Jupiter": "Jupiter",
+        "Venus": "Venus",
+        "Saturn": "Saturn",
+        "Rahu": "Rahu",
+        "Ketu": "Ketu"
+    },
+    "signs": {
+      "ascendant": "Ascendant",
+      "moon": "Moon",
+      "sun": "Sun"
+    },
+    "tools": {
+      "charts": "Charts",
+      "dashas": "Dashas",
+      "ashtakvarga": "Ashtak-\nvarga",
+      "positions": "Positions"
+    },
+    "panchang": {
+      "title": "🌅 Today's Panchang",
+      "sunrise": "Sunrise",
+      "sunset": "Sunset",
+      "moonrise": "Moonrise",
+      "moonset": "Moonset",
+      "elements": "🕉️ Panchang Elements",
+      "nakshatra": "⭐ Nakshatra:",
+      "tithi": "🌙 Tithi:",
+      "yoga": "🧘 Yoga:",
+      "karana": "⚡ Karana:",
+      "fullMoon": "Full Moon",
+      "dayProgress": "Day Progress",
+      "auspiciousTimes": "🕉️ Auspicious Times",
+      "brahmaMuhurta": "Brahma Muhurta:",
+      "abhijitMuhurta": "Abhijit Muhurta:",
+      "inauspiciousTimes": "⚠️ Inauspicious Times",
+      "rahuKaal": "Rahu Kaal:",
+      "durMuhurta": "Dur Muhurta:",
+      "varjyam": "Varjyam:"
+    },
+    "loading": {
+      "transits": "Loading transits...",
+      "noTransitData": "No transit data available"
+    }
+  },
+  "birthForm": {
+    "headerTitle": {
+      "updateGender": "Update Gender",
+      "editProfile": "Edit Profile",
+      "birthDetails": "Birth Details"
+    },
+    "progressText": "Step {{step}} of 5",
+    "stepTitle": {
+      "name": "What's your name?",
+      "gender": "Select your gender",
+      "date": "When were you born?",
+      "time": "What time were you born?",
+      "place": "Where were you born?"
+    },
+    "namePlaceholder": "Enter your full name",
+    "placePlaceholder": "City, State, Country",
+    "gender": {
+      "male": "Male",
+      "female": "Female"
+    },
+    "selectedLocation": "Selected Location",
+    "buttons": {
+      "back": "Back",
+      "processing": "Processing...",
+      "complete": "Complete",
+      "next": "Next"
+    },
+    "alerts": {
+      "invalidLocation": {
+        "title": "Invalid Location",
+        "suggestions": "Please select a location from the suggestions to ensure accurate calculations.",
+        "noSelection": "Please select a location from the suggestions."
+      },
+      "success": {
+        "title": "Success",
+        "genderUpdated": "Gender updated successfully!",
+        "profileUpdated": "Profile updated successfully!",
+        "chartCalculated": "Birth chart calculated successfully!"
+      },
+      "error": {
+        "title": "Error",
+        "default": "Failed to process birth details"
+      },
+      "ok": "OK"
+    },
+    "picker": {
+      "cancel": "Cancel",
+      "done": "Done"
+    },
+    "coords": {
+      "lat": "Lat:",
+      "long": "Long:"
+    }
+  },
+  "common": {
+    "current": "Current",
+    "unknown": "Unknown",
+    "ends": "Ends: ",
+    "notAvailable": "Not available"
+  },
+  "dasha": {
+    "vimshottari": "Vimshottari",
+    "kalchakra": "BPHS Kalchakra",
+    "yogini": "Yogini",
+    "chara": "Chara",
+    "currentBPHSKalachakra": "Current BPHS Kalchakra",
+    "maha": "Maha",
+    "antar": "Antar",
+    "selectDashas": "Select dashas to see hierarchy",
+    "kalchakraMahadasha": "BPHS Kalchakra Mahadasha (Sign-Based)",
+    "kalchakraAntardasha": "BPHS Kalchakra Antardasha",
+    "noPeriodsAvailable": "No periods available",
+    "mahaDasha": "Maha Dasha",
+    "antarDasha": "Antar Dasha",
+    "pratyantarDasha": "Pratyantar Dasha",
+    "sookshmaDasha": "Sookshma Dasha",
+    "pranaDasha": "Prana Dasha",
+    "browserFor": "Dasha Browser",
+    "completed": "Completed",
+    "remaining": "Remaining",
+    "yearShort": "Y",
+    "monthShort": "M",
+    "dayShort": "D",
+    "nakshatra": "Nakshatra",
+    "chakra": "Chakra",
+    "forward": "Forward",
+    "backward": "Backward",
+    "yearCompleteCycle": "Year Complete Cycle",
+    "deha": "Deha",
+    "jeeva": "Jeeva",
+    "periods": "Periods",
+    "wheel": "Wheel",
+    "timeline": "Timeline",
+    "kalchakraTimeline": "Kalchakra Timeline",
+    "sign": "Sign",
+    "gati": "Gati",
+    "duration": "Duration",
+    "period": "Period",
+    "kalchakraWheel": "Kalchakra Wheel",
+    "currentMaha": "Current Maha",
+    "currentAntar": "Current Antar",
+    "mahadashas": "Mahadashas",
+    "gatiAnalysis": "Gati Analysis",
+    "details": "Details",
+    "lifetimeGatiAnalysis": "Lifetime Gati Analysis",
+    "summary": "Summary",
+    "percentCompleted": "{{percentage}}% Completed",
+    "currentlyRunning": "Currently Running",
+    "loadingYogini": "Loading Yogini Dasha data...",
+    "dataStructureError": "Data structure error. Check console for details.",
+    "availableKeys": "Available keys: ",
+    "currentYoginiPhase": "Current Yogini Phase",
+    "mahadasha": "Mahadasha",
+    "antardasha": "Antardasha",
+    "criticalTiming": "Critical Timing",
+    "remedies": "Remedies",
+    "analysis": "Analysis",
+    "yoginiCycle": "Yogini Cycle (36 Years)"
+  },
+  "common": {
+    "current": "Current",
+    "unknown": "Unknown",
+    "ends": "Ends: "
+  },
+  "yogini": {
+    "success": "Success",
+    "aggression": "Aggression",
+    "wealth": "Wealth",
+    "travel": "Travel",
+    "career": "Career",
+    "workload": "Workload",
+    "victory": "Victory",
+    "crisis": "Crisis",
+    "mangala": "Mangala",
+    "pingala": "Pingala",
+    "dhanya": "Dhanya",
+    "bhramari": "Bhramari",
+    "bhadrika": "Bhadrika",
+    "ulka": "Ulka",
+    "siddha": "Siddha",
+    "sankata": "Sankata"
+  },
+  "signs": {
+    "Aries": "Aries",
+    "Taurus": "Taurus",
+    "Gemini": "Gemini",
+    "Cancer": "Cancer",
+    "Leo": "Leo",
+    "Virgo": "Virgo",
+    "Libra": "Libra",
+    "Scorpio": "Scorpio",
+    "Sagittarius": "Sagittarius",
+    "Capricorn": "Capricorn",
+    "Aquarius": "Aquarius",
+    "Pisces": "Pisces",
+    "Ari": "Ari",
+    "Tau": "Tau",
+    "Gem": "Gem",
+    "Can": "Can",
+    "Vir": "Vir",
+    "Lib": "Lib",
+    "Sco": "Sco",
+    "Sag": "Sag",
+    "Cap": "Cap",
+    "Aqu": "Aqu",
+    "Pis": "Pis"
+  }
+}

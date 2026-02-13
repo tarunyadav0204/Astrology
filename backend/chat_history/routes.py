@@ -40,6 +40,12 @@ def init_chat_tables():
     except sqlite3.OperationalError:
         pass  # Column already exists
     
+    # Add follow_up_questions column
+    try:
+        cursor.execute('ALTER TABLE chat_messages ADD COLUMN follow_up_questions TEXT')
+    except sqlite3.OperationalError:
+        pass # Column already exists
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
             message_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -255,6 +261,8 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 async def ask_question_async(request: dict, background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
     """Start async chat processing - returns immediately with message_id for polling"""
     from credits.credit_service import CreditService
+    from ai.intent_router import IntentRouter
+    from chat.fact_extractor import FactExtractor
     
     # Validate required fields
     session_id = request.get("session_id")
@@ -341,19 +349,121 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     conn.commit()
     conn.close()
     
-    # Start background processing
+    # Get chart insights from intent router BEFORE starting background task
+    chart_insights = []
+    try:
+        user_facts = {}
+        d1_chart = None
+        with sqlite3.connect('astrology.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT birth_chart_id FROM chat_sessions WHERE session_id = ?", (session_id,))
+            session_data = cursor.fetchone()
+            birth_chart_id = session_data[0] if session_data else None
+            
+            if birth_chart_id:
+                fact_extractor = FactExtractor()
+                user_facts = fact_extractor.get_facts(birth_chart_id)
+        
+        # Build minimal D1 chart for intent router
+        from calculators.chart_calculator import ChartCalculator
+        from types import SimpleNamespace
+        birth_obj = SimpleNamespace(**birth_details)
+        chart_calc = ChartCalculator({})
+        chart_data = chart_calc.calculate_chart(birth_obj)
+        
+        # Extract D1 chart with houses and planets
+        d1_chart = {
+            'ascendant': chart_data.get('ascendant', 0),
+            'houses': [],
+            'planets': {}
+        }
+        
+        # Add houses with signs
+        asc_sign = int(chart_data['ascendant'] / 30)
+        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+        for i in range(12):
+            house_sign = (asc_sign + i) % 12
+            d1_chart['houses'].append({
+                'house_number': i + 1,
+                'sign': sign_names[house_sign],
+                'planets': []
+            })
+        
+        # Add planets to houses
+        for planet_name, planet_data in chart_data.get('planets', {}).items():
+            house_num = planet_data.get('house', 1)
+            sign_num = planet_data.get('sign', 0)
+            d1_chart['planets'][planet_name] = {
+                'house': house_num,
+                'sign': sign_names[sign_num]
+            }
+            d1_chart['houses'][house_num - 1]['planets'].append(planet_name)
+        
+        intent_router = IntentRouter()
+        intent = await intent_router.classify_intent(question, [], user_facts, language=language, force_ready=partnership_mode, d1_chart=d1_chart)
+        chart_insights = intent.get('chart_insights', [])
+        print(f"📊 Got {len(chart_insights)} chart insights from intent router")
+        
+        # Handle clarification immediately - do NOT start background task
+        if intent.get('status') == 'CLARIFY':
+            print(f"❓ CLARIFICATION NEEDED - Returning immediately without background task")
+            clarification_question = intent.get('clarification_question', 'Could you provide more details?')
+            
+            # Update assistant message with clarification
+            conn = sqlite3.connect('astrology.db')
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                (sanitize_text(clarification_question), "completed", "clarification", datetime.now(), assistant_message_id)
+            )
+            
+            # Update conversation state
+            cursor.execute("""
+                INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                VALUES (?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET 
+                    clarification_count = clarification_count + 1,
+                    extracted_context = ?,
+                    last_updated = CURRENT_TIMESTAMP
+            """, (session_id, 1, json.dumps(intent.get('extracted_context', {})), json.dumps(intent.get('extracted_context', {}))))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"✅ CLARIFICATION SAVED - Returning to user")
+            return {
+                "user_message_id": user_message_id,
+                "message_id": assistant_message_id,
+                "status": "completed",
+                "message_type": "clarification",
+                "content": clarification_question,
+                "chart_insights": chart_insights
+            }
+            
+    except Exception as e:
+        print(f"⚠️ Failed to get chart insights: {e}")
+        import traceback
+        traceback.print_exc()
+        intent = None
+        chart_insights = []
+    
+    # Start background processing (pass intent to avoid re-classification)
     background_tasks.add_task(
         process_gemini_response,
-        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details
+        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent
     )
     
+    print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
+    print(f"🚀 Returning {len(chart_insights)} chart insights: {chart_insights[:2] if chart_insights else 'EMPTY'}")
     return {
         "user_message_id": user_message_id,
         "message_id": assistant_message_id,
         "status": "processing",
-        "message": "Analyzing your chart..."
+        "message": "Analyzing your chart...",
+        "chart_insights": chart_insights,
+        "d1_chart": d1_chart
     }
-    print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
 
 @router.get("/status/{message_id}")
 async def check_message_status(message_id: int, current_user = Depends(get_current_user)):
@@ -369,7 +479,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images
+            SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at, cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions
             FROM chat_messages cm
             JOIN chat_sessions cs ON cm.session_id = cs.session_id
             WHERE cm.message_id = ?
@@ -385,7 +495,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             print(f"❌ [STATUS] Message {message_id} not found")
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -420,6 +530,15 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
                 response["summary_image"] = summary_image
             else:
                 response["summary_image"] = None
+
+            # Add follow up questions
+            if follow_up_questions:
+                try:
+                    response["follow_up_questions"] = json.loads(follow_up_questions)
+                except:
+                    response["follow_up_questions"] = []
+            else:
+                response["follow_up_questions"] = []
                 
         elif status == "failed":
             response["error_message"] = error_message or "An error occurred while processing your request"
@@ -441,7 +560,54 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal server error")
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None):
+def get_original_question_for_clarification(session_id, current_message_id, conn):
+    """
+    Get the original user question that triggered the clarification chain.
+    Returns None if not found or not applicable.
+    """
+    cursor = conn.cursor()
+    
+    print(f"\n🔍 ORIGINAL QUESTION LOOKUP:")
+    print(f"   Session: {session_id}")
+    print(f"   Current message ID: {current_message_id}")
+    
+    # Find the last assistant message with message_type='clarification' before current
+    cursor.execute("""
+        SELECT message_id FROM chat_messages
+        WHERE session_id = ?
+          AND sender = 'assistant'
+          AND message_type = 'clarification'
+          AND message_id < ?
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """, (session_id, current_message_id))
+    
+    clarification_msg = cursor.fetchone()
+    if not clarification_msg:
+        print(f"   ❌ No clarification message found before ID {current_message_id}")
+        return None
+    
+    print(f"   ✅ Found clarification message ID: {clarification_msg[0]}")
+    
+    # Find the user message immediately before that clarification
+    cursor.execute("""
+        SELECT content FROM chat_messages
+        WHERE session_id = ?
+          AND sender = 'user'
+          AND message_id < ?
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """, (session_id, clarification_msg[0]))
+    
+    result = cursor.fetchone()
+    if result:
+        print(f"   ✅ Found original question: {result[0][:100]}...")
+    else:
+        print(f"   ❌ No user message found before clarification")
+    
+    return result[0] if result else None
+
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None):
     """Background task to process Gemini response"""
     import sys
     import os
@@ -602,7 +768,50 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 clarification_count = state_row[0] if state_row else 0
             
             intent_router = IntentRouter()
-            intent = await intent_router.classify_intent(question, history, user_facts)
+            force_ready = question.startswith('@All_Events')
+            
+            print(f"\n{'='*80}")
+            print(f"🔗 CLARIFICATION CONTEXT CHECK")
+            print(f"{'='*80}")
+            print(f"Current question: {question}")
+            print(f"Clarification count: {clarification_count}")
+            
+            # Check if this is a clarification response and combine with original question
+            combined_question = question
+            if clarification_count > 0:
+                print(f"🔍 Clarification detected, looking for original question...")
+                with sqlite3.connect('astrology.db') as conn:
+                    original_question = get_original_question_for_clarification(session_id, message_id, conn)
+                    if original_question:
+                        # Detect if user changed topic (response is long and doesn't look like clarification)
+                        word_count = len(question.split())
+                        clarification_keywords = ['all', 'everything', 'yes', 'no', 'both', 'any', 'every']
+                        looks_like_clarification = word_count < 10 or any(kw in question.lower() for kw in clarification_keywords)
+                        
+                        print(f"   Word count: {word_count}")
+                        print(f"   Has clarification keywords: {any(kw in question.lower() for kw in clarification_keywords)}")
+                        print(f"   Looks like clarification: {looks_like_clarification}")
+                        
+                        if looks_like_clarification:
+                            # Combine with original, truncate if too long
+                            combined = f"{original_question} {question}"
+                            if len(combined) > 500:
+                                combined = f"{original_question[:200]}... {question}"
+                            combined_question = combined
+                            print(f"🔗 COMBINED QUESTION:")
+                            print(f"   Original: {original_question}")
+                            print(f"   Clarification: {question}")
+                            print(f"   Combined: {combined_question}")
+                        else:
+                            print(f"🔄 USER CHANGED TOPIC: Treating as new question")
+                    else:
+                        print(f"   ⚠️ No original question found, using current question only")
+            else:
+                print(f"✅ First question in session, no combination needed")
+            
+            print(f"{'='*80}\n")
+            
+            intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready)
             
             # CLARIFICATION LIMIT: Set to 1 to allow only one clarification before forcing answer
             MAX_CLARIFICATIONS = 1
@@ -788,6 +997,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if intent.get('extracted_context'):
             context['extracted_context'] = intent['extracted_context']
         
+        # Override intent mode for @All_Events to force event prediction
+        if question.startswith('@All_Events'):
+            print(f"🎯 @All_Events DETECTED - Overriding intent mode to PREDICT_EVENTS_FOR_PERIOD")
+            intent['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
+            context['intent']['mode'] = 'PREDICT_EVENTS_FOR_PERIOD'
+            question = question.replace('@All_Events', '').strip()
+        
         # Generate response
         try:
             analyzer = GeminiChatAnalyzer()
@@ -795,14 +1011,15 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             from utils.error_logger import log_chat_error
             log_chat_error(user_id, birth_data.get('name', 'Unknown'), '', init_error, question, birth_data, 'backend')
             raise init_error
-        
+
         result = await analyzer.generate_chat_response(
             user_question=question,
             astrological_context=context,
             conversation_history=history,
             language=language,
             response_style=response_style,
-            premium_analysis=premium_analysis
+            premium_analysis=premium_analysis,
+            mode=intent.get('mode', 'default')
         )
         
         # Update database with result
@@ -829,14 +1046,16 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     
                     # Get summary image from result if available (store as string, not JSON)
                     summary_image = result.get('summary_image', None)
+                    follow_up_questions = result.get('follow_up_questions', [])
                     
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, follow_up_questions = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
                         (
                             sanitize_text(result['response']), 
                             json.dumps(terms),
                             json.dumps(glossary),
                             summary_image,  # Store as string URL, not JSON
+                            json.dumps(follow_up_questions),
                             "completed", 
                             "answer", 
                             datetime.now(), 

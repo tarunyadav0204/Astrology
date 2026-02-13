@@ -23,10 +23,13 @@ import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ birthData, onOptionSelect, navigation, setShowDashaBrowser }) {
+  const { t, i18n } = useTranslation();
+  console.log('🌐 HomeScreen current language:', i18n.language);
   useAnalytics('HomeScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -329,7 +332,8 @@ const loadHomeData = async (nativeData = null) => {
       4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
       8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
     };
-    return signs[signNumber] || signNumber;
+    const signName = signs[signNumber] || signNumber;
+    return t(`signs.${signName}`, signName);
   };
   
   const getSignIcon = (signNumber) => {
@@ -440,22 +444,22 @@ const loadHomeData = async (nativeData = null) => {
     {
       id: 'question',
       icon: '💬',
-      title: 'Ask Any Question',
-      description: 'Get insights about your personality, relationships, career, or any astrological topic',
+      title: t('home.options.question.title', 'Ask Any Question'),
+      description: t('home.options.question.description', 'Get insights about your personality, relationships, career, or any astrological topic'),
       action: 'question'
     },
     {
       id: 'partnership',
       icon: '👥',
-      title: 'Partnership Analysis',
-      description: 'Analyze compatibility and relationship dynamics between two people',
+      title: t('home.options.partnership.title', 'Partnership Analysis'),
+      description: t('home.options.partnership.description', 'Analyze compatibility and relationship dynamics between two people'),
       action: 'partnership'
     },
     {
       id: 'mundane',
       icon: '🌍',
-      title: 'Global Markets & Events',
-      description: 'Analyze world events, stock markets, politics, and economic trends',
+      title: t('home.options.mundane.title', 'Global Markets & Events'),
+      description: t('home.options.mundane.description', 'Analyze world events, stock markets, politics, and economic trends'),
       action: 'mundane'
     },
     // Commented out in favor of Event Timeline tile for now
@@ -469,8 +473,8 @@ const loadHomeData = async (nativeData = null) => {
     {
       id: 'events',
       icon: '🌟',
-      title: 'Event Timeline',
-      description: 'AI-powered yearly predictions with monthly breakdowns and major milestones',
+      title: t('home.options.events.title', 'Event Timeline'),
+      description: t('home.options.events.description', 'AI-powered yearly predictions with monthly breakdowns and major milestones'),
       action: 'events'
     }
   ];
@@ -478,81 +482,81 @@ const loadHomeData = async (nativeData = null) => {
   const analysisOptions = [
     { 
       id: 'career', 
-      title: 'Career Analysis', 
+      title: t('home.analysis.career.title', 'Career Analysis'), 
       icon: '💼', 
-      description: 'Professional success & opportunities',
+      description: t('home.analysis.career.description', 'Professional success & opportunities'),
       gradient: ['#6366F1', '#8B5CF6'],
       cost: pricing.career_analysis || 10
     },
     { 
       id: 'wealth', 
-      title: 'Wealth Analysis', 
+      title: t('home.analysis.wealth.title', 'Wealth Analysis'), 
       icon: '💰', 
-      description: 'Financial prospects & opportunities',
+      description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'),
       gradient: ['#FFD700', '#FF8C00'],
       cost: pricing.wealth_analysis || 5
     },
     { 
       id: 'health', 
-      title: 'Health Analysis', 
+      title: t('home.analysis.health.title', 'Health Analysis'), 
       icon: '🏥', 
-      description: 'Wellness insights & precautions',
+      description: t('home.analysis.health.description', 'Wellness insights & precautions'),
       gradient: ['#32CD32', '#228B22'],
       cost: pricing.health_analysis || 5
     },
     { 
       id: 'marriage', 
-      title: 'Marriage Analysis', 
+      title: t('home.analysis.marriage.title', 'Marriage Analysis'), 
       icon: '💕', 
-      description: 'Relationship compatibility & timing',
+      description: t('home.analysis.marriage.description', 'Relationship compatibility & timing'),
       gradient: ['#FF69B4', '#DC143C'],
       cost: pricing.marriage_analysis || 5
     },
     { 
       id: 'education', 
-      title: 'Education Analysis', 
+      title: t('home.analysis.education.title', 'Education Analysis'), 
       icon: '🎓', 
-      description: 'Learning path & career guidance',
+      description: t('home.analysis.education.description', 'Learning path & career guidance'),
       gradient: ['#4169E1', '#1E90FF'],
       cost: pricing.education_analysis || 5
     },
     { 
       id: 'progeny', 
-      title: 'Progeny Analysis', 
+      title: t('home.analysis.progeny.title', 'Progeny Analysis'), 
       icon: '👨‍👩‍👧‍👦', 
-      description: 'Fertility potential & family expansion',
+      description: t('home.analysis.progeny.description', 'Fertility potential & family expansion'),
       gradient: ['#FF69B4', '#FF1493'],
       cost: pricing.progeny_analysis || 15
     },
     { 
       id: 'trading', 
-      title: 'Trading Forecast', 
+      title: t('home.analysis.trading.title', 'Trading Forecast'), 
       icon: '📈', 
-      description: 'Stock market predictions & timing',
+      description: t('home.analysis.trading.description', 'Stock market predictions & timing'),
       gradient: ['#FFD700', '#FF8C00'],
       cost: 5
     },
     { 
       id: 'financial', 
-      title: 'Market Astrology', 
+      title: t('home.analysis.financial.title', 'Market Astrology'), 
       icon: '💹', 
-      description: 'Sector forecasts & investment timing',
+      description: t('home.analysis.financial.description', 'Sector forecasts & investment timing'),
       gradient: ['#10b981', '#059669'],
       cost: 0
     },
     { 
       id: 'childbirth', 
-      title: 'Childbirth Planner', 
+      title: t('home.analysis.childbirth.title', 'Childbirth Planner'), 
       icon: '🤱', 
-      description: 'Auspicious dates for delivery',
+      description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'),
       gradient: ['#FF69B4', '#FF1493'],
       cost: pricing.childbirth_planner || 8
     },
     { 
       id: 'muhurat', 
-      title: 'Muhurat Planner', 
+      title: t('home.analysis.muhurat.title', 'Muhurat Planner'), 
       icon: '🕉️', 
-      description: 'Auspicious timing for all events',
+      description: t('home.analysis.muhurat.description', 'Auspicious timing for all events'),
       gradient: ['#9C27B0', '#7B1FA2'],
       cost: 0
     }
@@ -613,7 +617,7 @@ const loadHomeData = async (nativeData = null) => {
           </View>
           
           <Text style={[styles.greetingTitle, { color: colors.text }]}>
-            {displayData?.name}'s Life Path
+            {t('home.greeting.lifePath', "{{name}}'s Life Path", { name: displayData?.name })}
           </Text>
           <View style={[
             styles.birthInfoCard,
@@ -633,7 +637,7 @@ const loadHomeData = async (nativeData = null) => {
             </Text>
           </View>
           <Text style={[styles.greetingSubtext, { color: colors.textSecondary }]}>
-            Your cosmic blueprint awaits. Choose your path to enlightenment.
+            {t('home.greeting.subtitle', 'Your cosmic blueprint awaits. Choose your path to enlightenment.')}
           </Text>
         </Animated.View>
 
@@ -647,7 +651,7 @@ const loadHomeData = async (nativeData = null) => {
         /> */}
 
         <Animated.View style={[styles.optionsContainer, { opacity: fadeAnim }]}>
-          <Text style={[styles.optionsTitle, { color: colors.text }]}>Choose Your Path</Text>
+          <Text style={[styles.optionsTitle, { color: colors.text }]}>{t('home.sections.choosePath', 'Choose Your Path')}</Text>
           {options.map((option, index) => (
             <OptionCard
               key={option.id}
@@ -660,7 +664,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Life Analysis Options */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
-          <Text style={[styles.analysisTitle, { color: colors.text }]}>🧘 Life Analysis</Text>
+          <Text style={[styles.analysisTitle, { color: colors.text }]}>{t('home.sections.lifeAnalysis', '🧘 Life Analysis')}</Text>
           <View style={styles.lifeAnalysisGrid}>
             {analysisOptions.slice(0, 6).map((option, index) => (
               <LifeAnalysisCard
@@ -675,7 +679,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Timing Planners */}
         <Animated.View style={[styles.analysisContainer, { opacity: fadeAnim }]}>
-          <Text style={[styles.analysisTitle, { color: colors.text }]}>⏰ Timing Planners</Text>
+          <Text style={[styles.analysisTitle, { color: colors.text }]}>{t('home.sections.timingPlanners', '⏰ Timing Planners')}</Text>
           {analysisOptions.slice(6).map((option, index) => (
             <AnalysisCard
               key={option.id}
@@ -690,7 +694,7 @@ const loadHomeData = async (nativeData = null) => {
 
         {/* Magical Dashboard Cards - Moved to Bottom */}
         <Animated.View style={[styles.dashboardContainer, { opacity: fadeAnim }]}>
-          <Text style={[styles.dashboardTitle, { color: colors.text }]}>✨ Your Cosmic Dashboard</Text>
+          <Text style={[styles.dashboardTitle, { color: colors.text }]}>{t('home.sections.cosmicDashboard', '✨ Your Cosmic Dashboard')}</Text>
           
 
 
@@ -699,10 +703,10 @@ const loadHomeData = async (nativeData = null) => {
             <View style={[styles.signCard, { elevation: getCardElevation(6) }]}>
               <LinearGradient colors={['#1E3A8A', '#3B82F6']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>⬆️</Text>
-                <Text style={styles.signLabel}>Ascendant</Text>
+                <Text style={styles.signLabel}>{t('home.signs.ascendant', 'Ascendant')}</Text>
                 <Text style={styles.signValue}>{chartData?.houses?.[0]?.sign !== undefined ? (() => {
                   const signIndex = chartData.houses[0].sign;
-                  return `${getSignIcon(signIndex)} ${getSignName(signIndex).slice(0, 3)}`;
+                  return `${getSignIcon(signIndex)} ${getSignName(signIndex)}`;
                 })() : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
@@ -710,16 +714,16 @@ const loadHomeData = async (nativeData = null) => {
             <View style={[styles.signCard, { elevation: getCardElevation(6) }]}>
               <LinearGradient colors={['#7C2D12', '#DC2626']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>🌙</Text>
-                <Text style={styles.signLabel}>Moon</Text>
-                <Text style={styles.signValue}>{chartData?.planets?.Moon?.sign !== undefined ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign).slice(0, 3)}` : loading ? '...' : 'N/A'}</Text>
+                <Text style={styles.signLabel}>{t('home.signs.moon', 'Moon')}</Text>
+                <Text style={styles.signValue}>{chartData?.planets?.Moon?.sign !== undefined ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
             
             <View style={[styles.signCard, { elevation: getCardElevation(6) }]}>
               <LinearGradient colors={['#B45309', '#F59E0B']} style={styles.signGradient}>
                 <Text style={styles.signEmoji}>☀️</Text>
-                <Text style={styles.signLabel}>Sun</Text>
-                <Text style={styles.signValue}>{chartData?.planets?.Sun?.sign !== undefined ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign).slice(0, 3)}` : loading ? '...' : 'N/A'}</Text>
+                <Text style={styles.signLabel}>{t('home.signs.sun', 'Sun')}</Text>
+                <Text style={styles.signValue}>{chartData?.planets?.Sun?.sign !== undefined ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign)}` : loading ? '...' : 'N/A'}</Text>
               </LinearGradient>
             </View>
           </View>
@@ -727,7 +731,7 @@ const loadHomeData = async (nativeData = null) => {
           {/* Current Dasha Chips - Under Birth Chart */}
           {dashData && (
             <Animated.View style={[styles.dashaSection, { opacity: fadeAnim }]}>
-              <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>⏰ Current Dasha Periods</Text>
+              <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>{t('home.sections.currentDasha', '⏰ Current Dasha Periods')}</Text>
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -747,7 +751,7 @@ const loadHomeData = async (nativeData = null) => {
                     <View 
                       style={[styles.dashaChip, { backgroundColor: planetColor + '20', borderColor: planetColor }]}
                     >
-                      <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{dasha.planet}</Text>
+                      <Text style={[styles.dashaChipPlanet, { color: planetColor }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
                       <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
                       <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                     </View>
@@ -763,7 +767,7 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Astrology Tools Section */}
           <View style={styles.toolsSection}>
-            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>🔧 Astrology Tools</Text>
+            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '🔧 Astrology Tools')}</Text>
             <View style={styles.toolsGrid}>
               <TouchableOpacity 
                 style={styles.toolCard}
@@ -783,7 +787,7 @@ const loadHomeData = async (nativeData = null) => {
                     <Line x1="2" y1="2" x2="46" y2="46" stroke="#ff8a65" strokeWidth="1" />
                     <Line x1="46" y1="2" x2="2" y2="46" stroke="#ff8a65" strokeWidth="1" />
                   </Svg>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>Charts</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.charts', 'Charts')}</Text>
                 </View>
               </TouchableOpacity>
               
@@ -800,7 +804,7 @@ const loadHomeData = async (nativeData = null) => {
                   }
                 ]}>
                   <Text style={styles.toolEmoji}>⏰</Text>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>Dashas</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.dashas', 'Dashas')}</Text>
                 </View>
               </TouchableOpacity>
               
@@ -817,7 +821,7 @@ const loadHomeData = async (nativeData = null) => {
                   }
                 ]}>
                   <Text style={styles.toolEmoji}>⊞</Text>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>Ashtak-{"\n"}varga</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.ashtakvarga', 'Ashtak-\nvarga')}</Text>
                 </View>
               </TouchableOpacity>
               
@@ -834,7 +838,7 @@ const loadHomeData = async (nativeData = null) => {
                   }
                 ]}>
                   <Text style={styles.toolEmoji}>🌌</Text>
-                  <Text style={[styles.toolTitle, { color: colors.text }]}>Positions</Text>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.positions', 'Positions')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -842,11 +846,11 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Zodiac Wheel - Vibrant Design */}
           <View style={styles.planetarySection}>
-            <Text style={[styles.planetarySectionTitle, { color: colors.text }]}>🪐 Current Planetary Transits</Text>
+            <Text style={[styles.planetarySectionTitle, { color: colors.text }]}>{t('home.sections.planetaryTransits', '🪐 Current Planetary Transits')}</Text>
             {!transitData ? (
-              <Text style={styles.loadingText}>Loading transits...</Text>
+              <Text style={styles.loadingText}>{t('home.loading.transits', 'Loading transits...')}</Text>
             ) : !transitData.planets ? (
-              <Text style={styles.loadingText}>No transit data available</Text>
+              <Text style={styles.loadingText}>{t('home.loading.noTransitData', 'No transit data available')}</Text>
             ) : (
               <View style={styles.planetGrid}>
                 {Object.entries(transitData.planets).map(([planet, data]) => (
@@ -854,7 +858,7 @@ const loadHomeData = async (nativeData = null) => {
                     styles.planetCard,
                     { backgroundColor: getSignColor(data.sign) + '20', borderColor: getSignColor(data.sign) }
                   ]}>
-                    <Text style={[styles.planetName, { color: colors.text }]}>{planet}</Text>
+                    <Text style={[styles.planetName, { color: colors.text }]}>{t(`home.planet_names.${planet}`, planet)}</Text>
                     <Text style={[styles.planetSign, { color: colors.textSecondary }]}>{getSignIcon(data.sign)} {getSignName(data.sign)}</Text>
                     <Text style={[styles.planetDegree, { color: colors.textSecondary }]}>{data.degree.toFixed(1)}°</Text>
                   </View>
@@ -872,16 +876,16 @@ const loadHomeData = async (nativeData = null) => {
                 borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
               }
             ]}>
-              <Text style={[styles.panchangTitle, { textAlign: 'center', marginBottom: 20, color: colors.text }]}>🌅 Today's Panchang</Text>
+              <Text style={[styles.panchangTitle, { textAlign: 'center', marginBottom: 20, color: colors.text }]}>{t('home.panchang.title', '🌅 Today\'s Panchang')}</Text>
               <View style={styles.sunTimesRow}>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌅</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunrise', 'Sunrise')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.sunrise ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:30 AM'}</Text>
                 </View>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌇</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunset', 'Sunset')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.sunset ? new Date(panchangData.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:45 PM'}</Text>
                 </View>
               </View>
@@ -889,12 +893,12 @@ const loadHomeData = async (nativeData = null) => {
               <View style={styles.sunTimesRow}>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌙</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Moonrise</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonrise', 'Moonrise')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || '7:53 AM'}</Text>
                 </View>
                 <View style={styles.sunTimeItem}>
                   <Text style={styles.sunTimeEmoji}>🌚</Text>
-                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>Moonset</Text>
+                  <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonset', 'Moonset')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>{panchangData.daily_panchang?.sunrise_sunset?.moonset || panchangData.sunrise_sunset?.moonset || '6:06 PM'}</Text>
                 </View>
               </View>
@@ -902,12 +906,12 @@ const loadHomeData = async (nativeData = null) => {
               {/* Panchang Elements Section */}
               {panchangData.daily_panchang && (
                 <View style={styles.panchangElementsSection}>
-                  <Text style={[styles.panchangElementsTitle, { color: colors.primary }]}>🕉️ Panchang Elements</Text>
+                  <Text style={[styles.panchangElementsTitle, { color: colors.primary }]}>{t('home.panchang.elements', '🕉️ Panchang Elements')}</Text>
                   
                   {/* Nakshatra */}
                   {panchangData.daily_panchang.nakshatra && (
                     <View style={styles.panchangElement}>
-                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>⭐ Nakshatra:</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>{t('home.panchang.nakshatra', '⭐ Nakshatra:')}</Text>
                       <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.nakshatra.name}</Text>
                     </View>
                   )}
@@ -915,7 +919,7 @@ const loadHomeData = async (nativeData = null) => {
                   {/* Tithi */}
                   {panchangData.daily_panchang.tithi && (
                     <View style={styles.panchangElement}>
-                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>🌙 Tithi:</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>{t('home.panchang.tithi', '🌙 Tithi:')}</Text>
                       <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.tithi.name}</Text>
                     </View>
                   )}
@@ -923,7 +927,7 @@ const loadHomeData = async (nativeData = null) => {
                   {/* Yoga */}
                   {panchangData.daily_panchang.yoga && (
                     <View style={styles.panchangElement}>
-                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>🧘 Yoga:</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>{t('home.panchang.yoga', '🧘 Yoga:')}</Text>
                       <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.yoga.name}</Text>
                     </View>
                   )}
@@ -931,7 +935,7 @@ const loadHomeData = async (nativeData = null) => {
                   {/* Karana */}
                   {panchangData.daily_panchang.karana && (
                     <View style={styles.panchangElement}>
-                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>⚡ Karana:</Text>
+                      <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>{t('home.panchang.karana', '⚡ Karana:')}</Text>
                       <Text style={[styles.elementValue, { color: colors.text }]}>{panchangData.daily_panchang.karana.name}</Text>
                     </View>
                   )}

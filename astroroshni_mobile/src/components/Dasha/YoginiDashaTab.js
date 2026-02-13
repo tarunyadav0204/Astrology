@@ -2,21 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
 // --- CONSTANTS & HELPERS ---
-
-const YOGINI_CONFIG = {
-  Mangala: { color: ['#11998e', '#38ef7d'], icon: 'moon', label: 'Success' },
-  Pingala: { color: ['#ff9966', '#ff5e62'], icon: 'sunny', label: 'Aggression' },
-  Dhanya:  { color: ['#f2994a', '#f2c94c'], icon: 'wallet', label: 'Wealth' },
-  Bhramari:{ color: ['#cb2d3e', '#ef473a'], icon: 'airplane', label: 'Travel' },
-  Bhadrika:{ color: ['#56ab2f', '#a8e063'], icon: 'people', label: 'Career' },
-  Ulka:    { color: ['#2980b9', '#6dd5fa'], icon: 'thunderstorm', label: 'Workload' },
-  Siddha:  { color: ['#8E2DE2', '#4A00E0'], icon: 'star', label: 'Victory' },
-  Sankata: { color: ['#833ab4', '#fd1d1d'], icon: 'alert-circle', label: 'Crisis' },
-};
 
 const formatDate = (dateString) => {
   if (!dateString) return '';
@@ -31,7 +21,7 @@ const formatDate = (dateString) => {
 
 // --- SUB-COMPONENTS ---
 
-const DashaProgress = ({ percentage = 0 }) => (
+const DashaProgress = ({ percentage = 0, t }) => (
   <View style={styles.progressContainer}>
     <View style={styles.track} />
     <LinearGradient
@@ -40,11 +30,11 @@ const DashaProgress = ({ percentage = 0 }) => (
       end={{ x: 1, y: 0 }}
       style={[styles.fill, { width: `${percentage}%` }]}
     />
-    <Text style={styles.progressText}>{Math.round(percentage)}% Completed</Text>
+    <Text style={styles.progressText}>{t('dasha.percentCompleted', '{{percentage}}% Completed', { percentage: Math.round(percentage) })}</Text>
   </View>
 );
 
-const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha }) => {
+const YoginiCard = ({ item, isCurrent, isExpanded, onPress, t, tYogini, YOGINI_CONFIG }) => {
   const config = YOGINI_CONFIG[item.name] || YOGINI_CONFIG['Mangala'];
   
   return (
@@ -69,7 +59,7 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha })
               <Ionicons name={config.icon} size={24} color={config.color[0]} />
             </View>
             <View>
-              <Text style={styles.yoginiName}>{item.name}</Text>
+              <Text style={styles.yoginiName}>{tYogini(item.name)}</Text>
               <Text style={styles.yoginiLord}>{item.lord}</Text>
             </View>
           </View>
@@ -88,7 +78,7 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha })
         {/* Expansion Indicator */}
         {isCurrent && (
           <View style={styles.currentIndicator}>
-            <Text style={styles.currentText}>Currently Running</Text>
+            <Text style={styles.currentText}>{t('dasha.currentlyRunning', 'Currently Running')}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -108,7 +98,7 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha })
                 <View style={[styles.subDot, { backgroundColor: YOGINI_CONFIG[sub.name]?.color[0] || '#ccc' }]} />
                 
                 <View style={styles.subContent}>
-                  <Text style={[styles.subName, isCurrentAntar && styles.currentSubName]}>{sub.name} ({sub.lord})</Text>
+                  <Text style={[styles.subName, isCurrentAntar && styles.currentSubName]}>{tYogini(sub.name)} ({sub.lord})</Text>
                   <Text style={[styles.subDates, isCurrentAntar && styles.currentSubDates]}>{formatDate(sub.start)} - {formatDate(sub.end)}</Text>
                 </View>
                 
@@ -118,7 +108,7 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha })
                 
                 {isCurrentAntar && (
                   <View style={styles.currentAntarIndicator}>
-                    <Text style={styles.currentAntarText}>Current</Text>
+                    <Text style={styles.currentAntarText}>{t('common.current', 'Current')}</Text>
                   </View>
                 )}
               </View>
@@ -133,7 +123,23 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, currentAntardasha })
 // --- MAIN COMPONENT ---
 
 export default function YoginiDashaTab({ data }) {
-  // console.log('YoginiDashaTab received data:', JSON.stringify(data, null, 2));
+  const { t } = useTranslation();
+
+  const YOGINI_CONFIG = {
+    Mangala: { color: ['#11998e', '#38ef7d'], icon: 'moon', label: t('yogini.success', 'Success') },
+    Pingala: { color: ['#ff9966', '#ff5e62'], icon: 'sunny', label: t('yogini.aggression', 'Aggression') },
+    Dhanya:  { color: ['#f2994a', '#f2c94c'], icon: 'wallet', label: t('yogini.wealth', 'Wealth') },
+    Bhramari:{ color: ['#cb2d3e', '#ef473a'], icon: 'airplane', label: t('yogini.travel', 'Travel') },
+    Bhadrika:{ color: ['#56ab2f', '#a8e063'], icon: 'people', label: t('yogini.career', 'Career') },
+    Ulka:    { color: ['#2980b9', '#6dd5fa'], icon: 'thunderstorm', label: t('yogini.workload', 'Workload') },
+    Siddha:  { color: ['#8E2DE2', '#4A00E0'], icon: 'star', label: t('yogini.victory', 'Victory') },
+    Sankata: { color: ['#833ab4', '#fd1d1d'], icon: 'alert-circle', label: t('yogini.crisis', 'Crisis') },
+  };
+
+  const tYogini = (name) => {
+    if (!name) return '';
+    return t(`yogini.${name.toLowerCase()}`, name);
+  };
   
   // Find current period index (safe with optional chaining)
   const currentIndex = useMemo(() => {
@@ -162,7 +168,7 @@ export default function YoginiDashaTab({ data }) {
   if (!data) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading Yogini Dasha data...</Text>
+        <Text style={styles.loadingText}>{t('dasha.loadingYogini', 'Loading Yogini Dasha data...')}</Text>
       </View>
     );
   }
@@ -172,8 +178,8 @@ export default function YoginiDashaTab({ data }) {
     console.log('Data missing expected structure. Available keys:', Object.keys(data || {}));
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Data structure error. Check console for details.</Text>
-        <Text style={styles.loadingText}>Available keys: {Object.keys(data || {}).join(', ')}</Text>
+        <Text style={styles.loadingText}>{t('dasha.dataStructureError', 'Data structure error. Check console for details.')}</Text>
+        <Text style={styles.loadingText}>{t('dasha.availableKeys', 'Available keys: ')} {Object.keys(data || {}).join(', ')}</Text>
       </View>
     );
   }
@@ -192,7 +198,7 @@ export default function YoginiDashaTab({ data }) {
           style={styles.heroCard}
         >
           <View style={styles.heroHeader}>
-            <Text style={styles.heroTitle}>Current Yogini Phase</Text>
+            <Text style={styles.heroTitle}>{t('dasha.currentYoginiPhase', 'Current Yogini Phase')}</Text>
             <TouchableOpacity>
               <Ionicons name="information-circle-outline" size={22} color="#666" />
             </TouchableOpacity>
@@ -200,9 +206,9 @@ export default function YoginiDashaTab({ data }) {
 
           <View style={styles.activeRow}>
             <View>
-              <Text style={styles.label}>Mahadasha</Text>
-              <Text style={styles.activeValue}>{data?.current?.mahadasha?.name || 'N/A'}</Text>
-              <Text style={styles.activeLord}>{YOGINI_CONFIG[data?.current?.mahadasha?.name]?.label || 'Unknown'}</Text>
+              <Text style={styles.label}>{t('dasha.mahadasha', 'Mahadasha')}</Text>
+              <Text style={styles.activeValue}>{tYogini(data?.current?.mahadasha?.name) || 'N/A'}</Text>
+              <Text style={styles.activeLord}>{YOGINI_CONFIG[data?.current?.mahadasha?.name]?.label || t('common.unknown', 'Unknown')}</Text>
             </View>
             
             <View style={styles.arrowContainer}>
@@ -210,22 +216,22 @@ export default function YoginiDashaTab({ data }) {
             </View>
 
             <View>
-              <Text style={[styles.label, { textAlign: 'right' }]}>Antardasha</Text>
+              <Text style={[styles.label, { textAlign: 'right' }]}>{t('dasha.antardasha', 'Antardasha')}</Text>
               <Text style={[styles.activeValue, { textAlign: 'right', color: '#8E2DE2' }]}>
-                {data?.current?.antardasha?.name || 'N/A'}
+                {tYogini(data?.current?.antardasha?.name) || 'N/A'}
               </Text>
               <Text style={[styles.activeLord, { textAlign: 'right' }]}>
-                {YOGINI_CONFIG[data?.current?.antardasha?.name]?.label || 'Unknown'}
+                {YOGINI_CONFIG[data?.current?.antardasha?.name]?.label || t('common.unknown', 'Unknown')}
               </Text>
             </View>
           </View>
 
-          <DashaProgress percentage={data?.current?.progress || 0} />
+          <DashaProgress percentage={data?.current?.progress || 0} t={t} />
           
           <View style={styles.dateRange}>
-            <Text style={styles.dateLabel}>Ends: {formatDate(data?.current?.antardasha?.end)}</Text>
+            <Text style={styles.dateLabel}>{t('common.ends', 'Ends: ')} {formatDate(data?.current?.antardasha?.end)}</Text>
             <Text style={styles.remainingText}>
-               Critical Timing
+               {t('dasha.criticalTiming', 'Critical Timing')}
             </Text>
           </View>
         </LinearGradient>
@@ -234,18 +240,18 @@ export default function YoginiDashaTab({ data }) {
       {/* 2. TAB CONTROLS (Mocking your existing style) */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity style={styles.activeTab}>
-          <Text style={styles.activeTabText}>Periods</Text>
+          <Text style={styles.activeTabText}>{t('dasha.periods', 'Periods')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.inactiveTab}>
-          <Text style={styles.inactiveTabText}>Analysis</Text>
+          <Text style={styles.inactiveTabText}>{t('dasha.analysis', 'Analysis')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.inactiveTab}>
-          <Text style={styles.inactiveTabText}>Remedies</Text>
+          <Text style={styles.inactiveTabText}>{t('dasha.remedies', 'Remedies')}</Text>
         </TouchableOpacity>
       </View>
 
       {/* 3. TIMELINE LIST */}
-      <Text style={styles.sectionTitle}>Yogini Cycle (36 Years)</Text>
+      <Text style={styles.sectionTitle}>{t('dasha.yoginiCycle', 'Yogini Cycle (36 Years)')}</Text>
       
       <View style={styles.listContainer}>
         {data.timeline.map((item, index) => {
@@ -266,6 +272,9 @@ export default function YoginiDashaTab({ data }) {
               isExpanded={isExpanded}
               onPress={() => handlePress(index)}
               currentAntardasha={data?.current?.antardasha}
+              t={t}
+              tYogini={tYogini}
+              YOGINI_CONFIG={YOGINI_CONFIG}
             />
           );
         })}

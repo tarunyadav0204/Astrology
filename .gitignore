@@ -130,3 +130,4 @@ backend/gcp_key.json
 *.json
 !package.json
 !package-lock.json
+!astroroshni_mobile/src/locales/*.json

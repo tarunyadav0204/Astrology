@@ -49,65 +49,6 @@ from .system_instruction_config import (
 class ChatContextBuilder:
     """Builds comprehensive astrological context for chat conversations"""
     
-    # Synastry System Instruction for Partnership Analysis
-    SYNASTRY_SYSTEM_INSTRUCTION = """
-You are analyzing COMPATIBILITY between TWO birth charts for partnership/relationship analysis.
-
-🚨 CRITICAL DATA SEPARATION WARNING 🚨
-This request contains TWO SEPARATE COMPLETE CHART CONTEXTS:
-- context['native']: Contains ALL data for {native_name} ONLY
-- context['partner']: Contains ALL data for {partner_name} ONLY
-
-⚠️ ABSOLUTE REQUIREMENT: NEVER mix or confuse data between the two charts.
-- When analyzing {native_name}, use ONLY context['native'] data
-- When analyzing {partner_name}, use ONLY context['partner'] data
-- Each person has their own: planets, houses, dashas, nakshatras, yogas, divisional charts
-- DO NOT apply {native_name}'s planetary positions to {partner_name} or vice versa
-
-Context Structure:
-- context['native']: First person's complete chart (all data)
-- context['partner']: Second person's complete chart (all data)
-
-Synastry Analysis Protocol:
-1. **Moon Compatibility**: Compare Moon signs and nakshatras for emotional harmony
-2. **Venus-Mars Dynamics**: Check attraction, passion, and relationship chemistry
-3. **7th House Analysis**: Marriage potential from BOTH charts (cross-reference)
-4. **Kuja Dosha**: Check Mars placement in both charts for cancellation
-5. **Dasha Synchronization**: Compare current periods for relationship timing
-6. **Ashtakoota Points**: Calculate traditional 36-point matching (Nadi, Gana, Yoni, etc.)
-7. **Ascendant Compatibility**: Check Lagna harmony and mutual aspects
-8. **Inter-chart Aspects**: Analyze how planets from one chart aspect the other
-
-Response Format:
-**Quick Answer**: Overall compatibility percentage and key insight (2-3 sentences)
-
-**Key Insights**: 3-4 bullet points on strengths and challenges
-
-**Detailed Analysis**:
-- **Emotional Compatibility (Moon)**: Describe emotional connection quality
-- **Physical Attraction (Venus-Mars)**: Analyze chemistry and passion
-- **Marriage Potential (7th House)**: Long-term partnership viability
-- **Challenges**: Specific areas requiring conscious effort
-- **Timing (Dasha Alignment)**: When is the best time for major decisions
-
-**Practical Guidance**: Actionable advice for relationship success
-
-Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth areas.
-"""
-    
-    # Use modular system instruction for reduced token usage
-    VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION = build_system_instruction()
-    
-    @classmethod
-    def get_system_instruction(cls, use_modular=False, components=None):
-        """Get system instruction - either full original or modular components"""
-        if use_modular:
-            return build_system_instruction(components)
-        return cls.VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION
-
-
-
-    
     # Class-level constants
     NAKSHATRA_NAMES = [
         'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu',
@@ -1135,6 +1076,10 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
             req = intent_result['transit_request']
             start_year = req.get('startYear', current_year)
             end_year = req.get('endYear', current_year)
+
+            # FIX: Ensure years are integers, as they can come from JSON as strings
+            start_year = int(start_year)
+            end_year = int(end_year)
             
             # Check if this is a short-term request (daily/weekly/monthly)
             if start_year == end_year:
@@ -1225,8 +1170,8 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
             transit_start_time = time.time()
             
             # Handle both formats: Intent Router uses 'startYear', old format uses 'start_year'
-            start_year = transit_request.get('startYear') or transit_request.get('start_year', current_year)
-            end_year = transit_request.get('endYear') or transit_request.get('end_year', current_year + 2)
+            start_year = int(transit_request.get('startYear') or transit_request.get('start_year', current_year))
+            end_year = int(transit_request.get('endYear') or transit_request.get('end_year', current_year + 2))
             year_range = end_year - start_year
             # print(f"\n🎯 TRANSIT PERIOD: {start_year}-{end_year} ({year_range} years)")
             # print(f"⏱️ TRANSIT CALCULATION STARTED")

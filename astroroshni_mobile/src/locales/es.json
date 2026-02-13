@@ -1,0 +1,157 @@
+{
+  "quickActions": {
+    "language": "Idioma",
+    "chart": "Carta",
+    "dasha": "Dasha",
+    "partnership": "Asociación"
+  },
+  "chartTypes": {
+    "lagna": {
+      "name": "Lagna (D1)",
+      "description": "Carta Natal Principal"
+    },
+    "navamsa": {
+      "name": "Navamsa (D9)",
+      "description": "Matrimonio y Espiritualidad"
+    },
+    "transit": {
+      "name": "Tránsito",
+      "description": "Posiciones Planetarias en Vivo"
+    },
+    "karkamsa": {
+      "name": "Karkamsa",
+      "description": "Camino Espiritual y Dharma"
+    },
+    "swamsa": {
+      "name": "Swamsa",
+      "description": "Linaje Parental y Ancestros"
+    },
+    "hora": {
+      "name": "Hora (D2)",
+      "description": "Riqueza y Familia"
+    },
+    "drekkana": {
+      "name": "Drekkana (D3)",
+      "description": "Hermanos y Felicidad"
+    },
+    "chaturthamsa": {
+      "name": "Chaturthamsa (D4)",
+      "description": "Destino y Activos"
+    },
+    "dashamsa": {
+      "name": "Dashamsa (D10)",
+      "description": "Carrera y Profesión"
+    },
+    "dwadashamsa": {
+      "name": "Dwadashamsa (D12)",
+      "description": "Padres y Ancestros"
+    },
+    "shodamsa": {
+      "name": "Shodamsa (D16)",
+      "description": "Vehículos y Comodidades"
+    },
+    "vimsamsa": {
+      "name": "Vimsamsa (D20)",
+      "description": "Prácticas Espirituales"
+    },
+    "chaturvimsamsa": {
+      "name": "Chaturvimsamsa (D24)",
+      "description": "Aprendizaje y Educación"
+    },
+    "trimsamsa": {
+      "name": "Trimsamsa (D30)",
+      "description": "Infortunios y Problemas"
+    },
+    "khavedamsa": {
+      "name": "Khavedamsa (D40)",
+      "description": "Auspicioso y Desfavorable"
+    },
+    "akshavedamsa": {
+      "name": "Akshavedamsa (D45)",
+      "description": "Carácter y Conducta"
+    },
+    "shashtyamsa": {
+      "name": "Shashtyamsa (D60)",
+      "description": "Karma de Vidas Pasadas"
+    }
+  },
+  "chartScreen": {
+    "loadingText": "Calculando alineaciones cósmicas...",
+    "loadingSubtext": "Leyendo posiciones planetarias",
+    "emptyTitle": "No hay datos de la carta",
+    "emptyText": "Por favor, agregue detalles de nacimiento para ver las cartas"
+  },
+  "planets": {
+    "Sun": "Sol",
+    "Moon": "Luna",
+    "Mars": "Marte",
+    "Mercury": "Mercurio",
+    "Jupiter": "Júpiter",
+    "Venus": "Venus",
+    "Saturn": "Saturno"
+  },
+  "shadbalaAnalysis": "Análisis de Shadbala",
+  "classicalPlanetaryStrength": "Fuerza Planetaria Clásica (7 Planetas Visibles)",
+  "rupas": "Rupas",
+  "points": "Puntos",
+  "grades": {
+    "Excellent": "Excelente",
+    "Good": "Bueno",
+    "Average": "Promedio",
+    "Weak": "Débil"
+  },
+  "strengthComponents": "Componentes de Fuerza",
+  "components": {
+    "sthana_bala": "Sthana Bala",
+    "dig_bala": "Dig Bala",
+    "kala_bala": "Kala Bala",
+    "chesta_bala": "Chesta Bala",
+    "naisargika_bala": "Naisargika Bala",
+    "drik_bala": "Drik Bala",
+    "uccha_bala": "Uccha Bala",
+    "saptavargaja_bala": "Saptavargaja Bala",
+    "ojha_yugma_bala": "Ojha Yugma Bala",
+    "kendradi_bala": "Kendradi Bala",
+    "drekkana_bala": "Drekkana Bala"
+  },
+  "sthanaBalaBreakdown": "Desglose de Sthana Bala",
+  "kalaBalaBreakdown": "Desglose de Kala Bala",
+  "profile": {
+    "myProfile": "Mi Perfil",
+    "birthDateNotSet": "Fecha de nacimiento no establecida",
+    "connectChart": "Conectar Carta con el Perfil",
+    "availableCredits": "Créditos Disponibles",
+    "add": "+ Añadir",
+    "chats": "Chats",
+    "charts": "Cartas",
+    "days": "Días",
+    "birthChartEssence": "Esencia de la Carta Natal",
+    "viewFullChart": "Ver Carta Completa",
+    "sunSign": "Signo Solar",
+    "moonSign": "Signo Lunar",
+    "ascendant": "Ascendente",
+    "calculating": "Calculando...",
+    "currentRunningDashas": "Dashas Actuales en Curso",
+    "loading": "Cargando...",
+    "quickActions": {
+      "newChat": "Nuevo Chat",
+      "viewChart": "Ver Carta",
+      "dashas": "Dashas",
+      "history": "Historial",
+      "myFacts": "Mis Hechos",
+      "language": "Idioma"
+    },
+    "birthDataRequired": "Se Requieren Datos de Nacimiento",
+    "dashasAlert": "Por favor, conecte su carta natal para ver las dashas.",
+    "factsAlert": "Por favor, conecte su carta natal para gestionar los hechos.",
+    "settings": "Configuración",
+    "lightTheme": "Tema Claro",
+    "darkTheme": "Tema Oscuro",
+    "editBirthDetails": "Editar Detalles de Nacimiento",
+    "logout": "Cerrar Sesión"
+  },
+  "languageModal": {
+    "title": "Seleccionar Idioma",
+    "close": "Cerrar"
+  }
+}

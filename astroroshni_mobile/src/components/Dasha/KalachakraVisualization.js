@@ -11,6 +11,7 @@ import {
 import Svg, { Circle, Path, Text as SvgText, G, Line } from 'react-native-svg';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 
 const { width: screenWidth } = Dimensions.get('window');
 const wheelSize = Math.min(screenWidth - 40, 300);
@@ -19,15 +20,50 @@ const centerY = wheelSize / 2;
 const outerRadius = wheelSize / 2 - 20;
 const innerRadius = outerRadius - 40;
 
+const signNameMap = {
+  'aries': 'Ari', 'taurus': 'Tau', 'gemini': 'Gem', 'cancer': 'Can',
+  'leo': 'Leo', 'virgo': 'Vir', 'libra': 'Lib', 'scorpio': 'Sco',
+  'sagittarius': 'Sag', 'capricorn': 'Cap', 'aquarius': 'Aqu', 'pisces': 'Pis'
+};
+const shortSignMap = {
+  'ari': 'Ari', 'tau': 'Tau', 'gem': 'Gem', 'can': 'Can',
+  'leo': 'Leo', 'vir': 'Vir', 'lib': 'Lib', 'sco': 'Sco',
+  'sag': 'Sag', 'cap': 'Cap', 'aqu': 'Aqu', 'pis': 'Pis'
+};
+
+const getShortSign = (sign) => {
+    if (typeof sign !== 'string') return sign;
+    const lowerSign = sign.toLowerCase();
+    return signNameMap[lowerSign] || shortSignMap[lowerSign] || sign;
+}
+
 const KalachakraVisualization = ({ visible, onClose, birthData }) => {
+  console.log('--- KalachakraVisualization Component Rendered ---');
+  console.log('Props - visible:', visible);
+  console.log('Props - birthData:', !!birthData);
+
+  const { t, i18n } = useTranslation();
   const [kalachakraData, setKalachakraData] = useState(null);
   const [gatiData, setGatiData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('wheel'); // 'wheel' or 'timeline'
   const [selectedMaha, setSelectedMaha] = useState(null);
   const [showGatiDetails, setShowGatiDetails] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  const tSign = (sign) => {
+    if (!sign) return '';
+    const shortSign = getShortSign(sign);
+    return t(`signs.${shortSign}`, sign);
+  }
 
   useEffect(() => {
+    setCurrentLanguage(i18n.language);
+  }, [i18n.language]);
+
+  useEffect(() => {
+    console.log('--- KalachakraVisualization useEffect triggered ---');
+    console.log('Condition (visible && birthData):', visible && !!birthData);
     if (visible && birthData) {
       fetchKalachakraData();
       fetchGatiAnalysis();
@@ -60,21 +96,11 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
       if (response.ok) {
         const data = await response.json();
         setKalachakraData(data);
-        
-        // Auto-select current mahadasha
-        const currentMaha = data.current_mahadasha || data.mahadashas?.find(period => {
-          const startDate = new Date(period.start);
-          const endDate = new Date(period.end);
-          const now = new Date();
-          return now >= startDate && now <= endDate;
-        });
-        
-        if (currentMaha) {
-          setSelectedMaha(currentMaha);
-        }
+      } else {
+        console.error('Kalachakra API response not OK:', response.status, await response.text());
       }
     } catch (err) {
-
+      console.error('Failed to fetch Kalachakra data:', err);
     } finally {
       setLoading(false);
     }
@@ -105,9 +131,11 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
       if (response.ok) {
         const data = await response.json();
         setGatiData(data);
+      } else {
+        console.error('Gati API response not OK:', response.status, await response.text());
       }
     } catch (err) {
-
+      console.error('Failed to fetch Gati analysis:', err);
     }
   };
 
@@ -140,13 +168,13 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
     if (!kalachakraData?.wheel_data) return null;
 
     const signs = [
-      'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
-      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+      'Ari', 'Tau', 'Gem', 'Can', 'Leo', 'Vir',
+      'Lib', 'Sco', 'Sag', 'Cap', 'Aqu', 'Pis'
     ];
 
     return (
-      <View style={styles.wheelContainer}>
-        <Svg width={wheelSize} height={wheelSize}>
+      <View style={styles.wheelContainer} key={currentLanguage}>
+        <Svg width={wheelSize} height={wheelSize} key={`svg-${currentLanguage}`}>
           {/* Outer circle */}
           <Circle
             cx={centerX}
@@ -200,7 +228,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
                   textAnchor="middle"
                   fontWeight="600"
                 >
-                  {sign.slice(0, 3)}
+                  {tSign(sign)}
                 </SvgText>
                 
                 {/* Radial lines */}
@@ -235,7 +263,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
                 textAnchor="middle"
                 fontWeight="700"
               >
-                {kalachakraData.deha}→{kalachakraData.jeeva}
+                {tSign(kalachakraData.deha)}→{tSign(kalachakraData.jeeva)}
               </SvgText>
               <SvgText
                 x={centerX}
@@ -259,8 +287,8 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
     return (
       <View style={styles.headerPillars}>
         <View style={styles.pillar}>
-          <Text style={styles.pillarLabel}>Deha (Body)</Text>
-          <Text style={styles.pillarValue}>{kalachakraData.deha}</Text>
+          <Text style={styles.pillarLabel}>{t('dasha.deha', 'Deha')} (Body)</Text>
+          <Text style={styles.pillarValue}>{tSign(kalachakraData.deha)}</Text>
           <Text style={styles.pillarLord}>{kalachakraData.deha_lord}</Text>
         </View>
         
@@ -270,8 +298,8 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         </View>
         
         <View style={styles.pillar}>
-          <Text style={styles.pillarLabel}>Jeeva (Soul)</Text>
-          <Text style={styles.pillarValue}>{kalachakraData.jeeva}</Text>
+          <Text style={styles.pillarLabel}>{t('dasha.jeeva', 'Jeeva')} (Soul)</Text>
+          <Text style={styles.pillarValue}>{tSign(kalachakraData.jeeva)}</Text>
           <Text style={styles.pillarLord}>{kalachakraData.jeeva_lord}</Text>
         </View>
       </View>
@@ -288,21 +316,21 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
       <View style={styles.currentContext}>
         <View style={styles.contextRow}>
           <View style={styles.contextItem}>
-            <Text style={styles.contextLabel}>Current Maha</Text>
-            <Text style={styles.contextValue}>{selectedMaha.name}</Text>
+            <Text style={styles.contextLabel}>{t('dasha.currentMaha', 'Current Maha')}</Text>
+            <Text style={styles.contextValue}>{tSign(selectedMaha.name)}</Text>
             <Text style={styles.contextGati}>{selectedMaha.gati}</Text>
           </View>
           
           {currentAntar && (
             <View style={styles.contextItem}>
-              <Text style={styles.contextLabel}>Current Antar</Text>
-              <Text style={styles.contextValue}>{currentAntar.name}</Text>
+              <Text style={styles.contextLabel}>{t('dasha.currentAntar', 'Current Antar')}</Text>
+              <Text style={styles.contextValue}>{tSign(currentAntar.name)}</Text>
               <Text style={styles.contextProgress}>{Math.round(calculateProgress(currentAntar.start, currentAntar.end))}%</Text>
             </View>
           )}
           
           <View style={styles.contextItem}>
-            <Text style={styles.contextLabel}>Remaining</Text>
+            <Text style={styles.contextLabel}>{t('dasha.remaining', 'Remaining')}</Text>
             <Text style={styles.contextValue}>{getRemainingTime(selectedMaha.end)}</Text>
             <Text style={styles.contextProgress}>{Math.round(progress)}%</Text>
           </View>
@@ -322,7 +350,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         onPress={() => setViewMode('wheel')}
       >
         <Text style={[styles.toggleText, viewMode === 'wheel' && styles.activeToggleText]}>
-          🎯 Wheel
+          🎯 {t('dasha.wheel', 'Wheel')}
         </Text>
       </TouchableOpacity>
       
@@ -331,7 +359,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
         onPress={() => setViewMode('timeline')}
       >
         <Text style={[styles.toggleText, viewMode === 'timeline' && styles.activeToggleText]}>
-          📊 Timeline
+          📊 {t('dasha.timeline', 'Timeline')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -342,7 +370,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
 
     return (
       <View style={styles.chipSection}>
-        <Text style={styles.sectionTitle}>Mahadashas</Text>
+        <Text style={styles.sectionTitle}>{t('dasha.mahadashas', 'Mahadashas')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
           {kalachakraData.mahadashas.map((maha, index) => {
             const isSelected = selectedMaha?.name === maha.name;
@@ -363,7 +391,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
                   isSelected && styles.selectedChipText,
                   isCurrent && styles.currentChipText
                 ]}>
-                  {maha.name}
+                  {tSign(maha.name)}
                 </Text>
                 <Text style={[
                   styles.chipLord,
@@ -400,41 +428,41 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
     return (
       <View style={styles.gatiSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Gati Analysis</Text>
+          <Text style={styles.sectionTitle}>{t('dasha.gatiAnalysis', 'Gati Analysis')}</Text>
           <TouchableOpacity
             style={styles.detailsButton}
             onPress={() => setShowGatiDetails(true)}
           >
-            <Text style={styles.detailsButtonText}>Details</Text>
+            <Text style={styles.detailsButtonText}>{t('dasha.details', 'Details')}</Text>
           </TouchableOpacity>
         </View>
         
         <View style={styles.gatiSummary}>
           <View style={styles.gatiStat}>
             <Text style={styles.gatiStatValue}>{gatiData.statistics?.total_transitions || 0}</Text>
-            <Text style={styles.gatiStatLabel}>Total Gatis</Text>
+            <Text style={styles.gatiStatLabel}>{t('dasha.totalGatis', 'Total Gatis')}</Text>
           </View>
           
           <View style={styles.gatiStat}>
             <Text style={styles.gatiStatValue}>{gatiData.statistics?.manduka_count || 0}</Text>
-            <Text style={styles.gatiStatLabel}>Manduka</Text>
+            <Text style={styles.gatiStatLabel}>{t('gati.Manduka', 'Manduka')}</Text>
           </View>
           
           <View style={styles.gatiStat}>
             <Text style={styles.gatiStatValue}>{gatiData.statistics?.simhavalokana_count || 0}</Text>
-            <Text style={styles.gatiStatLabel}>Simhavalokana</Text>
+            <Text style={styles.gatiStatLabel}>{t('gati.Simhavalokana', 'Simhavalokana')}</Text>
           </View>
           
           <View style={styles.gatiStat}>
             <Text style={styles.gatiStatValue}>{gatiData.statistics?.markata_count || 0}</Text>
-            <Text style={styles.gatiStatLabel}>Markata</Text>
+            <Text style={styles.gatiStatLabel}>{t('gati.Markata', 'Markata')}</Text>
           </View>
         </View>
 
         {gatiData.gati_transitions?.slice(0, 3).map((transition, index) => (
           <View key={index} style={styles.gatiTransition}>
             <Text style={styles.transitionText}>
-              {transition.from_sign} → {transition.to_sign} ({transition.gati_type})
+              {tSign(transition.from_sign)} → {tSign(transition.to_sign)} ({t(`gati.${transition.gati_type}`, transition.gati_type)})
             </Text>
             <Text style={styles.transitionDate}>
               {new Date(transition.date).toLocaleDateString()}
@@ -450,7 +478,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
       <View style={styles.modalOverlay}>
         <View style={styles.gatiModal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Lifetime Gati Analysis</Text>
+            <Text style={styles.modalTitle}>{t('dasha.lifetimeGatiAnalysis', 'Lifetime Gati Analysis')}</Text>
             <TouchableOpacity onPress={() => setShowGatiDetails(false)}>
               <Text style={styles.modalClose}>✕</Text>
             </TouchableOpacity>
@@ -459,7 +487,7 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
           <ScrollView style={styles.modalContent}>
             {gatiData?.summary && (
               <View style={styles.summarySection}>
-                <Text style={styles.summaryTitle}>Summary</Text>
+                <Text style={styles.summaryTitle}>{t('dasha.summary', 'Summary')}</Text>
                 <Text style={styles.summaryText}>{gatiData.summary}</Text>
               </View>
             )}
@@ -468,9 +496,9 @@ const KalachakraVisualization = ({ visible, onClose, birthData }) => {
               <View key={index} style={styles.transitionCard}>
                 <View style={styles.transitionHeader}>
                   <Text style={styles.transitionTitle}>
-                    {transition.from_sign} → {transition.to_sign}
+                    {tSign(transition.from_sign)} → {tSign(transition.to_sign)}
                   </Text>
-                  <Text style={styles.transitionType}>{transition.gati_type}</Text>
+                  <Text style={styles.transitionType}>{t(`gati.${transition.gati_type}`, transition.gati_type)}</Text>
                 </View>
                 <Text style={styles.transitionDate}>
                   {new Date(transition.date).toLocaleDateString()}

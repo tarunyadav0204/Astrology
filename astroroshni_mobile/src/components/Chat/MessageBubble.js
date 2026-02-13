@@ -21,8 +21,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/constants';
 import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 import * as Speech from 'expo-speech';
+import { useTranslation } from 'react-i18next';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart }) {
+  const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
@@ -276,7 +278,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     }
     
     // Normalize line breaks
-    formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\n/g, '\n');
     
     // Handle markdown tables - convert to simple format
     formatted = formatted.replace(/\|(.+?)\|\s*\n\s*\|[:\s-|]+\|\s*\n([\s\S]*?)(?=\n\n|\n###|\n##|$)/g, (match, header, rows) => {
@@ -819,9 +821,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             
             elements.push(
               <View key={`list-${currentIndex++}`} style={styles.listItem}>
-                <View style={styles.numberCircle}>
-                  <Text style={styles.numberText}>{listCounter}</Text>
-                </View>
+                <Text style={styles.bullet}>•</Text>
                 <Text style={styles.listText}>
                   {listElements}
                 </Text>
@@ -867,33 +867,6 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   // Check if this is a clarification message
   const isClarification = message.message_type === 'clarification';
 
-  // Handle typing indicator FIRST
-  if (message.isTyping) {
-    return (
-      <Animated.View style={[
-        styles.container,
-        styles.assistantContainer,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
-      ]}>
-        <View style={[styles.bubble, styles.assistantBubble, styles.typingBubble]}>
-          <View style={styles.assistantHeader}>
-            <Text style={styles.assistantLabel}>🔮 AstroRoshni</Text>
-          </View>
-          <View style={styles.messageContent}>
-            <View style={styles.typingContainer}>
-              <Text style={styles.typingText}>{message.content}</Text>
-              <View style={styles.typingDots}>
-                <Animated.View style={[styles.dot, { opacity: dot1Anim, transform: [{ scale: dot1Anim }] }]} />
-                <Animated.View style={[styles.dot, { opacity: dot2Anim, transform: [{ scale: dot2Anim }] }]} />
-                <Animated.View style={[styles.dot, { opacity: dot3Anim, transform: [{ scale: dot3Anim }] }]} />
-              </View>
-            </View>
-          </View>
-        </View>
-      </Animated.View>
-    );
-  }
-
   // Handle empty content for non-typing messages
   if (!message.content || message.content.trim() === '') {
     return null;
@@ -925,7 +898,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         {/* Beta Notice for Timeline Predictions */}
         {message.role === 'assistant' && !isClarification && (
           <View style={styles.betaNotice}>
-            <Text style={styles.betaNoticeText}>⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.</Text>
+            <Text style={styles.betaNoticeText}>{t('chat.betaNotice', '⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.')}</Text>
           </View>
         )}
         
@@ -933,7 +906,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         {message.role === 'assistant' && !isClarification && (
           <View style={styles.disclaimerNotice}>
             <Text style={styles.disclaimerNoticeText}>
-              ⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.
+              {t('chat.disclaimerNotice', '⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.')}
             </Text>
           </View>
         )}
@@ -1268,6 +1241,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 10,
     fontWeight: '700',
+  },
+  bullet: {
+    color: '#ff6b35',
+    fontSize: 20,
+    marginRight: 8,
   },
   listContent: {
     flex: 1,

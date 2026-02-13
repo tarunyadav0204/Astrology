@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
-const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null }) => {
+const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null, highlightHouse = null, glowAnimation = null }) => {
   const { theme, colors } = useTheme();
+  const { t } = useTranslation();
   
   // console.log('NorthIndianChart - showKarakas:', showKarakas, 'karakas:', karakas ? Object.keys(karakas) : 'null');
   
@@ -22,6 +24,11 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
   
   const handleRashiPress = (rashiIndex) => {
     setContextMenu({ show: true, rashiIndex, signName: rashiNames[rashiIndex] });
+  };
+
+  const getHouseGlowColor = (houseNum) => {
+    if (highlightHouse !== houseNum) return null;
+    return cosmicTheme ? 'rgba(255, 215, 0, 0.6)' : 'rgba(255, 107, 53, 0.6)';
   };
 
   const getHouseData = (houseNum) => {
@@ -170,7 +177,6 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
   const getPlanetsInHouse = (houseIndex) => {
     if (!chartData.planets) return [];
     
-    const planets = ['Su', 'Mo', 'Ma', 'Me', 'Ju', 'Ve', 'Sa', 'Ra', 'Ke', 'Gu', 'Mn'];
     const rashiForThisHouse = getRashiForHouse(houseIndex);
     const planetsInHouse = [];
     
@@ -178,10 +184,8 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
     Object.entries(chartData.planets)
       .filter(([name, data]) => data.sign === rashiForThisHouse && name !== 'InduLagna')
       .forEach(([name, data]) => {
-        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
-        const planetIndex = planetNames.indexOf(name);
         planetsInHouse.push({
-          symbol: planets[planetIndex] || name.substring(0, 2),
+          symbol: t(`planets.${name}`, name.substring(0, 2)),
           name: name,
           degree: data.degree ? data.degree.toFixed(2) : '0.00',
           longitude: data.longitude || 0,
@@ -194,7 +198,7 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
     // Add InduLagna if it's in this house
     if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === rashiForThisHouse) {
       planetsInHouse.push({
-        symbol: 'IL',
+        symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',
         degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
         longitude: chartData.planets.InduLagna.longitude || 0,
@@ -270,6 +274,17 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
           
           return (
             <G key={houseNumber}>
+              {/* House glow effect */}
+              {highlightHouse === houseNumber && glowAnimation && (
+                <Circle
+                  cx={houseData.center.x}
+                  cy={houseData.center.y}
+                  r="60"
+                  fill={getHouseGlowColor(houseNumber)}
+                  opacity={glowAnimation}
+                />
+              )}
+              
               {/* Rashi number */}
               <SvgText 
                 x={houseNumber === 1 ? houseData.center.x - 5 :

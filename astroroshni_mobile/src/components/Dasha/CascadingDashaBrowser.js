@@ -23,11 +23,30 @@ import Svg, { Circle, Path, Text as SvgText, G, Defs, LinearGradient, Stop } fro
 import DateNavigator from '../Common/DateNavigator';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { trackAstrologyEvent } from '../../utils/analytics';
+import { useTranslation } from 'react-i18next';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const signNameMap = {
+  'aries': 'Ari', 'taurus': 'Tau', 'gemini': 'Gem', 'cancer': 'Can',
+  'leo': 'Leo', 'virgo': 'Vir', 'libra': 'Lib', 'scorpio': 'Sco',
+  'sagittarius': 'Sag', 'capricorn': 'Cap', 'aquarius': 'Aqu', 'pisces': 'Pis'
+};
+const shortSignMap = {
+  'ari': 'Ari', 'tau': 'Tau', 'gem': 'Gem', 'can': 'Can',
+  'leo': 'Leo', 'vir': 'Vir', 'lib': 'Lib', 'sco': 'Sco',
+  'sag': 'Sag', 'cap': 'Cap', 'aqu': 'Aqu', 'pis': 'Pis'
+};
+
+const getShortSign = (sign) => {
+    if (typeof sign !== 'string') return sign;
+    const lowerSign = sign.toLowerCase();
+    return signNameMap[lowerSign] || shortSignMap[lowerSign] || sign;
+};
+
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
+  const { t } = useTranslation();
   useAnalytics('CascadingDashaBrowser');
   
   const insets = useSafeAreaInsets();
@@ -50,6 +69,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   const [jaiminiTab, setJaiminiTab] = useState('home'); // 'home', 'periods', 'analysis'
 
+  const tSign = (sign) => {
+    if (!sign) return '';
+    return t(`signs.${getShortSign(sign)}`, sign);
+  };
+
   const formatPeriodDuration = (years) => {
     if (!years) return '';
     
@@ -57,17 +81,17 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const totalMonths = years * 12;
     
     if (totalDays < 90) { // Less than 3 months
-      return `${Math.round(totalDays)}d`;
+      return `${Math.round(totalDays)}${t('dasha.dayShort', 'd')}`;
     } else if (totalMonths < 12) { // Less than 1 year
-      return `${Math.round(totalMonths)}m`;
+      return `${Math.round(totalMonths)}${t('dasha.monthShort', 'm')}`;
     } else {
       const wholeYears = Math.floor(years);
       const remainingMonths = Math.round((years - wholeYears) * 12);
       
       if (remainingMonths === 0) {
-        return `${wholeYears}y`;
+        return `${wholeYears}${t('dasha.yearShort', 'y')}`;
       } else {
-        return `${wholeYears}y ${remainingMonths}m`;
+        return `${wholeYears}${t('dasha.yearShort', 'y')} ${remainingMonths}${t('dasha.monthShort', 'm')}`;
       }
     }
   };
@@ -602,7 +626,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const now = new Date();
     const diffMs = end - now;
     
-    if (diffMs <= 0) return 'Completed';
+    if (diffMs <= 0) return t('dasha.completed', 'Completed');
     
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffYears = Math.floor(diffDays / 365);
@@ -611,11 +635,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const finalDays = remainingDays % 30;
     
     if (diffYears > 0) {
-      return `${diffYears}y ${diffMonths}m remaining`;
+      return `${diffYears}${t('dasha.yearShort', 'y')} ${diffMonths}${t('dasha.monthShort', 'm')} ${t('dasha.remaining', 'remaining')}`;
     } else if (diffMonths > 0) {
-      return `${diffMonths}m ${finalDays}d remaining`;
+      return `${diffMonths}${t('dasha.monthShort', 'm')} ${finalDays}${t('dasha.dayShort', 'd')} ${t('dasha.remaining', 'remaining')}`;
     } else {
-      return `${finalDays}d remaining`;
+      return `${finalDays}${t('dasha.dayShort', 'd')} ${t('dasha.remaining', 'remaining')}`;
     }
   };
 
@@ -728,7 +752,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           }}
         >
           <Text style={[styles.dashaTypeTabText, dashaType === 'vimshottari' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            Vimshottari
+            {t('dasha.vimshottari')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -742,7 +766,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         >
           <View style={styles.tabContent}>
             <Text style={[styles.dashaTypeTabText, dashaType === 'kalchakra' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-              BPHS Kalchakra
+              {t('dasha.kalchakra')}
             </Text>
             {kalchakraSystemInfo && (
               <TouchableOpacity 
@@ -762,7 +786,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           }}
         >
           <Text style={[styles.dashaTypeTabText, dashaType === 'yogini' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            Yogini
+            {t('dasha.yogini')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -773,7 +797,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           }}
         >
           <Text style={[styles.dashaTypeTabText, dashaType === 'chara' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            Chara
+            {t('dasha.chara')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -836,27 +860,27 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     
     return (
       <View style={styles.currentStatusCard}>
-        <Text style={styles.currentStatusTitle}>Current BPHS Kalchakra</Text>
+        <Text style={styles.currentStatusTitle}>{t('dasha.currentBPHSKalachakra')}</Text>
         
         <View style={styles.compactPeriodRow}>
           <View style={styles.periodColumn}>
-            <Text style={styles.periodLabel}>Maha</Text>
-            <Text style={styles.periodName}>{currentMaha.name}</Text>
+            <Text style={styles.periodLabel}>{t('dasha.maha')}</Text>
+            <Text style={styles.periodName}>{tSign(currentMaha.name)}</Text>
             <Text style={styles.periodGati}>{currentMaha.gati}</Text>
           </View>
           
           {currentAntar && (
             <View style={styles.periodColumn}>
-              <Text style={styles.periodLabel}>Antar</Text>
-              <Text style={styles.periodName}>{currentAntar.name}</Text>
+              <Text style={styles.periodLabel}>{t('dasha.antar')}</Text>
+              <Text style={styles.periodName}>{tSign(currentAntar.name)}</Text>
               <Text style={styles.periodProgress}>{Math.round(antarProgress)}%</Text>
             </View>
           )}
           
           <View style={styles.systemColumn}>
             <Text style={styles.systemLabel}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
-            <Text style={styles.systemLabel}>Nak {kalchakraData.nakshatra}.{kalchakraData.pada}</Text>
-            <Text style={styles.systemLabel}>{kalchakraData.deha}→{kalchakraData.jeeva}</Text>
+            <Text style={styles.systemLabel}>{t('dasha.nakshatra')}.{kalchakraData.nakshatra}.{kalchakraData.pada}</Text>
+            <Text style={styles.systemLabel}>{tSign(kalchakraData.deha)}→{tSign(kalchakraData.jeeva)}</Text>
           </View>
         </View>
         
@@ -880,7 +904,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (!cascadingData) {
       return (
         <View style={styles.breadcrumb}>
-          <Text style={styles.breadcrumbText}>Select dashas to see hierarchy</Text>
+          <Text style={styles.breadcrumbText}>{t('dasha.selectDashas')}</Text>
         </View>
       );
     }
@@ -915,13 +939,13 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     return (
       <View style={styles.breadcrumb}>
         {breadcrumbItems.length === 0 ? (
-          <Text style={styles.breadcrumbText}>Select dashas to see hierarchy</Text>
+          <Text style={styles.breadcrumbText}>{t('dasha.selectDashasHierarchy')}</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.breadcrumbScroll}>
             {breadcrumbItems.map((item, index) => (
               <View key={`breadcrumb-${item.planet}-${index}`} style={styles.breadcrumbRow}>
                 <View style={styles.breadcrumbCard}>
-                  <Text style={styles.breadcrumbPlanet}>{item.planet}</Text>
+                  <Text style={styles.breadcrumbPlanet}>{t(`planets.${item.planet}`, item.planet)}</Text>
                   {item.details && (
                     <>
                       <Text style={styles.breadcrumbPeriod}>{formatPeriodDuration(item.details.years)}</Text>
@@ -952,19 +976,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             style={[styles.jaiminiTab, jaiminiTab === 'home' && styles.activeJaiminiTab]}
             onPress={() => setJaiminiTab('home')}
           >
-            <Text style={[styles.jaiminiTabText, jaiminiTab === 'home' && styles.activeJaiminiTabText]}>Home</Text>
+            <Text style={[styles.jaiminiTabText, jaiminiTab === 'home' && styles.activeJaiminiTabText]}>{t('common.home')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.jaiminiTab, jaiminiTab === 'periods' && styles.activeJaiminiTab]}
             onPress={() => setJaiminiTab('periods')}
           >
-            <Text style={[styles.jaiminiTabText, jaiminiTab === 'periods' && styles.activeJaiminiTabText]}>Periods</Text>
+            <Text style={[styles.jaiminiTabText, jaiminiTab === 'periods' && styles.activeJaiminiTabText]}>{t('dasha.periods')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.jaiminiTab, jaiminiTab === 'analysis' && styles.activeJaiminiTab]}
             onPress={() => setJaiminiTab('analysis')}
           >
-            <Text style={[styles.jaiminiTabText, jaiminiTab === 'analysis' && styles.activeJaiminiTabText]}>Analysis</Text>
+            <Text style={[styles.jaiminiTabText, jaiminiTab === 'analysis' && styles.activeJaiminiTabText]}>{t('dasha.analysis')}</Text>
           </TouchableOpacity>
         </View>
         
@@ -987,9 +1011,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (!jaiminiData?.cards) {
       return (
         <View style={styles.selectorContainer}>
-          <Text style={styles.selectorLabel}>Analysis</Text>
+          <Text style={styles.selectorLabel}>{t('dasha.analysis')}</Text>
           <View style={[styles.optionCard, styles.disabledOption]}>
-            <Text style={styles.disabledOptionText}>No analysis data available</Text>
+            <Text style={styles.disabledOptionText}>{t('dasha.noAnalysis')}</Text>
           </View>
         </View>
       );
@@ -1001,7 +1025,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           {/* Status Card */}
           {jaiminiData.cards.status_card && (
             <View style={styles.statusCard}>
-              <Text style={styles.cardTitle}>Current Status</Text>
+              <Text style={styles.cardTitle}>{t('dasha.currentStatus')}</Text>
               <View style={styles.statusRow}>
                 <Text style={styles.statusSign}>{jaiminiData.cards.status_card.sign_name}</Text>
                 <Text style={styles.statusScore}>{jaiminiData.cards.status_card.strength_score}/100</Text>
@@ -1020,7 +1044,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           {/* Focus Card */}
           {jaiminiData.cards.focus_card && (
             <View style={styles.focusCard}>
-              <Text style={styles.cardTitle}>🎯 Life Focus</Text>
+              <Text style={styles.cardTitle}>{t('dasha.lifeFocus')}</Text>
               <Text style={styles.focusTheme}>{jaiminiData.cards.focus_card.theme}</Text>
               <Text style={styles.energyStyle}>⚡ {jaiminiData.cards.focus_card.energy_style}</Text>
               <Text style={styles.keyAreas}>🏠 {jaiminiData.cards.focus_card.key_areas}</Text>
@@ -1037,7 +1061,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           {/* Timeline Card */}
           {jaiminiData.cards.timeline_card && (
             <View style={styles.timelineCard}>
-              <Text style={styles.cardTitle}>📅 Timeline</Text>
+              <Text style={styles.cardTitle}>{t('dasha.timeline')}</Text>
               <View style={styles.currentPeriodInfo}>
                 <Text style={styles.currentPeriodName}>{jaiminiData.cards.timeline_card.current_period.name}</Text>
                 <Text style={styles.currentPeriodDates}>
@@ -1047,7 +1071,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               </View>
               {jaiminiData.cards.timeline_card.next_events.length > 0 && (
                 <View style={styles.nextEventsContainer}>
-                  <Text style={styles.nextEventsTitle}>Upcoming Events:</Text>
+                  <Text style={styles.nextEventsTitle}>{t('dasha.upcomingEvents')}</Text>
                   {jaiminiData.cards.timeline_card.next_events.map((event, index) => (
                     <Text key={index} style={styles.nextEventText}>• {event.name} ({new Date(event.date).toLocaleDateString()})</Text>
                   ))}
@@ -1059,10 +1083,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           {/* Predictions Card */}
           {jaiminiData.cards.predictions_card && (
             <View style={styles.predictionsCard}>
-              <Text style={styles.cardTitle}>🔮 Predictions</Text>
+              <Text style={styles.cardTitle}>{t('dasha.predictions')}</Text>
               {jaiminiData.cards.predictions_card.next_6_months.length > 0 && (
                 <View style={styles.predictionSection}>
-                  <Text style={styles.predictionSectionTitle}>Next 6 months:</Text>
+                  <Text style={styles.predictionSectionTitle}>{t('dasha.next6Months')}</Text>
                   {jaiminiData.cards.predictions_card.next_6_months.map((event, index) => (
                     <Text key={index} style={styles.predictionText}>• {event}</Text>
                   ))}
@@ -1070,7 +1094,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               )}
               {jaiminiData.cards.predictions_card.next_2_years.length > 0 && (
                 <View style={styles.predictionSection}>
-                  <Text style={styles.predictionSectionTitle}>Next 2 years:</Text>
+                  <Text style={styles.predictionSectionTitle}>{t('dasha.next2Years')}</Text>
                   {jaiminiData.cards.predictions_card.next_2_years.map((theme, index) => (
                     <Text key={index} style={styles.predictionText}>• {theme}</Text>
                   ))}
@@ -1078,7 +1102,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               )}
               {jaiminiData.cards.predictions_card.jump_effects.length > 0 && (
                 <View style={styles.predictionSection}>
-                  <Text style={styles.predictionSectionTitle}>Jump Effects:</Text>
+                  <Text style={styles.predictionSectionTitle}>{t('dasha.jumpEffects')}</Text>
                   {jaiminiData.cards.predictions_card.jump_effects.map((effect, index) => (
                     <Text key={index} style={styles.predictionText}>⚡ {effect}</Text>
                   ))}
@@ -1090,17 +1114,17 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           {/* Strength Card */}
           {jaiminiData.cards.strength_card && (
             <View style={styles.strengthCard}>
-              <Text style={styles.cardTitle}>💪 Strength Comparison</Text>
+              <Text style={styles.cardTitle}>{t('dasha.strengthComparison')}</Text>
               <View style={styles.strengthComparison}>
                 <View style={styles.strengthItem}>
-                  <Text style={styles.strengthLabel}>Current</Text>
+                  <Text style={styles.strengthLabel}>{t('dasha.current')}</Text>
                   <View style={styles.strengthBar}>
                     <View style={[styles.strengthFill, { width: `${jaiminiData.cards.strength_card.current_strength}%` }]} />
                   </View>
                   <Text style={styles.strengthValue}>{jaiminiData.cards.strength_card.current_strength}/100</Text>
                 </View>
                 <View style={styles.strengthItem}>
-                  <Text style={styles.strengthLabel}>Next ({jaiminiData.cards.strength_card.next_sign_name})</Text>
+                  <Text style={styles.strengthLabel}>{t('dasha.next')} ({jaiminiData.cards.strength_card.next_sign_name})</Text>
                   <View style={styles.strengthBar}>
                     <View style={[styles.strengthFill, { width: `${jaiminiData.cards.strength_card.next_strength}%` }]} />
                   </View>
@@ -1129,9 +1153,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (!jaiminiData) {
       return (
         <View style={styles.selectorContainer}>
-          <Text style={styles.selectorLabel}>Jaimini Kalchakra Dasha</Text>
+          <Text style={styles.selectorLabel}>{t('dasha.jaiminiKalchakraDasha')}</Text>
           <View style={[styles.optionCard, styles.disabledOption]}>
-            <Text style={styles.disabledOptionText}>Loading...</Text>
+            <Text style={styles.disabledOptionText}>{t('dasha.loading')}</Text>
           </View>
         </View>
       );
@@ -1140,9 +1164,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (jaiminiData.error) {
       return (
         <View style={styles.selectorContainer}>
-          <Text style={styles.selectorLabel}>Jaimini Kalchakra Dasha</Text>
+          <Text style={styles.selectorLabel}>{t('dasha.jaiminiKalchakraDasha')}</Text>
           <View style={[styles.optionCard, styles.disabledOption]}>
-            <Text style={styles.disabledOptionText}>Error: {jaiminiData.error}</Text>
+            <Text style={styles.disabledOptionText}>{t('common.error')}: {jaiminiData.error}</Text>
           </View>
         </View>
       );
@@ -1151,9 +1175,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (!jaiminiData.periods || jaiminiData.periods.length === 0) {
       return (
         <View style={styles.selectorContainer}>
-          <Text style={styles.selectorLabel}>Jaimini Kalchakra Dasha</Text>
+          <Text style={styles.selectorLabel}>{t('dasha.jaiminiKalchakraDasha')}</Text>
           <View style={[styles.optionCard, styles.disabledOption]}>
-            <Text style={styles.disabledOptionText}>No periods calculated</Text>
+            <Text style={styles.disabledOptionText}>{t('dasha.noPeriodsCalculated')}</Text>
           </View>
         </View>
       );
@@ -1162,14 +1186,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     return (
       <React.Fragment>
         <View style={styles.jaiminiInfoCard}>
-          <Text style={styles.jaiminiInfoTitle}>Jaimini Kalchakra System</Text>
-          <Text style={styles.jaiminiInfoText}>Janma Rashi: {jaiminiData.janma_rashi}</Text>
-          <Text style={styles.jaiminiInfoText}>Chakra 1: {jaiminiData.chakra1_direction} • Chakra 2: {jaiminiData.chakra2_direction}</Text>
-          <Text style={styles.jaiminiInfoText}>Total Cycle: {jaiminiData.total_cycle_years} years</Text>
+          <Text style={styles.jaiminiInfoTitle}>{t('dasha.jaiminiKalchakraSystem')}</Text>
+          <Text style={styles.jaiminiInfoText}>{t('dasha.janmaRashi')}: {jaiminiData.janma_rashi}</Text>
+          <Text style={styles.jaiminiInfoText}>{t('dasha.chakra1')}: {jaiminiData.chakra1_direction} • {t('dasha.chakra2')}: {jaiminiData.chakra2_direction}</Text>
+          <Text style={styles.jaiminiInfoText}>{t('dasha.totalCycle')}: {jaiminiData.total_cycle_years} {t('dasha.years')}</Text>
           
           {jaiminiData.reversals && jaiminiData.reversals.length > 0 && (
             <View style={styles.reversalInfo}>
-              <Text style={styles.reversalTitle}>🔄 Direction Reversals:</Text>
+              <Text style={styles.reversalTitle}>{t('dasha.directionReversals')}</Text>
               {jaiminiData.reversals.map((reversal, index) => (
                 <Text key={index} style={styles.reversalText}>
                   {reversal.type}: {reversal.from_direction} → {reversal.to_direction}
@@ -1180,10 +1204,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           
           {jaiminiData.jumps && jaiminiData.jumps.length > 0 && (
             <View style={styles.jumpInfo}>
-              <Text style={styles.jumpTitle}>⚡ Sign Jumps:</Text>
+              <Text style={styles.jumpTitle}>{t('dasha.signJumps')}</Text>
               {jaiminiData.jumps.map((jump, index) => (
                 <Text key={index} style={styles.jumpText}>
-                  Skipped: {jump.skipped_sign} ({jump.reason})
+                  {t('dasha.skipped')}: {jump.skipped_sign} ({jump.reason})
                 </Text>
               ))}
             </View>
@@ -1191,23 +1215,23 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           
           {jaiminiData.predictions && (
             <View style={styles.predictionInfo}>
-              <Text style={styles.predictionTitle}>🔮 Upcoming Events:</Text>
+              <Text style={styles.predictionTitle}>{t('dasha.upcomingEvents')}</Text>
               
               {jaiminiData.predictions.cycle_progress && (
                 <Text style={styles.predictionText}>
-                  Cycle Progress: {jaiminiData.predictions.cycle_progress}% complete
+                  {t('dasha.cycleProgress')}: {jaiminiData.predictions.cycle_progress}% {t('dasha.complete')}
                 </Text>
               )}
               
               {jaiminiData.predictions.next_reversal && (
                 <Text style={styles.predictionText}>
-                  Next Reversal: {jaiminiData.predictions.next_reversal.significance} in {jaiminiData.predictions.next_reversal.years_until} years
+                  {t('dasha.nextReversal')}: {jaiminiData.predictions.next_reversal.significance} in {jaiminiData.predictions.next_reversal.years_until} {t('dasha.years')}
                 </Text>
               )}
               
               {jaiminiData.predictions.next_cycle_reset && (
                 <Text style={styles.predictionText}>
-                  Cycle Reset: {jaiminiData.predictions.next_cycle_reset.years_until} years (Cycle {jaiminiData.predictions.next_cycle_reset.cycle_number})
+                  {t('dasha.cycleReset')}: {jaiminiData.predictions.next_cycle_reset.years_until} {t('dasha.years')} ({t('dasha.cycle')} {jaiminiData.predictions.next_cycle_reset.cycle_number})
                 </Text>
               )}
               
@@ -1223,7 +1247,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         </View>
         
         <View style={styles.selectorContainer}>
-          <Text style={styles.selectorLabel}>Jaimini Kalchakra Mahadasha</Text>
+          <Text style={styles.selectorLabel}>{t('dasha.jaiminiKalchakraMahadasha')}</Text>
           <ScrollView 
             ref={scrollRefs.jaimini_maha}
             horizontal 
@@ -1262,28 +1286,28 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     }, 100);
                   }}
                 >
-                  <Text style={[
+                  <Text style={[ 
                     styles.jaiminiSign,
                     isActuallyCurrent && styles.currentJaiminiSign,
                     selectedDashas.jaimini_maha === (period.id || period.sign) && styles.selectedJaiminiText
                   ]}>
-                    {period.sign}
+                    {t(`signs.${period.sign}`, period.sign)}
                   </Text>
-                  <Text style={[
+                  <Text style={[ 
                     styles.jaiminiPeriod,
                     isActuallyCurrent && styles.currentJaiminiPeriod,
                     selectedDashas.jaimini_maha === (period.id || period.sign) && styles.selectedJaiminiText
                   ]}>
                     {formatPeriodDuration(period.duration_years)}
                   </Text>
-                  <Text style={[
+                  <Text style={[ 
                     styles.jaiminiChakra,
                     isActuallyCurrent && styles.currentJaiminiChakra,
                     selectedDashas.jaimini_maha === (period.id || period.sign) && styles.selectedJaiminiText
                   ]}>
-                    C{period.chakra} {period.direction === 'Forward' ? '→' : '←'}
+                    C{period.chakra} {period.direction === t('dasha.forward') ? '→' : '←'}
                   </Text>
-                  <Text style={[
+                  <Text style={[ 
                     styles.jaiminiDates,
                     isActuallyCurrent && styles.currentJaiminiDates,
                     selectedDashas.jaimini_maha === (period.id || period.sign) && styles.selectedJaiminiText
@@ -1303,7 +1327,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         
         {jaiminiAntarData?.antar_periods && (
           <View style={styles.selectorContainer}>
-            <Text style={styles.selectorLabel}>Jaimini Antardasha ({jaiminiAntarData.maha_sign})</Text>
+            <Text style={styles.selectorLabel}>{t('dasha.jaiminiAntardasha')} ({jaiminiAntarData.maha_sign})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
               {jaiminiAntarData.antar_periods.map((period, index) => {
                 const isActuallyCurrent = period.current;
@@ -1312,7 +1336,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                 return (
                   <TouchableOpacity
                     key={`antar-${period.sign}-${index}`}
-                    style={[
+                    style={[ 
                       styles.jaiminiAntarCard,
                       isActuallyCurrent && styles.currentJaiminiAntarCard,
                       selectedDashas.jaimini_antar === period.sign && styles.selectedJaiminiAntarCard
@@ -1332,21 +1356,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                       }, 100);
                     }}
                   >
-                    <Text style={[
+                    <Text style={[ 
                       styles.jaiminiAntarSign,
                       isActuallyCurrent && styles.currentJaiminiAntarSign,
                       selectedDashas.jaimini_antar === period.sign && styles.selectedJaiminiText
                     ]}>
-                      {period.sign}
+                      {t(`signs.${period.sign}`, period.sign)}
                     </Text>
-                    <Text style={[
+                    <Text style={[ 
                       styles.jaiminiAntarPeriod,
                       isActuallyCurrent && styles.currentJaiminiAntarPeriod,
                       selectedDashas.jaimini_antar === period.sign && styles.selectedJaiminiText
                     ]}>
                       {formatPeriodDuration(period.years)}
                     </Text>
-                    <Text style={[
+                    <Text style={[ 
                       styles.jaiminiAntarDates,
                       isActuallyCurrent && styles.currentJaiminiAntarDates,
                       selectedDashas.jaimini_antar === period.sign && styles.selectedJaiminiText
@@ -1376,19 +1400,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         style={[styles.viewToggleBtn, kalchakraViewMode === 'chips' && styles.activeViewToggle]}
         onPress={() => setKalchakraViewMode('chips')}
       >
-        <Text style={[styles.viewToggleText, kalchakraViewMode === 'chips' && styles.activeViewToggleText]}>Periods</Text>
+        <Text style={[styles.viewToggleText, kalchakraViewMode === 'chips' && styles.activeViewToggleText]}>{t('dasha.periods')}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.viewToggleBtn, kalchakraViewMode === 'wheel' && styles.activeViewToggle]}
         onPress={() => setKalchakraViewMode('wheel')}
       >
-        <Text style={[styles.viewToggleText, kalchakraViewMode === 'wheel' && styles.activeViewToggleText]}>🎯 Wheel</Text>
+        <Text style={[styles.viewToggleText, kalchakraViewMode === 'wheel' && styles.activeViewToggleText]}>{t('dasha.wheel')}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.viewToggleBtn, kalchakraViewMode === 'timeline' && styles.activeViewToggle]}
         onPress={() => setKalchakraViewMode('timeline')}
       >
-        <Text style={[styles.viewToggleText, kalchakraViewMode === 'timeline' && styles.activeViewToggleText]}>📊 Timeline</Text>
+        <Text style={[styles.viewToggleText, kalchakraViewMode === 'timeline' && styles.activeViewToggleText]}>{t('dasha.timeline')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -1397,7 +1421,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (!kalchakraData) {
       return (
         <View style={styles.wheelContainer}>
-          <Text style={styles.wheelTitle}>Loading wheel data...</Text>
+          <Text style={styles.wheelTitle}>{t('dasha.loadingWheel')}</Text>
         </View>
       );
     }
@@ -1430,14 +1454,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     });
     const getGatiForSign = (signNumber) => {
       const maha = mahadashas.find(m => m.sign === signNumber);
-      return maha?.gati || 'Normal';
+      return maha?.gati || t('dasha.normal');
     };
     
     const getGatiColor = (gati) => {
-      if (gati.includes('Manduka')) return '#ffe0b2';
-      if (gati.includes('Simhavalokana')) return '#ffcc80';
-      if (gati.includes('Markata')) return '#ffab91';
-      if (gati === 'Start') return '#c8e6c9';
+      if (gati.includes(t('dasha.manduka'))) return '#ffe0b2';
+      if (gati.includes(t('dasha.simhavalokana'))) return '#ffcc80';
+      if (gati.includes(t('dasha.markata'))) return '#ffab91';
+      if (gati === t('dasha.start')) return '#c8e6c9';
       return '#e1bee7';
     };
     
@@ -1457,8 +1481,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     return (
       <View style={styles.wheelContainer}>
         <View style={styles.wheelHeader}>
-          <Text style={styles.wheelTitle}>Kalachakra Wheel</Text>
-          <Text style={styles.wheelSubtitle}>{kalchakraData.deha} → {kalchakraData.jeeva} ({kalchakraData.direction})</Text>
+          <Text style={styles.wheelTitle}>{t('dasha.kalchakraWheel')}</Text>
+          <Text style={styles.wheelSubtitle}>{tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)} ({kalchakraData.direction})</Text>
         </View>
         
         <Svg width={size} height={size} style={styles.svgWheel}>
@@ -1494,7 +1518,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             const isDeha = dehaSign === signNumber;
             const isJeeva = jeevaSign === signNumber;
             const gati = getGatiForSign(signNumber);
-            const hasSpecialGati = gati !== 'Normal' && gati !== 'Start';
+            const hasSpecialGati = gati !== t('dasha.normal') && gati !== t('dasha.start');
             
             const segmentColor = isCurrent ? '#9c27b0' : 
                                isDeha ? '#ffcdd2' :
@@ -1548,7 +1572,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                   textAnchor="middle"
                   alignmentBaseline="middle"
                 >
-                  {sign.slice(0, 3)}
+                  {tSign(sign)}
                 </SvgText>
                 
                 {/* Years inside ring below sign name */}
@@ -1611,9 +1635,9 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     textAnchor="middle"
                     alignmentBaseline="middle"
                   >
-                    {gati.includes('Manduka') ? '🐸' : 
-                     gati.includes('Simhavalokana') ? '🦁' : 
-                     gati.includes('Markata') ? '🐒' : '⚡'}
+                    {gati.includes(t('dasha.manduka')) ? '🐸' : 
+                     gati.includes(t('dasha.simhavalokana')) ? '🦁' : 
+                     gati.includes(t('dasha.markata')) ? '🐒' : '⚡'}
                   </SvgText>
                 )}
                 
@@ -1757,25 +1781,25 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#9c27b0' }]} />
-              <Text style={styles.legendText}>Current</Text>
+              <Text style={styles.legendText}>{t('dasha.current')}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#ffcdd2' }]} />
-              <Text style={styles.legendText}>Deha</Text>
+              <Text style={styles.legendText}>{t('dasha.deha')}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#c8e6c9' }]} />
-              <Text style={styles.legendText}>Jeeva</Text>
+              <Text style={styles.legendText}>{t('dasha.jeeva')}</Text>
             </View>
           </View>
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#e1bee7' }]} />
-              <Text style={styles.legendText}>Sequence</Text>
+              <Text style={styles.legendText}>{t('dasha.sequence')}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#ffe0b2' }]} />
-              <Text style={styles.legendText}>Gati</Text>
+              <Text style={styles.legendText}>{t('dasha.gati')}</Text>
             </View>
           </View>
         </View>
@@ -1787,7 +1811,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     if (!kalchakraData) {
       return (
         <View style={styles.timelineContainer}>
-          <Text style={styles.timelineTitle}>Loading timeline data...</Text>
+          <Text style={styles.timelineTitle}>{t('dasha.loadingTimeline')}</Text>
         </View>
       );
     }
@@ -1798,19 +1822,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     return (
       <View style={styles.timelineContainer}>
         <View style={styles.timelineHeader}>
-          <Text style={styles.timelineTitle}>Kalchakra Timeline</Text>
+          <Text style={styles.timelineTitle}>{t('dasha.kalchakraTimeline')}</Text>
           <View style={styles.dehaJeevaInfo}>
-            <Text style={styles.dehaJeevaText}>🎯 {kalchakraData.deha} → {kalchakraData.jeeva}</Text>
+            <Text style={styles.dehaJeevaText}>🎯 {tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)}</Text>
             <Text style={styles.cycleInfo}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
           </View>
         </View>
         
         <View style={styles.timelineTable}>
           <View style={styles.tableHeader}>
-            <Text style={styles.headerCell}>Sign</Text>
-            <Text style={styles.headerCell}>Gati</Text>
-            <Text style={styles.headerCell}>Duration</Text>
-            <Text style={styles.headerCell}>Period</Text>
+            <Text style={styles.headerCell}>{t('dasha.sign')}</Text>
+            <Text style={styles.headerCell}>{t('dasha.gati')}</Text>
+            <Text style={styles.headerCell}>{t('dasha.duration')}</Text>
+            <Text style={styles.headerCell}>{t('dasha.period')}</Text>
           </View>
           
           {mahadashas.map((maha, index) => {
@@ -1821,7 +1845,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             const isJeeva = maha.name === kalchakraData.jeeva;
             
             return (
-              <View key={index} style={[
+              <View key={index} style={[ 
                 styles.tableRow,
                 isCurrent && styles.currentRow,
                 isDeha && styles.dehaRow,
@@ -1829,19 +1853,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               ]}>
                 <View style={styles.signCell}>
                   <Text style={[styles.signText, isCurrent && styles.currentText]}>
-                    {maha.name}
+                    {tSign(maha.name)}
                   </Text>
-                  {isDeha && <Text style={styles.specialLabel}>DEHA</Text>}
-                  {isJeeva && <Text style={styles.specialLabel}>JEEVA</Text>}
+                  {isDeha && <Text style={styles.specialLabel}>{t('dasha.deha')}</Text>}
+                  {isJeeva && <Text style={styles.specialLabel}>{t('dasha.jeeva')}</Text>}
                 </View>
                 <View style={styles.gatiCell}>
                   <Text style={[styles.gatiText, isCurrent && styles.currentText]}>
-                    {maha.gati?.includes('Manduka') ? '🐸' :
-                     maha.gati?.includes('Simhavalokana') ? '🦁' :
-                     maha.gati?.includes('Markata') ? '🐒' : '⚡'}
+                    {maha.gati?.includes(t('dasha.manduka')) ? '🐸' :
+                     maha.gati?.includes(t('dasha.simhavalokana')) ? '🦁' :
+                     maha.gati?.includes(t('dasha.markata')) ? '🐒' : '⚡'}
                   </Text>
                   <Text style={[styles.gatiName, isCurrent && styles.currentText]}>
-                    {maha.gati?.replace(' Gati', '') || 'Normal'}
+                    {maha.gati ? t(`gati.${maha.gati.replace(' Gati', '')}`, maha.gati.replace(' Gati', '')) : t('dasha.normal')}
                   </Text>
                 </View>
                 <Text style={[styles.durationCell, isCurrent && styles.currentText]}>
@@ -1856,7 +1880,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         </View>
         
         {mahadashas.length === 0 && (
-          <Text style={styles.timelineEmpty}>No timeline data available</Text>
+          <Text style={styles.timelineEmpty}>{t('dasha.noTimelineData')}</Text>
         )}
       </View>
     );
@@ -1878,7 +1902,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         {kalchakraViewMode === 'chips' && (
           <React.Fragment>
             <View style={styles.selectorContainer}>
-              <Text style={styles.selectorLabel}>BPHS Kalchakra Mahadasha (Sign-Based)</Text>
+              <Text style={styles.selectorLabel}>{t('dasha.kalchakraMahadasha')}</Text>
               <ScrollView 
                 ref={scrollRefs.kalchakra_maha}
                 horizontal 
@@ -1887,7 +1911,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               >
                 {mahaOptions.length === 0 ? (
                   <View style={[styles.optionCard, styles.disabledOption]}>
-                    <Text style={styles.disabledOptionText}>No periods available</Text>
+                    <Text style={styles.disabledOptionText}>{t('dasha.noPeriods')}</Text>
                   </View>
                 ) : (
                   mahaOptions.map((period, index) => {
@@ -1901,35 +1925,35 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     return (
                       <TouchableOpacity
                         key={`${period.name}-${index}`}
-                        style={[
+                        style={[ 
                           styles.kalchakraCard,
                           isSelected && styles.selectedKalchakraCard,
                           isActuallyCurrent && styles.currentKalchakraCard
                         ]}
                         onPress={() => handleKalchakraMahaSelection(period.name)}
                       >
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraPlanet,
                           isSelected && styles.selectedKalchakraPlanet,
                           isActuallyCurrent && styles.currentKalchakraPlanet
                         ]}>
-                          {period.name}
+                          {tSign(period.name)}
                         </Text>
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraPeriod,
                           isSelected && styles.selectedKalchakraPeriod,
                           isActuallyCurrent && styles.currentKalchakraPeriod
                         ]}>
                           {formatPeriodDuration(period.years)}
                         </Text>
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraSequence,
                           isSelected && styles.selectedKalchakraSequence,
                           isActuallyCurrent && styles.currentKalchakraSequence
                         ]}>
                           {period.gati}
                         </Text>
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraDates,
                           isSelected && styles.selectedKalchakraDates,
                           isActuallyCurrent && styles.currentKalchakraDates
@@ -1950,7 +1974,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             
             {selectedDashas.kalchakra_maha && antarOptions.length > 0 && (
               <View style={styles.selectorContainer}>
-                <Text style={styles.selectorLabel}>BPHS Kalchakra Antardasha ({selectedDashas.kalchakra_maha})</Text>
+                <Text style={styles.selectorLabel}>{t('dasha.kalchakraAntardasha')} ({tSign(selectedDashas.kalchakra_maha)})</Text>
                 <ScrollView 
                   ref={scrollRefs.kalchakra_antar}
                   horizontal 
@@ -1965,7 +1989,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     return (
                       <TouchableOpacity
                         key={`antar-${period.name}-${index}`}
-                        style={[
+                        style={[ 
                           styles.kalchakraAntarCard,
                           isSelected && styles.selectedKalchakraAntarCard,
                           isActuallyCurrent && styles.currentKalchakraAntarCard
@@ -1985,21 +2009,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                           }, 100);
                         }}
                       >
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraAntarPlanet,
                           isSelected && styles.selectedKalchakraAntarPlanet,
                           isActuallyCurrent && styles.currentKalchakraAntarPlanet
                         ]}>
-                          {period.name}
+                          {tSign(period.name)}
                         </Text>
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraAntarPeriod,
                           isSelected && styles.selectedKalchakraAntarPeriod,
                           isActuallyCurrent && styles.currentKalchakraAntarPeriod
                         ]}>
                           {formatPeriodDuration(period.years)}
                         </Text>
-                        <Text style={[
+                        <Text style={[ 
                           styles.kalchakraAntarDates,
                           isSelected && styles.selectedKalchakraAntarDates,
                           isActuallyCurrent && styles.currentKalchakraAntarDates
@@ -2028,7 +2052,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       <View style={styles.modalOverlay}>
         <View style={styles.systemInfoModal}>
           <View style={styles.systemInfoHeader}>
-            <Text style={styles.systemInfoTitle}>BPHS Kalchakra Dasha</Text>
+            <Text style={styles.systemInfoTitle}>{t('dasha.bphsKalchakraDasha')}</Text>
             <TouchableOpacity onPress={() => setShowSystemInfo(false)}>
               <Text style={styles.modalCloseIcon}>✕</Text>
             </TouchableOpacity>
@@ -2040,12 +2064,12 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               <Text style={styles.systemInfoDescription}>{kalchakraSystemInfo.specialty}</Text>
               
               <View style={styles.systemInfoSection}>
-                <Text style={styles.systemInfoSectionTitle}>Source</Text>
+                <Text style={styles.systemInfoSectionTitle}>{t('dasha.source')}</Text>
                 <Text style={styles.systemInfoText}>{kalchakraSystemInfo.source}</Text>
               </View>
               
               <View style={styles.systemInfoSection}>
-                <Text style={styles.systemInfoSectionTitle}>Key Features</Text>
+                <Text style={styles.systemInfoSectionTitle}>{t('dasha.keyFeatures')}</Text>
                 <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.total_combinations} nakshatra-pada combinations</Text>
                 <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.cycle_length_years}-year complete cycle</Text>
                 <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.based_on}</Text>
@@ -2053,7 +2077,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               </View>
               
               <View style={styles.systemInfoSection}>
-                <Text style={styles.systemInfoSectionTitle}>Authenticity</Text>
+                <Text style={styles.systemInfoSectionTitle}>{t('dasha.authenticity')}</Text>
                 <Text style={styles.systemInfoText}>{kalchakraSystemInfo.authenticity}</Text>
               </View>
             </ScrollView>
@@ -2073,7 +2097,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         <ScrollView ref={scrollRefs[dashaLevel]} horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
           {options.length === 0 ? (
             <View style={[styles.optionCard, styles.disabledOption]}>
-              <Text style={styles.disabledOptionText}>No options available</Text>
+              <Text style={styles.disabledOptionText}>{t('dasha.noOptions')}</Text>
             </View>
           ) : (
             options.map((dasha, index) => {
@@ -2087,7 +2111,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
               return (
                 <TouchableOpacity
                   key={`${dasha.planet}-${index}`}
-                  style={[
+                  style={[ 
                     styles.optionCard,
                     isSelected && styles.selectedOptionCard,
                     isActuallyCurrent && styles.currentOptionCard
@@ -2096,21 +2120,21 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     handleDashaSelection(dashaLevel, dasha.planet);
                   }}
                 >
-                  <Text style={[
+                  <Text style={[ 
                     styles.optionPlanet,
                     isSelected && styles.selectedOptionPlanet,
                     isActuallyCurrent && styles.currentOptionPlanet
                   ]}>
-                    {dasha.planet}
+                    {t(`planets.${dasha.planet}`, dasha.planet)}
                   </Text>
-                  <Text style={[
+                  <Text style={[ 
                     styles.optionPeriod,
                     isSelected && styles.selectedOptionPeriod,
                     isActuallyCurrent && styles.currentOptionPeriod
                   ]}>
                     {formatPeriodDuration(dasha.years)}
                   </Text>
-                  <Text style={[
+                  <Text style={[ 
                     styles.optionDates,
                     isSelected && styles.selectedOptionDates,
                     isActuallyCurrent && styles.currentOptionDates
@@ -2135,12 +2159,12 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeIcon}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Dasha Browser</Text>
+            <Text style={styles.headerTitle}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
           </View>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.accent} />
-            <Text style={styles.loadingText}>Loading Dasha Data...</Text>
+            <Text style={styles.loadingText}>{t('dasha.loading')}</Text>
           </View>
         </View>
       </Modal>
@@ -2156,13 +2180,13 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeIcon}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Dasha Browser</Text>
+            <Text style={styles.headerTitle}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
           </View>
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchCascadingDashas}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>{t('common.retry')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2178,7 +2202,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Dashas for {birthData?.name || 'User'}</Text>
+          <Text style={styles.headerTitle}>{t('dasha.browserFor', { name: birthData?.name || t('common.user') })}</Text>
           <View style={styles.placeholder} />
         </View>
         
@@ -2190,11 +2214,11 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
           <View style={styles.selectorsContainer}>
             {dashaType === 'vimshottari' ? (
               <React.Fragment>
-                {renderDashaSelector('maha', 'Maha Dasha')}
-                {renderDashaSelector('antar', 'Antar Dasha')}
-                {renderDashaSelector('pratyantar', 'Pratyantar Dasha')}
-                {renderDashaSelector('sookshma', 'Sookshma Dasha')}
-                {renderDashaSelector('prana', 'Prana Dasha')}
+                {renderDashaSelector('maha', t('dasha.mahaDasha'))}
+                {renderDashaSelector('antar', t('dasha.antarDasha'))}
+                {renderDashaSelector('pratyantar', t('dasha.pratyantarDasha'))}
+                {renderDashaSelector('sookshma', t('dasha.sookshmaDasha'))}
+                {renderDashaSelector('prana', t('dasha.pranaDasha'))}
               </React.Fragment>
             ) : dashaType === 'kalchakra' ? (
               <React.Fragment>

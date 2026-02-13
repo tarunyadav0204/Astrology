@@ -24,6 +24,7 @@ import { StatusBar } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
+import LoadingBubble from '../LoadingBubble';
 import FeedbackComponent from './FeedbackComponent';
 import EventPeriods from './EventPeriods';
 import HomeScreen from './HomeScreen';
@@ -41,6 +42,7 @@ import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useCredits } from '../../credits/CreditContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -49,6 +51,7 @@ const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
 export default function ChatScreen({ navigation, route }) {
+  const { t, i18n } = useTranslation();
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const { credits, partnershipCost, fetchBalance } = useCredits();
@@ -114,6 +117,7 @@ export default function ChatScreen({ navigation, route }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [dynamicLoadingMessages, setDynamicLoadingMessages] = useState(null);
   const [language, setLanguage] = useState('english');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -179,7 +183,7 @@ export default function ChatScreen({ navigation, route }) {
       const pendingIds = JSON.parse(stored);
       pendingIds.forEach(messageId => {
         // Resume polling for each pending message
-        pollForResponse(messageId, null, sessionId, null, '', true); // true = resume mode
+        pollForResponse(messageId, null, sessionId, '', true); // true = resume mode
       });
     }
   };
@@ -315,7 +319,8 @@ export default function ChatScreen({ navigation, route }) {
       4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
       8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
     };
-    return signs[signNumber] || signNumber;
+    const signName = signs[signNumber] || signNumber;
+    return t(`signs.${signName}`, signName);
   };
   
   const getSignIcon = (signNumber) => {
@@ -515,16 +520,16 @@ export default function ChatScreen({ navigation, route }) {
             }, 50);
             
             // Check for processing messages and resume polling
-            const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
-            if (processingMessage) {
-              setLoading(true);
-              setIsTyping(true);
-              // Use personId directly to avoid timing issues
-              setTimeout(() => {
-                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
-                pollForResponse(processingMessage.messageId, null, sessionId, null, userMessage?.content || '', true);
-              }, 100);
-            }
+            // const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
+            // if (processingMessage) {
+            //   setLoading(true);
+            //   setIsTyping(true);
+            //   // Use personId directly to avoid timing issues
+            //   setTimeout(() => {
+            //     const userMessage = storedMessages.filter(m => m.role === 'user').pop();
+            //     pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
+            //   }, 100);
+            // }
           } else {
             setShowGreeting(true);
           }
@@ -616,15 +621,15 @@ export default function ChatScreen({ navigation, route }) {
             }
             
             // Only resume polling if not already polling
-            if (!loading && !isTyping) {
-              const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
-              if (processingMessage) {
-                setLoading(true);
-                setIsTyping(true);
-                const userMessage = storedMessages.filter(m => m.role === 'user').pop();
-                pollForResponse(processingMessage.messageId, null, sessionId, null, userMessage?.content || '', true);
-              }
-            }
+            // if (!loading && !isTyping) {
+            //   const processingMessage = storedMessages.find(msg => msg.isTyping && msg.messageId);
+            //   if (processingMessage) {
+            //     setLoading(true);
+            //     setIsTyping(true);
+            //     const userMessage = storedMessages.filter(m => m.role === 'user').pop();
+            //     pollForResponse(processingMessage.messageId, null, sessionId, userMessage?.content || '', true);
+            //   }
+            // }
           }
         });
       }
@@ -717,7 +722,7 @@ export default function ChatScreen({ navigation, route }) {
         
         const welcomeMessage = {
           id: Date.now().toString(),
-          content: `🌟 Welcome ${nativeName}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?`,
+          content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
           role: 'assistant',
           timestamp: new Date().toISOString(),
         };
@@ -925,7 +930,7 @@ export default function ChatScreen({ navigation, route }) {
     ];
   };
 
-  const pollForResponse = async (messageId, processingMessageId, currentSessionId, loadingInterval = null, userQuestion = '', isResume = false) => {
+  const pollForResponse = async (messageId, processingMessageId, currentSessionId, userQuestion = '', isResume = false) => {
     if (!messageId) {
       return;
     }
@@ -937,8 +942,6 @@ export default function ChatScreen({ navigation, route }) {
     if (!isResume) {
       await addPendingMessage(messageId);
     }
-    
-    const loadingMessages = getLoadingMessages(userQuestion);
     
     const poll = async () => {
       const pollStartTime = new Date().toISOString();
@@ -975,7 +978,6 @@ export default function ChatScreen({ navigation, route }) {
         // console.log(`📊 [POLL END] messageId: ${messageId}, status: ${status.status}, pollCount: ${pollCount}, startTime: ${pollStartTime}, endTime: ${pollEndTime}`);
         
         if (status.status === 'completed') {
-          if (loadingInterval) clearInterval(loadingInterval);
 
           const showFinalMessage = () => {
             setMessagesWithStorage(prev => {
@@ -1024,7 +1026,6 @@ export default function ChatScreen({ navigation, route }) {
         }
         
         if (status.status === 'failed') {
-          if (loadingInterval) clearInterval(loadingInterval);
           setMessagesWithStorage(prev => prev.map(msg => 
             msg.messageId === messageId 
               ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isTyping: false }
@@ -1036,19 +1037,14 @@ export default function ChatScreen({ navigation, route }) {
           return;
         }
         
-        // Still processing - update message and continue polling
+        // Still processing - continue polling
         if (status.status === 'processing') {
+          // Check for and set dynamic loading messages once
+          if (status.loading_messages && status.loading_messages.length > 0) {
+            setDynamicLoadingMessages(status.loading_messages);
+          }
+
           console.log(`🔄 [POLL PROCESSING] messageId: ${messageId}, pollCount: ${pollCount}, continuing...`);
-          const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
-          
-          setMessagesWithStorage(prev => {
-            const updated = prev.map(msg => 
-              msg.messageId === messageId 
-                ? { ...msg, content: randomMessage, isTyping: true }
-                : msg
-            );
-            return updated;
-          });
           
           pollCount++;
           if (pollCount < maxPolls) {
@@ -1062,7 +1058,6 @@ export default function ChatScreen({ navigation, route }) {
           } else {
             // console.log(`⏰ [POLL TIMEOUT] messageId: ${messageId} reached max polls (${maxPolls})`);
             // Timeout - show restart option
-            if (loadingInterval) clearInterval(loadingInterval);
             setMessagesWithStorage(prev => prev.map(msg => 
               msg.messageId === messageId 
                 ? { 
@@ -1081,8 +1076,6 @@ export default function ChatScreen({ navigation, route }) {
         
       } catch (error) {
         console.error('❌ Polling error:', error);
-        
-        if (loadingInterval) clearInterval(loadingInterval);
         
         // Show user-friendly error message based on error type
         let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
@@ -1145,13 +1138,16 @@ export default function ChatScreen({ navigation, route }) {
     // Restart polling (resume mode)
     const processingMessage = messages.find(msg => msg.messageId === messageId);
     const userMessage = messages.find(msg => msg.id === processingMessage?.userMessageId);
-    pollForResponse(messageId, null, sessionId, null, userMessage?.content || '', true);
+    pollForResponse(messageId, null, sessionId, userMessage?.content || '', true);
   };
 
   const sendMessage = async (messageText = inputText) => {
     if (!messageText.trim() || !birthData) {
       return;
     }
+
+    // Reset dynamic messages for the new question
+    setDynamicLoadingMessages(null);
 
     // Clear input and set states immediately
     setInputText('');
@@ -1184,7 +1180,7 @@ export default function ChatScreen({ navigation, route }) {
     const processingMessageId = Date.now() + '_processing';
     const processingMessage = {
       id: processingMessageId,
-      content: loadingMessages[0],
+      content: '', // Content is now handled by LoadingBubble
       role: 'assistant',
       timestamp: new Date().toISOString(),
       isTyping: true,
@@ -1210,17 +1206,6 @@ export default function ChatScreen({ navigation, route }) {
         return;
       }
     }
-
-    // Start cycling through loading messages
-    let messageIndex = 0;
-    const loadingInterval = setInterval(() => {
-      messageIndex = (messageIndex + 1) % loadingMessages.length;
-      setMessagesWithStorage(prev => prev.map(msg => 
-        msg.id === processingMessageId 
-          ? { ...msg, content: loadingMessages[messageIndex] }
-          : msg
-      ));
-    }, 3000);
 
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -1264,14 +1249,13 @@ export default function ChatScreen({ navigation, route }) {
         ));
         
         // Start polling
-        pollForResponse(messageId, processingMessageId, currentSessionId, loadingInterval, messageText);
+        pollForResponse(messageId, processingMessageId, currentSessionId, messageText);
         return;
       }
       
       // Partnership mode validation
       if (partnershipMode && (!nativeChart || !partnerChart)) {
         Alert.alert('Error', 'Please select both charts for partnership analysis');
-        clearInterval(loadingInterval);
         setMessagesWithStorage(prev => prev.filter(msg => msg.id !== processingMessageId));
         setLoading(false);
         setIsTyping(false);
@@ -1336,18 +1320,25 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       const result = await response.json();
-      const { user_message_id, message_id: assistantMessageId } = result;
+      const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights } = result;
 
       console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+      console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
+      console.log(`🏠 [CHART INSIGHTS] Received ${chart_insights?.length || 0} chart insights from backend`);
 
       if (!assistantMessageId) {
         throw new Error('No message ID received from server');
       }
 
+      // Use dynamic loading messages from backend if available
+      if (loading_messages && loading_messages.length > 0) {
+        setDynamicLoadingMessages(loading_messages);
+      }
+
       console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
       
       // Start polling IMMEDIATELY before state updates to avoid delay
-      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, loadingInterval, messageText);
+      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
 
       // Update user message with real DB ID (async, non-blocking)
       if (user_message_id) {
@@ -1363,11 +1354,11 @@ export default function ChatScreen({ navigation, route }) {
         });
       }
 
-      // Update processing message with messageId (async, non-blocking)
+      // Update processing message with messageId and chart insights
       setMessagesWithStorage(prev => {
         const updated = prev.map(msg => {
           if (msg.id === processingMessageId) {
-            const updatedMsg = { ...msg, messageId: assistantMessageId };
+            const updatedMsg = { ...msg, messageId: assistantMessageId, chartInsights: chart_insights };
             return updatedMsg;
           }
           return msg;
@@ -1377,7 +1368,6 @@ export default function ChatScreen({ navigation, route }) {
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
-      clearInterval(loadingInterval);
       
       // Log error to backend for developer monitoring
       try {
@@ -1416,6 +1406,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const handleLanguageChange = async (newLanguage) => {
+    i18n.changeLanguage(newLanguage);
     setLanguage(newLanguage);
     await storage.setLanguage(newLanguage);
     setShowLanguageModal(false);
@@ -1724,22 +1715,22 @@ export default function ChatScreen({ navigation, route }) {
                   colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
                   style={styles.signsGradient}
                 >
-                  <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {birthData.name}'s Chart Essence</Text>
+                  <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
                   <View style={styles.signsRow}>
                     <View style={styles.signItem}>
-                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ Sun</Text>
+                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ {t('home.signs.sun', 'Sun')}</Text>
                       <Text style={[styles.signValue, { color: colors.text }]}>
                         {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}
                       </Text>
                     </View>
                     <View style={styles.signItem}>
-                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 Moon</Text>
+                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 {t('home.signs.moon', 'Moon')}</Text>
                       <Text style={[styles.signValue, { color: colors.text }]}>
                         {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}
                       </Text>
                     </View>
                     <View style={styles.signItem}>
-                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ Ascendant</Text>
+                      <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ {t('home.signs.ascendant', 'Ascendant')}</Text>
                       <Text style={[styles.signValue, { color: colors.text }]}>
                         {loadingChart ? '...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}
                       </Text>
@@ -1775,7 +1766,7 @@ export default function ChatScreen({ navigation, route }) {
                               onPress={() => setShowDashaBrowser(true)}
                               activeOpacity={0.8}
                             >
-                              <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{dasha.planet}</Text>
+                              <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                             </TouchableOpacity>
@@ -1796,6 +1787,19 @@ export default function ChatScreen({ navigation, route }) {
             
             {messages.map((item, index) => {
               const isLastMessage = index === messages.length - 1;
+
+              if (item.isTyping) {
+                return (
+                  <View key={item.id} ref={isLastMessage ? lastMessageRef : null}>
+                    <LoadingBubble 
+                      chartInsights={item.chartInsights}
+                      chartData={chartData}
+                      scrollViewRef={scrollViewRef}
+                    />
+                  </View>
+                );
+              }
+
               return (
                 <View key={item.id}>
                   <View ref={isLastMessage ? lastMessageRef : null}>
@@ -1974,7 +1978,7 @@ export default function ChatScreen({ navigation, route }) {
               onPress={() => setShowLanguageModal(true)}
             >
               <Ionicons name="language-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Language</Text>
+              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.language')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -1982,7 +1986,7 @@ export default function ChatScreen({ navigation, route }) {
               onPress={() => navigation.navigate('Chart', { birthData })}
             >
               <Ionicons name="pie-chart-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Chart</Text>
+              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.chart')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -1990,7 +1994,7 @@ export default function ChatScreen({ navigation, route }) {
               onPress={() => setShowDashaBrowser(true)}
             >
               <Ionicons name="time-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Dasha</Text>
+              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.dasha')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -2020,7 +2024,7 @@ export default function ChatScreen({ navigation, route }) {
               }}
             >
               <Ionicons name="people-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Partner</Text>
+              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.partner')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -2028,7 +2032,7 @@ export default function ChatScreen({ navigation, route }) {
               onPress={() => navigation.navigate('ChatHistory')}
             >
               <Ionicons name="chatbubbles-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>History</Text>
+              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.history')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -2042,7 +2046,7 @@ export default function ChatScreen({ navigation, route }) {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>🌐 Select Language</Text>
+              <Text style={styles.modalTitle}>🌐 {t('languageModal.title')}</Text>
               {LANGUAGES.map((lang) => (
                 <TouchableOpacity
                   key={lang.code}
@@ -2061,7 +2065,7 @@ export default function ChatScreen({ navigation, route }) {
                 style={styles.modalCloseButton}
                 onPress={() => setShowLanguageModal(false)}
               >
-                <Text style={styles.modalCloseText}>Close</Text>
+                <Text style={styles.modalCloseText}>{t('languageModal.close')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2112,8 +2116,8 @@ export default function ChatScreen({ navigation, route }) {
                       <Text style={styles.orbIconSmall}>🔮</Text>
                     </LinearGradient>
                   </View>
-                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Cosmic Menu</Text>
-                  <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>Navigate Your Journey</Text>
+                  <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.title')}</Text>
+                  <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
                 </View>
 
                 <ScrollView 
@@ -2148,7 +2152,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>✨</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>My Profile</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.myProfile')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2178,7 +2182,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>👤</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Select Native</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.selectNative')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2208,7 +2212,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>➕</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>New Native</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.newNative')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2238,7 +2242,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>📊</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>View Chart</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.viewChart')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2268,7 +2272,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Dasha Browser</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.dashaBrowser')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2298,7 +2302,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⊞</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Ashtakvarga</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.ashtakvarga')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2327,7 +2331,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>⚖️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Shadbala</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.shadbala')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2358,7 +2362,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🏰</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Kota Chakra</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kotaChakra')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2388,7 +2392,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🧘</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Life Analysis</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.lifeAnalysis')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2418,7 +2422,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🕉️</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Past Life Regression</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.pastLifeRegression')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2448,7 +2452,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🔢</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Numerology</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.numerology')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2478,7 +2482,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>💬</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Chat History</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.chatHistory')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2534,7 +2538,7 @@ export default function ChatScreen({ navigation, route }) {
                             <Text style={styles.menuEmoji}>👥</Text>
                           </LinearGradient>
                         </View>
-                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Partnership {partnershipMode ? 'ON' : 'OFF'}</Text>
+                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
                         <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                       </LinearGradient>
                     </TouchableOpacity>
@@ -2565,7 +2569,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>💳</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>Credits</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.credits')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2595,7 +2599,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Text style={styles.menuEmoji}>🚪</Text>
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ff6b60' : '#dc2626' }]}>Logout</Text>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ff6b60' : '#dc2626' }]}>{t('menu.logout')}</Text>
                       <Ionicons name="chevron-forward" size={20} color="rgba(255, 107, 96, 0.6)" />
                     </LinearGradient>
                   </TouchableOpacity>

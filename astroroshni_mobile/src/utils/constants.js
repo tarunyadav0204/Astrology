@@ -66,10 +66,24 @@ export const LANGUAGES = [
   { code: 'tamil', name: 'தமிழ்', flag: '🇮🇳' },
 ];
 
+export const LANGUAGE_STORAGE_KEY = 'user_language';
+
 export const CREDIT_COSTS = {
   SINGLE_CHAT: 1,
   PARTNERSHIP_CHAT: 2,
 };
+
+export const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
+
+export const RASHI_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+
+export const NAKSHATRA_NAMES = [
+  'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu',
+  'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta',
+  'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha',
+  'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
+  'Uttara Bhadrapada', 'Revati'
+];
 
 export const VOICE_CONFIG = {
   rate: 0.75,           // Slower for more natural speech
@@ -85,4 +99,3 @@ export const VOICE_CONFIG = {
     'gu-IN': []
   }
 };
-

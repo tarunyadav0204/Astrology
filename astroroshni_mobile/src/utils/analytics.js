@@ -103,6 +103,7 @@ export const trackAstrologyEvent = {
   userLoggedIn: () => trackEvent('login', { method: 'mobile' }),
   pdfGenerated: (reportType) => trackEvent('pdf_generated', { report_type: reportType }),
   panchangViewed: (date) => trackEvent('panchang_viewed', { date }),
+  languageChanged: (language) => trackEvent('language_changed', { language }),
 };
 
 export const setUserProperties = async (properties) => {

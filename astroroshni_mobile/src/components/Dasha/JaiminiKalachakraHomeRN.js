@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 
 const JaiminiKalachakraHomeRN = ({ birthData }) => {
+  const { t } = useTranslation();
   const [dashadata, setDashadata] = useState(null);
   const [selectedMaha, setSelectedMaha] = useState(null);
   const [antardashas, setAntardashas] = useState([]);
@@ -293,7 +295,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
         <View style={styles.currentPeriods}>
           <View style={styles.periodInfo}>
             <Text style={styles.periodMain}>
-              {currentMaha?.sign} Mahadasha {currentAntar ? `→ ${currentAntar.sign} Antardasha` : ''}
+              {t(`signs.${currentMaha?.sign}`, currentMaha?.sign)} Mahadasha {currentAntar ? `→ ${t(`signs.${currentAntar.sign}`, currentAntar.sign)} Antardasha` : ''}
             </Text>
             <View style={styles.periodDetails}>
               <View style={[styles.chakraBadge, { backgroundColor: currentMaha?.chakra === 1 ? '#4caf50' : '#ff9800' }]}>
@@ -343,7 +345,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
               onPress={() => handleMahaClick(maha)}
             >
               <View style={styles.chipHeader}>
-                <Text style={styles.signName}>{maha.sign}</Text>
+                <Text style={styles.signName}>{t(`signs.${maha.sign}`, maha.sign)}</Text>
                 <View style={[styles.chakraBadgeSmall, { backgroundColor: maha.chakra === 1 ? '#4caf50' : '#ff9800' }]}>
                   <Text style={styles.chakraBadgeSmallText}>C{maha.chakra}</Text>
                 </View>
@@ -369,7 +371,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
       {/* Antardasha Row */}
       {selectedMaha && antardashas.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Antardasha for {selectedMaha.sign}</Text>
+          <Text style={styles.sectionTitle}>Antardasha for {t(`signs.${selectedMaha.sign}`, selectedMaha.sign)}</Text>
           <ScrollView 
             ref={antarScrollRef}
             horizontal 
@@ -385,7 +387,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
                 ]}
                 onPress={() => handleAntarClick(antar)}
               >
-                <Text style={styles.antarName}>{antar.sign}</Text>
+                <Text style={styles.antarName}>{t(`signs.${antar.sign}`, antar.sign)}</Text>
                 <Text style={styles.antarDates}>
                   {formatFullDate(antar.start_date)}
                 </Text>
@@ -412,7 +414,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
                   style={styles.skippedChip}
                   onPress={() => handleSkippedRashiClick(skipped)}
                 >
-                  <Text style={styles.skippedName}>{skipped.sign_name}</Text>
+                  <Text style={styles.skippedName}>{t(`signs.${skipped.sign_name}`, skipped.sign_name)}</Text>
                   <Text style={styles.skippedCycle}>Cycle {skipped.cycle}</Text>
                   <View style={[styles.chakraBadgeSmall, { backgroundColor: '#f44336' }]}>
                     <Text style={styles.chakraBadgeSmallText}>SKIP</Text>
@@ -434,7 +436,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
         <View style={styles.bottomSheetOverlay}>
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{selectedAntar?.sign} Antardasha</Text>
+              <Text style={styles.sheetTitle}>{t(`signs.${selectedAntar?.sign}`, selectedAntar?.sign)} Antardasha</Text>
               <TouchableOpacity 
                 style={styles.closeBtn}
                 onPress={() => setShowBottomSheet(false)}
@@ -490,7 +492,7 @@ const JaiminiKalachakraHomeRN = ({ birthData }) => {
         <View style={styles.bottomSheetOverlay}>
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Why {selectedSkippedRashi?.sign_name} is Skipped</Text>
+              <Text style={styles.sheetTitle}>Why {t(`signs.${selectedSkippedRashi?.sign_name}`, selectedSkippedRashi?.sign_name)} is Skipped</Text>
               <TouchableOpacity 
                 style={styles.closeBtn}
                 onPress={() => setShowSkipReasons(false)}

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 
 const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscendant = null, onRotate, cosmicTheme = false, showKarakas = false, karakas = null }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
+  const { t } = useTranslation();
   
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
   
@@ -53,16 +55,13 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscend
 
   const getPlanetsInSign = (signIndex) => {
     if (!chartData.planets || signIndex === -1) return [];
-    const planets = ['Su', 'Mo', 'Ma', 'Me', 'Ju', 'Ve', 'Sa', 'Ra', 'Ke', 'Gu', 'Mn'];
     const planetsInSign = [];
     
     // Add regular planets (exclude InduLagna as it's handled separately)
     Object.entries(chartData.planets)
       .filter(([name, data]) => data.sign === signIndex && name !== 'InduLagna')
       .forEach(([name, data]) => {
-        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
-        const planetIndex = planetNames.indexOf(name);
-        let symbol = planets[planetIndex] || name.substring(0, 2);
+        let symbol = t(`planets.${name}`, name.substring(0, 2));
         
         // Add Karaka abbreviation if showKarakas is true
         if (showKarakas && karakas && typeof karakas === 'object') {
@@ -95,7 +94,7 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscend
     // Add InduLagna if it's in this sign
     if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === signIndex) {
       planetsInSign.push({
-        symbol: 'IL',
+        symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',
         degree: chartData.planets.InduLagna.degree ? chartData.planets.InduLagna.degree.toFixed(2) : '0.00',
         longitude: chartData.planets.InduLagna.longitude || 0,

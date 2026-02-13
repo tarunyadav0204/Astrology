@@ -20,6 +20,7 @@ import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import { storage } from '../../services/storage';
 import { chartAPI, authAPI } from '../../services/api';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
@@ -31,6 +32,7 @@ const { width } = Dimensions.get('window');
 
 export default function BirthFormScreen({ navigation, route }) {
   useAnalytics('BirthFormScreen');
+  const { t } = useTranslation();
   const { theme, colors, getCardElevation } = useTheme();
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
@@ -350,7 +352,7 @@ export default function BirthFormScreen({ navigation, route }) {
         return false;
       }
       if (!formData.latitude || !formData.longitude) {
-        Alert.alert('Invalid Location', 'Please select a location from the suggestions to ensure accurate calculations.');
+        Alert.alert(t('birthForm.alerts.invalidLocation.title', 'Invalid Location'), t('birthForm.alerts.invalidLocation.suggestions', 'Please select a location from the suggestions to ensure accurate calculations.'));
         shakeAnimation();
         return false;
       }
@@ -372,7 +374,7 @@ export default function BirthFormScreen({ navigation, route }) {
   const handleSubmit = async () => {
     // Final validation before submission
     if (!formData.latitude || !formData.longitude) {
-      Alert.alert('Invalid Location', 'Please select a location from the suggestions.');
+      Alert.alert(t('birthForm.alerts.invalidLocation.title', 'Invalid Location'), t('birthForm.alerts.invalidLocation.noSelection', 'Please select a location from the suggestions.'));
       setLoading(false);
       return;
     }
@@ -472,9 +474,9 @@ export default function BirthFormScreen({ navigation, route }) {
 
       triggerConfetti();
       setTimeout(() => {
-        const successMessage = updateGender ? 'Gender updated successfully!' : editProfile ? 'Profile updated successfully!' : 'Birth chart calculated successfully!';
-        Alert.alert('Success', successMessage, [
-          { text: 'OK', onPress: () => {
+        const successMessage = updateGender ? t('birthForm.alerts.success.genderUpdated', 'Gender updated successfully!') : editProfile ? t('birthForm.alerts.success.profileUpdated', 'Profile updated successfully!') : t('birthForm.alerts.success.chartCalculated', 'Birth chart calculated successfully!');
+        Alert.alert(t('birthForm.alerts.success.title', 'Success'), successMessage, [
+          { text: t('birthForm.alerts.ok', 'OK'), onPress: () => {
             if (editProfile) {
               navigation.navigate('SelectNative');
             } else {
@@ -484,7 +486,7 @@ export default function BirthFormScreen({ navigation, route }) {
         ]);
       }, 1000);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to process birth details');
+      Alert.alert(t('birthForm.alerts.error.title', 'Error'), error.response?.data?.message || t('birthForm.alerts.error.default', 'Failed to process birth details'));
     } finally {
       setLoading(false);
     }
@@ -496,7 +498,7 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const getStepTitle = () => {
-    const titles = ['What\'s your name?', 'Select your gender', 'When were you born?', 'What time were you born?', 'Where were you born?'];
+    const titles = [t('birthForm.stepTitle.name', 'What\'s your name?'), t('birthForm.stepTitle.gender', 'Select your gender'), t('birthForm.stepTitle.date', 'When were you born?'), t('birthForm.stepTitle.time', 'What time were you born?'), t('birthForm.stepTitle.place', 'Where were you born?')];
     return titles[step - 1];
   };
 
@@ -518,7 +520,7 @@ export default function BirthFormScreen({ navigation, route }) {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <Ionicons name="person" size={20} color="#ff6b35" />
-                <Text style={[styles.headerTitle, { color: colors.text }]}>{updateGender ? 'Update Gender' : editProfile ? 'Edit Profile' : 'Birth Details'}</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{updateGender ? t('birthForm.headerTitle.updateGender', 'Update Gender') : editProfile ? t('birthForm.headerTitle.editProfile', 'Edit Profile') : t('birthForm.headerTitle.birthDetails', 'Birth Details')}</Text>
               </View>
               <View style={styles.placeholder} />
             </View>
@@ -530,7 +532,7 @@ export default function BirthFormScreen({ navigation, route }) {
                   <LinearGradient colors={['#ff6b35', '#ffd700']} style={styles.progressGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
                 </Animated.View>
               </View>
-              <Text style={[styles.progressText, { color: colors.textSecondary }]}>Step {step} of 5</Text>
+              <Text style={[styles.progressText, { color: colors.textSecondary }]}>{t('birthForm.progressText', 'Step {{step}} of 5', { step })}</Text>
             </View>
 
             <ScrollView 
@@ -558,7 +560,7 @@ export default function BirthFormScreen({ navigation, route }) {
                       style={[styles.input, { color: colors.text, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]}
                       value={formData.name}
                       onChangeText={(value) => handleInputChange('name', value)}
-                      placeholder="Enter your full name"
+                      placeholder={t('birthForm.namePlaceholder', 'Enter your full name')}
                       placeholderTextColor={colors.textSecondary}
                       autoFocus
                       autoCorrect={false}
@@ -577,7 +579,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         style={[styles.genderGradient, { borderColor: formData.gender === 'Male' ? 'rgba(255, 107, 53, 0.5)' : theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
                       >
                         <Text style={styles.genderIcon}>♂️</Text>
-                        <Text style={[styles.genderText, { color: colors.text }]}>Male</Text>
+                        <Text style={[styles.genderText, { color: colors.text }]}>{t('birthForm.gender.male', 'Male')}</Text>
                         {formData.gender === 'Male' && <Text style={[styles.selectedIndicator, { color: colors.text }]}>✓</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
@@ -590,7 +592,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         style={[styles.genderGradient, { borderColor: formData.gender === 'Female' ? 'rgba(255, 107, 53, 0.5)' : theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
                       >
                         <Text style={styles.genderIcon}>♀️</Text>
-                        <Text style={[styles.genderText, { color: colors.text }]}>Female</Text>
+                        <Text style={[styles.genderText, { color: colors.text }]}>{t('birthForm.gender.female', 'Female')}</Text>
                         {formData.gender === 'Female' && <Text style={[styles.selectedIndicator, { color: colors.text }]}>✓</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
@@ -641,7 +643,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         style={[styles.input, { color: colors.text, backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]}
                         value={formData.place}
                         onChangeText={(value) => handleInputChange('place', value)}
-                        placeholder="City, State, Country"
+                        placeholder={t('birthForm.placePlaceholder', 'City, State, Country')}
                         placeholderTextColor={colors.textSecondary}
                         autoCorrect={false}
                         onBlur={() => {
@@ -673,11 +675,11 @@ export default function BirthFormScreen({ navigation, route }) {
                     </View>
                     {formData.latitude && formData.longitude && (
                       <View style={[styles.locationDetails, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                        <Text style={[styles.locationDetailsTitle, { color: colors.text }]}>📍 Selected Location</Text>
+                        <Text style={[styles.locationDetailsTitle, { color: colors.text }]}>📍 {t('birthForm.selectedLocation', 'Selected Location')}</Text>
                         <Text style={[styles.locationDetailsText, { color: colors.text }]}>{formData.place}</Text>
                         <View style={[styles.coordinatesRow, { borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)' }]}>
-                          <Text style={[styles.coordinateText, { color: colors.textSecondary }]}>Lat: {formData.latitude.toFixed(4)}</Text>
-                          <Text style={[styles.coordinateText, { color: colors.textSecondary }]}>Long: {formData.longitude.toFixed(4)}</Text>
+                          <Text style={[styles.coordinateText, { color: colors.textSecondary }]}>{t('birthForm.coords.lat', 'Lat:')} {formData.latitude.toFixed(4)}</Text>
+                          <Text style={[styles.coordinateText, { color: colors.textSecondary }]}>{t('birthForm.coords.long', 'Long:')} {formData.longitude.toFixed(4)}</Text>
                         </View>
                       </View>
                     )}
@@ -693,13 +695,13 @@ export default function BirthFormScreen({ navigation, route }) {
                 <TouchableOpacity style={[styles.navButton, { elevation: getCardElevation(5) }]} onPress={prevStep}>
                   <LinearGradient colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']} style={styles.navGradient}>
                     <Ionicons name="arrow-back" size={20} color={colors.text} />
-                    <Text style={[styles.navText, { color: colors.text }]}>Back</Text>
+                    <Text style={[styles.navText, { color: colors.text }]}>{t('birthForm.buttons.back', 'Back')}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={[styles.navButton, styles.navButtonPrimary, step === 1 && styles.navButtonFull, { elevation: getCardElevation(5) }]} onPress={nextStep} disabled={loading}>
                 <LinearGradient colors={['#ff6b35', '#ff8c5a']} style={styles.navGradient}>
-                  <Text style={styles.navTextPrimary}>{loading ? 'Processing...' : step === 5 ? 'Complete' : 'Next'}</Text>
+                  <Text style={styles.navTextPrimary}>{loading ? t('birthForm.buttons.processing', 'Processing...') : step === 5 ? t('birthForm.buttons.complete', 'Complete') : t('birthForm.buttons.next', 'Next')}</Text>
                   {step < 5 && <Ionicons name="arrow-forward" size={20} color={COLORS.white} />}
                 </LinearGradient>
               </TouchableOpacity>
@@ -713,10 +715,10 @@ export default function BirthFormScreen({ navigation, route }) {
                     <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.pickerGradient}>
                       <View style={styles.pickerHeader}>
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                          <Text style={styles.pickerButton}>Cancel</Text>
+                          <Text style={styles.pickerButton}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
@@ -757,7 +759,7 @@ export default function BirthFormScreen({ navigation, route }) {
                     <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.pickerGradient}>
                       <View style={styles.pickerHeader}>
                         <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                          <Text style={styles.pickerButton}>Cancel</Text>
+                          <Text style={styles.pickerButton}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => {
                           const hours = tempPeriod === 'PM' ? (tempHour === 12 ? 12 : tempHour + 12) : (tempHour === 12 ? 0 : tempHour);
@@ -766,7 +768,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           handleInputChange('time', newTime);
                           setShowTimePicker(false);
                         }}>
-                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>Done</Text>
+                          <Text style={[styles.pickerButton, styles.pickerButtonDone]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={styles.customPickerRow}>

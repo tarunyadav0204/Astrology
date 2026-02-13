@@ -23,11 +23,13 @@ import ChartWidget from './ChartWidget';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ChartScreen({ navigation, route }) {
+  const { t } = useTranslation();
   useAnalytics('ChartScreen');
   const { theme, colors } = useTheme();
   const [birthData, setBirthData] = useState(null);
@@ -41,23 +43,23 @@ export default function ChartScreen({ navigation, route }) {
   const lastSwipeTime = useRef(0);
   
   const chartTypes = [
-    { id: 'lagna', name: 'Lagna (D1)', icon: '🏠', description: 'Main Birth Chart' },
-    { id: 'navamsa', name: 'Navamsa (D9)', icon: '💎', description: 'Marriage & Spirituality' },
-    { id: 'transit', name: 'Transit', icon: '🪐', description: 'Live Planetary Positions' },
-    { id: 'karkamsa', name: 'Karkamsa', icon: '🎯', description: 'Spiritual Path & Dharma' },
-    { id: 'swamsa', name: 'Swamsa', icon: '🕉️', description: 'Parental Lineage & Ancestry' },
-    { id: 'hora', name: 'Hora (D2)', icon: '💰', description: 'Wealth & Family' },
-    { id: 'drekkana', name: 'Drekkana (D3)', icon: '👫', description: 'Siblings & Happiness' },
-    { id: 'chaturthamsa', name: 'Chaturthamsa (D4)', icon: '🏡', description: 'Destiny & Assets' },
-    { id: 'dashamsa', name: 'Dashamsa (D10)', icon: '💼', description: 'Career & Profession' },
-    { id: 'dwadashamsa', name: 'Dwadashamsa (D12)', icon: '👨👩👧👦', description: 'Parents & Ancestry' },
-    { id: 'shodamsa', name: 'Shodamsa (D16)', icon: '🚗', description: 'Vehicles & Comforts' },
-    { id: 'vimsamsa', name: 'Vimsamsa (D20)', icon: '🙏', description: 'Spiritual Practices' },
-    { id: 'chaturvimsamsa', name: 'Chaturvimsamsa (D24)', icon: '📚', description: 'Learning & Education' },
-    { id: 'trimsamsa', name: 'Trimsamsa (D30)', icon: '⚠️', description: 'Misfortunes & Troubles' },
-    { id: 'khavedamsa', name: 'Khavedamsa (D40)', icon: '🍀', description: 'Auspicious & Inauspicious' },
-    { id: 'akshavedamsa', name: 'Akshavedamsa (D45)', icon: '🎭', description: 'Character & Conduct' },
-    { id: 'shashtyamsa', name: 'Shashtyamsa (D60)', icon: '⏰', description: 'Past Life Karma' },
+    { id: 'lagna', name: t('chartTypes.lagna.name'), icon: '🏠', description: t('chartTypes.lagna.description') },
+    { id: 'navamsa', name: t('chartTypes.navamsa.name'), icon: '💎', description: t('chartTypes.navamsa.description') },
+    { id: 'transit', name: t('chartTypes.transit.name'), icon: '🪐', description: t('chartTypes.transit.description') },
+    { id: 'karkamsa', name: t('chartTypes.karkamsa.name'), icon: '🎯', description: t('chartTypes.karkamsa.description') },
+    { id: 'swamsa', name: t('chartTypes.swamsa.name'), icon: '🕉️', description: t('chartTypes.swamsa.description') },
+    { id: 'hora', name: t('chartTypes.hora.name'), icon: '💰', description: t('chartTypes.hora.description') },
+    { id: 'drekkana', name: t('chartTypes.drekkana.name'), icon: '👫', description: t('chartTypes.drekkana.description') },
+    { id: 'chaturthamsa', name: t('chartTypes.chaturthamsa.name'), icon: '🏡', description: t('chartTypes.chaturthamsa.description') },
+    { id: 'dashamsa', name: t('chartTypes.dashamsa.name'), icon: '💼', description: t('chartTypes.dashamsa.description') },
+    { id: 'dwadashamsa', name: t('chartTypes.dwadashamsa.name'), icon: '👨👩👧👦', description: t('chartTypes.dwadashamsa.description') },
+    { id: 'shodamsa', name: t('chartTypes.shodamsa.name'), icon: '🚗', description: t('chartTypes.shodamsa.description') },
+    { id: 'vimsamsa', name: t('chartTypes.vimsamsa.name'), icon: '🙏', description: t('chartTypes.vimsamsa.description') },
+    { id: 'chaturvimsamsa', name: t('chartTypes.chaturvimsamsa.name'), icon: '📚', description: t('chartTypes.chaturvimsamsa.description') },
+    { id: 'trimsamsa', name: t('chartTypes.trimsamsa.name'), icon: '⚠️', description: t('chartTypes.trimsamsa.description') },
+    { id: 'khavedamsa', name: t('chartTypes.khavedamsa.name'), icon: '🍀', description: t('chartTypes.khavedamsa.description') },
+    { id: 'akshavedamsa', name: t('chartTypes.akshavedamsa.name'), icon: '🎭', description: t('chartTypes.akshavedamsa.description') },
+    { id: 'shashtyamsa', name: t('chartTypes.shashtyamsa.name'), icon: '⏰', description: t('chartTypes.shashtyamsa.description') },
   ];
   
   console.log('[ChartScreen] Chart types loaded:', chartTypes.map(c => c.id));
@@ -259,8 +261,8 @@ export default function ChartScreen({ navigation, route }) {
                   <Text style={styles.loadingOrbIcon}>✨</Text>
                 </LinearGradient>
               </Animated.View>
-              <Text style={[styles.loadingText, { color: colors.text }]}>Calculating Cosmic Alignments...</Text>
-              <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>Reading planetary positions</Text>
+              <Text style={[styles.loadingText, { color: colors.text }]}>{t('chartScreen.loadingText')}</Text>
+              <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>{t('chartScreen.loadingSubtext')}</Text>
             </View>
           </View>
         ) : chartData && birthData ? (
@@ -340,8 +342,8 @@ export default function ChartScreen({ navigation, route }) {
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📊</Text>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Chart Data</Text>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Please add birth details to view charts</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('chartScreen.emptyTitle')}</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('chartScreen.emptyText')}</Text>
           </View>
         )}
         </SafeAreaView>

@@ -9,22 +9,26 @@ import {
   Dimensions,
   StatusBar,
   Alert,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Rect, Line, Polygon } from 'react-native-svg';
-import { COLORS } from '../../utils/constants';
+import { COLORS, LANGUAGES } from '../../utils/constants';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../locales/i18n';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NorthIndianChart from '../Chart/NorthIndianChart';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }) {
+  const { t } = useTranslation();
   useAnalytics('ProfileScreen');
   const { theme, toggleTheme, colors } = useTheme();
   const { credits } = useCredits();
@@ -36,6 +40,8 @@ export default function ProfileScreen({ navigation }) {
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [dashaData, setDashaData] = useState(null);
   const [loadingDashas, setLoadingDashas] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [language, setLanguage] = useState(i18n.language);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -44,6 +50,14 @@ export default function ProfileScreen({ navigation }) {
   useEffect(() => {
     loadUserData();
     startAnimations();
+    const loadLanguage = async () => {
+      const savedLanguage = await storage.getLanguage();
+      if (savedLanguage) {
+        setLanguage(savedLanguage);
+        i18n.changeLanguage(savedLanguage);
+      }
+    }
+    loadLanguage();
     
     // Add focus listener to reload data when returning to screen
     const unsubscribe = navigation.addListener('focus', () => {
@@ -190,6 +204,13 @@ export default function ProfileScreen({ navigation }) {
     } finally {
       setLoadingDashas(false);
     }
+  };
+
+  const handleLanguageChange = async (newLanguage) => {
+    i18n.changeLanguage(newLanguage);
+    setLanguage(newLanguage);
+    await storage.setLanguage(newLanguage);
+    setShowLanguageModal(false);
   };
 
   const getZodiacSign = (date) => {
@@ -422,13 +443,13 @@ export default function ProfileScreen({ navigation }) {
               <View style={styles.actionsGrid}>
                 <ActionButton 
                   icon="chatbubbles" 
-                  label="New Chat" 
+                  label={t('profile.quickActions.newChat')} 
                   onPress={() => navigation.navigate('Home', { startChat: true })}
                   color="#4a90e2"
                 />
                 <ActionButton 
                   icon="pie-chart" 
-                  label="View Chart" 
+                  label={t('profile.quickActions.viewChart')} 
                   onPress={() => {
                     if (birthData) {
                       navigation.navigate('Chart', { birthData });
@@ -440,7 +461,7 @@ export default function ProfileScreen({ navigation }) {
                 />
                 <ActionButton 
                   icon="time" 
-                  label="Dashas" 
+                  label={t('profile.quickActions.dashas')} 
                   onPress={() => {
                     if (birthData) {
                       setShowDashaBrowser(true);
@@ -453,13 +474,13 @@ export default function ProfileScreen({ navigation }) {
                 />
                 <ActionButton 
                   icon="calendar" 
-                  label="History" 
+                  label={t('profile.quickActions.history')} 
                   onPress={() => navigation.navigate('ChatHistory')}
                   color="#4caf50"
                 />
                 <ActionButton 
                   icon="list" 
-                  label="My Facts" 
+                  label={t('profile.quickActions.myFacts')} 
                   onPress={() => {
                     if (birthData?.id) {
                       navigation.navigate('Facts', { birthChartId: birthData.id, nativeName: birthData.name });
@@ -468,6 +489,12 @@ export default function ProfileScreen({ navigation }) {
                     }
                   }}
                   color="#e91e63"
+                />
+                <ActionButton 
+                  icon="language" 
+                  label={t('profile.quickActions.language')} 
+                  onPress={() => setShowLanguageModal(true)}
+                  color="#2196f3"
                 />
               </View>
             </Animated.View>
@@ -510,6 +537,39 @@ export default function ProfileScreen({ navigation }) {
         </SafeAreaView>
       </LinearGradient>
       
+      <Modal
+        visible={showLanguageModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🌐 {t('languageModal.title')}</Text>
+            {LANGUAGES.map((lang) => (
+              <TouchableOpacity
+                key={lang.code}
+                style={[
+                  styles.languageOption,
+                  language === lang.code && styles.languageOptionSelected
+                ]}
+                onPress={() => handleLanguageChange(lang.code)}
+              >
+                <Text style={styles.languageText}>
+                  {lang.flag} {lang.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowLanguageModal(false)}
+            >
+              <Text style={styles.modalCloseText}>{t('languageModal.close')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <CascadingDashaBrowser 
         visible={showDashaBrowser} 
         onClose={() => setShowDashaBrowser(false)}
@@ -639,5 +699,66 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 24,
+    padding: 24,
+    width: '88%',
+    maxHeight: '75%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.accent,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  languageOption: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: COLORS.lightGray,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  languageOptionSelected: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: COLORS.accent,
+  },
+  languageText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.black,
+  },
+  modalCloseButton: {
+    backgroundColor: COLORS.accent,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalCloseText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
