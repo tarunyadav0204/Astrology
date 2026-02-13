@@ -408,8 +408,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             state_row = cursor.fetchone()
             clarification_count = state_row[0] if state_row else 0
         
+        # Force ready if clarification limit reached
+        force_ready_for_limit = partnership_mode or clarification_count >= 1
+        
         intent_router = IntentRouter()
-        intent = await intent_router.classify_intent(question, [], user_facts, clarification_count=clarification_count, language=language, force_ready=partnership_mode, d1_chart=d1_chart)
+        intent = await intent_router.classify_intent(question, [], user_facts, clarification_count=clarification_count, language=language, force_ready=force_ready_for_limit, d1_chart=d1_chart)
         chart_insights = intent.get('chart_insights', [])
         print(f"📊 Got {len(chart_insights)} chart insights from intent router")
         

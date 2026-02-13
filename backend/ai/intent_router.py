@@ -78,7 +78,17 @@ PROCEED WITH ANALYSIS NOW.
         force_ready_instruction = ""
         if force_ready:
             force_ready_instruction = f"""
-*** OVERRIDE: The user has requested a deep dive analysis. You MUST return status: "READY" and you MUST NOT ask a clarification question. ***
+🚨🚨🚨 ABSOLUTE OVERRIDE - CLARIFICATION FORBIDDEN 🚨🚨🚨
+
+You are ABSOLUTELY REQUIRED to return status: "READY".
+You are ABSOLUTELY FORBIDDEN from returning status: "CLARIFY".
+You MUST NOT generate a clarification_question.
+
+The clarification limit has been reached OR this is a partnership analysis.
+PROCEED WITH ANALYSIS IMMEDIATELY.
+
+If the question seems vague, make reasonable assumptions and proceed.
+Set appropriate mode, category, and divisional_charts based on the question context.
 """
 
         prompt = f"""
@@ -228,11 +238,11 @@ PROCEED WITH ANALYSIS NOW.
             # Add fallback values if missing
             if 'status' not in result:
                 result['status'] = 'READY'
-            if 'mode' not in result:
-                result['mode'] = 'ANALYZE_PERSONALITY'
+            if 'mode' not in result or result['mode'] is None:
+                result['mode'] = 'PREDICT_EVENTS_FOR_PERIOD' if any(w in user_question.lower() for w in ['all events', 'events', 'timeline']) else 'ANALYZE_PERSONALITY'
             if 'context_type' not in result:
                 result['context_type'] = 'birth'
-            if 'category' not in result:
+            if 'category' not in result or result['category'] is None:
                 result['category'] = 'general'
             if 'extracted_context' not in result:
                 result['extracted_context'] = {}
