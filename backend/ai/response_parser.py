@@ -131,7 +131,8 @@ class ResponseParser:
                 print(f"   ⚠️ Glossary error: {e}")
         
         # 3. Extract Follow-up Questions from DECODED content (Hybrid Parser)
-        print(f"   Checking for follow-up in decoded content: {'<div class="follow-up-questions">' in content}")
+        follow_up_div = '<div class="follow-up-questions">'
+        print(f"   Checking for follow-up in decoded content: {follow_up_div in content}")
         follow_up_match = re.search(r'<div class="follow-up-questions">(.*?)</div>', content, re.DOTALL)
         if follow_up_match:
             print(f"   Found follow-up match!")
