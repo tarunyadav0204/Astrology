@@ -17,6 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Speech from 'expo-speech';
 
 import { chatAPI, creditAPI } from '../services/api';
 import { storage } from '../services/storage';
@@ -26,6 +27,7 @@ import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
 import { trackAstrologyEvent } from '../utils/analytics';
+import { generatePDF, sharePDFOnWhatsApp } from '../utils/pdfGenerator';
 import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
@@ -51,7 +53,9 @@ export default function EventScreen({ route }) {
   const [analysisStarted, setAnalysisStarted] = useState(false);
   const [creditCost, setCreditCost] = useState(100);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+    const [loadingProgress, setLoadingProgress] = useState(0);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const progressIntervalRef = useRef(null);
   const [nativeName, setNativeName] = useState('');
   const [birthData, setBirthData] = useState(null);
@@ -444,6 +448,126 @@ export default function EventScreen({ route }) {
     });
   };
 
+  const formatDataForPDF = (data, year) => {
+    let content = `## The Vibe of ${year}\n\n`;
+
+    if (data.macro_trends && data.macro_trends.length > 0) {
+      data.macro_trends.forEach(trend => {
+        content += `- ${trend}\n`;
+      });
+    }
+
+    content += `\n\n## Monthly Guide\n\n`;
+
+    if (data.monthly_predictions && data.monthly_predictions.length > 0) {
+      data.monthly_predictions.forEach(month => {
+        content += `### ${getMonthName(month.month_id)}\n\n`;
+        if (month.focus_areas && month.focus_areas.length > 0) {
+          content += `**Focus:** ${month.focus_areas.join(', ')}\n\n`;
+        }
+        if (month.events && month.events.length > 0) {
+          month.events.forEach(event => {
+            content += `**${event.type}** (${event.start_date} to ${event.end_date})\n`;
+            content += `${event.prediction}\n\n`;
+            if (event.possible_manifestations && event.possible_manifestations.length > 0) {
+                content += `*Possible Scenarios:*\n`;
+                event.possible_manifestations.forEach(manifestation => {
+                    const scenario = typeof manifestation === 'string' ? manifestation : manifestation.scenario;
+                    content += `- ${scenario}\n`;
+                });
+                content += '\n';
+            }
+          });
+        }
+      });
+    }
+
+    return content;
+  };
+
+  const sharePDF = async () => {
+    if (!monthlyData) {
+      Alert.alert('No Data', 'Please generate the predictions first.');
+      return;
+    }
+
+    try {
+      setIsGeneratingPDF(true);
+      const content = formatDataForPDF(monthlyData, selectedYear);
+      
+      const pdfPayload = {
+        content: content,
+        timestamp: new Date().toISOString(),
+      };
+
+      const pdfUri = await generatePDF(pdfPayload);
+      await sharePDFOnWhatsApp(pdfUri);
+
+    } catch (error) {
+      console.error('❌ PDF generation error:', error);
+      Alert.alert('Error', `Failed to generate PDF: ${error.message}`);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const formatDataForSpeech = (data, year) => {
+    let content = `Predictions for ${year}. `;
+
+    if (data.macro_trends && data.macro_trends.length > 0) {
+      content += `The overall vibe for the year is: ${data.macro_trends.join(', ')}. `;
+    }
+
+    content += `Here is your monthly guide. `;
+
+    if (data.monthly_predictions && data.monthly_predictions.length > 0) {
+      data.monthly_predictions.forEach(month => {
+        content += `Month: ${getMonthName(month.month_id)}. `;
+        if (month.focus_areas && month.focus_areas.length > 0) {
+          content += `The key focus areas are: ${month.focus_areas.join(', ')}. `;
+        }
+        if (month.events && month.events.length > 0) {
+          month.events.forEach(event => {
+            content += `${event.type} from ${event.start_date} to ${event.end_date}. `;
+            content += `${event.prediction}. `;
+            if (event.possible_manifestations && event.possible_manifestations.length > 0) {
+                content += `Possible Scenarios include: `;
+                event.possible_manifestations.forEach(manifestation => {
+                    const scenario = typeof manifestation === 'string' ? manifestation : manifestation.scenario;
+                    content += `${scenario}. `;
+                });
+            }
+          });
+        }
+      });
+    }
+    return content.replace(/\*/g, ''); // Remove any asterisks
+  };
+
+  const speak = async () => {
+    if (isSpeaking) {
+      Speech.stop();
+      setIsSpeaking(false);
+      return;
+    }
+
+    if (!monthlyData) {
+      Alert.alert('No Data', 'Please generate the predictions first.');
+      return;
+    }
+
+    const speechText = formatDataForSpeech(monthlyData, selectedYear);
+    setIsSpeaking(true);
+    Speech.speak(speechText, {
+      onDone: () => setIsSpeaking(false),
+      onStopped: () => setIsSpeaking(false),
+      onError: () => {
+        setIsSpeaking(false);
+        Alert.alert('Error', 'Could not play the speech.');
+      }
+    });
+  };
+
   const handleContinue = async () => {
     try {
       const birthData = await getBirthDetails();
@@ -578,6 +702,8 @@ export default function EventScreen({ route }) {
               birthData={birthData}
               onPress={() => navigation.navigate('SelectNative')}
               maxLength={12}
+              style={styles.nameChip}
+              textStyle={styles.nameChipText}
             />
           )}
         </View>
@@ -587,9 +713,18 @@ export default function EventScreen({ route }) {
               <Ionicons name="refresh" size={22} color={colors.accent} />
             </TouchableOpacity>
           )}
-          {analysisStarted && (
-            <TouchableOpacity onPress={() => setAnalysisStarted(false)} style={[styles.settingsButton, { backgroundColor: colors.surface }]}>
-              <Ionicons name="settings-outline" size={24} color={colors.accent} />
+          {analysisStarted && monthlyData && (
+            <TouchableOpacity onPress={sharePDF} disabled={isGeneratingPDF} style={[styles.regenerateButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              {isGeneratingPDF ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Ionicons name="download-outline" size={22} color={colors.accent} />
+              )}
+            </TouchableOpacity>
+          )}
+          {analysisStarted && monthlyData && (
+            <TouchableOpacity onPress={speak} disabled={loadingMonthly} style={[styles.regenerateButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Ionicons name={isSpeaking ? "stop-circle" : "volume-medium-outline"} size={22} color={colors.accent} />
             </TouchableOpacity>
           )}
         </View>
@@ -800,9 +935,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  headerTitle: { 
-    fontSize: 20, 
-    fontWeight: '700', 
+    headerTitle: {
+      fontSize: 18,    fontWeight: '700', 
     color: '#FFD700', 
     textAlign: 'center',
     marginBottom: 4,
@@ -1071,5 +1205,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3
+  },
+  nameChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  nameChipText: {
+    fontSize: 11,
   }
 });

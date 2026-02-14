@@ -37,6 +37,7 @@ import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/consta
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
 import { trackAstrologyEvent } from '../../utils/analytics';
 import { useTheme } from '../../context/ThemeContext';
+import { Image } from 'react-native';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -860,7 +861,7 @@ export default function ChatScreen({ navigation, route }) {
         '📈 Identifying key periods for career growth...',
         '🌟 Uncovering hidden talents and opportunities...',
         '🎯 Aligning your career with your life purpose...',
-        '🔮 Predicting potential challenges in your professional life...',
+        '☀️ Predicting potential challenges in your professional life...',
         '✨ Providing guidance for career advancement...',
         'Congratulations on taking this important step in your career exploration! I am now examining the intricate details of your birth chart to provide you with the most accurate and personalized insights available.',
         'I am analyzing the placement of Saturn, the planet of career and responsibility, in your birth chart. This will help me understand your professional potential and challenges.',
@@ -875,7 +876,7 @@ export default function ChatScreen({ navigation, route }) {
         '💍 Assessing marital compatibility and timing...',
         '❤️ Exploring romantic connections in your chart...',
         '💑 Understanding partnership dynamics...',
-        '🔮 Predicting potential challenges in your married life...',
+        '☀️ Predicting potential challenges in your married life...',
         '✨ Providing guidance for a harmonious relationship...',
         'Now, I am delving into the complexities of your birth chart to provide you with a comprehensive analysis of your marital prospects. This is an important step in understanding your future, and I am committed to providing you with the most accurate and personalized insights available.',
         'I am analyzing the placement of Venus, the planet of love and relationships, in your birth chart. This will help me understand your romantic potential and challenges.',
@@ -922,7 +923,7 @@ export default function ChatScreen({ navigation, route }) {
     
     // Default messages
     return [
-      '🔮 Analyzing your birth chart...',
+      '☀️ Analyzing your birth chart...',
       '⭐ Consulting the cosmic energies...',
       '📊 Calculating planetary positions...',
       '🌟 Interpreting astrological patterns...',
@@ -1419,7 +1420,7 @@ export default function ChatScreen({ navigation, route }) {
         .join('\n\n');
       
       await Share.share({
-        message: `🔮 AstroRoshni Chat\n\n${chatText}\n\nShared from AstroRoshni App`,
+        message: `☀️ AstroRoshni Chat\n\n${chatText}\n\nShared from AstroRoshni App`,
       });
     } catch (error) {
       console.error('Error sharing chat:', error);
@@ -2106,15 +2107,12 @@ export default function ChatScreen({ navigation, route }) {
                 style={styles.drawerGradient}
               >
                 <View style={styles.drawerHeader}>
-                  <View style={styles.cosmicOrbSmall}>
-                    <LinearGradient
-                      colors={['#ff6b35', '#ffd700', '#ff6b35']}
-                      style={styles.orbGradientSmall}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                    >
-                      <Text style={styles.orbIconSmall}>🔮</Text>
-                    </LinearGradient>
+                  <View style={styles.logoContainer}>
+                    <Image 
+                      source={require('../../../assets/logo.png')}
+                      style={styles.logoImage}
+                      resizeMode="contain"
+                    />
                   </View>
                   <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.title')}</Text>
                   <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
@@ -2363,6 +2361,36 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kotaChakra')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
+                        navigation.navigate('Yogas');
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#8b5cf6', '#6366f1']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🧘</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.yogas')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -2687,7 +2715,7 @@ export default function ChatScreen({ navigation, route }) {
                       colors={['#ff6b35', '#ff8c5a']}
                       style={styles.benefitIconGradient}
                     >
-                      <Text style={styles.benefitIcon}>🔮</Text>
+                      <Text style={styles.benefitIcon}>☀️</Text>
                     </LinearGradient>
                   </View>
                   <View style={styles.benefitText}>
@@ -3362,6 +3390,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  logoImage: {
+    width: 70,
+    height: 70,
   },
   cosmicOrbSmall: {
     width: 70,

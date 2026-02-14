@@ -206,7 +206,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         .replace(/•\s*/g, '• ')
         .trim();
 
-      const shareText = `🔮 AstroRoshni Prediction\n\n${cleanText}\n\nShared from AstroRoshni App`;
+      const shareText = `☀️ AstroRoshni Prediction\n\n${cleanText}\n\nShared from AstroRoshni App`;
       
       await Share.share({
         message: shareText,
@@ -737,7 +737,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     if (text.includes('health') || text.includes('wellness')) return '🌿';
     if (text.includes('finance') || text.includes('money') || text.includes('wealth')) return '💰';
     if (text.includes('spiritual') || text.includes('meditation')) return '🕉️';
-    if (text.includes('remedy') || text.includes('solution')) return '🔮';
+    if (text.includes('remedy') || text.includes('solution')) return '☀️';
     if (text.includes('prediction') || text.includes('forecast')) return '🌙';
     if (text.includes('transit') || text.includes('planetary')) return '🪐';
     return '✨'; // Default symbol
@@ -890,7 +890,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         {message.role === 'assistant' && (
           <View style={styles.assistantHeader}>
             <Text style={styles.assistantLabel}>
-              {isClarification ? '❓ Question' : '🔮 AstroRoshni'}
+              {isClarification ? '❓ Question' : '☀️ AstroRoshni'}
             </Text>
           </View>
         )}
@@ -938,7 +938,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           <View style={styles.followUpContainer}>
             {message.follow_up_questions.map((question, index) => {
               const cleanQuestion = question
-                .replace(/^[\s🔮🌟⭐💫✨📅💼🍎📚🧘*•-]+/, '')
+                .replace(/^[\s☀️🌟⭐💫✨📅💼🍎📚🧘*•-]+/, '')
                 .trim();
               if (cleanQuestion.length < 5) return null;
               return (

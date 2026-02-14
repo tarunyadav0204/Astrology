@@ -133,7 +133,7 @@ export default function AnalysisHubScreen({ navigation }) {
     
     return baseTypes.map(type => ({
       ...type,
-      cost: pricing[type.id] || 5
+      cost: pricing[type.id] || 0
     }));
   };
 

@@ -105,7 +105,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                         end={{ x: 1, y: 1 }}
                         style={styles.welcomeBubble}
                     >
-                        <Text style={styles.welcomeTitle}>🔮 AstroRoshni</Text>
+                        <Text style={styles.welcomeTitle}>☀️ AstroRoshni</Text>
                         <Text style={styles.welcomeSubtext}>Preparing your cosmic insights...</Text>
                     </LinearGradient>
                 </View>
@@ -120,7 +120,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                     end={{ x: 1, y: 1 }}
                     style={styles.chartBubble}
                 >
-                    <Text style={styles.chartTitle}>🔮 AstroRoshni</Text>
+                    <Text style={styles.chartTitle}>☀️ AstroRoshni</Text>
                     
                     <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
                         <NorthIndianChart 
@@ -148,7 +148,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                 style={styles.welcomeBubble}
             >
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <Text style={styles.welcomeIcon}>🔮</Text>
+                    <Text style={styles.welcomeIcon}>☀️</Text>
                 </Animated.View>
                 
                 <Text style={styles.welcomeTitle}>AstroRoshni</Text>

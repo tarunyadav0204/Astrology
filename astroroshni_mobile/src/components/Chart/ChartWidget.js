@@ -55,8 +55,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
   
-  console.log('[ChartWidget] Available chart types:', chartTypes);
-  
   const chartTitles = {
     lagna: 'Birth Chart (Lagna)',
     navamsa: 'Navamsa (D9)',
@@ -77,9 +75,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   };
   
   const chartDivisions = {
-    hora: 2, drekkana: 3, chaturthamsa: 4, navamsa: 9, saptamsa: 7, dasamsa: 10, dwadasamsa: 12, shodasamsa: 16,
-    vimshamsa: 20, chaturvimshamsa: 24, saptavimshamsa: 27,
-    trimshamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60,
+    hora: 2, drekkana: 3, chaturthamsa: 4, navamsa: 9, saptamsa: 7, dashamsa: 10, dwadashamsa: 12, shodamsa: 16,
+    vimsamsa: 20, chaturvimsamsa: 24, saptavimshamsa: 27,
+    trimsamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60,
     // Aliases for consistency with ChartScreen
     shodamsa: 16, vimsamsa: 20, trimsamsa: 30
   };
@@ -210,7 +208,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         loadAllCharts();
       }
     } catch (error) {
-
+      console.warn('Error loading cached charts, falling back to API:', error);
       loadAllCharts();
     }
   };
@@ -223,7 +221,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       const { lagna, ...cacheToSave } = cache; // Don't save lagna as it's always available
       await storage.setItem(cacheKey, JSON.stringify(cacheToSave));
     } catch (error) {
-
+      console.error('Failed to save charts to storage:', error);
     }
   };
 
@@ -246,7 +244,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           const response = await chartAPI.calculateDivisionalChart(formattedData, division);
           return { type, data: response.data.divisional_chart };
         } catch (error) {
-
+          console.warn(`Failed to load ${type}:`, error);
           return { type, data: null };
         }
       });
@@ -258,7 +256,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           const response = await chartAPI.calculateTransits(formattedData, today);
           return { type: 'transit', data: response.data };
         } catch (error) {
-
+          console.warn('Failed to load transit chart:', error);
           return { type: 'transit', data: null };
         }
       })();
@@ -279,7 +277,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       await saveCacheToStorage(newCache);
       
     } catch (error) {
-
+      console.error('Error in loadAllCharts:', error);
     } finally {
       setLoading(false);
     }
@@ -310,9 +308,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       if (data && targetChartType) {
         setChartDataCache(prev => ({ ...prev, [targetChartType]: data }));
         setCurrentChartData(data);
+      } else if (!targetChartType) {
+        console.error(`[ChartWidget] No targetChartType found for D${divisionNumber}`);
       }
     } catch (error) {
       console.error(`Error loading divisional chart D${divisionNumber}:`, error);
+      console.error('Full error details:', error.response?.data || error.message);
     } finally {
       setLoading(false);
     }
@@ -690,6 +691,31 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           >
             <Text style={styles.quickActionIcon}>📋</Text>
             <Text style={styles.quickActionText}>{t('chartScreen.positions', 'Positions')}</Text>
+          </TouchableOpacity>
+          
+          {currentChartType === 'lagna' && (
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => navigation?.navigate('Yogas')}
+            >
+              <Text style={styles.quickActionIcon}>🧘</Text>
+              <Text style={styles.quickActionText}>{t('chartScreen.yogas', 'Yogas')}</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity 
+            style={styles.quickActionButton}
+            onPress={() => {
+              const chartName = chartTitles[currentChartType] || currentChartType;
+              const prompt = `Analyze my ${chartName} chart in detail. What does it reveal about my life?`;
+              navigation?.navigate('Home', {
+                startChat: true,
+                initialMessage: prompt
+              });
+            }}
+          >
+            <Text style={styles.quickActionIcon}>💬</Text>
+            <Text style={styles.quickActionText}>{t('chartScreen.analyze', 'Analyze')}</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -62,7 +62,7 @@ class YogaCalculator(BaseCalculator):
                         'planets': [kendra_lord, trikona_lord],
                         'houses': [planets[kendra_lord].get('house', 1), planets[trikona_lord].get('house', 1)],
                         'strength': 'High',
-                        'description': f'{kendra_house}th lord {kendra_lord} and {trikona_house}th lord {trikona_lord} connected'
+                        'description': f'{self._ordinal(kendra_house)} lord {kendra_lord} and {self._ordinal(trikona_house)} lord {trikona_lord} connected'
                     })
         
         return raj_yogas
@@ -135,32 +135,67 @@ class YogaCalculator(BaseCalculator):
             'Sun': 6, 'Moon': 7, 'Mars': 3, 'Mercury': 11,
             'Jupiter': 9, 'Venus': 5, 'Saturn': 0
         }
-        
+        exaltation_signs = {
+            'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5,
+            'Jupiter': 3, 'Venus': 11, 'Saturn': 6
+        }
+
         for planet_name, debil_sign in debilitation_signs.items():
             if planet_name in planets:
                 planet_data = planets[planet_name]
                 current_sign = planet_data.get('sign', 0)
                 
                 if current_sign == debil_sign:
-                    # Check for cancellation conditions
-                    cancellation_found = False
-                    cancellation_reason = ""
+                    cancellation_reasons = []
                     
-                    # Rule 1: Debilitation lord in Kendra from Moon/Ascendant
+                    # Rule 1: Lord of the debilitation sign is in a Kendra from Lagna or Moon.
                     debil_lord = self.SIGN_LORDS[debil_sign]
                     if debil_lord in planets:
                         debil_lord_house = planets[debil_lord].get('house', 1)
-                        if debil_lord_house in [1, 4, 7, 10]:
-                            cancellation_found = True
-                            cancellation_reason = f"Debilitation lord {debil_lord} in Kendra"
+                        moon_house = planets['Moon'].get('house', 1)
+                        debil_lord_house_from_moon = (debil_lord_house - moon_house + 12) % 12 + 1
+                        if debil_lord_house in [1, 4, 7, 10] or debil_lord_house_from_moon in [1, 4, 7, 10]:
+                            cancellation_reasons.append(f"Lord of debilitation sign, {debil_lord}, is in a Kendra from Lagna or Moon.")
+
+                    # Rule 2: Lord of the exaltation sign of the debilitated planet is in a Kendra from Lagna or Moon.
+                    exalt_sign = exaltation_signs[planet_name]
+                    exalt_lord = self.SIGN_LORDS[exalt_sign]
+                    if exalt_lord in planets:
+                        exalt_lord_house = planets[exalt_lord].get('house', 1)
+                        moon_house = planets['Moon'].get('house', 1)
+                        exalt_lord_house_from_moon = (exalt_lord_house - moon_house + 12) % 12 + 1
+                        if exalt_lord_house in [1, 4, 7, 10] or exalt_lord_house_from_moon in [1, 4, 7, 10]:
+                            cancellation_reasons.append(f"Lord of exaltation sign, {exalt_lord}, is in a Kendra from Lagna or Moon.")
                     
-                    if cancellation_found:
+                    # Rule 3: The debilitated planet is aspected by its exaltation lord.
+                    exalt_lord_aspects = self.aspect_calc.get_aspecting_planets(planet_data.get('house'))
+                    if exalt_lord in exalt_lord_aspects:
+                        cancellation_reasons.append(f"Debilitated planet is aspected by its exaltation lord, {exalt_lord}.")
+
+                    # Rule 4: The debilitated planet is in conjunction with its exaltation lord.
+                    if exalt_lord in planets and planets[exalt_lord].get('house') == planet_data.get('house'):
+                         cancellation_reasons.append(f"Debilitated planet is conjunct with its exaltation lord, {exalt_lord}.")
+                    
+                    # Rule 5: The debilitated planet is aspected by the lord of the sign it is in.
+                    debil_lord_aspects = self.aspect_calc.get_aspecting_planets(planet_data.get('house'))
+                    if debil_lord in debil_lord_aspects:
+                        cancellation_reasons.append(f"Debilitated planet is aspected by the lord of its sign, {debil_lord}.")
+
+                    # Rule 6: Two debilitated planets aspecting each other.
+                    for other_planet, other_debil_sign in debilitation_signs.items():
+                        if other_planet != planet_name and other_planet in planets and planets[other_planet].get('sign') == other_debil_sign:
+                            other_planet_data = planets[other_planet]
+                            # Check for mutual aspect
+                            if self._are_planets_connected(planet_data, other_planet_data):
+                                cancellation_reasons.append(f"Debilitated planet is in mutual aspect with another debilitated planet, {other_planet}.")
+
+                    if cancellation_reasons:
                         neecha_bhanga_yogas.append({
-                            'name': 'Neecha Bhanga Yoga',
+                            'name': 'Neecha Bhanga Raja Yoga',
                             'planet': planet_name,
-                            'reason': cancellation_reason,
+                            'reason': " ".join(cancellation_reasons),
                             'strength': 'Medium',
-                            'description': f'{planet_name} debilitation cancelled'
+                            'description': f'{planet_name} debilitation cancelled.'
                         })
         
         return neecha_bhanga_yogas
@@ -250,10 +285,315 @@ class YogaCalculator(BaseCalculator):
                 })
         return yogas
     
+    def calculate_nabhasa_yogas(self):
+        """Calculate Nabhasa Yogas"""
+        yogas = {}
+        sankhya_yogas = self._calculate_sankhya_yogas()
+        if sankhya_yogas:
+            yogas['sankhya_yogas'] = sankhya_yogas
+        akriti_yogas = self._calculate_akriti_yogas()
+        if akriti_yogas:
+            yogas['akriti_yogas'] = akriti_yogas
+        ashraya_yogas = self._calculate_ashraya_yogas()
+        if ashraya_yogas:
+            yogas['ashraya_yogas'] = ashraya_yogas
+        return yogas
+
+    def _calculate_ashraya_yogas(self):
+        """Calculate Ashraya Yogas (dependency-based)"""
+        planets = self.chart_data.get('planets', {})
+        classical_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        
+        movable_signs = [0, 3, 6, 9]  # Aries, Cancer, Libra, Capricorn
+        fixed_signs = [1, 4, 7, 10]  # Taurus, Leo, Scorpio, Aquarius
+        dual_signs = [2, 5, 8, 11]  # Gemini, Virgo, Sagittarius, Pisces
+        
+        planet_signs = []
+        for planet_name in classical_planets:
+            if planet_name in planets:
+                planet_signs.append(planets[planet_name].get('sign'))
+
+        yogas = []
+        
+        if len(planet_signs) == 7:
+            if all(s in movable_signs for s in planet_signs):
+                yogas.append({
+                    'name': 'Rajju Yoga',
+                    'strength': 'Low',
+                    'description': 'All planets in movable signs. Indicates a person who is fond of traveling and is of a jealous disposition.'
+                })
+            elif all(s in fixed_signs for s in planet_signs):
+                yogas.append({
+                    'name': 'Musala Yoga',
+                    'strength': 'Medium',
+                    'description': 'All planets in fixed signs. Indicates a person who is proud, wealthy, and attached to their homeland.'
+                })
+            elif all(s in dual_signs for s in planet_signs):
+                yogas.append({
+                    'name': 'Nalika Yoga',
+                    'strength': 'Medium',
+                    'description': 'All planets in dual signs. Indicates a person who is intelligent, wealthy, and has a fluctuating mind.'
+                })
+                
+        return yogas
+
+
+    def _calculate_akriti_yogas(self):
+        """Calculate Akriti Yogas (shape-based)"""
+        planets = self.chart_data.get('planets', {})
+        classical_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        
+        occupied_houses = set()
+        for planet_name in classical_planets:
+            if planet_name in planets:
+                occupied_houses.add(planets[planet_name].get('house'))
+
+        yogas = []
+
+        # 1. Gada Yoga: All planets in two adjacent kendras.
+        if len(occupied_houses) > 1 and all(h in [1,4] for h in occupied_houses) or \
+           all(h in [4,7] for h in occupied_houses) or \
+           all(h in [7,10] for h in occupied_houses) or \
+           all(h in [10,1] for h in occupied_houses):
+            yogas.append({
+                'name': 'Gada Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in two adjacent kendras. Indicates wealth and property.'
+            })
+
+        # 2. Sakata Yoga: All planets in the 1st and 7th houses.
+        if len(occupied_houses) > 1 and all(h in [1, 7] for h in occupied_houses):
+            yogas.append({
+                'name': 'Sakata Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 1st and 7th houses. Indicates a life of struggle with occasional bursts of fortune.'
+            })
+
+        # 3. Vihaga Yoga: All planets in the 4th and 10th houses.
+        if len(occupied_houses) > 1 and all(h in [4, 10] for h in occupied_houses):
+            yogas.append({
+                'name': 'Vihaga Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 4th and 10th houses. Indicates a person who is a wanderer.'
+            })
+
+        # 4. Shringataka Yoga: All planets in the 1st, 5th, and 9th houses.
+        if len(occupied_houses) > 1 and all(h in [1, 5, 9] for h in occupied_houses):
+            yogas.append({
+                'name': 'Shringataka Yoga',
+                'strength': 'High',
+                'description': 'All planets in trikonas. Indicates a life of ease and comfort.'
+            })
+
+        # 5. Hala Yoga: All planets in the 2nd, 6th, and 10th; or 3rd, 7th, and 11th; or 4th, 8th, and 12th.
+        if len(occupied_houses) > 1 and all(h in [2, 6, 10] for h in occupied_houses) or \
+           all(h in [3, 7, 11] for h in occupied_houses) or \
+           all(h in [4, 8, 12] for h in occupied_houses):
+            yogas.append({
+                'name': 'Hala Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in 2nd, 6th, 10th or 3rd, 7th, 11th or 4th, 8th, 12th. Indicates a person who is a farmer or works with the land.'
+            })
+            
+        # 6. Vajra Yoga: Benefics in the 1st and 7th, malefics in the 4th and 10th.
+        benefics = ['Venus', 'Jupiter', 'Mercury', 'Moon']
+        malefics = ['Saturn', 'Mars', 'Sun']
+        
+        benefic_houses = set()
+        malefic_houses = set()
+        
+        for planet in benefics:
+            if planet in planets:
+                benefic_houses.add(planets[planet].get('house'))
+        
+        for planet in malefics:
+            if planet in planets:
+                malefic_houses.add(planets[planet].get('house'))
+                
+        if all(h in [1, 7] for h in benefic_houses) and all(h in [4, 10] for h in malefic_houses):
+            yogas.append({
+                'name': 'Vajra Yoga',
+                'strength': 'High',
+                'description': 'Benefics in 1st and 7th, malefics in 4th and 10th. Indicates a powerful and influential person.'
+            })
+            
+        # 7. Yava Yoga: Benefics in the 4th and 10th, malefics in the 1st and 7th.
+        if all(h in [4, 10] for h in benefic_houses) and all(h in [1, 7] for h in malefic_houses):
+            yogas.append({
+                'name': 'Yava Yoga',
+                'strength': 'High',
+                'description': 'Benefics in 4th and 10th, malefics in 1st and 7th. Indicates a person with a difficult early life but success later.'
+            })
+            
+        # 8. Kamala Yoga: All planets in the 1st, 4th, 7th, and 10th houses.
+        if len(occupied_houses) > 1 and all(h in [1, 4, 7, 10] for h in occupied_houses):
+            yogas.append({
+                'name': 'Kamala Yoga',
+                'strength': 'High',
+                'description': 'All planets in kendras. Indicates a person who is famous and wealthy.'
+            })
+
+        # 9. Vapi Yoga: All planets in Panapara houses (2, 5, 8, 11) or Apoklima houses (3, 6, 9, 12).
+        if len(occupied_houses) > 1 and all(h in [2, 5, 8, 11] for h in occupied_houses) or \
+           all(h in [3, 6, 9, 12] for h in occupied_houses):
+            yogas.append({
+                'name': 'Vapi Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in Panapara or Apoklima houses. Indicates a person who is secretive and may have hidden wealth.'
+            })
+            
+        # 10. Yoopa Yoga: All planets in the 1st, 2nd, 3rd, and 4th houses.
+        if len(occupied_houses) > 1 and all(h in [1, 2, 3, 4] for h in occupied_houses):
+            yogas.append({
+                'name': 'Yoopa Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the first four houses. Indicates a person who is religious and performs sacrifices.'
+            })
+
+        # 11. Sara Yoga: All planets in the 4th, 5th, 6th, and 7th houses.
+        if len(occupied_houses) > 1 and all(h in [4, 5, 6, 7] for h in occupied_houses):
+            yogas.append({
+                'name': 'Sara Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 4th, 5th, 6th, and 7th houses. Indicates a person who is strong and powerful.'
+            })
+
+        # 12. Sakti Yoga: All planets in the 7th, 8th, 9th, and 10th houses.
+        if len(occupied_houses) > 1 and all(h in [7, 8, 9, 10] for h in occupied_houses):
+            yogas.append({
+                'name': 'Sakti Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 7th, 8th, 9th, and 10th houses. Indicates a person who is lazy and unhappy.'
+            })
+            
+        # 13. Danda Yoga: All planets in the 10th, 11th, 12th, and 1st houses.
+        if len(occupied_houses) > 1 and all(h in [10, 11, 12, 1] for h in occupied_houses):
+            yogas.append({
+                'name': 'Danda Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 10th, 11th, 12th, and 1st houses. Indicates a person who is poor and unfortunate.'
+            })
+
+        # 14. Nauka Yoga: All planets in the 7 houses from the 1st to the 7th.
+        if len(occupied_houses) > 1 and all(h in [1, 2, 3, 4, 5, 6, 7] for h in occupied_houses):
+            yogas.append({
+                'name': 'Nauka Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 7 houses from the 1st to the 7th. Indicates a person who is famous and wealthy.'
+            })
+            
+        # 15. Koota Yoga: All planets in the 7 houses from the 4th to the 10th.
+        if len(occupied_houses) > 1 and all(h in [4, 5, 6, 7, 8, 9, 10] for h in occupied_houses):
+            yogas.append({
+                'name': 'Koota Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 7 houses from the 4th to the 10th. Indicates a person who is a liar and a cheat.'
+            })
+            
+        # 16. Chatra Yoga: All planets in the 7 houses from the 7th to the 1st.
+        if len(occupied_houses) > 1 and all(h in [7, 8, 9, 10, 11, 12, 1] for h in occupied_houses):
+            yogas.append({
+                'name': 'Chatra Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 7 houses from the 7th to the 1st. Indicates a person who is a king or a minister.'
+            })
+            
+        # 17. Chapa Yoga: All planets in the 7 houses from the 10th to the 4th.
+        if len(occupied_houses) > 1 and all(h in [10, 11, 12, 1, 2, 3, 4] for h in occupied_houses):
+            yogas.append({
+                'name': 'Chapa Yoga',
+                'strength': 'Medium',
+                'description': 'All planets in the 7 houses from the 10th to the 4th. Indicates a person who is a hunter or a warrior.'
+            })
+            
+        # 18. Ardha Chandra Yoga: All planets in the 7 houses starting from a house other than a Kendra.
+        panapara_start = [2, 5, 8, 11]
+        apoklima_start = [3, 6, 9, 12]
+        
+        for start_house in panapara_start + apoklima_start:
+            house_range = [(start_house + i -1) % 12 + 1 for i in range(7)]
+            if len(occupied_houses) > 1 and all(h in house_range for h in occupied_houses):
+                 yogas.append({
+                    'name': 'Ardha Chandra Yoga',
+                    'strength': 'Medium',
+                    'description': 'All planets in 7 consecutive houses starting from a non-kendra house. Indicates a person who is a commander or a leader.'
+                })
+                 break
+
+        # 19. Samudra Yoga: All planets in the even houses (2, 4, 6, 8, 10, 12).
+        if len(occupied_houses) > 1 and all(h in [2, 4, 6, 8, 10, 12] for h in occupied_houses):
+            yogas.append({
+                'name': 'Samudra Yoga',
+                'strength': 'High',
+                'description': 'All planets in even houses. Indicates a person who is wealthy and prosperous.'
+            })
+
+        # 20. Chakra Yoga: All planets in the odd houses (1, 3, 5, 7, 9, 11).
+        if len(occupied_houses) > 1 and all(h in [1, 3, 5, 7, 9, 11] for h in occupied_houses):
+            yogas.append({
+                'name': 'Chakra Yoga',
+                'strength': 'High',
+                'description': 'All planets in odd houses. Indicates a person who is a king or a ruler.'
+            })
+
+        return yogas
+
+
+    def _calculate_sankhya_yogas(self):
+        """Calculate Sankhya Yogas (number-based)"""
+        planets = self.chart_data.get('planets', {})
+        classical_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        
+        occupied_signs = set()
+        for planet_name in classical_planets:
+            if planet_name in planets:
+                occupied_signs.add(planets[planet_name].get('sign'))
+                
+        num_occupied_signs = len(occupied_signs)
+        sankhya_yoga_name = ""
+        description = ""
+        
+        if num_occupied_signs == 1:
+            sankhya_yoga_name = "Gola Yoga"
+            description = "All planets in one sign - focused, but can be narrow-minded."
+        elif num_occupied_signs == 2:
+            sankhya_yoga_name = "Yuga Yoga"
+            description = "All planets in two signs - can be pulled in two directions."
+        elif num_occupied_signs == 3:
+            sankhya_yoga_name = "Shula Yoga"
+            description = "All planets in three signs - can indicate sharp or painful experiences."
+        elif num_occupied_signs == 4:
+            sankhya_yoga_name = "Kedara Yoga"
+            description = "All planets in four signs - resourceful and helpful."
+        elif num_occupied_signs == 5:
+            sankhya_yoga_name = "Pasha Yoga"
+            description = "All planets in five signs - can be bound by obligations."
+        elif num_occupied_signs == 6:
+            sankhya_yoga_name = "Dama Yoga"
+            description = "All planets in six signs - generous and skillful."
+        elif num_occupied_signs == 7:
+            sankhya_yoga_name = "Veena Yoga"
+            description = "All planets in seven signs - talented, enjoys arts and music."
+            
+        if sankhya_yoga_name:
+            return [{
+                'name': sankhya_yoga_name,
+                'strength': 'Medium',
+                'description': description
+            }]
+        return []
+    
     def calculate_all_yogas(self):
         """Calculate all major yogas"""
+        parivartana_yogas = self.calculate_parivartana_yogas()
+        # Separate parivartana yogas into their respective categories
+        maha_yogas = [y for y in parivartana_yogas if y['name'] == 'Maha Yoga']
+        dainya_yogas = [y for y in parivartana_yogas if y['name'] == 'Dainya Yoga']
+        khala_yogas = [y for y in parivartana_yogas if y['name'] == 'Khala Yoga']
+        other_parivartana_yogas = [y for y in parivartana_yogas if y['name'] == 'Parivartana Yoga']
+        
         return {
-            'raj_yogas': self.calculate_raj_yogas(),
+            'raj_yogas': self.calculate_raj_yogas() + maha_yogas,
             'dhana_yogas': self.calculate_dhana_yogas(),
             'mahapurusha_yogas': self.calculate_panch_mahapurusha_yogas(),
             'neecha_bhanga_yogas': self.calculate_neecha_bhanga_yogas(),
@@ -261,12 +601,301 @@ class YogaCalculator(BaseCalculator):
             'amala_yogas': self.calculate_amala_yoga(),
             'viparita_raja_yogas': self.calculate_viparita_raja_yogas(),
             'dharma_karma_yogas': self.calculate_dharma_karma_yogas(),
+            'nabhasa_yogas': self.calculate_nabhasa_yogas(),
+            'chandra_yogas': self.calculate_chandra_yogas(),
+            'surya_yogas': self.calculate_surya_yogas(),
+            'parivartana_yogas': {
+                'maha_yogas': maha_yogas,
+                'dainya_yogas': dainya_yogas,
+                'khala_yogas': khala_yogas,
+                'other_parivartana_yogas': other_parivartana_yogas
+            },
             'career_specific_yogas': self.calculate_career_specific_yogas(),
             'health_yogas': self.calculate_health_yogas(),
             'education_yogas': self.calculate_education_yogas(),
             'marriage_yogas': self.calculate_marriage_yogas(),
             'major_doshas': self.calculate_major_doshas()
         }
+
+    def calculate_other_yogas(self):
+        """Calculate Lakshmi, Sakata, Shubha/Papa Kartari and Chamara Yogas"""
+        planets = self.chart_data.get('planets', {})
+        if not planets:
+            return []
+
+        yogas = []
+
+        # Lakshmi Yoga
+        ninth_lord = self._get_house_lord(9)
+        lagna_lord = self._get_house_lord(1)
+        if ninth_lord and lagna_lord and ninth_lord in planets and lagna_lord in planets:
+            ninth_lord_house = planets[ninth_lord].get('house')
+            # A simplified check for strong lagna lord.
+            if ninth_lord_house in [1, 4, 5, 7, 9, 10] and planets[lagna_lord].get('strength') == 'High':
+                yogas.append({
+                    'name': 'Lakshmi Yoga',
+                    'strength': 'High',
+                    'description': 'Lord of the 9th house is in a Kendra or Trikona and the Lagna lord is strong. Indicates wealth and prosperity.'
+                })
+
+        # Sakata Yoga
+        if 'Jupiter' in planets and 'Moon' in planets:
+            jupiter_house = planets['Jupiter'].get('house')
+            moon_house = planets['Moon'].get('house')
+            
+            house_diff = (jupiter_house - moon_house + 12) % 12
+            if house_diff == 5 or house_diff == 7: # 6th or 8th from Moon
+                yogas.append({
+                    'name': 'Sakata Yoga',
+                    'strength': 'Low',
+                    'description': 'Jupiter in the 6th or 8th house from the Moon. Indicates a life of struggle with occasional bursts of fortune.'
+                })
+
+        # Shubha/Papa Kartari Yoga
+        benefics = ['Venus', 'Jupiter', 'Mercury']
+        malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu']
+        
+        # Shubha Kartari Yoga
+        planets_in_second = [p for p,d in planets.items() if d.get('house') == 2]
+        planets_in_twelfth = [p for p,d in planets.items() if d.get('house') == 12]
+        
+        if any(p in benefics for p in planets_in_second) and any(p in benefics for p in planets_in_twelfth):
+            yogas.append({
+                'name': 'Shubha Kartari Yoga',
+                'strength': 'Medium',
+                'description': 'Benefic planets in the 2nd and 12th houses from the Lagna. Indicates a protected and easy life.'
+            })
+        # Papa Kartari Yoga
+        if any(p in malefics for p in planets_in_second) and any(p in malefics for p in planets_in_twelfth):
+            yogas.append({
+                'name': 'Papa Kartari Yoga',
+                'strength': 'Low',
+                'description': 'Malefic planets in the 2nd and 12th houses from the Lagna. Indicates a life of struggle and hardship.'
+            })
+            
+        # Chamara Yoga
+        lagna_lord = self._get_house_lord(1)
+        if lagna_lord and lagna_lord in planets:
+            lagna_lord_data = planets[lagna_lord]
+            # Lagna lord exalted and aspected by Jupiter
+            if 'is_exalted' in lagna_lord_data and lagna_lord_data.get('is_exalted') and 'Jupiter' in self.aspect_calc.get_aspecting_planets(lagna_lord_data.get('house')):
+                yogas.append({
+                    'name': 'Chamara Yoga',
+                    'strength': 'High',
+                    'description': 'Lagna lord is exalted and aspected by Jupiter. Indicates a long, prosperous, and reputable life.'
+                })
+        
+        # Two benefics in Lagna, 7th, 9th, or 10th
+        for h in [1, 7, 9, 10]:
+            benefics_in_house = [p for p in benefics if p in planets and planets[p].get('house') == h]
+            if len(benefics_in_house) >= 2:
+                yogas.append({
+                    'name': 'Chamara Yoga',
+                    'strength': 'High',
+                    'description': f'Two or more benefic planets in the {h}th house. Indicates a long, prosperous, and reputable life.'
+                })
+
+        return yogas
+        
+    def calculate_parivartana_yogas(self):
+        """Calculate Parivartana Yogas (exchange of house lords)"""
+        planets = self.chart_data.get('planets', {})
+        if not planets:
+            return []
+
+        yogas = []
+        house_lords = {i: self._get_house_lord(i) for i in range(1, 13)}
+        
+        # Get planet positions
+        planet_houses = {p: d.get('house') for p, d in planets.items()}
+
+        # Check for exchanges
+        exchanged_lords = set()
+        for h1 in range(1, 13):
+            for h2 in range(h1 + 1, 13):
+                l1 = house_lords.get(h1)
+                l2 = house_lords.get(h2)
+
+                if l1 and l2 and l1 != l2 and l1 in planet_houses and l2 in planet_houses:
+                    # Check if l1 is in h2 and l2 is in h1
+                    if planet_houses.get(l1) == h2 and planet_houses.get(l2) == h1:
+                        
+                        # Avoid duplicates
+                        pair = tuple(sorted((l1, l2)))
+                        if pair in exchanged_lords:
+                            continue
+                        exchanged_lords.add(pair)
+
+                        # Classify the yoga
+                        yoga_type = ''
+                        description = ''
+                        strength = 'Medium'
+                        
+                        dusthana_houses = [6, 8, 12]
+                        trikona_houses = [1, 5, 9]
+                        kendra_houses = [1, 4, 7, 10]
+                        
+                        is_h1_dusthana = h1 in dusthana_houses
+                        is_h2_dusthana = h2 in dusthana_houses
+                        
+                        is_h1_trikona = h1 in trikona_houses
+                        is_h2_trikona = h2 in trikona_houses
+                        
+                        is_h1_kendra = h1 in kendra_houses
+                        is_h2_kendra = h2 in kendra_houses
+
+                        if is_h1_dusthana or is_h2_dusthana:
+                            yoga_type = 'Dainya Yoga'
+                            description = f"Exchange between lord of {h1} and {h2}. Indicates struggles and challenges."
+                            strength = 'Low'
+                        elif h1 == 3 or h2 == 3:
+                            yoga_type = 'Khala Yoga'
+                            description = f"Exchange between lord of {h1} and {h2}. Indicates a person who is clever and cunning."
+                        elif (is_h1_kendra and is_h2_trikona) or (is_h1_trikona and is_h2_kendra):
+                            yoga_type = 'Maha Yoga'
+                            description = f"Exchange between lord of {h1} and {h2}. A powerful Raj Yoga, indicating success and high status."
+                            strength = 'High'
+                        else:
+                            yoga_type = 'Parivartana Yoga'
+                            description = f"Exchange between lord of {h1} and {h2}."
+
+                        yogas.append({
+                            'name': yoga_type,
+                            'planets': [l1, l2],
+                            'houses': [h1, h2],
+                            'strength': strength,
+                            'description': description
+                        })
+
+        return yogas
+
+    def calculate_surya_yogas(self):
+        """Calculate Surya Yogas (Sun-based)"""
+        planets = self.chart_data.get('planets', {})
+        if 'Sun' not in planets:
+            return []
+
+        yogas = []
+        sun_house = planets['Sun'].get('house')
+        
+        planets_in_second_from_sun = []
+        planets_in_twelfth_from_sun = []
+        
+        second_from_sun = (sun_house % 12) + 1
+        twelfth_from_sun = (sun_house - 2 + 12) % 12 + 1
+
+        for planet, data in planets.items():
+            if planet not in ['Sun', 'Rahu', 'Ketu', 'Moon']:
+                if data.get('house') == second_from_sun:
+                    planets_in_second_from_sun.append(planet)
+                if data.get('house') == twelfth_from_sun:
+                    planets_in_twelfth_from_sun.append(planet)
+
+        if planets_in_second_from_sun and not planets_in_twelfth_from_sun:
+            yogas.append({
+                'name': 'Vesi Yoga',
+                'strength': 'Medium',
+                'description': 'Planets in the 2nd house from the Sun. Makes the person truthful, and skillful.'
+            })
+        elif not planets_in_second_from_sun and planets_in_twelfth_from_sun:
+            yogas.append({
+                'name': 'Vasi Yoga',
+                'strength': 'Medium',
+                'description': 'Planets in the 12th house from the Sun. Makes the person charitable, and famous.'
+            })
+        elif planets_in_second_from_sun and planets_in_twelfth_from_sun:
+            yogas.append({
+                'name': 'Ubhayachari Yoga',
+                'strength': 'High',
+                'description': 'Planets in both the 2nd and 12th houses from the Sun. Makes the person a king or a ruler.'
+            })
+            
+        return yogas
+    
+    def calculate_chandra_yogas(self):
+        """Calculate Chandra Yogas (Moon-based)"""
+        planets = self.chart_data.get('planets', {})
+        if 'Moon' not in planets:
+            return []
+
+        yogas = []
+        moon_house = planets['Moon'].get('house')
+        
+        planets_in_second_from_moon = []
+        planets_in_twelfth_from_moon = []
+        
+        second_from_moon = (moon_house % 12) + 1
+        twelfth_from_moon = (moon_house - 2 + 12) % 12 + 1
+
+        for planet, data in planets.items():
+            if planet not in ['Sun', 'Rahu', 'Ketu', 'Moon']:
+                if data.get('house') == second_from_moon:
+                    planets_in_second_from_moon.append(planet)
+                if data.get('house') == twelfth_from_moon:
+                    planets_in_twelfth_from_moon.append(planet)
+
+        if planets_in_second_from_moon and not planets_in_twelfth_from_moon:
+            yogas.append({
+                'name': 'Sunapha Yoga',
+                'strength': 'Medium',
+                'description': 'Planets in the 2nd house from the Moon. Indicates self-earned wealth and intelligence.'
+            })
+        elif not planets_in_second_from_moon and planets_in_twelfth_from_moon:
+            yogas.append({
+                'name': 'Anapha Yoga',
+                'strength': 'Medium',
+                'description': 'Planets in the 12th house from the Moon. Indicates good health, and an attractive personality.'
+            })
+        elif planets_in_second_from_moon and planets_in_twelfth_from_moon:
+            yogas.append({
+                'name': 'Durudhura Yoga',
+                'strength': 'High',
+                'description': 'Planets in both the 2nd and 12th houses from the Moon. Indicates a person who enjoys a luxurious life.'
+            })
+        else:
+            # Kemadruma Yoga check
+            # No planets in 2nd or 12th from Moon.
+            # Also check for cancellation: No planets in kendra from Moon
+            kendra_from_moon = [(moon_house + i - 1) % 12 + 1 for i in [1, 4, 7, 10]]
+            planets_in_kendra_from_moon = False
+            for planet, data in planets.items():
+                if planet != 'Moon' and data.get('house') in kendra_from_moon:
+                    planets_in_kendra_from_moon = True
+                    break
+            if not planets_in_kendra_from_moon:
+                 yogas.append({
+                    'name': 'Kemadruma Yoga',
+                    'strength': 'Low',
+                    'description': 'No planets in the 2nd or 12th from the Moon, and no planets in a kendra from the Moon. Indicates poverty, struggle, and loneliness.'
+                })
+
+
+        # Adhi Yoga
+        benefics = ['Mercury', 'Venus', 'Jupiter']
+        benefics_in_6_7_8 = {'6': [], '7': [], '8': []}
+        
+        sixth_from_moon = (moon_house + 5 - 1) % 12 + 1
+        seventh_from_moon = (moon_house + 6 - 1) % 12 + 1
+        eighth_from_moon = (moon_house + 7 - 1) % 12 + 1
+
+        for planet in benefics:
+            if planet in planets:
+                p_house = planets[planet].get('house')
+                if p_house == sixth_from_moon:
+                    benefics_in_6_7_8['6'].append(planet)
+                if p_house == seventh_from_moon:
+                    benefics_in_6_7_8['7'].append(planet)
+                if p_house == eighth_from_moon:
+                    benefics_in_6_7_8['8'].append(planet)
+                    
+        if benefics_in_6_7_8['6'] or benefics_in_6_7_8['7'] or benefics_in_6_7_8['8']:
+            yogas.append({
+                'name': 'Adhi Yoga',
+                'strength': 'High',
+                'description': 'Benefics in the 6th, 7th, or 8th from the Moon. Indicates leadership, wealth, and a happy life.'
+            })
+            
+        return yogas
     
     def calculate_career_specific_yogas(self):
         """Calculate career-specific yogas"""
@@ -698,6 +1327,14 @@ class YogaCalculator(BaseCalculator):
         if house_number <= len(houses):
             house_sign = houses[house_number - 1].get('sign', 0)
             return self.SIGN_LORDS.get(house_sign)
+    
+    def _ordinal(self, n):
+        """Convert number to ordinal (1st, 2nd, 3rd, etc.)"""
+        if 10 <= n % 100 <= 20:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+        return f"{n}{suffix}"
 
     
     def get_marriage_yogas_only(self):
@@ -938,71 +1575,135 @@ class YogaCalculator(BaseCalculator):
         planets = self.chart_data.get('planets', {})
         if 'Rahu' not in planets or 'Ketu' not in planets:
             return {"present": False, "note": "Missing node data"}
+
+        rahu_house = planets['Rahu'].get('house')
+        ketu_house = planets['Ketu'].get('house')
         
-        rahu_long = planets['Rahu']['longitude']
-        ketu_long = planets['Ketu']['longitude']
+        # All other planets
+        other_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         
-        # Get other planets
-        others = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-        planet_longitudes = []
+        # Check if all other planets are between Rahu and Ketu
+        is_kal_sarp = True
+        for planet in other_planets:
+            if planet in planets:
+                p_house = planets[planet].get('house')
+                # This is a simplified check, a more accurate one would be to check the longitude
+                if not (rahu_house < p_house < ketu_house or (ketu_house < rahu_house and (p_house > rahu_house or p_house < ketu_house))):
+                     is_kal_sarp = False
+                     break
         
-        for p in others:
-            if p in planets:
-                planet_longitudes.append(planets[p]['longitude'])
-        
-        if len(planet_longitudes) < 7:
-            return {"present": False, "note": "Incomplete planetary data"}
-        
-        # Simple check: all planets in one hemisphere
-        # Calculate arc between Rahu and Ketu
-        if rahu_long < ketu_long:
-            arc1_start, arc1_end = rahu_long, ketu_long
-        else:
-            arc1_start, arc1_end = ketu_long, rahu_long
-        
-        planets_in_arc = 0
-        for p_long in planet_longitudes:
-            if arc1_start <= p_long <= arc1_end:
-                planets_in_arc += 1
-        
-        # KSY if all 7 planets are in one arc (simplified)
-        ksy_present = planets_in_arc == 7 or planets_in_arc == 0
-        
+        if not is_kal_sarp:
+            # Check the other way around
+            is_kal_sarp = True
+            for planet in other_planets:
+                if planet in planets:
+                    p_house = planets[planet].get('house')
+                    if not (ketu_house < p_house < rahu_house or (rahu_house < ketu_house and (p_house > ketu_house or p_house < rahu_house))):
+                        is_kal_sarp = False
+                        break
+
+        if not is_kal_sarp:
+            return {"present": False}
+
+        # Determine the type of Kaal Sarp Yoga
+        kaal_sarp_type = ""
+        if rahu_house == 1:
+            kaal_sarp_type = "Anant"
+        elif rahu_house == 2:
+            kaal_sarp_type = "Kulik"
+        elif rahu_house == 3:
+            kaal_sarp_type = "Vasuki"
+        elif rahu_house == 4:
+            kaal_sarp_type = "Shankhpal"
+        elif rahu_house == 5:
+            kaal_sarp_type = "Padma"
+        elif rahu_house == 6:
+            kaal_sarp_type = "Mahapadma"
+        elif rahu_house == 7:
+            kaal_sarp_type = "Takshak"
+        elif rahu_house == 8:
+            kaal_sarp_type = "Karkotak"
+        elif rahu_house == 9:
+            kaal_sarp_type = "Shankhachood"
+        elif rahu_house == 10:
+            kaal_sarp_type = "Ghatak"
+        elif rahu_house == 11:
+            kaal_sarp_type = "Vishdhar"
+        elif rahu_house == 12:
+            kaal_sarp_type = "Sheshnag"
+
+        # Check for cancellations
+        cancellation_reasons = []
+        # 1. If Lagna lord is strong
+        lagna_lord = self._get_house_lord(1)
+        if lagna_lord and lagna_lord in planets:
+            # This is a simplified check for strength. A more detailed check would be needed for a world-class calculator.
+            if planets[lagna_lord].get('strength', 'Medium') == 'High':
+                cancellation_reasons.append("Lagna lord is strong.")
+                
+        # 2. If there is a strong Raja Yoga
+        if self.calculate_raj_yogas():
+            cancellation_reasons.append("A strong Raja Yoga is present.")
+
         return {
-            "present": ksy_present,
-            "planets_in_rahu_ketu_arc": planets_in_arc,
-            "note": "Simplified calculation - all planets in one hemisphere"
+            "present": True,
+            "type": kaal_sarp_type,
+            "cancellation": bool(cancellation_reasons),
+            "cancellation_reason": " ".join(cancellation_reasons)
         }
     
     def _check_pitra_dosha(self):
         """Sun or Moon afflicted by Nodes or Saturn in 9th"""
         planets = self.chart_data.get('planets', {})
-        
-        # Check 9th house occupants
-        ninth_house_planets = []
-        for planet, data in planets.items():
-            if data.get('house') == 9:
-                ninth_house_planets.append(planet)
-        
-        # Check Sun/Moon conjunctions with malefics
-        sun_afflicted = False
-        moon_afflicted = False
-        
-        if 'Sun' in planets and 'Saturn' in planets:
-            if planets['Sun'].get('house') == planets['Saturn'].get('house'):
-                sun_afflicted = True
-        
-        if 'Moon' in planets and 'Rahu' in planets:
-            if planets['Moon'].get('house') == planets['Rahu'].get('house'):
-                moon_afflicted = True
-        
-        pitra_present = ('Rahu' in ninth_house_planets or 'Ketu' in ninth_house_planets or 
-                        'Saturn' in ninth_house_planets or sun_afflicted or moon_afflicted)
-        
-        return {
-            "present": pitra_present,
-            "ninth_house_malefics": [p for p in ninth_house_planets if p in ['Rahu', 'Ketu', 'Saturn']],
-            "sun_afflicted": sun_afflicted,
-            "moon_afflicted": moon_afflicted,
-            "note": "Requires detailed conjunction analysis for complete assessment"
-        }
+        if not planets:
+            return {"present": False, "note": "Missing planetary data"}
+
+        pitra_dosha_reasons = []
+
+        # 1. Check afflictions to the 9th house from Lagna, Sun, and Moon
+        for ref_point in ['ascendant', 'Sun', 'Moon']:
+            if ref_point == 'ascendant':
+                ref_house = 1
+            elif ref_point in planets:
+                ref_house = planets[ref_point].get('house')
+            else:
+                continue
+                
+            ninth_house = (ref_house + 8 - 1) % 12 + 1
+            
+            for malefic in ['Rahu', 'Ketu', 'Saturn']:
+                if malefic in planets and planets[malefic].get('house') == ninth_house:
+                    pitra_dosha_reasons.append(f"{malefic} in the 9th house from {ref_point}.")
+
+        # 2. Check afflictions to the 9th lord
+        ninth_lord = self._get_house_lord(9)
+        if ninth_lord and ninth_lord in planets:
+            ninth_lord_house = planets[ninth_lord].get('house')
+            # Affliction by conjunction
+            for malefic in ['Rahu', 'Ketu', 'Saturn']:
+                if malefic in planets and planets[malefic].get('house') == ninth_lord_house:
+                    pitra_dosha_reasons.append(f"9th lord {ninth_lord} is conjunct with {malefic}.")
+            # Affliction by aspect
+            aspecting_planets = self.aspect_calc.get_aspecting_planets(ninth_lord_house)
+            for malefic in ['Rahu', 'Ketu', 'Saturn']:
+                if malefic in aspecting_planets:
+                    pitra_dosha_reasons.append(f"9th lord {ninth_lord} is aspected by {malefic}.")
+
+        # 3. Check afflictions to Sun and Moon
+        for luminary in ['Sun', 'Moon']:
+            if luminary in planets:
+                luminary_house = planets[luminary].get('house')
+                for malefic in ['Rahu', 'Ketu', 'Saturn']:
+                    if malefic in planets and planets[malefic].get('house') == luminary_house:
+                        pitra_dosha_reasons.append(f"{luminary} is conjunct with {malefic}.")
+                    aspecting_planets = self.aspect_calc.get_aspecting_planets(luminary_house)
+                    if malefic in aspecting_planets:
+                        pitra_dosha_reasons.append(f"{luminary} is aspected by {malefic}.")
+
+        if pitra_dosha_reasons:
+            return {
+                "present": True,
+                "reasons": list(set(pitra_dosha_reasons)) # remove duplicates
+            }
+
+        return {"present": False}

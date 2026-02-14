@@ -111,6 +111,7 @@ export const chatAPI = {
   getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData),
   getMonthlyEventsStatus: (jobId) => api.get(getEndpoint(`/chat/monthly-events/status/${jobId}`)),
   getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), birthData),
+  getYogas: (birthData) => api.post(getEndpoint('/chat/ask'), { ...birthData, question: 'yogas', include_context: true }),
   deductCredits: (amount) => api.post(getEndpoint('/credits/spend'), { 
     amount, 
     feature: 'event_timeline', 
@@ -368,6 +369,14 @@ export const lifeEventsAPI = {
       start_age: startAge,
       end_age: endAge
     }),
+};
+
+export const yogaAPI = {
+  getYogas: (birthData) => {
+    console.log('[yogaAPI] Endpoint:', getEndpoint('/yogas/'));
+    console.log('[yogaAPI] Data:', birthData);
+    return api.post(getEndpoint('/yogas/'), birthData);
+  },
 };
 
 export const chatErrorAPI = {
