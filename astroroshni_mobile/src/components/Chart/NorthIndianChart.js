@@ -4,7 +4,7 @@ import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Sto
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null, highlightHouse = null, glowAnimation = null }) => {
+const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, cosmicTheme = false, rotatedAscendant = null, onRotate, showKarakas = false, karakas = null, highlightHouse = null, glowAnimation = null, hideInstructions = false }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
   
@@ -728,9 +728,11 @@ const NorthIndianChart = ({ chartData, birthData, showDegreeNakshatra = true, co
         </TouchableOpacity>
       </Modal>
       
-      <Text style={[styles.instructionText, { color: theme === 'dark' ? (cosmicTheme ? 'rgba(255, 255, 255, 0.7)' : '#666') : (cosmicTheme ? 'rgba(0, 0, 0, 0.6)' : '#666') }]}>
-        Touch any sign to make it ascendant
-      </Text>
+      {!hideInstructions && (
+        <Text style={[styles.instructionText, { color: theme === 'dark' ? (cosmicTheme ? 'rgba(255, 255, 255, 0.7)' : '#666') : (cosmicTheme ? 'rgba(0, 0, 0, 0.6)' : '#666') }]}>
+          Touch any sign to make it ascendant
+        </Text>
+      )}
     </View>
   );
 };

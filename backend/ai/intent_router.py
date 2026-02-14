@@ -100,6 +100,13 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         - chart_insights is MANDATORY when status="READY"
         - DO NOT return null for chart_insights when status="READY"
         
+        🚨 ABSOLUTE PROHIBITION - NEVER ASK FOR BIRTH DETAILS:
+        - The user's complete birth chart data is ALREADY PROVIDED in the D1_CHART_DATA below
+        - You have access to ALL planetary positions, houses, and signs
+        - NEVER ask for birth date, time, place, or any birth information
+        - If a question seems to need birth details, use the provided chart data to answer
+        - Only ask clarification about WHICH ASPECT of their life they want to focus on (career, health, relationships, etc.)
+        
         {force_ready_instruction}
         {language_instruction}
 

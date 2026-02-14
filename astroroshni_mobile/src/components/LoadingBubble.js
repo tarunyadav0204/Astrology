@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NorthIndianChart from './Chart/NorthIndianChart';
+import { useTheme } from '../context/ThemeContext';
 
 const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
+    const { theme, colors } = useTheme();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [fadeAnim] = useState(new Animated.Value(1));
     const glowAnim = useRef(new Animated.Value(0)).current;
@@ -61,7 +63,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                         useNativeDriver: true,
                     }).start();
                 });
-            }, 7000);
+            }, 10000);
             
             return () => clearInterval(interval);
         } else {
@@ -120,7 +122,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                     end={{ x: 1, y: 1 }}
                     style={styles.chartBubble}
                 >
-                    <Text style={styles.chartTitle}>☀️ AstroRoshni</Text>
+                    <Text style={[styles.chartTitle, { color: theme === 'dark' ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
                     
                     <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
                         <NorthIndianChart 
@@ -128,10 +130,11 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                             showDegreeNakshatra={false}
                             highlightHouse={currentInsight.house_number}
                             glowAnimation={glowAnim}
+                            hideInstructions={true}
                         />
                     </Animated.View>
                     
-                    <Animated.Text style={[styles.insightText, { opacity: fadeAnim }]}>
+                    <Animated.Text style={[styles.insightText, { color: theme === 'dark' ? '#fff' : '#1a1a1a', opacity: fadeAnim }]}>
                         {currentInsight.message}
                     </Animated.Text>
                 </LinearGradient>
@@ -148,10 +151,16 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                 style={styles.welcomeBubble}
             >
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <Text style={styles.welcomeIcon}>☀️</Text>
+                    <View style={styles.logoContainer}>
+                        <Image 
+                            source={require('../../assets/logo.png')}
+                            style={styles.logoImage}
+                            resizeMode="contain"
+                        />
+                    </View>
                 </Animated.View>
                 
-                <Text style={styles.welcomeTitle}>AstroRoshni</Text>
+                <Text style={[styles.welcomeTitle, { color: theme === 'dark' ? '#ffd700' : '#ff6b35' }]}>AstroRoshni</Text>
                 
                 <View style={styles.divider}>
                     <View style={styles.dividerLine} />
@@ -159,11 +168,11 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                     <View style={styles.dividerLine} />
                 </View>
                 
-                <Text style={styles.welcomeMessage}>
+                <Text style={[styles.welcomeMessage, { color: theme === 'dark' ? '#fff' : '#1a1a1a' }]}>
                     Thank you for reaching out to AstroRoshni with your question.
                 </Text>
                 
-                <Text style={styles.welcomeSubtext}>
+                <Text style={[styles.welcomeSubtext, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : '#4b5563' }]}>
                     I am deeply analyzing your celestial chart to provide you with the most accurate insights.
                     This sacred process takes a moment...
                 </Text>
@@ -220,12 +229,31 @@ const styles = StyleSheet.create({
         fontSize: 64,
         marginBottom: 16,
     },
+    logoContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        marginBottom: 16,
+        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#ff6b35',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+        overflow: 'hidden',
+    },
+    logoImage: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+    },
     welcomeTitle: {
         fontSize: 28,
         fontWeight: '800',
-        color: '#ffd700',
         marginBottom: 16,
-        textShadowColor: 'rgba(255, 215, 0, 0.5)',
+        textShadowColor: 'rgba(255, 107, 53, 0.3)',
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 8,
     },
@@ -247,7 +275,6 @@ const styles = StyleSheet.create({
     },
     welcomeMessage: {
         fontSize: 16,
-        color: '#fff',
         textAlign: 'center',
         marginBottom: 12,
         fontWeight: '600',
@@ -255,7 +282,6 @@ const styles = StyleSheet.create({
     },
     welcomeSubtext: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.85)',
         textAlign: 'center',
         marginBottom: 20,
         lineHeight: 22,
@@ -270,7 +296,7 @@ const styles = StyleSheet.create({
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#ffd700',
+        backgroundColor: '#ff6b35',
     },
     chartPreview: {
         fontSize: 13,
@@ -295,9 +321,8 @@ const styles = StyleSheet.create({
     chartTitle: {
         fontSize: 28,
         fontWeight: '800',
-        color: '#ffd700',
         marginBottom: 20,
-        textShadowColor: 'rgba(255, 215, 0, 0.5)',
+        textShadowColor: 'rgba(255, 107, 53, 0.3)',
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 8,
     },
@@ -308,9 +333,9 @@ const styles = StyleSheet.create({
     },
     insightText: {
         fontSize: 15,
-        color: '#fff',
         textAlign: 'center',
-        fontWeight: '600',
+        fontWeight: '400',
+        fontStyle: 'italic',
         lineHeight: 22,
         paddingHorizontal: 12,
     },

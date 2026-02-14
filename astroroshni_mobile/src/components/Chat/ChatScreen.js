@@ -124,6 +124,33 @@ export default function ChatScreen({ navigation, route }) {
   const [showMenu, setShowMenu] = useState(false);
   const drawerAnim = useRef(new Animated.Value(300)).current;
   const menuScrollViewRef = useRef(null);
+  const menuLogoGlow = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let animation;
+    if (showMenu) {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(menuLogoGlow, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+          Animated.timing(menuLogoGlow, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      animation.start();
+    } else {
+      menuLogoGlow.setValue(0);
+    }
+    return () => {
+      animation?.stop();
+    };
+  }, [showMenu]);
 
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
@@ -2107,13 +2134,28 @@ export default function ChatScreen({ navigation, route }) {
                 style={styles.drawerGradient}
               >
                 <View style={styles.drawerHeader}>
-                  <View style={styles.logoContainer}>
+                  <Animated.View style={[styles.logoContainer, {
+                    shadowOpacity: menuLogoGlow.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.6, 1],
+                    }),
+                    shadowRadius: menuLogoGlow.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [12, 20],
+                    }),
+                    transform: [{
+                      scale: menuLogoGlow.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.05],
+                      })
+                    }]
+                  }]}>
                     <Image 
                       source={require('../../../assets/logo.png')}
                       style={styles.logoImage}
                       resizeMode="contain"
                     />
-                  </View>
+                  </Animated.View>
                   <Text style={[styles.drawerTitle, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.title')}</Text>
                   <Text style={[styles.drawerSubtitle, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(31, 41, 55, 0.7)' }]}>{t('menu.subtitle')}</Text>
                 </View>
@@ -3401,13 +3443,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
     elevation: 8,
   },
   logoImage: {
     width: 70,
     height: 70,
+    borderRadius: 35,
   },
   cosmicOrbSmall: {
     width: 70,

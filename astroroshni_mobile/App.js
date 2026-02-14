@@ -42,6 +42,7 @@ import { CreditProvider } from './src/credits/CreditContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
+import SplashScreen from './src/components/SplashScreen';
 
 const Stack = createStackNavigator();
 
@@ -111,13 +112,7 @@ export default function App() {
   };
 
   if (isLoading) {
-    return (
-      <SafeAreaProvider>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a23' }}>
-          <ActivityIndicator size="large" color="#ff6b35" />
-        </View>
-      </SafeAreaProvider>
-    );
+    return <SplashScreen />;
   }
   
   return (

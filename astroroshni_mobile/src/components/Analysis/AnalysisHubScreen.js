@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +27,7 @@ export default function AnalysisHubScreen({ navigation }) {
   const { credits } = useCredits();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
+  const [logoGlow] = useState(new Animated.Value(0));
   const [pricing, setPricing] = useState({});
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [birthData, setBirthData] = useState(null);
@@ -43,6 +45,21 @@ export default function AnalysisHubScreen({ navigation }) {
         useNativeDriver: true,
       }),
     ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoGlow, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
     
     fetchPricing();
     loadBirthData();
@@ -206,14 +223,28 @@ export default function AnalysisHubScreen({ navigation }) {
             >
               {/* Hero Section */}
               <View style={styles.heroSection}>
-                <View style={styles.cosmicOrb}>
-                  <LinearGradient
-                    colors={['#ff6b35', '#ffd700', '#ff6b35']}
-                    style={styles.orbGradient}
-                  >
-                    <Text style={styles.orbIcon}>🔮</Text>
-                  </LinearGradient>
-                </View>
+                <Animated.View style={[styles.logoContainer, {
+                  shadowOpacity: logoGlow.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 1],
+                  }),
+                  shadowRadius: logoGlow.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 20],
+                  }),
+                  transform: [{
+                    scale: logoGlow.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.05],
+                    })
+                  }]
+                }]}>
+                  <Image 
+                    source={require('../../../assets/logo.png')}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
                 <Text style={styles.heroTitle}>Unlock Your Life's Mysteries</Text>
                 <Text style={styles.heroSubtitle}>
                   Deep astrological insights into the four pillars of life
@@ -370,28 +401,22 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
     paddingHorizontal: 20,
   },
-  cosmicOrb: {
+  logoContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
     marginBottom: 20,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  orbGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 40,
-    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
-  orbIcon: {
-    fontSize: 40,
+  logoImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   heroTitle: {
     fontSize: 28,

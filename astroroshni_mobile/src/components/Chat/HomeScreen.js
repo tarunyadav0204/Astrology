@@ -962,8 +962,13 @@ const loadHomeData = async (nativeData = null) => {
                     const r = 33;
                     const cx = 40;
                     const cy = 40;
-                    
-                    const isWaxing = phase.includes('Waxing') || (!phase.includes('Waning') && !phase.includes('Full') && !phase.includes('New'));
+
+                    // Corrected logic for determining waxing/waning
+                    const normalizedPhase = phase.toLowerCase();
+                    const isWaning = normalizedPhase.includes('waning') || normalizedPhase.includes('last quarter') || normalizedPhase.includes('third quarter');
+                    const isFull = normalizedPhase.includes('full');
+                    const isNew = normalizedPhase.includes('new');
+                    const isWaxing = !isWaning && !isFull && !isNew;
 
                     if (illumination >= 99) {
                       return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
@@ -976,20 +981,20 @@ const loadHomeData = async (nativeData = null) => {
                     let pathData = "";
 
                     if (isWaxing) {
-                      pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`;
-                      
-                      if (illumination > 50) {
-                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r}`;
-                      } else {
-                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r}`;
+                      // Right side is lit
+                      pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`; // Right half of circle
+                      if (illumination > 50) { // Waxing Gibbous
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
+                      } else { // Waxing Crescent
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
                       }
-                    } else {
-                      pathData = `M ${cx} ${cy + r} A ${r} ${r} 0 0 1 ${cx} ${cy - r}`;
-                      
-                      if (illumination > 50) {
-                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy + r}`;
-                      } else {
-                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy + r}`;
+                    } else { // Waning
+                      // Left side is lit
+                      pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r}`; // Left half of circle
+                      if (illumination > 50) { // Waning Gibbous
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
+                      } else { // Waning Crescent
+                        pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
                       }
                     }
 
