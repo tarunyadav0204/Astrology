@@ -132,11 +132,8 @@ class GeminiChatAnalyzer:
         
         # Add response format instruction to prevent truncation
         enhanced_context['response_format'] = {
-            'instruction': 'Provide complete response. Do not truncate mid-sentence.',
-            'format': 'Use proper formatting with **bold** and *italic* text as needed.',
             'mandatory_sections': 'ALWAYS include Nakshatra Insights section when nakshatra data is available in context.',
-            'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.',
-            'verdict_template': 'For predictions, use Rule J format: "Since this [yoga/event] appears in [X] out of 3 charts, confidence is [X*33]%"'
+            'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.'
         }
         
         # Prune context to reduce token load

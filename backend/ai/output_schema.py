@@ -85,9 +85,9 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
    - #### Timing Synthesis: [Synthesize all dasha systems]
    - #### Triple Perspective (Sudarshana): [Analyze from Lagna, Moon, Sun]
    - #### Divisional Chart Analysis: [Analyze relevant D-chart]
-5. ### Nakshatra Insights: [Analysis + Remedies]
+5. ### Nakshatra Insights: [Analysis + Remedies. This section is MANDATORY if nakshatra data is available.]
 6. ### Timing & Guidance: [Actionable roadmap]
-7. <div class="final-thoughts-card">**Final Thoughts**: [Conclusion]</div>
+7. <div class="final-thoughts-card">**Final Verdict**: [Conclusion based on the HOLISTIC_SYNTHESIS_RULE]</div>
 
 ### 🚨 FORMATTING RULES
 - [HEADERS]: Use ### for main headers, #### for subsections.
