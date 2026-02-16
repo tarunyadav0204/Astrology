@@ -4,13 +4,6 @@ from ..config.kp_constants import NAKSHATRAS, SUB_LORD_DIVISIONS, PLANET_ORDER, 
 
 class KPCalculations:
     @staticmethod
-    def get_kp_ayanamsa(jd):
-        """Calculate KP Ayanamsa for given Julian Day"""
-        # Using Lahiri ayanamsa as base, KP uses slight modification
-        lahiri = swe.get_ayanamsa(jd)
-        return lahiri + 0.25  # KP adjustment
-    
-    @staticmethod
     def get_nakshatra_info(longitude):
         """Get nakshatra information for given longitude"""
         # Normalize longitude to 0-360 range
@@ -46,25 +39,60 @@ class KPCalculations:
     
     @staticmethod
     def get_significators(planet_positions, house_cusps):
-        """Calculate significators for each house"""
-        significators = {i: [] for i in range(1, 13)}
+        """Calculate significators for each house and planet using standard KP 4-level logic"""
+        house_significators = {i: [] for i in range(1, 13)}
+        planet_significators = {p: set() for p in planet_positions.keys() if p != 'Ascendant'}
+        planet_house_map = {}
         
-        # Star lords (planets in nakshatras)
+        # 1. Map planets to houses
         for planet, position in planet_positions.items():
-            nakshatra = KPCalculations.get_nakshatra_info(position)
-            star_lord = nakshatra["lord"]
-            
-            # Find which house this planet is in
+            if planet == 'Ascendant': continue
             house = KPCalculations.get_house_from_longitude(position, house_cusps)
-            if house:
-                significators[house].append(f"{star_lord} (Star lord of {planet})")
+            planet_house_map[planet] = house
+
+        # 2. Calculate significators for each house
+        for house_num in range(1, 13):
+            house_sigs = set()
+            
+            # Level 1: Planets in the Nakshatra of planets in the house
+            planets_in_house = [p for p, h in planet_house_map.items() if h == house_num]
+            for p_in_h in planets_in_house:
+                for planet, pos in planet_positions.items():
+                    if planet == 'Ascendant': continue
+                    nak_info = KPCalculations.get_nakshatra_info(pos)
+                    if nak_info["lord"] == p_in_h:
+                        house_sigs.add(planet)
+                        planet_significators[planet].add(house_num)
+            
+            # Level 2: Planets in the house
+            for p_in_h in planets_in_house:
+                house_sigs.add(p_in_h)
+                planet_significators[p_in_h].add(house_num)
+                
+            # Level 3: Planets in the Nakshatra of the house lord
+            cusp_pos = house_cusps[house_num]
+            house_lord = KPCalculations.get_sign_lord(cusp_pos)
+            for planet, pos in planet_positions.items():
+                if planet == 'Ascendant': continue
+                nak_info = KPCalculations.get_nakshatra_info(pos)
+                if nak_info["lord"] == house_lord:
+                    house_sigs.add(planet)
+                    planet_significators[planet].add(house_num)
+            
+            # Level 4: The house lord itself
+            house_sigs.add(house_lord)
+            if house_lord in planet_significators:
+                planet_significators[house_lord].add(house_num)
+            
+            house_significators[house_num] = sorted(list(house_sigs))
         
-        # Sub lords of cusps
-        for house_num, cusp_longitude in house_cusps.items():
-            sub_lord = KPCalculations.get_sub_lord(cusp_longitude)
-            significators[house_num].append(f"{sub_lord} (Sub lord of {house_num})")
+        # Convert sets to sorted lists for JSON serialization
+        planet_significators_list = {p: sorted(list(h_list)) for p, h_list in planet_significators.items()}
         
-        return significators
+        return {
+            "house_significators": house_significators,
+            "planet_significators": planet_significators_list
+        }
     
     @staticmethod
     def get_house_from_longitude(longitude, house_cusps):
@@ -83,27 +111,52 @@ class KPCalculations:
         return 1  # Fallback
     
     @staticmethod
-    def get_ruling_planets(birth_time, latitude, longitude):
-        """Calculate KP ruling planets"""
-        jd = swe.julday(birth_time.year, birth_time.month, birth_time.day, 
-                       birth_time.hour + birth_time.minute/60.0)
+    def get_ruling_planets(birth_date, birth_time, latitude, longitude, timezone):
+        """Calculate KP ruling planets with correct timezone handling."""
+        try:
+            from utils.timezone_service import parse_timezone_offset
+        except ImportError:
+            pass
+
+        # Calculate Julian Day in UTC
+        time_parts = birth_time.split(':')
+        hour = float(time_parts[0]) + float(time_parts[1])/60.0
+        tz_offset = parse_timezone_offset(timezone, latitude, longitude)
+        utc_hour = hour - tz_offset
+        year, month, day = [int(p) for p in birth_date.split('-')]
+        jd = swe.julday(year, month, day, utc_hour)
+
+        # CRITICAL: Set sidereal mode BEFORE getting ayanamsa
+        swe.set_sid_mode(swe.SIDM_KRISHNAMURTI)
+        ayanamsa = swe.get_ayanamsa_ut(jd)
+
+        # Calculate Ascendant
+        # Note: swe.houses always returns tropical positions regardless of sidereal mode
+        cusps_tropical, ascmc_tropical = swe.houses(jd, latitude, longitude, b'P')
         
-        # Calculate ascendant
-        houses = swe.houses(jd, latitude, longitude, b'P')  # Placidus
-        asc_longitude = houses[1][0]  # Ascendant longitude
-        
-        # Ascendant ruling planet
+        # Apply Ayanamsa and Correction Factor to get Sidereal Ascendant
+        # Using the same correction factor as the main chart for consistency
+        CORRECTION_FACTOR = 0.00653
+        asc_longitude = (ascmc_tropical[0] - ayanamsa - CORRECTION_FACTOR) % 360
+
+        # Ascendant lords
         asc_nakshatra = KPCalculations.get_nakshatra_info(asc_longitude)
         asc_sub_lord = KPCalculations.get_sub_lord(asc_longitude)
+
+        # Moon position and lords
+        # swe.calc_ut with FLG_SIDEREAL respects the set_sid_mode
+        moon_pos_raw = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+        moon_pos = (moon_pos_raw - CORRECTION_FACTOR) % 360
         
-        # Moon position and ruling planet
-        moon_pos = swe.calc_ut(jd, swe.MOON)[0][0]
         moon_nakshatra = KPCalculations.get_nakshatra_info(moon_pos)
         moon_sub_lord = KPCalculations.get_sub_lord(moon_pos)
-        
-        # Day lord (based on weekday)
-        day_lords = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
-        day_lord = day_lords[birth_time.weekday()]
+
+        # Day lord (based on local weekday)
+        local_dt = datetime(year, month, day)
+        # Python weekday(): Monday is 0 and Sunday is 6
+        # Day lords: Sun=Sun, Mon=Moon, Tue=Mars, Wed=Mercury, Thu=Jupiter, Fri=Venus, Sat=Saturn
+        day_lords = ["Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Sun"]
+        day_lord = day_lords[local_dt.weekday()]
         
         return {
             "ascendant": {

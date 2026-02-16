@@ -235,6 +235,30 @@ class DivisionalChartCalculator(BaseCalculator):
             'chart_name': f'D{division_number}'
         }
     
+    def calculate_all_divisional_charts(self):
+        """Calculate all standard divisional charts needed for Shadbala and analysis"""
+        divisions = {'D1': {p: {'sign': d.get('sign', 0), 'house': d.get('house', 1)} 
+                           for p, d in self.chart_data.get('planets', {}).items()}}
+        
+        # Standard vargas for Shadbala and general analysis
+        varga_list = [
+            (2, 'D2'), (3, 'D3'), (4, 'D4'), (7, 'D7'), (9, 'D9'), 
+            (10, 'D10'), (12, 'D12'), (16, 'D16'), (20, 'D20'), 
+            (24, 'D24'), (27, 'D27'), (30, 'D30'), (40, 'D40'), 
+            (45, 'D45'), (60, 'D60')
+        ]
+        
+        for div_num, div_code in varga_list:
+            try:
+                div_chart = self.calculate_divisional_chart(div_num)
+                planets_data = div_chart.get('divisional_chart', {}).get('planets', div_chart.get('planets', {}))
+                divisions[div_code] = {p: {'sign': d.get('sign', 0), 'house': d.get('house', 1)} 
+                                      for p, d in planets_data.items()}
+            except Exception as e:
+                print(f"   ❌ {div_code} calculation failed: {e}")
+        
+        return divisions
+
     def get_chart_name(self, division_number):
         """Get traditional name for divisional chart"""
         chart_names = {

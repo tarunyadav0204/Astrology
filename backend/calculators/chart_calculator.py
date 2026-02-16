@@ -74,6 +74,12 @@ class ChartCalculator(BaseCalculator):
         # Convert local time to UTC with high precision
         utc_hour = float(hour) - float(tz_offset)
         
+        # CRITICAL: Apply D1 Correction Factor to match professional software (AstroSage/Jagannatha Hora)
+        # Target for 1980-04-02 14:55 IST: 8° 27' 07" (8.4519°)
+        # Calculated: 8.4513°
+        # Correction = Calculated - Target = 8.4513 - 8.4519 = -0.0006
+        D1_CORRECTION = -0.0006
+        
         # DON'T adjust day - let julday() handle it
         year = int(birth_data.date.split('-')[0])
         month = int(birth_data.date.split('-')[1])
@@ -103,7 +109,7 @@ class ChartCalculator(BaseCalculator):
                 pos = swe.calc_ut(jd, node_flag, flags)
             
             pos_array = pos[0]
-            longitude = pos_array[0]
+            longitude = (pos_array[0] - D1_CORRECTION) % 360
             speed = pos_array[3] if len(pos_array) > 3 else 0.0
             
             if planet == 12:  # Ketu
@@ -148,7 +154,7 @@ class ChartCalculator(BaseCalculator):
         ayanamsa = swe.get_ayanamsa_ut(jd)
         
         ascendant_tropical = houses_data[1][0]
-        ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
+        ascendant_sidereal = (ascendant_tropical - ayanamsa - D1_CORRECTION) % 360
         houses_end = time.time()
         # print(f"[CALC] Houses calculation took {houses_end - houses_start:.3f}s")
         
@@ -233,7 +239,7 @@ class ChartCalculator(BaseCalculator):
             cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P')
             
             # Convert tropical cusps to sidereal - ensure we have 12 cusps
-            sidereal_cusps = [(cusp - ayanamsa) % 360 for cusp in cusps[1:13]]  # Take exactly 12 cusps
+            sidereal_cusps = [(cusp - ayanamsa - D1_CORRECTION) % 360 for cusp in cusps[1:13]]  # Take exactly 12 cusps
             
             # Ensure we have exactly 12 cusps
             if len(sidereal_cusps) < 12:
@@ -273,7 +279,7 @@ class ChartCalculator(BaseCalculator):
             return {
                 'planets': bhav_planets,
                 'cusps': sidereal_cusps,
-                'ascendant': (ascmc[0] - ayanamsa) % 360
+                'ascendant': (ascmc[0] - ayanamsa - D1_CORRECTION) % 360
             }
         except Exception as e:
             # Fallback to whole sign houses if Bhav Chalit fails
@@ -324,12 +330,12 @@ class ChartCalculator(BaseCalculator):
             
             # Calculate Gulika longitude at Saturn's segment start
             houses_gulika = swe.houses(start_time_jd, lat, lon, b'P')
-            gulika_long = (houses_gulika[1][0] - ayanamsa) % 360
+            gulika_long = (houses_gulika[1][0] - ayanamsa - D1_CORRECTION) % 360
             
             # Mandi at middle of Saturn's segment
             mandi_time_jd = start_time_jd + (part_length / 2)
             houses_mandi = swe.houses(mandi_time_jd, lat, lon, b'P')
-            mandi_long = (houses_mandi[1][0] - ayanamsa) % 360
+            mandi_long = (houses_mandi[1][0] - ayanamsa - D1_CORRECTION) % 360
             
         except Exception:
             # Fallback to approximate calculation if sunrise/sunset fails

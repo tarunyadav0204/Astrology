@@ -5,34 +5,37 @@ KP_AYANAMSA = 23.85  # Approximate value, should be calculated dynamically
 
 # Nakshatra data with lords and sub-divisions
 NAKSHATRAS = [
-    {"name": "Ashwini", "lord": "Ketu", "start": 0.0, "end": 13.333333},
-    {"name": "Bharani", "lord": "Venus", "start": 13.333333, "end": 26.666667},
-    {"name": "Krittika", "lord": "Sun", "start": 26.666667, "end": 40.0},
-    {"name": "Rohini", "lord": "Moon", "start": 40.0, "end": 53.333333},
-    {"name": "Mrigashira", "lord": "Mars", "start": 53.333333, "end": 66.666667},
-    {"name": "Ardra", "lord": "Rahu", "start": 66.666667, "end": 80.0},
-    {"name": "Punarvasu", "lord": "Jupiter", "start": 80.0, "end": 93.333333},
-    {"name": "Pushya", "lord": "Saturn", "start": 93.333333, "end": 106.666667},
-    {"name": "Ashlesha", "lord": "Mercury", "start": 106.666667, "end": 120.0},
-    {"name": "Magha", "lord": "Ketu", "start": 120.0, "end": 133.333333},
-    {"name": "Purva Phalguni", "lord": "Venus", "start": 133.333333, "end": 146.666667},
-    {"name": "Uttara Phalguni", "lord": "Sun", "start": 146.666667, "end": 160.0},
-    {"name": "Hasta", "lord": "Moon", "start": 160.0, "end": 173.333333},
-    {"name": "Chitra", "lord": "Mars", "start": 173.333333, "end": 186.666667},
-    {"name": "Swati", "lord": "Rahu", "start": 186.666667, "end": 200.0},
-    {"name": "Vishakha", "lord": "Jupiter", "start": 200.0, "end": 213.333333},
-    {"name": "Anuradha", "lord": "Saturn", "start": 213.333333, "end": 226.666667},
-    {"name": "Jyeshtha", "lord": "Mercury", "start": 226.666667, "end": 240.0},
-    {"name": "Mula", "lord": "Ketu", "start": 240.0, "end": 253.333333},
-    {"name": "Purva Ashadha", "lord": "Venus", "start": 253.333333, "end": 266.666667},
-    {"name": "Uttara Ashadha", "lord": "Sun", "start": 266.666667, "end": 280.0},
-    {"name": "Shravana", "lord": "Moon", "start": 280.0, "end": 293.333333},
-    {"name": "Dhanishtha", "lord": "Mars", "start": 293.333333, "end": 306.666667},
-    {"name": "Shatabhisha", "lord": "Rahu", "start": 306.666667, "end": 320.0},
-    {"name": "Purva Bhadrapada", "lord": "Jupiter", "start": 320.0, "end": 333.333333},
-    {"name": "Uttara Bhadrapada", "lord": "Saturn", "start": 333.333333, "end": 346.666667},
-    {"name": "Revati", "lord": "Mercury", "start": 346.666667, "end": 360.0}
+    {"name": "Ashwini", "lord": "Ketu", "start": 0.0, "end": 13.333333333333334},
+    {"name": "Bharani", "lord": "Venus", "start": 13.333333333333334, "end": 26.666666666666668},
+    {"name": "Krittika", "lord": "Sun", "start": 26.666666666666668, "end": 40.0},
+    {"name": "Rohini", "lord": "Moon", "start": 40.0, "end": 53.333333333333336},
+    {"name": "Mrigashira", "lord": "Mars", "start": 53.333333333333336, "end": 66.66666666666667},
+    {"name": "Ardra", "lord": "Rahu", "start": 66.66666666666667, "end": 80.0},
+    {"name": "Punarvasu", "lord": "Jupiter", "start": 80.0, "end": 93.33333333333334},
+    {"name": "Pushya", "lord": "Saturn", "start": 93.33333333333334, "end": 106.66666666666667},
+    {"name": "Ashlesha", "lord": "Mercury", "start": 106.66666666666667, "end": 120.0},
+    {"name": "Magha", "lord": "Ketu", "start": 120.0, "end": 133.33333333333334},
+    {"name": "Purva Phalguni", "lord": "Venus", "start": 133.33333333333334, "end": 146.66666666666669},
+    {"name": "Uttara Phalguni", "lord": "Sun", "start": 146.66666666666669, "end": 160.0},
+    {"name": "Hasta", "lord": "Moon", "start": 160.0, "end": 173.33333333333334},
+    {"name": "Chitra", "lord": "Mars", "start": 173.33333333333334, "end": 186.66666666666669},
+    {"name": "Swati", "lord": "Rahu", "start": 186.66666666666669, "end": 200.0},
+    {"name": "Vishakha", "lord": "Jupiter", "start": 200.0, "end": 213.33333333333334},
+    {"name": "Anuradha", "lord": "Saturn", "start": 213.33333333333334, "end": 226.66666666666669},
+    {"name": "Jyeshtha", "lord": "Mercury", "start": 226.66666666666669, "end": 240.0},
+    {"name": "Mula", "lord": "Ketu", "start": 240.0, "end": 253.33333333333334},
+    {"name": "Purva Ashadha", "lord": "Venus", "start": 253.33333333333334, "end": 266.6666666666667},
+    {"name": "Uttara Ashadha", "lord": "Sun", "start": 266.6666666666667, "end": 280.0},
+    {"name": "Shravana", "lord": "Moon", "start": 280.0, "end": 293.33333333333337},
+    {"name": "Dhanishtha", "lord": "Mars", "start": 293.33333333333337, "end": 306.6666666666667},
+    {"name": "Shatabhisha", "lord": "Rahu", "start": 306.6666666666667, "end": 320.0},
+    {"name": "Purva Bhadrapada", "lord": "Jupiter", "start": 320.0, "end": 333.33333333333337},
+    {"name": "Uttara Bhadrapada", "lord": "Saturn", "start": 333.33333333333337, "end": 346.6666666666667},
+    {"name": "Revati", "lord": "Mercury", "start": 346.6666666666667, "end": 360.0}
 ]
+
+# Removed destructive normalization loop that caused precision errors
+
 
 # Sub-lord divisions (Original Vimshottari periods in years)
 SUB_LORD_DIVISIONS = {

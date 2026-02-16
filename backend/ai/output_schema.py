@@ -79,10 +79,11 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
 2. ### Key Insights: [3-4 bullets]
 3. ### Analysis Steps: [A bulleted list of 3-4 key astrological calculation steps taken to generate the response, e.g., "- Analyzing Dasha periods", "- Calculating planetary dignities", "- Cross-referencing Navamsa chart".]
 4. ### Astrological Analysis: [Use #### for all subsections below]
-   - #### The Parashari View: [Bulleted list of predictions]
-   - #### The Jaimini View: [Paragraph for Chara Dasha (MD & AD), then bulleted list for Karakas]
+   - #### The Parashari View: [Provide a detailed analysis explaining the 'why' behind each prediction. Mention specific house lordships, planetary placements, and aspects in D1 and D9.]
+   - #### The Jaimini View: [Explain the influence of the current Chara Dasha (MD & AD) and the role of relevant Chara Karakas like Atmakaraka or Darakaraka in the context of the query.]
+   - #### KP Stellar Perspective: [Provide a technically detailed analysis. Explicitly mention the Cusp Sub-Lord (CSL) of the primary house, its Star Lord, and the specific houses they signify (e.g., 2, 7, 11). Apply the 4-Step Theory for the current Dasha/Antardasha lords to show the flow of results.]
    - #### Nadi Interpretation: [Bulleted list, one for each planetary combination]
-   - #### Timing Synthesis: [Synthesize all dasha systems]
+   - #### Timing Synthesis: [Synthesize all dasha systems including KP significators]
    - #### Triple Perspective (Sudarshana): [Analyze from Lagna, Moon, Sun]
    - #### Divisional Chart Analysis: [Analyze relevant D-chart]
 5. ### Nakshatra Insights: [Analysis + Remedies. This section is MANDATORY if nakshatra data is available.]
@@ -124,6 +125,33 @@ TEMPLATE_DAILY_SUMMARY = """
 
 ### Guidance for the Day
 [A final piece of actionable advice]
+"""
+
+# Template D: Lifespan Timeline
+# Used for: LIFESPAN_EVENT_TIMING
+TEMPLATE_LIFESPAN_TIMELINE = """
+### 🕰️ LIFESPAN EVENT TIMELINE (MANDATORY)
+Your response must be a chronological analysis of the specific event requested across the native's lifespan.
+
+1. <div class="quick-answer-card">**Executive Summary**: [Direct answer to the "When" question with the most likely window/year]</div>
+
+2. ### 🗓️ Chronological Potential Windows
+[List 3-5 specific time windows in chronological order]
+- **Window [1/2/3]**: [Year/Period]
+  - **Astrological Strength**: [High/Medium/Low]
+  - **Key Triggers**: [Briefly mention the Dasha and Transit alignment]
+  - **Manifestation**: [How the event is likely to occur in this period]
+
+3. ### 🔍 Technical Deep Dive
+- **Primary Dasha Promise**: [Analysis of the Mahadasha/Antardasha lords responsible]
+- **KP Cusp Confirmation**: [Check the relevant Cusp Sub-Lord (CSL) and its significations for the event]
+- **Transit Confirmations**: [Analysis of Jupiter/Saturn/Rahu transits for the key windows]
+- **Divisional Confirmation**: [Brief mention of D9/D10/D7 support]
+
+4. ### 💡 Guidance & Preparation
+[Actionable advice for the upcoming windows or reflection for past windows]
+
+<div class="final-thoughts-card">**Final Verdict**: [Summary of the most certain period and why]</div>
 """
 
 # Special Template for Mundane Astrology
@@ -174,6 +202,7 @@ SCHEMA_MAPPING = {
     'PREDICT_DAILY': TEMPLATE_DEEP_DIVE,
     'MUNDANE': TEMPLATE_MUNDANE,
     'DEV_EVENT_LOG': TEMPLATE_DEV_EVENT_LOG,
+    'LIFESPAN_EVENT_TIMING': TEMPLATE_LIFESPAN_TIMELINE,
     'DEFAULT': TEMPLATE_DEEP_DIVE,
 }
 
@@ -190,13 +219,13 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False) -> s
     base_schema = SCHEMA_MAPPING.get(mode.upper(), SCHEMA_MAPPING['DEFAULT'])
     
     # Programmatically add common blocks to all schemas except special cases
-    if mode.upper() != 'DEV_EVENT_LOG':
+    if mode.upper() not in ['DEV_EVENT_LOG', 'LIFESPAN_EVENT_TIMING']:
         # Ensure there's a newline before appending
         schema_with_common_blocks = base_schema.strip() + "\n"
         schema_with_common_blocks += GLOSSARY_BLOCK_INSTRUCTION + "\n"
         schema_with_common_blocks += FOLLOW_UP_BLOCK_INSTRUCTION
     else:
-        # Dev log only gets the glossary
+        # Dev log and Lifespan only get the glossary
         schema_with_common_blocks = base_schema.strip() + "\n" + GLOSSARY_BLOCK_INSTRUCTION
 
     # Optional: Append instructions for premium features
@@ -208,7 +237,7 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False) -> s
    SUMMARY_IMAGE_END
 """
         # This is appended carefully to avoid breaking the structure of simpler templates
-        if mode.upper() in ['ANALYZE_TOPIC_POTENTIAL', 'ANALYZE_ROOT_CAUSE', 'PREDICT_PERIOD_OUTLOOK', 'DEFAULT', 'PREDICT_DAILY']:
+        if mode.upper() in ['ANALYZE_TOPIC_POTENTIAL', 'ANALYZE_ROOT_CAUSE', 'PREDICT_PERIOD_OUTLOOK', 'DEFAULT', 'PREDICT_DAILY', 'LIFESPAN_EVENT_TIMING']:
              return schema_with_common_blocks + "\n" + image_instructions
 
     return schema_with_common_blocks
@@ -232,7 +261,8 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
 
     history_text = ""
     if history:
-        history_text = "\n\nCONVERSATION HISTORY:\n"
+        history_text = "\n\nCONVERSATION HISTORY (FOR CONTEXT ONLY):\n"
+        history_text += "⚠️ RELEVANCE RULE: ONLY refer to this history if the current question is a follow-up or directly linked to these past messages. If the user has shifted to a new topic, IGNORE the specifics of the history below.\n\n"
         recent_messages = history[-3:] if len(history) >= 3 else history
         for msg in recent_messages:
             question = msg.get('question', '')[:500]
@@ -282,6 +312,8 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
         # Override for daily predictions to use the specific daily structure
         if intent_mode.upper() == 'PREDICT_DAILY':
             analysis_type_from_intent = 'DAILY_PREDICTION'
+        elif intent_mode.upper() == 'LIFESPAN_EVENT_TIMING':
+            analysis_type_from_intent = 'LIFESPAN_EVENT_TIMING'
             
         system_instruction = build_system_instruction(analysis_type=analysis_type_from_intent, intent_category=intent_category)
 

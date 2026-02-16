@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, validator, ValidationError
+from pydantic import BaseModel, field_validator, ValidationError
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import swisseph as swe
@@ -10,6 +10,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+from contextlib import asynccontextmanager
 from utils.timezone_service import parse_timezone_offset
 import bcrypt
 import jwt
@@ -133,7 +134,29 @@ except ImportError:
     subprocess.check_call(["pip", "install", "psutil"])
     import psutil
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown lifecycle (replaces on_event)."""
+    # Startup
+    try:
+        prediction_engine = DailyPredictionEngine()
+        prediction_engine.reset_prediction_rules()
+        print("Daily prediction engine initialized with updated rules")
+    except Exception as e:
+        print(f"Warning: Could not initialize prediction engine: {e}")
+    try:
+        init_house_combinations_db()
+        init_chat_tables()
+        print("House combinations and chat history databases initialized")
+    except Exception as e:
+        print(f"Warning: Could not initialize additional databases: {e}")
+    yield
+    # Shutdown (if needed later)
+    pass
+
+
+app = FastAPI(lifespan=lifespan)
 horoscope_api = HoroscopeAPI()
 
 # Add validation error handler
@@ -449,8 +472,9 @@ class BirthData(BaseModel):
     gender: str = ""
     relation: Optional[str] = "other"
     
-    @validator('time')
-    def normalize_time_format(cls, v):
+    @field_validator('time')
+    @classmethod
+    def normalize_time_format(cls, v: str) -> str:
         """Normalize time to HH:MM format for consistent calculations"""
         if v and ':' in v:
             parts = v.split(':')
@@ -3176,27 +3200,6 @@ async def analyze_compatibility(request: CompatibilityRequest, current_user: Use
         "girl_details": girl_birth,
         "compatibility_analysis": result
     }
-
-@app.on_event("startup")
-async def startup_event():
-    try:
-        # Initialize daily prediction rules database
-        prediction_engine = DailyPredictionEngine()
-        # Reset rules to ensure we have the latest ones
-        prediction_engine.reset_prediction_rules()
-        print("Daily prediction engine initialized with updated rules")
-    except Exception as e:
-        print(f"Warning: Could not initialize prediction engine: {e}")
-    
-    # Initialize house combinations database
-    try:
-        init_house_combinations_db()
-        init_chat_tables()
-        print("House combinations and chat history databases initialized")
-    except Exception as e:
-        print(f"Warning: Could not initialize additional databases: {e}")
-    
-    # Timezone auto-fix disabled - manual correction required
 
 # Horoscope endpoints
 @app.get("/api/horoscope/daily/{zodiac_sign}")

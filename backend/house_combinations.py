@@ -11,11 +11,6 @@ import json
 
 router = APIRouter()
 
-# Initialize database on module import
-try:
-    init_house_combinations_db()
-except Exception as e:
-    print(f"Warning: Could not initialize house combinations database: {e}")
 
 class HouseSpecification(BaseModel):
     house_number: int
@@ -132,6 +127,14 @@ def init_house_combinations_db():
     
     conn.commit()
     conn.close()
+
+
+# Initialize database on module load (after function is defined)
+try:
+    init_house_combinations_db()
+except Exception as e:
+    print(f"Warning: Could not initialize house combinations database: {e}")
+
 
 @router.get("/house-specifications")
 async def get_house_specifications():

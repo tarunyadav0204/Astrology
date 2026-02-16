@@ -12,6 +12,7 @@
     "kotaChakra": "Kota Chakra",
     "yogas": "Yogas",
     "lifeAnalysis": "Life Analysis",
+    "kpSystem": "KP System",
     "pastLifeRegression": "Past Life Regression",
     "numerology": "Numerology",
     "chatHistory": "Chat History",
@@ -506,5 +507,27 @@
     "dainya_yogas": "Dainya Yogas",
     "khala_yogas": "Khala Yogas",
     "other_parivartana_yogas": "Other Parivartana Yogas"
+  },
+  "kp": {
+    "title": "KP System",
+    "planetaryScript": "Planetary Script",
+    "cuspalScript": "Cuspal Script",
+    "significators": "Significators",
+    "rulingPlanets": "Ruling Planets (RP)",
+    "columns": {
+      "planet": "Planet",
+      "cusp": "Cusp",
+      "sign": "Sign",
+      "degree": "Deg",
+      "starLord": "StL",
+      "subLord": "SbL",
+      "subSubLord": "SSL"
+    },
+    "levels": {
+      "level1": "L1 (In Star of Occupant)",
+      "level2": "L2 (Occupant)",
+      "level3": "L3 (In Star of Owner)",
+      "level4": "L4 (Owner)"
+    }
   }
 }

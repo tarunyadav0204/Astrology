@@ -39,6 +39,7 @@ from calculators.pushkara_calculator import PushkaraCalculator
 from calculators.sudarshana_chakra_calculator import SudarshanaChakraCalculator
 from calculators.sudarshana_dasha_calculator import SudarshanaDashaCalculator
 from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
+from app.kp.services.chart_service import KPChartService
 
 # Import modular system instruction config
 from .system_instruction_config import (
@@ -255,9 +256,12 @@ class ChatContextBuilder:
         chart_data = chart_calc.calculate_chart(birth_obj)
         chart_data_original = chart_data  # Store original before enrichment
         
+        # Initialize divisional calculator first so divisions are available for Shadbala
+        divisional_calc = DivisionalChartCalculator(chart_data)
+        chart_data['divisions'] = divisional_calc.calculate_all_divisional_charts()
+        
         # Initialize analyzers
         planet_analyzer = PlanetAnalyzer(chart_data, birth_obj)
-        divisional_calc = DivisionalChartCalculator(chart_data)
         chara_karaka_calc = CharaKarakaCalculator(chart_data)
         yogi_calc = YogiCalculator(chart_data)
         badhaka_calc = BadhakaCalculator(chart_data)
@@ -449,7 +453,29 @@ class ChatContextBuilder:
         except Exception as e:
             pushkara_data = {'has_pushkara': False, 'pushkara_planets': []}
         
+        # Calculate KP Chart Data
+        try:
+            kp_data = KPChartService.calculate_kp_chart(
+                birth_data.get('date'),
+                birth_data.get('time'),
+                birth_data.get('latitude'),
+                birth_data.get('longitude'),
+                birth_data.get('timezone')
+            )
+            # Include all KP levels (Sign, Star, Sub, Sub-Sub) as calculations are now verified
+            kp_analysis = {
+                "planet_lords": kp_data.get('planet_lords', {}),
+                "cusp_lords": kp_data.get('cusp_lords', {}),
+                "significators": kp_data.get('significators', {})
+            }
+        except Exception as e:
+            print(f"❌ KP calculation failed for chat context: {e}")
+            kp_analysis = {"error": "KP calculation unavailable"}
+
         context.update({
+            # KP Analysis (Full 4-level analysis)
+            "kp_analysis": kp_analysis,
+            
             # Key divisional charts
             "divisional_charts": divisional_charts,
             
@@ -1195,9 +1221,16 @@ class ChatContextBuilder:
                 requested_months = None
                 if transit_request.get('yearMonthMap'):
                     year_month_map = transit_request['yearMonthMap']
-                    if str(start_year) in year_month_map:
-                        requested_months = year_month_map[str(start_year)]
-                        print(f"   📅 MONTH FILTERING: Only including {requested_months} for {start_year}")
+                    # For long periods, combine all requested months into a unique set
+                    # This allows filtering if Gemini requested specific months across different years
+                    all_requested_months = set()
+                    for year_str, months in year_month_map.items():
+                        if months:
+                            all_requested_months.update(months)
+                    
+                    if all_requested_months:
+                        requested_months = list(all_requested_months)
+                        # print(f"   📅 MONTH FILTERING: Including months {requested_months} across all years")
                 
                 # Include Mars for short-term analysis (daily/weekly/monthly)
                 if requested_months and len(requested_months) <= 3:
@@ -1238,17 +1271,22 @@ class ChatContextBuilder:
                                     }.get(month_name)
                                     
                                     if month_num:
-                                        # Check if period overlaps with this month
-                                        month_start = datetime(start_year, month_num, 1)
-                                        if month_num == 12:
-                                            month_end = datetime(start_year + 1, 1, 1) - timedelta(days=1)
-                                        else:
-                                            month_end = datetime(start_year, month_num + 1, 1) - timedelta(days=1)
+                                        # Check if period overlaps with this month in ANY year of the range
+                                        # We check if the month_num is present in any year between start_date and end_date
+                                        current_p_year = start_date.year
+                                        while current_p_year <= end_date.year:
+                                            month_start = datetime(current_p_year, month_num, 1)
+                                            if month_num == 12:
+                                                month_end = datetime(current_p_year + 1, 1, 1) - timedelta(days=1)
+                                            else:
+                                                month_end = datetime(current_p_year, month_num + 1, 1) - timedelta(days=1)
+                                            
+                                            if start_date <= month_end and end_date >= month_start:
+                                                period_overlaps = True
+                                                break
+                                            current_p_year += 1
                                         
-                                        if start_date <= month_end and end_date >= month_start:
-                                            period_overlaps = True
-                                            # if aspect['transit_planet'] == 'Mars':
-                                            #     print(f"     🔴 MARS PERIOD OVERLAPS {month_name}: {period['start_date']} to {period['end_date']}")
+                                        if period_overlaps:
                                             break
                                 
                                 if period_overlaps:

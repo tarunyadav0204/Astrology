@@ -1592,16 +1592,25 @@ export default function ChatScreen({ navigation, route }) {
             
             <View style={styles.headerCenter}>
               {showGreeting ? (
-                <>
-                  <Text style={[styles.headerTitle, { color: colors.text }]}>🌟 AstroRoshni</Text>
-                  {birthData && (
-                    <NativeSelectorChip 
-                      birthData={birthData}
-                      onPress={() => navigation.navigate('SelectNative')}
-                      maxLength={7}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -16 }}>
+                  <View style={styles.headerLogoContainer}>
+                    <Image 
+                      source={require('../../../assets/logo.png')}
+                      style={styles.headerLogo}
+                      resizeMode="contain"
                     />
-                  )}
-                </>
+                  </View>
+                  <View>
+                    <Text style={[styles.headerTitle, { color: colors.text, marginBottom: 4 }]}>AstroRoshni</Text>
+                    {birthData && (
+                      <NativeSelectorChip 
+                        birthData={birthData}
+                        onPress={() => navigation.navigate('SelectNative')}
+                        maxLength={7}
+                      />
+                    )}
+                  </View>
+                </View>
               ) : isMundane ? (
                 <View style={styles.partnershipChipsContainer}>
                   <TouchableOpacity 
@@ -2446,6 +2455,38 @@ export default function ChatScreen({ navigation, route }) {
                         useNativeDriver: true,
                       }).start(() => {
                         setShowMenu(false);
+                        if (birthData) {
+                            navigation.navigate('KPSystem', { birthDetails: birthData });
+                        }
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={['#10b981', '#34d399']}
+                          style={styles.menuIconGradient}
+                        >
+                          <Text style={styles.menuEmoji}>🔢</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kpSystem')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      Animated.timing(drawerAnim, {
+                        toValue: 300,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMenu(false);
                         navigation.navigate('AnalysisHub');
                       });
                     }}
@@ -3051,7 +3092,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 2,
+  },
+  headerLogoContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',

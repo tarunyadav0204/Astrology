@@ -117,14 +117,35 @@ class ResponseParser:
         if 'GLOSSARY_START' in content and 'GLOSSARY_END' in content:
             try:
                 glossary_part = content.split('GLOSSARY_START')[1].split('GLOSSARY_END')[0]
-                glossary_json_str = re.sub(r'^```(?:json)?\s*|```$', '', glossary_part).strip()
                 
-                data = json.loads(glossary_json_str)
-                if isinstance(data, list):
-                    parsed_glossary = {item['term'].strip().lower(): item['description'] for item in data if 'term' in item and 'description' in item}
-                elif isinstance(data, dict):
-                    parsed_glossary = {k.strip().lower(): v for k, v in data.items()}
+                # Check if it's a JSON block or a Markdown list
+                if '{' in glossary_part or '[' in glossary_part:
+                    glossary_json_str = re.sub(r'^```(?:json)?\s*|```$', '', glossary_part).strip()
+                    try:
+                        data = json.loads(glossary_json_str)
+                        if isinstance(data, list):
+                            parsed_glossary = {item['term'].strip().lower(): item['description'] if 'description' in item else item.get('definition', '') for item in data}
+                        elif isinstance(data, dict):
+                            parsed_glossary = {k.strip().lower(): v for k, v in data.items()}
+                    except json.JSONDecodeError:
+                        # Fallback for malformed JSON
+                        json_match = re.search(r'(\{.*\})|(\[.*\])', glossary_json_str, re.DOTALL)
+                        if json_match:
+                            data = json.loads(json_match.group(0))
+                            # ... handle list/dict as above ...
                 
+                # NEW: Handle Markdown List Format (e.g., "- <term id='...'>Term</term>: Definition")
+                if not parsed_glossary:
+                    list_matches = re.findall(r'-\s*<term\s+id="([^"]+)">([^<]+)<\/term>:\s*(.*)', glossary_part)
+                    if list_matches:
+                        for term_id, term_text, definition in list_matches:
+                            parsed_glossary[term_id.lower()] = definition.strip()
+                    else:
+                        # Even simpler list fallback
+                        simple_list = re.findall(r'-\s*\*\*([^*]+)\*\*:\s*(.*)', glossary_part)
+                        for term_text, definition in simple_list:
+                            parsed_glossary[term_text.lower().strip()] = definition.strip()
+
                 content = re.sub(r'GLOSSARY_START.*?GLOSSARY_END', '', content, flags=re.DOTALL)
                 print(f"   ✅ Glossary parsed ({len(parsed_glossary)} terms).")
             except Exception as e:

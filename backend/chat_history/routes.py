@@ -824,6 +824,31 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             
             intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready)
             
+            # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap
+            timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
+            if any(kw in question.lower() for kw in timing_keywords) and intent.get('status') == 'CLARIFY':
+                print(f"🛡️ FAIL-SAFE TRIGGERED: Forcing LIFESPAN_EVENT_TIMING for timing question")
+                intent['status'] = 'READY'
+                intent['mode'] = 'LIFESPAN_EVENT_TIMING'
+                intent['needs_transits'] = True
+
+            # Special handling for LIFESPAN_EVENT_TIMING transit range
+            if intent.get('mode') == 'LIFESPAN_EVENT_TIMING':
+                print(f"🎯 LIFESPAN_EVENT_TIMING detected - Setting wide transit range")
+                # Calculate age 18 to +25 years
+                birth_year = int(birth_data['date'].split('-')[0])
+                start_year = birth_year + 18
+                current_year = datetime.now().year
+                end_year = current_year + 25
+                
+                intent['needs_transits'] = True
+                intent['transit_request'] = {
+                    "startYear": start_year,
+                    "endYear": end_year,
+                    "yearMonthMap": None # No sparse map - get all major transits for lifespan
+                }
+                print(f"🎯 Range set: {start_year} to {end_year}")
+
             # CLARIFICATION LIMIT: Set to 1 to allow only one clarification before forcing answer
             MAX_CLARIFICATIONS = 1
             

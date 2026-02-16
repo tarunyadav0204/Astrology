@@ -29,9 +29,9 @@ class LocalStorageManager:
         """Save chart locally for testing"""
         return self.upload_image(chart_data, filename, 'image/png')
 
-# Use local storage for testing
+# Use GCP Cloud Storage when available, otherwise local storage
 try:
-    from google.cloud import storage
+    from blog.storage import CloudStorageManager
     storage_manager = CloudStorageManager()
 except Exception as e:
     print(f"Using local storage: {e}")

@@ -36,7 +36,8 @@ class IntentRouter:
         # Build conversation context
         history_text = ""
         if chat_history:
-            history_text = "\n\nPrevious conversation:\n"
+            history_text = "\n\nPrevious conversation (FOR CONTEXT ONLY):\n"
+            history_text += "⚠️ RELEVANCE RULE: ONLY refer to this history if the current question is a follow-up or directly linked to these past messages. If the user has shifted to a new topic, IGNORE the specifics of the history below.\n"
             for msg in chat_history[-3:]:
                 history_text += f"Q: {msg.get('question', '')}\nA: {msg.get('response', '')}\n"
         
@@ -44,6 +45,7 @@ class IntentRouter:
         facts_text = ""
         if user_facts:
             facts_text = "\n\nKNOWN USER BACKGROUND:\n"
+            facts_text += "⚠️ RELEVANCE RULE: ONLY use these facts if they are directly relevant to the current question's life area. Do NOT mention unrelated situational context from the background.\n"
             for category, items in user_facts.items():
                 fact_str = ", ".join(items) if isinstance(items, list) else str(items)
                 facts_text += f"- {category.upper()}: {fact_str}\n"
@@ -166,6 +168,9 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         You must choose one of the following modes based on the user's question. This determines the structure of the final answer.
 
         - "PREDICT_DAILY": For daily predictions (e.g., "How is today?", "What's in store for me today?").
+        - "LIFESPAN_EVENT_TIMING": For open-ended "When" questions about major life events (e.g., "When will I get married?", "When did I buy my house?", "When will my daughter get married?", "In which year did I get married?"). 
+          🚨 CRITICAL: Use this mode for ANY question seeking a specific year or date for a major milestone, past or future. 
+          🚨 CRITICAL: For this mode, ALWAYS return status: "READY". Never ask for clarification on "When" questions.
         - "PREDICT_PERIOD_OUTLOOK": For general questions about a specific timeframe (e.g., "How will the next 6 months be for my career?"). This is for a deep-dive analysis.
         - "PREDICT_EVENT_TIMING": For "when will X happen?" questions (e.g., "When will I get married?").
         - "PREDICT_EVENTS_FOR_PERIOD": For listing numerous potential events over a period (e.g., "Tell me all events for this year."). This is for a timeline-style list.

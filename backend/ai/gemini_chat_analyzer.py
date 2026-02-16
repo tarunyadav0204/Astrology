@@ -587,6 +587,33 @@ class GeminiChatAnalyzer:
         # 4. Remove Response Structure (It's in System Prompt)
         clean.pop('RESPONSE_STRUCTURE_REQUIRED', None)
         
+        # 5. Prune Transit Activations for long periods
+        if 'transit_activations' in clean and isinstance(clean['transit_activations'], list):
+            activations = clean['transit_activations']
+            if len(activations) > 20:
+                # If too many activations, prune less important fields to save tokens
+                for act in activations:
+                    # Remove redundant or heavy fields
+                    act.pop('all_aspects_cast', None)
+                    if 'ashtakavarga_filter' in act:
+                        # Keep only the essential strength info
+                        filter_data = act['ashtakavarga_filter']
+                        act['ashtakavarga_filter'] = {
+                            'sav': filter_data.get('sav_points'),
+                            'bav': filter_data.get('bav_points'),
+                            'strength': filter_data.get('final_strength')
+                        }
+                
+                # If still too many (e.g. > 50), prioritize slow moving planets
+                if len(activations) > 50:
+                    slow_planets = ['Jupiter', 'Saturn', 'Rahu', 'Ketu']
+                    prioritized = [a for a in activations if a.get('transit_planet') in slow_planets]
+                    others = [a for a in activations if a.get('transit_planet') not in slow_planets]
+                    
+                    # Keep all slow ones, and some of the others if space permits
+                    clean['transit_activations'] = prioritized + others[:20]
+                    # print(f"✂️ Pruned transit_activations from {len(activations)} to {len(clean['transit_activations'])}")
+
         return clean
     
     def _create_chat_prompt(self, user_question: str, context: Dict[str, Any], history: List[Dict], language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False, mode: str = 'default') -> str:

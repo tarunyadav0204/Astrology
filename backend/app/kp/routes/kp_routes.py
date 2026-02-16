@@ -16,7 +16,7 @@ class KPChartRequest(BaseModel):
     birth_time: str
     latitude: float
     longitude: float
-    timezone_offset: Optional[float] = 0
+    timezone: Optional[str] = ""
 
 class HoraryRequest(BaseModel):
     question_number: int
@@ -27,6 +27,7 @@ class EventTimingRequest(BaseModel):
     birth_time: str
     latitude: float
     longitude: float
+    timezone: str
     event_type: str
 
 @router.post("/chart")
@@ -38,7 +39,7 @@ async def calculate_kp_chart(request: KPChartRequest, current_user: dict = Depen
             request.birth_time,
             request.latitude,
             request.longitude,
-            request.timezone_offset
+            request.timezone
         )
         return {"success": True, "data": chart_data}
     except Exception as e:
@@ -53,7 +54,7 @@ async def get_sub_lords(request: KPChartRequest, current_user: dict = Depends(ge
             request.birth_time,
             request.latitude,
             request.longitude,
-            request.timezone_offset
+            request.timezone
         )
         
         return {
@@ -68,13 +69,14 @@ async def get_sub_lords(request: KPChartRequest, current_user: dict = Depends(ge
 
 @router.post("/ruling-planets")
 async def get_ruling_planets(request: KPChartRequest, current_user: dict = Depends(get_current_user)):
-    """Get KP ruling planets"""
+    """Get KP ruling planets for the birth moment"""
     try:
-        birth_datetime = datetime.strptime(f"{request.birth_date} {request.birth_time}", "%Y-%m-%d %H:%M")
         ruling_planets = KPCalculations.get_ruling_planets(
-            birth_datetime,
+            request.birth_date,
+            request.birth_time,
             request.latitude,
-            request.longitude
+            request.longitude,
+            request.timezone
         )
         return {"success": True, "data": ruling_planets}
     except Exception as e:
@@ -101,7 +103,7 @@ async def get_significators(request: KPChartRequest, current_user: dict = Depend
             request.birth_time,
             request.latitude,
             request.longitude,
-            request.timezone_offset
+            request.timezone
         )
         
         return {
@@ -121,7 +123,8 @@ async def predict_event_timing(request: EventTimingRequest, current_user: dict =
             "birth_date": request.birth_date,
             "birth_time": request.birth_time,
             "latitude": request.latitude,
-            "longitude": request.longitude
+            "longitude": request.longitude,
+            "timezone": request.timezone,
         }
         
         predictions = KPEventTimingService.predict_event_timing(

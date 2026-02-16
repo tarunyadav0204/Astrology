@@ -268,6 +268,11 @@ export default function SelectNativeScreen({ navigation, route }) {
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate('KarmaAnalysis', { chartId: profileWithId.id });
+      } else if (returnTo === 'KP') {
+        // Return to KP Screen with selected chart
+        await storage.setBirthDetails(profileWithId);
+        setSelectedProfile(profile.name);
+        navigation.navigate('KPSystem', { birthDetails: profileWithId });
       } else {
         // Normal selection flow
         await storage.setBirthDetails(profileWithId);
