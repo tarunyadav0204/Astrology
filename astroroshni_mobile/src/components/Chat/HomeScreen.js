@@ -11,7 +11,9 @@ import {
   AppState,
   Platform,
   Modal,
+  Animated,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -41,6 +43,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   }
   const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
+  const [activeTab, setActiveTab] = useState('ask');
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
   const [pricing, setPricing] = useState({});
@@ -57,6 +60,18 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     mahadasha: null,
     moonPhase: null,
     loading: true
+  });
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const fabWidth = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [180, 56],
+    extrapolate: 'clamp',
+  });
+  const fabTextOpacity = scrollY.interpolate({
+    inputRange: [0, 50],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
   });
 
   const getSignInsight = (type, signIndex) => {
@@ -529,7 +544,7 @@ const loadHomeData = async (nativeData = null) => {
     // },
     {
       id: 'events',
-      icon: '🌟',
+      icon: '📅',
       title: t('home.options.events.title', 'Event Timeline'),
       description: t('home.options.events.description', 'AI-powered yearly predictions with monthly breakdowns and major milestones'),
       action: 'events'
@@ -550,7 +565,7 @@ const loadHomeData = async (nativeData = null) => {
       title: t('home.analysis.wealth.title', 'Wealth Analysis'), 
       icon: '💰', 
       description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'),
-      gradient: ['#FFD700', '#FF8C00'],
+      gradient: ['#0EA5E9', '#38BDF8'],
       cost: pricing.wealth_analysis || 5
     },
     { 
@@ -644,6 +659,11 @@ const loadHomeData = async (nativeData = null) => {
         style={[styles.scrollView, { zIndex: 1 }]} 
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
       >
         {/* Header with Native Selector & Big 3 Dashboard - Integrated into ScrollView */}
         <View style={styles.header}>
@@ -813,17 +833,27 @@ const loadHomeData = async (nativeData = null) => {
           </View>
         </View>
 
-        {/* Timing Planners */}
-        <View style={styles.analysisContainer}>
-          <Text style={[styles.analysisTitle, { color: colors.text }]}>{t('home.sections.timingPlanners', '⏰ Timing Planners')}</Text>
-          {analysisOptions.slice(6).map((option, index) => (
-            <AnalysisCard
-              key={option.id}
-              option={option}
-              index={index + 6}
-              onOptionSelect={onOptionSelect}
-            />
-          ))}
+        {/* Timing Planners - Cosmic Ribbon (Horizontal Snap-Gallery) */}
+        <View style={styles.ribbonContainer}>
+          <Text style={[styles.analysisTitle, { color: colors.text, paddingHorizontal: 20 }]}>
+            {t('home.sections.timingPlanners', '⏰ Timing Planners')}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={width * 0.72 + 16}
+            decelerationRate="fast"
+            contentContainerStyle={styles.ribbonScrollContent}
+          >
+            {analysisOptions.slice(6).map((option, index) => (
+              <CosmicRibbonCard
+                key={option.id}
+                option={option}
+                index={index}
+                onOptionSelect={onOptionSelect}
+              />
+            ))}
+          </ScrollView>
         </View>
 
 
@@ -1448,8 +1478,8 @@ const loadHomeData = async (nativeData = null) => {
                       const isNew = normalizedPhase.includes('new');
                       const isWaxing = !isWaning && !isFull && !isNew;
 
-                      if (illumination >= 99) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
-                      if (illumination <= 1) return null; 
+                      if (isNew || illumination <= 2) return null; 
+                      if (isFull || illumination >= 98) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
                       
                       const ellipseRadiusX = r * Math.abs(1 - (2 * illumination / 100));
                       if (isNaN(ellipseRadiusX)) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
@@ -1652,21 +1682,138 @@ const loadHomeData = async (nativeData = null) => {
       </LinearGradient>
 
       {/* Floating Action Button (FAB) - Outside of ScrollView and Gradient to ensure absolute positioning */}
-      <View style={styles.fabContainer}>
+      <Animated.View style={[styles.fabContainer, { bottom: 90, width: fabWidth }]}>
         <TouchableOpacity
           style={styles.fabButton}
           onPress={() => onOptionSelect({ action: 'question' })}
           activeOpacity={0.9}
         >
           <LinearGradient
-            colors={['#8B5CF6', '#6D28D9']}
+            colors={['#FFD700', '#F59E0B']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.fabGradient}
           >
-            <Icon name="chatbubbles" size={24} color={COLORS.white} />
-            <Text style={styles.fabText}>{t('home.askFAB', 'Ask AstroRoshni')}</Text>
+            <Icon name="chatbubbles" size={24} color="#854d0e" />
+            <Animated.Text 
+              style={[
+                styles.fabText, 
+                { 
+                  color: '#854d0e',
+                  opacity: fabTextOpacity,
+                  width: fabTextOpacity.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 120]
+                  })
+                }
+              ]} 
+              numberOfLines={1}
+            >
+              {t('home.askFAB', 'Ask AstroRoshni')}
+            </Animated.Text>
           </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Bottom Tabs */}
+      <View style={styles.bottomTabs}>
+        <LinearGradient
+          colors={theme === 'dark' ? ['#f97316', '#ea580c'] : ['#ffffff', '#fff5f0']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+        {Platform.OS === 'ios' && (
+          <BlurView intensity={theme === 'dark' ? 20 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
+        )}
+        
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => onOptionSelect({ action: 'question' })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <Icon 
+              name="chatbubble-ellipses-outline" 
+              size={22} 
+              color={activeTab === 'ask' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+            />
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'ask' ? '800' : '600' }]}>
+            {t('home.tabs.ask', 'Ask')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => onOptionSelect({ action: 'events' })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <Icon 
+              name="calendar-outline" 
+              size={22} 
+              color={activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+            />
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'events' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'events' ? '800' : '600' }]}>
+            {t('home.tabs.events', 'Events')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => navigation.navigate('Chart', { birthData })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <Svg width="22" height="22" viewBox="0 0 48 48">
+              {/* Outer square */}
+              <Rect x="2" y="2" width="44" height="44" fill="none" stroke={activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="3" />
+              {/* Inner diamond */}
+              <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={activeTab === 'charts' ? '#ffd700' : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="2" />
+              {/* Diagonal lines creating triangular houses */}
+              <Line x1="2" y1="2" x2="46" y2="46" stroke={activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="1.5" />
+              <Line x1="46" y1="2" x2="2" y2="46" stroke={activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} strokeWidth="1.5" />
+            </Svg>
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'charts' ? '800' : '600' }]}>
+            {t('home.tabs.charts', 'Charts')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => setShowDashaBrowser(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <Icon 
+              name="time-outline" 
+              size={22} 
+              color={activeTab === 'dashas' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+            />
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'dashas' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'dashas' ? '800' : '600' }]}>
+            {t('home.tabs.dashas', 'Dashas')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => navigation.navigate('Profile')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <Icon 
+              name="person-outline" 
+              size={22} 
+              color={activeTab === 'you' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+            />
+          </View>
+          <Text style={[styles.tabLabel, { color: activeTab === 'you' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'you' ? '800' : '600' }]}>
+            {t('home.tabs.you', 'You')}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -1791,6 +1938,56 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
             </View>
           </View>
         </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Premium Cosmic Ribbon Card for Timing Planners
+function CosmicRibbonCard({ option, index, onOptionSelect }) {
+  const { theme, colors } = useTheme();
+  
+  if (!option) return null;
+  
+  const cardWidth = width * 0.72;
+  
+  return (
+    <View style={[styles.ribbonCardWrapper, { width: cardWidth }]}>
+      <TouchableOpacity
+        onPress={() => {
+          if (option.id === 'muhurat') {
+            onOptionSelect({ action: 'muhurat' });
+          } else {
+            onOptionSelect({ action: 'analysis', type: option.id });
+          }
+        }}
+        activeOpacity={0.9}
+        style={styles.ribbonCardTouch}
+      >
+        <View style={[
+          styles.ribbonGlassmorphism,
+          {
+            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.7)',
+            borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.2)',
+          }
+        ]}>
+          <View style={styles.ribbonContent}>
+            <View style={[styles.ribbonIconContainer, { backgroundColor: (option.gradient?.[0] || colors.primary) + '15' }]}>
+              <Text style={styles.ribbonEmoji}>{option.icon}</Text>
+            </View>
+            
+            <View style={styles.ribbonTextContainer}>
+              <Text style={[styles.ribbonTitle, { color: colors.text }]}>{option.title}</Text>
+              <Text style={[styles.ribbonDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                {option.description}
+              </Text>
+            </View>
+            
+            <View style={styles.ribbonActionContainer}>
+              <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+            </View>
+          </View>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -2178,26 +2375,26 @@ const styles = StyleSheet.create({
   },
   lifeAnalysisCardLarge: {
     width: '48%',
-    height: 200,
+    height: 220,
   },
   lifeAnalysisCardWide: {
     width: '100%',
-    height: 120,
+    height: 130,
   },
   lifeAnalysisGradient: {
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 150,
+    height: 160,
   },
   lifeAnalysisGradientLarge: {
-    height: 200,
+    height: 220,
     justifyContent: 'flex-end',
     alignItems: 'flex-start',
     padding: 20,
   },
   lifeAnalysisGradientWide: {
-    height: 120,
+    height: 130,
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
@@ -2206,11 +2403,13 @@ const styles = StyleSheet.create({
   lifeAnalysisContent: {
     alignItems: 'center',
     width: '100%',
+    paddingTop: 4,
   },
   lifeAnalysisContentWide: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
+    paddingTop: 0,
   },
   lifeAnalysisTextNormal: {
     alignItems: 'center',
@@ -2224,10 +2423,16 @@ const styles = StyleSheet.create({
   lifeAnalysisEmoji: {
     fontSize: 32,
     marginBottom: 12,
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    lineHeight: 40,
   },
   lifeAnalysisEmojiLarge: {
     fontSize: 48,
     marginBottom: 16,
+    textAlign: 'left',
+    lineHeight: 56,
   },
   lifeAnalysisTitle: {
     fontSize: 14,
@@ -3453,5 +3658,145 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     width: 30,
+  },
+  // Cosmic Ribbon Styles
+  ribbonContainer: {
+    marginBottom: 32,
+  },
+  ribbonScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 16,
+  },
+  ribbonCardWrapper: {
+    height: 100,
+    borderRadius: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  ribbonCardTouch: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  ribbonGlassmorphism: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+  },
+  ribbonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ribbonIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ribbonEmoji: {
+    fontSize: 24,
+  },
+  ribbonTextContainer: {
+    flex: 1,
+  },
+  ribbonTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 2,
+    letterSpacing: 0.3,
+  },
+  ribbonDescription: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+  },
+  ribbonActionContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // FAB Styles
+  fabContainer: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 1000,
+    height: 56,
+  },
+  fabButton: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  fabGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  fabText: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+  // Bottom Tabs Styles
+  bottomTabs: {
+    flexDirection: 'row',
+    height: 75,
+    paddingBottom: 20,
+    paddingTop: 8,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10000,
+    overflow: 'hidden',
+  },
+  tabItem: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabIconContainer: {
+    width: 42,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  tabLabel: {
+    fontSize: 11,
+    marginTop: 2,
+    letterSpacing: 0.3,
   },
 });

@@ -260,12 +260,22 @@ class PanchangCalculator(BaseCalculator):
         sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
         moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
         phase_angle = (moon_pos - sun_pos) % 360
-        illumination = round((1 - abs(phase_angle - 180) / 180) * 100, 1)
+        
+        # Use accurate illumination calculation
+        res = swe.pheno_ut(jd, swe.MOON)
+        illumination = round(res[1] * 100, 1)
         
         phase_names = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
                       'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent']
+        # More precise phase index
         phase_index = int((phase_angle + 22.5) / 45) % 8
         moon_phase = phase_names[phase_index]
+        
+        # Special check for Amavasya/Purnima based on Tithi
+        if phase_angle > 348 or phase_angle < 12:
+            moon_phase = 'New Moon'
+        elif 168 < phase_angle < 192:
+            moon_phase = 'Full Moon'
         
         return {
             'sunrise': sunrise_time.isoformat() if sunrise_time else None,

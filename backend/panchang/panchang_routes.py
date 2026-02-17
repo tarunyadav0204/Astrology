@@ -175,22 +175,31 @@ async def calculate_sunrise_sunset(request: SunriseSunsetRequest):
 async def calculate_moon_phase(request: MoonPhaseRequest):
     try:
         date_obj = datetime.strptime(request.date, '%Y-%m-%d')
-        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 12.0)
+        now = datetime.now()
+        
+        # If the requested date is today, use the current time for more accurate phase
+        if date_obj.date() == now.date():
+            jd = swe.julday(now.year, now.month, now.day, now.hour + now.minute/60.0 + now.second/3600.0)
+        else:
+            jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 12.0)
         
         # Calculate Moon position and phase
         # Set Lahiri Ayanamsa for accurate Vedic calculations
-
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
+        # Use more accurate illumination calculation from Swiss Ephemeris
+        # swe.pheno_ut returns [phase_angle, phase_illum, elongation, diam, app_mag]
+        res = swe.pheno_ut(jd, swe.MOON)
+        illumination_percentage = res[1] * 100
+        
         moon_data = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL | swe.FLG_SPEED)
         sun_data = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)
         
         moon_pos = moon_data[0][0]
         sun_pos = sun_data[0][0]
         
-        # Calculate phase
+        # Calculate phase angle for naming
         phase_angle = (moon_pos - sun_pos) % 360
-        illumination_percentage = (1 - math.cos(math.radians(phase_angle))) / 2 * 100
         
         # Moon age in days
         moon_age = phase_angle / 12.2  # Approximate
@@ -198,8 +207,16 @@ async def calculate_moon_phase(request: MoonPhaseRequest):
         # Phase name
         phase_names = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
                       'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent']
+        # More precise phase index
         phase_index = int((phase_angle + 22.5) / 45) % 8
         phase_name = phase_names[phase_index]
+        
+        # Special check for Amavasya/Purnima based on Tithi
+        tithi_deg = (moon_pos - sun_pos) % 360
+        if tithi_deg > 348 or tithi_deg < 12:
+            phase_name = 'New Moon'
+        elif 168 < tithi_deg < 192:
+            phase_name = 'Full Moon'
         
         # Moon sign
         moon_sign = int(moon_pos / 30)

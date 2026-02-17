@@ -1560,7 +1560,7 @@ export default function ChatScreen({ navigation, route }) {
     <View style={styles.container}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradientBg}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={showGreeting ? ['top'] : ['top', 'bottom']}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

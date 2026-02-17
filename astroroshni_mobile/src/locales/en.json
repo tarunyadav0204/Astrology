@@ -333,6 +333,13 @@
       "noSadeSati": "No active Sade Sati",
       "active": "Active"
     },
+    "tabs": {
+      "ask": "Ask",
+      "charts": "Charts",
+      "events": "Events",
+      "dashas": "Dashas",
+      "you": "You"
+    },
     "askFAB": "Ask AstroRoshni"
   },
   "birthForm": {
