@@ -4,13 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   StatusBar,
   Animated,
   Dimensions,
   Platform,
   Image,
   Alert,
+  Modal,
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
@@ -45,8 +45,17 @@ export default function ChartScreen({ navigation, route }) {
   const bottomNavScrollRef = useRef(null);
   const lastSwipeTime = useRef(0);
   const captureViewRef = useRef(null);
+  const chartWidgetRef = useRef(null);
   const [isSharing, setIsSharing] = useState(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  
+  // House Drawer State
+  const [selectedHouse, setSelectedHouse] = useState(null);
+  const drawerAnim = useRef(new Animated.Value(height)).current;
+
+  // Animation for smooth chart transitions
+  const chartTranslateX = useRef(new Animated.Value(0)).current;
+  const chartOpacity = useRef(new Animated.Value(1)).current;
   
   const handleShare = async () => {
     if (isSharing) return;
@@ -94,30 +103,74 @@ export default function ChartScreen({ navigation, route }) {
     { id: 'shashtyamsa', name: t('chartTypes.shashtyamsa.name'), icon: '⏰', description: t('chartTypes.shashtyamsa.description') },
   ];
   
+  const onGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: chartTranslateX } }],
+    { useNativeDriver: true }
+  );
+
   const handleSwipe = useCallback((event) => {
-    if (event.nativeEvent.state === State.END) {
+    const { translationX, state, velocityX } = event.nativeEvent;
+    
+    if (state === State.END) {
       const now = Date.now();
-      const { translationX } = event.nativeEvent;
-      const swipeThreshold = 50;
-      if (now - lastSwipeTime.current < 100) return;
-      lastSwipeTime.current = now;
+      const swipeThreshold = width * 0.2;
+      const velocityThreshold = 500;
+      
+      if (now - lastSwipeTime.current < 300) return;
+      
       let newIndex = currentChartIndex;
-      if (translationX > swipeThreshold && currentChartIndex > 0) {
+
+      if ((translationX > swipeThreshold || (velocityX > velocityThreshold && translationX > 20)) && currentChartIndex > 0) {
         newIndex = currentChartIndex - 1;
-      } else if (translationX < -swipeThreshold && currentChartIndex < chartTypes.length - 1) {
+      } else if ((translationX < -swipeThreshold || (velocityX < -velocityThreshold && translationX < -20)) && currentChartIndex < chartTypes.length - 1) {
         newIndex = currentChartIndex + 1;
       }
+
       if (newIndex !== currentChartIndex) {
-        changeChart(newIndex);
+        lastSwipeTime.current = now;
+        const direction = newIndex > currentChartIndex ? -1 : 1;
+        Animated.parallel([
+          Animated.timing(chartTranslateX, { toValue: direction * width, duration: 200, useNativeDriver: true }),
+          Animated.timing(chartOpacity, { toValue: 0, duration: 200, useNativeDriver: true })
+        ]).start(() => {
+          setCurrentChartIndex(newIndex);
+          scrollToActiveTab(newIndex);
+          chartTranslateX.setValue(-direction * width);
+          Animated.parallel([
+            Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }),
+            Animated.timing(chartOpacity, { toValue: 1, duration: 250, useNativeDriver: true })
+          ]).start();
+        });
+      } else {
+        Animated.spring(chartTranslateX, { toValue: 0, friction: 6, useNativeDriver: true }).start();
       }
     }
   }, [currentChartIndex, chartTypes.length]);
   
   const changeChart = useCallback((newIndex) => {
-    setCurrentChartIndex(newIndex);
+    if (newIndex === currentChartIndex) return;
+    const direction = newIndex > currentChartIndex ? -1 : 1;
+    Animated.parallel([
+      Animated.timing(chartTranslateX, { toValue: direction * width, duration: 200, useNativeDriver: true }),
+      Animated.timing(chartOpacity, { toValue: 0, duration: 200, useNativeDriver: true })
+    ]).start(() => {
+      setCurrentChartIndex(newIndex);
+      scrollToActiveTab(newIndex);
+      chartTranslateX.setValue(-direction * width);
+      Animated.parallel([
+        Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }),
+        Animated.timing(chartOpacity, { toValue: 1, duration: 250, useNativeDriver: true })
+      ]).start();
+    });
+  }, [currentChartIndex]);
+
+  const scrollToActiveTab = useCallback((index) => {
     if (bottomNavScrollRef.current) {
       const pillWidth = 100;
-      bottomNavScrollRef.current.scrollTo({ x: newIndex * pillWidth - (width / 2) + (pillWidth / 2), animated: true });
+      bottomNavScrollRef.current.scrollTo({ 
+        x: index * pillWidth - (width / 2) + (pillWidth / 2), 
+        animated: true 
+      });
     }
   }, []);
   
@@ -128,6 +181,48 @@ export default function ChartScreen({ navigation, route }) {
     if (chartType === 'lagna') return chartData;
     return null; 
   }, [birthData, chartData]);
+
+  // House Lord Logic
+  const getHouseLord = (rashiIndex) => {
+    const lords = ['Mars', 'Venus', 'Mercury', 'Moon', 'Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Saturn', 'Jupiter'];
+    return lords[rashiIndex];
+  };
+
+  const getHouseSignificance = (houseNum) => {
+    const significances = {
+      1: { title: t('houses.1.title', '1st House: Self & Appearance'), desc: t('houses.1.desc', 'Represents your personality, physical body, and general path in life.') },
+      2: { title: t('houses.2.title', '2nd House: Wealth & Speech'), desc: t('houses.2.desc', 'Governs accumulated wealth, family, speech, and early education.') },
+      3: { title: t('houses.3.title', '3rd House: Courage & Siblings'), desc: t('houses.3.desc', 'Represents short travels, siblings, communication, and your own efforts.') },
+      4: { title: t('houses.4.title', '4th House: Mother & Comfort'), desc: t('houses.4.desc', 'Governs home, mother, vehicles, happiness, and inner peace.') },
+      5: { title: t('houses.5.title', '5th House: Creativity & Children'), desc: t('houses.5.desc', 'Represents intelligence, children, past life merits, and speculation.') },
+      6: { title: t('houses.6.title', '6th House: Health & Enemies'), desc: t('houses.6.desc', 'Governs daily routine, health issues, debts, and competition.') },
+      7: { title: t('houses.7.title', '7th House: Marriage & Partners'), desc: t('houses.7.desc', 'Represents long-term relationships, marriage, and business partnerships.') },
+      8: { title: t('houses.8.title', '8th House: Transformation & Longevity'), desc: t('houses.8.desc', 'Governs sudden changes, longevity, occult, and hidden wealth.') },
+      9: { title: t('houses.9.title', '9th House: Luck & Higher Learning'), desc: t('houses.9.desc', 'Represents fortune, father, long travels, and spiritual wisdom.') },
+      10: { title: t('houses.10.title', '10th House: Career & Fame'), desc: t('houses.10.desc', 'Governs profession, social status, fame, and authority.') },
+      11: { title: t('houses.11.title', '11th House: Gains & Friends'), desc: t('houses.11.desc', 'Represents fulfillment of desires, income, and social circles.') },
+      12: { title: t('houses.12.title', '12th House: Loss & Spirituality'), desc: t('houses.12.desc', 'Governs isolation, expenses, foreign lands, and spiritual liberation.') },
+    };
+    return significances[houseNum];
+  };
+
+  const openHouseDrawer = (houseData) => {
+    setSelectedHouse(houseData);
+    Animated.spring(drawerAnim, {
+      toValue: 0,
+      friction: 8,
+      tension: 40,
+      useNativeDriver: true
+    }).start();
+  };
+
+  const closeHouseDrawer = () => {
+    Animated.timing(drawerAnim, {
+      toValue: height,
+      duration: 300,
+      useNativeDriver: true
+    }).start(() => setSelectedHouse(null));
+  };
   
   useEffect(() => {
     loadBirthData();
@@ -230,12 +325,20 @@ export default function ChartScreen({ navigation, route }) {
               <View style={styles.mainContent}>
                 <View style={styles.chartAndNavContainer}>
                   <PanGestureHandler 
+                    onGestureEvent={onGestureEvent}
                     onHandlerStateChange={handleSwipe}
-                    activeOffsetX={[-20, 20]}
-                    failOffsetY={[-20, 20]}
+                    activeOffsetX={[-10, 10]}
+                    failOffsetY={[-30, 30]}
                   >
-                    <View style={{ flex: 1 }}>
-                      <View ref={captureViewRef} collapsable={false} style={styles.captureArea}>
+                    <Animated.View style={{ flex: 1, opacity: chartOpacity }}>
+                      <Animated.View 
+                        ref={captureViewRef} 
+                        collapsable={false} 
+                        style={[
+                          styles.captureArea,
+                          { transform: [{ translateX: chartTranslateX }] }
+                        ]}
+                      >
                         <LinearGradient
                           colors={theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0']}
                           style={styles.captureGradient}
@@ -249,8 +352,9 @@ export default function ChartScreen({ navigation, route }) {
                           </View>
 
                           <View style={styles.chartArea}>
-                            <Animated.View style={styles.chartWrapper}>
+                            <View style={styles.chartWrapper}>
                               <ChartWidget 
+                                ref={chartWidgetRef}
                                 chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
                                 birthData={birthData}
                                 lagnaChartData={chartData}
@@ -266,6 +370,7 @@ export default function ChartScreen({ navigation, route }) {
                                   if (transitIndex !== -1) changeChart(transitIndex);
                                 }}
                                 navigation={navigation}
+                                onHousePress={openHouseDrawer}
                                 division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
                                          chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
                                          chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
@@ -280,15 +385,15 @@ export default function ChartScreen({ navigation, route }) {
                                          chartTypes[currentChartIndex].id === 'akshavedamsa' ? 45 :
                                          chartTypes[currentChartIndex].id === 'shashtyamsa' ? 60 : 1}
                               /> 
-                            </Animated.View>
+                            </View>
                           </View>
 
                           <View style={styles.captureFooter}>
                             <Text style={[styles.captureFooterText, { color: colors.textSecondary }]}>Generated by AstroRoshni</Text>
                           </View>
                         </LinearGradient>
-                      </View>
-                    </View>
+                      </Animated.View>
+                    </Animated.View>
                   </PanGestureHandler>
 
                   <View style={[styles.bottomNavContainer, { 
@@ -303,6 +408,7 @@ export default function ChartScreen({ navigation, route }) {
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.navContent}
+                      decelerationRate="fast"
                     >
                       {chartTypes.map((chart, index) => (
                         <TouchableOpacity
@@ -332,6 +438,136 @@ export default function ChartScreen({ navigation, route }) {
           </SafeAreaView>
         </LinearGradient>
         <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} />
+        
+        {/* House Insights Drawer */}
+        <Modal
+          visible={!!selectedHouse}
+          transparent
+          animationType="none"
+          onRequestClose={closeHouseDrawer}
+        >
+          <TouchableOpacity 
+            style={styles.drawerOverlay} 
+            activeOpacity={1} 
+            onPress={closeHouseDrawer}
+          >
+            <Animated.View 
+              style={[
+                styles.drawerContent, 
+                { 
+                  backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+                  transform: [{ translateY: drawerAnim }]
+                }
+              ]}
+            >
+              <View style={styles.drawerHandle} />
+              
+              {selectedHouse && (
+                <View style={{ height: height * 0.7 }}>
+                  <ScrollView 
+                    style={{ flex: 1 }}
+                    contentContainerStyle={styles.drawerScrollContent}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {/* House Header */}
+                    <View style={styles.drawerHeader}>
+                      <View style={[styles.houseNumberBadge, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.houseNumberText}>{selectedHouse.houseNum}</Text>
+                      </View>
+                      <View style={styles.houseTitleContainer}>
+                        <Text style={[styles.houseTitle, { color: colors.text }]}>
+                          {getHouseSignificance(selectedHouse.houseNum).title}
+                        </Text>
+                        <Text style={[styles.houseSign, { color: colors.primary }]}>
+                          {selectedHouse.signName}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Significance Description */}
+                    <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
+                      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Significance</Text>
+                      <Text style={[styles.sectionDesc, { color: colors.text }]}>
+                        {getHouseSignificance(selectedHouse.houseNum).desc}
+                      </Text>
+                    </View>
+
+                    {/* Occupant Planets */}
+                    <View style={styles.drawerSection}>
+                      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Occupant Planets</Text>
+                      {selectedHouse.planets && selectedHouse.planets.length > 0 ? (
+                        selectedHouse.planets.map((planet, idx) => (
+                          <View key={idx} style={styles.planetRow}>
+                            <View style={[styles.planetIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                              <Text style={[styles.planetEmoji, { color: colors.primary, fontWeight: 'bold' }]}>{planet.symbol}</Text>
+                            </View>
+                            <View style={styles.planetInfo}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                {planet.formattedDegree} in {planet.nakshatra}
+                              </Text>
+                            </View>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={[styles.emptySectionText, { color: colors.textTertiary }]}>No planets occupy this house.</Text>
+                      )}
+                    </View>
+
+                    {/* House Lord */}
+                    <View style={styles.drawerSection}>
+                      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>House Lord</Text>
+                      <View style={styles.lordContainer}>
+                        <Ionicons name="key-outline" size={20} color={colors.primary} />
+                        <Text style={[styles.lordText, { color: colors.text }]}>
+                          Lord of {selectedHouse.signName} is <Text style={{ fontWeight: 'bold', color: colors.primary }}>{getHouseLord(selectedHouse.rashiIndex)}</Text>
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {/* Extra padding for scroll */}
+                    <View style={{ height: 40 }} />
+                  </ScrollView>
+
+                  {/* Sticky Quick Actions at Bottom */}
+                  <View style={[styles.drawerActions, { 
+                    backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
+                    borderTopWidth: 1,
+                    borderTopColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                    paddingTop: 16,
+                    paddingHorizontal: 24,
+                    paddingBottom: Platform.OS === 'ios' ? 30 : 20
+                  }]}>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        closeHouseDrawer();
+                        if (chartWidgetRef.current) {
+                          chartWidgetRef.current.handleRotate(selectedHouse.rashiIndex);
+                        }
+                      }}
+                    >
+                      <Ionicons name="refresh-outline" size={20} color="white" />
+                      <Text style={styles.actionButtonText}>Make Ascendant</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+                      onPress={() => {
+                        const prompt = `Analyze the ${selectedHouse.houseNum} house in my ${chartTypes[currentChartIndex].name} chart. It has ${selectedHouse.signName} sign and ${selectedHouse.planets && selectedHouse.planets.length > 0 ? selectedHouse.planets.map(p => p.name).join(', ') : 'no planets'}.`;
+                        closeHouseDrawer();
+                        navigation.navigate('Home', { startChat: true, initialMessage: prompt });
+                      }}
+                    >
+                      <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
+                      <Text style={[styles.actionButtonText, { color: colors.text }]}>Ask AI Analysis</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </Animated.View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </GestureHandlerRootView>
   );
@@ -539,5 +775,129 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  // Drawer Styles
+  drawerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  drawerContent: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    maxHeight: height * 0.75,
+  },
+  drawerHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: 'rgba(128,128,128,0.3)',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  drawerScrollContent: {
+    padding: 24,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  houseNumberBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  houseNumberText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  houseTitleContainer: {
+    flex: 1,
+  },
+  houseTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  houseSign: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  drawerSection: {
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  sectionDesc: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  planetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  planetIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  planetEmoji: {
+    fontSize: 16,
+  },
+  planetName: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  planetDetails: {
+    fontSize: 13,
+  },
+  emptySectionText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  lordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  lordText: {
+    fontSize: 15,
+  },
+  drawerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
