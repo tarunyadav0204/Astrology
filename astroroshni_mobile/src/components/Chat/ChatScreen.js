@@ -342,6 +342,7 @@ export default function ChatScreen({ navigation, route }) {
   ];
 
   const getSignName = (signNumber) => {
+    if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
     const signs = {
       0: 'Aries', 1: 'Taurus', 2: 'Gemini', 3: 'Cancer',
       4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
@@ -350,8 +351,9 @@ export default function ChatScreen({ navigation, route }) {
     const signName = signs[signNumber] || signNumber;
     return t(`signs.${signName}`, signName);
   };
-  
+
   const getSignIcon = (signNumber) => {
+    if (signNumber === undefined || signNumber === null) return '⭐';
     const icons = {
       0: '♈', 1: '♉', 2: '♊', 3: '♋',
       4: '♌', 5: '♍', 6: '♎', 7: '♏',
@@ -1602,13 +1604,6 @@ export default function ChatScreen({ navigation, route }) {
                   </View>
                   <View>
                     <Text style={[styles.headerTitle, { color: colors.text, marginBottom: 4 }]}>AstroRoshni</Text>
-                    {birthData && (
-                      <NativeSelectorChip 
-                        birthData={birthData}
-                        onPress={() => navigation.navigate('SelectNative')}
-                        maxLength={7}
-                      />
-                    )}
                   </View>
                 </View>
               ) : isMundane ? (
@@ -1633,13 +1628,6 @@ export default function ChatScreen({ navigation, route }) {
               ) : !partnershipMode ? (
                 <>
                   <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
-                  {birthData && (
-                    <NativeSelectorChip 
-                      birthData={birthData}
-                      onPress={() => navigation.navigate('SelectNative')}
-                      maxLength={7}
-                    />
-                  )}
                 </>
               ) : (
                 <View style={styles.partnershipChipsContainer}>
@@ -1749,7 +1737,9 @@ export default function ChatScreen({ navigation, route }) {
             {birthData && (
               <View style={styles.signsContainer}>
                 <LinearGradient
-                  colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
+                  colors={Platform.OS === 'android'
+                    ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
+                    : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
                   style={styles.signsGradient}
                 >
                   <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
@@ -1757,19 +1747,19 @@ export default function ChatScreen({ navigation, route }) {
                     <View style={styles.signItem}>
                       <Text style={[styles.signLabel, { color: colors.textSecondary }]}>☀️ {t('home.signs.sun', 'Sun')}</Text>
                       <Text style={[styles.signValue, { color: colors.text }]}>
-                        {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}
+                        {loadingChart ? '...' : (chartData?.planets?.Sun ? `${getSignIcon(chartData.planets.Sun.sign)} ${getSignName(chartData.planets.Sun.sign)}` : '...')}
                       </Text>
                     </View>
                     <View style={styles.signItem}>
                       <Text style={[styles.signLabel, { color: colors.textSecondary }]}>🌙 {t('home.signs.moon', 'Moon')}</Text>
                       <Text style={[styles.signValue, { color: colors.text }]}>
-                        {loadingChart ? '...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}
+                        {loadingChart ? '...' : (chartData?.planets?.Moon ? `${getSignIcon(chartData.planets.Moon.sign)} ${getSignName(chartData.planets.Moon.sign)}` : '...')}
                       </Text>
                     </View>
                     <View style={styles.signItem}>
                       <Text style={[styles.signLabel, { color: colors.textSecondary }]}>⬆️ {t('home.signs.ascendant', 'Ascendant')}</Text>
                       <Text style={[styles.signValue, { color: colors.text }]}>
-                        {loadingChart ? '...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}
+                        {loadingChart ? '...' : (chartData?.houses?.[0] ? `${getSignIcon(chartData.houses[0].sign)} ${getSignName(chartData.houses[0].sign)}` : '...')}
                       </Text>
                     </View>
                   </View>
@@ -1789,9 +1779,12 @@ export default function ChatScreen({ navigation, route }) {
                         ].filter(Boolean)}
                         keyExtractor={(item, index) => index.toString()}
                         renderItem={({ item: dasha }) => {
+                          if (!dasha || !dasha.planet || !dasha.start || !dasha.end) return null;
                           const planetColor = getPlanetColor(dasha.planet);
-                          const startDate = new Date(dasha.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-                          const endDate = new Date(dasha.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+                          const startDateObj = new Date(dasha.start);
+                          const endDateObj = new Date(dasha.end);
+                          const startDate = !isNaN(startDateObj.getTime()) ? startDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
+                          const endDate = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
                           return (
                             <TouchableOpacity 
                               style={[styles.dashaChip, { 
@@ -1889,7 +1882,9 @@ export default function ChatScreen({ navigation, route }) {
         {!showGreeting && (
           <View style={styles.unifiedInputContainer}>
             <LinearGradient
-              colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.1)'] : ['rgba(249, 115, 22, 0.08)', 'rgba(249, 115, 22, 0.04)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)'])}
               style={[
                 styles.inputBarGradient,
                 {
@@ -2190,8 +2185,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2220,8 +2217,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2250,8 +2249,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2280,8 +2281,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2310,8 +2313,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2340,8 +2345,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2369,8 +2376,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2400,8 +2409,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2430,8 +2441,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2462,8 +2475,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2492,8 +2507,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2522,8 +2539,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2552,8 +2571,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2582,8 +2603,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2638,8 +2661,12 @@ export default function ChatScreen({ navigation, route }) {
                       }}
                     >
                       <LinearGradient
-                        colors={partnershipMode ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'] : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                        colors={partnershipMode 
+                          ? (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)'])
+                          : (Platform.OS === 'android' 
+                            ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                            : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
+                        style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                       >
                         <View style={styles.menuIconContainer}>
                           <LinearGradient
@@ -2669,8 +2696,10 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      colors={Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2700,7 +2729,7 @@ export default function ChatScreen({ navigation, route }) {
                   >
                     <LinearGradient
                       colors={['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
-                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(249, 115, 22, 0.4)' }]}
+                      style={[styles.menuGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)' }]}
                     >
                       <View style={styles.menuIconContainer}>
                         <LinearGradient
@@ -2733,7 +2762,11 @@ export default function ChatScreen({ navigation, route }) {
             onPeriodSelect={(period) => {
               setShowEventPeriods(false);
               setShowGreeting(false);
-              const periodQuestion = `Tell me more about the period from ${new Date(period.start_date).toLocaleDateString()} to ${new Date(period.end_date).toLocaleDateString()} when ${period.transit_planet} activates ${period.natal_planet}. What specific events should I expect?`;
+              const startDate = period.start_date ? new Date(period.start_date) : null;
+              const endDate = period.end_date ? new Date(period.end_date) : null;
+              const startDateStr = (startDate && !isNaN(startDate.getTime())) ? startDate.toLocaleDateString() : '...';
+              const endDateStr = (endDate && !isNaN(endDate.getTime())) ? endDate.toLocaleDateString() : '...';
+              const periodQuestion = `Tell me more about the period from ${startDateStr} to ${endDateStr} when ${period.transit_planet} activates ${period.natal_planet}. What specific events should I expect?`;
               sendMessage(periodQuestion);
             }}
           />

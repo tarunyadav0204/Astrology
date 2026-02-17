@@ -120,7 +120,7 @@
     "naisargika_bala": "नैसर्गिक बल",
     "drik_bala": "दृक् बल",
     "uccha_bala": "उच्च बल",
-    "saptavargaja_bala": "सप्तవర్గज बल",
+    "saptavargaja_bala": "सप्तవర్గజ बल",
     "ojha_yugma_bala": "ओज युग्म बल",
     "kendradi_bala": "केंद्रादि बल",
     "drekkana_bala": "द्रेक्काण बल"
@@ -275,15 +275,15 @@
       }
     },
     "planet_names": {
-      "Sun": "सूर्य",
-      "Moon": "चंद्रमा",
-      "Mars": "मंगल",
-      "Mercury": "बुध",
-      "Jupiter": "बृहस्पति",
-      "Venus": "शुक्र",
-      "Saturn": "शनि",
-      "Rahu": "राहु",
-      "Ketu": "केतु"
+        "Sun": "सूर्य",
+        "Moon": "चंद्रमा",
+        "Mars": "मंगल",
+        "Mercury": "बुध",
+        "Jupiter": "बृहस्पति",
+        "Venus": "शुक्र",
+        "Saturn": "शनि",
+        "Rahu": "राहु",
+        "Ketu": "केतु"
     },
     "signs": {
       "ascendant": "लग्न",
@@ -315,11 +315,7 @@
       "inauspiciousTimes": "⚠️ अशुभ समय",
       "rahuKaal": "राहु काल:",
       "durMuhurta": "दुर मुहूर्त:",
-      "varjyam": "वर्ज्यम:",
-      "dayQuality": "दिन की गुणवत्ता समयरेखा",
-      "auspicious": "शुभ",
-      "inauspicious": "अशुभ",
-      "illuminated": "प्रकाशित"
+      "varjyam": "वर्ज्यम:"
     },
     "loading": {
       "transits": "गोचर लोड हो रहे हैं...",
@@ -400,6 +396,11 @@
     "analysis": "विश्लेषण",
     "yoginiCycle": "योगिनी चक्र (36 वर्ष)"
   },
+  "common": {
+    "current": "वर्तमान",
+    "unknown": "अज्ञात",
+    "ends": "समाप्त: "
+  },
   "yogini": {
     "success": "सफलता",
     "aggression": "आक्रामकता",
@@ -435,6 +436,7 @@
     "Tau": "वृष",
     "Gem": "मिथ",
     "Can": "कर्क",
+    "Leo": "सिंह",
     "Vir": "कन्या",
     "Lib": "तुला",
     "Sco": "वृश्च",
@@ -442,107 +444,106 @@
     "Cap": "मकर",
     "Aqu": "कुंभ",
     "Pis": "मीन"
-  },
-  "yogas": {
-    "raj_yogas": "राज योग",
-    "dhana_yogas": "धन योग",
-    "mahapurusha_yogas": "महापुरुष योग",
-    "neecha_bhanga_yogas": "नीच भंग योग",
-    "gaja_kesari_yogas": "गज केसरी योग",
-    "amala_yogas": "अमला योग",
-    "viparita_raja_yogas": "विपरीत राज योग",
-    "dharma_karma_yogas": "धर्म कर्म योग",
-    "nabhasa_yogas": "नाभस योग",
-    "chandra_yogas": "चंद्र योग",
-    "surya_yogas": "सूर्य योग",
-    "parivartana_yogas": "परिवर्तन योग",
-    "career_specific_yogas": "करियर विशिष्ट योग",
-    "health_yogas": "स्वास्थ्य योग",
-    "education_yogas": "शिक्षा योग",
-    "marriage_yogas": "विवाह योग",
-    "major_doshas": "प्रमुख दोष",
-    "sankhya_yogas": "संख्या योग",
-    "akriti_yogas": "आकृति योग",
-    "ashraya_yogas": "आश्रय योग",
-    "maha_yogas": "महा योग",
-    "dainya_yogas": "दैन्य योग",
-    "khala_yogas": "खल योग",
-    "other_parivartana_yogas": "अन्य परिवर्तन योग"
-  },
-  "kp": {
-    "title": "केपी सिस्टम",
-    "planetaryScript": "ग्रह स्क्रिप्ट",
-    "cuspalScript": "भाव स्क्रिप्ट",
-    "significators": "कारक (Significators)",
-    "rulingPlanets": "सत्तारूढ़ ग्रह (RP)",
-    "columns": {
-      "planet": "ग्रह",
-      "cusp": "भाव",
-      "sign": "राशि",
-      "degree": "अंश",
-      "starLord": "नक्षत्र स्वामी",
-      "subLord": "उप स्वामी",
-      "subSubLord": "उप-उप स्वामी"
+    "yogas": {
+      "raj_yogas": "राज योग",
+      "dhana_yogas": "धन योग",
+      "mahapurusha_yogas": "महापुरुष योग",
+      "neecha_bhanga_yogas": "नीच भंग योग",
+      "gaja_kesari_yogas": "गज केसरी योग",
+      "amala_yogas": "अमला योग",
+      "viparita_raja_yogas": "विपरीत राज योग",
+      "dharma_karma_yogas": "धर्म कर्म योग",
+      "nabhasa_yogas": "नाभस योग",
+      "chandra_yogas": "चंद्र योग",
+      "surya_yogas": "सूर्य योग",
+      "parivartana_yogas": "परिवर्तन योग",
+      "career_specific_yogas": "करियर विशिष्ट योग",
+      "health_yogas": "स्वास्थ्य योग",
+      "education_yogas": "शिक्षा योग",
+      "marriage_yogas": "विवाह योग",
+      "major_doshas": "प्रमुख दोष",
+      "sankhya_yogas": "संख्या योग",
+      "akriti_yogas": "आकृति योग",
+      "ashraya_yogas": "आश्रय योग",
+      "maha_yogas": "महा योग",
+      "dainya_yogas": "दैन्य योग",
+      "khala_yogas": "खल योग",
+      "other_parivartana_yogas": "अन्य परिवर्तन योग"
     },
-    "levels": {
-      "level1": "L1 (नक्षत्र स्वामी का भाव)",
-      "level2": "L2 (स्थित भाव)",
-      "level3": "L3 (नक्षत्र स्वामी का स्वामित्व)",
-      "level4": "L4 (स्वामित्व भाव)"
-    }
-  },
-  "birthForm": {
-    "headerTitle": {
-      "updateGender": "लिंग अपडेट करें",
-      "editProfile": "प्रोफ़ाइल संपादित करें",
-      "birthDetails": "जन्म विवरण"
-    },
-    "progressText": "चरण {{step}} का 5",
-    "stepTitle": {
-      "name": "आपका नाम क्या है?",
-      "gender": "अपना लिंग चुनें",
-      "date": "आपका जन्म कब हुआ था?",
-      "time": "आपका जन्म किस समय हुआ था?",
-      "place": "आपका जन्म कहाँ हुआ था?"
-    },
-    "namePlaceholder": "अपना पूरा नाम दर्ज करें",
-    "placePlaceholder": "शहर, राज्य, देश",
-    "gender": {
-      "male": "पुरुष",
-      "female": "महिला"
-    },
-    "selectedLocation": "चयनित स्थान",
-    "buttons": {
-      "back": "पीछे",
-      "processing": "प्रक्रिया जारी है...",
-      "complete": "पूर्ण",
-      "next": "अगला"
-    },
-    "alerts": {
-      "invalidLocation": {
-        "title": "अमान्य स्थान",
-        "suggestions": "सटीक गणना सुनिश्चित करने के लिए कृपया सुझावों में से एक स्थान चुनें।",
-        "noSelection": "कृपया सुझावों में से एक स्थान चुनें।"
+    "kp": {
+      "title": "केपी सिस्टम",
+      "planetaryScript": "ग्रह स्क्रिप्ट",
+      "cuspalScript": "भाव स्क्रिप्ट",
+      "significators": "कारक (Significators)",
+      "rulingPlanets": "सत्तारूढ़ ग्रह (RP)",
+      "columns": {
+        "planet": "ग्रह",
+        "cusp": "भाव",
+        "sign": "राशि",
+        "degree": "अंश",
+        "starLord": "नक्षत्र स्वामी",
+        "subLord": "उप स्वामी",
+        "subSubLord": "उप-उप स्वामी"
       },
-      "success": {
-        "title": "सफलता",
-        "genderUpdated": "लिंग सफलतापूर्वक अपडेट किया गया!",
-        "profileUpdated": "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!",
-        "chartCalculated": "जन्म कुंडली की गणना सफलतापूर्वक की गई!"
-      },
-      "error": {
-        "title": "त्रुटि",
-        "default": "जन्म विवरण संसाधित करने में विफल"
-      },
-      "ok": "ठीक है"
+      "levels": {
+        "level1": "L1 (नक्षत्र स्वामी का भाव)",
+        "level2": "L2 (स्थित भाव)",
+        "level3": "L3 (नक्षत्र स्वामी का स्वामित्व)",
+        "level4": "L4 (स्वामित्व भाव)"
+      }
     },
-    "picker": {
-      "cancel": "रद्द करें",
-      "done": "हो गया"
-    },
-    "coords": {
-      "lat": "अक्षांश:",
-      "long": "देशांतर:"
+    "birthForm": {
+      "headerTitle": {
+        "updateGender": "लिंग अपडेट करें",
+        "editProfile": "प्रोफ़ाइल संपादित करें",
+        "birthDetails": "जन्म विवरण"
+      },
+      "progressText": "चरण {{step}} का 5",
+      "stepTitle": {
+        "name": "आपका नाम क्या है?",
+        "gender": "अपना लिंग चुनें",
+        "date": "आपका जन्म कब हुआ था?",
+        "time": "आपका जन्म किस समय हुआ था?",
+        "place": "आपका जन्म कहाँ हुआ था?"
+      },
+      "namePlaceholder": "अपना पूरा नाम दर्ज करें",
+      "placePlaceholder": "शहर, राज्य, देश",
+      "gender": {
+        "male": "पुरुष",
+        "female": "महिला"
+      },
+      "selectedLocation": "चयनित स्थान",
+      "buttons": {
+        "back": "पीछे",
+        "processing": "प्रक्रिया जारी है...",
+        "complete": "पूर्ण",
+        "next": "अगला"
+      },
+      "alerts": {
+        "invalidLocation": {
+          "title": "अमान्य स्थान",
+          "suggestions": "सटीक गणना सुनिश्चित करने के लिए कृपया सुझावों में से एक स्थान चुनें।",
+          "noSelection": "कृपया सुझावों में से एक स्थान चुनें।"
+        },
+        "success": {
+          "title": "सफलता",
+          "genderUpdated": "लिंग सफलतापूर्वक अपडेट किया गया!",
+          "profileUpdated": "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!",
+          "chartCalculated": "जन्म कुंडली की गणना सफलतापूर्वक की गई!"
+        },
+        "error": {
+          "title": "त्रुटि",
+          "default": "जन्म विवरण संसाधित करने में विफल"
+        },
+        "ok": "ठीक है"
+      },
+      "picker": {
+        "cancel": "रद्द करें",
+        "done": "हो गया"
+      },
+      "coords": {
+        "lat": "अक्षांश:",
+        "long": "देशांतर:"
+      }
     }
   }
-}

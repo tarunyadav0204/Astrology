@@ -79,7 +79,7 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
 2. ### Key Insights: [3-4 bullets]
 3. ### Analysis Steps: [A bulleted list of 3-4 key astrological calculation steps taken to generate the response, e.g., "- Analyzing Dasha periods", "- Calculating planetary dignities", "- Cross-referencing Navamsa chart".]
 4. ### Astrological Analysis: [Use #### for all subsections below]
-   - #### The Parashari View: [Provide a detailed analysis explaining the 'why' behind each prediction. Mention specific house lordships, planetary placements, and aspects in D1 and D9.]
+   - #### The Parashari View: [Provide a detailed analysis explaining the 'why' behind each prediction. Mention specific house lordships, planetary placements, and aspects in D1 and D9. Explicitly discuss the planet's happiness (Friendship) in its current sign using the provided `friendship_analysis` (Panchadha Maitri).]
    - #### The Jaimini View: [Explain the influence of the current Chara Dasha (MD & AD) and the role of relevant Chara Karakas like Atmakaraka or Darakaraka in the context of the query.]
    - #### KP Stellar Perspective: [Provide a technically detailed analysis. Explicitly mention the Cusp Sub-Lord (CSL) of the primary house, its Star Lord, and the specific houses they signify (e.g., 2, 7, 11). Apply the 4-Step Theory for the current Dasha/Antardasha lords to show the flow of results.]
    - #### Nadi Interpretation: [Bulleted list, one for each planetary combination]

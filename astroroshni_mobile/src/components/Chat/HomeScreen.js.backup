@@ -39,7 +39,6 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   if (!colors) {
     return null;
   }
-  const [dashData, setDashData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [transitData, setTransitData] = useState(null);
   const [panchangData, setPanchangData] = useState(null);
@@ -191,11 +190,11 @@ const loadHomeData = async (nativeData = null) => {
       if (currentBirthData) {
         try {
           const formattedBirthData = {
-            name: currentBirthData.name || 'Unknown',
-            date: (currentBirthData.date && typeof currentBirthData.date === 'string' && currentBirthData.date.includes('T')) ? currentBirthData.date.split('T')[0] : (currentBirthData.date || ''),
-            time: (currentBirthData.time && typeof currentBirthData.time === 'string' && currentBirthData.time.includes('T')) ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : (currentBirthData.time || ''),
-            latitude: parseFloat(currentBirthData.latitude) || 0,
-            longitude: parseFloat(currentBirthData.longitude) || 0,
+            name: currentBirthData.name,
+            date: currentBirthData.date.includes('T') ? currentBirthData.date.split('T')[0] : currentBirthData.date,
+            time: currentBirthData.time.includes('T') ? new Date(currentBirthData.time).toTimeString().slice(0, 5) : currentBirthData.time,
+            latitude: parseFloat(currentBirthData.latitude),
+            longitude: parseFloat(currentBirthData.longitude),
             location: currentBirthData.place || 'Unknown'
           };
           
@@ -901,10 +900,10 @@ const loadHomeData = async (nativeData = null) => {
                   return (
                     <View key={item.level} style={styles.timelineRow}>
                       <View style={styles.timelineLeft}>
-                        <View style={[styles.levelBadge, { backgroundColor: (colors.textSecondary || '#ffffff') + '20' }]}>
+                        <View style={[styles.levelBadge, { backgroundColor: colors.textSecondary + '20' }]}>
                           <Text style={[styles.levelText, { color: colors.textSecondary }]}>{item.level}</Text>
                         </View>
-                        {index < 2 && <View style={[styles.timelineConnector, { backgroundColor: (colors.textSecondary || '#ffffff') + '30' }]} />}
+                        {index < 2 && <View style={[styles.timelineConnector, { backgroundColor: colors.textSecondary + '30' }]} />}
                       </View>
                       
                       <View style={styles.timelineContent}>
@@ -918,7 +917,7 @@ const loadHomeData = async (nativeData = null) => {
                         </View>
                         
                         <View style={styles.progressContainer}>
-                          <View style={[styles.progressBar, { backgroundColor: (colors.textSecondary || '#ffffff') + '10' }]}>
+                          <View style={[styles.progressBar, { backgroundColor: colors.textSecondary + '10' }]}>
                             <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: planetColor }]} />
                           </View>
                           <Text style={[styles.progressPercent, { color: colors.textTertiary }]}>{Math.round(progress)}%</Text>
@@ -1368,6 +1367,18 @@ const loadHomeData = async (nativeData = null) => {
                   </Text>
                   
                   <View style={styles.panchangElementGrid}>
+                    {/* Nakshatra */}
+                    {panchangData.daily_panchang.nakshatra && (
+                      <View style={styles.panchangElement}>
+                        <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
+                          {t('home.panchang.nakshatra', '⭐ Nakshatra')}
+                        </Text>
+                        <Text style={[styles.elementValue, { color: colors.text }]}>
+                          {panchangData.daily_panchang.nakshatra.name}
+                        </Text>
+                      </View>
+                    )}
+                    
                     {/* Tithi */}
                     {panchangData.daily_panchang.tithi && (
                       <View style={styles.panchangElement}>
@@ -1409,231 +1420,140 @@ const loadHomeData = async (nativeData = null) => {
               
 
               
-              {/* Moon SVG & Info Row */}
-              <View style={styles.moonSectionRow}>
-                <View style={styles.moonSvgContainer}>
-                  {/* Starlight Background */}
-                  <View style={styles.starlightContainer}>
-                    {[...Array(12)].map((_, i) => (
-                      <View 
-                        key={i} 
-                        style={[
-                          styles.star, 
-                          { 
-                            top: `${Math.random() * 100}%`, 
-                            left: `${Math.random() * 100}%`,
-                            opacity: Math.random() * 0.7 + 0.3,
-                            width: Math.random() * 2 + 1,
-                            height: Math.random() * 2 + 1,
-                            backgroundColor: '#fff'
-                          }
-                        ]} 
-                      />
-                    ))}
-                  </View>
-                  <Svg width="100" height="100" viewBox="0 0 100 100">
-                    <Circle cx="50" cy="50" r="45" fill="#1a1a1a" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                    {(() => {
-                      const illumination = parseFloat(panchangData.moon_illumination) || 98.5;
-                      const phase = panchangData.moon_phase || 'Full Moon';
-                      const r = 43;
-                      const cx = 50;
-                      const cy = 50;
-                      
-                      if (isNaN(illumination)) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
+              {/* Moon Phase Row */}
+              <View style={styles.moonPhaseTextRow}>
+                <Text style={[styles.moonPhaseText, { color: colors.text }]}>
+                  {panchangData.moon_phase || t('home.panchang.fullMoon', 'Full Moon')}
+                </Text>
+                <Text style={[styles.moonIllumination, { color: colors.textSecondary }]}>
+                  {panchangData.moon_illumination ? `${panchangData.moon_illumination.toFixed(1)}%` : '98.5%'}
+                </Text>
+              </View>
+              
+              {/* Moon SVG */}
+              <View style={styles.moonSvgRow}>
+                <Svg width="80" height="80" viewBox="0 0 80 80">
+                  <Circle cx="40" cy="40" r="35" fill="#1a1a1a" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  {(() => {
+                    const illumination = parseFloat(panchangData.moon_illumination) || 98.5;
+                    const phase = panchangData.moon_phase || 'Full Moon';
+                    const r = 33;
+                    const cx = 40;
+                    const cy = 40;
+                    
+                    if (isNaN(illumination)) return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
 
-                      const normalizedPhase = phase.toLowerCase();
-                      const isWaning = normalizedPhase.includes('waning') || normalizedPhase.includes('last quarter') || normalizedPhase.includes('third quarter');
-                      const isFull = normalizedPhase.includes('full');
-                      const isNew = normalizedPhase.includes('new');
-                      const isWaxing = !isWaning && !isFull && !isNew;
+                    const normalizedPhase = phase.toLowerCase();
+                    const isWaning = normalizedPhase.includes('waning') || normalizedPhase.includes('last quarter') || normalizedPhase.includes('third quarter');
+                    const isFull = normalizedPhase.includes('full');
+                    const isNew = normalizedPhase.includes('new');
+                    const isWaxing = !isWaning && !isFull && !isNew;
 
-                      if (illumination >= 99) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
-                      if (illumination <= 1) return null; 
-                      
-                      const ellipseRadiusX = r * Math.abs(1 - (2 * illumination / 100));
-                      if (isNaN(ellipseRadiusX)) return <Circle cx="50" cy="50" r="43" fill="#f0f0f0" />;
+                    if (illumination >= 99) return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
+                    if (illumination <= 1) return null; 
+                    
+                    const ellipseRadiusX = r * Math.abs(1 - (2 * illumination / 100));
+                    if (isNaN(ellipseRadiusX)) return <Circle cx="40" cy="40" r="33" fill="#f0f0f0" />;
 
-                      let pathData = "";
-                      if (isWaxing) {
-                        pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`;
-                        if (illumination > 50) pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
-                        else pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
-                      } else {
-                        pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r}`;
-                        if (illumination > 50) pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
-                        else pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
-                      }
-                      return <Path d={pathData} fill="#f0f0f0" stroke="none" />;
-                    })()}
-                  </Svg>
+                    let pathData = "";
+                    if (isWaxing) {
+                      pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`;
+                      if (illumination > 50) pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
+                      else pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
+                    } else {
+                      pathData = `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r}`;
+                      if (illumination > 50) pathData += ` A ${ellipseRadiusX} ${r} 0 0 0 ${cx} ${cy - r} Z`;
+                      else pathData += ` A ${ellipseRadiusX} ${r} 0 0 1 ${cx} ${cy - r} Z`;
+                    }
+                    return <Path d={pathData} fill="#f0f0f0" stroke="none" />;
+                  })()}
+                </Svg>
+              </View>
+              
+              {/* Auspicious Times */}
+              <View style={styles.muhurtaSection}>
+                <Text style={styles.muhurtaTitle}>
+                  {t('home.panchang.auspiciousTimes', '🕉️ Auspicious Times')}
+                </Text>
+                <View style={styles.muhurtaRow}>
+                  <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>
+                    {t('home.panchang.brahmaMuhurta', 'Brahma Muhurta')}
+                  </Text>
+                  <Text style={styles.muhurtaTime}>
+                    {panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end && 
+                     !isNaN(new Date(panchangData.brahma_muhurta_start).getTime()) && !isNaN(new Date(panchangData.brahma_muhurta_end).getTime()) ? 
+                      `${new Date(panchangData.brahma_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.brahma_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                      '4:29 AM - 6:05 AM'
+                    }
+                  </Text>
                 </View>
-                
-                <View style={styles.moonInfoContainer}>
-                  <Text style={[styles.moonPhaseText, { color: colors.text }]}>
-                    {panchangData.moon_phase || t('home.panchang.fullMoon', 'Full Moon')}
+                <View style={styles.muhurtaRow}>
+                  <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>
+                    {t('home.panchang.abhijitMuhurta', 'Abhijit Muhurta')}
                   </Text>
-                  <Text style={[styles.moonIllumination, { color: colors.textSecondary }]}>
-                    {panchangData.moon_illumination ? `${panchangData.moon_illumination.toFixed(1)}% ${t('home.panchang.illuminated', 'Illuminated')}` : '98.5% Illuminated'}
+                  <Text style={styles.muhurtaTime}>
+                    {panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end &&
+                     !isNaN(new Date(panchangData.abhijit_muhurta_start).getTime()) && !isNaN(new Date(panchangData.abhijit_muhurta_end).getTime()) ? 
+                      `${new Date(panchangData.abhijit_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.abhijit_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                      '11:36 AM - 12:24 PM'
+                    }
                   </Text>
-                  <View style={styles.moonElementRow}>
-                    <Icon name="moon-outline" size={14} color={colors.textTertiary} />
-                    <Text style={[styles.moonElementText, { color: colors.textSecondary }]}>
-                      {panchangData.daily_panchang?.nakshatra?.name || '...'}
-                    </Text>
-                  </View>
                 </View>
               </View>
-
-              {/* Visual Day Quality Timeline */}
-              <View style={styles.dayQualityContainer}>
-                <Text style={[styles.dayQualityTitle, { color: colors.text }]}>{t('home.panchang.dayQuality', 'Day Quality Timeline')}</Text>
-                <View style={styles.qualityTimelineWrapper}>
-                  <View style={styles.qualityTimelineTrack}>
-                    {(() => {
-                      const now = new Date();
-                      const startOfDay = new Date(now);
-                      startOfDay.setHours(0, 0, 0, 0);
-                      const totalMs = 24 * 60 * 60 * 1000;
-                      
-                      const getPos = (timeStr) => {
-                        if (!timeStr) return null;
-                        const d = new Date(timeStr);
-                        if (isNaN(d.getTime())) return null;
-                        return ((d.getTime() - startOfDay.getTime()) / totalMs) * 100;
-                      };
-
-                      const blocks = [];
-                      
-                      // Brahma Muhurta (Green)
-                      if (panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end) {
-                        const start = getPos(panchangData.brahma_muhurta_start);
-                        const end = getPos(panchangData.brahma_muhurta_end);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key="brahma" style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#10B981' }]} />);
-                        }
-                      }
-
-                      // Abhijit Muhurta (Green)
-                      if (panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end) {
-                        const start = getPos(panchangData.abhijit_muhurta_start);
-                        const end = getPos(panchangData.abhijit_muhurta_end);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key="abhijit" style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#10B981' }]} />);
-                        }
-                      }
-
-                      // Rahu Kaal (Red)
-                      if (panchangData.rahu_kaal?.rahu_kaal_start && panchangData.rahu_kaal?.rahu_kaal_end) {
-                        const start = getPos(panchangData.rahu_kaal.rahu_kaal_start);
-                        const end = getPos(panchangData.rahu_kaal.rahu_kaal_end);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key="rahu" style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#EF4444' }]} />);
-                        }
-                      }
-
-                      // Dur Muhurta (Red)
-                      panchangData.inauspicious_times?.dur_muhurta?.forEach((period, i) => {
-                        const start = getPos(period.start_time);
-                        const end = getPos(period.end_time);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key={`dur-${i}`} style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#EF4444', opacity: 0.7 }]} />);
-                        }
-                      });
-
-                      // Varjyam (Red)
-                      panchangData.inauspicious_times?.varjyam?.forEach((period, i) => {
-                        const start = getPos(period.start_time);
-                        const end = getPos(period.end_time);
-                        if (start !== null && end !== null) {
-                          blocks.push(<View key={`varjyam-${i}`} style={[styles.qualityBlock, { left: `${start}%`, width: `${end - start}%`, backgroundColor: '#EF4444', opacity: 0.5 }]} />);
-                        }
-                      });
-
-                      // Current Time Indicator
-                      const currentPos = ((now.getTime() - startOfDay.getTime()) / totalMs) * 100;
-                      blocks.push(
-                        <View key="now" style={[styles.qualityNowIndicator, { left: `${currentPos}%` }]}>
-                          <View style={styles.qualityNowDot} />
-                          <View style={styles.qualityNowLine} />
-                        </View>
-                      );
-
-                      return blocks;
-                    })()}
-                  </View>
-                  <View style={styles.qualityLabels}>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>00:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>06:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>12:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>18:00</Text>
-                    <Text style={[styles.qualityTimeLabel, { color: colors.textTertiary }]}>23:59</Text>
-                  </View>
-                </View>
-                <View style={styles.qualityLegend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('home.panchang.auspicious', 'Auspicious')}</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('home.panchang.inauspicious', 'Inauspicious')}</Text>
-                  </View>
-                </View>
-
-                {/* Detailed Timings List */}
-                <View style={styles.detailedTimingsContainer}>
-                  {/* Auspicious */}
-                  <View style={styles.timingGroup}>
-                    <View style={styles.timingRow}>
-                      <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.brahmaMuhurta', 'Brahma Muhurta')}</Text>
-                      <Text style={[styles.timingValue, { color: '#10B981' }]}>
-                        {panchangData.brahma_muhurta_start && panchangData.brahma_muhurta_end && 
-                         !isNaN(new Date(panchangData.brahma_muhurta_start).getTime()) ? 
-                          `${new Date(panchangData.brahma_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.brahma_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                          '4:29 AM - 6:05 AM'
+              
+              {/* Inauspicious Times */}
+              {(panchangData.rahu_kaal || panchangData.inauspicious_times) && (
+                <View style={styles.inauspiciousSection}>
+                  <Text style={styles.inauspiciousTitle}>
+                    {t('home.panchang.inauspiciousTimes', '⚠️ Inauspicious Times')}
+                  </Text>
+                  
+                  {panchangData.rahu_kaal && (
+                    <View style={styles.muhurtaRow}>
+                      <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>
+                        {t('home.panchang.rahuKaal', 'Rahu Kaal')}
+                      </Text>
+                      <Text style={styles.inauspiciousTime}>
+                        {panchangData.rahu_kaal.rahu_kaal_start && panchangData.rahu_kaal.rahu_kaal_end &&
+                         !isNaN(new Date(panchangData.rahu_kaal.rahu_kaal_start).getTime()) && !isNaN(new Date(panchangData.rahu_kaal.rahu_kaal_end).getTime()) ? 
+                          `${new Date(panchangData.rahu_kaal.rahu_kaal_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.rahu_kaal.rahu_kaal_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                          t('common.notAvailable', 'Not available')
                         }
                       </Text>
                     </View>
-                    <View style={styles.timingRow}>
-                      <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.abhijitMuhurta', 'Abhijit Muhurta')}</Text>
-                      <Text style={[styles.timingValue, { color: '#10B981' }]}>
-                        {panchangData.abhijit_muhurta_start && panchangData.abhijit_muhurta_end &&
-                         !isNaN(new Date(panchangData.abhijit_muhurta_start).getTime()) ? 
-                          `${new Date(panchangData.abhijit_muhurta_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.abhijit_muhurta_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                          '11:36 AM - 12:24 PM'
+                  )}
+                  
+                  {panchangData.inauspicious_times?.dur_muhurta?.map((period, index) => (
+                    <View key={`dur-${index}`} style={styles.muhurtaRow}>
+                      <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>
+                        {t('home.panchang.durMuhurta', 'Dur Muhurta')}
+                      </Text>
+                      <Text style={styles.inauspiciousTime}>
+                        {period.start_time && period.end_time &&
+                         !isNaN(new Date(period.start_time).getTime()) && !isNaN(new Date(period.end_time).getTime()) ? 
+                          `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                          t('common.notAvailable', 'Not available')
                         }
                       </Text>
                     </View>
-                  </View>
-
-                  {/* Inauspicious */}
-                  <View style={styles.timingGroup}>
-                    {panchangData.rahu_kaal && (
-                      <View style={styles.timingRow}>
-                        <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.rahuKaal', 'Rahu Kaal')}</Text>
-                        <Text style={[styles.timingValue, { color: '#EF4444' }]}>
-                          {panchangData.rahu_kaal.rahu_kaal_start && !isNaN(new Date(panchangData.rahu_kaal.rahu_kaal_start).getTime()) ? 
-                            `${new Date(panchangData.rahu_kaal.rahu_kaal_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(panchangData.rahu_kaal.rahu_kaal_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                            t('common.notAvailable', 'Not available')
-                          }
-                        </Text>
-                      </View>
-                    )}
-                    {panchangData.inauspicious_times?.varjyam?.map((period, index) => (
-                      <View key={`varjyam-list-${index}`} style={styles.timingRow}>
-                        <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.varjyam', 'Varjyam')}</Text>
-                        <Text style={[styles.timingValue, { color: '#EF4444' }]}>
-                          {period.start_time && !isNaN(new Date(period.start_time).getTime()) ? 
-                            `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
-                            t('common.notAvailable', 'Not available')
-                          }
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  ))}
+                  
+                  {panchangData.inauspicious_times?.varjyam?.map((period, index) => (
+                    <View key={`varjyam-${index}`} style={styles.muhurtaRow}>
+                      <Text style={[styles.muhurtaLabel, { color: colors.textSecondary }]}>
+                        {t('home.panchang.varjyam', 'Varjyam')}
+                      </Text>
+                      <Text style={styles.inauspiciousTime}>
+                        {period.start_time && period.end_time &&
+                         !isNaN(new Date(period.start_time).getTime()) && !isNaN(new Date(period.end_time).getTime()) ? 
+                          `${new Date(period.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(period.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : 
+                          t('common.notAvailable', 'Not available')
+                        }
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              </View>
+              )}
             </View>
           )}
 
@@ -3049,141 +2969,6 @@ const styles = StyleSheet.create({
   moonIllumination: {
     fontSize: 13,
     fontWeight: '700',
-  },
-  // New Panchang Styles
-  moonSectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap: 20,
-  },
-  moonSvgContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  starlightContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  moonInfoContainer: {
-    flex: 1,
-  },
-  moonElementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-  },
-  moonElementText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dayQualityContainer: {
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  dayQualityTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 16,
-  },
-  qualityTimelineWrapper: {
-    marginBottom: 16,
-  },
-  qualityTimelineTrack: {
-    height: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 6,
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  qualityBlock: {
-    position: 'absolute',
-    height: '100%',
-    borderRadius: 2,
-  },
-  qualityNowIndicator: {
-    position: 'absolute',
-    height: '100%',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  qualityNowDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#ff6b35',
-    marginTop: 2,
-  },
-  qualityNowLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  qualityLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  qualityTimeLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  qualityLegend: {
-    flexDirection: 'row',
-    gap: 16,
-    justifyContent: 'center',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  detailedTimingsContainer: {
-    marginTop: 20,
-    gap: 12,
-  },
-  timingGroup: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 16,
-    padding: 12,
-    gap: 8,
-  },
-  timingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  timingLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  timingValue: {
-    fontSize: 11,
-    fontWeight: '800',
   },
   
   // Header Styles

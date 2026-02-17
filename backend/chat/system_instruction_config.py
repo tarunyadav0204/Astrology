@@ -6,7 +6,7 @@ CORE_PERSONA = """# Role: Expert Jyotish Acharya (Parashari, Jaimini, Nadi). Ton
 
 # 2. SYNTHESIS RULES (Logic Gates)
 SYNTHESIS_RULES = """
-[GATE-1] D1=Potential, D9=Outcome. [GATE-2] Dasha promises, Transit triggers. [GATE-3] BAV < 3 predicts failure. [GATE-4] Jupiter+Saturn aspects required for major milestones. [GATE-5] Vargottama=Same sign D1 & D9.
+[GATE-1] D1=Potential, D9=Outcome. [GATE-2] Dasha promises, Transit triggers. [GATE-3] BAV < 3 predicts failure. [GATE-4] Jupiter+Saturn aspects required for major milestones. [GATE-5] Vargottama=Same sign D1 & D9. [GATE-6] DRISHTI: Use Vedic aspects only. Mars (4,7,8), Jupiter (5,7,9), Saturn (3,7,10).
 """
 
 PARASHARI_PILLAR = """
@@ -15,6 +15,9 @@ PARASHARI_PILLAR = """
 [P-3] KENDRADHIPATI DOSHA: Natural benefics (Jupiter, Venus, Mercury) ruling Kendra houses (1,4,7,10) acquire a flaw and may not give purely good results unless also associated with a Trikona.
 [P-4] BADHAKESH: The lord of the Badhaka (obstruction) house brings obstacles. For movable signs (Ar, Cn, Li, Cp) it's the 11th lord. For fixed (Ta, Le, Sc, Aq) it's the 9th lord. For dual (Ge, Vi, Sg, Pi) it's the 7th lord.
 [P-5] MARAKA: Lords of the 2nd and 7th houses are Maraka (killer) planets. Their dashas can bring health challenges or significant life changes, not necessarily death. Saturn's association with them increases their power.
+[P-6] PANCHADHA MAITRI (5-FOLD FRIENDSHIP): This is the "Happiness" of a planet. You MUST check the `friendship_analysis` in the JSON.
+   - 🚨 ANALYSIS RULE: A planet in a 'Great Friend' sign is extremely happy and gives results easily. In 'Great Enemy' sign, it is miserable and its results are blocked or corrupted.
+   - 🚨 PHRASING RULE: Explicitly state: "Planet [X] is in a [Status] sign, meaning it feels [Happy/Miserable/Neutral] here and will [give results easily/struggle to deliver]."
 """
 
 # 3. ANALYTICAL LOGIC UNITS (Modular Logic)
@@ -79,7 +82,7 @@ DIVISIONAL_ANALYSIS = """
 WEALTH_SUTRAS = "[WEALTH]: Check AL 2/11, Indu Lagna, HL, D2 Hora."
 CAREER_SUTRAS = "[CAREER]: Check D10, AmK, GL, Karkamsa (KL)."
 HEALTH_SUTRAS = "[HEALTH]: Check 6th lord, Mars, Saturn aspects, D3."
-MARRIAGE_SUTRAS = "[MARRIAGE]: Check UL, 7th lord, Venus/Jupiter, D7. KP Analysis: Check 7th Cusp Sub Lord (CSL) and Sub-Sub Lord (CSSL). If they signify houses 2, 7, or 11, the marriage promise is strong. Also verify the 7th Cusp Sign Lord and Nakshatra Lord (NL)."
+MARRIAGE_SUTRAS = "[MARRIAGE]: Check UL, 7th lord, Venus/Jupiter, D7. KP Analysis: Check 7th Cusp Sub Lord (CSL) and Sub-Sub Lord (CSSL). If they signify houses 2, 7, or 11, the marriage promise is strong. If they signify 1, 6, or 10, there will be delays or denials. Also verify the 7th Cusp Sign Lord and Nakshatra Lord (NL). Use `friendship_analysis` to check the happiness of the 7th lord and Venus."
 EDUCATION_SUTRAS = "[EDUCATION]: Check 4/5th lords, Mercury, Jupiter aspects, D24."
 
 LONGEVITY_ANALYSIS = """

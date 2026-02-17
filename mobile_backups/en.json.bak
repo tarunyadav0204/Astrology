@@ -315,11 +315,7 @@
       "inauspiciousTimes": "⚠️ Inauspicious Times",
       "rahuKaal": "Rahu Kaal:",
       "durMuhurta": "Dur Muhurta:",
-      "varjyam": "Varjyam:",
-      "dayQuality": "Day Quality Timeline",
-      "auspicious": "Auspicious",
-      "inauspicious": "Inauspicious",
-      "illuminated": "Illuminated"
+      "varjyam": "Varjyam:"
     },
     "loading": {
       "transits": "Loading transits...",

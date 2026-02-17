@@ -1023,7 +1023,46 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             user_facts = {}
             if birth_chart_id:
                 fact_extractor = FactExtractor()
-                user_facts = fact_extractor.get_facts(birth_chart_id)
+                all_facts = fact_extractor.get_facts(birth_chart_id)
+                
+                # Filter facts based on intent category for relevance
+                intent_category = intent.get('category', 'general')
+                relevant_categories = {
+                    'career': ['career', 'education', 'major_events'],
+                    'job': ['career', 'education', 'major_events'],
+                    'promotion': ['career', 'major_events'],
+                    'business': ['career', 'wealth', 'major_events'],
+                    'wealth': ['career', 'wealth', 'major_events'],
+                    'money': ['career', 'wealth', 'major_events'],
+                    'finance': ['career', 'wealth', 'major_events'],
+                    'love': ['family', 'relationships', 'major_events'],
+                    'relationship': ['family', 'relationships', 'major_events'],
+                    'marriage': ['family', 'relationships', 'major_events', 'marriage'],
+                    'partner': ['family', 'relationships', 'major_events'],
+                    'spouse': ['family', 'relationships', 'major_events'],
+                    'health': ['health', 'temporary_events', 'major_events'],
+                    'disease': ['health', 'temporary_events', 'major_events'],
+                    'child': ['family', 'major_events'],
+                    'children': ['family', 'major_events'],
+                    'pregnancy': ['family', 'health', 'major_events'],
+                    'son': ['family', 'major_events'],
+                    'daughter': ['family', 'major_events'],
+                    'mother': ['family', 'major_events'],
+                    'father': ['family', 'major_events'],
+                    'siblings': ['family', 'major_events'],
+                    'education': ['education', 'career', 'major_events'],
+                    'property': ['wealth', 'major_events'],
+                    'home': ['family', 'major_events'],
+                    'travel': ['location', 'temporary_events', 'major_events'],
+                    'visa': ['location', 'temporary_events', 'major_events'],
+                    'foreign': ['location', 'temporary_events', 'major_events']
+                }
+                
+                allowed_cats = relevant_categories.get(intent_category, ['career', 'family', 'health', 'location', 'preferences', 'education', 'relationships', 'major_events', 'temporary_events'])
+                user_facts = {cat: items for cat, items in all_facts.items() if cat in allowed_cats}
+                
+                if user_facts:
+                    print(f"📚 Filtered user facts for category '{intent_category}': {list(user_facts.keys())}")
         
         # Inject user facts into context
         if user_facts:

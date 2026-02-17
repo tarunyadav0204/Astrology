@@ -453,6 +453,13 @@ class ChatContextBuilder:
         except Exception as e:
             pushkara_data = {'has_pushkara': False, 'pushkara_planets': []}
         
+        # Calculate Planetary Friendship and Aspects
+        try:
+            friendship_data = friendship_calc.calculate_friendship(birth_data)
+        except Exception as e:
+            print(f"❌ Friendship calculation failed for chat context: {e}")
+            friendship_data = {"error": "Friendship calculation unavailable"}
+        
         # Calculate KP Chart Data
         try:
             kp_data = KPChartService.calculate_kp_chart(
@@ -475,6 +482,9 @@ class ChatContextBuilder:
         context.update({
             # KP Analysis (Full 4-level analysis)
             "kp_analysis": kp_analysis,
+            
+            # Planetary Friendship and Aspects
+            "friendship_analysis": friendship_data,
             
             # Key divisional charts
             "divisional_charts": divisional_charts,
