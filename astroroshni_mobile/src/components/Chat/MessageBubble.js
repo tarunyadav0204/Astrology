@@ -21,7 +21,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/constants';
 import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
-import * as Speech from 'expo-speech';
+import { textToSpeech } from '../../utils/textToSpeech';
 import { useTranslation } from 'react-i18next';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart }) {
@@ -110,53 +110,43 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   }, []);
   const speak = async () => {
     if (isSpeaking) {
-      Speech.stop();
+      textToSpeech.stop();
       setIsSpeaking(false);
       return;
     }
 
-    const cleanText = message.content
-      .replace(/<[^>]*>/g, '')
-      .replace(/[#*]/g, '')
-      .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-      .trim();
-
-    setIsSpeaking(true);
-    const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-IN';
-
     try {
-      const voices = await Speech.getAvailableVoicesAsync();
-      const languageVoices = voices.filter(v => v.language === voiceLanguage || v.language === 'en-IN');
-      
-      let preferredVoice = selectedVoice || languageVoices.find(v => v.name === 'Rishi') || languageVoices[0];
+      setIsSpeaking(true);
+      const cleanText = message.content
+        .replace(/<[^>]*>/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .trim();
 
-      Speech.speak(cleanText, {
-        language: voiceLanguage,
-        voice: preferredVoice?.identifier,
-        rate: 1.0,
-        pitch: 1.0,
+      textToSpeech.speak(cleanText, {
+        voice: selectedVoice?.identifier,
         onDone: () => setIsSpeaking(false),
-        onStopped: () => setIsSpeaking(false),
-        onError: () => setIsSpeaking(false)
+        onError: () => setIsSpeaking(false),
       });
     } catch (error) {
-      console.log('Speech error:', error);
       setIsSpeaking(false);
     }
   };
 
   const showVoiceSelector = async () => {
     try {
-      const voices = await Speech.getAvailableVoicesAsync();
-      const voiceLanguage = language === 'hindi' ? 'hi-IN' : language === 'telugu' ? 'te-IN' : language === 'tamil' ? 'ta-IN' : language === 'gujarati' ? 'gu-IN' : 'en-IN';
-      
-      const languageVoices = voices.filter(v => v.language === voiceLanguage || v.language === 'en-IN' || v.language.startsWith('en-'));
-      
-      setAvailableVoices(languageVoices);
+      const voices = await textToSpeech.getAvailableVoices();
+      const filteredVoices = voices.filter(v => v.language.startsWith('en') || v.language.startsWith('hi'));
+      setAvailableVoices(filteredVoices);
       setShowVoicePicker(true);
     } catch (error) {
-      console.log('Error getting voices:', error);
+      Alert.alert('Error', 'Could not load voices');
     }
   };
 

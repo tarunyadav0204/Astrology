@@ -304,6 +304,9 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate 
   };
 
   const renderEventPredictions = () => {
+    const payload = eventPredictions && (eventPredictions.data != null ? eventPredictions.data : eventPredictions);
+    const predictions = (payload && Array.isArray(payload.predictions)) ? payload.predictions : [];
+
     if (!eventPredictions) {
       return (
         <div className="event-predictions">
@@ -332,8 +335,6 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate 
       );
     }
 
-    const { event_type, predictions } = eventPredictions;
-
     return (
       <div className="event-predictions">
         <h3>{selectedEventType.charAt(0).toUpperCase() + selectedEventType.slice(1)} Predictions</h3>
@@ -359,30 +360,35 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate 
         </div>
 
         <div className="predictions-list">
-          {predictions.map((prediction, index) => (
-            <div key={index} className={`prediction-card ${prediction.probability.toLowerCase().replace(' ', '-')}`}>
-              <div className="prediction-header">
-                <span className="year">{prediction.year}</span>
-                <span className={`probability ${prediction.probability.toLowerCase().replace(' ', '-')}`}>
-                  {prediction.probability}
-                </span>
-              </div>
-              <div className="prediction-details">
-                <div className="strength-bar">
-                  <div 
-                    className="strength-fill" 
-                    style={{width: `${(prediction.strength / 360) * 100}%`}}
-                  ></div>
+          {predictions.map((prediction, index) => {
+            if (!prediction || typeof prediction !== 'object') return null;
+            const prob = (prediction.probability || '').toString().toLowerCase().replace(/\s+/g, '-');
+            const bestMonths = Array.isArray(prediction.best_months) ? prediction.best_months : [];
+            return (
+              <div key={index} className={`prediction-card ${prob || 'unknown'}`}>
+                <div className="prediction-header">
+                  <span className="year">{prediction.year ?? '—'}</span>
+                  <span className={`probability ${prob || 'unknown'}`}>
+                    {prediction.probability ?? '—'}
+                  </span>
                 </div>
-                <p>{prediction.analysis}</p>
-                {prediction.best_months.length > 0 && (
-                  <div className="best-months">
-                    <strong>Best Months:</strong> {prediction.best_months.join(', ')}
+                <div className="prediction-details">
+                  <div className="strength-bar">
+                    <div 
+                      className="strength-fill" 
+                      style={{ width: `${Math.min(100, ((prediction.strength ?? 0) / 360) * 100)}%` }}
+                    />
                   </div>
-                )}
+                  <p>{prediction.analysis ?? ''}</p>
+                  {bestMonths.length > 0 && (
+                    <div className="best-months">
+                      <strong>Best Months:</strong> {bestMonths.join(', ')}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );

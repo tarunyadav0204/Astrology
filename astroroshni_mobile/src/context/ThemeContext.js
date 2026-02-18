@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -22,30 +22,37 @@ export const THEMES = {
     gradientStart: '#1a0033',
     gradientMid: '#2d1b4e',
     gradientEnd: '#4a2c6d',
+    gradientAccent: '#f97316',
     cardBackground: 'rgba(255, 255, 255, 0.05)',
     cardBorder: 'rgba(255, 255, 255, 0.1)',
     statusBarStyle: 'light-content',
+    strokeMuted: 'rgba(255, 255, 255, 0.3)',
+    strokeStrong: 'rgba(255, 255, 255, 0.5)',
   },
   light: {
-    background: '#fff5f0',
-    backgroundSecondary: '#ffe8dc',
-    backgroundTertiary: '#ffd4c8',
-    surface: 'rgba(249, 115, 22, 0.08)',
-    text: '#1a1a1a',
+    background: '#fffbf7',
+    backgroundSecondary: '#ffefe6',
+    backgroundTertiary: '#ffdfd0',
+    surface: 'rgba(249, 115, 22, 0.1)',
+    text: '#1c1917',
     textSecondary: '#7c2d12',
     textTertiary: '#9a3412',
-    primary: '#f97316',
-    secondary: '#ec4899',
-    accent: '#fb923c',
-    success: '#22c55e',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    gradientStart: '#fff7ed',
-    gradientMid: '#ffedd5',
-    gradientEnd: '#fed7aa',
+    primary: '#ea580c',
+    secondary: '#db2777',
+    accent: '#d97706',
+    success: '#16a34a',
+    error: '#dc2626',
+    warning: '#d97706',
+    gradientStart: '#fffbf7',
+    gradientMid: '#ffefe6',
+    gradientEnd: '#ffdfd0',
+    gradientAccent: '#fde68a',
     cardBackground: '#ffffff',
-    cardBorder: 'rgba(249, 115, 22, 0.2)',
+    cardBorder: 'rgba(234, 88, 12, 0.25)',
     statusBarStyle: 'dark-content',
+    // For elements that need to read well on both themes (e.g. zodiac wheel stroke)
+    strokeMuted: 'rgba(28, 25, 23, 0.2)',
+    strokeStrong: 'rgba(28, 25, 23, 0.35)',
   },
 };
 
@@ -80,18 +87,40 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  const colors = THEMES[theme];
+  // On Android light theme, use card/surface colors almost same as background and remove elevation/shadow to avoid white inner-shadow look
+  const isAndroidLight = Platform.OS === 'android' && theme === 'light';
+  const baseColors = THEMES[theme];
+  const colors = isAndroidLight
+    ? {
+        ...baseColors,
+        cardBackground: baseColors.background,
+        surface: baseColors.backgroundSecondary,
+        cardBorder: 'rgba(249, 115, 22, 0.12)',
+      }
+    : baseColors;
+
+  // Spread this onto any card View to remove elevation and shadow on Android light (fixes white inner shadow)
+  const androidLightCardFixStyle = useMemo(() => 
+    isAndroidLight
+      ? {
+          elevation: 0,
+          shadowColor: 'transparent',
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          shadowOffset: { width: 0, height: 0 },
+        }
+      : {}, [isAndroidLight]);
 
   // Helper function to get card elevation based on theme
   const getCardElevation = (defaultElevation = 3) => {
-    if (Platform.OS === 'android' && theme === 'light') {
+    if (isAndroidLight) {
       return 0;
     }
     return defaultElevation;
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, colors, toggleTheme, isLoading, getCardElevation }}>
+    <ThemeContext.Provider value={{ theme, colors, toggleTheme, isLoading, getCardElevation, androidLightCardFixStyle }}>
       {children}
     </ThemeContext.Provider>
   );

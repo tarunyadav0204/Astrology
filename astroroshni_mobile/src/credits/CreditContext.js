@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { creditAPI } from './creditService';
 
@@ -9,7 +9,7 @@ export const CreditProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [partnershipCost, setPartnershipCost] = useState(2);
 
-  const fetchBalance = async () => {
+  const fetchBalance = useCallback(async () => {
     try {
       // Check if user is authenticated first
       const token = await AsyncStorage.getItem('authToken');
@@ -20,7 +20,9 @@ export const CreditProvider = ({ children }) => {
       
       setLoading(true);
       const response = await creditAPI.getBalance();
-      setCredits(response.data.credits);
+      const data = response?.data;
+      const balance = data?.credits ?? data?.balance ?? 0;
+      setCredits(Number(balance) || 0);
     } catch (error) {
       console.error('❌ Error fetching credits:', {
         message: error.message,
@@ -38,7 +40,7 @@ export const CreditProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const redeemCode = async (code) => {
     try {

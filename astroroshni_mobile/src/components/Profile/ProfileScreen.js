@@ -523,6 +523,58 @@ export default function ProfileScreen({ navigation }) {
             </Animated.View>
 
             <TouchableOpacity 
+              style={[
+                styles.logoutButton, 
+                { 
+                  backgroundColor: theme === 'dark' ? 'rgba(220, 38, 38, 0.2)' : 'rgba(248, 113, 113, 0.15)', 
+                  borderColor: theme === 'dark' ? 'rgba(248, 113, 113, 0.6)' : 'rgba(220, 38, 38, 0.5)' 
+                }
+              ]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Account',
+                  'This will permanently delete your account and associated data. This action cannot be undone.\n\nAre you sure you want to continue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { API_BASE_URL, getEndpoint } = require('../../utils/constants');
+                          const token = await storage.getAuthToken();
+                          const res = await fetch(`${API_BASE_URL}${getEndpoint('/user/account')}`, {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                          });
+                          if (!res.ok) {
+                            const text = await res.text();
+                            console.log('Delete account failed:', res.status, text);
+                            Alert.alert('Error', 'Failed to delete account. Please try again.');
+                            return;
+                          }
+                          await storage.clearAll();
+                          navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Login' }],
+                          });
+                        } catch (err) {
+                          console.error('Delete account error', err);
+                          Alert.alert('Error', 'Something went wrong while deleting your account. Please try again.');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.logoutText}>🗑️ Delete Account & Data</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={[styles.logoutButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.2)' : 'rgba(255, 107, 53, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.5)' : 'rgba(255, 107, 53, 0.4)' }]}
               onPress={async () => {
                 await storage.clearAll();

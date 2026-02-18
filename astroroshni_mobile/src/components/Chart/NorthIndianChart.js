@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Easing } from 'react-native';
-import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle, Path } from 'react-native-svg';
+import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle, Path, ClipPath } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,7 @@ const AnimatedG = Animated.createAnimatedComponent(G);
 
 const NorthIndianChart = ({ 
   chartData, 
+  chartType,
   birthData, 
   showDegreeNakshatra = true, 
   cosmicTheme = false, 
@@ -31,29 +32,39 @@ const NorthIndianChart = ({
   
   // Animation refs
   const drawAnim = useRef(new Animated.Value(0)).current;
-  const planetsAnim = useRef(new Animated.Value(0)).current;
+  const lastDataRef = useRef(null);
   const [isAnimating, setIsAnimating] = useState(true);
 
   useEffect(() => {
-    drawAnim.setValue(0);
-    planetsAnim.setValue(0);
-    setIsAnimating(true);
+    if (!chartData) return;
 
-    Animated.sequence([
+    // Deep compare chartData to prevent unnecessary animation resets
+    const dataString = JSON.stringify({
+      planets: chartData.planets,
+      houses: chartData.houses,
+      chartType,
+      rotatedAscendant
+    });
+
+    if (lastDataRef.current === dataString) {
+      return;
+    }
+    lastDataRef.current = dataString;
+    
+    const runAnimation = () => {
+      drawAnim.setValue(0);
+      setIsAnimating(true);
+
       Animated.timing(drawAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }),
-      Animated.spring(planetsAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
-        useNativeDriver: true,
-      })
-    ]).start(() => setIsAnimating(false));
-  }, [chartData]);
+      }).start(() => setIsAnimating(false));
+    };
+
+    runAnimation();
+  }, [chartData, chartType, rotatedAscendant]);
 
   const handlePlanetPress = (planet) => {
     const tooltipText = `${planet.name}: ${planet.degree}° in ${planet.nakshatra}`;
@@ -104,7 +115,7 @@ const NorthIndianChart = ({
   };
 
   const getRashiForHouse = (houseIndex) => {
-    if (!chartData.houses || !chartData.houses[houseIndex]) return houseIndex;
+    if (!chartData || !chartData.houses || !chartData.houses[houseIndex]) return houseIndex;
     if (rotatedAscendant !== null) {
       return (rotatedAscendant + houseIndex) % 12;
     }
@@ -112,6 +123,7 @@ const NorthIndianChart = ({
   };
 
   const getPlanetStatus = (planet) => {
+    if (!chartData) return 'normal';
     if (['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna'].includes(planet.name)) return 'normal';
     const planets = chartData.planets || chartData;
     const planetData = planets[planet.name];
@@ -169,6 +181,7 @@ const NorthIndianChart = ({
   };
 
   const getPlanetsInHouse = (houseIndex) => {
+    if (!chartData) return [];
     const planets = chartData.planets || chartData;
     if (!planets || typeof planets !== 'object') return [];
     const rashiForThisHouse = getRashiForHouse(houseIndex);
@@ -211,6 +224,13 @@ const NorthIndianChart = ({
     <View style={styles.container}>
       <Svg viewBox="0 0 400 400" style={styles.svg}>
         <Defs>
+          <ClipPath id="chartClip">
+            <Rect 
+              x="2" y="2" width="396" height="396" 
+              rx={cosmicTheme ? "16" : "0"}
+              ry={cosmicTheme ? "16" : "0"}
+            />
+          </ClipPath>
           <LinearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             {cosmicTheme ? (
               theme === 'dark' ? [
@@ -230,17 +250,7 @@ const NorthIndianChart = ({
           </LinearGradient>
         </Defs>
 
-        {/* House Hit Areas */}
-        {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNum) => (
-          <Path
-            key={`hit-${houseNum}`}
-            d={getHouseData(houseNum).path}
-            fill="transparent"
-            onPress={() => handleHousePressInternal(houseNum)}
-          />
-        ))}
-
-        {/* Outer square border - Perfectly aligned at 0,0 to 400,400 */}
+        {/* Outer square border */}
         <AnimatedRect 
           x="2" y="2" width="396" height="396" 
           fill="transparent" 
@@ -253,7 +263,7 @@ const NorthIndianChart = ({
           pointerEvents="none"
         />
         
-        {/* Inner diamond border - Perfectly aligned connecting midpoints */}
+        {/* Inner diamond border */}
         <AnimatedPolygon 
           points="200,2 398,200 200,398 2,200" 
           fill="none" 
@@ -264,23 +274,25 @@ const NorthIndianChart = ({
           pointerEvents="none"
         />
         
-        {/* Diagonal lines - Perfectly straight from corner to corner */}
-        <AnimatedLine 
-          x1="2" y1="2" x2="398" y2="398" 
-          stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
-          strokeWidth="2"
-          strokeDasharray="600"
-          strokeDashoffset={gridStrokeDash}
-          pointerEvents="none"
-        />
-        <AnimatedLine 
-          x1="398" y1="2" x2="2" y2="398" 
-          stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
-          strokeWidth="2"
-          strokeDasharray="600"
-          strokeDashoffset={gridStrokeDash}
-          pointerEvents="none"
-        />
+        {/* Diagonal lines */}
+        <G clipPath="url(#chartClip)">
+          <AnimatedLine 
+            x1="2" y1="2" x2="398" y2="398" 
+            stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
+            strokeWidth="2"
+            strokeDasharray="600"
+            strokeDashoffset={gridStrokeDash}
+            pointerEvents="none"
+          />
+          <AnimatedLine 
+            x1="398" y1="2" x2="2" y2="398" 
+            stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} 
+            strokeWidth="2"
+            strokeDasharray="600"
+            strokeDashoffset={gridStrokeDash}
+            pointerEvents="none"
+          />
+        </G>
 
         {/* Houses */}
         {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
@@ -317,17 +329,16 @@ const NorthIndianChart = ({
                    houseNumber === 5 ? houseData.center.y + 10 : houseData.center.y + 5} 
                 fontSize="18" 
                 fill={cosmicTheme ? 
-                  (rashiIndex === (chartData.houses?.[0]?.sign ?? 0) ? "#ff6b35" : (theme === 'dark' ? "rgba(255, 255, 255, 0.9)" : "rgba(0, 0, 0, 0.8)")) :
-                  (rashiIndex === (chartData.houses?.[0]?.sign ?? 0) ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333"))} 
-                opacity={drawAnim}
-                fontWeight={rashiIndex === (chartData.houses?.[0]?.sign ?? 0) ? "900" : "bold"}>
+                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#ff6b35" : (theme === 'dark' ? "rgba(255, 255, 255, 0.9)" : "rgba(0, 0, 0, 0.8)")) :
+                  (rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "#e91e63" : (theme === 'dark' ? "#fff" : "#333"))} 
+                fontWeight={rashiIndex === (chartData?.houses?.[0]?.sign ?? 0) ? "900" : "bold"}>
                 {rashiIndex + 1}
               </SvgText>
               
               {houseNumber === 1 && (
-                <G opacity={drawAnim}>
+                <G>
                   <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={cosmicTheme ? "#ff6b35" : "#e91e63"} fontWeight="900" textAnchor="middle">ASC</SvgText>
-                  {chartData.ascendant && (
+                  {chartData?.ascendant && (
                     <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
                       {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
                     </SvgText>
@@ -338,27 +349,140 @@ const NorthIndianChart = ({
               {planetsInHouse.map((planet, pIndex) => {
                 const totalPlanets = planetsInHouse.length;
                 let planetX, planetY;
-                const row = Math.floor(pIndex / 2);
-                const col = pIndex % 2;
-                const spacing = 20;
-                const rowSpacing = 25;
-                planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                planetY = houseData.center.y - 20 + (row * rowSpacing);
+                
+                if (totalPlanets === 1) {
+                  if (houseNumber === 1) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 15;
+                  } else if ([3, 4, 5].includes(houseNumber)) {
+                    planetX = houseData.center.x - 15;
+                    planetY = houseData.center.y + 10;
+                  } else if ([6, 7, 8].includes(houseNumber)) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y + 30;
+                  } else if (houseNumber === 9) {
+                    planetX = houseData.center.x + 10;
+                    planetY = houseData.center.y - 20;
+                  } else if (houseNumber === 10) {
+                    planetX = houseData.center.x + 15;
+                    planetY = houseData.center.y - 20;
+                  } else if (houseNumber === 11) {
+                    planetX = houseData.center.x + 5;
+                    planetY = houseData.center.y - 15;
+                  } else if (houseNumber === 12) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 15;
+                  } else if (houseNumber === 2) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 25;
+                  } else {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 10;
+                  }
+                } else if (totalPlanets <= 4) {
+                  if ([3, 5, 9, 11].includes(houseNumber)) {
+                    const rowSpacing = 35;
+                    if (houseNumber === 3) {
+                      planetX = houseData.center.x - 35;
+                      planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                    } else if (houseNumber === 5) {
+                      planetX = houseData.center.x - 25;
+                      planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
+                    } else if (houseNumber === 9) {
+                      planetX = houseData.center.x + 25;
+                      planetY = houseData.center.y - 40 + (pIndex * rowSpacing);
+                    } else if (houseNumber === 11) {
+                      planetX = houseData.center.x + 15;
+                      planetY = houseData.center.y - 55 + (pIndex * rowSpacing);
+                    }
+                  } else {
+                    const row = Math.floor(pIndex / 2);
+                    const col = pIndex % 2;
+                    const spacing = 25;
+                    const rowSpacing = 32;
+                    
+                    if (houseNumber === 1) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 20 + (row * rowSpacing);
+                    } else if (houseNumber === 4) {
+                      planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y + 5 + (row * rowSpacing);
+                    } else if ([6, 7, 8].includes(houseNumber)) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y + 25 + (row * rowSpacing);
+                    } else if (houseNumber === 10) {
+                      planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 25 + (row * rowSpacing);
+                    } else if (houseNumber === 12) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 5 + (row * rowSpacing);
+                    } else if (houseNumber === 2) {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 5 + (row * rowSpacing);
+                    } else {
+                      planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                      planetY = houseData.center.y - 25 + (row * rowSpacing);
+                    }
+                  }
+                } else {
+                  const rowSpacing = 26;
+                  
+                  if (houseNumber === 1) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
+                  } else if ([3, 4, 5].includes(houseNumber)) {
+                    planetX = houseData.center.x - 25;
+                    planetY = houseData.center.y + 0 + (pIndex * rowSpacing);
+                  } else if ([6, 7, 8].includes(houseNumber)) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y + 20 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 9) {
+                    planetX = houseData.center.x + 15;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 10) {
+                    planetX = houseData.center.x + 15;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 11) {
+                    planetX = houseData.center.x + 10;
+                    planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 12) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 5 + (pIndex * rowSpacing);
+                  } else if (houseNumber === 2) {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 10 + (pIndex * rowSpacing);
+                  } else {
+                    planetX = houseData.center.x;
+                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                  }
+                }
                 
                 return (
-                  <AnimatedG key={pIndex} style={{ transform: [{ scale: planetsAnim }, { translateY: planetsAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }], opacity: planetsAnim }}>
+                  <G key={pIndex}>
                     <SvgText x={planetX} y={planetY - 8} fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")} fill={getPlanetColor(planet)} fontWeight="900" textAnchor="middle">{getPlanetSymbolWithStatus(planet)}</SvgText>
                     {showDegreeNakshatra && (
                       <SvgText x={planetX} y={planetY + 8} fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
                         {planet.formattedDegree} {planet.shortNakshatra}
                       </SvgText>
                     )}
-                  </AnimatedG>
+                  </G>
                 );
               })}
             </G>
           );
         })}
+
+        {/* House Hit Areas - Moved to end to be on top */}
+        <G pointerEvents="auto">
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNum) => (
+            <Path
+              key={`hit-${houseNum}`}
+              d={getHouseData(houseNum).path}
+              fill="transparent"
+              onPress={() => handleHousePressInternal(houseNum)}
+            />
+          ))}
+        </G>
       </Svg>
       
       {tooltip.show && (
@@ -381,7 +505,7 @@ const styles = StyleSheet.create({
   svg: { width: '100%', height: '100%', aspectRatio: 1 },
   tooltip: { position: 'absolute', top: 20, left: 20, right: 20, padding: 12, borderRadius: 12, alignItems: 'center', zIndex: 100 },
   tooltipText: { color: 'white', fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  instructionText: { textAlign: 'center', fontSize: 12, fontStyle: 'italic', marginTop: 8 },
+  instructionText: { textAlign: 'center', fontSize: 12, fontStyle: 'italic', marginTop: 24, marginBottom: 12 },
 });
 
 export default NorthIndianChart;

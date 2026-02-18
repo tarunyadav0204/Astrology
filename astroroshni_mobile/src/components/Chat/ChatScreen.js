@@ -700,7 +700,14 @@ export default function ChatScreen({ navigation, route }) {
     } else if (option.action === 'periods') {
       setShowEventPeriods(true);
     } else if (option.action === 'events') {
-      navigation.navigate('EventScreen');
+      navigation.navigate('EventScreen', {
+        eventType: 'yearly_timeline',
+        title: 'Event Timeline',
+        icon: '📅',
+        color: '#FFD700',
+        description: 'AI-powered yearly predictions with monthly breakdowns',
+        cost: 0
+      });
     } else if (option.action === 'ashtakvarga') {
       navigation.navigate('AshtakvargaOracle');
     } else if (option.action === 'muhurat') {

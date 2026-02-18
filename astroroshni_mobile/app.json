@@ -5,6 +5,7 @@
     "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -20,13 +21,15 @@
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "bitcode": false,
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        },
-        "UILaunchScreen": {}
-      }
+    "infoPlist": {
+      "ITSAppUsesNonExemptEncryption": false,
+      "NSAppTransportSecurity": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "NSMicrophoneUsageDescription": "This app does not use the microphone.",
+      "NSSpeechRecognitionUsageDescription": "This app uses speech recognition for voice commands.",
+      "UILaunchScreen": {}
+    }
     },
     "android": {
       "adaptiveIcon": {

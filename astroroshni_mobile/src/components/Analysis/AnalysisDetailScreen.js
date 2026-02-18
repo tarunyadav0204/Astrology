@@ -1100,7 +1100,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           style={[styles.modalFocusOption, analysisFocus === 'next_child' && styles.modalFocusOptionSelected]}
                           onPress={() => setAnalysisFocus('next_child')}
                         >
-                          <Text style={styles.modalFocusIcon}>👨👩👧</Text>
+                          <Text style={styles.modalFocusIcon}>👨‍👩‍👧</Text>
                           <View style={styles.modalFocusTextContainer}>
                             <Text style={styles.modalFocusOptionTitle}>Have Children, Planning More</Text>
                             <Text style={styles.modalFocusOptionSubtitle}>Sibling Timing & Fertility</Text>

@@ -21,7 +21,7 @@ const PolicyPage = () => {
       <section style={{ marginBottom: '30px' }}>
         <h2>2. Data Controller</h2>
         <p>For the purposes of the General Data Protection Regulation (GDPR) and the Digital Personal Data Protection Act (DPDP India), the data controller is:</p>
-        <p><strong>Amber Yadav</strong><br />Email: help@astroroshni.com</p>
+        <p><strong>Aradhana Asnani</strong><br />Email: help@astroroshni.com</p>
       </section>
 
       <section style={{ marginBottom: '30px' }}>
@@ -43,13 +43,14 @@ const PolicyPage = () => {
           <li><strong>Service Functionality:</strong> To calculate birth charts and generate predictions.</li>
           <li><strong>Personalization:</strong> To tailor AI insights to your specific planetary positions.</li>
           <li><strong>Account Management:</strong> To allow you to access your history across devices.</li>
+          <li><strong>Analytics & Improvements:</strong> To understand how users interact with our app and to improve performance, reliability, and features.</li>
         </ul>
       </section>
 
       <section style={{ marginBottom: '30px' }}>
         <h2>5. Security & Confidentiality</h2>
         <div style={{ background: '#e8f5e8', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '2px solid #4caf50' }}>
-          <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#2e7d32' }}>🔒 All data is kept <strong>End-to-End Encrypted</strong>. Data is <strong>Encrypted in Transit</strong> (HTTPS/TLS) and <strong>Encrypted at Rest</strong> using industry-standard encryption protocols.</p>
+          <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#2e7d32' }}>🔒 All data is <strong>encrypted in transit</strong> (HTTPS/TLS) and <strong>encrypted at rest</strong> using industry-standard encryption protocols.</p>
           <p style={{ margin: '0', color: '#2e7d32' }}>We guarantee confidentiality of your identity, birth details, and predictions. No direct or indirect use will be made of your information except for the explicit purpose of generating and communicating your horoscope charts and predictions back to you.</p>
         </div>
         <p><strong>Payment Security:</strong> We DO NOT collect or store payment information on our servers. All payments are processed securely by third-party payment gateways (Stripe, PayPal, etc.) that comply with PCI-DSS standards.</p>
@@ -58,7 +59,7 @@ const PolicyPage = () => {
       <section style={{ marginBottom: '30px' }}>
         <h2>6. AI Processing</h2>
         <div style={{ background: '#fff3e0', padding: '15px', borderRadius: '8px', border: '2px solid #ff9800' }}>
-          <p style={{ margin: '0', fontWeight: 'bold', color: '#e65100' }}>🤖 We use Google Gemini API for astrological analysis. No personally identifiable information (Name/Email) is sent to the AI. Only birth coordinates and chat queries are processed.</p>
+          <p style={{ margin: '0', fontWeight: 'bold', color: '#e65100' }}>🤖 We use the Google Gemini API for astrological analysis. We do not intentionally send personally identifiable information (such as your name or email) to the AI provider. We primarily send birth coordinates and chat queries needed for astrological analysis, which may be processed on servers outside your country in accordance with the provider&apos;s privacy and data handling practices.</p>
         </div>
       </section>
 
@@ -76,7 +77,8 @@ const PolicyPage = () => {
         <p>You have the <strong>"Right to be Forgotten"</strong> and the following rights:</p>
         <ul>
           <li><strong>Access & Modify:</strong> You can access and update your profile information at any time through your account settings.</li>
-          <li><strong>Delete Account:</strong> Request total deletion of your data via <strong>App Settings &gt; Delete Account</strong> or by emailing help@astroroshni.com. We will process deletions within 72 hours.</li>
+          <li><strong>Delete Account In-App:</strong> You can permanently delete your account and associated data directly from the AstroRoshni mobile app by going to <strong>Profile &gt; Delete Account &amp; Data</strong>.</li>
+          <li><strong>Delete Account via Email:</strong> You can also request deletion by emailing <a href="mailto:help@astroroshni.com">help@astroroshni.com</a> with the subject line <em>"Delete my AstroRoshni account"</em>. We will process verified deletion requests within 72 hours.</li>
         </ul>
       </section>
 

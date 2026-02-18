@@ -1,12 +1,41 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
-import Svg, { Rect, Text as SvgText, G, Line } from 'react-native-svg';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing } from 'react-native';
+import Svg, { Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 
-const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscendant = null, onRotate, cosmicTheme = false, showKarakas = false, karakas = null }) => {
+const AnimatedG = Animated.createAnimatedComponent(G);
+
+const SouthIndianChart = ({ 
+  chartData, 
+  chartType,
+  showDegreeNakshatra = true, 
+  rotatedAscendant = null, 
+  onRotate, 
+  cosmicTheme = false, 
+  showKarakas = false, 
+  karakas = null 
+}) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
   
+  const lastDataRef = useRef(null);
+
+  useEffect(() => {
+    if (!chartData) return;
+    
+    // Deep compare chartData to prevent unnecessary animation resets
+    const dataString = JSON.stringify({
+      planets: chartData.planets,
+      houses: chartData.houses,
+      chartType,
+      rotatedAscendant
+    });
+
+    if (lastDataRef.current === dataString) {
+      return;
+    }
+    lastDataRef.current = dataString;
+  }, [chartData, chartType, rotatedAscendant]);
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
   
   // Fixed sign positions in South Indian chart
@@ -126,25 +155,45 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscend
   return (
     <View style={styles.container}>
       <Svg viewBox="0 0 340 340" style={styles.svg}>
+        <Defs>
+          <ClipPath id="southChartClip">
+            <Rect 
+              x="0" y="0" width="340" height="340" 
+              rx={cosmicTheme ? "16" : "0"}
+              ry={cosmicTheme ? "16" : "0"}
+            />
+          </ClipPath>
+        </Defs>
+
         {/* Outer border */}
-        <Rect x="0" y="0" width="340" height="340" fill="none" stroke="#ff6f00" strokeWidth="3"/>
-        {/* Grid lines */}
-        <Line x1="85" y1="0" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="170" y1="0" x2="170" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="255" y1="0" x2="255" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="85" y1="255" x2="85" y2="340" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="170" y1="255" x2="170" y2="340" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="255" y1="255" x2="255" y2="340" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="0" y1="85" x2="85" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="0" y1="170" x2="85" y2="170" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="0" y1="255" x2="85" y2="255" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="255" y1="85" x2="340" y2="85" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="255" y1="170" x2="340" y2="170" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="255" y1="255" x2="340" y2="255" stroke="#ff8a65" strokeWidth="2"/>
-        <Line x1="0" y1="85" x2="340" y2="85" stroke="#ff6f00" strokeWidth="3"/>
-        <Line x1="0" y1="255" x2="340" y2="255" stroke="#ff6f00" strokeWidth="3"/>
-        <Line x1="85" y1="0" x2="85" y2="340" stroke="#ff6f00" strokeWidth="3"/>
-        <Line x1="255" y1="0" x2="255" y2="340" stroke="#ff6f00" strokeWidth="3"/>
+        <Rect 
+          x="1.5" y="1.5" width="337" height="337" 
+          fill="none" 
+          stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} 
+          strokeWidth="3"
+          rx={cosmicTheme ? "16" : "0"}
+          ry={cosmicTheme ? "16" : "0"}
+        />
+
+        <G clipPath="url(#southChartClip)" pointerEvents="none">
+          {/* Grid lines */}
+          <Line x1="85" y1="0" x2="85" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="170" y1="0" x2="170" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="255" y1="0" x2="255" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="85" y1="255" x2="85" y2="340" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="170" y1="255" x2="170" y2="340" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="255" y1="255" x2="255" y2="340" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="0" y1="85" x2="85" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="0" y1="170" x2="85" y2="170" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="0" y1="255" x2="85" y2="255" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="255" y1="85" x2="340" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="255" y1="170" x2="340" y2="170" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="255" y1="255" x2="340" y2="255" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
+          <Line x1="0" y1="85" x2="340" y2="85" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
+          <Line x1="0" y1="255" x2="340" y2="255" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
+          <Line x1="85" y1="0" x2="85" y2="340" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
+          <Line x1="255" y1="0" x2="255" y2="340" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
+        </G>
 
         {/* Grid cells */}
         {gridPositions.map((pos, index) => {
@@ -153,6 +202,13 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscend
           
           return (
             <G key={index}>
+              {/* Hit area for the entire cell */}
+              <Rect 
+                x={pos.x} y={pos.y} width={pos.width} height={pos.height} 
+                fill="transparent" 
+                onPress={() => setContextMenu({ show: true, rashiIndex: pos.sign, signName: rashiNames[pos.sign] })}
+              />
+              
               {/* House number */}
               <SvgText 
                 x={pos.x + 8} 
@@ -160,7 +216,7 @@ const SouthIndianChart = ({ chartData, showDegreeNakshatra = true, rotatedAscend
                 fontSize="12" 
                 fill={houseNumber === 1 ? "#e91e63" : "#333"} 
                 fontWeight={houseNumber === 1 ? "900" : "bold"}
-                onPress={() => setContextMenu({ show: true, rashiIndex: pos.sign, signName: rashiNames[pos.sign] })}>
+                pointerEvents="none">
                 {houseNumber}
               </SvgText>
               

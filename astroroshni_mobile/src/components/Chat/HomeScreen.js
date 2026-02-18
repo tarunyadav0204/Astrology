@@ -16,6 +16,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import Icon from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Text as SvgText, Path, Line, Rect, Polygon } from 'react-native-svg';
 import { COLORS } from '../../utils/constants';
@@ -36,7 +37,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const { t, i18n } = useTranslation();
   console.log('🌐 HomeScreen current language:', i18n.language);
   useAnalytics('HomeScreen');
-  const { theme, colors } = useTheme();
+  const { theme, colors, androidLightCardFixStyle } = useTheme();
   
   if (!colors) {
     return null;
@@ -61,18 +62,50 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     moonPhase: null,
     loading: true
   });
+  const [isFABCollapsed, setIsFABCollapsed] = useState(false);
+  const lastScrollY = useRef(0);
+  const fabWidth = useRef(new Animated.Value(1)).current; // 1 for full, 0 for collapsed
 
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const fabWidth = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [180, 56],
-    extrapolate: 'clamp',
-  });
-  const fabTextOpacity = scrollY.interpolate({
-    inputRange: [0, 50],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
+  const handleScroll = (event) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    
+    // Determine scroll direction
+    const isScrollingDown = currentScrollY > lastScrollY.current;
+    const scrollThreshold = 20;
+
+    if (currentScrollY <= scrollThreshold) {
+      // Always expand at the top
+      if (isFABCollapsed) {
+        setIsFABCollapsed(false);
+        Animated.timing(fabWidth, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      }
+    } else {
+      // Toggle based on direction when not at the top
+      if (isScrollingDown && !isFABCollapsed) {
+        setIsFABCollapsed(true);
+        Animated.timing(fabWidth, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      } else if (!isScrollingDown && isFABCollapsed) {
+        setIsFABCollapsed(false);
+        Animated.timing(fabWidth, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      }
+    }
+    
+    lastScrollY.current = currentScrollY;
+  };
+
+
 
   const getSignInsight = (type, signIndex) => {
     if (signIndex === undefined || signIndex === null) return null;
@@ -115,11 +148,11 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     tomorrow.setHours(0, 0, 0, 0);
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
     
+    let dailyInterval;
     const midnightTimer = setTimeout(() => {
       loadHomeData();
       // Set up daily interval after first midnight update
-      const dailyInterval = setInterval(loadHomeData, 24 * 60 * 60 * 1000);
-      return () => clearInterval(dailyInterval);
+      dailyInterval = setInterval(loadHomeData, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
     
     // Update when app becomes active (user returns from background)
@@ -133,6 +166,7 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
     
     return () => {
       clearTimeout(midnightTimer);
+      if (dailyInterval) clearInterval(dailyInterval);
       subscription?.remove();
     };
   }, []);
@@ -651,7 +685,7 @@ const loadHomeData = async (nativeData = null) => {
       <LinearGradient
         colors={theme === 'dark' 
           ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] 
-          : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#fef3c7']}
+          : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a']}
         style={styles.gradient}
       >
         
@@ -659,10 +693,7 @@ const loadHomeData = async (nativeData = null) => {
         style={[styles.scrollView, { zIndex: 1 }]} 
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
       >
         {/* Header with Native Selector & Big 3 Dashboard - Integrated into ScrollView */}
@@ -670,8 +701,8 @@ const loadHomeData = async (nativeData = null) => {
           <LinearGradient
             colors={theme === 'dark' 
               ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] 
-              : ['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']}
-            style={styles.headerDashboard}
+              : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)']}
+            style={[styles.headerDashboard, androidLightCardFixStyle, theme === 'light' ? { borderColor: colors.cardBorder } : {}]}
           >
             <View style={styles.headerTopRow}>
               <View style={styles.headerProfileInfo}>
@@ -691,7 +722,7 @@ const loadHomeData = async (nativeData = null) => {
               />
             </View>
 
-            <View style={styles.headerBigThree}>
+            <View style={[styles.headerBigThree, theme === 'light' && { backgroundColor: colors.surface }]}>
               <TouchableOpacity 
                 style={styles.headerSignItem}
                 onPress={() => {
@@ -699,7 +730,7 @@ const loadHomeData = async (nativeData = null) => {
                   setActiveInsight(insight);
                 }}
               >
-                <View style={[styles.headerSignIcon, { backgroundColor: '#3B82F620' }]}>
+                <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#3B82F620' : 'rgba(59, 130, 246, 0.12)' }]}>
                   <Text style={styles.headerSignEmoji}>
                     {loading ? '⏳' : getSignIcon(chartData?.houses?.[0]?.sign)}
                   </Text>
@@ -712,7 +743,7 @@ const loadHomeData = async (nativeData = null) => {
                 </View>
               </TouchableOpacity>
 
-              <View style={styles.headerDivider} />
+              <View style={[styles.headerDivider, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
 
               <TouchableOpacity 
                 style={styles.headerSignItem}
@@ -721,7 +752,7 @@ const loadHomeData = async (nativeData = null) => {
                   setActiveInsight(insight);
                 }}
               >
-                <View style={[styles.headerSignIcon, { backgroundColor: '#DC262620' }]}>
+                <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#DC262620' : 'rgba(220, 38, 38, 0.12)' }]}>
                   <Text style={styles.headerSignEmoji}>
                     {loading ? '⏳' : getSignIcon(chartData?.planets?.Moon?.sign)}
                   </Text>
@@ -734,7 +765,7 @@ const loadHomeData = async (nativeData = null) => {
                 </View>
               </TouchableOpacity>
 
-              <View style={styles.headerDivider} />
+              <View style={[styles.headerDivider, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
 
               <TouchableOpacity 
                 style={styles.headerSignItem}
@@ -743,7 +774,7 @@ const loadHomeData = async (nativeData = null) => {
                   setActiveInsight(insight);
                 }}
               >
-                <View style={[styles.headerSignIcon, { backgroundColor: '#F59E0B20' }]}>
+                <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#F59E0B20' : 'rgba(245, 158, 11, 0.2)' }]}>
                   <Text style={styles.headerSignEmoji}>
                     {loading ? '⏳' : getSignIcon(chartData?.planets?.Sun?.sign)}
                   </Text>
@@ -760,7 +791,7 @@ const loadHomeData = async (nativeData = null) => {
         </View>
 
         {/* At-a-Glance Ticker */}
-        <View style={styles.tickerContainer}>
+        <View style={[styles.tickerContainer, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -778,14 +809,14 @@ const loadHomeData = async (nativeData = null) => {
                   value={tickerData.mahadasha || t('common.unknown', 'Unknown')}
                   color="#F59E0B"
                 />
-                <View style={styles.tickerSeparator} />
+                <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
                 <TickerItem 
                   icon="moon-outline" 
                   label={t('home.ticker.moonPhase', 'Moon Phase')} 
                   value={tickerData.moonPhase || t('common.unknown', 'Unknown')}
                   color="#3B82F6"
                 />
-                <View style={styles.tickerSeparator} />
+                <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
                 <TickerItem 
                   icon="shield-checkmark-outline" 
                   label={t('home.ticker.sadeSati', 'Sade Sati')} 
@@ -901,7 +932,7 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Current Dasha Timeline - Compact Style */}
           {dashData && (
-            <View style={styles.dashaTimelineContainer}>
+            <View style={[styles.dashaTimelineContainer, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>{t('home.sections.currentDasha', '⏰ Current Dasha Periods')}</Text>
               <View style={styles.timelineWrapper}>
                 {[
@@ -972,12 +1003,13 @@ const loadHomeData = async (nativeData = null) => {
               snapToInterval={width * 0.3 + 12}
             >
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => navigation.navigate('Chart', { birthData })}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
                     borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
@@ -997,12 +1029,13 @@ const loadHomeData = async (nativeData = null) => {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => setShowDashaBrowser(true)}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.15)',
                     borderColor: 'rgba(139, 92, 246, 0.3)',
@@ -1022,12 +1055,13 @@ const loadHomeData = async (nativeData = null) => {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => navigation.navigate('KPSystem', { birthDetails: birthData })}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.15)',
                     borderColor: 'rgba(16, 185, 129, 0.3)',
@@ -1045,12 +1079,13 @@ const loadHomeData = async (nativeData = null) => {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => navigation.navigate('KotaChakra', { birthChartId: birthData?.id })}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.15)',
                     borderColor: 'rgba(245, 158, 11, 0.3)',
@@ -1068,12 +1103,13 @@ const loadHomeData = async (nativeData = null) => {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => navigation.navigate('Yogas')}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.15)',
                     borderColor: 'rgba(236, 72, 153, 0.3)',
@@ -1091,12 +1127,13 @@ const loadHomeData = async (nativeData = null) => {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => navigation.navigate('AshtakvargaOracle')}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.15)',
                     borderColor: 'rgba(59, 130, 246, 0.3)',
@@ -1111,12 +1148,13 @@ const loadHomeData = async (nativeData = null) => {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.toolCard}
+                style={[styles.toolCard, androidLightCardFixStyle]}
                 onPress={() => chartData && navigation.navigate('PlanetaryPositions', { chartData })}
                 activeOpacity={0.8}
               >
                 <View style={[
                   styles.toolGlassmorphism,
+                  androidLightCardFixStyle,
                   {
                     backgroundColor: theme === 'dark' ? 'rgba(244, 63, 94, 0.1)' : 'rgba(244, 63, 94, 0.15)',
                     borderColor: 'rgba(244, 63, 94, 0.3)',
@@ -1133,7 +1171,7 @@ const loadHomeData = async (nativeData = null) => {
           </View>
 
           {/* Cosmic Weather - Transits & Mini Zodiac */}
-          <View style={styles.planetarySection}>
+          <View style={[styles.planetarySection, theme === 'light' && { backgroundColor: colors.cardBackground, borderColor: 'rgba(234, 88, 12, 0.18)' }]}>
             <View style={styles.planetaryHeader}>
               <Text style={[styles.planetarySectionTitle, { color: colors.text }]}>{t('home.sections.planetaryTransits', '🪐 Cosmic Weather')}</Text>
               <View style={styles.liveBadge}>
@@ -1143,9 +1181,9 @@ const loadHomeData = async (nativeData = null) => {
             </View>
 
             {!transitData ? (
-              <Text style={styles.loadingText}>{t('home.loading.transits', 'Loading transits...')}</Text>
+              <Text style={[styles.loadingText, { color: colors.textTertiary }]}>{t('home.loading.transits', 'Loading transits...')}</Text>
             ) : !transitData.planets ? (
-              <Text style={styles.loadingText}>{t('home.loading.noTransitData', 'No transit data available')}</Text>
+              <Text style={[styles.loadingText, { color: colors.textTertiary }]}>{t('home.loading.noTransitData', 'No transit data available')}</Text>
             ) : (
               <View>
                   {/* Mini Zodiac Map */}
@@ -1153,7 +1191,7 @@ const loadHomeData = async (nativeData = null) => {
                     <View style={styles.zodiacWheelWrapper}>
                       <Svg width="160" height="160" viewBox="0 0 160 160">
                         {/* Outer Sign Ring */}
-                        <Circle cx="80" cy="80" r="75" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+                        <Circle cx="80" cy="80" r="75" fill="none" stroke={colors.strokeStrong} strokeWidth="2" />
                         
                         {/* Sign Dividers & Symbols */}
                         {[...Array(12)].map((_, i) => {
@@ -1176,11 +1214,11 @@ const loadHomeData = async (nativeData = null) => {
                           
                           return (
                             <React.Fragment key={i}>
-                              <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+                              <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke={colors.strokeMuted} strokeWidth="1.5" />
                               <SvgText
                                 x={sx}
                                 y={sy}
-                                fill="#FFFFFF"
+                                fill={colors.text}
                                 fontSize="14"
                                 fontWeight="900"
                                 textAnchor="middle"
@@ -1193,8 +1231,8 @@ const loadHomeData = async (nativeData = null) => {
                         })}
 
                         {/* Inner Rings */}
-                        <Circle cx="80" cy="80" r="55" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
-                        <Circle cx="80" cy="80" r="40" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+                        <Circle cx="80" cy="80" r="55" fill="none" stroke={colors.strokeStrong} strokeWidth="2" />
+                        <Circle cx="80" cy="80" r="40" fill="none" stroke={colors.strokeMuted} strokeWidth="1.5" />
                         
                         {/* Planet Dots */}
                         {Object.entries(transitData.planets || {}).map(([planet, data], i) => {
@@ -1218,14 +1256,14 @@ const loadHomeData = async (nativeData = null) => {
                               r="5" 
                               fill={getPlanetColor(planet)} 
                               opacity={1}
-                              stroke="#FFFFFF"
+                              stroke={theme === 'dark' ? '#FFFFFF' : colors.text}
                               strokeWidth="1.5"
                             />
                           );
                         })}
                       </Svg>
                       {/* Center Glow */}
-                      <View style={styles.zodiacCenterGlow} />
+                      <View style={[styles.zodiacCenterGlow, theme === 'light' && { backgroundColor: 'rgba(249, 115, 22, 0.08)' }]} />
                     </View>
                     
                     <View style={styles.zodiacSummary}>
@@ -1275,7 +1313,9 @@ const loadHomeData = async (nativeData = null) => {
                           return (
                             <View key={planet} style={[
                               styles.transitCard,
-                              { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: getSignColor(signIdx) + '40' }
+                              theme === 'dark'
+                                ? { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: getSignColor(signIdx) + '40' }
+                                : { backgroundColor: '#fffbf7', borderColor: getSignColor(signIdx) + '45' }
                             ]}>
                               <View style={styles.transitCardHeader}>
                                 <Text style={styles.transitPlanetIcon}>{vibe.icon}</Text>
@@ -1313,21 +1353,21 @@ const loadHomeData = async (nativeData = null) => {
 
           {/* Panchang Timeline */}
           {panchangData && (
-            <View style={styles.panchangCard}>
+            <View style={[styles.panchangCard, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.cardBackground, borderColor: 'rgba(234, 88, 12, 0.18)', borderWidth: 1 }]}>
               <Text style={[styles.panchangTitle, { color: colors.text }]}>
                 {t('home.panchang.title', '🌅 Today\'s Panchang')}
               </Text>
-              <View style={styles.panchangTitleUnderline} />
+              <View style={[styles.panchangTitleUnderline, theme === 'light' && { backgroundColor: colors.primary }]} />
               
               <View style={styles.sunTimesRow}>
-                <View style={styles.sunTimeItem}>
+                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                   <Text style={styles.sunTimeEmoji}>🌅</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunrise', 'Sunrise')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
                     {panchangData.sunrise && !isNaN(new Date(panchangData.sunrise).getTime()) ? new Date(panchangData.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '6:30 AM'}
                   </Text>
                 </View>
-                <View style={styles.sunTimeItem}>
+                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                   <Text style={styles.sunTimeEmoji}>🌇</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.sunset', 'Sunset')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
@@ -1337,14 +1377,14 @@ const loadHomeData = async (nativeData = null) => {
               </View>
               
               <View style={styles.sunTimesRow}>
-                <View style={styles.sunTimeItem}>
+                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                   <Text style={styles.sunTimeEmoji}>🌙</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonrise', 'Moonrise')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
                     {panchangData.daily_panchang?.sunrise_sunset?.moonrise || panchangData.sunrise_sunset?.moonrise || '7:53 AM'}
                   </Text>
                 </View>
-                <View style={styles.sunTimeItem}>
+                <View style={[styles.sunTimeItem, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                   <Text style={styles.sunTimeEmoji}>🌚</Text>
                   <Text style={[styles.sunTimeLabel, { color: colors.textSecondary }]}>{t('home.panchang.moonset', 'Moonset')}</Text>
                   <Text style={[styles.sunTimeValue, { color: colors.text }]}>
@@ -1355,7 +1395,7 @@ const loadHomeData = async (nativeData = null) => {
               
               {/* Day Progress */}
               <View style={styles.dayProgressBar}>
-                <View style={styles.progressTrack}>
+                <View style={[styles.progressTrack, theme === 'light' && { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
                   {(() => {
                     const now = new Date();
                     const sunrise = panchangData.sunrise ? new Date(panchangData.sunrise) : null;
@@ -1400,7 +1440,7 @@ const loadHomeData = async (nativeData = null) => {
                   <View style={styles.panchangElementGrid}>
                     {/* Tithi */}
                     {panchangData.daily_panchang.tithi && (
-                      <View style={styles.panchangElement}>
+                      <View style={[styles.panchangElement, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                         <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
                           {t('home.panchang.tithi', '🌙 Tithi')}
                         </Text>
@@ -1412,7 +1452,7 @@ const loadHomeData = async (nativeData = null) => {
                     
                     {/* Yoga */}
                     {panchangData.daily_panchang.yoga && (
-                      <View style={styles.panchangElement}>
+                      <View style={[styles.panchangElement, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                         <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
                           {t('home.panchang.yoga', '🧘 Yoga')}
                         </Text>
@@ -1424,7 +1464,7 @@ const loadHomeData = async (nativeData = null) => {
                     
                     {/* Karana */}
                     {panchangData.daily_panchang.karana && (
-                      <View style={styles.panchangElement}>
+                      <View style={[styles.panchangElement, theme === 'light' && { backgroundColor: '#fffbf7', borderColor: 'rgba(234, 88, 12, 0.22)' }]}>
                         <Text style={[styles.elementLabel, { color: colors.textSecondary }]}>
                           {t('home.panchang.karana', '⚡ Karana')}
                         </Text>
@@ -1519,7 +1559,7 @@ const loadHomeData = async (nativeData = null) => {
               <View style={styles.dayQualityContainer}>
                 <Text style={[styles.dayQualityTitle, { color: colors.text }]}>{t('home.panchang.dayQuality', 'Day Quality Timeline')}</Text>
                 <View style={styles.qualityTimelineWrapper}>
-                  <View style={styles.qualityTimelineTrack}>
+                  <View style={[styles.qualityTimelineTrack, theme === 'light' && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.12)' }]}>
                     {(() => {
                       const now = new Date();
                       const startOfDay = new Date(now);
@@ -1614,7 +1654,7 @@ const loadHomeData = async (nativeData = null) => {
                 {/* Detailed Timings List */}
                 <View style={styles.detailedTimingsContainer}>
                   {/* Auspicious */}
-                  <View style={styles.timingGroup}>
+                  <View style={[styles.timingGroup, theme === 'light' && { backgroundColor: 'rgba(16, 185, 129, 0.08)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' }]}>
                     <View style={styles.timingRow}>
                       <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.brahmaMuhurta', 'Brahma Muhurta')}</Text>
                       <Text style={[styles.timingValue, { color: '#10B981' }]}>
@@ -1638,7 +1678,7 @@ const loadHomeData = async (nativeData = null) => {
                   </View>
 
                   {/* Inauspicious */}
-                  <View style={styles.timingGroup}>
+                  <View style={[styles.timingGroup, theme === 'light' && { backgroundColor: 'rgba(239, 68, 68, 0.08)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
                     {panchangData.rahu_kaal && (
                       <View style={styles.timingRow}>
                         <Text style={[styles.timingLabel, { color: colors.textSecondary }]}>{t('home.panchang.rahuKaal', 'Rahu Kaal')}</Text>
@@ -1682,17 +1722,38 @@ const loadHomeData = async (nativeData = null) => {
       </LinearGradient>
 
       {/* Floating Action Button (FAB) - Outside of ScrollView and Gradient to ensure absolute positioning */}
-      <Animated.View style={[styles.fabContainer, { bottom: 90, width: fabWidth }]}>
+      <Animated.View 
+        style={[
+          styles.fabContainer, 
+          androidLightCardFixStyle,
+          { 
+            bottom: 90,
+            width: fabWidth.interpolate({
+              inputRange: [0, 1],
+              outputRange: [56, 180], // Icon only vs full width
+            })
+          }
+        ]}
+      >
         <TouchableOpacity
-          style={styles.fabButton}
+          style={[styles.fabButton, androidLightCardFixStyle]}
           onPress={() => onOptionSelect({ action: 'question' })}
           activeOpacity={0.9}
         >
-          <LinearGradient
+          <AnimatedLinearGradient
             colors={['#FFD700', '#F59E0B']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.fabGradient}
+            style={[
+              styles.fabGradient, 
+              {
+                paddingHorizontal: fabWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 16],
+                }),
+                justifyContent: 'center'
+              }
+            ]}
           >
             <Icon name="chatbubbles" size={24} color="#854d0e" />
             <Animated.Text 
@@ -1700,18 +1761,24 @@ const loadHomeData = async (nativeData = null) => {
                 styles.fabText, 
                 { 
                   color: '#854d0e',
-                  opacity: fabTextOpacity,
-                  width: fabTextOpacity.interpolate({
+                  opacity: fabWidth,
+                  width: fabWidth.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 120]
-                  })
+                    outputRange: [0, 110], // Adjusted width for "Ask AstroRoshni"
+                  }),
+                  transform: [{
+                    translateX: fabWidth.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-20, 0],
+                    })
+                  }]
                 }
               ]} 
               numberOfLines={1}
             >
               {t('home.askFAB', 'Ask AstroRoshni')}
             </Animated.Text>
-          </LinearGradient>
+          </AnimatedLinearGradient>
         </TouchableOpacity>
       </Animated.View>
 
@@ -1822,7 +1889,7 @@ const loadHomeData = async (nativeData = null) => {
 
 // Separate component to avoid hooks order violation
 function OptionCard({ option, index, onOptionSelect }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, androidLightCardFixStyle } = useTheme();
   
   if (!option) return null;
   const gradientColors = option.id === 'events' 
@@ -1833,7 +1900,7 @@ function OptionCard({ option, index, onOptionSelect }) {
   
   return (
     <View 
-      style={styles.optionCard}
+      style={[styles.optionCard, androidLightCardFixStyle]}
     >
       <TouchableOpacity
         onPress={() => onOptionSelect(option)}
@@ -1843,7 +1910,7 @@ function OptionCard({ option, index, onOptionSelect }) {
           colors={theme === 'dark' 
             ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
             : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)']}
-          style={styles.optionGradient}
+          style={[styles.optionGradient, androidLightCardFixStyle]}
         >
           <View style={styles.optionIconContainer}>
             <LinearGradient
@@ -1945,14 +2012,14 @@ function LifeAnalysisCard({ option, index, onOptionSelect }) {
 
 // Premium Cosmic Ribbon Card for Timing Planners
 function CosmicRibbonCard({ option, index, onOptionSelect }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, androidLightCardFixStyle } = useTheme();
   
   if (!option) return null;
   
   const cardWidth = width * 0.72;
   
   return (
-    <View style={[styles.ribbonCardWrapper, { width: cardWidth }]}>
+    <View style={[styles.ribbonCardWrapper, androidLightCardFixStyle, { width: cardWidth }]}>
       <TouchableOpacity
         onPress={() => {
           if (option.id === 'muhurat') {
@@ -1966,6 +2033,7 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
       >
         <View style={[
           styles.ribbonGlassmorphism,
+          androidLightCardFixStyle,
           {
             backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.7)',
             borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.2)',
@@ -1995,12 +2063,12 @@ function CosmicRibbonCard({ option, index, onOptionSelect }) {
 
 // Full width Analysis Card for Timing Planners
 function AnalysisCard({ option, index, onOptionSelect }) {
-  const { theme, colors } = useTheme();
+  const { theme, colors, androidLightCardFixStyle } = useTheme();
   
   if (!option) return null;
   return (
     <View
-      style={styles.analysisCard}
+      style={[styles.analysisCard, androidLightCardFixStyle]}
     >
       <TouchableOpacity
         onPress={() => {
@@ -2014,9 +2082,10 @@ function AnalysisCard({ option, index, onOptionSelect }) {
       >
         <View style={[
           styles.analysisGlassmorphism,
+          androidLightCardFixStyle,
           {
-            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(251, 146, 60, 0.15)',
-            borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
+            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : colors.surface,
+            borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder,
           }
         ]}>
           <View style={styles.analysisIconContainer}>
@@ -3537,15 +3606,15 @@ const styles = StyleSheet.create({
   // FAB Styles
   fabContainer: {
     position: 'absolute',
-    bottom: 30,
     right: 20,
     zIndex: 1000,
+    height: 56,
     ...Platform.select({
       ios: {
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
       },
       android: {
         elevation: 8,
@@ -3553,20 +3622,23 @@ const styles = StyleSheet.create({
     }),
   },
   fabButton: {
-    borderRadius: 30,
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
     overflow: 'hidden',
   },
   fabGradient: {
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 30,
+    paddingHorizontal: 16,
+    borderRadius: 28,
   },
   fabText: {
-    color: COLORS.white,
+    color: '#854d0e',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     marginLeft: 8,
   },
   // Dasha Timeline Styles
@@ -3730,43 +3802,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // FAB Styles
-  fabContainer: {
-    position: 'absolute',
-    right: 20,
-    zIndex: 1000,
-    height: 56,
-  },
-  fabButton: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 28,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
-  fabGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  fabText: {
-    fontSize: 14,
-    fontWeight: '800',
-    marginLeft: 8,
   },
   // Bottom Tabs Styles
   bottomTabs: {

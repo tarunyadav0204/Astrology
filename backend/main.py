@@ -971,6 +971,97 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
         "self_birth_chart": birth_chart_data
     }
 
+
+def delete_user_data(userid: int):
+    """
+    Permanently delete (or strongly anonymize) all data linked to a given user id.
+    This is intended for account & data deletion requests.
+    """
+    conn = sqlite3.connect("astrology.db")
+    cursor = conn.cursor()
+    try:
+        # 1) Chat history (sessions and messages)
+        cursor.execute(
+            """
+            DELETE FROM chat_messages
+            WHERE session_id IN (
+              SELECT session_id FROM chat_sessions WHERE user_id = ?
+            )
+            """,
+            (userid,),
+        )
+        cursor.execute("DELETE FROM chat_sessions WHERE user_id = ?", (userid,))
+
+        # 2) Credits & transactions
+        cursor.execute("DELETE FROM credit_transactions WHERE userid = ?", (userid,))
+        cursor.execute("DELETE FROM user_credits WHERE userid = ?", (userid,))
+
+        # 3) Credit requests (user as requester)
+        try:
+            cursor.execute("DELETE FROM credit_requests WHERE userid = ?", (userid,))
+        except sqlite3.OperationalError:
+            # Table may not exist in all deployments
+            pass
+
+        # 4) Promo code usage (user as redeemer)
+        try:
+            cursor.execute("DELETE FROM promo_code_usage WHERE userid = ?", (userid,))
+        except sqlite3.OperationalError:
+            pass
+
+        # 5) User settings
+        try:
+            cursor.execute("DELETE FROM user_settings WHERE user_id = ?", (userid,))
+        except sqlite3.OperationalError:
+            pass
+
+        # 6) Subscriptions
+        cursor.execute("DELETE FROM user_subscriptions WHERE userid = ?", (userid,))
+
+        # 7) Birth charts
+        cursor.execute("DELETE FROM birth_charts WHERE userid = ?", (userid,))
+
+        # 8) Finally, delete the user record itself
+        cursor.execute("DELETE FROM users WHERE userid = ?", (userid,))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@app.delete("/api/admin/users/{userid}")
+async def admin_delete_user(userid: int, current_user: User = Depends(get_current_user)):
+    """
+    Hard-delete a user and all associated data from the system.
+
+    NOTE: This endpoint is protected so that only admins can call it.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    # Verify user exists
+    conn = sqlite3.connect("astrology.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT userid FROM users WHERE userid = ?", (userid,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    delete_user_data(userid)
+    return {"status": "deleted", "userid": userid}
+
+
+@app.delete("/api/user/account")
+async def delete_own_account(current_user: User = Depends(get_current_user)):
+    """
+    Allow a logged-in user to delete their own account and all associated data.
+    Intended to be called from the mobile app's 'Delete account' flow.
+    """
+    delete_user_data(current_user.userid)
+    return {"status": "deleted"}
+
 @app.post("/api/login")
 async def login(user_data: UserLogin):
     conn = None

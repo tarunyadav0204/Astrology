@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Animated,
   Dimensions,
   PanResponder,
+  Platform,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { BlurView } from 'expo-blur';
 import { chartAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 
@@ -29,12 +31,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
   
-  // Update chart type when prop changes
   useEffect(() => {
     if (chartType && chartType !== currentChartType) {
       setCurrentChartType(chartType);
     }
   }, [chartType, currentChartType]);
+
   const [currentChartData, setCurrentChartData] = useState(chartData);
   const [loading, setLoading] = useState(false);
   const [slideAnim] = useState(new Animated.Value(0));
@@ -42,7 +44,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [chartDataCache, setChartDataCache] = useState({ lagna: chartData });
   const [transitDate, setTransitDate] = useState(new Date());
   
-  // Ref to prevent stale state updates
   const activeChartTypeRef = useRef(currentChartType);
   
   useEffect(() => {
@@ -78,7 +79,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     hora: 2, drekkana: 3, chaturthamsa: 4, navamsa: 9, saptamsa: 7, dashamsa: 10, dwadashamsa: 12, shodamsa: 16,
     vimsamsa: 20, chaturvimsamsa: 24, saptavimshamsa: 27,
     trimsamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60,
-    shodamsa: 16, vimsamsa: 20, trimsamsa: 30
   };
 
   const toggleStyle = useCallback(() => {
@@ -323,6 +323,26 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     );
   }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress]);
 
+  const QuickActionButton = ({ icon, label, onPress, active, primary }) => (
+    <TouchableOpacity 
+      style={[
+        styles.quickActionButton, 
+        active && styles.quickActionButtonActive,
+        primary && styles.quickActionButtonPrimary
+      ]} 
+      onPress={onPress}
+    >
+      <Ionicons name={icon} size={18} color="#fff" />
+      <Text style={[
+        styles.quickActionText, 
+        active && styles.quickActionTextActive,
+        primary && styles.quickActionTextPrimary
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={[styles.container, cosmicTheme && styles.cosmicContainer]}>
       {!hideHeader && (
@@ -351,16 +371,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         {cosmicTheme && (
           <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
             <TouchableOpacity onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)} style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}>
-              <Text style={styles.floatingButtonIcon}>👁️</Text>
+              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={18} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
-              <Text style={[styles.floatingButtonIcon, styles.floatingButtonText]}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
+              <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
             </TouchableOpacity>
           </View>
         )}
         
         <Animated.View 
-          {...panResponder.panHandlers}
+          {...(disableSwipe ? {} : panResponder.panHandlers)}
           style={[styles.swipeArea, { transform: [{ translateX: slideAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-20, 0, 20], extrapolate: 'clamp' }) }] }]}
         >
           {renderChart(currentChartType, getChartData())}
@@ -368,37 +388,52 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       </View>
       
       {cosmicTheme && (
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickActionButton} onPress={() => { setCurrentChartType('transit'); if (onNavigateToTransit) onNavigateToTransit(); }}>
-            <Text style={styles.quickActionIcon}>🪐</Text>
-            <Text style={styles.quickActionText}>{t('chartScreen.transit', 'Transit')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton} onPress={onOpenDasha}>
-            <Text style={styles.quickActionIcon}>⏰</Text>
-            <Text style={styles.quickActionText}>{t('chartScreen.dasha', 'Dasha')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickActionButton, showKarakas && styles.quickActionButtonActive]} onPress={toggleKarakas}>
-            <Text style={styles.quickActionIcon}>🎯</Text>
-            <Text style={styles.quickActionText}>{t('chartScreen.karakas', 'Karakas')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData(), birthData })}>
-            <Text style={styles.quickActionIcon}>📋</Text>
-            <Text style={styles.quickActionText}>{t('chartScreen.positions', 'Positions')}</Text>
-          </TouchableOpacity>
-          {currentChartType === 'lagna' && (
-            <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation?.navigate('Yogas')}>
-              <Text style={styles.quickActionIcon}>🧘</Text>
-              <Text style={styles.quickActionText}>{t('chartScreen.yogas', 'Yogas')}</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.quickActionButton} onPress={() => {
-            const chartName = chartTitles[currentChartType] || currentChartType;
-            const prompt = `Analyze my ${chartName} chart in detail. What does it reveal about my life?`;
-            navigation?.navigate('Home', { startChat: true, initialMessage: prompt });
-          }}>
-            <Text style={styles.quickActionIcon}>💬</Text>
-            <Text style={styles.quickActionText}>{t('chartScreen.analyze', 'Analyze')}</Text>
-          </TouchableOpacity>
+        <View style={styles.quickActionsGrid}>
+          <View style={styles.quickActionsRow}>
+            <QuickActionButton 
+              icon="planet-outline" 
+              label={t('chartScreen.transit', 'Transit')} 
+              onPress={() => { setCurrentChartType('transit'); if (onNavigateToTransit) onNavigateToTransit(); }}
+              active={currentChartType === 'transit'}
+            />
+            <QuickActionButton 
+              icon="time-outline" 
+              label={t('chartScreen.dasha', 'Dasha')} 
+              onPress={onOpenDasha}
+            />
+            <QuickActionButton 
+              icon="star-outline" 
+              label={t('chartScreen.karakas', 'Karakas')} 
+              onPress={toggleKarakas}
+              active={showKarakas}
+            />
+          </View>
+          <View style={styles.quickActionsRow}>
+            <QuickActionButton 
+              icon="list-outline" 
+              label={t('chartScreen.positions', 'Positions')} 
+              onPress={() => navigation?.navigate('PlanetaryPositions', { chartData: getChartData(), birthData })}
+            />
+            {currentChartType === 'lagna' ? (
+              <QuickActionButton 
+                icon="body-outline" 
+                label={t('chartScreen.yogas', 'Yogas')} 
+                onPress={() => navigation?.navigate('Yogas')}
+              />
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+            <QuickActionButton 
+              icon="sparkles-outline" 
+              label={t('chartScreen.analyze', 'Analyze')} 
+              primary
+              onPress={() => {
+                const chartName = chartTitles[currentChartType] || currentChartType;
+                const prompt = `Analyze my ${chartName} chart in detail. What does it reveal about my life?`;
+                navigation?.navigate('Home', { startChat: true, initialMessage: prompt });
+              }}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -413,23 +448,43 @@ const styles = StyleSheet.create({
   chartIndicators: { flexDirection: 'row', gap: 6 },
   indicator: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.border, marginHorizontal: 3 },
   indicatorActive: { backgroundColor: COLORS.accent, width: 24, height: 6, borderRadius: 3 },
-  chartContainer: { width: '100%', height: 400, position: 'relative', alignItems: 'center', justifyContent: 'center', padding: 10 },
-  cosmicChartContainer: { flex: 1, minHeight: 400, padding: 10 },
+  chartContainer: { width: '100%', aspectRatio: 1, position: 'relative', alignItems: 'center', justifyContent: 'center', padding: 0, paddingTop: 60 },
+  cosmicChartContainer: { width: '100%', aspectRatio: 1, padding: 0, paddingTop: 60, marginBottom: 20 },
   swipeArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
-  floatingControls: { position: 'absolute', top: -30, right: 10, flexDirection: 'row', gap: 8, zIndex: 10 },
-  floatingControlsTransit: { top: -30 },
+  floatingControls: { position: 'absolute', top: 10, right: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
+  floatingControlsTransit: { top: 10 },
   chartContainerTransit: { marginTop: 20 },
   floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
-  floatingButtonIcon: { fontSize: 16 },
-  floatingButtonText: { fontSize: 14, fontWeight: '700', color: COLORS.white },
-  quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingHorizontal: 20, marginTop: 16, flexWrap: 'wrap' },
-  quickActionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(0, 0, 0, 0.4)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)', gap: 6, marginBottom: 8 },
-  quickActionButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.6)', borderColor: 'rgba(255, 107, 53, 0.8)' },
-  quickActionIcon: { fontSize: 14 },
-  quickActionText: { fontSize: 12, fontWeight: '600', color: COLORS.white },
+  floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
+  quickActionsRow: { flexDirection: 'row', gap: 12 },
+  quickActionButton: { 
+    flex: 1,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 12, 
+    paddingVertical: 12, 
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    borderRadius: 16, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255, 255, 255, 0.2)', 
+    gap: 8,
+    justifyContent: 'center'
+  },
+  quickActionButtonActive: { 
+    backgroundColor: 'rgba(255, 255, 255, 0.25)', 
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  quickActionButtonPrimary: {
+    backgroundColor: '#ff6b35',
+    borderColor: '#ff8a65',
+  },
+  quickActionText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  quickActionTextActive: { color: '#fff', fontWeight: '800' },
+  quickActionTextPrimary: { color: '#fff', fontWeight: '800' },
   rotationBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginVertical: 12, alignSelf: 'center', gap: 12 },
   rotationBadgeCosmic: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   rotationBadgeText: { fontSize: 14, fontWeight: '600', color: COLORS.white },

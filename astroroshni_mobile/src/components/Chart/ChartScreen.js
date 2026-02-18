@@ -14,11 +14,12 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
-import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 import { COLORS } from '../../utils/constants';
 import { storage } from '../../services/storage';
@@ -37,6 +38,7 @@ export default function ChartScreen({ navigation, route }) {
   const { t } = useTranslation();
   useAnalytics('ChartScreen');
   const { theme, colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -44,44 +46,23 @@ export default function ChartScreen({ navigation, route }) {
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const bottomNavScrollRef = useRef(null);
   const lastSwipeTime = useRef(0);
-  const captureViewRef = useRef(null);
   const chartWidgetRef = useRef(null);
-  const [isSharing, setIsSharing] = useState(false);
+  const captureViewRef = useRef(null);
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const currentChartIndexRef = useRef(0);
+
+  useEffect(() => {
+    currentChartIndexRef.current = currentChartIndex;
+  }, [currentChartIndex]);
   
   // House Drawer State
   const [selectedHouse, setSelectedHouse] = useState(null);
+  const [isSharing, setIsSharing] = useState(false);
   const drawerAnim = useRef(new Animated.Value(height)).current;
 
   // Animation for smooth chart transitions
   const chartTranslateX = useRef(new Animated.Value(0)).current;
   const chartOpacity = useRef(new Animated.Value(1)).current;
-  
-  const handleShare = async () => {
-    if (isSharing) return;
-    try {
-      setIsSharing(true);
-      const uri = await captureRef(captureViewRef, {
-        format: 'png',
-        quality: 1.0,
-        result: 'tmpfile',
-      });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
-          dialogTitle: `Cosmic Blueprint - ${birthData?.name}`,
-          UTI: 'public.png',
-        });
-      } else {
-        Alert.alert('Sharing not available', 'Sharing is not supported on this device.');
-      }
-    } catch (error) {
-      console.error('Error sharing chart:', error);
-      Alert.alert('Error', 'Failed to generate shareable image.');
-    } finally {
-      setIsSharing(false);
-    }
-  };
   
   const chartTypes = [
     { id: 'lagna', name: t('chartTypes.lagna.name'), icon: '🏠', description: t('chartTypes.lagna.description') },
@@ -108,71 +89,65 @@ export default function ChartScreen({ navigation, route }) {
     { useNativeDriver: true }
   );
 
+  const resetChartTranslation = useCallback(() => {
+    Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }).start();
+  }, [chartTranslateX]);
+
   const handleSwipe = useCallback((event) => {
     const { translationX, state, velocityX } = event.nativeEvent;
-    
-    if (state === State.END) {
-      const now = Date.now();
-      const swipeThreshold = width * 0.2;
-      const velocityThreshold = 500;
-      
-      if (now - lastSwipeTime.current < 300) return;
-      
-      let newIndex = currentChartIndex;
+    const idx = currentChartIndexRef.current;
+    const numCharts = chartTypes.length;
 
-      if ((translationX > swipeThreshold || (velocityX > velocityThreshold && translationX > 20)) && currentChartIndex > 0) {
-        newIndex = currentChartIndex - 1;
-      } else if ((translationX < -swipeThreshold || (velocityX < -velocityThreshold && translationX < -20)) && currentChartIndex < chartTypes.length - 1) {
-        newIndex = currentChartIndex + 1;
+    if (state === State.END || state === State.CANCELLED) {
+      if (state === State.CANCELLED) {
+        resetChartTranslation();
+        return;
+      }
+      const now = Date.now();
+      const swipeThreshold = width * 0.12;
+      const velocityThreshold = 300;
+
+      if (now - lastSwipeTime.current < 150) {
+        resetChartTranslation();
+        return;
       }
 
-      if (newIndex !== currentChartIndex) {
+      let newIndex = idx;
+      if ((translationX > swipeThreshold || (velocityX > velocityThreshold && translationX > 10)) && idx > 0) {
+        newIndex = idx - 1;
+      } else if ((translationX < -swipeThreshold || (velocityX < -velocityThreshold && translationX < -10)) && idx < numCharts - 1) {
+        newIndex = idx + 1;
+      }
+      newIndex = Math.max(0, Math.min(newIndex, numCharts - 1));
+
+      if (newIndex !== idx) {
         lastSwipeTime.current = now;
-        const direction = newIndex > currentChartIndex ? -1 : 1;
-        Animated.parallel([
-          Animated.timing(chartTranslateX, { toValue: direction * width, duration: 200, useNativeDriver: true }),
-          Animated.timing(chartOpacity, { toValue: 0, duration: 200, useNativeDriver: true })
-        ]).start(() => {
-          setCurrentChartIndex(newIndex);
-          scrollToActiveTab(newIndex);
-          chartTranslateX.setValue(-direction * width);
-          Animated.parallel([
-            Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }),
-            Animated.timing(chartOpacity, { toValue: 1, duration: 250, useNativeDriver: true })
-          ]).start();
-        });
+        chartTranslateX.setValue(0);
+        setCurrentChartIndex(newIndex);
+        scrollToActiveTab(newIndex);
       } else {
-        Animated.spring(chartTranslateX, { toValue: 0, friction: 6, useNativeDriver: true }).start();
+        resetChartTranslation();
       }
     }
-  }, [currentChartIndex, chartTypes.length]);
+  }, [chartTypes.length, chartTranslateX, resetChartTranslation, scrollToActiveTab]);
   
   const changeChart = useCallback((newIndex) => {
     if (newIndex === currentChartIndex) return;
-    const direction = newIndex > currentChartIndex ? -1 : 1;
-    Animated.parallel([
-      Animated.timing(chartTranslateX, { toValue: direction * width, duration: 200, useNativeDriver: true }),
-      Animated.timing(chartOpacity, { toValue: 0, duration: 200, useNativeDriver: true })
-    ]).start(() => {
-      setCurrentChartIndex(newIndex);
-      scrollToActiveTab(newIndex);
-      chartTranslateX.setValue(-direction * width);
-      Animated.parallel([
-        Animated.spring(chartTranslateX, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }),
-        Animated.timing(chartOpacity, { toValue: 1, duration: 250, useNativeDriver: true })
-      ]).start();
-    });
+    // Simplified for performance
+    setCurrentChartIndex(newIndex);
+    scrollToActiveTab(newIndex);
   }, [currentChartIndex]);
 
   const scrollToActiveTab = useCallback((index) => {
-    if (bottomNavScrollRef.current) {
-      const pillWidth = 100;
-      bottomNavScrollRef.current.scrollTo({ 
-        x: index * pillWidth - (width / 2) + (pillWidth / 2), 
-        animated: true 
-      });
-    }
-  }, []);
+    if (!bottomNavScrollRef.current) return;
+    const pillWidth = 100;
+    const maxIndex = Math.max(0, chartTypes.length - 1);
+    const safeIndex = Math.max(0, Math.min(index, maxIndex));
+    const x = Math.max(0, safeIndex * pillWidth - (width / 2) + (pillWidth / 2));
+    try {
+      bottomNavScrollRef.current.scrollTo({ x, animated: true });
+    } catch (_) {}
+  }, [chartTypes.length]);
   
   const getChartDataForType = useCallback((chartType) => {
     if (!birthData) return null;
@@ -208,25 +183,38 @@ export default function ChartScreen({ navigation, route }) {
 
   const openHouseDrawer = (houseData) => {
     setSelectedHouse(houseData);
-    Animated.spring(drawerAnim, {
-      toValue: 0,
-      friction: 8,
-      tension: 40,
-      useNativeDriver: true
-    }).start();
   };
 
   const closeHouseDrawer = () => {
-    Animated.timing(drawerAnim, {
-      toValue: height,
-      duration: 300,
-      useNativeDriver: true
-    }).start(() => setSelectedHouse(null));
+    setSelectedHouse(null);
+  };
+  
+  const handleShare = async () => {
+    try {
+      setIsSharing(true);
+      // Wait for state update and potential re-renders
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const uri = await captureRef(captureViewRef, {
+        format: 'png',
+        quality: 0.8,
+      });
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share your Cosmic Blueprint',
+        UTI: 'public.png',
+      });
+    } catch (error) {
+      console.error('Error sharing chart:', error);
+      Alert.alert('Error', 'Failed to share chart. Please try again.');
+    } finally {
+      setIsSharing(false);
+    }
   };
   
   useEffect(() => {
     loadBirthData();
-    startAnimations();
   }, []);
   
   useEffect(() => {
@@ -236,20 +224,7 @@ export default function ChartScreen({ navigation, route }) {
     return unsubscribe;
   }, [navigation]);
   
-  const startAnimations = () => {
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 20000,
-        useNativeDriver: true,
-      })
-    ).start();
-  };
-  
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+
 
   const loadBirthData = async () => {
     try {
@@ -265,7 +240,14 @@ export default function ChartScreen({ navigation, route }) {
           longitude: parseFloat(data.longitude)
         };
         const response = await chartAPI.calculateChartOnly(formattedData);
-        setChartData(response.data);
+        
+        // Only update if data is actually different to prevent unnecessary re-renders
+        setChartData(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(response.data)) {
+            return prev;
+          }
+          return response.data;
+        });
       }
     } catch (error) {
       console.error('ChartScreen - Error loading birth data:', error);
@@ -278,165 +260,173 @@ export default function ChartScreen({ navigation, route }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
-        <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.container}>
-          <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <View style={styles.compactHeader}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
-                <Ionicons name="close" size={20} color={colors.text} />
-              </TouchableOpacity>
-              <View style={styles.headerCenter}>
-                <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
-                {birthData && (
-                  <NativeSelectorChip 
-                    birthData={birthData}
-                    onPress={() => navigation.navigate('SelectNative')}
-                    maxLength={15}
-                    style={styles.nativeChip}
-                    textStyle={styles.nativeChipText}
-                    showIcon={false}
-                  />
-                )}
-              </View>
-              <View style={[styles.chartPosition, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
-                <Text style={[styles.positionText, { color: colors.text }]}>{currentChartIndex + 1}/{chartTypes.length}</Text>
-              </View>
-              <TouchableOpacity 
-                onPress={handleShare} 
-                disabled={isSharing}
-                style={[styles.shareButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
-              >
-                <Ionicons name={isSharing ? "hourglass-outline" : "share-social-outline"} size={20} color={colors.text} />
-              </TouchableOpacity>
+        <LinearGradient 
+          colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd] : [colors.gradientStart, colors.gradientStart]} 
+          style={StyleSheet.absoluteFill} 
+        />
+        
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <View style={styles.compactHeader}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
+              <Ionicons name="close" size={20} color={colors.text} />
+            </TouchableOpacity>
+            <View style={styles.headerCenter}>
+              <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
+              {birthData && (
+                <NativeSelectorChip 
+                  birthData={birthData}
+                  onPress={() => navigation.navigate('SelectNative')}
+                  maxLength={15}
+                  style={styles.nativeChip}
+                  textStyle={styles.nativeChipText}
+                  showIcon={false}
+                />
+              )}
             </View>
+            <TouchableOpacity 
+              onPress={handleShare} 
+              style={[styles.shareButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}
+              disabled={isSharing}
+            >
+              <Ionicons name="share-outline" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <View style={[styles.chartPosition, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(249, 115, 22, 0.25)' }]}>
+              <Text style={[styles.positionText, { color: colors.text }]}>{currentChartIndex + 1}/{chartTypes.length}</Text>
+            </View>
+          </View>
 
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <View style={styles.loadingContent}>
-                  <Animated.View style={[styles.loadingOrb, { transform: [{ rotate: spin }] }]}>
-                    <LinearGradient colors={['#ff6b35', '#ffd700']} style={styles.loadingOrbGradient}>
-                      <Text style={styles.loadingOrbIcon}>✨</Text>
-                    </LinearGradient>
-                  </Animated.View>
-                  <Text style={[styles.loadingText, { color: colors.text }]}>{t('chartScreen.loadingText')}</Text>
-                  <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>{t('chartScreen.loadingSubtext')}</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <View style={styles.loadingContent}>
+                <View style={styles.loadingOrb}>
+                  <LinearGradient colors={['#ff6b35', '#ffd700']} style={styles.loadingOrbGradient}>
+                    <Text style={styles.loadingOrbIcon}>✨</Text>
+                  </LinearGradient>
                 </View>
+                <Text style={[styles.loadingText, { color: colors.text }]}>{t('chartScreen.loadingText')}</Text>
+                <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>{t('chartScreen.loadingSubtext')}</Text>
               </View>
-            ) : chartData && birthData ? (
-              <View style={styles.mainContent}>
-                <View style={styles.chartAndNavContainer}>
-                  <PanGestureHandler 
-                    onGestureEvent={onGestureEvent}
-                    onHandlerStateChange={handleSwipe}
-                    activeOffsetX={[-10, 10]}
-                    failOffsetY={[-30, 30]}
-                  >
-                    <Animated.View style={{ flex: 1, opacity: chartOpacity }}>
-                      <Animated.View 
-                        ref={captureViewRef} 
-                        collapsable={false} 
-                        style={[
-                          styles.captureArea,
-                          { transform: [{ translateX: chartTranslateX }] }
-                        ]}
-                      >
-                        <LinearGradient
-                          colors={theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0']}
-                          style={styles.captureGradient}
-                        >
-                          <View style={styles.captureHeader}>
-                            <Image source={require('../../../assets/logo.png')} style={styles.captureLogo} resizeMode="contain" />
-                            <View>
-                              <Text style={[styles.captureTitle, { color: colors.text }]}>Cosmic Blueprint</Text>
-                              <Text style={[styles.captureName, { color: colors.primary }]}>{birthData?.name}</Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.chartArea}>
-                            <View style={styles.chartWrapper}>
-                              <ChartWidget 
-                                ref={chartWidgetRef}
-                                chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
-                                birthData={birthData}
-                                lagnaChartData={chartData}
-                                defaultStyle="north"
-                                showTransits={chartTypes[currentChartIndex].id === 'transit'}
-                                disableSwipe={true}
-                                hideHeader={true}
-                                cosmicTheme={true}
-                                chartType={chartTypes[currentChartIndex].id}
-                                onOpenDasha={() => setShowDashaBrowser(true)}
-                                onNavigateToTransit={() => {
-                                  const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
-                                  if (transitIndex !== -1) changeChart(transitIndex);
-                                }}
-                                navigation={navigation}
-                                onHousePress={openHouseDrawer}
-                                division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
-                                         chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
-                                         chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
-                                         chartTypes[currentChartIndex].id === 'navamsa' ? 9 : 
-                                         chartTypes[currentChartIndex].id === 'dashamsa' ? 10 :
-                                         chartTypes[currentChartIndex].id === 'dwadashamsa' ? 12 :
-                                         chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :
-                                         chartTypes[currentChartIndex].id === 'vimsamsa' ? 20 :
-                                         chartTypes[currentChartIndex].id === 'chaturvimsamsa' ? 24 :
-                                         chartTypes[currentChartIndex].id === 'trimsamsa' ? 30 :
-                                         chartTypes[currentChartIndex].id === 'khavedamsa' ? 40 :
-                                         chartTypes[currentChartIndex].id === 'akshavedamsa' ? 45 :
-                                         chartTypes[currentChartIndex].id === 'shashtyamsa' ? 60 : 1}
-                              /> 
-                            </View>
-                          </View>
-
-                          <View style={styles.captureFooter}>
-                            <Text style={[styles.captureFooterText, { color: colors.textSecondary }]}>Generated by AstroRoshni</Text>
-                          </View>
-                        </LinearGradient>
-                      </Animated.View>
-                    </Animated.View>
-                  </PanGestureHandler>
-
-                  <View style={[styles.bottomNavContainer, { 
-                    backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                    borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  }]}>
-                    {Platform.OS === 'ios' && (
-                      <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
-                    )}
-                    <ScrollView
-                      ref={bottomNavScrollRef}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.navContent}
-                      decelerationRate="fast"
+            </View>
+          ) : chartData && birthData ? (
+            <View style={{ flex: 1 }}>
+              <ScrollView 
+                style={{ flex: 1 }} 
+                contentContainerStyle={{ paddingBottom: 120 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.mainContent}>
+                  <View style={styles.chartAndNavContainer}>
+                    <PanGestureHandler 
+                      onGestureEvent={onGestureEvent}
+                      onHandlerStateChange={handleSwipe}
+                      activeOffsetX={[-8, 8]}
+                      failOffsetY={[-80, 80]}
+                      shouldCancelWhenOutside={false}
                     >
-                      {chartTypes.map((chart, index) => (
-                        <TouchableOpacity
-                          key={chart.id}
-                          style={[styles.navPill, currentChartIndex === index && styles.navPillActive]}
-                          onPress={() => changeChart(index)}
-                          activeOpacity={0.7}
+                      <Animated.View 
+                        style={{ 
+                          flex: 1,
+                          transform: [{ translateX: chartTranslateX }] 
+                        }}
+                      >
+                        <View 
+                          ref={captureViewRef}
+                          collapsable={false} 
+                          style={styles.captureArea}
                         >
-                          {currentChartIndex === index && <View style={[styles.activeGlow, { backgroundColor: colors.primary + '40' }]} />}
-                          <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>{chart.icon}</Text>
-                          <Text style={[styles.navText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }, currentChartIndex === index && { color: theme === 'dark' ? '#ffffff' : colors.primary, fontWeight: '800' }]}>
-                            {chart.name.split(' ')[0]}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                          <LinearGradient
+                            colors={theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0']}
+                            style={styles.captureGradient}
+                          >
+                            <View style={styles.chartArea}>
+                              <View style={styles.chartWrapper}>
+                                <ChartWidget 
+                                  ref={chartWidgetRef}
+                                  chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
+                                  birthData={birthData}
+                                  lagnaChartData={chartData}
+                                  defaultStyle="north"
+                                  showTransits={chartTypes[currentChartIndex].id === 'transit'}
+                                  disableSwipe={true}
+                                  hideHeader={true}
+                                  cosmicTheme={true}
+                                  chartType={chartTypes[currentChartIndex].id}
+                                  onOpenDasha={() => setShowDashaBrowser(true)}
+                                  onNavigateToTransit={() => {
+                                    const transitIndex = chartTypes.findIndex(chart => chart.id === 'transit');
+                                    if (transitIndex !== -1) changeChart(transitIndex);
+                                  }}
+                                  navigation={navigation}
+                                  onHousePress={openHouseDrawer}
+                                  division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
+                                           chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
+                                           chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
+                                           chartTypes[currentChartIndex].id === 'navamsa' ? 9 : 
+                                           chartTypes[currentChartIndex].id === 'dashamsa' ? 10 :
+                                           chartTypes[currentChartIndex].id === 'dwadashamsa' ? 12 :
+                                           chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :
+                                           chartTypes[currentChartIndex].id === 'vimsamsa' ? 20 :
+                                           chartTypes[currentChartIndex].id === 'chaturvimsamsa' ? 24 :
+                                           chartTypes[currentChartIndex].id === 'trimsamsa' ? 30 :
+                                           chartTypes[currentChartIndex].id === 'khavedamsa' ? 40 :
+                                           chartTypes[currentChartIndex].id === 'akshavedamsa' ? 45 :
+                                           chartTypes[currentChartIndex].id === 'shashtyamsa' ? 60 : 1}
+                                /> 
+                              </View>
+                            </View>
+
+                            <View style={styles.captureFooter}>
+                              <Text style={[styles.captureFooterText, { color: colors.textSecondary }]}>Generated by AstroRoshni</Text>
+                            </View>
+                          </LinearGradient>
+                        </View>
+                      </Animated.View>
+                    </PanGestureHandler>
                   </View>
                 </View>
+              </ScrollView>
+
+              <View style={[styles.bottomNavContainer, { 
+                backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 1)' : 'rgba(255, 255, 255, 1)',
+                borderTopColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                paddingBottom: insets.bottom || 15
+              }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={theme === 'dark' ? 40 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
+                )}
+                <ScrollView
+                  ref={bottomNavScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.navContent}
+                  decelerationRate="fast"
+                >
+                  {chartTypes.map((chart, index) => (
+                    <TouchableOpacity
+                      key={chart.id}
+                      style={[styles.navPill, currentChartIndex === index && styles.navPillActive]}
+                      onPress={() => changeChart(index)}
+                      activeOpacity={0.7}
+                    >
+                      {currentChartIndex === index && <View style={[styles.activeGlow, { backgroundColor: colors.primary + '40' }]} />}
+                      <Text style={[styles.navIcon, currentChartIndex === index && styles.navIconActive]}>{chart.icon}</Text>
+                      <Text style={[styles.navText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }, currentChartIndex === index && { color: theme === 'dark' ? '#ffffff' : colors.primary, fontWeight: '800' }]}>
+                        {chart.name.split(' ')[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>📊</Text>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('chartScreen.emptyTitle')}</Text>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('chartScreen.emptyText')}</Text>
-              </View>
-            )}
-          </SafeAreaView>
-        </LinearGradient>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>📊</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('chartScreen.emptyTitle')}</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('chartScreen.emptyText')}</Text>
+            </View>
+          )}
+        </SafeAreaView>
+        
         <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} />
         
         {/* House Insights Drawer */}
@@ -451,12 +441,11 @@ export default function ChartScreen({ navigation, route }) {
             activeOpacity={1} 
             onPress={closeHouseDrawer}
           >
-            <Animated.View 
+            <View 
               style={[
                 styles.drawerContent, 
                 { 
-                  backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)',
-                  transform: [{ translateY: drawerAnim }]
+                  backgroundColor: theme === 'dark' ? 'rgba(26, 0, 51, 0.98)' : 'rgba(255, 255, 255, 0.98)'
                 }
               ]}
             >
@@ -560,12 +549,12 @@ export default function ChartScreen({ navigation, route }) {
                       }}
                     >
                       <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
-                      <Text style={[styles.actionButtonText, { color: colors.text }]}>Ask AI Analysis</Text>
+                      <Text style={[styles.actionButtonText, { color: colors.text }]}>Ask</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               )}
-            </Animated.View>
+            </View>
           </TouchableOpacity>
         </Modal>
       </View>
@@ -626,6 +615,7 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+    paddingHorizontal: 0,
   },
   chartAndNavContainer: {
     flex: 1,
@@ -635,7 +625,7 @@ const styles = StyleSheet.create({
   },
   captureGradient: {
     flex: 1,
-    padding: 16,
+    padding: 0,
   },
   captureHeader: {
     flexDirection: 'row',
@@ -659,7 +649,9 @@ const styles = StyleSheet.create({
   },
   chartArea: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingHorizontal: 0,
+    marginHorizontal: -20,
   },
   chartWrapper: {
     flex: 1,
@@ -667,7 +659,7 @@ const styles = StyleSheet.create({
   captureFooter: {
     alignItems: 'center',
     marginTop: 16,
-    paddingBottom: 90, // Space for bottom nav
+    paddingBottom: 20,
   },
   captureFooterText: {
     fontSize: 12,
@@ -680,7 +672,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 80,
-    paddingBottom: 15,
     borderTopWidth: 1,
     zIndex: 10000,
     elevation: 20,
@@ -854,6 +845,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: 'rgba(128,128,128,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,

@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   ScrollView,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../../../utils/constants';
@@ -72,12 +73,11 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
             },
           ]}
         >
-          <LinearGradient
-            colors={['#ff6b35', '#ffd700', '#ff6b35']}
-            style={styles.logoGradient}
-          >
-            <Text style={styles.logoEmoji}>🔮</Text>
-          </LinearGradient>
+          <Image 
+            source={require('../../../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </Animated.View>
 
         <Animated.View
@@ -139,20 +139,10 @@ const styles = StyleSheet.create({
   logoContainer: {
     marginBottom: 60,
   },
-  logoGradient: {
+  logoImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 15,
-  },
-  logoEmoji: {
-    fontSize: 50,
   },
   titleContainer: {
     alignItems: 'center',
