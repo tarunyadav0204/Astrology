@@ -41,6 +41,7 @@ import ProfilePage from './components/Profile/ProfilePage';
 import EducationAnalysisPage from './components/EducationAnalysis/EducationAnalysisPage';
 import CreditsPage from './components/Credits/CreditsPage';
 import PolicyPage from './components/Policy/PolicyPage';
+import DeleteAccountPage from './components/Policy/DeleteAccountPage';
 import ContactPage from './components/Contact/ContactPage';
 import AboutUs from './components/About/AboutUs';
 import Calendar2026 from './components/Calendar2026/Calendar2026';
@@ -804,6 +805,7 @@ function App() {
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
           <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/calendar-2026" element={<Calendar2026 user={null} onLogin={() => setShowLoginModal(true)} />} />
@@ -893,6 +895,7 @@ function App() {
           <Route path="/festivals/monthly" element={<MonthlyFestivalsPage />} />
           <Route path="/karma-analysis" element={<KarmaAnalysis />} />
           <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/account/delete" element={<DeleteAccountPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/education" element={
             <EducationAnalysisPage 
