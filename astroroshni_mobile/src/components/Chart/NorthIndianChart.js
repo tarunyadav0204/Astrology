@@ -14,7 +14,7 @@ const NorthIndianChart = ({
   chartData, 
   chartType,
   birthData, 
-  showDegreeNakshatra = true, 
+  showDegreeNakshatra = false, 
   cosmicTheme = false, 
   rotatedAscendant = null, 
   onRotate, 
@@ -355,7 +355,7 @@ const NorthIndianChart = ({
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 15;
                   } else if ([3, 4, 5].includes(houseNumber)) {
-                    planetX = houseData.center.x - 15;
+                    planetX = houseData.center.x - (houseNumber === 3 ? 5 : 15);
                     planetY = houseData.center.y + 10;
                   } else if ([6, 7, 8].includes(houseNumber)) {
                     planetX = houseData.center.x;
@@ -383,7 +383,7 @@ const NorthIndianChart = ({
                   if ([3, 5, 9, 11].includes(houseNumber)) {
                     const rowSpacing = 35;
                     if (houseNumber === 3) {
-                      planetX = houseData.center.x - 35;
+                      planetX = houseData.center.x - 25;
                       planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                     } else if (houseNumber === 5) {
                       planetX = houseData.center.x - 25;
@@ -431,7 +431,7 @@ const NorthIndianChart = ({
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
                   } else if ([3, 4, 5].includes(houseNumber)) {
-                    planetX = houseData.center.x - 25;
+                    planetX = houseData.center.x - (houseNumber === 3 ? 15 : 25);
                     planetY = houseData.center.y + 0 + (pIndex * rowSpacing);
                   } else if ([6, 7, 8].includes(houseNumber)) {
                     planetX = houseData.center.x;

@@ -204,6 +204,7 @@ const DateNavigator = ({ date, onDateChange, cosmicTheme = false, resetDate = nu
 const styles = StyleSheet.create({
   dateNav: {
     marginBottom: 12,
+    alignSelf: 'stretch',
   },
   modalOverlay: {
     flex: 1,
@@ -231,17 +232,18 @@ const styles = StyleSheet.create({
   compactNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly',
     borderRadius: 12,
-    padding: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
   },
   navButtonGroup: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
   compactNavButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     borderRadius: 8,
     minWidth: 32,
   },
@@ -251,10 +253,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   compactDateButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderRadius: 8,
-    minWidth: 80,
+    minWidth: 75,
     height: 32,
     justifyContent: 'center',
   },
@@ -264,7 +266,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   compactCalendarButton: {
-    padding: 8,
+    padding: 6,
     borderRadius: 8,
     height: 32,
     width: 32,

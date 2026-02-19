@@ -8,7 +8,7 @@ const AnimatedG = Animated.createAnimatedComponent(G);
 const SouthIndianChart = ({ 
   chartData, 
   chartType,
-  showDegreeNakshatra = true, 
+  showDegreeNakshatra = false, 
   rotatedAscendant = null, 
   onRotate, 
   cosmicTheme = false, 

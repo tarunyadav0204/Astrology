@@ -8,6 +8,8 @@ import {
   Dimensions,
   PanResponder,
   Platform,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
@@ -25,11 +27,12 @@ const { width } = Dimensions.get('window');
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const [chartStyle, setChartStyle] = useState(defaultStyle);
-  const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
+  const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
   const [rotatedAscendant, setRotatedAscendant] = useState(null);
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   
   useEffect(() => {
     if (chartType && chartType !== currentChartType) {
@@ -131,6 +134,44 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     }
     setShowKarakas(prev => !prev);
   }, [karakas, showKarakas, loadKarakas]);
+
+  const getChartInfoIntro = () => {
+    switch (currentChartType) {
+      case 'lagna':
+        return 'This is your Lagna (D1) birth chart. It shows how the 12 houses and zodiac signs were arranged at your birth, and where each planet was placed.';
+      case 'navamsa':
+        return 'This is your Navamsa (D9) chart. It refines your birth chart and is especially important for marriage, dharma, and the strength of planets.';
+      case 'transit':
+        return 'This is your Transit chart. It shows where the planets are today in the sky and how they interact with the houses and signs in your chart.';
+      case 'dasamsa':
+        return 'This is your Dasamsa (D10) chart, often used for career, profession, and public role analysis.';
+      case 'saptamsa':
+        return 'This is your Saptamsa (D7) chart, often used for children, progeny, and related life themes.';
+      case 'dwadasamsa':
+        return 'This is your Dwadasamsa (D12) chart, sometimes used for ancestry, parents, and inherited patterns.';
+      default:
+        return `This is your ${chartTitles[currentChartType] || 'divisional'} chart. It is a Vedic astrology divisional chart used to zoom in on specific areas of life.`;
+    }
+  };
+
+  const getChartInfoUsage = () => {
+    switch (currentChartType) {
+      case 'lagna':
+        return 'Use this chart to understand your overall life pattern: personality, health, family, career foundations, relationships and major life themes across all 12 houses.';
+      case 'navamsa':
+        return 'Use this chart to study deeper patterns in relationships, marriage, spiritual path and the true strength and maturity of planets over time.';
+      case 'transit':
+        return 'Use this chart to see how current planetary movements activate different houses and themes in your life right now (e.g. timing of events, focus areas).';
+      case 'dasamsa':
+        return 'Use this chart to explore your career direction, professional growth, leadership potential and how your work life may evolve.';
+      case 'saptamsa':
+        return 'Use this chart to explore themes related to children, fertility, joy from progeny and how that area may unfold in your life.';
+      case 'dwadasamsa':
+        return 'Use this chart to explore connections with parents, ancestors, family lineage and inherited tendencies.';
+      default:
+        return 'Use this chart to focus on a specific life theme connected to this divisional chart, alongside your main Lagna (D1) chart for full context.';
+    }
+  };
   
   const getChartData = () => {
     if (currentChartType === 'lagna') return chartData;
@@ -357,7 +398,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       )}
       
       {currentChartType === 'transit' && (
-        <DateNavigator date={transitDate} onDateChange={handleTransitDateChange} cosmicTheme={cosmicTheme} />
+        <DateNavigator 
+          date={transitDate} 
+          onDateChange={handleTransitDateChange} 
+          cosmicTheme={cosmicTheme} 
+        />
       )}
       
       {rotatedAscendant !== null && (
@@ -369,14 +414,42 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       
       <View style={[styles.chartContainer, cosmicTheme && styles.cosmicChartContainer, currentChartType === 'transit' && cosmicTheme && styles.chartContainerTransit]}>
         {cosmicTheme && (
-          <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
-            <TouchableOpacity onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)} style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}>
-              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
-              <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
-            </TouchableOpacity>
-          </View>
+          <>
+            <View style={[styles.floatingControls, currentChartType === 'transit' && styles.floatingControlsTransit]}>
+              <TouchableOpacity
+                onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
+                style={[styles.floatingButton, showDegreeNakshatra && styles.floatingButtonActive]}
+              >
+                <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleStyle} style={styles.floatingButton}>
+                <Text style={styles.floatingButtonText}>{chartStyle === 'north' ? 'S' : 'N'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => navigation?.navigate('AshtakvargaOracle')} 
+                style={styles.floatingButton}
+              >
+                <Ionicons name="grid-outline" size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => navigation?.navigate('KPSystem', { birthDetails: birthData })} 
+                style={styles.floatingButton}
+              >
+                <Ionicons name="compass-outline" size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })} 
+                style={styles.floatingButton}
+              >
+                <Ionicons name="shield-outline" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.infoButtonContainer}>
+              <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.infoButton}>
+                <Ionicons name="information-circle-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </>
         )}
         
         <Animated.View 
@@ -390,12 +463,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       {cosmicTheme && (
         <View style={styles.quickActionsGrid}>
           <View style={styles.quickActionsRow}>
-            <QuickActionButton 
-              icon="planet-outline" 
-              label={t('chartScreen.transit', 'Transit')} 
-              onPress={() => { setCurrentChartType('transit'); if (onNavigateToTransit) onNavigateToTransit(); }}
-              active={currentChartType === 'transit'}
-            />
+            {currentChartType !== 'transit' && (
+              <QuickActionButton 
+                icon="planet-outline" 
+                label={t('chartScreen.transit', 'Transit')} 
+                onPress={() => { setCurrentChartType('transit'); if (onNavigateToTransit) onNavigateToTransit(); }}
+                active={false}
+              />
+            )}
             <QuickActionButton 
               icon="time-outline" 
               label={t('chartScreen.dasha', 'Dasha')} 
@@ -436,6 +511,47 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           </View>
         </View>
       )}
+      
+      {showInfoModal && (
+        <Modal
+          visible={showInfoModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowInfoModal(false)}
+        >
+          <View style={styles.infoOverlay}>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>
+                {t('chartScreen.infoTitle', 'About this chart')}
+              </Text>
+              <ScrollView style={styles.infoScroll} showsVerticalScrollIndicator={false}>
+                <Text style={styles.infoText}>
+                  {getChartInfoIntro()}
+                </Text>
+                <Text style={styles.infoText}>
+                  {getChartInfoUsage()}
+                </Text>
+                <Text style={styles.infoSubTitle}>
+                  {t('chartScreen.legendTitle', 'Legend')}
+                </Text>
+                <Text style={styles.infoText}>
+                  • {t('chartScreen.legendHouses', 'The house with ASC written is your 1st house. From there, go counter‑clockwise around the chart for houses 1–12.')}{'\n'}
+                  • {t('chartScreen.legendSigns', 'The small number inside each diamond is the zodiac sign number (1–12), not the house number.')}{'\n'}
+                  • {t('chartScreen.legendPlanets', 'Planet symbols show where each planet sits in the chart.')}{'\n'}
+                  • {t('chartScreen.legendRetro', '(R) after a planet means it is retrograde.')}{'\n'}
+                  • {t('chartScreen.legendExaltDebil', '↑ and ↓ indicate exalted or debilitated planets.')}{'\n'}
+                  • {t('chartScreen.legendNakshatra', 'Turn on the eye icon to see exact degrees and nakshatra names under each planet.')}
+                </Text>
+              </ScrollView>
+              <TouchableOpacity onPress={() => setShowInfoModal(false)} style={styles.infoCloseButton}>
+                <Text style={styles.infoCloseButtonText}>
+                  {t('common.close', 'Close')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 });
@@ -453,12 +569,14 @@ const styles = StyleSheet.create({
   swipeArea: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: COLORS.textSecondary },
-  floatingControls: { position: 'absolute', top: 10, right: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
+  floatingControls: { position: 'absolute', top: 10, left: 30, flexDirection: 'row', gap: 8, zIndex: 10 },
   floatingControlsTransit: { top: 10 },
   chartContainerTransit: { marginTop: 20 },
   floatingButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   floatingButtonActive: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderColor: 'rgba(255, 107, 53, 1)' },
   floatingButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  infoButtonContainer: { position: 'absolute', top: 10, right: 30, zIndex: 10 },
+  infoButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   quickActionsGrid: { marginTop: 24, paddingHorizontal: 36, gap: 12 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },
   quickActionButton: { 
@@ -491,6 +609,37 @@ const styles = StyleSheet.create({
   rotationBadgeTextCosmic: { color: COLORS.white },
   resetButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
   resetButtonText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
+  infoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  infoContent: { 
+    width: '100%', 
+    maxWidth: 420, 
+    maxHeight: 480,
+    backgroundColor: '#020617', 
+    borderRadius: 24, 
+    paddingHorizontal: 22, 
+    paddingVertical: 20, 
+    borderWidth: 1, 
+    borderColor: 'rgba(248, 250, 252, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.45,
+    shadowRadius: 26,
+    elevation: 16,
+  },
+  infoTitle: { 
+    fontSize: 19, 
+    fontWeight: '800', 
+    color: '#f9fafb', 
+    marginBottom: 6, 
+    textAlign: 'center', 
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  infoSubTitle: { fontSize: 14, fontWeight: '700', color: '#cbd5f5', marginTop: 12, marginBottom: 4 },
+  infoScroll: { maxHeight: 360, marginBottom: 16 },
+  infoText: { fontSize: 13, color: '#e5e7eb', lineHeight: 20, marginBottom: 8 },
+  infoCloseButton: { alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, backgroundColor: '#f97316' },
+  infoCloseButtonText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' },
 });
 
 export default ChartWidget;
