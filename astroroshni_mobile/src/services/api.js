@@ -207,6 +207,49 @@ export const chartAPI = {
         throw error;
       });
   },
+  getSadeSatiPeriods: (birthData) => {
+    const transitDate = new Date().toISOString().split('T')[0];
+    return api.post(getEndpoint('/transits/sade-sati-periods'), { birth_data: birthData, transit_date: transitDate })
+      .then(response => response)
+      .catch(error => {
+        console.error('getSadeSatiPeriods error:', error?.response?.data || error);
+        throw error;
+      });
+  },
+  getNakshatraYearCalendar: async (year, latitude, longitude) => {
+    const lat = latitude != null ? Number(latitude) : 28.6139;
+    const lon = longitude != null ? Number(longitude) : 77.2090;
+    const latR = Math.round(lat * 10000) / 10000;
+    const lonR = Math.round(lon * 10000) / 10000;
+    const CACHE_KEY_PREFIX = 'nakshatra_year_';
+    const NAKSHATRA_CACHE_VERSION = 5; // bump when backend nakshatra logic/response changes
+    const CACHE_HOURS = 24;
+    const cacheKey = `${CACHE_KEY_PREFIX}v${NAKSHATRA_CACHE_VERSION}_${year}_${latR}_${lonR}`;
+    try {
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) {
+        const { cachedAt, data } = JSON.parse(cached);
+        const ageHours = (Date.now() - (cachedAt || 0)) / (1000 * 60 * 60);
+        if (ageHours <= CACHE_HOURS && data) {
+          return { data };
+        }
+      }
+    } catch (_) { /* ignore parse/storage errors */ }
+    return api.get(getEndpoint(`/nakshatra/year/${year}`), { params: { latitude: lat, longitude: lon } })
+      .then(async (response) => {
+        try {
+          await AsyncStorage.setItem(cacheKey, JSON.stringify({
+            cachedAt: Date.now(),
+            data: response.data,
+          }));
+        } catch (_) { /* ignore */ }
+        return response;
+      })
+      .catch(error => {
+        console.error('getNakshatraYearCalendar error:', error?.response?.data || error);
+        throw error;
+      });
+  },
   calculateYogi: (birthData) => api.post(getEndpoint('/calculate-yogi'), birthData),
   calculateCascadingDashas: (birthData, targetDate) => {
     // console.log('\n' + '='.repeat(60));

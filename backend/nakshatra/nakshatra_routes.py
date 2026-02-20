@@ -1,16 +1,107 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from typing import Optional, Dict, List, Any, Tuple
 import sqlite3
 import os
 from datetime import datetime
+from collections import defaultdict, OrderedDict
 from calculators.annual_nakshatra_calculator import AnnualNakshatraCalculator
 
 router = APIRouter()
+
+# In-memory cache for nakshatra year calendar (slow to compute). Key -> response dict. Max 100 entries.
+# Bump NAKSHATRA_YEAR_RESPONSE_VERSION when dedupe/response shape changes so old cache entries are not reused.
+NAKSHATRA_YEAR_RESPONSE_VERSION = 3
+NAKSHATRA_YEAR_CACHE: OrderedDict = OrderedDict()
+NAKSHATRA_YEAR_CACHE_MAX = 100
+
+
+def _nakshatra_year_cache_key(year: int, latitude: float, longitude: float, ayanamsa_correction: float) -> Tuple:
+    return (NAKSHATRA_YEAR_RESPONSE_VERSION, year, round(float(latitude), 4), round(float(longitude), 4), round(float(ayanamsa_correction), 4))
+
+
+def _build_nakshatra_year_response(year: int, latitude: float, longitude: float, ayanamsa_correction: float) -> Dict[str, Any]:
+    """Compute nakshatra year by month. Uses a single pass so each boundary is used once:
+    end of one nakshatra = start of next (no overlaps or gaps)."""
+    calculator = AnnualNakshatraCalculator()
+    months: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    ayan_corr = float(ayanamsa_correction)
+    all_periods = calculator.calculate_annual_nakshatra_periods_all_continuous(
+        year, latitude, longitude, ayanamsa_correction_degrees=ayan_corr
+    )
+    # Build list of period dicts per month, then dedupe by (nakshatra, start_date): keep only the first by start_time (removes duplicate rows from calculator artifacts)
+    for period in all_periods:
+        start_dt = period["start_datetime"]
+        month_key = str(start_dt.month)
+        start_date = start_dt.strftime("%Y-%m-%d")
+        end_date = period["end_datetime"].strftime("%Y-%m-%d")
+        start_time = period.get("start_time", start_dt.strftime("%I:%M %p"))
+        nakshatra = period["nakshatra"]
+        months[month_key].append({
+            "nakshatra": nakshatra,
+            "start_date": start_date,
+            "end_date": end_date,
+            "start_time": start_time,
+            "end_time": period.get("end_time", period["end_datetime"].strftime("%I:%M %p")),
+        })
+    for month_key in months:
+        months[month_key].sort(key=lambda p: (p["start_date"], p.get("start_time", "")))
+        # One row per (nakshatra, start_date): keep first when sorted by (start_date, start_time)
+        seen_key: set = set()
+        deduped = []
+        for p in months[month_key]:
+            key = (p["nakshatra"], p["start_date"])
+            if key in seen_key:
+                continue
+            seen_key.add(key)
+            deduped.append(p)
+        months[month_key] = deduped
+    return {
+        "success": True,
+        "year": year,
+        "months": dict(months),
+        "location": {"latitude": latitude, "longitude": longitude},
+    }
+
 
 def get_db_connection():
     """Get database connection"""
     db_path = os.path.join(os.path.dirname(__file__), '..', 'astrology.db')
     return sqlite3.connect(db_path)
+
+
+@router.get("/nakshatra/year/{year}")
+async def get_nakshatra_year_by_month(
+    year: int,
+    latitude: Optional[float] = Query(28.6139, description="Latitude for location"),
+    longitude: Optional[float] = Query(77.2090, description="Longitude for location"),
+    ayanamsa_correction: Optional[float] = Query(0.0, description="Ayanamsa correction in degrees (e.g. -0.2 for Drik Panchang alignment)"),
+):
+    """Get all nakshatra periods for a year, grouped by month (1-12). Cached on server."""
+    try:
+        current_year = datetime.now().year
+        if year < 1900 or year > current_year + 10:
+            raise HTTPException(status_code=400, detail="Year must be between 1900 and 10 years from now")
+
+        lat = float(latitude) if latitude is not None else 28.6139
+        lon = float(longitude) if longitude is not None else 77.2090
+        ayan_corr = float(ayanamsa_correction) if ayanamsa_correction is not None else 0.0
+        cache_key = _nakshatra_year_cache_key(year, lat, lon, ayan_corr)
+
+        if cache_key in NAKSHATRA_YEAR_CACHE:
+            NAKSHATRA_YEAR_CACHE.move_to_end(cache_key)
+            return NAKSHATRA_YEAR_CACHE[cache_key]
+
+        result = _build_nakshatra_year_response(year, lat, lon, ayan_corr)
+        NAKSHATRA_YEAR_CACHE[cache_key] = result
+        NAKSHATRA_YEAR_CACHE.move_to_end(cache_key)
+        if len(NAKSHATRA_YEAR_CACHE) > NAKSHATRA_YEAR_CACHE_MAX:
+            NAKSHATRA_YEAR_CACHE.popitem(last=False)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error building nakshatra year calendar: {str(e)}")
+
 
 @router.get("/nakshatra/{nakshatra_name}/{year}")
 async def get_nakshatra_year_data(
@@ -18,7 +109,8 @@ async def get_nakshatra_year_data(
     year: int,
     latitude: Optional[float] = Query(28.6139, description="Latitude for location"),
     longitude: Optional[float] = Query(77.2090, description="Longitude for location"),
-    location_name: Optional[str] = Query("New Delhi, India", description="Location name")
+    location_name: Optional[str] = Query("New Delhi, India", description="Location name"),
+    ayanamsa_correction: Optional[float] = Query(0.0, description="Ayanamsa correction in degrees"),
 ):
     """Get nakshatra periods for specific year and location"""
     
@@ -33,10 +125,12 @@ async def get_nakshatra_year_data(
         current_year = datetime.now().year
         if year < 1900 or year > current_year + 10:
             raise HTTPException(status_code=400, detail="Year must be between 1900 and 10 years from now")
+
+        ayan_corr = float(ayanamsa_correction) if ayanamsa_correction is not None else 0.0
         
         # Calculate annual periods
         nakshatra_data = calculator.calculate_annual_nakshatra_periods(
-            nakshatra_name.title(), year, latitude, longitude
+            nakshatra_name.title(), year, latitude, longitude, ayanamsa_correction_degrees=ayan_corr
         )
         
         # Add dynamic auspiciousness to each period based on multiple factors
@@ -102,6 +196,7 @@ async def get_nakshatra_year_data(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating nakshatra data: {str(e)}")
+
 
 @router.get("/nakshatras/list")
 async def get_all_nakshatras():

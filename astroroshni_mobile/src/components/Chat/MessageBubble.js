@@ -1233,6 +1233,32 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
 
+        {!message.isTyping && message.messageId && message.role === 'user' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={copyToClipboard}
+            >
+              <Ionicons name="copy-outline" size={16} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Message',
+                  'Are you sure you want to delete this message?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: deleteMessage }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="trash-outline" size={16} color="#666" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {message.role === 'assistant' && (
           <Text style={styles.timestamp}>
             {new Date(message.timestamp).toLocaleTimeString([], {

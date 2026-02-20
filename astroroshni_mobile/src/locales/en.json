@@ -330,8 +330,22 @@
       "sadeSati": "Sade Sati",
       "activeMahadasha": "Active Mahadasha",
       "moonPhase": "Moon Phase",
+      "todaysNakshatra": "Today's Nakshatra",
       "noSadeSati": "No active Sade Sati",
       "active": "Active"
+    },
+    "sadeSati": {
+      "title": "Sade Sati Periods (100 years)",
+      "loadError": "Could not load Sade Sati periods.",
+      "noPeriods": "No periods found."
+    },
+    "nakshatra": {
+      "title": "Nakshatra calendar",
+      "loadError": "Could not load nakshatra calendar.",
+      "noData": "No nakshatra data for this month.",
+      "begins": "Begins",
+      "ends": "Ends",
+      "at": "at"
     },
     "tabs": {
       "ask": "Ask",

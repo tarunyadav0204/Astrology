@@ -1,7 +1,13 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 import math
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+
+try:
+    from utils.timezone_service import parse_timezone_offset
+except ImportError:
+    parse_timezone_offset = None
+
 
 class AnnualNakshatraCalculator:
     """Calculate annual nakshatra periods for specific nakshatras"""
@@ -56,44 +62,242 @@ class AnnualNakshatraCalculator:
             'Revati': {'lord': 'Mercury', 'deity': 'Pushan', 'nature': 'Soft/Mridu', 'guna': 'Sattva', 'symbol': '🐟'}
         }
     
-    def calculate_annual_nakshatra_periods(self, nakshatra_name: str, year: int, latitude: float = 28.6139, longitude: float = 77.2090) -> Dict[str, Any]:
-        """Calculate all periods when Moon is in specific nakshatra for a year"""
+    def _moon_sidereal_lon(self, jd: float, ayanamsa_correction_degrees: float = 0.0) -> float:
+        """Moon's sidereal longitude in [0, 360). Uses Lahiri + optional correction to align with Drik Panchang."""
+        if ayanamsa_correction_degrees == 0.0:
+            lon = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+            return lon % 360.0
+        # Apply custom correction: sidereal = tropical - ayanamsa + correction (positive = crossing earlier)
+        trop = swe.calc_ut(jd, swe.MOON, 0)[0][0]
+        ayan = swe.get_ayanamsa_ut(jd)
+        return (trop - ayan + ayanamsa_correction_degrees) % 360.0
+
+    def _find_moon_longitude_crossing(
+        self,
+        jd_start: float,
+        target_lon: float,
+        max_days: float = 2.0,
+        ayanamsa_correction_degrees: float = 0.0,
+    ) -> Optional[float]:
+        """
+        Find the next UT JD after jd_start when Moon's sidereal longitude crosses target_lon (0-360).
+        Moon moves forward ~13°/day. Returns None if no crossing in max_days.
+        Precision: ~1 minute (1/1440 day).
+        """
+        target_lon = target_lon % 360.0
+        step = 1.0 / 24.0  # 1 hour
+        jd = jd_start
+        end_jd = jd_start + max_days
+        prev_lon = self._moon_sidereal_lon(jd, ayanamsa_correction_degrees)
         
+        while jd < end_jd:
+            jd += step
+            curr_lon = self._moon_sidereal_lon(jd, ayanamsa_correction_degrees)
+            # Detect crossing: Moon moves forward; handle wrap at 360
+            crossed = False
+            if prev_lon < curr_lon:
+                if prev_lon < target_lon <= curr_lon:
+                    crossed = True
+            else:
+                # wrap: prev_lon > curr_lon (e.g. 350 -> 10)
+                if prev_lon < target_lon or target_lon <= curr_lon:
+                    crossed = True
+            if crossed:
+                # Binary search in [jd - step, jd] for precision (~1 min)
+                lo, hi = jd - step, jd
+                for _ in range(30):
+                    mid = (lo + hi) / 2.0
+                    mid_lon = self._moon_sidereal_lon(mid, ayanamsa_correction_degrees)
+                    # Moon moves forward; "before" target = need to go forward in time (lo = mid)
+                    diff = (target_lon - mid_lon + 360.0) % 360.0
+                    if diff > 180.0:
+                        lo = mid
+                    else:
+                        hi = mid
+                    if hi - lo < 1.0 / 1440.0:
+                        return (lo + hi) / 2.0
+                return (lo + hi) / 2.0
+            prev_lon = curr_lon
+        return None
+    
+    def _jd_ut_to_local_datetime(self, jd_ut: float, tz_offset_hours: float) -> datetime:
+        """Convert UT Julian Day to local datetime (date + time) using timezone offset."""
+        local_jd = jd_ut + (tz_offset_hours / 24.0)
+        y, m, d, h, mi, s = swe.jdut1_to_utc(local_jd, 1)
+        sec = min(59, int(round(s)))  # datetime allows 0..59 only
+        return datetime(int(y), int(m), int(d), int(h), int(mi), sec)
+    
+    def calculate_annual_nakshatra_periods_all_continuous(
+        self,
+        year: int,
+        latitude: float = 28.6139,
+        longitude: float = 77.2090,
+        ayanamsa_correction_degrees: float = 0.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Compute all nakshatra periods for the year so that each boundary is used exactly once:
+        end of nakshatra N = start of nakshatra N+1 (no gaps or overlaps).
+        Returns a flat list of periods, each with nakshatra_name, start_datetime, end_datetime, etc.
+        """
+        nak_slice = 360.0 / 27.0
+        tz_offset = 5.5
+        if parse_timezone_offset:
+            try:
+                tz_offset = parse_timezone_offset('', latitude, longitude)
+            except Exception:
+                pass
+        jd_year_start = swe.julday(year, 1, 1, 0.0)
+        jd_year_end = swe.julday(year + 1, 1, 1, 0.0)
+
+        # Build ordered list of (jd, into_nakshatra_index) for every boundary crossing in the year.
+        # Each (jd, nak) means: at jd we enter nakshatra nak (so the previous nakshatra ends at jd).
+        crossings = []  # (jd, into_nakshatra_index)
+        cursor_jd = jd_year_start
+        min_jd_step = 1.0 / 24.0  # 1 hour: skip duplicate crossing if same nakshatra within this
+        min_forward_jd = 1.0 / 1440.0  # crossing must be at least 1 min after previous (avoid past/wrong boundary)
+        while cursor_jd < jd_year_end:
+            lon = self._moon_sidereal_lon(cursor_jd, ayanamsa_correction_degrees)
+            current_nak = int(lon / nak_slice) % 27
+            next_boundary = ((current_nak + 1) * nak_slice) % 360.0
+            if next_boundary == 0:
+                next_boundary = 360.0
+            exit_jd = self._find_moon_longitude_crossing(
+                cursor_jd + 1.0 / 1440.0, next_boundary, max_days=32.0, ayanamsa_correction_degrees=ayanamsa_correction_degrees
+            )
+            if exit_jd is None or exit_jd >= jd_year_end:
+                break
+            next_nak = (current_nak + 1) % 27
+            last_jd = crossings[-1][0] if crossings else jd_year_start
+            expected_next = (crossings[-1][1] + 1) % 27 if crossings else None
+            # Enforce strict order: must be next nakshatra in cycle (fixes Ashlesha reappearing after Magha)
+            if expected_next is not None and next_nak != expected_next:
+                cursor_jd = cursor_jd + min_jd_step
+                continue
+            # Skip if this crossing is in the past or same as last (wrong boundary)
+            if exit_jd <= last_jd + min_forward_jd:
+                cursor_jd = cursor_jd + min_jd_step
+                continue
+            # Skip duplicate: same nakshatra entered within 1 hour of previous (numerical artifact)
+            if crossings and crossings[-1][1] == next_nak and (exit_jd - crossings[-1][0]) < min_jd_step:
+                cursor_jd = exit_jd + 1.0 / 1440.0
+                continue
+            crossings.append((exit_jd, next_nak))
+            cursor_jd = exit_jd + 1.0 / 1440.0
+
+        # Build periods: use each boundary exactly once. First period starts at year_start.
+        result = []
+        # First period: nakshatra at year start, from year_start to first crossing
+        if crossings:
+            entry_jd = jd_year_start
+            exit_jd = crossings[0][0]
+            lon0 = self._moon_sidereal_lon(jd_year_start, ayanamsa_correction_degrees)
+            first_nak = int(lon0 / nak_slice) % 27
+            entry_local = self._jd_ut_to_local_datetime(entry_jd, tz_offset)
+            exit_local = self._jd_ut_to_local_datetime(exit_jd, tz_offset)
+            result.append({
+                'nakshatra': self.NAKSHATRA_NAMES[first_nak],
+                'start_datetime': entry_local,
+                'end_datetime': exit_local,
+                'start_time': entry_local.strftime('%I:%M %p'),
+                'end_time': exit_local.strftime('%I:%M %p'),
+                'start_date': entry_local.strftime('%b %d'),
+                'end_date': exit_local.strftime('%b %d'),
+            })
+        for k in range(len(crossings)):
+            entry_jd, nak_idx = crossings[k]
+            exit_jd = crossings[k + 1][0] if k + 1 < len(crossings) else jd_year_end
+            if exit_jd > jd_year_end:
+                exit_jd = jd_year_end
+            entry_local = self._jd_ut_to_local_datetime(entry_jd, tz_offset)
+            exit_local = self._jd_ut_to_local_datetime(exit_jd, tz_offset)
+            result.append({
+                'nakshatra': self.NAKSHATRA_NAMES[nak_idx],
+                'start_datetime': entry_local,
+                'end_datetime': exit_local,
+                'start_time': entry_local.strftime('%I:%M %p'),
+                'end_time': exit_local.strftime('%I:%M %p'),
+                'start_date': entry_local.strftime('%b %d'),
+                'end_date': exit_local.strftime('%b %d'),
+            })
+        # Remove duplicates: same nakshatra and same start_datetime (can occur from crossing list edge cases)
+        seen = set()
+        deduped = []
+        for p in result:
+            key = (p["nakshatra"], p["start_datetime"])
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(p)
+        return deduped
+
+    def calculate_annual_nakshatra_periods(
+        self,
+        nakshatra_name: str,
+        year: int,
+        latitude: float = 28.6139,
+        longitude: float = 77.2090,
+        ayanamsa_correction_degrees: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        Calculate all periods when Moon is in this nakshatra for the year.
+        Uses exact Moon longitude crossing (Lahiri sidereal) and converts to local time.
+        Optional ayanamsa_correction_degrees: add to sidereal longitude (positive = crossings earlier).
+        Use a small value (e.g. -0.2 to +0.2) to align with Drik Panchang if needed.
+        """
         if nakshatra_name not in self.NAKSHATRA_NAMES:
             raise ValueError(f"Invalid nakshatra name: {nakshatra_name}")
         
+        tz_offset = 5.5  # IST fallback
+        if parse_timezone_offset:
+            try:
+                tz_offset = parse_timezone_offset('', latitude, longitude)
+            except Exception:
+                pass
+        
         nakshatra_index = self.NAKSHATRA_NAMES.index(nakshatra_name)
-        nakshatra_start = nakshatra_index * 13.333333
-        nakshatra_end = (nakshatra_index + 1) * 13.333333
+        nak_slice = 360.0 / 27.0
+        nakshatra_start = (nakshatra_index * nak_slice) % 360.0
+        nakshatra_end = ((nakshatra_index + 1) * nak_slice) % 360.0
+        if nakshatra_end == 0:
+            nakshatra_end = 360.0
+        
+        jd_year_start = swe.julday(year, 1, 1, 0.0)
+        jd_year_end = swe.julday(year + 1, 1, 1, 0.0)
         
         periods = []
-        current_date = datetime(year, 1, 1)
-        end_date = datetime(year + 1, 1, 1)
+        cursor_jd = jd_year_start
         
-        # Moon completes cycle in ~27 days, check every 26 days
-        while current_date < end_date:
-            jd = swe.julday(current_date.year, current_date.month, current_date.day, 12.0)
-            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+        while cursor_jd < jd_year_end:
+            entry_jd = self._find_moon_longitude_crossing(
+                cursor_jd, nakshatra_start, max_days=30.0, ayanamsa_correction_degrees=ayanamsa_correction_degrees
+            )
+            if entry_jd is None or entry_jd >= jd_year_end:
+                break
+            exit_jd = self._find_moon_longitude_crossing(
+                entry_jd + 1.0 / 1440.0, nakshatra_end, max_days=2.0, ayanamsa_correction_degrees=ayanamsa_correction_degrees
+            )
+            if exit_jd is None:
+                exit_jd = entry_jd + 1.0  # fallback ~1 day
+            if exit_jd > jd_year_end:
+                exit_jd = jd_year_end
             
-            if nakshatra_start <= moon_pos < nakshatra_end:
-                entry = self._quick_find_entry(current_date, nakshatra_start)
-                exit_time = entry + timedelta(hours=24)
-                
-                periods.append({
-                    'start_datetime': entry,
-                    'end_datetime': exit_time,
-                    'start_time': entry.strftime('%I:%M %p'),
-                    'end_time': exit_time.strftime('%I:%M %p'),
-                    'start_date': entry.strftime('%b %d'),
-                    'end_date': exit_time.strftime('%b %d'),
-                    'duration_hours': 24,
-                    'weekday': entry.strftime('%a'),
-                    'day_number': entry.day,
-                    'month_name': entry.strftime('%b')
-                })
-                current_date += timedelta(days=27)
-            else:
-                current_date += timedelta(days=1)
+            entry_local = self._jd_ut_to_local_datetime(entry_jd, tz_offset)
+            exit_local = self._jd_ut_to_local_datetime(exit_jd, tz_offset)
+            duration_hours = (exit_jd - entry_jd) * 24.0
+            
+            periods.append({
+                'start_datetime': entry_local,
+                'end_datetime': exit_local,
+                'start_time': entry_local.strftime('%I:%M %p'),
+                'end_time': exit_local.strftime('%I:%M %p'),
+                'start_date': entry_local.strftime('%b %d'),
+                'end_date': exit_local.strftime('%b %d'),
+                'duration_hours': round(duration_hours, 2),
+                'weekday': entry_local.strftime('%a'),
+                'day_number': entry_local.day,
+                'month_name': entry_local.strftime('%b')
+            })
+            cursor_jd = exit_jd + 0.01
         
         return {
             'nakshatra': nakshatra_name,

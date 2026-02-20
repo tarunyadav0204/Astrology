@@ -1626,9 +1626,20 @@ export default function ChatScreen({ navigation, route }) {
                   </TouchableOpacity>
                 </View>
               ) : !partnershipMode ? (
-                <>
-                  <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
-                </>
+                <View style={styles.headerNativeChipWrap}>
+                  {birthData ? (
+                    <NativeSelectorChip
+                      birthData={birthData}
+                      onPress={() => navigation.navigate('SelectNative', { returnTo: 'Chat' })}
+                      maxLength={8}
+                      showIcon={false}
+                      style={styles.headerNativeChip}
+                      textStyle={styles.headerNativeChipText}
+                    />
+                  ) : (
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
+                  )}
+                </View>
               ) : (
                 <View style={styles.partnershipChipsContainer}>
                   <TouchableOpacity 
@@ -3182,6 +3193,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     color: '#ffffff',
+  },
+  headerNativeChipWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerNativeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minHeight: 32,
+  },
+  headerNativeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   headerRight: {
     flexDirection: 'row',

@@ -21,11 +21,14 @@ import NorthIndianChart from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -364,25 +367,31 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     );
   }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress]);
 
-  const QuickActionButton = ({ icon, label, onPress, active, primary }) => (
-    <TouchableOpacity 
-      style={[
-        styles.quickActionButton, 
-        active && styles.quickActionButtonActive,
-        primary && styles.quickActionButtonPrimary
-      ]} 
-      onPress={onPress}
-    >
-      <Ionicons name={icon} size={18} color="#fff" />
-      <Text style={[
-        styles.quickActionText, 
-        active && styles.quickActionTextActive,
-        primary && styles.quickActionTextPrimary
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
+    const iconColor = primary ? '#fff' : (isLight ? '#1e293b' : '#fff');
+    const textColor = primary ? '#fff' : (isLight ? '#1e293b' : '#fff');
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.quickActionButton, 
+          isLight && styles.quickActionButtonLight,
+          active && (isLight ? styles.quickActionButtonActiveLight : styles.quickActionButtonActive),
+          primary && styles.quickActionButtonPrimary
+        ]} 
+        onPress={onPress}
+      >
+        <Ionicons name={icon} size={18} color={iconColor} />
+        <Text style={[
+          styles.quickActionText, 
+          { color: textColor },
+          active && styles.quickActionTextActive,
+          primary && styles.quickActionTextPrimary
+        ]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, cosmicTheme && styles.cosmicContainer]}>
@@ -592,16 +601,24 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: 'center'
   },
+  quickActionButtonLight: {
+    backgroundColor: 'rgba(30, 41, 59, 0.08)',
+    borderColor: 'rgba(30, 41, 59, 0.2)',
+  },
   quickActionButtonActive: { 
     backgroundColor: 'rgba(255, 255, 255, 0.25)', 
     borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  quickActionButtonActiveLight: {
+    backgroundColor: 'rgba(30, 41, 59, 0.15)',
+    borderColor: 'rgba(30, 41, 59, 0.35)',
   },
   quickActionButtonPrimary: {
     backgroundColor: '#ff6b35',
     borderColor: '#ff8a65',
   },
-  quickActionText: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  quickActionTextActive: { color: '#fff', fontWeight: '800' },
+  quickActionText: { fontSize: 12, fontWeight: '600' },
+  quickActionTextActive: { fontWeight: '800' },
   quickActionTextPrimary: { color: '#fff', fontWeight: '800' },
   rotationBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginVertical: 12, alignSelf: 'center', gap: 12 },
   rotationBadgeCosmic: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },

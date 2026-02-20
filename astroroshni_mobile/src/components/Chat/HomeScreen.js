@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,24 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 
-const { width } = Dimensions.get('window');
+const { width, height: windowHeight } = Dimensions.get('window');
+const NAKSHATRA_MODAL_HEIGHT = Math.min(windowHeight * 0.8, 560);
+const NAKSHATRA_LIST_HEIGHT = NAKSHATRA_MODAL_HEIGHT - 108; // header ~52 + month strip 56
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const ordinalSuffix = (n) => {
+  if (n >= 11 && n <= 13) return 'th';
+  switch (n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
+};
+/** Format ISO date "YYYY-MM-DD" as "2nd April 1980" */
+const formatDateOrdinal = (isoDate) => {
+  if (!isoDate || typeof isoDate !== 'string') return isoDate || '';
+  const [y, m, d] = isoDate.split('T')[0].split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  const dayStr = d + ordinalSuffix(d);
+  const month = MONTH_NAMES[m - 1] || m;
+  return `${dayStr} ${month} ${y}`;
+};
 
 // Scale animation for cards on scroll
 const getCardScale = (index) => 1;
@@ -59,9 +76,18 @@ export default function HomeScreen({ birthData, onOptionSelect, navigation, setS
   const [tickerData, setTickerData] = useState({
     sadeSati: null,
     mahadasha: null,
-    moonPhase: null,
+    nakshatra: null,
     loading: true
   });
+  const [sadeSatiModalVisible, setSadeSatiModalVisible] = useState(false);
+  const [sadeSatiPeriods, setSadeSatiPeriods] = useState([]);
+  const [sadeSatiPeriodsLoading, setSadeSatiPeriodsLoading] = useState(false);
+  const [nakshatraModalVisible, setNakshatraModalVisible] = useState(false);
+  const [nakshatraYearData, setNakshatraYearData] = useState(null);
+  const [nakshatraLoading, setNakshatraLoading] = useState(false);
+  const [nakshatraSelectedMonth, setNakshatraSelectedMonth] = useState(() => new Date().getMonth() + 1);
+  const [nakshatraSelectedYear, setNakshatraSelectedYear] = useState(() => new Date().getFullYear());
+  const [nakshatraYearPickerVisible, setNakshatraYearPickerVisible] = useState(false);
   const [isFABCollapsed, setIsFABCollapsed] = useState(false);
   const lastScrollY = useRef(0);
   const fabWidth = useRef(new Animated.Value(1)).current; // 1 for full, 0 for collapsed
@@ -303,22 +329,13 @@ const loadHomeData = async (nativeData = null) => {
           panchangLon = parseFloat(currentBirthData.longitude);
         }
         
-        const [panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse, moonPhaseResponse] = await Promise.allSettled([
+        const [panchangResponse, rahuKaalResponse, inauspiciousResponse, dailyPanchangResponse] = await Promise.allSettled([
           panchangAPI.calculateSunriseSunset(targetDate, panchangLat, panchangLon),
           panchangAPI.calculateRahuKaal(targetDate, panchangLat, panchangLon),
           panchangAPI.calculateInauspiciousTimes(targetDate, panchangLat, panchangLon),
-          panchangAPI.calculateDailyPanchang(targetDate, panchangLat, panchangLon),
-          panchangAPI.calculateMoonPhase(targetDate)
+          panchangAPI.calculateDailyPanchang(targetDate, panchangLat, panchangLon)
         ]);
         
-        // Update Ticker Moon Phase
-        if (moonPhaseResponse && moonPhaseResponse.status === 'fulfilled' && moonPhaseResponse.value?.data) {
-          setTickerData(prev => ({
-            ...prev,
-            moonPhase: moonPhaseResponse.value.data.phase_name || moonPhaseResponse.value.data.phase,
-          }));
-        }
-
         if (panchangResponse && panchangResponse.status === 'fulfilled' && panchangResponse.value?.data) {
           let combinedPanchangData = panchangResponse.value.data;
           
@@ -340,6 +357,10 @@ const loadHomeData = async (nativeData = null) => {
                 yoga: basicPanchang.yoga,
                 karana: basicPanchang.karana
               };
+              const nakshatraName = basicPanchang.nakshatra?.name || basicPanchang.nakshatra;
+              if (nakshatraName) {
+                setTickerData(prev => ({ ...prev, nakshatra: nakshatraName }));
+              }
             }
           }
           
@@ -462,7 +483,23 @@ const loadHomeData = async (nativeData = null) => {
   
   // Use current native data for display
   const displayData = currentNativeData || birthData;
-  
+
+  const loadNakshatraYear = useCallback(async (year) => {
+    setNakshatraLoading(true);
+    const lat = displayData ? parseFloat(displayData.latitude) : 28.6139;
+    const lon = displayData ? parseFloat(displayData.longitude) : 77.2090;
+    try {
+      const res = await chartAPI.getNakshatraYearCalendar(year, lat, lon);
+      setNakshatraYearData(res?.data || null);
+      setNakshatraSelectedYear(year);
+    } catch (e) {
+      Alert.alert(t('common.error', 'Error'), t('home.nakshatra.loadError', 'Could not load nakshatra calendar.'));
+      setNakshatraYearData(null);
+    } finally {
+      setNakshatraLoading(false);
+    }
+  }, [displayData, t]);
+
   // Don't render if no birth data available
   if (!displayData || !colors) {
     return null;
@@ -668,7 +705,7 @@ const loadHomeData = async (nativeData = null) => {
     }
   ];
 
-  const TickerItem = ({ icon, label, value, color }) => (
+  const TickerItem = ({ icon, label, value, color, showInfoIcon }) => (
     <View style={styles.tickerItem}>
       <View style={[styles.tickerIconContainer, { backgroundColor: `${color}20` }]}>
         <Icon name={icon} size={14} color={color} />
@@ -677,6 +714,11 @@ const loadHomeData = async (nativeData = null) => {
         <Text style={[styles.tickerLabel, { color: colors.textTertiary }]}>{label}</Text>
         <Text style={[styles.tickerValue, { color: colors.text }]}>{value}</Text>
       </View>
+      {showInfoIcon && (
+        <View style={styles.tickerItemInfoIcon}>
+          <Icon name="information-circle-outline" size={18} color={colors.textTertiary} />
+        </View>
+      )}
     </View>
   );
 
@@ -803,30 +845,295 @@ const loadHomeData = async (nativeData = null) => {
               </Text>
             ) : (
               <>
-                <TickerItem 
-                  icon="time-outline" 
-                  label={t('home.ticker.activeMahadasha', 'Active Mahadasha')} 
-                  value={tickerData.mahadasha || t('common.unknown', 'Unknown')}
-                  color="#F59E0B"
-                />
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (displayData && setShowDashaBrowser) setShowDashaBrowser(true);
+                  }}
+                >
+                  <TickerItem 
+                    icon="time-outline" 
+                    label={t('home.ticker.activeMahadasha', 'Active Mahadasha')} 
+                    value={tickerData.mahadasha || t('common.unknown', 'Unknown')}
+                    color="#F59E0B"
+                    showInfoIcon
+                  />
+                </TouchableOpacity>
                 <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
-                <TickerItem 
-                  icon="moon-outline" 
-                  label={t('home.ticker.moonPhase', 'Moon Phase')} 
-                  value={tickerData.moonPhase || t('common.unknown', 'Unknown')}
-                  color="#3B82F6"
-                />
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setNakshatraModalVisible(true);
+                    setNakshatraSelectedMonth(new Date().getMonth() + 1);
+                    setNakshatraSelectedYear(new Date().getFullYear());
+                    loadNakshatraYear(new Date().getFullYear());
+                  }}
+                >
+                  <TickerItem 
+                    icon="star-outline" 
+                    label={t('home.ticker.todaysNakshatra', "Today's Nakshatra")} 
+                    value={tickerData.nakshatra || t('common.unknown', 'Unknown')}
+                    color="#8B5CF6"
+                    showInfoIcon
+                  />
+                </TouchableOpacity>
                 <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
-                <TickerItem 
-                  icon="shield-checkmark-outline" 
-                  label={t('home.ticker.sadeSati', 'Sade Sati')} 
-                  value={tickerData.sadeSati ? t('home.ticker.active', 'Active') : t('home.ticker.noSadeSati', 'No active Sade Sati')}
-                  color={tickerData.sadeSati ? "#EF4444" : "#10B981"}
-                />
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={async () => {
+                    if (!displayData) return;
+                    setSadeSatiModalVisible(true);
+                    setSadeSatiPeriodsLoading(true);
+                    try {
+                      const formatted = {
+                        name: displayData.name,
+                        date: typeof displayData.date === 'string' ? displayData.date.split('T')[0] : displayData.date,
+                        time: typeof displayData.time === 'string' ? displayData.time.split('T')[1]?.slice(0, 5) || displayData.time : displayData.time,
+                        latitude: parseFloat(displayData.latitude) || 0,
+                        longitude: parseFloat(displayData.longitude) || 0,
+                        place: displayData.place || ''
+                      };
+                      const res = await chartAPI.getSadeSatiPeriods(formatted);
+                      setSadeSatiPeriods(res?.data?.periods || []);
+                    } catch (e) {
+                      Alert.alert(t('common.error', 'Error'), t('home.sadeSati.loadError', 'Could not load Sade Sati periods.'));
+                      setSadeSatiPeriods([]);
+                    } finally {
+                      setSadeSatiPeriodsLoading(false);
+                    }
+                  }}
+                >
+                  <TickerItem 
+                    icon="shield-checkmark-outline" 
+                    label={t('home.ticker.sadeSati', 'Sade Sati')} 
+                    value={tickerData.sadeSati ? t('home.ticker.active', 'Active') : t('home.ticker.noSadeSati', 'No active Sade Sati')}
+                    color={tickerData.sadeSati ? "#EF4444" : "#10B981"}
+                    showInfoIcon
+                  />
+                </TouchableOpacity>
               </>
             )}
           </ScrollView>
         </View>
+
+        {/* Sade Sati periods modal */}
+        <Modal
+          visible={sadeSatiModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSadeSatiModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.sadeSatiModalOverlay}
+            onPress={() => setSadeSatiModalVisible(false)}
+          >
+            <View style={[styles.sadeSatiModalContent, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onStartShouldSetResponder={() => true}>
+              <View style={styles.sadeSatiModalHeader}>
+                <Text style={[styles.sadeSatiModalTitle, { color: colors.text }]}>
+                  {t('home.sadeSati.title', 'Sade Sati Periods (100 years)')}
+                </Text>
+                <TouchableOpacity onPress={() => setSadeSatiModalVisible(false)} style={styles.sadeSatiModalClose}>
+                  <Icon name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              {sadeSatiPeriodsLoading ? (
+                <Text style={[styles.sadeSatiModalLoading, { color: colors.textSecondary }]}>{t('home.loading.ticker', 'Loading...')}</Text>
+              ) : (
+                <View style={styles.sadeSatiPeriodListContainer}>
+                  <ScrollView
+                    style={styles.sadeSatiPeriodList}
+                    contentContainerStyle={styles.sadeSatiPeriodListContent}
+                    showsVerticalScrollIndicator={true}
+                    nestedScrollEnabled={true}
+                  >
+                    {sadeSatiPeriods.length === 0 && !sadeSatiPeriodsLoading && (
+                      <Text style={[styles.sadeSatiModalEmpty, { color: colors.textSecondary }]}>{t('home.sadeSati.noPeriods', 'No periods found.')}</Text>
+                    )}
+                    {sadeSatiPeriods.map((p, i) => (
+                    <View
+                      key={`${p.start_date}-${i}`}
+                      style={[
+                        styles.sadeSatiPeriodRow,
+                        theme === 'light' && { borderColor: colors.cardBorder },
+                        p.is_current && styles.sadeSatiPeriodRowCurrent
+                      ]}
+                    >
+                      <Text style={[styles.sadeSatiPeriodDates, { color: colors.text }]}>
+                        {formatDateOrdinal(p.start_date)} — {formatDateOrdinal(p.end_date)}
+                      </Text>
+                      {p.is_current && (
+                        <View style={styles.sadeSatiCurrentBadge}>
+                          <Text style={styles.sadeSatiCurrentBadgeText}>{t('home.ticker.active', 'Active')}</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Nakshatra year calendar modal */}
+        <Modal
+          visible={nakshatraModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setNakshatraModalVisible(false)}
+        >
+          <View style={styles.sadeSatiModalOverlay}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setNakshatraModalVisible(false)}
+            />
+            <View
+              style={[
+                styles.nakshatraModalContent,
+                { height: NAKSHATRA_MODAL_HEIGHT },
+                theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }
+              ]}
+              pointerEvents="box-none"
+            >
+              <View style={styles.sadeSatiModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+                  <Text style={[styles.sadeSatiModalTitle, { color: colors.text }]}>
+                    {t('home.nakshatra.title', 'Nakshatra calendar')}{' '}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setNakshatraYearPickerVisible(true)}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingRight: 4 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.sadeSatiModalTitle, { color: colors.primary }]}>
+                      {nakshatraSelectedYear}
+                    </Text>
+                    <Icon name="chevron-down" size={20} color={colors.primary} style={{ marginLeft: 2 }} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => setNakshatraModalVisible(false)} style={styles.sadeSatiModalClose}>
+                  <Icon name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              {nakshatraLoading ? (
+                <Text style={[styles.sadeSatiModalLoading, { color: colors.textSecondary }]}>{t('home.loading.ticker', 'Loading...')}</Text>
+              ) : (
+                <View style={styles.nakshatraModalBody}>
+                  <View style={styles.nakshatraMonthStripWrapper} collapsable={false}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={[styles.nakshatraMonthStrip, { paddingBottom: 4 }]}
+                      style={styles.nakshatraMonthStripScroll}
+                    >
+                      {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((label, i) => {
+                        const monthNum = i + 1;
+                        const isSelected = nakshatraSelectedMonth === monthNum;
+                        return (
+                          <TouchableOpacity
+                            key={monthNum}
+                            onPress={() => setNakshatraSelectedMonth(monthNum)}
+                            style={[
+                              styles.nakshatraMonthChip,
+                              !isSelected && (theme === 'light' ? { borderColor: '#cbd5e1', backgroundColor: '#f1f5f9' } : { borderColor: 'rgba(148,163,184,0.3)', backgroundColor: 'rgba(255,255,255,0.08)' }),
+                              isSelected && styles.nakshatraMonthChipSelected,
+                              isSelected && theme === 'light' && { backgroundColor: colors.primary, borderColor: colors.primary }
+                            ]}
+                          >
+                            <View style={styles.nakshatraMonthChipInner}>
+                              <Text style={[styles.nakshatraMonthChipText, { color: isSelected ? '#ffffff' : (theme === 'light' ? '#334155' : '#e2e8f0') }]} includeFontPadding={false}>
+                                {label}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                  <ScrollView
+                    style={{ height: NAKSHATRA_LIST_HEIGHT, width: '100%' }}
+                    contentContainerStyle={styles.sadeSatiPeriodListContent}
+                    showsVerticalScrollIndicator={true}
+                    nestedScrollEnabled={true}
+                    bounces={true}
+                  >
+                    {!nakshatraLoading && (!nakshatraYearData?.months?.[String(nakshatraSelectedMonth)]?.length) ? (
+                      <Text style={[styles.sadeSatiModalEmpty, { color: colors.textSecondary }]}>
+                        {t('home.nakshatra.noData', 'No nakshatra data for this month.')}
+                      </Text>
+                    ) : null}
+                    {(nakshatraYearData?.months?.[String(nakshatraSelectedMonth)] || []).map((p, i) => (
+                      <View
+                        key={`${p.nakshatra}-${p.start_date}-${i}`}
+                        style={[
+                          styles.sadeSatiPeriodRow,
+                          styles.nakshatraPeriodRowColumn,
+                          theme === 'light' && { borderColor: colors.cardBorder }
+                        ]}
+                      >
+                        <Text style={[styles.sadeSatiPeriodDates, styles.nakshatraPeriodName, { color: colors.text }]}>
+                          {p.nakshatra}
+                        </Text>
+                        <View style={styles.nakshatraPeriodMeta}>
+                          <Text style={[styles.nakshatraPeriodRange, { color: colors.textSecondary }]}>
+                            {t('home.nakshatra.begins', 'Begins')} {formatDateOrdinal(p.start_date)}{p.start_time ? ` ${t('home.nakshatra.at', 'at')} ${p.start_time}` : ''}
+                          </Text>
+                          <Text style={[styles.nakshatraPeriodTime, { color: colors.textTertiary }]}>
+                            {t('home.nakshatra.ends', 'Ends')} {formatDateOrdinal(p.end_date)}{p.end_time ? ` ${t('home.nakshatra.at', 'at')} ${p.end_time}` : ''}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              {/* Year picker overlay: rendered on top so tapping year in header opens this */}
+              {nakshatraYearPickerVisible ? (
+                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFill}
+                    activeOpacity={1}
+                    onPress={() => setNakshatraYearPickerVisible(false)}
+                  />
+                  <View style={styles.nakshatraYearPickerOverlay} pointerEvents="box-none">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      onPress={(e) => e.stopPropagation()}
+                      style={[styles.nakshatraYearPickerBox, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                    >
+                      <Text style={[styles.sadeSatiModalTitle, { color: colors.text, marginBottom: 12 }]}>
+                        {t('home.nakshatra.selectYear', 'Select year')}
+                      </Text>
+                      <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={true}>
+                        {(() => {
+                          const currentYear = new Date().getFullYear();
+                          const years = [];
+                          for (let y = currentYear - 1; y <= currentYear + 10; y++) years.push(y);
+                          return years.map((y) => (
+                            <TouchableOpacity
+                              key={y}
+                              onPress={() => {
+                                setNakshatraYearPickerVisible(false);
+                                loadNakshatraYear(y);
+                              }}
+                              style={[styles.nakshatraYearPickerRow, nakshatraSelectedYear === y && (theme === 'light' ? { backgroundColor: colors.primary + '22', borderColor: colors.primary } : { backgroundColor: 'rgba(139,92,246,0.25)', borderColor: '#8B5CF6' })]}
+                            >
+                              <Text style={[styles.nakshatraYearPickerRowText, { color: nakshatraSelectedYear === y ? colors.primary : colors.text }]}>
+                                {y}
+                              </Text>
+                            </TouchableOpacity>
+                          ));
+                        })()}
+                      </ScrollView>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </Modal>
 
         {/* Biometric Teaser Card - COMMENTED OUT */}
         {/* <BiometricTeaserCard 
@@ -3574,6 +3881,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
+  tickerItemInfoIcon: {
+    marginLeft: 6,
+  },
   tickerIconContainer: {
     width: 28,
     height: 28,
@@ -3602,6 +3912,199 @@ const styles = StyleSheet.create({
   tickerLoading: {
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  sadeSatiModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  sadeSatiModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    height: '80%',
+    maxHeight: '80%',
+    backgroundColor: 'rgba(15,23,42,0.96)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.3)',
+    overflow: 'hidden',
+  },
+  sadeSatiModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148,163,184,0.2)',
+  },
+  sadeSatiModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    flex: 1,
+  },
+  sadeSatiModalClose: {
+    padding: 4,
+  },
+  sadeSatiModalLoading: {
+    padding: 24,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  sadeSatiPeriodListContainer: {
+    flex: 1,
+    minHeight: 0,
+  },
+  sadeSatiPeriodList: {
+    flex: 1,
+  },
+  sadeSatiPeriodListContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 24,
+  },
+  sadeSatiModalEmpty: {
+    padding: 24,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  sadeSatiPeriodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  sadeSatiPeriodRowCurrent: {
+    borderColor: 'rgba(239, 68, 68, 0.6)',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  sadeSatiPeriodDates: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  sadeSatiCurrentBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sadeSatiCurrentBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  nakshatraModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: 'rgba(15,23,42,0.96)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.3)',
+    overflow: 'hidden',
+    flexDirection: 'column',
+  },
+  nakshatraModalBody: {
+    flex: 1,
+    minHeight: 0,
+  },
+  nakshatraMonthStripWrapper: {
+    height: 56,
+  },
+  nakshatraMonthStripScroll: {
+    flex: 1,
+  },
+  nakshatraMonthStrip: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148,163,184,0.2)',
+  },
+  nakshatraMonthChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+    minWidth: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nakshatraMonthChipInner: {
+    minHeight: 18,
+    justifyContent: 'center',
+  },
+  nakshatraMonthChipSelected: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  nakshatraMonthChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  nakshatraYearPickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  nakshatraYearPickerBox: {
+    width: '100%',
+    maxWidth: 260,
+    backgroundColor: 'rgba(15,23,42,0.98)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.3)',
+    padding: 20,
+  },
+  nakshatraYearPickerRow: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: 6,
+  },
+  nakshatraYearPickerRowText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  nakshatraListContainer: {
+    minHeight: 0,
+  },
+  nakshatraListScroll: {
+    flex: 1,
+  },
+  nakshatraPeriodRowColumn: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
+  nakshatraPeriodName: {
+    flex: 0,
+    marginBottom: 6,
+  },
+  nakshatraPeriodMeta: {
+    alignItems: 'flex-start',
+    flexShrink: 0,
+    marginLeft: 0,
+  },
+  nakshatraPeriodRange: {
+    fontSize: 12,
+  },
+  nakshatraPeriodTime: {
+    fontSize: 11,
+    marginTop: 2,
   },
   // FAB Styles
   fabContainer: {

@@ -2081,7 +2081,7 @@ async def calculate_transits(request: TransitRequest, current_user: User = Depen
         "ascendant": birth_ascendant_sidereal
     }
 
-@app.post("/api/calculate-yogi")
+
 async def calculate_yogi(birth_data: BirthData):
     time_parts = birth_data.time.split(':')
     hour = float(time_parts[0]) + float(time_parts[1])/60
