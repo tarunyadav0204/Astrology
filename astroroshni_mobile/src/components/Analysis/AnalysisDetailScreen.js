@@ -13,7 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
 import { storage } from '../../services/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,6 +26,8 @@ import { trackAstrologyEvent } from '../../utils/analytics';
 
 export default function AnalysisDetailScreen({ route, navigation }) {
   useAnalytics('AnalysisDetailScreen');
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const { analysisType, title, cost } = route.params;
   const { credits, fetchBalance } = useCredits();
   const [loading, setLoading] = useState(false);
@@ -525,29 +528,32 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
       allMatches.sort((a, b) => a.start - b.start);
 
-      // 6. Assembly
+      // 6. Assembly (colors from theme)
+      const bodyColor = colors.text;
+      const termColor = colors.accent;
+      const finalBoldColor = isDark ? '#1a0033' : colors.text;
       allMatches.forEach((m, i) => {
         if (m.start > currentIndex) {
-          parts.push(<Text key={`text-${i}`} style={isFinalThoughts ? {color: '#333'} : {color: 'white'}}>{cleanPara.substring(currentIndex, m.start)}</Text>);
+          parts.push(<Text key={`text-${i}`} style={{ color: bodyColor }}>{cleanPara.substring(currentIndex, m.start)}</Text>);
         }
         if (m.type === 'term') {
           parts.push(
             <Text 
               key={`term-${i}`} 
-              style={[{ color: '#FFD700', textDecorationLine: 'underline', fontWeight: '700' }, isFinalThoughts && {color: '#1a0033'}]}
+              style={{ color: isFinalThoughts ? finalBoldColor : termColor, textDecorationLine: 'underline', fontWeight: '700' }}
               onPress={() => setTooltipModal({ show: true, term: m.text, definition: glossary[m.termId] })}
             >
               {m.text}
             </Text>
           );
         } else {
-          parts.push(<Text key={`bold-${i}`} style={isFinalThoughts ? styles.boldDarkText : styles.boldYellowText}>{m.text}</Text>);
+          parts.push(<Text key={`bold-${i}`} style={{ fontWeight: 'bold', color: isFinalThoughts ? finalBoldColor : termColor }}>{m.text}</Text>);
         }
         currentIndex = m.end;
       });
 
       if (currentIndex < cleanPara.length) {
-        parts.push(<Text key="tail" style={isFinalThoughts ? {color: '#333'} : {color: 'white'}}>{cleanPara.substring(currentIndex)}</Text>);
+        parts.push(<Text key="tail" style={{ color: bodyColor }}>{cleanPara.substring(currentIndex)}</Text>);
       }
 
       return <Text key={pIndex} style={{marginBottom: 10}}>{parts}</Text>;
@@ -740,39 +746,43 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     }
   };
 
+  const screenGradientColors = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary, colors.primary];
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradientBg}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity 
-              style={styles.backButton}
+              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
               onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
             >
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
-              <Text style={styles.headerTitle}>{title}</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
               {birthData?.name && (
-                <Text style={styles.headerSubtitle}>for {birthData.name.length > 15 ? birthData.name.substring(0, 15) + '...' : birthData.name}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>for {birthData.name.length > 15 ? birthData.name.substring(0, 15) + '...' : birthData.name}</Text>
               )}
             </View>
             <View style={styles.headerRight}>
               {analysisResult && (
                 <TouchableOpacity 
-                  style={styles.regenerateButton}
+                  style={[styles.regenerateButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
                   onPress={regenerateAnalysis}
                 >
-                  <Ionicons name="refresh" size={20} color={COLORS.white} />
+                  <Ionicons name="refresh" size={20} color={colors.text} />
                 </TouchableOpacity>
               )}
               {analysisResult && (
                 <TouchableOpacity 
-                  style={styles.pdfButton}
+                  style={[styles.pdfButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
                   onPress={downloadPDF}
                 >
-                  <Ionicons name="download" size={20} color={COLORS.white} />
+                  <Ionicons name="download" size={20} color={colors.text} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity 
@@ -780,10 +790,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 onPress={() => navigation.navigate('Credits')}
               >
                 <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
+                  colors={[colors.primary, colors.secondary]}
                   style={styles.creditGradient}
                 >
-                  <Text style={styles.creditText}>💳 {credits}</Text>
+                  <Text style={[styles.creditText, { color: '#fff' }]}>💳 {credits}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -801,8 +811,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       <Text style={styles.iconText}>{getAnalysisIcon()}</Text>
                     </LinearGradient>
                   </View>
-                  <Text style={styles.analysisTitle}>{title}</Text>
-                  <Text style={styles.analysisDescription}>
+                  <Text style={[styles.analysisTitle, { color: colors.text }]}>{title}</Text>
+                  <Text style={[styles.analysisDescription, { color: colors.textSecondary }]}>
                     Get comprehensive insights into your {analysisType} prospects with detailed astrological analysis
                   </Text>
                 </View>
@@ -810,7 +820,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                 {/* Progeny Focus Selector - only show when no existing analysis */}
                 {analysisType === 'progeny' && !analysisResult && (
                   <View style={styles.focusSection}>
-                    <Text style={styles.focusTitle}>What is your primary focus today?</Text>
+                    <Text style={[styles.focusTitle, { color: colors.text }]}>What is your primary focus today?</Text>
                     
                     <TouchableOpacity
                       style={[styles.focusOption, analysisFocus === 'first_child' && styles.focusOptionSelected]}
@@ -823,13 +833,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       disabled={loading}
                     >
                       <LinearGradient
-                        colors={analysisFocus === 'first_child' ? ['#FF69B4', '#FFB6C1'] : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.focusOptionGradient}
+                        colors={analysisFocus === 'first_child' ? ['#FF69B4', '#FFB6C1'] : (isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground])}
+                        style={[styles.focusOptionGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                       >
                         <Text style={styles.focusIcon}>👶</Text>
                         <View style={styles.focusTextContainer}>
-                          <Text style={styles.focusOptionTitle}>Planning First Child</Text>
-                          <Text style={styles.focusOptionSubtitle}>Fertility & Timing</Text>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Planning First Child</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Fertility & Timing</Text>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -845,13 +855,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       disabled={loading}
                     >
                       <LinearGradient
-                        colors={analysisFocus === 'next_child' ? ['#FF69B4', '#FFB6C1'] : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.focusOptionGradient}
+                        colors={analysisFocus === 'next_child' ? ['#FF69B4', '#FFB6C1'] : (isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground])}
+                        style={[styles.focusOptionGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                       >
                         <Text style={styles.focusIcon}>👨‍👩‍👧</Text>
                         <View style={styles.focusTextContainer}>
-                          <Text style={styles.focusOptionTitle}>Have Children, Planning More</Text>
-                          <Text style={styles.focusOptionSubtitle}>Sibling Timing & Fertility</Text>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Have Children, Planning More</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Sibling Timing & Fertility</Text>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -867,29 +877,29 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       disabled={loading}
                     >
                       <LinearGradient
-                        colors={analysisFocus === 'parenting' ? ['#FF69B4', '#FFB6C1'] : ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.focusOptionGradient}
+                        colors={analysisFocus === 'parenting' ? ['#FF69B4', '#FFB6C1'] : (isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground])}
+                        style={[styles.focusOptionGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                       >
                         <Text style={styles.focusIcon}>🧘</Text>
                         <View style={styles.focusTextContainer}>
-                          <Text style={styles.focusOptionTitle}>Parenting & Well-being</Text>
-                          <Text style={styles.focusOptionSubtitle}>Relationship with existing children</Text>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Parenting & Well-being</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Relationship with existing children</Text>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
 
                     {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
-                      <View style={styles.childrenCountSection}>
-                        <Text style={styles.childrenCountTitle}>Number of children you have:</Text>
+                      <View style={[styles.childrenCountSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface, borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}>
+                        <Text style={[styles.childrenCountTitle, { color: colors.text }]}>Number of children you have:</Text>
                         <View style={styles.childrenCountButtons}>
                           {[1, 2, 3, 4, 5].map(count => (
                             <TouchableOpacity
                               key={count}
-                              style={[styles.countButton, childrenCount === count && styles.countButtonSelected]}
+                              style={[styles.countButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBackground, borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }, childrenCount === count && styles.countButtonSelected]}
                               onPress={() => !loading && setChildrenCount(count)}
                               disabled={loading}
                             >
-                              <Text style={[styles.countButtonText, childrenCount === count && styles.countButtonTextSelected]}>
+                              <Text style={[styles.countButtonText, { color: colors.textSecondary }, childrenCount === count && styles.countButtonTextSelected]}>
                                 {count}
                               </Text>
                             </TouchableOpacity>
@@ -926,15 +936,15 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         outputRange: [0.8, 1.2]
                       }) }]
                     }]} />
-                    <Text style={styles.loadingTitle}>Analyzing Your Cosmic Blueprint</Text>
-                    <Text style={styles.loadingMessage}>{loadingMessage}</Text>
+                    <Text style={[styles.loadingTitle, { color: colors.text }]}>Analyzing Your Cosmic Blueprint</Text>
+                    <Text style={[styles.loadingMessage, { color: colors.textSecondary }]}>{loadingMessage}</Text>
                     <View style={styles.loadingDots}>
-                      <Animated.View style={[styles.dot, { opacity: pulseAnim }]} />
-                      <Animated.View style={[styles.dot, { opacity: pulseAnim.interpolate({
+                      <Animated.View style={[styles.dot, { backgroundColor: colors.accent, opacity: pulseAnim }]} />
+                      <Animated.View style={[styles.dot, { backgroundColor: colors.accent, opacity: pulseAnim.interpolate({
                         inputRange: [0.8, 1, 1.2],
                         outputRange: [0.3, 1, 0.3]
                       }) }]} />
-                      <Animated.View style={[styles.dot, { opacity: pulseAnim.interpolate({
+                      <Animated.View style={[styles.dot, { backgroundColor: colors.accent, opacity: pulseAnim.interpolate({
                         inputRange: [0.6, 1, 1.4],
                         outputRange: [0.3, 1, 0.3]
                       }) }]} />
@@ -950,7 +960,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       colors={getAnalysisGradient()}
                       style={styles.startGradient}
                     >
-                      <Text style={styles.startButtonText}>
+                      <Text style={[styles.startButtonText, { color: '#fff' }]}>
                         Start Analysis ({cost} credits)
                       </Text>
                     </LinearGradient>
@@ -959,10 +969,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
                 {credits < cost && (
                   <TouchableOpacity 
-                    style={styles.lowCreditBanner}
+                    style={[styles.lowCreditBanner, { backgroundColor: isDark ? 'rgba(255, 107, 53, 0.2)' : colors.surface, borderColor: isDark ? 'rgba(255, 107, 53, 0.3)' : colors.cardBorder }]}
                     onPress={() => navigation.navigate('Credits')}
                   >
-                    <Text style={styles.lowCreditText}>💳 Get more credits to continue</Text>
+                    <Text style={[styles.lowCreditText, { color: colors.text }]}>💳 Get more credits to continue</Text>
                   </TouchableOpacity>
                 )}
               </ScrollView>
@@ -970,17 +980,17 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.quickAnswerSection}>
                   <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                    style={styles.quickAnswerCard}
+                    colors={isDark ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                    style={[styles.quickAnswerCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                   >
-                    <Text style={styles.quickAnswerTitle}>✨ Quick Insights</Text>
-                    <Text style={styles.quickAnswerText}>{formatTextWithBold(analysisResult.quick_answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                    <Text style={[styles.quickAnswerTitle, { color: colors.text }]}>✨ Quick Insights</Text>
+                    <Text style={[styles.quickAnswerText, { color: colors.textSecondary }]}>{formatTextWithBold(analysisResult.quick_answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
                   </LinearGradient>
                 </View>
 
                 {analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) && (
                   <View style={styles.detailedSection}>
-                    <Text style={styles.sectionTitle}>📋 Detailed Analysis</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>📋 Detailed Analysis</Text>
                     {analysisResult.detailed_analysis.map((item, index) => (
                       <View key={index} style={styles.analysisItem}>
                         <TouchableOpacity
@@ -988,33 +998,33 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           onPress={() => toggleExpanded(index)}
                         >
                           <LinearGradient
-                            colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
-                            style={styles.analysisHeaderGradient}
+                            colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                            style={[styles.analysisHeaderGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                           >
-                            <Text style={styles.questionText}>{item.question}</Text>
+                            <Text style={[styles.questionText, { color: colors.text }]}>{item.question}</Text>
                             <Ionicons 
                               name={expandedItems[index] ? "chevron-up" : "chevron-down"} 
                               size={20} 
-                              color="rgba(255, 255, 255, 0.8)" 
+                              color={colors.textSecondary} 
                             />
                           </LinearGradient>
                         </TouchableOpacity>
                         
                         {expandedItems[index] && (
-                          <View style={styles.answerSection}>
-                            <Text style={styles.answerText}>{formatTextWithBold(item.answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                          <View style={[styles.answerSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.cardBackground }]}>
+                            <Text style={[styles.answerText, { color: colors.textSecondary }]}>{formatTextWithBold(item.answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
                             {item.key_points && item.key_points.length > 0 && (
                               <View style={styles.keyPointsSection}>
-                                <Text style={styles.keyPointsTitle}>Key Points:</Text>
+                                <Text style={[styles.keyPointsTitle, { color: colors.text }]}>Key Points:</Text>
                                 {item.key_points.map((point, pointIndex) => (
-                                  <Text key={pointIndex} style={styles.keyPoint}>• {formatTextWithBold(point, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                                  <Text key={pointIndex} style={[styles.keyPoint, { color: colors.textSecondary }]}>• {formatTextWithBold(point, false, analysisResult.terms, analysisResult.glossary)}</Text>
                                 ))}
                               </View>
                             )}
                             {item.astrological_basis && (
                               <View style={styles.basisSection}>
-                                <Text style={styles.basisTitle}>Astrological Basis:</Text>
-                                <Text style={styles.basisText}>{formatTextWithBold(item.astrological_basis, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                                <Text style={[styles.basisTitle, { color: colors.text }]}>Astrological Basis:</Text>
+                                <Text style={[styles.basisText, { color: colors.textTertiary }]}>{formatTextWithBold(item.astrological_basis, false, analysisResult.terms, analysisResult.glossary)}</Text>
                               </View>
                             )}
                           </View>
@@ -1028,9 +1038,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                   <View style={styles.finalSection}>
                     <LinearGradient
                       colors={getAnalysisGradient()}
-                      style={styles.finalCard}
+                      style={[styles.finalCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }]}
                     >
-                      <Text style={styles.finalTitle}>🌟 Final Thoughts</Text>
+                      <Text style={[styles.finalTitle, { color: colors.text }]}>🌟 Final Thoughts</Text>
                       <View style={styles.finalTextContainer}>
                         {formatTextWithBold(analysisResult.final_thoughts, true, analysisResult.terms, analysisResult.glossary)}
                       </View>
@@ -1040,7 +1050,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
                 {analysisResult.follow_up_questions && Array.isArray(analysisResult.follow_up_questions) && (
                   <View style={styles.followUpSection}>
-                    <Text style={styles.sectionTitle}>💭 Explore Further</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>💭 Explore Further</Text>
                     {analysisResult.follow_up_questions.map((question, index) => (
                       <TouchableOpacity
                         key={index}
@@ -1048,11 +1058,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         onPress={() => navigation.navigate('Home')}
                       >
                         <LinearGradient
-                          colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
-                          style={styles.followUpGradient}
+                          colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                          style={[styles.followUpGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                         >
-                          <Text style={styles.followUpText}>{question}</Text>
-                          <Ionicons name="arrow-forward" size={16} color="rgba(255, 255, 255, 0.8)" />
+                          <Text style={[styles.followUpText, { color: colors.text }]}>{question}</Text>
+                          <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
                         </LinearGradient>
                       </TouchableOpacity>
                     ))}
@@ -1068,21 +1078,21 @@ export default function AnalysisDetailScreen({ route, navigation }) {
               <ScrollView contentContainerStyle={styles.modalScrollContainer}>
                 <View style={styles.modalContainer}>
                   <LinearGradient
-                    colors={['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)']}
+                    colors={isDark ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)'] : [colors.cardBackground, colors.backgroundSecondary]}
                     style={styles.modalContent}
                   >
-                    <Text style={styles.modalTitle}>🔄 Regenerate Analysis</Text>
-                    <Text style={styles.modalText}>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>🔄 Regenerate Analysis</Text>
+                    <Text style={[styles.modalText, { color: colors.textSecondary }]}>
                       This will create a fresh {title.toLowerCase()} analysis with new insights.
                     </Text>
                     
                     {/* Progeny Focus Selector in Modal */}
                     {analysisType === 'progeny' && (
                       <View style={styles.modalFocusSection}>
-                        <Text style={styles.modalFocusTitle}>Update your focus:</Text>
+                        <Text style={[styles.modalFocusTitle, { color: colors.text }]}>Update your focus:</Text>
                         
                         <TouchableOpacity
-                          style={[styles.modalFocusOption, analysisFocus === 'first_child' && styles.modalFocusOptionSelected]}
+                          style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'first_child' && styles.modalFocusOptionSelected]}
                           onPress={() => {
                             setAnalysisFocus('first_child');
                             setChildrenCount(0);
@@ -1090,47 +1100,47 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                         >
                           <Text style={styles.modalFocusIcon}>👶</Text>
                           <View style={styles.modalFocusTextContainer}>
-                            <Text style={styles.modalFocusOptionTitle}>Planning First Child</Text>
-                            <Text style={styles.modalFocusOptionSubtitle}>Fertility & Timing</Text>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Planning First Child</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Fertility & Timing</Text>
                           </View>
                           {analysisFocus === 'first_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.modalFocusOption, analysisFocus === 'next_child' && styles.modalFocusOptionSelected]}
+                          style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'next_child' && styles.modalFocusOptionSelected]}
                           onPress={() => setAnalysisFocus('next_child')}
                         >
                           <Text style={styles.modalFocusIcon}>👨‍👩‍👧</Text>
                           <View style={styles.modalFocusTextContainer}>
-                            <Text style={styles.modalFocusOptionTitle}>Have Children, Planning More</Text>
-                            <Text style={styles.modalFocusOptionSubtitle}>Sibling Timing & Fertility</Text>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Have Children, Planning More</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Sibling Timing & Fertility</Text>
                           </View>
                           {analysisFocus === 'next_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.modalFocusOption, analysisFocus === 'parenting' && styles.modalFocusOptionSelected]}
+                          style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'parenting' && styles.modalFocusOptionSelected]}
                           onPress={() => setAnalysisFocus('parenting')}
                         >
                           <Text style={styles.modalFocusIcon}>🧘</Text>
                           <View style={styles.modalFocusTextContainer}>
-                            <Text style={styles.modalFocusOptionTitle}>Parenting & Well-being</Text>
-                            <Text style={styles.modalFocusOptionSubtitle}>Relationship with existing children</Text>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Parenting & Well-being</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Relationship with existing children</Text>
                           </View>
                           {analysisFocus === 'parenting' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
                         </TouchableOpacity>
 
                         {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
-                          <View style={styles.modalChildrenCountSection}>
-                            <Text style={styles.modalChildrenCountTitle}>Number of children you have:</Text>
+                          <View style={[styles.modalChildrenCountSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.surface }]}>
+                            <Text style={[styles.modalChildrenCountTitle, { color: colors.text }]}>Number of children you have:</Text>
                             <View style={styles.modalChildrenCountButtons}>
                               {[1, 2, 3, 4, 5].map(count => (
                                 <TouchableOpacity
                                   key={count}
-                                  style={[styles.modalCountButton, childrenCount === count && styles.modalCountButtonSelected]}
+                                  style={[styles.modalCountButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, childrenCount === count && styles.modalCountButtonSelected]}
                                   onPress={() => setChildrenCount(count)}
                                 >
-                                  <Text style={[styles.modalCountButtonText, childrenCount === count && styles.modalCountButtonTextSelected]}>
+                                  <Text style={[styles.modalCountButtonText, { color: colors.textSecondary }, childrenCount === count && styles.modalCountButtonTextSelected]}>
                                     {count}
                                   </Text>
                                 </TouchableOpacity>
@@ -1141,16 +1151,16 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                       </View>
                     )}
                     
-                    <View style={styles.modalCreditInfo}>
-                      <Text style={styles.modalCreditText}>💳 Credits to be charged: {cost}</Text>
-                      <Text style={styles.modalBalanceText}>Current balance: {credits}</Text>
+                    <View style={[styles.modalCreditInfo, { backgroundColor: colors.surface }]}>
+                      <Text style={[styles.modalCreditText, { color: colors.text }]}>💳 Credits to be charged: {cost}</Text>
+                      <Text style={[styles.modalBalanceText, { color: colors.textSecondary }]}>Current balance: {credits}</Text>
                     </View>
                     <View style={styles.modalButtons}>
                       <TouchableOpacity
-                        style={styles.modalCancelButton}
+                        style={[styles.modalCancelButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
                         onPress={() => setShowRegenerateModal(false)}
                       >
-                        <Text style={styles.modalCancelText}>Cancel</Text>
+                        <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.modalConfirmButton}
@@ -1160,7 +1170,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                           colors={getAnalysisGradient()}
                           style={styles.modalConfirmGradient}
                         >
-                          <Text style={styles.modalConfirmText}>Regenerate</Text>
+                          <Text style={[styles.modalConfirmText, { color: '#fff' }]}>Regenerate</Text>
                         </LinearGradient>
                       </TouchableOpacity>
                     </View>
@@ -1177,17 +1187,17 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         <View style={styles.tooltipModalOverlay}>
           <View style={styles.tooltipModalContainer}>
             <LinearGradient
-              colors={['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)']}
+              colors={isDark ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)'] : [colors.cardBackground, colors.backgroundSecondary]}
               style={styles.tooltipModalContent}
             >
-              <Text style={styles.tooltipModalTitle}>{tooltipModal.term}</Text>
-              <Text style={styles.tooltipModalText}>{tooltipModal.definition}</Text>
+              <Text style={[styles.tooltipModalTitle, { color: colors.accent }]}>{tooltipModal.term}</Text>
+              <Text style={[styles.tooltipModalText, { color: colors.textSecondary }]}>{tooltipModal.definition}</Text>
               <TouchableOpacity
                 style={styles.tooltipModalButton}
                 onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
               >
                 <LinearGradient
-                  colors={['#ff6b35', '#ff8c5a']}
+                  colors={[colors.primary, colors.secondary]}
                   style={styles.tooltipModalButtonGradient}
                 >
                   <Text style={styles.tooltipModalButtonText}>Close</Text>
@@ -1228,7 +1238,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
   },
   headerSubtitle: {
@@ -1240,7 +1250,7 @@ const styles = StyleSheet.create({
   },
   creditButton: { borderRadius: 16, overflow: 'hidden' },
   creditGradient: { paddingHorizontal: 10, paddingVertical: 6 },
-  creditText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
+  creditText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
   content: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 30 },
@@ -1273,7 +1283,7 @@ const styles = StyleSheet.create({
   analysisTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -1302,7 +1312,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   startButtonText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
     marginRight: 8,
@@ -1350,7 +1360,7 @@ const styles = StyleSheet.create({
   loadingTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -1381,7 +1391,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 107, 53, 0.3)',
   },
   lowCreditText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
@@ -1396,7 +1406,7 @@ const styles = StyleSheet.create({
   quickAnswerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 12,
   },
   quickAnswerText: {
@@ -1408,7 +1418,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 16,
   },
   analysisItem: { marginBottom: 12, borderRadius: 12, overflow: 'hidden' },
@@ -1425,7 +1435,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     marginRight: 12,
   },
   answerSection: { backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: 16 },
@@ -1439,7 +1449,7 @@ const styles = StyleSheet.create({
   keyPointsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 8,
   },
   keyPoint: {
@@ -1452,7 +1462,7 @@ const styles = StyleSheet.create({
   basisTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 6,
   },
   basisText: {
@@ -1547,7 +1557,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -1568,7 +1578,7 @@ const styles = StyleSheet.create({
   modalCreditText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 4,
   },
@@ -1590,7 +1600,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   modalCancelText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -1605,7 +1615,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modalConfirmText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -1620,7 +1630,7 @@ const styles = StyleSheet.create({
   focusTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -1653,7 +1663,7 @@ const styles = StyleSheet.create({
   focusOptionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 4,
   },
   focusOptionSubtitle: {
@@ -1671,7 +1681,7 @@ const styles = StyleSheet.create({
   childrenCountTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -1700,7 +1710,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
   countButtonTextSelected: {
-    color: COLORS.white,
+    color: '#ffffff',
   },
   
   // Modal Focus Selector Styles
@@ -1716,7 +1726,7 @@ const styles = StyleSheet.create({
   modalFocusTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -1744,7 +1754,7 @@ const styles = StyleSheet.create({
   modalFocusOptionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 2,
   },
   modalFocusOptionSubtitle: {
@@ -1760,7 +1770,7 @@ const styles = StyleSheet.create({
   modalChildrenCountTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -1789,7 +1799,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
   modalCountButtonTextSelected: {
-    color: COLORS.white,
+    color: '#ffffff',
   },
   
   // Tooltip Modal Styles
@@ -1837,7 +1847,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   tooltipModalButtonText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
