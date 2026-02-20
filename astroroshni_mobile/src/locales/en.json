@@ -162,7 +162,7 @@
     "viewFullChart": "View Full Chart",
     "sunSign": "Sun Sign",
     "moonSign": "Moon Sign",
-    "ascendant": "Ascendant",
+    "ascendant": "Asc",
     "calculating": "Calculating...",
     "currentRunningDashas": "Current Running Dashas",
     "loading": "Loading...",
@@ -286,15 +286,61 @@
         "Ketu": "Ketu"
     },
     "signs": {
-      "ascendant": "Ascendant",
+      "ascendant": "Asc",
       "moon": "Moon",
       "sun": "Sun"
+    },
+    "ascendantDescriptions": {
+    "Aries": "Ruled by Mars. Your physical constitution is active, athletic, and prone to quick movements. You approach the world with a pioneering, headfirst attitude. Your outward behavior is independent, frank, and decisive, preferring immediate action over prolonged deliberation.",
+    "Taurus": "Ruled by Venus. You possess a sturdy, grounded physical frame and often a pleasing voice or facial structure. Your outward behavior is slow, methodical, and resistant to being rushed. You naturally seek to build tangible security and navigate the world through practical, sustained effort.",
+    "Gemini": "Ruled by Mercury. Your physical appearance often remains youthful, and your movements are quick and expressive. You engage with the world through communication and adaptability. Your outward behavior is highly active, often juggling multiple tasks, skills, or conversations simultaneously.",
+    "Cancer": "Ruled by the Moon. Your physical body is often softer, with a tendency to retain water, and you have a gentle, approachable demeanor. You navigate the world with a cautious, protective instinct. Your outward actions are strongly driven by a need to secure your environment and protect those close to you.",
+    "Leo": "Ruled by the Sun. You carry yourself with a regal, upright posture and often have a strong physical presence or broad shoulders. You interact with the world with natural authority and vitality. Your outward behavior is confident, seeking visibility, respect, and leadership roles.",
+    "Virgo": "Ruled by Mercury. You have a neat, well-kept physical appearance and a highly observant demeanor. You navigate life through analysis and practical service. Your outward actions are precise, detail-oriented, and driven by a constant desire to improve systems or help others.",
+    "Libra": "Ruled by Venus. Your physical features are often symmetrical, and your outward expression is naturally charming and diplomatic. You approach the world by seeking balance and avoiding conflict. Your actions are heavily focused on forming partnerships and maintaining social harmony.",
+    "Scorpio": "Ruled by Mars. You have a resilient physical constitution and an intense, penetrating outward gaze. You navigate the world carefully, often keeping your true motives hidden. Your outward behavior is determined, highly focused, and capable of weathering sudden transformations.",
+    "Sagittarius": "Ruled by Jupiter. You often have a tall or large physical frame and an active, restless disposition. You interact with the world through a lens of expansion and exploration. Your outward behavior is optimistic, blunt in speech, and constantly seeking higher knowledge or travel.",
+    "Capricorn": "Ruled by Saturn. Your physical frame may be lean or bony, and you often appear more mature than your age. You navigate the world with immense discipline and endurance. Your outward behavior is serious, pragmatic, and heavily focused on achieving long-term status and structural success.",
+    "Aquarius": "Ruled by Saturn. You often have an unconventional physical appearance or a unique personal style. You interact with the world through a highly objective, observational lens. Your outward behavior is independent, network-oriented, and driven by systemic or humanitarian ideals.",
+    "Pisces": "Ruled by Jupiter. You possess a softer physical constitution, often with large or dreamy eyes. You approach the world with extreme adaptability, easily blending into different environments. Your outward actions are highly intuitive, charitable, and often drawn toward the abstract or spiritual."
+    },
+    "moonDescriptions": {
+    "Aries": "Your mind is quick, passionate, and thrives on action. You find emotional comfort in independence and the immediate expression of your feelings. You are quick to anger but equally quick to forgive, preferring to move forward rather than dwell on the past.",
+    "Taurus": "Here, the Moon is exalted. Your mind seeks peace, stability, and sensory comfort. You process emotions slowly and find security in routine, material wealth, and nature. While deeply loyal, your feelings can be quite stubborn once they are set.",
+    "Gemini": "Your mind is restless, curious, and constantly active. You process your emotions intellectually and find comfort in communication, learning, and variety. You may struggle with emotional consistency, as your feelings change as quickly as your thoughts.",
+    "Cancer": "This is the Moon's own sign. Your inner world is deeply sensitive, empathetic, and intuitive. You find emotional comfort in a secure home environment and close family ties. You are highly nurturing, but you easily absorb the emotional undercurrents of the people around you.",
+    "Leo": "Your mind is generous, proud, and expressive. You find emotional comfort in being appreciated, loved, and creatively engaged. Your feelings are warm and dramatic, and you have a deep inner need to be recognized and valued by your loved ones.",
+    "Virgo": "Your mind is analytical, practical, and detail-oriented. You process emotions by organizing your environment and being of service to others. You find comfort in routine and problem-solving, but you can be prone to inner anxiety or overthinking your feelings.",
+    "Libra": "Your mind constantly seeks balance, harmony, and companionship. You find emotional comfort in peaceful surroundings and strong one-on-one relationships. You deeply dislike conflict and often process your own feelings by discussing them with someone you trust.",
+    "Scorpio": "Here, the Moon is debilitated. Your inner world is intensely deep, passionate, and private. You experience emotions in extremes and find comfort in exploring hidden truths and psychological depths. You guard your vulnerabilities fiercely but possess immense emotional resilience.",
+    "Sagittarius": "Your mind is optimistic, philosophical, and restless. You find emotional comfort in freedom, travel, and seeking higher meaning or truth. You prefer not to be bogged down by heavy emotional demands, looking instead toward future possibilities.",
+    "Capricorn": "Your inner world is serious, disciplined, and cautious. You process emotions by focusing on duties, responsibilities, and tangible achievements. You find comfort in structure and control, often hiding your vulnerabilities behind a stoic or capable exterior.",
+    "Aquarius": "Your mind is objective, innovative, and socially conscious. You process your emotions intellectually and often view them from a detached perspective. You find emotional comfort in your ideals, friendships, and maintaining your personal freedom and individuality.",
+    "Pisces": "Your inner world is highly imaginative, compassionate, and spiritual. You have incredibly porous emotional boundaries, often feeling exactly what others feel. You find comfort in art, meditation, and retreating into your rich, dreamy inner life."
+    },
+    "sunDescriptions": {
+    "Aries": "Here, the Sun is exalted. Your core identity is radiant, courageous, and highly independent. Your soul’s purpose is driven by leadership, overcoming challenges, and initiating action. You possess a strong ego and natural authority.",
+    "Taurus": "Your core identity is grounded, resourceful, and value-driven. Your soul’s purpose is to build enduring stability, whether through material wealth, family, or the arts. You project a calm, enduring inner strength.",
+    "Gemini": "Your core identity is highly intellectual and communicative. Your soul’s purpose revolves around gathering knowledge, networking, and expressing ideas. You are driven by a need to understand the world through logic and connection.",
+    "Cancer": "Your core identity is deeply protective and emotionally anchored. Your soul’s purpose is to nurture, secure, and lead through empathy. Your sense of self is strongly tied to your roots, homeland, or personal foundations.",
+    "Leo": "This is the Sun's own sign. Your core identity is regal, proud, and creatively vibrant. Your soul’s purpose is to shine, lead, and inspire others. You naturally take center stage and possess a warm, magnetic authority.",
+    "Virgo": "Your core identity is pure, analytical, and service-oriented. Your soul’s purpose is to improve, organize, and heal. You derive your sense of self-worth from your skills, hard work, and ability to perfect your environment.",
+    "Libra": "Here, the Sun is debilitated. Your core identity is tied to partnerships, harmony, and diplomacy. Your soul’s purpose is to create balance and fairness, often meaning you place the needs of others or the relationship above your own independent ego.",
+    "Scorpio": "Your core identity is intense, resilient, and transformative. Your soul’s purpose involves uncovering hidden truths, wielding power responsibly, and undergoing deep personal metamorphosis. You possess an unwavering, focused inner will.",
+    "Sagittarius": "Your core identity is optimistic, philosophical, and guided by a strong moral compass. Your soul’s purpose is to seek higher wisdom, teach, and explore. You are driven by dharma (righteous duty) and a love for truth.",
+    "Capricorn": "Your core identity is disciplined, ambitious, and highly pragmatic. Your soul’s purpose is to achieve tangible success, status, and structural authority. You build your ego through patience, endurance, and fulfilling your duties.",
+    "Aquarius": "Your core identity is collective, innovative, and slightly detached. Your soul’s purpose is to serve humanity, challenge outdated structures, and bring progressive ideas to the masses. You often subordinate your personal ego for the greater good.",
+    "Pisces": "Your core identity is compassionate, spiritual, and boundless. Your soul’s purpose is to transcend the material world, offering empathy and divine love. Your ego is fluid, often blending your own identity with the universe or higher ideals."
     },
     "tools": {
       "charts": "Charts",
       "dashas": "Dashas",
       "ashtakvarga": "Ashtak-\nvarga",
-      "positions": "Positions"
+      "positions": "Positions",
+      "cosmicRing": "Cosmic\nRing"
+    },
+    "cosmicRing": {
+      "viewRing": "Ring"
     },
     "panchang": {
       "title": "🌅 Today's Panchang",
@@ -335,7 +381,7 @@
       "active": "Active"
     },
     "sadeSati": {
-      "title": "Sade Sati Periods (100 years)",
+      "title": "Sade Sati Periods",
       "loadError": "Could not load Sade Sati periods.",
       "noPeriods": "No periods found."
     },

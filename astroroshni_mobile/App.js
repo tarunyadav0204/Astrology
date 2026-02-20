@@ -37,6 +37,9 @@ import FactsScreen from './src/components/Facts/FactsScreen';
 import ShadbalaScreen from './src/components/Shadbala/ShadbalaScreen';
 import YogaScreen from './src/components/Yogas/YogaScreen';
 import KPScreen from './src/screens/KPScreen';
+import SadeSatiScreen from './src/components/SadeSati/SadeSatiScreen';
+import NakshatraCalendarScreen from './src/components/NakshatraCalendar/NakshatraCalendarScreen';
+import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
 import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
 import { CreditProvider } from './src/credits/CreditContext';
@@ -291,6 +294,21 @@ export default function App() {
           <Stack.Screen 
             name="KPSystem"
             component={KPScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="SadeSati"
+            component={SadeSatiScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="NakshatraCalendar"
+            component={NakshatraCalendarScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="CosmicRing"
+            component={CosmicRingScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
