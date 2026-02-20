@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -21,30 +22,33 @@ const formatDate = (dateString) => {
 
 // --- SUB-COMPONENTS ---
 
-const DashaProgress = ({ percentage = 0, t }) => (
-  <View style={styles.progressContainer}>
-    <View style={styles.track} />
+const DashaProgress = ({ percentage = 0, t, trackBg, fillColors, progressTextColor }) => (
+  <View style={[styles.progressContainer, trackBg && { backgroundColor: trackBg }]}>
+    <View style={[styles.track, trackBg && { backgroundColor: trackBg }]} />
     <LinearGradient
-      colors={['#8E2DE2', '#4A00E0']}
+      colors={fillColors || ['#8E2DE2', '#4A00E0']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
       style={[styles.fill, { width: `${percentage}%` }]}
     />
-    <Text style={styles.progressText}>{t('dasha.percentCompleted', '{{percentage}}% Completed', { percentage: Math.round(percentage) })}</Text>
+    <Text style={[styles.progressText, progressTextColor && { color: progressTextColor }]}>{t('dasha.percentCompleted', '{{percentage}}% Completed', { percentage: Math.round(percentage) })}</Text>
   </View>
 );
 
-const YoginiCard = ({ item, isCurrent, isExpanded, onPress, t, tYogini, YOGINI_CONFIG }) => {
+const YoginiCard = ({ item, isCurrent, isExpanded, onPress, t, tYogini, YOGINI_CONFIG, colors, isDark }) => {
   const config = YOGINI_CONFIG[item.name] || YOGINI_CONFIG['Mangala'];
-  
+  const cardBg = isDark ? colors.surface : colors.cardBackground;
+  const listBg = isDark ? colors.background : colors.surface;
+  const cardBorder = isCurrent ? colors.primary : colors.cardBorder;
+  const accent = colors.primary;
+
   return (
     <View>
       <TouchableOpacity 
-        style={[styles.card, isCurrent && styles.activeCard]} 
+        style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }, isCurrent && { borderColor: accent, borderWidth: 1.5 }]} 
         onPress={onPress}
         activeOpacity={0.9}
       >
-        {/* Header Strip */}
         <LinearGradient
           colors={config.color}
           start={{ x: 0, y: 0 }}
@@ -53,61 +57,60 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, t, tYogini, YOGINI_C
         />
 
         <View style={styles.cardContent}>
-          {/* Left: Icon & Name */}
           <View style={styles.cardLeft}>
             <View style={[styles.iconBox, { backgroundColor: config.color[0] + '20' }]}>
               <Ionicons name={config.icon} size={24} color={config.color[0]} />
             </View>
             <View>
-              <Text style={styles.yoginiName}>{tYogini(item.name)}</Text>
-              <Text style={styles.yoginiLord}>{item.lord}</Text>
+              <Text style={[styles.yoginiName, { color: colors.text }]}>{tYogini(item.name)}</Text>
+              <Text style={[styles.yoginiLord, { color: colors.textSecondary }]}>{item.lord}</Text>
             </View>
           </View>
 
-          {/* Right: Dates & Badge */}
           <View style={styles.cardRight}>
             <View style={[styles.vibeBadge, { backgroundColor: config.color[0] + '15' }]}>
               <Text style={[styles.vibeText, { color: config.color[0] }]}>{config.label}</Text>
             </View>
-            <Text style={styles.dateText}>
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>
               {formatDate(item.start)} - {formatDate(item.end)}
             </Text>
           </View>
         </View>
 
-        {/* Expansion Indicator */}
         {isCurrent && (
-          <View style={styles.currentIndicator}>
-            <Text style={styles.currentText}>{t('dasha.currentlyRunning', 'Currently Running')}</Text>
+          <View style={[styles.currentIndicator, { backgroundColor: isDark ? colors.background : '#f8f0ff', borderTopColor: colors.cardBorder }]}>
+            <Text style={[styles.currentText, { color: accent }]}>{t('dasha.currentlyRunning', 'Currently Running')}</Text>
           </View>
         )}
       </TouchableOpacity>
 
-      {/* Expanded Sub-Periods (Antardasha) */}
       {isExpanded && item.sub_periods && (
-        <View style={styles.subList}>
+        <View style={[styles.subList, { backgroundColor: listBg }]}>
           {item.sub_periods.map((sub, idx) => {
             const now = new Date();
             const subStart = new Date(sub.start);
             const subEnd = new Date(sub.end);
             const isCurrentAntar = now >= subStart && now <= subEnd;
-            
             return (
-              <View key={idx} style={[styles.subItem, isCurrentAntar && styles.currentSubItem]}>
-                <View style={styles.subTimelineLine} />
-                <View style={[styles.subDot, { backgroundColor: YOGINI_CONFIG[sub.name]?.color[0] || '#ccc' }]} />
-                
+              <View
+                key={idx}
+                style={[
+                  styles.subItem,
+                  isCurrentAntar && styles.currentSubItem,
+                  isCurrentAntar && { backgroundColor: isDark ? colors.surface : '#f8f0ff', borderColor: accent },
+                ]}
+              >
+                <View style={[styles.subTimelineLine, { backgroundColor: colors.cardBorder }]} />
+                <View style={[styles.subDot, { backgroundColor: YOGINI_CONFIG[sub.name]?.color[0] || '#ccc', borderColor: listBg }]} />
                 <View style={styles.subContent}>
-                  <Text style={[styles.subName, isCurrentAntar && styles.currentSubName]}>{tYogini(sub.name)} ({sub.lord})</Text>
-                  <Text style={[styles.subDates, isCurrentAntar && styles.currentSubDates]}>{formatDate(sub.start)} - {formatDate(sub.end)}</Text>
+                  <Text style={[styles.subName, { color: colors.text }, isCurrentAntar && { color: accent, fontWeight: '700' }]}>{tYogini(sub.name)} ({sub.lord})</Text>
+                  <Text style={[styles.subDates, { color: colors.textSecondary }, isCurrentAntar && { color: accent, fontWeight: '600' }]}>{formatDate(sub.start)} - {formatDate(sub.end)}</Text>
                 </View>
-                
-                <Text style={[styles.subVibe, { color: YOGINI_CONFIG[sub.name]?.color[0] || '#888' }, isCurrentAntar && styles.currentSubVibe]}>
+                <Text style={[styles.subVibe, { color: YOGINI_CONFIG[sub.name]?.color[0] || colors.textSecondary }, isCurrentAntar && styles.currentSubVibe]}>
                   {YOGINI_CONFIG[sub.name]?.label}
                 </Text>
-                
                 {isCurrentAntar && (
-                  <View style={styles.currentAntarIndicator}>
+                  <View style={[styles.currentAntarIndicator, { backgroundColor: accent }]}>
                     <Text style={styles.currentAntarText}>{t('common.current', 'Current')}</Text>
                   </View>
                 )}
@@ -124,6 +127,8 @@ const YoginiCard = ({ item, isCurrent, isExpanded, onPress, t, tYogini, YOGINI_C
 
 export default function YoginiDashaTab({ data }) {
   const { t } = useTranslation();
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
 
   const YOGINI_CONFIG = {
     Mangala: { color: ['#11998e', '#38ef7d'], icon: 'moon', label: t('yogini.success', 'Success') },
@@ -167,19 +172,17 @@ export default function YoginiDashaTab({ data }) {
 
   if (!data) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>{t('dasha.loadingYogini', 'Loading Yogini Dasha data...')}</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.loadingYogini', 'Loading Yogini Dasha data...')}</Text>
       </View>
     );
   }
 
-  // Check if data has the expected structure
   if (!data?.timeline || !Array.isArray(data.timeline) || !data?.current) {
-    console.log('Data missing expected structure. Available keys:', Object.keys(data || {}));
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>{t('dasha.dataStructureError', 'Data structure error. Check console for details.')}</Text>
-        <Text style={styles.loadingText}>{t('dasha.availableKeys', 'Available keys: ')} {Object.keys(data || {}).join(', ')}</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.dataStructureError', 'Data structure error. Check console for details.')}</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.availableKeys', 'Available keys: ')} {Object.keys(data || {}).join(', ')}</Text>
       </View>
     );
   }
@@ -189,69 +192,66 @@ export default function YoginiDashaTab({ data }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      
-      {/* 1. HERO SECTION: Current Context */}
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.heroContainer}>
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
-          style={styles.heroCard}
+          colors={isDark ? [colors.surface, colors.background] : [colors.cardBackground, colors.backgroundSecondary]}
+          style={[styles.heroCard, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}
         >
           <View style={styles.heroHeader}>
-            <Text style={styles.heroTitle}>{t('dasha.currentYoginiPhase', 'Current Yogini Phase')}</Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>{t('dasha.currentYoginiPhase', 'Current Yogini Phase')}</Text>
             <TouchableOpacity>
-              <Ionicons name="information-circle-outline" size={22} color="#666" />
+              <Ionicons name="information-circle-outline" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.activeRow}>
             <View>
-              <Text style={styles.label}>{t('dasha.mahadasha', 'Mahadasha')}</Text>
-              <Text style={styles.activeValue}>{tYogini(data?.current?.mahadasha?.name) || 'N/A'}</Text>
-              <Text style={styles.activeLord}>{YOGINI_CONFIG[data?.current?.mahadasha?.name]?.label || t('common.unknown', 'Unknown')}</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('dasha.mahadasha', 'Mahadasha')}</Text>
+              <Text style={[styles.activeValue, { color: colors.text }]}>{tYogini(data?.current?.mahadasha?.name) || 'N/A'}</Text>
+              <Text style={[styles.activeLord, { color: colors.textSecondary }]}>{YOGINI_CONFIG[data?.current?.mahadasha?.name]?.label || t('common.unknown', 'Unknown')}</Text>
             </View>
-            
             <View style={styles.arrowContainer}>
-              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+              <Ionicons name="chevron-forward" size={20} color={colors.cardBorder} />
             </View>
-
             <View>
-              <Text style={[styles.label, { textAlign: 'right' }]}>{t('dasha.antardasha', 'Antardasha')}</Text>
-              <Text style={[styles.activeValue, { textAlign: 'right', color: '#8E2DE2' }]}>
+              <Text style={[styles.label, { textAlign: 'right', color: colors.textSecondary }]}>{t('dasha.antardasha', 'Antardasha')}</Text>
+              <Text style={[styles.activeValue, { textAlign: 'right', color: colors.primary }]}>
                 {tYogini(data?.current?.antardasha?.name) || 'N/A'}
               </Text>
-              <Text style={[styles.activeLord, { textAlign: 'right' }]}>
+              <Text style={[styles.activeLord, { textAlign: 'right', color: colors.textSecondary }]}>
                 {YOGINI_CONFIG[data?.current?.antardasha?.name]?.label || t('common.unknown', 'Unknown')}
               </Text>
             </View>
           </View>
 
-          <DashaProgress percentage={data?.current?.progress || 0} t={t} />
+          <DashaProgress 
+            percentage={data?.current?.progress || 0} 
+            t={t} 
+            trackBg={isDark ? 'rgba(255,255,255,0.12)' : colors.surface}
+            fillColors={[colors.primary, colors.secondary]}
+          />
           
           <View style={styles.dateRange}>
-            <Text style={styles.dateLabel}>{t('common.ends', 'Ends: ')} {formatDate(data?.current?.antardasha?.end)}</Text>
-            <Text style={styles.remainingText}>
-               {t('dasha.criticalTiming', 'Critical Timing')}
-            </Text>
+            <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{t('common.ends', 'Ends: ')} {formatDate(data?.current?.antardasha?.end)}</Text>
+            <Text style={[styles.remainingText, { color: colors.primary }]}>{t('dasha.criticalTiming', 'Critical Timing')}</Text>
           </View>
         </LinearGradient>
       </View>
 
-      {/* 2. TAB CONTROLS (Mocking your existing style) */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity style={styles.activeTab}>
+        <TouchableOpacity style={[styles.activeTab, { backgroundColor: colors.primary }]}>
           <Text style={styles.activeTabText}>{t('dasha.periods', 'Periods')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.inactiveTab}>
-          <Text style={styles.inactiveTabText}>{t('dasha.analysis', 'Analysis')}</Text>
+        <TouchableOpacity style={[styles.inactiveTab, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.inactiveTabText, { color: colors.textSecondary }]}>{t('dasha.analysis', 'Analysis')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.inactiveTab}>
-          <Text style={styles.inactiveTabText}>{t('dasha.remedies', 'Remedies')}</Text>
+        <TouchableOpacity style={[styles.inactiveTab, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.inactiveTabText, { color: colors.textSecondary }]}>{t('dasha.remedies', 'Remedies')}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 3. TIMELINE LIST */}
-      <Text style={styles.sectionTitle}>{t('dasha.yoginiCycle', 'Yogini Cycle (36 Years)')}</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('dasha.yoginiCycle', 'Yogini Cycle (36 Years)')}</Text>
       
       <View style={styles.listContainer}>
         {data.timeline.map((item, index) => {
@@ -259,11 +259,6 @@ export default function YoginiDashaTab({ data }) {
                            item.start === data?.current?.mahadasha?.start && 
                            item.end === data?.current?.mahadasha?.end;
           const isExpanded = expandedId === index;
-          
-          if (isCurrent) {
-            // console.log(`Current period at index ${index}: expanded=${isExpanded}, has sub_periods=${!!item.sub_periods}`);
-          }
-          
           return (
             <YoginiCard 
               key={index} 
@@ -275,11 +270,12 @@ export default function YoginiDashaTab({ data }) {
               t={t}
               tYogini={tYogini}
               YOGINI_CONFIG={YOGINI_CONFIG}
+              colors={colors}
+              isDark={isDark}
             />
           );
         })}
       </View>
-
     </ScrollView>
   );
 }

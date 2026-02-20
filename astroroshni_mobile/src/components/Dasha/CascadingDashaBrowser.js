@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, API_BASE_URL } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import JaiminiKalachakraHomeRN from './JaiminiKalachakraHomeRN';
@@ -47,8 +48,10 @@ const getShortSign = (sign) => {
 
 const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const { t } = useTranslation();
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   useAnalytics('CascadingDashaBrowser');
-  
+
   const insets = useSafeAreaInsets();
   const [cascadingData, setCascadingData] = useState(null);
   const [kalchakraData, setKalchakraData] = useState(null);
@@ -739,73 +742,75 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
 
 
-  const renderDashaTypeSelector = () => (
-    <View style={styles.dashaTypeSelector}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
-        <TouchableOpacity
-          style={[styles.dashaTypeTab, dashaType === 'vimshottari' && styles.activeDashaTypeTab]}
-          onPress={() => {
-            setDashaType('vimshottari');
-            setSelectedDashas({});
-            setKalchakraAntarData(null);
-            setJaiminiData(null);
-          }}
-        >
-          <Text style={[styles.dashaTypeTabText, dashaType === 'vimshottari' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            {t('dasha.vimshottari')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.dashaTypeTab, dashaType === 'kalchakra' && styles.activeDashaTypeTab]}
-          onPress={() => {
-            setDashaType('kalchakra');
-            setSelectedDashas({});
-            setKalchakraAntarData(null);
-            setJaiminiData(null);
-          }}
-        >
-          <View style={styles.tabContent}>
-            <Text style={[styles.dashaTypeTabText, dashaType === 'kalchakra' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-              {t('dasha.kalchakra')}
+  const renderDashaTypeSelector = () => {
+    const tabActive = (key) => dashaType === key;
+    const tabStyle = (key) => [styles.dashaTypeTab, tabActive(key) && { backgroundColor: colors.primary }];
+    const tabTextStyle = (key) => ({ color: tabActive(key) ? '#fff' : colors.textSecondary });
+    return (
+      <View style={[styles.dashaTypeSelector, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollView}>
+          <TouchableOpacity
+            style={tabStyle('vimshottari')}
+            onPress={() => {
+              setDashaType('vimshottari');
+              setSelectedDashas({});
+              setKalchakraAntarData(null);
+              setJaiminiData(null);
+            }}
+          >
+            <Text style={[styles.dashaTypeTabText, tabTextStyle('vimshottari')]} numberOfLines={1}>
+              {t('dasha.vimshottari')}
             </Text>
-            {kalchakraSystemInfo && (
-              <TouchableOpacity 
-                style={styles.infoButton}
-                onPress={() => setShowSystemInfo(true)}
-              >
-                <Text style={styles.infoIcon}>ℹ️</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.dashaTypeTab, dashaType === 'yogini' && styles.activeDashaTypeTab]}
-          onPress={() => {
-            setDashaType('yogini');
-            setSelectedDashas({});
-          }}
-        >
-          <Text style={[styles.dashaTypeTabText, dashaType === 'yogini' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            {t('dasha.yogini')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.dashaTypeTab, dashaType === 'chara' && styles.activeDashaTypeTab]}
-          onPress={() => {
-            setDashaType('chara');
-            setSelectedDashas({});
-          }}
-        >
-          <Text style={[styles.dashaTypeTabText, dashaType === 'chara' && styles.activeDashaTypeTabText]} numberOfLines={1}>
-            {t('dasha.chara')}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={tabStyle('kalchakra')}
+            onPress={() => {
+              setDashaType('kalchakra');
+              setSelectedDashas({});
+              setKalchakraAntarData(null);
+              setJaiminiData(null);
+            }}
+          >
+            <View style={styles.tabContent}>
+              <Text style={[styles.dashaTypeTabText, tabTextStyle('kalchakra')]} numberOfLines={1}>
+                {t('dasha.kalchakra')}
+              </Text>
+              {kalchakraSystemInfo && (
+                <TouchableOpacity style={styles.infoButton} onPress={() => setShowSystemInfo(true)}>
+                  <Text style={styles.infoIcon}>ℹ️</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={tabStyle('yogini')}
+            onPress={() => {
+              setDashaType('yogini');
+              setSelectedDashas({});
+            }}
+          >
+            <Text style={[styles.dashaTypeTabText, tabTextStyle('yogini')]} numberOfLines={1}>
+              {t('dasha.yogini')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={tabStyle('chara')}
+            onPress={() => {
+              setDashaType('chara');
+              setSelectedDashas({});
+            }}
+          >
+            <Text style={[styles.dashaTypeTabText, tabTextStyle('chara')]} numberOfLines={1}>
+              {t('dasha.chara')}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  };
 
   const renderDateNavigation = () => (
-    <DateNavigator date={transitDate} onDateChange={setTransitDate} />
+    <DateNavigator date={transitDate} onDateChange={setTransitDate} cosmicTheme={isDark} resetDate={new Date()} />
   );
 
 
@@ -859,34 +864,34 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     const antarProgress = currentAntar ? calculateProgress(currentAntar.start, currentAntar.end) : 0;
     
     return (
-      <View style={styles.currentStatusCard}>
-        <Text style={styles.currentStatusTitle}>{t('dasha.currentBPHSKalachakra')}</Text>
+      <View style={[styles.currentStatusCard, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}>
+        <Text style={[styles.currentStatusTitle, { color: colors.primary }]}>{t('dasha.currentBPHSKalachakra')}</Text>
         
         <View style={styles.compactPeriodRow}>
           <View style={styles.periodColumn}>
-            <Text style={styles.periodLabel}>{t('dasha.maha')}</Text>
-            <Text style={styles.periodName}>{tSign(currentMaha.name)}</Text>
-            <Text style={styles.periodGati}>{currentMaha.gati}</Text>
+            <Text style={[styles.periodLabel, { color: colors.textSecondary }]}>{t('dasha.maha')}</Text>
+            <Text style={[styles.periodName, { color: colors.primary }]}>{tSign(currentMaha.name)}</Text>
+            <Text style={[styles.periodGati, { color: colors.textSecondary }]}>{currentMaha.gati}</Text>
           </View>
           
           {currentAntar && (
             <View style={styles.periodColumn}>
-              <Text style={styles.periodLabel}>{t('dasha.antar')}</Text>
-              <Text style={styles.periodName}>{tSign(currentAntar.name)}</Text>
-              <Text style={styles.periodProgress}>{Math.round(antarProgress)}%</Text>
+              <Text style={[styles.periodLabel, { color: colors.textSecondary }]}>{t('dasha.antar')}</Text>
+              <Text style={[styles.periodName, { color: colors.primary }]}>{tSign(currentAntar.name)}</Text>
+              <Text style={[styles.periodProgress, { color: colors.primary }]}>{Math.round(antarProgress)}%</Text>
             </View>
           )}
           
           <View style={styles.systemColumn}>
-            <Text style={styles.systemLabel}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
-            <Text style={styles.systemLabel}>{t('dasha.nakshatra')}.{kalchakraData.nakshatra}.{kalchakraData.pada}</Text>
-            <Text style={styles.systemLabel}>{tSign(kalchakraData.deha)}→{tSign(kalchakraData.jeeva)}</Text>
+            <Text style={[styles.systemLabel, { color: colors.textSecondary }]}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
+            <Text style={[styles.systemLabel, { color: colors.textSecondary }]}>{t('dasha.nakshatra')}.{kalchakraData.nakshatra}.{kalchakraData.pada}</Text>
+            <Text style={[styles.systemLabel, { color: colors.textSecondary }]}>{tSign(kalchakraData.deha)}→{tSign(kalchakraData.jeeva)}</Text>
           </View>
         </View>
         
-        <View style={styles.compactProgressBar}>
-          <View style={[styles.compactProgressFill, { width: `${mahaProgress}%` }]} />
-          <Text style={styles.compactProgressText}>{Math.round(mahaProgress)}% • {getRemainingTime(currentMaha.end)}</Text>
+        <View style={[styles.compactProgressBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+          <View style={[styles.compactProgressFill, { width: `${mahaProgress}%`, backgroundColor: colors.primary }]} />
+          <Text style={[styles.compactProgressText, { color: colors.text }]}>{Math.round(mahaProgress)}% • {getRemainingTime(currentMaha.end)}</Text>
         </View>
       </View>
     );
@@ -897,14 +902,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       return renderKalchakraCurrentStatus();
     } else if (dashaType === 'jaimini') {
       return renderJaiminiCurrentStatus();
-    } else if (dashaType === 'yogini') {
-      return null; // Yogini Dasha has its own hero section, no breadcrumb needed
+    } else if (dashaType === 'yogini' || dashaType === 'chara') {
+      return null; // Yogini and Chara have their own hero sections, no breadcrumb needed
     }
     
     if (!cascadingData) {
       return (
-        <View style={styles.breadcrumb}>
-          <Text style={styles.breadcrumbText}>{t('dasha.selectDashas')}</Text>
+        <View style={[styles.breadcrumb, dashaType === 'vimshottari' && { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderRadius: 8 }]}>
+          <Text style={[styles.breadcrumbText, dashaType === 'vimshottari' && { color: colors.textSecondary }]}>{t('dasha.selectDashas')}</Text>
         </View>
       );
     }
@@ -936,27 +941,28 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       breadcrumbItems.push({ planet: selectedDashas.prana, details });
     }
     
+    const vimTheme = dashaType === 'vimshottari';
     return (
-      <View style={styles.breadcrumb}>
+      <View style={[styles.breadcrumb, vimTheme && { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
         {breadcrumbItems.length === 0 ? (
-          <Text style={styles.breadcrumbText}>{t('dasha.selectDashasHierarchy')}</Text>
+          <Text style={[styles.breadcrumbText, vimTheme && { color: colors.textSecondary }]}>{t('dasha.selectDashasHierarchy')}</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.breadcrumbScroll}>
             {breadcrumbItems.map((item, index) => (
               <View key={`breadcrumb-${item.planet}-${index}`} style={styles.breadcrumbRow}>
-                <View style={styles.breadcrumbCard}>
-                  <Text style={styles.breadcrumbPlanet}>{t(`planets.${item.planet}`, item.planet)}</Text>
+                <View style={[styles.breadcrumbCard, vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.breadcrumbPlanet, vimTheme && { color: colors.primary }]}>{t(`planets.${item.planet}`, item.planet)}</Text>
                   {item.details && (
                     <>
-                      <Text style={styles.breadcrumbPeriod}>{formatPeriodDuration(item.details.years)}</Text>
-                      <Text style={styles.breadcrumbDates}>
+                      <Text style={[styles.breadcrumbPeriod, vimTheme && { color: colors.text }]}>{formatPeriodDuration(item.details.years)}</Text>
+                      <Text style={[styles.breadcrumbDates, vimTheme && { color: colors.textSecondary }]}>
                         {new Date(item.details.start).toLocaleDateString('en-US', {month: 'short', year: '2-digit'})} - {new Date(item.details.end).toLocaleDateString('en-US', {month: 'short', year: '2-digit'})}
                       </Text>
                     </>
                   )}
                 </View>
                 {index < breadcrumbItems.length - 1 && (
-                  <Text style={styles.breadcrumbArrow}>→</Text>
+                  <Text style={[styles.breadcrumbArrow, vimTheme && { color: colors.textSecondary }]}>→</Text>
                 )}
               </View>
             ))}
@@ -1394,34 +1400,37 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     );
   };
 
-  const renderKalchakraViewToggle = () => (
-    <View style={styles.kalchakraViewToggle}>
-      <TouchableOpacity
-        style={[styles.viewToggleBtn, kalchakraViewMode === 'chips' && styles.activeViewToggle]}
-        onPress={() => setKalchakraViewMode('chips')}
-      >
-        <Text style={[styles.viewToggleText, kalchakraViewMode === 'chips' && styles.activeViewToggleText]}>{t('dasha.periods')}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.viewToggleBtn, kalchakraViewMode === 'wheel' && styles.activeViewToggle]}
-        onPress={() => setKalchakraViewMode('wheel')}
-      >
-        <Text style={[styles.viewToggleText, kalchakraViewMode === 'wheel' && styles.activeViewToggleText]}>{t('dasha.wheel')}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.viewToggleBtn, kalchakraViewMode === 'timeline' && styles.activeViewToggle]}
-        onPress={() => setKalchakraViewMode('timeline')}
-      >
-        <Text style={[styles.viewToggleText, kalchakraViewMode === 'timeline' && styles.activeViewToggleText]}>{t('dasha.timeline')}</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderKalchakraViewToggle = () => {
+    const active = (mode) => kalchakraViewMode === mode;
+    return (
+      <View style={[styles.kalchakraViewToggle, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, active('chips') && { backgroundColor: colors.primary }]}
+          onPress={() => setKalchakraViewMode('chips')}
+        >
+          <Text style={[styles.viewToggleText, { color: colors.textSecondary }, active('chips') && { color: '#fff' }]}>{t('dasha.periods')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, active('wheel') && { backgroundColor: colors.primary }]}
+          onPress={() => setKalchakraViewMode('wheel')}
+        >
+          <Text style={[styles.viewToggleText, { color: colors.textSecondary }, active('wheel') && { color: '#fff' }]}>{t('dasha.wheel')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, active('timeline') && { backgroundColor: colors.primary }]}
+          onPress={() => setKalchakraViewMode('timeline')}
+        >
+          <Text style={[styles.viewToggleText, { color: colors.textSecondary }, active('timeline') && { color: '#fff' }]}>{t('dasha.timeline')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const renderKalchakraWheel = () => {
     if (!kalchakraData) {
       return (
-        <View style={styles.wheelContainer}>
-          <Text style={styles.wheelTitle}>{t('dasha.loadingWheel')}</Text>
+        <View style={[styles.wheelContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+          <Text style={[styles.wheelTitle, { color: colors.text }]}>{t('dasha.loadingWheel')}</Text>
         </View>
       );
     }
@@ -1479,10 +1488,10 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
     };
 
     return (
-      <View style={styles.wheelContainer}>
+      <View style={[styles.wheelContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
         <View style={styles.wheelHeader}>
-          <Text style={styles.wheelTitle}>{t('dasha.kalchakraWheel')}</Text>
-          <Text style={styles.wheelSubtitle}>{tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)} ({kalchakraData.direction})</Text>
+          <Text style={[styles.wheelTitle, { color: colors.primary }]}>{t('dasha.kalchakraWheel')}</Text>
+          <Text style={[styles.wheelSubtitle, { color: colors.textSecondary }]}>{tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)} ({kalchakraData.direction})</Text>
         </View>
         
         <Svg width={size} height={size} style={styles.svgWheel}>
@@ -1780,26 +1789,26 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         <View style={styles.wheelLegend}>
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: '#9c27b0' }]} />
-              <Text style={styles.legendText}>{t('dasha.current')}</Text>
+              <View style={[styles.legendColor, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('dasha.current')}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#ffcdd2' }]} />
-              <Text style={styles.legendText}>{t('dasha.deha')}</Text>
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('dasha.deha')}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#c8e6c9' }]} />
-              <Text style={styles.legendText}>{t('dasha.jeeva')}</Text>
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('dasha.jeeva')}</Text>
             </View>
           </View>
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: '#e1bee7' }]} />
-              <Text style={styles.legendText}>{t('dasha.sequence')}</Text>
+              <View style={[styles.legendColor, { backgroundColor: isDark ? colors.secondary : '#e1bee7' }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('dasha.sequence')}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#ffe0b2' }]} />
-              <Text style={styles.legendText}>{t('dasha.gati')}</Text>
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('dasha.gati')}</Text>
             </View>
           </View>
         </View>
@@ -1810,31 +1819,37 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const renderKalchakraTimeline = () => {
     if (!kalchakraData) {
       return (
-        <View style={styles.timelineContainer}>
-          <Text style={styles.timelineTitle}>{t('dasha.loadingTimeline')}</Text>
+        <View style={[styles.timelineContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+          <Text style={[styles.timelineTitle, { color: colors.text }]}>{t('dasha.loadingTimeline')}</Text>
         </View>
       );
     }
 
     const mahadashas = kalchakraData.mahadashas || [];
     const currentDate = new Date();
+    const rowBg = (current, deha, jeeva) => {
+      if (current) return isDark ? colors.primary : '#e8f5e8';
+      if (deha) return isDark ? 'rgba(255,205,210,0.3)' : '#ffebee';
+      if (jeeva) return isDark ? 'rgba(232,245,233,0.3)' : '#e3f2fd';
+      return isDark ? colors.surface : colors.cardBackground;
+    };
 
     return (
-      <View style={styles.timelineContainer}>
+      <View style={[styles.timelineContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
         <View style={styles.timelineHeader}>
-          <Text style={styles.timelineTitle}>{t('dasha.kalchakraTimeline')}</Text>
+          <Text style={[styles.timelineTitle, { color: colors.primary }]}>{t('dasha.kalchakraTimeline')}</Text>
           <View style={styles.dehaJeevaInfo}>
-            <Text style={styles.dehaJeevaText}>🎯 {tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)}</Text>
-            <Text style={styles.cycleInfo}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
+            <Text style={[styles.dehaJeevaText, { color: colors.primary }]}>🎯 {tSign(kalchakraData.deha)} → {tSign(kalchakraData.jeeva)}</Text>
+            <Text style={[styles.cycleInfo, { color: colors.textSecondary }]}>{kalchakraData.cycle_len}y • {kalchakraData.direction}</Text>
           </View>
         </View>
         
-        <View style={styles.timelineTable}>
-          <View style={styles.tableHeader}>
-            <Text style={styles.headerCell}>{t('dasha.sign')}</Text>
-            <Text style={styles.headerCell}>{t('dasha.gati')}</Text>
-            <Text style={styles.headerCell}>{t('dasha.duration')}</Text>
-            <Text style={styles.headerCell}>{t('dasha.period')}</Text>
+        <View style={[styles.timelineTable, { borderColor: colors.cardBorder }]}>
+          <View style={[styles.tableHeader, { backgroundColor: isDark ? colors.background : colors.surface }]}>
+            <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.sign')}</Text>
+            <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.gati')}</Text>
+            <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.duration')}</Text>
+            <Text style={[styles.headerCell, { color: colors.primary }]}>{t('dasha.period')}</Text>
           </View>
           
           {mahadashas.map((maha, index) => {
@@ -1845,33 +1860,28 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             const isJeeva = maha.name === kalchakraData.jeeva;
             
             return (
-              <View key={index} style={[ 
-                styles.tableRow,
-                isCurrent && styles.currentRow,
-                isDeha && styles.dehaRow,
-                isJeeva && styles.jeevaRow
-              ]}>
+              <View key={index} style={[styles.tableRow, { backgroundColor: rowBg(isCurrent, isDeha, isJeeva), borderBottomColor: colors.cardBorder }]}>
                 <View style={styles.signCell}>
-                  <Text style={[styles.signText, isCurrent && styles.currentText]}>
+                  <Text style={[styles.signText, { color: colors.text }, isCurrent && { color: isDark ? '#fff' : '#2e7d32', fontWeight: '700' }]}>
                     {tSign(maha.name)}
                   </Text>
-                  {isDeha && <Text style={styles.specialLabel}>{t('dasha.deha')}</Text>}
-                  {isJeeva && <Text style={styles.specialLabel}>{t('dasha.jeeva')}</Text>}
+                  {isDeha && <Text style={[styles.specialLabel, { color: colors.primary }]}>{t('dasha.deha')}</Text>}
+                  {isJeeva && <Text style={[styles.specialLabel, { color: colors.primary }]}>{t('dasha.jeeva')}</Text>}
                 </View>
                 <View style={styles.gatiCell}>
-                  <Text style={[styles.gatiText, isCurrent && styles.currentText]}>
+                  <Text style={[styles.gatiText, { color: isCurrent && isDark ? '#fff' : colors.text }]}>
                     {maha.gati?.includes(t('dasha.manduka')) ? '🐸' :
                      maha.gati?.includes(t('dasha.simhavalokana')) ? '🦁' :
                      maha.gati?.includes(t('dasha.markata')) ? '🐒' : '⚡'}
                   </Text>
-                  <Text style={[styles.gatiName, isCurrent && styles.currentText]}>
+                  <Text style={[styles.gatiName, { color: isCurrent && isDark ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
                     {maha.gati ? t(`gati.${maha.gati.replace(' Gati', '')}`, maha.gati.replace(' Gati', '')) : t('dasha.normal')}
                   </Text>
                 </View>
-                <Text style={[styles.durationCell, isCurrent && styles.currentText]}>
+                <Text style={[styles.durationCell, { color: isCurrent && isDark ? '#fff' : colors.text }]}>
                   {formatPeriodDuration(maha.years)}
                 </Text>
-                <Text style={[styles.periodCell, isCurrent && styles.currentText]}>
+                <Text style={[styles.periodCell, { color: isCurrent && isDark ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
                   {startDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'})} - {endDate.toLocaleDateString('en-US', {month: 'short', year: '2-digit'})}
                 </Text>
               </View>
@@ -1880,7 +1890,7 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         </View>
         
         {mahadashas.length === 0 && (
-          <Text style={styles.timelineEmpty}>{t('dasha.noTimelineData')}</Text>
+          <Text style={[styles.timelineEmpty, { color: colors.textSecondary }]}>{t('dasha.noTimelineData')}</Text>
         )}
       </View>
     );
@@ -1901,8 +1911,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
         
         {kalchakraViewMode === 'chips' && (
           <React.Fragment>
-            <View style={styles.selectorContainer}>
-              <Text style={styles.selectorLabel}>{t('dasha.kalchakraMahadasha')}</Text>
+            <View style={[styles.selectorContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+              <Text style={[styles.selectorLabel, { color: colors.text }]}>{t('dasha.kalchakraMahadasha')}</Text>
               <ScrollView 
                 ref={scrollRefs.kalchakra_maha}
                 horizontal 
@@ -1910,8 +1920,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                 style={styles.optionsScroll}
               >
                 {mahaOptions.length === 0 ? (
-                  <View style={[styles.optionCard, styles.disabledOption]}>
-                    <Text style={styles.disabledOptionText}>{t('dasha.noPeriods')}</Text>
+                  <View style={[styles.optionCard, styles.disabledOption, { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
+                    <Text style={[styles.disabledOptionText, { color: colors.textSecondary }]}>{t('dasha.noPeriods')}</Text>
                   </View>
                 ) : (
                   mahaOptions.map((period, index) => {
@@ -1921,48 +1931,25 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     const endDate = new Date(period.end);
                     const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
                     const progress = calculateProgress(period.start, period.end);
-                    
+                    const cardBg = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.primary : (isDark ? colors.background : colors.surface);
+                    const cardBorder = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.primary : colors.cardBorder;
+                    const textColor = (isSelected || isActuallyCurrent) ? '#fff' : colors.text;
+                    const subColor = (isSelected || isActuallyCurrent) ? '#fff' : colors.textSecondary;
                     return (
                       <TouchableOpacity
                         key={`${period.name}-${index}`}
-                        style={[ 
-                          styles.kalchakraCard,
-                          isSelected && styles.selectedKalchakraCard,
-                          isActuallyCurrent && styles.currentKalchakraCard
-                        ]}
+                        style={[styles.kalchakraCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
                         onPress={() => handleKalchakraMahaSelection(period.name)}
                       >
-                        <Text style={[ 
-                          styles.kalchakraPlanet,
-                          isSelected && styles.selectedKalchakraPlanet,
-                          isActuallyCurrent && styles.currentKalchakraPlanet
-                        ]}>
-                          {tSign(period.name)}
-                        </Text>
-                        <Text style={[ 
-                          styles.kalchakraPeriod,
-                          isSelected && styles.selectedKalchakraPeriod,
-                          isActuallyCurrent && styles.currentKalchakraPeriod
-                        ]}>
-                          {formatPeriodDuration(period.years)}
-                        </Text>
-                        <Text style={[ 
-                          styles.kalchakraSequence,
-                          isSelected && styles.selectedKalchakraSequence,
-                          isActuallyCurrent && styles.currentKalchakraSequence
-                        ]}>
-                          {period.gati}
-                        </Text>
-                        <Text style={[ 
-                          styles.kalchakraDates,
-                          isSelected && styles.selectedKalchakraDates,
-                          isActuallyCurrent && styles.currentKalchakraDates
-                        ]}>
+                        <Text style={[styles.kalchakraPlanet, { color: textColor }]}>{tSign(period.name)}</Text>
+                        <Text style={[styles.kalchakraPeriod, { color: subColor }]}>{formatPeriodDuration(period.years)}</Text>
+                        <Text style={[styles.kalchakraSequence, { color: subColor }]}>{period.gati}</Text>
+                        <Text style={[styles.kalchakraDates, { color: subColor }]}>
                           {new Date(period.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(period.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
                         </Text>
                         {isActuallyCurrent && (
-                          <View style={styles.kalchakraProgressBar}>
-                            <View style={[styles.kalchakraProgressFill, { width: `${progress}%` }]} />
+                          <View style={[styles.kalchakraProgressBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.3)' }]}>
+                            <View style={[styles.kalchakraProgressFill, { width: `${progress}%`, backgroundColor: colors.accent }]} />
                           </View>
                         )}
                       </TouchableOpacity>
@@ -1973,8 +1960,8 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
             </View>
             
             {selectedDashas.kalchakra_maha && antarOptions.length > 0 && (
-              <View style={styles.selectorContainer}>
-                <Text style={styles.selectorLabel}>{t('dasha.kalchakraAntardasha')} ({tSign(selectedDashas.kalchakra_maha)})</Text>
+              <View style={[styles.selectorContainer, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+                <Text style={[styles.selectorLabel, { color: colors.text }]}>{t('dasha.kalchakraAntardasha')} ({tSign(selectedDashas.kalchakra_maha)})</Text>
                 <ScrollView 
                   ref={scrollRefs.kalchakra_antar}
                   horizontal 
@@ -1985,19 +1972,16 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                     const isSelected = selectedDashas.kalchakra_antar === period.name;
                     const isActuallyCurrent = period.current;
                     const progress = calculateProgress(period.start, period.end);
-                    
+                    const antarBg = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.success : (isDark ? colors.background : colors.surface);
+                    const antarBorder = isActuallyCurrent && !isSelected ? colors.accent : isSelected ? colors.success : colors.cardBorder;
+                    const antarText = (isSelected || isActuallyCurrent) ? '#fff' : colors.text;
+                    const antarSub = (isSelected || isActuallyCurrent) ? '#fff' : colors.textSecondary;
                     return (
                       <TouchableOpacity
                         key={`antar-${period.name}-${index}`}
-                        style={[ 
-                          styles.kalchakraAntarCard,
-                          isSelected && styles.selectedKalchakraAntarCard,
-                          isActuallyCurrent && styles.currentKalchakraAntarCard
-                        ]}
+                        style={[styles.kalchakraAntarCard, { backgroundColor: antarBg, borderColor: antarBorder }]}
                         onPress={() => {
                           setSelectedDashas(prev => ({ ...prev, kalchakra_antar: period.name }));
-                          
-                          // Auto-scroll to selected antardasha
                           setTimeout(() => {
                             if (scrollRefs.kalchakra_antar?.current && antarOptions) {
                               const selectedIndex = antarOptions.findIndex(d => d.name === period.name);
@@ -2009,30 +1993,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
                           }, 100);
                         }}
                       >
-                        <Text style={[ 
-                          styles.kalchakraAntarPlanet,
-                          isSelected && styles.selectedKalchakraAntarPlanet,
-                          isActuallyCurrent && styles.currentKalchakraAntarPlanet
-                        ]}>
-                          {tSign(period.name)}
-                        </Text>
-                        <Text style={[ 
-                          styles.kalchakraAntarPeriod,
-                          isSelected && styles.selectedKalchakraAntarPeriod,
-                          isActuallyCurrent && styles.currentKalchakraAntarPeriod
-                        ]}>
-                          {formatPeriodDuration(period.years)}
-                        </Text>
-                        <Text style={[ 
-                          styles.kalchakraAntarDates,
-                          isSelected && styles.selectedKalchakraAntarDates,
-                          isActuallyCurrent && styles.currentKalchakraAntarDates
-                        ]}>
+                        <Text style={[styles.kalchakraAntarPlanet, { color: antarText }]}>{tSign(period.name)}</Text>
+                        <Text style={[styles.kalchakraAntarPeriod, { color: antarSub }]}>{formatPeriodDuration(period.years)}</Text>
+                        <Text style={[styles.kalchakraAntarDates, { color: antarSub }]}>
                           {new Date(period.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(period.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
                         </Text>
                         {isActuallyCurrent && (
-                          <View style={styles.kalchakraAntarProgressBar}>
-                            <View style={[styles.kalchakraAntarProgressFill, { width: `${progress}%` }]} />
+                          <View style={[styles.kalchakraAntarProgressBar, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
+                            <View style={[styles.kalchakraAntarProgressFill, { width: `${progress}%`, backgroundColor: colors.accent }]} />
                           </View>
                         )}
                       </TouchableOpacity>
@@ -2049,36 +2017,36 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   
   const renderSystemInfoModal = () => (
     <Modal visible={showSystemInfo} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.systemInfoModal}>
-          <View style={styles.systemInfoHeader}>
-            <Text style={styles.systemInfoTitle}>{t('dasha.bphsKalchakraDasha')}</Text>
+      <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+        <View style={[styles.systemInfoModal, { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+          <View style={[styles.systemInfoHeader, { borderBottomColor: colors.cardBorder }]}>
+            <Text style={[styles.systemInfoTitle, { color: colors.primary }]}>{t('dasha.bphsKalchakraDasha')}</Text>
             <TouchableOpacity onPress={() => setShowSystemInfo(false)}>
-              <Text style={styles.modalCloseIcon}>✕</Text>
+              <Text style={[styles.modalCloseIcon, { color: colors.text }]}>✕</Text>
             </TouchableOpacity>
           </View>
           
           {kalchakraSystemInfo && (
             <ScrollView style={styles.systemInfoContent}>
-              <Text style={styles.systemInfoSubtitle}>{kalchakraSystemInfo.system_name}</Text>
-              <Text style={styles.systemInfoDescription}>{kalchakraSystemInfo.specialty}</Text>
+              <Text style={[styles.systemInfoSubtitle, { color: colors.text }]}>{kalchakraSystemInfo.system_name}</Text>
+              <Text style={[styles.systemInfoDescription, { color: colors.textSecondary }]}>{kalchakraSystemInfo.specialty}</Text>
               
               <View style={styles.systemInfoSection}>
-                <Text style={styles.systemInfoSectionTitle}>{t('dasha.source')}</Text>
-                <Text style={styles.systemInfoText}>{kalchakraSystemInfo.source}</Text>
+                <Text style={[styles.systemInfoSectionTitle, { color: colors.primary }]}>{t('dasha.source')}</Text>
+                <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>{kalchakraSystemInfo.source}</Text>
               </View>
               
               <View style={styles.systemInfoSection}>
-                <Text style={styles.systemInfoSectionTitle}>{t('dasha.keyFeatures')}</Text>
-                <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.total_combinations} nakshatra-pada combinations</Text>
-                <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.cycle_length_years}-year complete cycle</Text>
-                <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.based_on}</Text>
-                <Text style={styles.systemInfoText}>• {kalchakraSystemInfo.timing_method}</Text>
+                <Text style={[styles.systemInfoSectionTitle, { color: colors.primary }]}>{t('dasha.keyFeatures')}</Text>
+                <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>• {kalchakraSystemInfo.total_combinations} nakshatra-pada combinations</Text>
+                <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>• {kalchakraSystemInfo.cycle_length_years}-year complete cycle</Text>
+                <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>• {kalchakraSystemInfo.based_on}</Text>
+                <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>• {kalchakraSystemInfo.timing_method}</Text>
               </View>
               
               <View style={styles.systemInfoSection}>
-                <Text style={styles.systemInfoSectionTitle}>{t('dasha.authenticity')}</Text>
-                <Text style={styles.systemInfoText}>{kalchakraSystemInfo.authenticity}</Text>
+                <Text style={[styles.systemInfoSectionTitle, { color: colors.primary }]}>{t('dasha.authenticity')}</Text>
+                <Text style={[styles.systemInfoText, { color: colors.textSecondary }]}>{kalchakraSystemInfo.authenticity}</Text>
               </View>
             </ScrollView>
           )}
@@ -2090,54 +2058,58 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const renderDashaSelector = (dashaLevel, title) => {
     const options = getDashaOptions(dashaLevel);
     const selectedValue = selectedDashas[dashaLevel];
-    
+    const vimTheme = dashaType === 'vimshottari';
+
     return (
-      <View style={styles.selectorContainer}>
-        <Text style={styles.selectorLabel}>{title}</Text>
+      <View style={[styles.selectorContainer, vimTheme && { backgroundColor: isDark ? colors.surface : colors.cardBackground }]}>
+        <Text style={[styles.selectorLabel, vimTheme && { color: colors.text }]}>{title}</Text>
         <ScrollView ref={scrollRefs[dashaLevel]} horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
           {options.length === 0 ? (
-            <View style={[styles.optionCard, styles.disabledOption]}>
-              <Text style={styles.disabledOptionText}>{t('dasha.noOptions')}</Text>
+            <View style={[styles.optionCard, styles.disabledOption, vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.disabledOptionText, vimTheme && { color: colors.textSecondary }]}>{t('dasha.noOptions')}</Text>
             </View>
           ) : (
             options.map((dasha, index) => {
               const isSelected = selectedValue === dasha.planet;
-              const isCurrent = dasha.current;
               const currentDate = transitDate;
               const startDate = new Date(dasha.start);
               const endDate = new Date(dasha.end);
               const isActuallyCurrent = currentDate >= startDate && currentDate <= endDate;
-              
+
               return (
                 <TouchableOpacity
                   key={`${dasha.planet}-${index}`}
-                  style={[ 
+                  style={[
                     styles.optionCard,
-                    isSelected && styles.selectedOptionCard,
-                    isActuallyCurrent && styles.currentOptionCard
+                    vimTheme && { backgroundColor: isDark ? colors.background : colors.surface, borderColor: colors.cardBorder },
+                    isSelected && (vimTheme ? { backgroundColor: colors.primary, borderColor: colors.primary } : styles.selectedOptionCard),
+                    isActuallyCurrent && !isSelected && (vimTheme ? { backgroundColor: colors.accent, borderColor: colors.accent } : styles.currentOptionCard)
                   ]}
                   onPress={() => {
                     handleDashaSelection(dashaLevel, dasha.planet);
                   }}
                 >
-                  <Text style={[ 
+                  <Text style={[
                     styles.optionPlanet,
-                    isSelected && styles.selectedOptionPlanet,
-                    isActuallyCurrent && styles.currentOptionPlanet
+                    vimTheme && !isSelected && !isActuallyCurrent && { color: colors.text },
+                    isSelected && (vimTheme ? { color: '#fff' } : styles.selectedOptionPlanet),
+                    isActuallyCurrent && !isSelected && (vimTheme ? { color: '#fff' } : styles.currentOptionPlanet)
                   ]}>
                     {t(`planets.${dasha.planet}`, dasha.planet)}
                   </Text>
-                  <Text style={[ 
+                  <Text style={[
                     styles.optionPeriod,
-                    isSelected && styles.selectedOptionPeriod,
-                    isActuallyCurrent && styles.currentOptionPeriod
+                    vimTheme && !isSelected && !isActuallyCurrent && { color: colors.text },
+                    isSelected && (vimTheme ? { color: '#fff' } : styles.selectedOptionPeriod),
+                    isActuallyCurrent && !isSelected && (vimTheme ? { color: '#fff' } : styles.currentOptionPeriod)
                   ]}>
                     {formatPeriodDuration(dasha.years)}
                   </Text>
-                  <Text style={[ 
+                  <Text style={[
                     styles.optionDates,
-                    isSelected && styles.selectedOptionDates,
-                    isActuallyCurrent && styles.currentOptionDates
+                    vimTheme && !isSelected && !isActuallyCurrent && { color: colors.textSecondary },
+                    isSelected && (vimTheme ? { color: '#fff' } : styles.selectedOptionDates),
+                    isActuallyCurrent && !isSelected && (vimTheme ? { color: '#fff' } : styles.currentOptionDates)
                   ]}>
                     {new Date(dasha.start).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})} - {new Date(dasha.end).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: '2-digit'})}
                   </Text>
@@ -2153,18 +2125,18 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   if (loading) {
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-        <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
-          <StatusBar barStyle="dark-content" />
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeIcon}>✕</Text>
+        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+          <StatusBar barStyle={colors.statusBarStyle} />
+          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+              <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{t('dasha.browserTitle')}</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
           </View>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.accent} />
-            <Text style={styles.loadingText}>{t('dasha.loading')}</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('dasha.loading')}</Text>
           </View>
         </View>
       </Modal>
@@ -2174,19 +2146,19 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   if (error) {
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-        <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
-          <StatusBar barStyle="dark-content" />
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeIcon}>✕</Text>
+        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+          <StatusBar barStyle={colors.statusBarStyle} />
+          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+              <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{t('dasha.browserTitle')}</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
             <View style={styles.placeholder} />
           </View>
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchCascadingDashas}>
-              <Text style={styles.retryText}>{t('common.retry')}</Text>
+            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+            <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchCascadingDashas}>
+              <Text style={[styles.retryText, { color: '#fff' }]}>{t('common.retry')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2196,17 +2168,17 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeIcon}>✕</Text>
+      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+        <StatusBar barStyle={colors.statusBarStyle} />
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
+          <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+            <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('dasha.browserFor', { name: birthData?.name || t('common.user') })}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserFor', { name: birthData?.name || t('common.user') })}</Text>
           <View style={styles.placeholder} />
         </View>
         
-        <ScrollView style={styles.content}>
+        <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
           {renderDashaTypeSelector()}
           {dashaType === 'vimshottari' && renderDateNavigation()}
           {renderBreadcrumb()}

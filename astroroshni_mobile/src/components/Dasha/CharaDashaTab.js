@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { chartAPI } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 
 // Element-based colors for zodiac signs
 const SIGN_CONFIG = {
@@ -26,11 +27,11 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 };
 
-const DashaProgress = ({ percentage }) => (
-  <View style={styles.progressContainer}>
-    <View style={styles.track} />
+const DashaProgress = ({ percentage, trackBg, fillColors }) => (
+  <View style={[styles.progressContainer, trackBg && { backgroundColor: trackBg }]}>
+    <View style={[styles.track, trackBg && { backgroundColor: trackBg }]} />
     <LinearGradient
-      colors={['#FF6B6B', '#EE5A6F']}
+      colors={fillColors || ['#FF6B6B', '#EE5A6F']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
       style={[styles.fill, { width: `${percentage}%` }]}
@@ -39,13 +40,16 @@ const DashaProgress = ({ percentage }) => (
   </View>
 );
 
-const SignCard = ({ item, isCurrent, isExpanded, onPress }) => {
+const SignCard = ({ item, isCurrent, isExpanded, onPress, colors, isDark }) => {
   const config = SIGN_CONFIG[item.sign_name] || SIGN_CONFIG['Aries'];
-  
+  const cardBg = isDark ? colors.surface : colors.cardBackground;
+  const listBg = isDark ? colors.background : colors.surface;
+  const accent = colors.primary;
+
   return (
     <View>
       <TouchableOpacity 
-        style={[styles.card, isCurrent && styles.activeCard]} 
+        style={[styles.card, { backgroundColor: cardBg, borderColor: isCurrent ? accent : colors.cardBorder }, isCurrent && { borderWidth: 1.5 }]} 
         onPress={onPress}
         activeOpacity={0.9}
       >
@@ -62,8 +66,8 @@ const SignCard = ({ item, isCurrent, isExpanded, onPress }) => {
               <Text style={[styles.zodiacIcon, { color: config.color[0] }]}>{config.icon}</Text>
             </View>
             <View>
-              <Text style={styles.signName}>{item.sign_name}</Text>
-              <Text style={styles.signMeta}>{config.element} • {item.duration_years} Years</Text>
+              <Text style={[styles.signName, { color: colors.text }]}>{item.sign_name}</Text>
+              <Text style={[styles.signMeta, { color: colors.textSecondary }]}>{config.element} • {item.duration_years} Years</Text>
             </View>
           </View>
 
@@ -71,43 +75,46 @@ const SignCard = ({ item, isCurrent, isExpanded, onPress }) => {
             <View style={[styles.elementBadge, { backgroundColor: config.color[0] + '15' }]}>
               <Text style={[styles.elementText, { color: config.color[0] }]}>{config.element}</Text>
             </View>
-            <Text style={styles.dateText}>
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>
               {formatDate(item.start_date)} - {formatDate(item.end_date)}
             </Text>
           </View>
         </View>
 
         {isCurrent && (
-          <View style={styles.currentIndicator}>
-            <Text style={styles.currentText}>Currently Running</Text>
+          <View style={[styles.currentIndicator, { backgroundColor: isDark ? colors.background : '#fff5f5', borderTopColor: colors.cardBorder }]}>
+            <Text style={[styles.currentText, { color: accent }]}>Currently Running</Text>
           </View>
         )}
       </TouchableOpacity>
 
       {isExpanded && item.sub_periods && (
-        <View style={styles.subList}>
+        <View style={[styles.subList, { backgroundColor: listBg }]}>
           {item.sub_periods.map((sub, idx) => {
             const now = new Date();
             const subStart = new Date(sub.start_date);
             const subEnd = new Date(sub.end_date);
             const isCurrentAntar = now >= subStart && now <= subEnd;
-            
             return (
-              <View key={idx} style={[styles.subItem, isCurrentAntar && styles.currentSubItem]}>
-                <View style={styles.subTimelineLine} />
-                <View style={[styles.subDot, { backgroundColor: SIGN_CONFIG[sub.sign]?.color[0] || '#ccc' }]} />
-                
+              <View
+                key={idx}
+                style={[
+                  styles.subItem,
+                  isCurrentAntar && styles.currentSubItem,
+                  isCurrentAntar && { backgroundColor: isDark ? colors.surface : '#fff5f5', borderColor: accent },
+                ]}
+              >
+                <View style={[styles.subTimelineLine, { backgroundColor: colors.cardBorder }]} />
+                <View style={[styles.subDot, { backgroundColor: SIGN_CONFIG[sub.sign]?.color[0] || '#ccc', borderColor: listBg }]} />
                 <View style={styles.subContent}>
-                  <Text style={[styles.subName, isCurrentAntar && styles.currentSubName]}>{sub.sign}</Text>
-                  <Text style={[styles.subDates, isCurrentAntar && styles.currentSubDates]}>{formatDate(sub.start_date)} - {formatDate(sub.end_date)}</Text>
+                  <Text style={[styles.subName, { color: colors.text }, isCurrentAntar && { color: accent, fontWeight: '700' }]}>{sub.sign}</Text>
+                  <Text style={[styles.subDates, { color: colors.textSecondary }, isCurrentAntar && { color: accent, fontWeight: '600' }]}>{formatDate(sub.start_date)} - {formatDate(sub.end_date)}</Text>
                 </View>
-                
-                <Text style={[styles.subElement, { color: SIGN_CONFIG[sub.sign]?.color[0] || '#888' }, isCurrentAntar && styles.currentSubElement]}>
+                <Text style={[styles.subElement, { color: SIGN_CONFIG[sub.sign]?.color[0] || colors.textSecondary }, isCurrentAntar && styles.currentSubElement]}>
                   {SIGN_CONFIG[sub.sign]?.element}
                 </Text>
-                
                 {isCurrentAntar && (
-                  <View style={styles.currentAntarIndicator}>
+                  <View style={[styles.currentAntarIndicator, { backgroundColor: accent }]}>
                     <Text style={styles.currentAntarText}>Current</Text>
                   </View>
                 )}
@@ -121,6 +128,8 @@ const SignCard = ({ item, isCurrent, isExpanded, onPress }) => {
 };
 
 export default function CharaDashaTab({ birthData }) {
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -199,16 +208,16 @@ export default function CharaDashaTab({ birthData }) {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading Chara Dasha...</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Chara Dasha...</Text>
       </View>
     );
   }
 
   if (!data) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>No data available</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>No data available</Text>
       </View>
     );
   }
@@ -224,18 +233,16 @@ export default function CharaDashaTab({ birthData }) {
   })() : 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      
-      {/* Hero Section */}
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.heroContainer}>
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
-          style={styles.heroCard}
+          colors={isDark ? [colors.surface, colors.background] : [colors.cardBackground, colors.backgroundSecondary]}
+          style={[styles.heroCard, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}
         >
           <View style={styles.heroHeader}>
-            <Text style={styles.heroTitle}>Jaimini Chara Dasha</Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>Jaimini Chara Dasha</Text>
             <TouchableOpacity>
-              <Ionicons name="information-circle-outline" size={22} color="#666" />
+              <Ionicons name="information-circle-outline" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -244,44 +251,45 @@ export default function CharaDashaTab({ birthData }) {
               <View style={styles.activeRow}>
                 <View style={styles.currentSignBox}>
                   <Text style={styles.currentSignIcon}>{SIGN_CONFIG[currentPeriod.sign_name]?.icon}</Text>
-                  <Text style={styles.currentSignName}>{currentPeriod.sign_name}</Text>
-                  <Text style={styles.currentElement}>{SIGN_CONFIG[currentPeriod.sign_name]?.element} Sign</Text>
+                  <Text style={[styles.currentSignName, { color: colors.text }]}>{currentPeriod.sign_name}</Text>
+                  <Text style={[styles.currentElement, { color: colors.textSecondary }]}>{SIGN_CONFIG[currentPeriod.sign_name]?.element} Sign</Text>
                 </View>
               </View>
 
-              <DashaProgress percentage={progress} />
+              <DashaProgress
+                percentage={progress}
+                trackBg={isDark ? 'rgba(255,255,255,0.12)' : colors.surface}
+                fillColors={[colors.primary, colors.secondary]}
+              />
               
               <View style={styles.dateRange}>
-                <Text style={styles.dateLabel}>Ends: {formatDate(currentPeriod.end_date)}</Text>
-                <Text style={styles.remainingText}>
-                  {currentPeriod.duration_years} Year Period
-                </Text>
+                <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>Ends: {formatDate(currentPeriod.end_date)}</Text>
+                <Text style={[styles.remainingText, { color: colors.primary }]}>{currentPeriod.duration_years} Year Period</Text>
               </View>
             </>
           )}
         </LinearGradient>
       </View>
 
-      {/* Timeline List */}
-      <Text style={styles.sectionTitle}>12 Sign Periods (120 Years)</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>12 Sign Periods (120 Years)</Text>
       
       <View style={styles.listContainer}>
         {data.periods.map((item, index) => {
           const isCurrent = item.is_current;
           const isExpanded = expandedId === index;
-          
           return (
-            <SignCard 
-              key={index} 
-              item={item} 
+            <SignCard
+              key={index}
+              item={item}
               isCurrent={isCurrent}
               isExpanded={isExpanded}
               onPress={() => handlePress(index, item.sign_id)}
+              colors={colors}
+              isDark={isDark}
             />
           );
         })}
       </View>
-
     </ScrollView>
   );
 }
