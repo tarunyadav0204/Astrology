@@ -73,6 +73,7 @@ from chat_error_logging import router as chat_error_router
 from kota_chakra.routes import router as kota_chakra_router
 from user_facts.routes import router as user_facts_router
 from nudge_engine.routes import router as nudge_engine_router
+from nudge_engine import db as nudge_db
 import math
 from datetime import timedelta
 import signal
@@ -152,6 +153,15 @@ async def lifespan(app: FastAPI):
         print("House combinations and chat history databases initialized")
     except Exception as e:
         print(f"Warning: Could not initialize additional databases: {e}")
+    try:
+        conn = nudge_db.get_conn()
+        try:
+            nudge_db.init_nudge_tables(conn)
+            print("Nudge engine tables (device_tokens, nudge_deliveries) initialized")
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"Warning: Could not initialize nudge engine tables: {e}")
     yield
     # Shutdown (if needed later)
     pass

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator, Animated } from 'react-native';
@@ -139,15 +140,22 @@ export default function App() {
     }
   };
 
-  // When app is ready and user is logged in, register push token; always set up notification tap handler
+  // When app is ready and user is logged in, register push token; retry on foreground and once after delay
   useEffect(() => {
     if (isLoading) return;
-    (async () => {
+    const tryRegisterPush = async () => {
       const token = await storage.getAuthToken();
       if (token) await registerPushTokenIfLoggedIn();
-    })();
+    };
+    tryRegisterPush();
+    const delayed = setTimeout(tryRegisterPush, 3000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') tryRegisterPush();
+    });
     const cleanup = setupNotificationResponseListener(navigationRef);
     return () => {
+      clearTimeout(delayed);
+      sub?.remove?.();
       if (typeof cleanup === 'function') cleanup();
     };
   }, [isLoading]);
