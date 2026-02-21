@@ -935,7 +935,7 @@ const loadHomeData = async (nativeData = null) => {
         <View style={styles.dashboardContainer}>
 
 
-          {/* Mini Insight Modal */}
+          {/* Mini Insight Modal - theme aware */}
           <Modal
             visible={!!activeInsight}
             transparent={true}
@@ -943,26 +943,26 @@ const loadHomeData = async (nativeData = null) => {
             onRequestClose={() => setActiveInsight(null)}
           >
             <TouchableOpacity 
-              style={styles.modalOverlay} 
+              style={[styles.modalOverlay, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.45)' }]} 
               activeOpacity={1} 
               onPress={() => setActiveInsight(null)}
             >
               <View style={styles.insightModalContent}>
                 <LinearGradient
-                  colors={Platform.OS === 'android' 
-                    ? ['rgba(0, 0, 0, 0.95)', 'rgba(20, 20, 20, 0.9)'] 
-                    : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 248, 240, 0.95)']}
-                  style={styles.insightGradient}
+                  colors={theme === 'dark' 
+                    ? [colors.backgroundSecondary, colors.backgroundTertiary] 
+                    : [colors.background, colors.backgroundSecondary]}
+                  style={[styles.insightGradient, { borderColor: colors.cardBorder }]}
                 >
                   <View style={styles.insightHeader}>
                     <Text style={styles.insightEmoji}>{activeInsight?.icon}</Text>
-                    <Text style={styles.insightTitle}>{activeInsight?.title}</Text>
+                    <Text style={[styles.insightTitle, { color: colors.primary }]}>{activeInsight?.title}</Text>
                   </View>
-                  <Text style={[styles.insightDescription, { color: Platform.OS === 'android' ? '#ecf0f1' : '#2c3e50' }]}>
+                  <Text style={[styles.insightDescription, { color: colors.text }]}>
                     {activeInsight?.description}
                   </Text>
                   <TouchableOpacity
-                    style={styles.insightCloseButton}
+                    style={[styles.insightCloseButton, { backgroundColor: colors.primary }]}
                     onPress={() => setActiveInsight(null)}
                   >
                     <Text style={styles.insightCloseText}>{t('languageModal.close', 'Close')}</Text>
@@ -972,9 +972,13 @@ const loadHomeData = async (nativeData = null) => {
             </TouchableOpacity>
           </Modal>
 
-          {/* Current Dasha Timeline - Compact Style */}
+          {/* Current Dasha Timeline - Compact Style (tap to open CascadingDashaBrowser) */}
           {dashData && (
-            <View style={[styles.dashaTimelineContainer, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <TouchableOpacity
+              style={[styles.dashaTimelineContainer, androidLightCardFixStyle, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              onPress={() => setShowDashaBrowser && setShowDashaBrowser(true)}
+              activeOpacity={0.85}
+            >
               <Text style={[styles.dashaSectionTitle, { color: colors.text }]}>{t('home.sections.currentDasha', '⏰ Current Dasha Periods')}</Text>
               <View style={styles.timelineWrapper}>
                 {[
@@ -1031,7 +1035,7 @@ const loadHomeData = async (nativeData = null) => {
                   );
                 })}
               </View>
-            </View>
+            </TouchableOpacity>
           )}
 
           {/* Astrology Tools Section */}
@@ -1089,8 +1093,8 @@ const loadHomeData = async (nativeData = null) => {
                   </View>
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{t('home.tools.dashas', 'Dashas')}</Text>
                   {dashData?.current_dasha && typeof dashData.current_dasha === 'string' && (
-                    <View style={styles.toolMiniStat}>
-                      <Text style={styles.toolMiniStatText}>{dashData.current_dasha.split(' ')[0]}</Text>
+                    <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                      <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>{dashData.current_dasha.split(' ')[0]}</Text>
                     </View>
                   )}
                 </View>
@@ -1114,8 +1118,8 @@ const loadHomeData = async (nativeData = null) => {
                     <View style={[styles.toolIconGlow, { backgroundColor: '#34D399' }]} />
                   </View>
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kpSystem', 'KP System')}</Text>
-                  <View style={styles.toolMiniStat}>
-                    <Text style={styles.toolMiniStatText}>Precise</Text>
+                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Precise</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1138,8 +1142,8 @@ const loadHomeData = async (nativeData = null) => {
                     <View style={[styles.toolIconGlow, { backgroundColor: '#FBBF24' }]} />
                   </View>
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.kotaChakra', 'Kota Chakra')}</Text>
-                  <View style={styles.toolMiniStat}>
-                    <Text style={styles.toolMiniStatText}>Safety</Text>
+                  <View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                    <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Safety</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1162,8 +1166,8 @@ const loadHomeData = async (nativeData = null) => {
                     <View style={[styles.toolIconGlow, { backgroundColor: '#F472B6' }]} />
                   </View>
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{t('menu.yogas', 'Yogas')}</Text>
-                  <View style={styles.toolMiniStat}>
-                    <Text style={styles.toolMiniStatText}>Fortune</Text>
+<View style={[styles.toolMiniStat, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                  <Text style={[styles.toolMiniStatText, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : colors.textSecondary }]}>Fortune</Text>
                   </View>
                 </View>
               </TouchableOpacity>

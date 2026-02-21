@@ -383,7 +383,12 @@
     "sadeSati": {
       "title": "Sade Sati Periods",
       "loadError": "Could not load Sade Sati periods.",
-      "noPeriods": "No periods found."
+      "noPeriods": "No periods found.",
+      "ctaHeadline": "Will my Sade Sati be challenging or more manageable?",
+      "ctaSubtext": "Get a reading based on your chart — intensity, timing, and remedies.",
+      "ctaButton": "Ask in Chat",
+      "infoTitle": "What is Sade Sati?",
+      "infoBody": "Sade Sati is the roughly 7.5-year period when transiting Saturn passes through the Moon sign, the sign before it, and the sign after it in your birth chart. In Vedic astrology it is considered a significant transit that can bring challenges, delays, and life lessons, but also maturity and growth. The intensity and effects depend on your chart. This screen shows when your Sade Sati periods occur and which one is currently active."
     },
     "nakshatra": {
       "title": "Nakshatra calendar",

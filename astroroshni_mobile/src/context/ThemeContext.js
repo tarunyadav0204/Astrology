@@ -56,18 +56,22 @@ export const THEMES = {
   },
 };
 
-export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('dark');
-  const [isLoading, setIsLoading] = useState(true);
+export const ThemeProvider = ({ children, initialTheme }) => {
+  const [theme, setTheme] = useState(initialTheme === 'light' || initialTheme === 'dark' ? initialTheme : 'dark');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (initialTheme != null) {
+      return;
+    }
     loadTheme();
   }, []);
 
   const loadTheme = async () => {
     try {
+      setIsLoading(true);
       const savedTheme = await AsyncStorage.getItem('appTheme');
-      if (savedTheme) {
+      if (savedTheme === 'light' || savedTheme === 'dark') {
         setTheme(savedTheme);
       }
     } catch (error) {

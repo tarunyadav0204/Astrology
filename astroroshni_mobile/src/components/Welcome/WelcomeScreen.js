@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   Animated,
   TouchableOpacity,
@@ -17,53 +18,6 @@ import { storage } from '../../services/storage';
 const { width, height } = Dimensions.get('window');
 
 
-
-const TrustBadge = ({ icon, title, description, delay = 0 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 50,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        styles.trustBadge,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }
-      ]}
-    >
-      <View style={styles.trustIconContainer}>
-        <LinearGradient
-          colors={['#ff6b35', '#ff8c5a']}
-          style={styles.trustIconGradient}
-        >
-          <Ionicons name={icon} size={24} color="white" />
-        </LinearGradient>
-      </View>
-      <Text style={styles.trustTitle}>{title}</Text>
-      <Text style={styles.trustDescription}>{description}</Text>
-    </Animated.View>
-  );
-};
 
 const FeatureCard = ({ icon, title, description, delay = 0 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -127,13 +81,6 @@ const WelcomeScreen = ({ navigation }) => {
   const scrollY = useRef(new Animated.Value(0)).current;
   
 
-  
-  const trustBadges = [
-    { icon: 'shield-checkmark', title: 'Bank-Level Security', description: 'End-to-end encryption' },
-    { icon: 'telescope', title: 'NASA-Grade Precision', description: 'Swiss Ephemeris calculations' },
-    { icon: 'people', title: '10,000+ Happy Users', description: 'Trusted worldwide' },
-    { icon: 'ribbon', title: 'Vedic Certified', description: 'Traditional authenticity' },
-  ];
   
   const features = [
     { icon: '📊', title: 'Live Birth Charts', description: 'North & South Indian styles with real-time calculations' },
@@ -270,15 +217,14 @@ const WelcomeScreen = ({ navigation }) => {
                 <View style={[styles.ringDot, styles.ringDot4]} />
               </Animated.View>
               
-              {/* Sacred Om symbol - stationary */}
-              <LinearGradient
-                colors={['#FFD700', '#FFA500', '#FF6B35']}
-                style={styles.mandala}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.mandalaSymbol}>🕉️</Text>
-              </LinearGradient>
+              {/* App icon inside circular ring - stationary */}
+              <View style={styles.logoCircle}>
+                <Image
+                  source={require('../../../assets/icon.png')}
+                  style={styles.logoCircleImage}
+                  resizeMode="cover"
+                />
+              </View>
             </View>
           </Animated.View>
 
@@ -289,25 +235,52 @@ const WelcomeScreen = ({ navigation }) => {
           <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
             <Text style={styles.tagline}>Your Personal Cosmic Guide</Text>
             <Text style={styles.subtitle}>
-              Ancient Wisdom • Modern Precision • Trusted by Thousands
+              Ancient Wisdom • Modern Precision
             </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.8} style={styles.heroCtaWrap}>
+              <LinearGradient
+                colors={['#FF6B35', '#F7931E', '#FFD700']}
+                style={styles.heroCtaButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.heroCtaText} numberOfLines={1} adjustsFontSizeToFit>Begin Your Cosmic Journey</Text>
+                <Text style={styles.buttonIcon}>✨</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </Animated.View>
         </View>
 
-        {/* Trust & Security Section */}
+        {/* Trust & Privacy — single merged section */}
         <View style={styles.trustSection}>
-          <Text style={styles.sectionTitle}>Why Trust AstroRoshni?</Text>
-          <View style={styles.trustGrid}>
-            {trustBadges.map((badge, index) => (
-              <TrustBadge
-                key={index}
-                icon={badge.icon}
-                title={badge.title}
-                description={badge.description}
-                delay={index * 200}
-              />
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>Trust & Privacy</Text>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
+            style={styles.trustPrivacyCard}
+          >
+            <View style={styles.trustPrivacyList}>
+              <View style={styles.trustPrivacyItem}>
+                <Ionicons name="lock-closed" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
+                <Text style={styles.trustPrivacyText}>Your data is encrypted and never sold or shared</Text>
+              </View>
+              <View style={styles.trustPrivacyItem}>
+                <Ionicons name="telescope" size={20} color="#FF6B35" style={styles.trustPrivacyIcon} />
+                <Text style={styles.trustPrivacyText}>Swiss Ephemeris for precise calculations</Text>
+              </View>
+              <View style={styles.trustPrivacyItem}>
+                <Ionicons name="eye-off" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
+                <Text style={styles.trustPrivacyText}>We don’t share your birth details with third parties</Text>
+              </View>
+              <View style={styles.trustPrivacyItem}>
+                <Ionicons name="ribbon" size={20} color="#FF6B35" style={styles.trustPrivacyIcon} />
+                <Text style={styles.trustPrivacyText}>Rooted in traditional Vedic astrology</Text>
+              </View>
+              <View style={styles.trustPrivacyItem}>
+                <Ionicons name="gift" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
+                <Text style={styles.trustPrivacyText}>Free to start — no credit card required</Text>
+              </View>
+            </View>
+          </LinearGradient>
         </View>
 
         {/* Features Section */}
@@ -323,63 +296,6 @@ const WelcomeScreen = ({ navigation }) => {
                 delay={index * 150}
               />
             ))}
-          </View>
-        </View>
-
-        {/* Security Section */}
-        <View style={styles.securitySection}>
-          <LinearGradient
-            colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
-            style={styles.securityCard}
-          >
-            <View style={styles.securityHeader}>
-              <View style={styles.securityIconContainer}>
-                <LinearGradient
-                  colors={['#4CAF50', '#66BB6A']}
-                  style={styles.securityIconGradient}
-                >
-                  <Ionicons name="shield-checkmark" size={32} color="white" />
-                </LinearGradient>
-              </View>
-              <Text style={styles.securityTitle}>Your Privacy is Sacred</Text>
-            </View>
-            
-            <View style={styles.securityFeatures}>
-              <View style={styles.securityFeature}>
-                <Ionicons name="lock-closed" size={16} color="#4CAF50" />
-                <Text style={styles.securityFeatureText}>256-bit Military Encryption</Text>
-              </View>
-              <View style={styles.securityFeature}>
-                <Ionicons name="eye-off" size={16} color="#4CAF50" />
-                <Text style={styles.securityFeatureText}>Zero Data Sharing Policy</Text>
-              </View>
-              <View style={styles.securityFeature}>
-                <Ionicons name="phone-portrait" size={16} color="#4CAF50" />
-                <Text style={styles.securityFeatureText}>Local Device Processing</Text>
-              </View>
-              <View style={styles.securityFeature}>
-                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.securityFeatureText}>GDPR Compliant</Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* Social Proof */}
-        <View style={styles.socialProofSection}>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>10,000+</Text>
-              <Text style={styles.statLabel}>Happy Users</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>4.8★</Text>
-              <Text style={styles.statLabel}>App Rating</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>99.9%</Text>
-              <Text style={styles.statLabel}>Accuracy</Text>
-            </View>
           </View>
         </View>
 
@@ -412,8 +328,7 @@ const WelcomeScreen = ({ navigation }) => {
             </TouchableOpacity> */}
             
             <View style={styles.ctaSubtext}>
-              <Text style={styles.ctaSubtextMain}>Trusted by 10,000+ Users</Text>
-              <Text style={styles.ctaSubtextSub}>Free to Start • No Hidden Fees</Text>
+              <Text style={styles.ctaSubtextSub}>Free to start • No credit card required</Text>
             </View>
           </Animated.View>
         </View>
@@ -447,7 +362,7 @@ const styles = StyleSheet.create({
   heroSection: {
     alignItems: 'center',
     paddingHorizontal: 40,
-    paddingTop: 80,
+    paddingTop: 100,
     paddingBottom: 60,
   },
   logoContainer: {
@@ -495,24 +410,21 @@ const styles = StyleSheet.create({
     left: -4,
     backgroundColor: '#FFD700',
   },
-  mandala: {
+  logoCircle: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: '#1a1a3a',
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
     elevation: 15,
   },
-  mandalaSymbol: {
-    fontSize: 70,
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+  logoCircleImage: {
+    width: 140,
+    height: 140,
   },
   appTitle: {
     fontSize: width < 375 ? 32 : width < 414 ? 38 : 42,
@@ -549,6 +461,30 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     paddingHorizontal: 10,
   },
+  heroCtaWrap: {
+    marginTop: 24,
+    alignSelf: 'center',
+  },
+  heroCtaButton: {
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  heroCtaText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    marginRight: 8,
+  },
   sectionTitle: {
     fontSize: 28,
     fontWeight: '700',
@@ -563,43 +499,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
   },
-  trustGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  trustPrivacyCard: {
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  trustBadge: {
-    width: (width - 60) / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 20,
+  trustPrivacyList: {},
+  trustPrivacyItem: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  trustIconContainer: {
-    marginBottom: 12,
+  trustPrivacyIcon: {
+    marginRight: 14,
   },
-  trustIconGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trustTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  trustDescription: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 16,
+  trustPrivacyText: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 22,
   },
   featuresSection: {
     paddingHorizontal: 20,
@@ -654,79 +577,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  securitySection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  securityCard: {
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  securityHeader: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  securityIconContainer: {
-    marginBottom: 16,
-  },
-  securityIconGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  securityTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#333',
-    textAlign: 'center',
-  },
-  securityFeatures: {
-    gap: 16,
-  },
-  securityFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  securityFeatureText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  socialProofSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 40,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFD700',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
-  },
   ctaSection: {
     paddingHorizontal: 40,
     paddingVertical: 60,
@@ -764,12 +614,6 @@ const styles = StyleSheet.create({
   },
   ctaSubtext: {
     alignItems: 'center',
-  },
-  ctaSubtextMain: {
-    fontSize: 16,
-    color: '#FFD700',
-    fontWeight: '600',
-    marginBottom: 4,
   },
   ctaSubtextSub: {
     fontSize: 14,

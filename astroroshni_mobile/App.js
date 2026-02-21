@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar, View, ActivityIndicator } from 'react-native';
+import { StatusBar, View, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import i18n from './src/locales/i18n';
 
@@ -53,11 +54,22 @@ const Stack = createStackNavigator();
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Welcome');
+  const [initialTheme, setInitialTheme] = useState(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    checkAuthStatus();
-    loadSavedLanguage();
+    bootstrap();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isLoading]);
 
   const loadSavedLanguage = async () => {
     try {
@@ -70,48 +82,52 @@ export default function App() {
     }
   };
 
-  const checkAuthStatus = async () => {
+  const SPLASH_MIN_MS = 3000;
+
+  const bootstrap = async () => {
+    const start = Date.now();
     try {
+      // Load theme first so first paint has correct theme (avoids flash/flicker)
+      const savedTheme = await AsyncStorage.getItem('appTheme');
+      setInitialTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark');
+
+      loadSavedLanguage();
+
       const authToken = await storage.getAuthToken();
-      
+
       if (authToken) {
-        // User is logged in, check if they have charts
         try {
           const { chartAPI } = require('./src/services/api');
           const response = await Promise.race([
             chartAPI.getExistingCharts(),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Timeout')), 10000)
             )
           ]);
-          
           if (response.data && response.data.charts && response.data.charts.length > 0) {
-            // User has charts, check if one is selected in local storage
             const localBirthData = await storage.getBirthDetails();
             if (localBirthData) {
               setInitialRoute('Home');
             } else {
-              // Charts exist but none selected, go to SelectNative
               setInitialRoute('SelectNative');
             }
           } else {
-            // User has no charts, go to BirthForm
             setInitialRoute('BirthForm');
           }
         } catch (apiError) {
           console.log('API Error on startup:', apiError);
-          // If API fails, go to BirthForm as fallback
           setInitialRoute('BirthForm');
         }
       } else {
-        // User not logged in, show Welcome
         setInitialRoute('Welcome');
       }
     } catch (error) {
-      console.log('Auth check error:', error);
+      console.log('Bootstrap error:', error);
       setInitialRoute('Welcome');
     } finally {
-      setIsLoading(false);
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, SPLASH_MIN_MS - elapsed);
+      setTimeout(() => setIsLoading(false), remaining);
     }
   };
 
@@ -121,10 +137,11 @@ export default function App() {
   
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <ErrorProvider>
-          <CreditProvider>
-            <NavigationContainer>
+      <ThemeProvider initialTheme={initialTheme}>
+        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+          <ErrorProvider>
+            <CreditProvider>
+              <NavigationContainer>
               <GlobalErrorHandler />
               <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator
@@ -316,6 +333,7 @@ export default function App() {
         </NavigationContainer>
       </CreditProvider>
       </ErrorProvider>
+        </Animated.View>
       </ThemeProvider>
     </SafeAreaProvider>
   );

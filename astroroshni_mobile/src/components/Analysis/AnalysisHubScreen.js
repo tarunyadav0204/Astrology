@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../credits/CreditContext';
 import { pricingAPI } from '../../services/api';
 import { storage } from '../../services/storage';
@@ -24,6 +24,8 @@ const { width } = Dimensions.get('window');
 
 export default function AnalysisHubScreen({ navigation }) {
   useAnalytics('AnalysisHubScreen');
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const { credits } = useCredits();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
@@ -167,41 +169,38 @@ export default function AnalysisHubScreen({ navigation }) {
     });
   };
 
+  const screenGradientColors = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary, colors.primary];
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradientBg}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
         <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity 
-              style={styles.backButton}
+              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
               onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
             >
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>Life Analysis</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Life Analysis</Text>
               {birthData && (
                 <NativeSelectorChip 
                   birthData={birthData}
                   onPress={() => navigation.navigate('SelectNative')}
                   maxLength={15}
-                  style={styles.nativeChip}
-                  textStyle={styles.nativeChipText}
+                  style={[styles.nativeChip, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface }]}
+                  textStyle={[styles.nativeChipText, { color: colors.textSecondary }]}
                   showIcon={false}
                 />
               )}
             </View>
-            <TouchableOpacity 
-              style={styles.creditButton}
-              onPress={() => navigation.navigate('Credits')}
-            >
-              <LinearGradient
-                colors={['#ff6b35', '#ff8c5a']}
-                style={styles.creditGradient}
-              >
-                <Text style={styles.creditText}>💳 {credits}</Text>
+            <TouchableOpacity style={styles.creditButton} onPress={() => navigation.navigate('Credits')}>
+              <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.creditGradient}>
+                <Text style={[styles.creditText, { color: '#fff' }]}>💳 {credits}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -223,7 +222,7 @@ export default function AnalysisHubScreen({ navigation }) {
             >
               {/* Hero Section */}
               <View style={styles.heroSection}>
-                <Animated.View style={[styles.logoContainer, {
+                <Animated.View style={[styles.logoContainer, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface }, {
                   shadowOpacity: logoGlow.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0.6, 1],
@@ -245,8 +244,8 @@ export default function AnalysisHubScreen({ navigation }) {
                     resizeMode="contain"
                   />
                 </Animated.View>
-                <Text style={styles.heroTitle}>Unlock Your Life's Mysteries</Text>
-                <Text style={styles.heroSubtitle}>
+                <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Your Life's Mysteries</Text>
+                <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
                   Deep astrological insights into the four pillars of life
                 </Text>
               </View>
@@ -274,30 +273,25 @@ export default function AnalysisHubScreen({ navigation }) {
                       style={styles.cardTouchable}
                     >
                       <LinearGradient
-                        colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
-                        style={styles.cardGradient}
+                        colors={isDark ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                        style={[styles.cardGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                       >
                         <View style={styles.cardHeader}>
                           <View style={styles.iconContainer}>
-                            <LinearGradient
-                              colors={analysis.gradient}
-                              style={styles.iconGradient}
-                            >
+                            <LinearGradient colors={analysis.gradient} style={[styles.iconGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }]}>
                               <Text style={styles.cardIcon}>{analysis.icon}</Text>
                             </LinearGradient>
                           </View>
-                          <View style={styles.costBadge}>
-                            <Text style={styles.costText}>{analysis.cost} credits</Text>
+                          <View style={[styles.costBadge, { backgroundColor: colors.primary }]}>
+                            <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
                           </View>
                         </View>
-                        
-                        <Text style={styles.cardTitle}>{analysis.title}</Text>
-                        <Text style={styles.cardSubtitle}>{analysis.subtitle}</Text>
-                        <Text style={styles.cardDescription}>{analysis.description}</Text>
-                        
+                        <Text style={[styles.cardTitle, { color: colors.text }]}>{analysis.title}</Text>
+                        <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{analysis.subtitle}</Text>
+                        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{analysis.description}</Text>
                         <View style={styles.cardFooter}>
-                          <Text style={styles.exploreText}>Explore Now</Text>
-                          <Ionicons name="arrow-forward" size={16} color="rgba(255, 255, 255, 0.8)" />
+                          <Text style={[styles.exploreText, { color: colors.primary }]}>Explore Now</Text>
+                          <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -305,14 +299,13 @@ export default function AnalysisHubScreen({ navigation }) {
                 ))}
               </View>
 
-              {/* Info Section */}
               <View style={styles.infoSection}>
                 <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']}
-                  style={styles.infoCard}
+                  colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                  style={[styles.infoCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
                 >
-                  <Text style={styles.infoTitle}>✨ Premium Analysis Features</Text>
-                  <Text style={styles.infoText}>
+                  <Text style={[styles.infoTitle, { color: colors.text }]}>✨ Premium Analysis Features</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                     • Detailed astrological calculations{'\n'}
                     • Personalized remedies & suggestions{'\n'}
                     • Timing predictions & favorable periods{'\n'}
@@ -357,7 +350,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
   },
   headerCenter: {
@@ -383,7 +376,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   creditText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -421,7 +414,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.white,
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 12,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -485,14 +478,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   costText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
   },
   cardTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 8,
   },
   cardSubtitle: {
@@ -530,7 +523,7 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
     marginBottom: 12,
   },
   infoText: {

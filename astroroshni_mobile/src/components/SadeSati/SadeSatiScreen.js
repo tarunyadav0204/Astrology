@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -32,6 +33,7 @@ export default function SadeSatiScreen({ navigation, route }) {
   const birthData = route.params?.birthData || null;
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     if (!birthData) {
@@ -78,8 +80,28 @@ export default function SadeSatiScreen({ navigation, route }) {
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
           {t('home.sadeSati.title', 'Sade Sati Periods')}
         </Text>
-        <View style={styles.backBtn} />
+        <TouchableOpacity onPress={() => setShowInfoModal(true)} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Icon name="information-circle-outline" size={26} color={colors.text} />
+        </TouchableOpacity>
       </View>
+
+      <Modal visible={showInfoModal} transparent animationType="fade">
+        <TouchableOpacity
+          style={[styles.infoOverlay, { backgroundColor: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.6)' }]}
+          activeOpacity={1}
+          onPress={() => setShowInfoModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={[styles.infoModalBox, { backgroundColor: isLight ? colors.cardBackground : colors.backgroundSecondary, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.infoModalTitle, { color: colors.text }]}>{t('home.sadeSati.infoTitle', 'What is Sade Sati?')}</Text>
+            <ScrollView style={styles.infoModalScroll} showsVerticalScrollIndicator={false}>
+              <Text style={[styles.infoModalBody, { color: colors.textSecondary }]}>{t('home.sadeSati.infoBody', 'Sade Sati is the roughly 7.5-year period when transiting Saturn passes through the Moon sign, the sign before it, and the sign after it in your birth chart. In Vedic astrology it is considered a significant transit that can bring challenges, delays, and life lessons, but also maturity and growth. The intensity and effects depend on your chart. This screen shows when your Sade Sati periods occur and which one is currently active.')}</Text>
+            </ScrollView>
+            <TouchableOpacity style={[styles.infoModalClose, { backgroundColor: colors.primary }]} onPress={() => setShowInfoModal(false)}>
+              <Text style={styles.infoModalCloseText}>{t('languageModal.close', 'Close')}</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -116,6 +138,25 @@ export default function SadeSatiScreen({ navigation, route }) {
               )}
             </View>
           ))}
+
+          {birthData && (
+            <View style={[styles.ctaCard, { backgroundColor: isLight ? colors.surface : 'rgba(249, 115, 22, 0.12)', borderColor: isLight ? colors.cardBorder : 'rgba(249, 115, 22, 0.3)' }]}>
+              <Text style={[styles.ctaHeadline, { color: colors.text }]}>
+                {t('home.sadeSati.ctaHeadline', 'Will my Sade Sati be challenging or more manageable?')}
+              </Text>
+              <Text style={[styles.ctaSubtext, { color: colors.textSecondary }]}>
+                {t('home.sadeSati.ctaSubtext', 'Get a reading based on your chart — intensity, timing, and remedies.')}
+              </Text>
+              <TouchableOpacity
+                style={[styles.ctaButton, { backgroundColor: colors.primary }]}
+                onPress={() => navigation.navigate('Home', { startChat: true, initialMessage: t('home.sadeSati.ctaHeadline', 'Will my Sade Sati be challenging or more manageable?') })}
+                activeOpacity={0.85}
+              >
+                <Icon name="chatbubble-ellipses-outline" size={18} color="#fff" style={styles.ctaButtonIcon} />
+                <Text style={styles.ctaButtonText}>{t('home.sadeSati.ctaButton', 'Ask in Chat')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -197,6 +238,82 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#fff',
     fontSize: 11,
+    fontWeight: '700',
+  },
+  ctaCard: {
+    marginTop: 24,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  ctaHeadline: {
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  ctaSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+    paddingHorizontal: 4,
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+  },
+  ctaButtonIcon: {
+    marginRight: 8,
+  },
+  ctaButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  infoOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  infoModalBox: {
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+  },
+  infoModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  infoModalScroll: {
+    maxHeight: 280,
+  },
+  infoModalBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'left',
+  },
+  infoModalClose: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    alignItems: 'center',
+  },
+  infoModalCloseText: {
+    color: '#fff',
+    fontSize: 15,
     fontWeight: '700',
   },
 });

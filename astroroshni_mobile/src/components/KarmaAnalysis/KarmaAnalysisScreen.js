@@ -15,7 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { API_BASE_URL, getEndpoint, COLORS } from '../../utils/constants';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { storage } from '../../services/storage';
 import { useCredits } from '../../credits/CreditContext';
@@ -26,8 +27,17 @@ const { width, height } = Dimensions.get('window');
 
 const KarmaAnalysisScreen = ({ route, navigation }) => {
   useAnalytics('KarmaAnalysisScreen');
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const { chartId } = route.params || {};
   const { credits, fetchBalance } = useCredits();
+
+  const screenGradient = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
+    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary];
+  const screenGradientWithAccent = isDark
+    ? [...screenGradient, colors.primary]
+    : [...screenGradient, colors.primary];
   const [karmaCost, setKarmaCost] = useState(25);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
@@ -508,92 +518,95 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <LinearGradient colors={['#1a0033', '#2d004d', '#4a0080']} style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconButton}>
-            <Text style={styles.backIcon}>←</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
+            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
           </TouchableOpacity>
-          <View style={styles.nameChip}>
-            <Text style={styles.nameChipText}>{nativeName}</Text>
+          <View style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
+            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
           </View>
           <View style={styles.regenerateButton} />
         </View>
         <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
-          <View style={styles.cosmicLoader}>
+          <View style={[styles.cosmicLoader, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
             <Text style={styles.omSymbol}>🕉️</Text>
           </View>
-          <ActivityIndicator size="large" color="#FFD700" style={styles.spinner} />
-          <Text style={styles.loadingTitle}>Accessing Akashic Records</Text>
-          <Text style={styles.loadingSubtitle}>
+          <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
+          <Text style={[styles.loadingTitle, { color: colors.accent }]}>Accessing Akashic Records</Text>
+          <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
             {showProgress ? 'Analyzing your soul\'s journey through time...' : 'This is taking longer than usual...'}
           </Text>
           {showProgress && (
             <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarBackground}>
-                <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+              <View style={[styles.progressBarBackground, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : colors.surface }]}>
+                <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: colors.primary }]} />
               </View>
-              <Text style={styles.progressText}>{Math.round(progress)}%</Text>
+              <Text style={[styles.progressText, { color: colors.accent }]}>{Math.round(progress)}%</Text>
             </View>
           )}
           <View style={styles.dotsContainer}>
-            <View style={[styles.dot, styles.dot1]} />
-            <View style={[styles.dot, styles.dot2]} />
-            <View style={[styles.dot, styles.dot3]} />
+            <View style={[styles.dot, styles.dot1, { backgroundColor: colors.accent }]} />
+            <View style={[styles.dot, styles.dot2, { backgroundColor: colors.accent }]} />
+            <View style={[styles.dot, styles.dot3, { backgroundColor: colors.accent }]} />
           </View>
         </Animated.View>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <LinearGradient colors={['#1a0033', '#2d004d', '#4a0080']} style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconButton}>
-            <Text style={styles.backIcon}>←</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
+            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
           </TouchableOpacity>
-          <View style={styles.nameChip}>
-            <Text style={styles.nameChipText}>{nativeName}</Text>
+          <View style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
+            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
           </View>
           <View style={styles.regenerateButton} />
         </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorTitle}>Unable to Access Records</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorTitle, { color: colors.accent }]}>Unable to Access Records</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={initiateAnalysis}>
-            <LinearGradient colors={['#FFD700', '#FFA500']} style={styles.retryGradient}>
-              <Text style={styles.retryText}>Try Again</Text>
+            <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.retryGradient}>
+              <Text style={[styles.retryText, { color: '#fff' }]}>Try Again</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>← Go Back</Text>
+            <Text style={[styles.backText, { color: colors.textSecondary }]}>← Go Back</Text>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (!analysis && !loading && !error) {
     return (
-      <LinearGradient colors={['#1a0033', '#2d004d', '#4a0080']} style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <LinearGradient colors={screenGradient} style={StyleSheet.absoluteFill} />
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconButton}>
-            <Text style={styles.backIcon}>←</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
+            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={styles.nameChip}>
-            <Text style={styles.nameChipText}>{nativeName}</Text>
-            <Text style={styles.nameChipIcon}>▼</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
+            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
+            <Text style={[styles.nameChipIcon, { color: colors.accent }]}>▼</Text>
           </TouchableOpacity>
           <View style={styles.regenerateButton} />
         </View>
         <View style={styles.startContainer}>
           <Text style={styles.omSymbol}>🕉️</Text>
-          <Text style={styles.startTitle}>Past Life Karma Analysis</Text>
-          <Text style={styles.startSubtitle}>Discover your soul's eternal journey</Text>
+          <Text style={[styles.startTitle, { color: colors.accent }]}>Past Life Karma Analysis</Text>
+          <Text style={[styles.startSubtitle, { color: colors.textSecondary }]}>Discover your soul's eternal journey</Text>
           <TouchableOpacity style={styles.startButton} onPress={handleStartAnalysis}>
-            <LinearGradient colors={['#FFD700', '#FFA500']} style={styles.startGradient}>
-              <Text style={styles.startButtonText}>Start Analysis</Text>
+            <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.startGradient}>
+              <Text style={[styles.startButtonText, { color: '#fff' }]}>Start Analysis</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -604,8 +617,10 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           credits={credits}
           cost={karmaCost}
           title="Start Karma Analysis"
+          colors={colors}
+          isDark={isDark}
         />
-      </LinearGradient>
+      </View>
     );
   }
 
@@ -613,21 +628,21 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const sectionKeys = Object.keys(sections);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#1a0033', '#2d004d', '#4a0080', '#1a0033']} style={styles.backgroundGradient}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient colors={screenGradientWithAccent} style={styles.backgroundGradient}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconButton}>
-            <Text style={styles.backIcon}>←</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backIconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
+            <Text style={[styles.backIcon, { color: colors.accent }]}>←</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={styles.nameChip}>
-            <Text style={styles.nameChipText}>{nativeName}</Text>
-            <Text style={styles.nameChipIcon}>▼</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('SelectNative', { returnTo: 'KarmaAnalysis' })} style={[styles.nameChip, { backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.4)' : colors.cardBorder }]}>
+            <Text style={[styles.nameChipText, { color: colors.accent }]}>{nativeName}</Text>
+            <Text style={[styles.nameChipIcon, { color: colors.accent }]}>▼</Text>
           </TouchableOpacity>
           <View style={styles.topBarActions}>
-            <TouchableOpacity onPress={generateKarmaPDF} style={styles.shareButton} disabled={generatingPDF}>
+            <TouchableOpacity onPress={generateKarmaPDF} style={[styles.shareButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]} disabled={generatingPDF}>
               <Text style={styles.shareIcon}>{generatingPDF ? '⏳' : '📤'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleRegenerate} style={styles.regenerateButton}>
+            <TouchableOpacity onPress={handleRegenerate} style={[styles.regenerateButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface }]}>
               <Text style={styles.regenerateIcon}>↻</Text>
             </TouchableOpacity>
           </View>
@@ -639,6 +654,8 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           credits={credits}
           cost={karmaCost}
           title="Regenerate Karma Analysis"
+          colors={colors}
+          isDark={isDark}
         />
         <ScrollView 
           showsVerticalScrollIndicator={false} 
@@ -646,24 +663,24 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
           bounces={true}
         >
           <Animated.View style={{ opacity: fadeAnim }}>
-            <View style={styles.headerContainer}>
-              <View style={styles.headerGlow}>
+            <View style={[styles.headerContainer, { backgroundColor: isDark ? 'rgba(255,215,0,0.08)' : colors.surface }]}>
+              <View style={[styles.headerGlow, { backgroundColor: isDark ? 'rgba(255,215,0,0.15)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]}>
                 <Text style={styles.omHeader}>🕉️</Text>
-                <Text style={styles.title}>Past Life Karma</Text>
-                <Text style={styles.subtitle}>Your Soul's Eternal Journey</Text>
-                <View style={styles.divider} />
+                <Text style={[styles.title, { color: colors.accent }]}>Past Life Karma</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your Soul's Eternal Journey</Text>
+                <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,215,0,0.3)' : colors.cardBorder }]} />
               </View>
             </View>
 
             {sectionKeys.map((key, index) => (
-              <KarmaCard key={index} title={key} content={sections[key]} index={index} />
+              <KarmaCard key={index} title={key} content={sections[key]} index={index} colors={colors} isDark={isDark} />
             ))}
 
             <View style={styles.footerContainer}>
-              <View style={styles.footerGradient}>
+              <View style={[styles.footerGradient, { backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : colors.surface, borderColor: isDark ? 'rgba(255,215,0,0.15)' : colors.cardBorder }]}>
                 <Text style={styles.footerIcon}>✨</Text>
-                <Text style={styles.footerText}>Analyzed by AstroRoshni</Text>
-                <Text style={styles.footerSubtext}>Artificial Intelligence</Text>
+                <Text style={[styles.footerText, { color: colors.textSecondary }]}>Analyzed by AstroRoshni</Text>
+                <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>Artificial Intelligence</Text>
               </View>
             </View>
           </Animated.View>
@@ -673,19 +690,19 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   );
 };
 
-const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title }) => (
+const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title, colors = {}, isDark = true }) => (
   <Modal visible={visible} transparent animationType="fade">
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>{title}</Text>
-        <Text style={styles.modalText}>This will use {cost} credits</Text>
-        <Text style={styles.modalBalance}>Your balance: {credits} credits</Text>
+    <View style={[styles.modalOverlay, { backgroundColor: colors.overlay || 'rgba(0,0,0,0.6)' }]}>
+      <View style={[styles.modalContent, { backgroundColor: colors.surface || '#2d1b4e', borderColor: colors.cardBorder || 'rgba(255,215,0,0.3)' }]}>
+        <Text style={[styles.modalTitle, { color: colors.accent || '#FFD700' }]}>{title}</Text>
+        <Text style={[styles.modalText, { color: colors.text || '#fff' }]}>This will use {cost} credits</Text>
+        <Text style={[styles.modalBalance, { color: colors.textSecondary || '#ccc' }]}>Your balance: {credits} credits</Text>
         <View style={styles.modalButtons}>
-          <TouchableOpacity style={styles.modalButton} onPress={onClose}>
-            <Text style={styles.modalButtonText}>Cancel</Text>
+          <TouchableOpacity style={[styles.modalButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.backgroundSecondary, borderColor: colors.cardBorder }]} onPress={onClose}>
+            <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary]} onPress={onConfirm}>
-            <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>Confirm</Text>
+          <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: colors.primary }]} onPress={onConfirm}>
+            <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary, { color: '#fff' }]}>Confirm</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -693,14 +710,14 @@ const CreditModal = ({ visible, onClose, onConfirm, credits, cost, title }) => (
   </Modal>
 );
 
-const KarmaCard = ({ title, content, index }) => {
+const KarmaCard = ({ title, content, index, colors = {}, isDark = true }) => {
   const [expanded, setExpanded] = useState(true);
   const icons = ['🕉️', '🌟', '🎯', '⚖️', '💎', '🔱', '👪', '🦋', '🙏', '⏳', '🕉️'];
   
   const isIntroduction = title === 'Introduction';
   const cardStyle = isIntroduction 
-    ? { backgroundColor: 'rgba(218, 165, 32, 0.9)', borderColor: 'rgba(218, 165, 32, 1)' }
-    : { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderColor: 'rgba(255, 255, 255, 0.3)' };
+    ? { backgroundColor: isDark ? 'rgba(218, 165, 32, 0.9)' : (colors.cardBackground || colors.surface), borderColor: isDark ? 'rgba(218, 165, 32, 1)' : (colors.cardBorder || colors.primary) }
+    : { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : (colors.cardBackground || colors.surface), borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : (colors.cardBorder || colors.primary) };
 
   const formatContent = (text) => {
     // Clean up text first
@@ -747,6 +764,10 @@ const KarmaCard = ({ title, content, index }) => {
     });
   };
 
+  const contentColor = colors.text || 'rgba(255,255,255,0.95)';
+  const accentColor = colors.accent || '#FFD700';
+  const introHighlightColor = isDark ? '#4a0080' : (colors.primary || colors.text);
+
   const renderFormattedText = (text) => {
     // Split by single or double newlines to get paragraphs
     const paragraphs = text.split(/\n+/).filter(p => p.trim().length > 0);
@@ -756,14 +777,15 @@ const KarmaCard = ({ title, content, index }) => {
         {paragraphs.map((para, paraIndex) => {
           const parts = formatContent(para);
           return (
-            <Text key={paraIndex} style={[styles.cardContent, paraIndex > 0 && styles.paragraphSpacing]}>
+            <Text key={paraIndex} style={[styles.cardContent, { color: contentColor }, paraIndex > 0 && styles.paragraphSpacing]}>
               {parts.map((part, index) => (
                 <Text
                   key={index}
                   style={[
                     styles.cardContent,
-                    part.style === 'bold' && (isIntroduction ? styles.introBoldText : styles.boldText),
-                    part.style === 'italic' && (isIntroduction ? styles.introItalicText : styles.italicText),
+                    { color: contentColor },
+                    part.style === 'bold' && (isIntroduction ? { fontWeight: '700', color: introHighlightColor } : { fontWeight: '700', color: accentColor }),
+                    part.style === 'italic' && (isIntroduction ? { fontStyle: 'italic', color: introHighlightColor } : { fontStyle: 'italic', color: accentColor }),
                   ]}
                 >
                   {index === 0 ? part.text.trimStart() : part.text}
@@ -776,6 +798,10 @@ const KarmaCard = ({ title, content, index }) => {
     );
   };
 
+  const iconCircleStyle = isIntroduction
+    ? (isDark ? { backgroundColor: 'rgba(139, 69, 19, 0.3)', borderColor: 'rgba(139, 69, 19, 0.6)' } : { backgroundColor: colors.surface, borderColor: colors.cardBorder })
+    : (isDark ? { backgroundColor: 'rgba(255, 215, 0, 0.2)', borderColor: 'rgba(255, 215, 0, 0.4)' } : { backgroundColor: colors.surface, borderColor: colors.cardBorder });
+
   return (
     <View style={styles.cardWrapper}>
       <View style={[styles.glassCard, cardStyle]}>
@@ -784,15 +810,15 @@ const KarmaCard = ({ title, content, index }) => {
           onPress={() => setExpanded(!expanded)}
           activeOpacity={0.8}
         >
-          <View style={[styles.iconCircle, isIntroduction && styles.introIconCircle]}>
+          <View style={[styles.iconCircle, isIntroduction && styles.introIconCircle, iconCircleStyle]}>
             <Text style={styles.cardIcon}>{icons[index % icons.length]}</Text>
           </View>
-          <Text style={styles.cardTitle}>{title}</Text>
-          <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text || '#fff' }]}>{title}</Text>
+          <Text style={[styles.expandIcon, { color: colors.textSecondary || 'rgba(255,255,255,0.8)' }]}>{expanded ? '▼' : '▶'}</Text>
         </TouchableOpacity>
         {expanded && (
           <View style={styles.cardContentContainer}>
-            <View style={styles.contentDivider} />
+            <View style={[styles.contentDivider, { backgroundColor: colors.cardBorder || 'rgba(255,255,255,0.2)' }]} />
             {renderFormattedText(content)}
           </View>
         )}

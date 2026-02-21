@@ -3,10 +3,15 @@ import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const { chartData, birthData } = route.params;
+  const screenGradient = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
+    : [colors.gradientStart, colors.gradientMid, colors.gradientEnd];
   const [activeTab, setActiveTab] = React.useState('planets');
   const [karakas, setKarakas] = React.useState(null);
   const [jaiminiLagnas, setJaiminiLagnas] = React.useState(null);
@@ -187,46 +192,51 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   // Tab Button Component
   const TabButton = ({ label, emoji, value, active }) => (
     <TouchableOpacity
-      style={[styles.tabButton, active && styles.tabButtonActive]}
+      style={[
+        styles.tabButton,
+        { backgroundColor: active ? colors.primary : (isDark ? colors.surface : colors.cardBackground), borderColor: active ? colors.primary : colors.cardBorder },
+        active && styles.tabButtonActive,
+      ]}
       onPress={() => setActiveTab(value)}
     >
       <Text style={[styles.tabEmoji, active && styles.tabEmojiActive]}>{emoji}</Text>
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
+      <Text style={[styles.tabLabel, { color: active ? '#fff' : colors.text }, active && styles.tabLabelActive]}>{label}</Text>
     </TouchableOpacity>
   );
 
   // Planet Card Component
+  const planetCardGradient = isDark ? [colors.cardBackground, colors.surface] : [colors.cardBackground, colors.backgroundSecondary];
   const PlanetCard = ({ planet }) => (
     <View style={styles.card}>
-      <LinearGradient colors={['#ffffff', '#fef7f0']} style={styles.cardGradient}>
+      <LinearGradient colors={planetCardGradient} style={[styles.cardGradient, { borderColor: colors.cardBorder }]}>
         <View style={styles.cardHeader}>
           <View style={styles.planetInfo}>
             <Text style={styles.planetEmoji}>{planetEmojis[planet.name]}</Text>
             <View>
-              <Text style={styles.planetName}>{planet.name}</Text>
-              {planet.retrograde && <Text style={styles.retrogradeTag}>Retrograde</Text>}
+              <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
+              {planet.retrograde && <Text style={[styles.retrogradeTag, { color: colors.error }]}>Retrograde</Text>}
             </View>
           </View>
-          <View style={styles.houseTag}>
+          <View style={[styles.houseTag, { backgroundColor: colors.primary }]}>
             <Text style={styles.houseText}>House {planet.house}</Text>
           </View>
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
         <View style={styles.detailsGrid}>
           <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Rashi</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Rashi</Text>
             <View style={styles.rashiContainer}>
               <Text style={styles.rashiIcon}>{rashiIcons[planet.sign]}</Text>
-              <Text style={styles.detailValue}>{rashiNames[planet.sign]}</Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>{rashiNames[planet.sign]}</Text>
             </View>
           </View>
           <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Degree</Text>
-            <Text style={styles.detailValue}>{planet.degree.toFixed(2)}°</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Degree</Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>{planet.degree.toFixed(2)}°</Text>
           </View>
           <View style={styles.detailItemFull}>
-            <Text style={styles.detailLabel}>Nakshatra</Text>
-            <Text style={styles.detailValue}>{planet.nakshatra} - Pada {planet.pada}</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Nakshatra</Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>{planet.nakshatra} - Pada {planet.pada}</Text>
           </View>
         </View>
       </LinearGradient>
@@ -234,41 +244,42 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   );
 
   // Lagna Card Component
+  const lagnaCardGradient = isDark ? [colors.backgroundSecondary, colors.cardBackground] : [colors.backgroundSecondary, colors.cardBackground];
   const LagnaCard = ({ lagna }) => (
     <View style={styles.card}>
-      <LinearGradient colors={['#f0f9ff', '#e0f2fe']} style={styles.cardGradient}>
+      <LinearGradient colors={lagnaCardGradient} style={[styles.cardGradient, { borderColor: colors.cardBorder }]}>
         <View style={styles.cardHeader}>
           <View style={styles.planetInfo}>
             <Text style={styles.planetEmoji}>{planetEmojis[lagna.name] || '⭐'}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.planetName}>{lagna.name}</Text>
+              <Text style={[styles.planetName, { color: colors.text }]}>{lagna.name}</Text>
               {lagna.description && (
-                <Text style={styles.lagnaDescription}>{lagna.description}</Text>
+                <Text style={[styles.lagnaDescription, { color: colors.textSecondary }]}>{lagna.description}</Text>
               )}
             </View>
           </View>
-          <View style={styles.houseTag}>
+          <View style={[styles.houseTag, { backgroundColor: colors.primary }]}>
             <Text style={styles.houseText}>House {lagna.house}</Text>
           </View>
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
         <View style={styles.detailsGrid}>
           <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Rashi</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Rashi</Text>
             <View style={styles.rashiContainer}>
               <Text style={styles.rashiIcon}>{rashiIcons[lagna.sign]}</Text>
-              <Text style={styles.detailValue}>{rashiNames[lagna.sign]}</Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>{rashiNames[lagna.sign]}</Text>
             </View>
           </View>
           {!lagna.isJaimini && (
             <>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Degree</Text>
-                <Text style={styles.detailValue}>{lagna.degree.toFixed(2)}°</Text>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Degree</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>{lagna.degree.toFixed(2)}°</Text>
               </View>
               <View style={styles.detailItemFull}>
-                <Text style={styles.detailLabel}>Nakshatra</Text>
-                <Text style={styles.detailValue}>{lagna.nakshatra} - Pada {lagna.pada}</Text>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Nakshatra</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>{lagna.nakshatra} - Pada {lagna.pada}</Text>
               </View>
             </>
           )}
@@ -287,13 +298,13 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       if (loading) {
         return (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Loading Karakas...</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Karakas...</Text>
           </View>
         );
       }
       if (!karakas) {
-        return <Text style={styles.emptyText}>No Karaka data available</Text>;
+        return <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No Karaka data available</Text>;
       }
       return (
         <View style={styles.karakasGrid}>
@@ -305,9 +316,9 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               displayName = value.planet || value.name || 'Unknown';
             }
             return (
-              <View key={karaka} style={styles.karakaCard}>
-                <Text style={styles.karakaName}>{karaka}</Text>
-                <Text style={styles.karakaPlanet}>{planetEmojis[displayName] || '⭐'} {displayName}</Text>
+              <View key={karaka} style={[styles.karakaCard, { backgroundColor: isDark ? 'rgba(249, 115, 22, 0.1)' : 'rgba(234, 88, 12, 0.08)', borderColor: isDark ? 'rgba(249, 115, 22, 0.3)' : colors.cardBorder }]}>
+                <Text style={[styles.karakaName, { color: colors.textSecondary }]}>{karaka}</Text>
+                <Text style={[styles.karakaPlanet, { color: colors.text }]}>{planetEmojis[displayName] || '⭐'} {displayName}</Text>
               </View>
             );
           })}
@@ -319,8 +330,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       if (lagnasLoading) {
         return (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Loading Jaimini Lagnas...</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Jaimini Lagnas...</Text>
           </View>
         );
       }
@@ -331,25 +342,27 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       if (specialLoading) {
         return (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Loading Special Points...</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Special Points...</Text>
           </View>
         );
       }
 
+      const specialCardBg = isDark ? 'rgba(236, 72, 153, 0.08)' : 'rgba(219, 39, 119, 0.08)';
+      const specialCardBorder = isDark ? 'rgba(236, 72, 153, 0.2)' : colors.cardBorder;
       return (
         <View>
           {/* Yogi Points */}
           {yogiPoints && (
             <View style={styles.specialSection}>
-              <Text style={styles.specialSectionTitle}>🔮 Yogi Points</Text>
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>Yogi Points</Text>
               {Object.entries(yogiPoints).map(([key, point]) => (
-                <View key={key} style={styles.specialCard}>
-                  <Text style={styles.specialPointName}>{key.replace('_', ' ').toUpperCase()}</Text>
-                  <Text style={styles.specialPointValue}>
+                <View key={key} style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                  <Text style={[styles.specialPointName, { color: colors.text }]}>{key.replace('_', ' ').toUpperCase()}</Text>
+                  <Text style={[styles.specialPointValue, { color: colors.primary }]}>
                     {point.sign_name} {point.degree?.toFixed(2)}°
                   </Text>
-                  <Text style={styles.specialPointLord}>Lord: {point.lord}</Text>
+                  <Text style={[styles.specialPointLord, { color: colors.textSecondary }]}>Lord: {point.lord}</Text>
                 </View>
               ))}
             </View>
@@ -358,13 +371,13 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           {/* Bhrigu Bindu */}
           {sniperPoints?.bhrigu_bindu && !sniperPoints.bhrigu_bindu.error && (
             <View style={styles.specialSection}>
-              <Text style={styles.specialSectionTitle}>🎯 Bhrigu Bindu</Text>
-              <View style={styles.specialCard}>
-                <Text style={styles.specialPointName}>Destiny Point</Text>
-                <Text style={styles.specialPointValue}>
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>🎯 Bhrigu Bindu</Text>
+              <View style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                <Text style={[styles.specialPointName, { color: colors.text }]}>Destiny Point</Text>
+                <Text style={[styles.specialPointValue, { color: colors.primary }]}>
                   {sniperPoints.bhrigu_bindu.formatted}
                 </Text>
-                <Text style={styles.specialPointDesc}>
+                <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>
                   {sniperPoints.bhrigu_bindu.significance}
                 </Text>
               </View>
@@ -374,14 +387,14 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           {/* Pushkara Navamsha */}
           {pushkaraData?.pushkara_planets && pushkaraData.pushkara_planets.length > 0 && (
             <View style={styles.specialSection}>
-              <Text style={styles.specialSectionTitle}>💎 Pushkara Navamsha</Text>
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>💎 Pushkara Navamsha</Text>
               {pushkaraData.pushkara_planets.map((data, index) => (
-                <View key={index} style={styles.specialCard}>
-                  <Text style={styles.specialPointName}>{data.planet}</Text>
-                  <Text style={styles.specialPointValue}>
+                <View key={index} style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                  <Text style={[styles.specialPointName, { color: colors.text }]}>{data.planet}</Text>
+                  <Text style={[styles.specialPointValue, { color: colors.primary }]}>
                     Navamsa {data.navamsa_no} • {data.degree_in_sign?.toFixed(2)}°
                   </Text>
-                  <Text style={styles.specialPointDesc}>
+                  <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>
                     {data.description} ({data.intensity})
                   </Text>
                 </View>
@@ -390,7 +403,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           )}
 
           {!yogiPoints && !sniperPoints && !pushkaraData && (
-            <Text style={styles.emptyText}>No special points data available</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No special points data available</Text>
           )}
         </View>
       );
@@ -398,20 +411,20 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-      <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.gradient}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <LinearGradient colors={screenGradient} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Planetary Positions</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Planetary Positions</Text>
             <View style={styles.placeholder} />
           </View>
 
           {/* Tab Bar */}
-          <View style={styles.tabBar}>
+          <View style={[styles.tabBar, { borderBottomColor: colors.cardBorder }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
               <TabButton label="Planets" emoji="🪐" value="planets" active={activeTab === 'planets'} />
               <TabButton label="Karakas" emoji="🔱" value="karakas" active={activeTab === 'karakas'} />
@@ -446,7 +459,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -458,7 +471,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.textPrimary,
   },
   placeholder: { width: 40 },
   
@@ -467,7 +479,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   tabScrollContent: {
     gap: 8,
@@ -478,15 +489,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
     gap: 6,
   },
-  tabButtonActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
+  tabButtonActive: {},
   tabEmoji: {
     fontSize: 16,
   },
@@ -496,11 +502,8 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.textPrimary,
   },
-  tabLabelActive: {
-    color: COLORS.white,
-  },
+  tabLabelActive: {},
 
   scrollView: {
     flex: 1,
@@ -520,7 +523,6 @@ const styles = StyleSheet.create({
   cardGradient: {
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -540,21 +542,17 @@ const styles = StyleSheet.create({
   planetName: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.textPrimary,
   },
   retrogradeTag: {
     fontSize: 10,
-    color: COLORS.error,
     fontWeight: '600',
     marginTop: 2,
   },
   lagnaDescription: {
     fontSize: 11,
-    color: COLORS.textSecondary,
     marginTop: 2,
   },
   houseTag: {
-    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -562,11 +560,10 @@ const styles = StyleSheet.create({
   houseText: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#ffffff',
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.border,
     marginVertical: 12,
   },
   detailsGrid: {
@@ -584,12 +581,10 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   detailValue: {
     fontSize: 14,
-    color: COLORS.textPrimary,
     fontWeight: '700',
   },
   rashiContainer: {
@@ -608,9 +603,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   karakaCard: {
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.3)',
     borderRadius: 12,
     padding: 12,
     minWidth: '48%',
@@ -618,13 +611,11 @@ const styles = StyleSheet.create({
   },
   karakaName: {
     fontSize: 12,
-    color: COLORS.textSecondary,
     fontWeight: '600',
     marginBottom: 4,
   },
   karakaPlanet: {
     fontSize: 16,
-    color: COLORS.textPrimary,
     fontWeight: '700',
   },
 
@@ -637,12 +628,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   emptyText: {
     textAlign: 'center',
     fontSize: 14,
-    color: COLORS.textSecondary,
     paddingVertical: 40,
   },
   comingSoonContainer: {
@@ -657,12 +646,10 @@ const styles = StyleSheet.create({
   comingSoonText: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   comingSoonSubtext: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 40,
   },
@@ -674,13 +661,10 @@ const styles = StyleSheet.create({
   specialSectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.textPrimary,
     marginBottom: 12,
   },
   specialCard: {
-    backgroundColor: 'rgba(236, 72, 153, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(236, 72, 153, 0.2)',
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
@@ -688,23 +672,19 @@ const styles = StyleSheet.create({
   specialPointName: {
     fontSize: 13,
     fontWeight: '700',
-    color: COLORS.textPrimary,
     marginBottom: 4,
     textTransform: 'capitalize',
   },
   specialPointValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.primary,
     marginBottom: 4,
   },
   specialPointLord: {
     fontSize: 12,
-    color: COLORS.textSecondary,
   },
   specialPointDesc: {
     fontSize: 11,
-    color: COLORS.textSecondary,
     marginTop: 4,
     lineHeight: 16,
   },

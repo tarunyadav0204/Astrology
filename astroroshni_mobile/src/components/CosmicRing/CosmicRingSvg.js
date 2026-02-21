@@ -67,7 +67,7 @@ const THEME_COLORS = {
     strokeInner: '#a8a29e',
     centerFill: '#fffbf7',
     rashiText: '#1c1917',
-    nakText: '#fde047',
+    nakText: '#92400e',
     centerTitle: '#1c1917',
     centerSub: '#78716c',
     centerMuted: '#a8a29e',
@@ -187,7 +187,7 @@ export default function CosmicRingSvg({
           const ty = CY - R_RASHI_LABEL * Math.cos(rad);
           return (
             <G key={name} transform={`rotate(${deg}, ${tx}, ${ty})`}>
-              <SvgText x={tx} y={ty} fill={c.rashiText} fontSize={14} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
+              <SvgText x={tx} y={ty} fill={c.rashiText} fontSize={18} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
                 {name}
               </SvgText>
             </G>
@@ -204,17 +204,28 @@ export default function CosmicRingSvg({
           const y2 = CY - R_OUTER * Math.cos(rad);
           return <Line key={`nak-line-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={c.strokeMid} strokeWidth={1} />;
         })}
-        {/* Nakshatra labels (27) - at centre of each section, rotated with the circle, bright yellow */}
+        {/* Nakshatra labels (27) - 8 chars first line, rest on second line so it fits */}
         {NAKSHATRA_LABELS.map((name, i) => {
           const deg = ((i + 0.5) * 360) / 27;
           const rad = (deg * Math.PI) / 180;
           const tx = CX + R_NAK_LABEL * Math.sin(rad);
           const ty = CY - R_NAK_LABEL * Math.cos(rad);
+          const nakFontSize = 16;
+          const lineHeight = 16;
+          const maxFirstLine = 8;
+          const firstLine = name.length <= maxFirstLine ? name : name.slice(0, maxFirstLine);
+          const secondLine = name.length > maxFirstLine ? name.slice(maxFirstLine).trim() : null;
+          const offsetY = secondLine ? -lineHeight / 2 : 0;
           return (
             <G key={`${name}-${i}`} transform={`rotate(${deg}, ${tx}, ${ty})`}>
-              <SvgText x={tx} y={ty} fill={c.nakText} fontSize={11} fontWeight="600" textAnchor="middle" dominantBaseline="middle">
-                {name}
+              <SvgText x={tx} y={ty + offsetY} fill={c.nakText} fontSize={nakFontSize} fontWeight="600" textAnchor="middle" dominantBaseline="middle">
+                {firstLine}
               </SvgText>
+              {secondLine ? (
+                <SvgText x={tx} y={ty + offsetY + lineHeight} fill={c.nakText} fontSize={nakFontSize} fontWeight="600" textAnchor="middle" dominantBaseline="middle">
+                  {secondLine}
+                </SvgText>
+              ) : null}
             </G>
           );
         })}
