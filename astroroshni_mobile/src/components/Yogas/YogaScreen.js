@@ -36,13 +36,18 @@ const YogaScreen = ({ navigation }) => {
 
     const loadInitialNative = async () => {
         try {
-            const birthData = await storage.getBirthDetails();
-            if (birthData) {
-                // Only fetch if native changed or first time
-                if (!currentNative || currentNative.id !== birthData.id) {
-                    setCurrentNative(birthData);
-                    fetchYogas(birthData);
-                }
+            let birthData = await storage.getBirthDetails();
+            if (!birthData) {
+                const profiles = await storage.getBirthProfiles();
+                if (profiles?.length) birthData = profiles.find(p => p.relation === 'self') || profiles[0];
+            }
+            if (!birthData?.name) {
+                navigation.replace('BirthProfileIntro', { returnTo: 'Yogas' });
+                return;
+            }
+            if (!currentNative || currentNative.id !== birthData.id) {
+                setCurrentNative(birthData);
+                fetchYogas(birthData);
             }
         } catch (error) {
             console.error('Error loading initial native:', error);

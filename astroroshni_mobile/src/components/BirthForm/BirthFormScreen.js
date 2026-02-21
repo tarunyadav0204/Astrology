@@ -37,6 +37,7 @@ export default function BirthFormScreen({ navigation, route }) {
   const editProfile = route?.params?.editProfile;
   const prefillData = route?.params?.prefillData;
   const updateGender = route?.params?.updateGender;
+  const returnTo = route?.params?.returnTo;
   const [step, setStep] = useState(updateGender ? 2 : 1); // Start at gender step if updating gender
   const getTimeDate = (timeString) => {
     if (!timeString) return new Date();
@@ -480,7 +481,7 @@ export default function BirthFormScreen({ navigation, route }) {
             if (editProfile) {
               navigation.navigate('SelectNative');
             } else {
-              navigation.replace('Home');
+              navigation.replace(returnTo || 'Home');
             }
           }}
         ]);

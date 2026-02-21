@@ -142,16 +142,22 @@ export default function AshtakvargaOracle({ navigation }) {
         }
       }
       
-      if (data) {
+      if (data?.name) {
         setBirthData(data);
-        // Set selected date to birth date initially
         setSelectedDate(new Date(data.date));
-        await fetchAshtakvargaData(data, new Date(data.date));
+        try {
+          await fetchAshtakvargaData(data, new Date(data.date));
+        } catch (fetchErr) {
+          console.error('Error fetching ashtakvarga:', fetchErr);
+          setOracleData(null);
+        }
       } else {
-        console.log('No birth data found in storage');
+        navigation.replace('BirthProfileIntro', { returnTo: 'AshtakvargaOracle' });
+        return;
       }
     } catch (error) {
       console.error('Error loading birth data:', error);
+      setOracleData(null);
     } finally {
       setLoading(false);
     }
@@ -254,9 +260,12 @@ export default function AshtakvargaOracle({ navigation }) {
 
   const getCosmicWeatherTheme = () => {
     if (!oracleData?.ashtakavarga?.total_bindus) {
-      throw new Error('Ashtakvarga total bindus data is required but not available');
+      return {
+        theme: 'Loading',
+        sentiment: 'neutral',
+        colors: theme === 'dark' ? ['#1a0033', '#2d1b4e', '#4a2c6d'] : ['#fef3c7', '#fde68a', '#fcd34d'],
+      };
     }
-    
     const totalBindus = oracleData.ashtakavarga.total_bindus;
     const strength = Math.round((totalBindus / 337) * 100); // 337 is theoretical max
     
@@ -283,7 +292,7 @@ export default function AshtakvargaOracle({ navigation }) {
 
   const renderOraclesPulse = () => {
     const weather = getCosmicWeatherTheme();
-    
+    const hasBindus = oracleData?.ashtakavarga?.total_bindus != null;
     return (
       <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.cosmicWeatherHeader, { height: height * 0.35 }]}>
@@ -297,7 +306,7 @@ export default function AshtakvargaOracle({ navigation }) {
               <Text style={[styles.cosmicTheme, { color: colors.text }]}>{weather.theme}</Text>
               <Text style={[styles.cosmicSubtext, { color: colors.textSecondary }]}>Today's Cosmic Pulse</Text>
               <View style={styles.strengthIndicator}>
-                <Text style={styles.strengthValue}>{Math.round((oracleData.ashtakavarga.total_bindus / 337) * 100)}%</Text>
+                <Text style={styles.strengthValue}>{hasBindus ? `${Math.round((oracleData.ashtakavarga.total_bindus / 337) * 100)}%` : '—'}</Text>
                 <Text style={styles.strengthLabel}>Cosmic Alignment</Text>
               </View>
             </Animated.View>
@@ -350,7 +359,24 @@ export default function AshtakvargaOracle({ navigation }) {
 
   const renderDestinyMap = () => {
     if (!oracleData || !oracleData.ashtakavarga || !oracleData.ashtakavarga.sarvashtakavarga) {
-      throw new Error('Ashtakvarga data is required but not available');
+      return (
+        <ScrollView style={styles.tabContent} contentContainerStyle={[styles.tabContent, { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }]} showsVerticalScrollIndicator={false}>
+          <Text style={[styles.loadingSubtext, { color: colors.textSecondary, textAlign: 'center', marginBottom: 12 }]}>
+            Ashtakvarga data couldn't be loaded.
+          </Text>
+          <Text style={[styles.loadingSubtext, { color: colors.textTertiary, textAlign: 'center', fontSize: 14 }]}>
+            Please try again or select another date.
+          </Text>
+          {birthData && (
+            <TouchableOpacity
+              onPress={() => fetchAshtakvargaData(birthData, selectedDate)}
+              style={{ marginTop: 20, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: colors.primary, borderRadius: 24 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      );
     }
 
     return (

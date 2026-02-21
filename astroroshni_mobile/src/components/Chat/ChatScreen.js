@@ -793,24 +793,13 @@ export default function ChatScreen({ navigation, route }) {
       if (selectedBirthData && selectedBirthData.name) {
         setBirthData(selectedBirthData);
       } else {
-        // Check if charts exist on server
-        try {
-          const { chartAPI } = require('../../services/api');
-          const response = await chartAPI.getExistingCharts();
-          if (response.data && response.data.charts && response.data.charts.length > 0) {
-            navigation.navigate('SelectNative');
-          } else {
-            navigation.navigate('BirthForm');
-          }
-        } catch (apiError) {
-          navigation.navigate('BirthForm');
-        }
+        // No local birth data: stay on Home and show empty state (Add birth profile CTA).
+        // Do not auto-redirect to SelectNative/BirthForm; user can tap CTA to see BirthProfileIntro.
         setBirthData(null);
       }
     } catch (error) {
       console.error('❌ Error checking birth data:', error);
       setBirthData(null);
-      navigation.navigate('BirthForm');
     }
   };
 
@@ -2788,6 +2777,7 @@ export default function ChatScreen({ navigation, route }) {
           visible={showDashaBrowser} 
           onClose={() => setShowDashaBrowser(false)}
           birthData={birthData}
+          onRequireBirthData={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Home' })}
         />
 
         {/* Enhanced Analysis Popup */}

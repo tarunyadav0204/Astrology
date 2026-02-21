@@ -151,11 +151,11 @@ const WelcomeScreen = ({ navigation }) => {
       const birthDetails = await storage.getBirthDetails();
       
       if (authToken && birthDetails) {
-        // User is logged in and has birth details, go to Chat
+        // User is logged in and has birth details, go to Home
         navigation.replace('Home');
       } else if (authToken) {
-        // User is logged in but no birth details, go to BirthForm
-        navigation.replace('BirthForm');
+        // Already logged in but no birth details: go to Home (empty state + Add profile CTA)
+        navigation.replace('Home');
       }
       // If no auth token, stay on Welcome screen
     } catch (error) {

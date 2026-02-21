@@ -50,15 +50,17 @@ export default function UniversalMuhuratScreen({ route, navigation }) {
   const loadProfile = async () => {
     try {
       const data = await storage.getBirthData();
-      if (data) {
-        setUserProfile(data);
-        if (data.latitude) {
-          setLocation({
-            latitude: parseFloat(data.latitude),
-            longitude: parseFloat(data.longitude),
-            name: data.place || "My Location"
-          });
-        }
+      if (!data?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'UniversalMuhurat' });
+        return;
+      }
+      setUserProfile(data);
+      if (data.latitude) {
+        setLocation({
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
+          name: data.place || "My Location"
+        });
       }
     } catch(e) { console.error(e); }
   };

@@ -46,7 +46,7 @@ const getShortSign = (sign) => {
 };
 
 
-const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
+const CascadingDashaBrowser = ({ visible, onClose, birthData, onRequireBirthData }) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
@@ -61,6 +61,14 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
   const [jaiminiAntarData, setJaiminiAntarData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // When visible but no birth data, stop loading and show empty state
+  useEffect(() => {
+    if (visible && (!birthData || !birthData.name)) {
+      setLoading(false);
+      setError(null);
+    }
+  }, [visible, birthData]);
   const [transitDate, setTransitDate] = useState(new Date());
   const [selectedDashas, setSelectedDashas] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -2121,6 +2129,46 @@ const CascadingDashaBrowser = ({ visible, onClose, birthData }) => {
       </View>
     );
   };
+
+  // No birth data: show empty state instead of loader
+  if (visible && (!birthData || !birthData.name)) {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+          <StatusBar barStyle={colors.statusBarStyle} />
+          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : colors.surface }]}>
+              <Text style={[styles.closeIcon, { color: colors.text }]}>✕</Text>
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('dasha.browserTitle')}</Text>
+            <View style={styles.placeholder} />
+          </View>
+          <View style={[styles.loadingContainer, { justifyContent: 'center', paddingHorizontal: 24 }]}>
+            <Text style={[styles.loadingText, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>
+              {t('dasha.birthDataRequired', 'Birth data is required to view dashas.')}
+            </Text>
+            <Text style={[styles.loadingText, { color: colors.textSecondary, textAlign: 'center', fontSize: 14, marginBottom: 24 }]}>
+              {t('dasha.addBirthProfileHint', 'Add your birth profile from the home screen to continue.')}
+            </Text>
+            {onRequireBirthData ? (
+              <TouchableOpacity
+                onPress={() => { onRequireBirthData(); onClose(); }}
+                style={[styles.retryButton, { backgroundColor: colors.primary, alignSelf: 'center', paddingHorizontal: 24 }]}
+              >
+                <Text style={[styles.retryText, { color: '#fff' }]}>{t('birthProfileIntro.emptyStateCta', 'Add birth profile')}</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              onPress={onClose}
+              style={{ marginTop: 16, paddingVertical: 12, paddingHorizontal: 24, alignSelf: 'center' }}
+            >
+              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>{t('common.close', 'Close')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   if (loading) {
     return (

@@ -9,10 +9,21 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 export default function CreditModal({ visible, onConfirm, onCancel, cost, title, description }) {
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
+
+  const modalGradient = isDark
+    ? [colors.gradientStart || '#1E1E2E', colors.gradientMid || '#2A2A40']
+    : [colors.cardBackground, colors.backgroundSecondary];
+  const confirmGradientColors = isDark ? [colors.accent, colors.primary] : [colors.primary, colors.secondary];
+  const overlayBg = isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)';
+  const costContainerBg = isDark ? 'rgba(255, 215, 0, 0.1)' : 'rgba(249, 115, 22, 0.12)';
+
   return (
     <Modal
       visible={visible}
@@ -20,36 +31,39 @@ export default function CreditModal({ visible, onConfirm, onCancel, cost, title,
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: overlayBg }]}>
         <View style={styles.modalContainer}>
           <LinearGradient
-            colors={['#1E1E2E', '#2A2A40']}
+            colors={modalGradient}
             style={styles.modalContent}
           >
             {/* Header */}
             <View style={styles.header}>
-              <Ionicons name="sparkles" size={32} color="#FFD700" />
-              <Text style={styles.title}>{title}</Text>
+              <Ionicons name="sparkles" size={32} color={colors.accent} />
+              <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
             </View>
 
             {/* Description */}
-            <Text style={styles.description}>{description}</Text>
+            <Text style={[styles.description, { color: colors.textSecondary }]}>{description}</Text>
 
             {/* Credit Cost */}
-            <View style={styles.costContainer}>
-              <Ionicons name="diamond" size={20} color="#FFD700" />
-              <Text style={styles.costText}>{cost} Credits Required</Text>
+            <View style={[styles.costContainer, { backgroundColor: costContainerBg }]}>
+              <Ionicons name="diamond" size={20} color={colors.accent} />
+              <Text style={[styles.costText, { color: colors.accent }]}>{cost} Credits Required</Text>
             </View>
 
             {/* Buttons */}
             <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-                <Text style={styles.cancelText}>Cancel</Text>
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: colors.cardBorder }]}
+                onPress={onCancel}
+              >
+                <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
                 <LinearGradient
-                  colors={['#FFD700', '#FFA500']}
+                  colors={confirmGradientColors}
                   style={styles.confirmGradient}
                 >
                   <Text style={styles.confirmText}>Start Analysis</Text>
@@ -66,7 +80,6 @@ export default function CreditModal({ visible, onConfirm, onCancel, cost, title,
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -86,13 +99,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
     marginTop: 8,
     textAlign: 'center',
   },
   description: {
     fontSize: 14,
-    color: '#DDD',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -100,7 +111,6 @@ const styles = StyleSheet.create({
   costContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -109,7 +119,6 @@ const styles = StyleSheet.create({
   costText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFD700',
     marginLeft: 8,
   },
   buttonContainer: {
@@ -122,11 +131,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#666',
     alignItems: 'center',
   },
   cancelText: {
-    color: '#AAA',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -140,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmText: {
-    color: '#000',
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },

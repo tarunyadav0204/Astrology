@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { kpAPI } from '../services/api';
+import { storage } from '../services/storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import NativeSelectorChip from '../components/Common/NativeSelectorChip';
@@ -282,12 +283,26 @@ const KPScreen = ({ route, navigation }) => {
         }).start();
     }, [birthDetails]);
 
+    // When no birthDetails from params, try storage and redirect if none
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            if (birthDetails?.name) return;
+            const fromStorage = await storage.getBirthDetails();
+            if (!mounted) return;
+            if (fromStorage?.name) {
+                setBirthDetails(fromStorage);
+            } else {
+                navigation.replace('BirthProfileIntro', { returnTo: 'KPSystem' });
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
+
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
-            // Check if birthDetails changed in SelectNative
             if (route.params?.birthDetails) {
                 const newDetails = route.params.birthDetails;
-                // Only update if it's actually different to avoid infinite loops
                 if (newDetails.name !== birthDetails?.name || 
                     newDetails.date !== birthDetails?.date || 
                     newDetails.time !== birthDetails?.time) {

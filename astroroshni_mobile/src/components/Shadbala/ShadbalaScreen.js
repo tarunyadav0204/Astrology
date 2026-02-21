@@ -9,7 +9,7 @@ import { getEndpoint } from '../../utils/constants';
 import { useAstrologyTranslation } from '../../utils/astrologyTranslation';
 
 const ShadbalaScreen = ({ route, navigation }) => {
-  const { birthData } = route.params;
+  const { birthData } = route.params || {};
   const { theme, colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [shadbalaData, setData] = useState(null);
@@ -18,11 +18,18 @@ const ShadbalaScreen = ({ route, navigation }) => {
   const { t, translatePlanet } = useAstrologyTranslation();
 
   useEffect(() => {
-    if (!hasFetched) {
+    if (!birthData?.name) {
+      navigation.replace('BirthProfileIntro', { returnTo: 'Shadbala' });
+      return;
+    }
+  }, [birthData, navigation]);
+
+  useEffect(() => {
+    if (!hasFetched && birthData?.name) {
       fetchShadbala();
       setHasFetched(true);
     }
-  }, [hasFetched]);
+  }, [hasFetched, birthData]);
 
   const fetchShadbala = async () => {
     try {

@@ -8,7 +8,14 @@ import { useTheme } from '../../context/ThemeContext';
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
-  const { chartData, birthData } = route.params;
+  const { chartData, birthData } = route.params || {};
+  React.useEffect(() => {
+    if (!birthData?.name) {
+      navigation.replace('BirthProfileIntro', { returnTo: 'PlanetaryPositions' });
+    }
+  }, [birthData, navigation]);
+
+  if (!birthData?.name) return null;
   const screenGradient = isDark
     ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
     : [colors.gradientStart, colors.gradientMid, colors.gradientEnd];

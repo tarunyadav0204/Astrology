@@ -63,16 +63,17 @@ export default function ChildbirthPlannerScreen({ navigation }) {
   const loadProfile = async () => {
     try {
       const data = await storage.getBirthData();
-      if (data) {
-        setMotherProfile(data);
-        // SAFETY: Ensure lat/long exist before setting delivery location
-        if (data.latitude && data.longitude) {
-          setDeliveryLocation({
-            latitude: parseFloat(data.latitude),
-            longitude: parseFloat(data.longitude),
-            name: data.place || "Mother's location"
-          });
-        }
+      if (!data?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'ChildbirthPlanner' });
+        return;
+      }
+      setMotherProfile(data);
+      if (data.latitude && data.longitude) {
+        setDeliveryLocation({
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
+          name: data.place || "Mother's location"
+        });
       }
     } catch(e) { 
       console.error(e); 

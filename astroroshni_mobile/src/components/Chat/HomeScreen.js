@@ -479,11 +479,69 @@ const loadHomeData = async (nativeData = null) => {
   // Use current native data for display
   const displayData = currentNativeData || birthData;
 
-  // Don't render if no birth data available
-  if (!displayData || !colors) {
+  if (!colors) {
     return null;
   }
-  
+
+  // Empty state when no native: show CTA to add birth profile (→ BirthProfileIntro)
+  if (!displayData) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={theme === 'dark'
+            ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+            : [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.gradientAccent || '#fde68a']}
+          style={styles.gradient}
+        >
+          <ScrollView
+            style={[styles.scrollView, { zIndex: 1 }]}
+            contentContainerStyle={[styles.content, styles.emptyStateContent]}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.emptyStateCard, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <View style={styles.emptyStateIconWrap}>
+                <Icon name="planet-outline" size={48} color={colors.accent || '#FFD700'} />
+              </View>
+              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
+                {t('birthProfileIntro.emptyStateTitle', 'Add your birth profile')}
+              </Text>
+              <Text style={[styles.emptyStateBody, { color: colors.textSecondary }]}>
+                {t('birthProfileIntro.emptyStateBody', 'Your date, time and place of birth unlock your Vedic chart, personalized insights, and cosmic guidance. You can add or change this anytime.')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Home' })}
+                activeOpacity={0.85}
+                style={styles.emptyStateCtaWrap}
+              >
+                <LinearGradient
+                  colors={['#FF6B35', '#F7931E', '#FFD700']}
+                  style={styles.emptyStateCta}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.emptyStateCtaText}>
+                    {t('birthProfileIntro.emptyStateCta', 'Add birth profile')}
+                  </Text>
+                  <Text style={styles.emptyStateCtaIcon}>✨</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            {panchangData && (
+              <View style={[styles.emptyStatePanchang, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <Text style={[styles.emptyStatePanchangTitle, { color: colors.text }]}>
+                  {t('home.panchang.title', 'Today’s Panchang')}
+                </Text>
+                <Text style={[styles.emptyStatePanchangSub, { color: colors.textSecondary }]}>
+                  {panchangData?.sunrise_sunset ? `${t('common.sunrise', 'Sunrise')}: ${panchangData.sunrise_sunset.sunrise || '—'} • ${t('common.sunset', 'Sunset')}: ${panchangData.sunrise_sunset.sunset || '—'}` : t('home.panchang.loading', 'Loading…')}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </LinearGradient>
+      </View>
+    );
+  }
+
   const place = displayData?.place || `${displayData?.latitude}, ${displayData?.longitude}`;
   const time = displayData?.time || 'Unknown time';
 
@@ -2312,6 +2370,77 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 10,
     paddingBottom: 40,
+  },
+  emptyStateContent: {
+    paddingTop: 40,
+    paddingHorizontal: 24,
+  },
+  emptyStateCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 24,
+    padding: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+  },
+  emptyStateIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  emptyStateBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  emptyStateCtaWrap: {
+    alignSelf: 'stretch',
+  },
+  emptyStateCta: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateCtaText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginRight: 8,
+  },
+  emptyStateCtaIcon: {
+    fontSize: 18,
+  },
+  emptyStatePanchang: {
+    marginTop: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  emptyStatePanchangTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptyStatePanchangSub: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   star: {
     position: 'absolute',

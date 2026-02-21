@@ -87,7 +87,15 @@ const KarmaAnalysisScreen = ({ route, navigation }) => {
   const loadBirthData = useCallback(async () => {
     try {
       console.log('[KarmaAnalysis] Loading birth data...');
-      const birthDetails = await storage.getBirthDetails();
+      let birthDetails = await storage.getBirthDetails();
+      if (!birthDetails) {
+        const profiles = await storage.getBirthProfiles();
+        if (profiles?.length) birthDetails = profiles.find((p) => p.relation === 'self') || profiles[0];
+      }
+      if (!birthDetails?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'KarmaAnalysis' });
+        return;
+      }
       console.log('[KarmaAnalysis] Birth details:', birthDetails);
       
       if (birthDetails?.name) {

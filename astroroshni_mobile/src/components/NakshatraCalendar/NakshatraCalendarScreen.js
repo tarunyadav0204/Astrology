@@ -59,6 +59,13 @@ export default function NakshatraCalendarScreen({ navigation, route }) {
   }, [displayData, t]);
 
   useEffect(() => {
+    if (!birthData?.name) {
+      navigation.replace('BirthProfileIntro', { returnTo: 'NakshatraCalendar' });
+      return;
+    }
+  }, [birthData, navigation]);
+
+  useEffect(() => {
     if (!displayData) {
       setLoading(false);
       return;

@@ -84,10 +84,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   const checkBirthData = async () => {
     try {
-      // console.log('🔍 [DEBUG] checkBirthData: Starting to load birth data...');
       const savedBirthData = await storage.getBirthDetails();
-      // console.log('🔍 [DEBUG] checkBirthData: Raw storage data:', JSON.stringify(savedBirthData, null, 2));
-      
+      if (!savedBirthData || !savedBirthData.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'AnalysisDetail' });
+        return;
+      }
       if (savedBirthData && savedBirthData.name) {
         // console.log('✅ [DEBUG] checkBirthData: Valid birth data found');
         // console.log('👤 [DEBUG] checkBirthData: Name:', savedBirthData.name);
@@ -97,15 +98,10 @@ export default function AnalysisDetailScreen({ route, navigation }) {
         // console.log('📍 [DEBUG] checkBirthData: Place:', savedBirthData.place);
         // console.log('🌍 [DEBUG] checkBirthData: Coordinates:', savedBirthData.latitude, savedBirthData.longitude);
         setBirthData(savedBirthData);
-      } else {
-        // console.log('❌ [DEBUG] checkBirthData: No valid birth data found');
-        Alert.alert('Birth Data Required', 'Please complete your birth details first.', [
-          { text: 'OK', onPress: () => navigation.navigate('BirthForm') }
-        ]);
       }
     } catch (error) {
       console.error('❌ [DEBUG] checkBirthData: Error loading birth data:', error);
-      navigation.navigate('BirthForm');
+      navigation.replace('BirthProfileIntro', { returnTo: 'AnalysisDetail' });
     }
   };
 

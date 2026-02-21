@@ -33,14 +33,14 @@ export default function NumerologyScreen({ navigation, route }) {
     try {
       const { storage } = require('../../services/storage');
       let selectedBirthData = await storage.getBirthDetails();
-      
       if (!selectedBirthData) {
         const profiles = await storage.getBirthProfiles();
-        if (profiles && profiles.length > 0) {
-          selectedBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
-        }
+        if (profiles?.length) selectedBirthData = profiles.find(p => p.relation === 'self') || profiles[0];
       }
-      
+      if (!selectedBirthData?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'Numerology' });
+        return;
+      }
       setBirthData(selectedBirthData);
     } catch (error) {
       console.error('Error loading birth data:', error);

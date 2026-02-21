@@ -276,12 +276,19 @@ export default function SelectNativeScreen({ navigation, route }) {
         setSelectedProfile(profile.name);
         navigation.navigate('KPSystem', { birthDetails: profileWithId });
       } else if (returnTo === 'Yogas') {
-        // Return to Yogas Screen with selected chart
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate('Yogas', { birthDetails: profileWithId });
+      } else if (returnTo) {
+        // Return to the screen that required a native (Chart, Shadbala, SadeSati, etc.)
+        await storage.setBirthDetails(profileWithId);
+        setSelectedProfile(profile.name);
+        navigation.navigate(returnTo, {
+          birthData: profileWithId,
+          birthDetails: profileWithId,
+          birthChartId: profileWithId.id,
+        });
       } else {
-        // Normal selection flow
         await storage.setBirthDetails(profileWithId);
         setSelectedProfile(profile.name);
         navigation.navigate('Home');

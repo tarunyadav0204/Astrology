@@ -113,20 +113,8 @@ export default function PasswordScreen({
         if (response.data.self_birth_chart) {
           navigation.replace('Home');
         } else {
-          // Check existing charts
-          try {
-            const { chartAPI } = require('../../../services/api');
-            const chartResponse = await chartAPI.getExistingCharts();
-            const hasCharts = chartResponse.data.charts && chartResponse.data.charts.length > 0;
-            
-            if (hasCharts) {
-              navigation.replace('SelectNative');
-            } else {
-              navigation.replace('BirthForm');
-            }
-          } catch (error) {
-            navigation.replace('BirthForm');
-          }
+          // Show intro screen (explain birth profile, Continue → SelectNative/BirthForm, Skip → Home)
+          navigation.replace('BirthProfileIntro');
         }
       } else {
         // Registration complete - register user and navigate to birth form

@@ -7,6 +7,7 @@ import { useCredits } from '../../credits/CreditContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../utils/constants';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { storage } from '../../services/storage';
 
 const LuckGauge = ({ score, signal }) => {
   const getColor = () => {
@@ -101,9 +102,19 @@ export default function TradingDashboardScreen({ navigation }) {
   const { credits, fetchBalance } = useCredits();
 
   useEffect(() => {
-    fetchBalance();
-    fetchCosts();
-    checkCacheFirst();
+    let mounted = true;
+    (async () => {
+      const birthData = await storage.getBirthDetails();
+      if (!mounted) return;
+      if (!birthData?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'TradingDashboard' });
+        return;
+      }
+      fetchBalance();
+      fetchCosts();
+      checkCacheFirst();
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const fetchCosts = async () => {

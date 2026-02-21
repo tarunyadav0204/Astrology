@@ -230,6 +230,11 @@ export default function ChartScreen({ navigation, route }) {
     try {
       setLoading(true);
       const data = await storage.getBirthDetails();
+      if (!data || !data.name) {
+        setLoading(false);
+        navigation.replace('BirthProfileIntro', { returnTo: 'Chart' });
+        return;
+      }
       if (data && data.name) {
         setBirthData(data);
         const formattedData = {
@@ -427,7 +432,7 @@ export default function ChartScreen({ navigation, route }) {
           )}
         </SafeAreaView>
         
-        <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} />
+        <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} />
         
         {/* House Insights Drawer */}
         <Modal

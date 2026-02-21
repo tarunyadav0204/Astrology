@@ -17,7 +17,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS } from '../utils/constants';
+import { useTheme } from '../context/ThemeContext';
 import { useCredits } from './CreditContext';
 import { creditAPI } from './creditService';
 import { useAnalytics } from '../hooks/useAnalytics';
@@ -26,6 +26,8 @@ const { width } = Dimensions.get('window');
 
 const CreditScreen = ({ navigation }) => {
   useAnalytics('CreditScreen');
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
   const { credits, loading, redeemCode, fetchBalance } = useCredits();
   const [promoCode, setPromoCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -145,32 +147,39 @@ const CreditScreen = ({ navigation }) => {
   };
 
 
+  const bgGradient = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd]
+    : [colors.gradientStart, colors.gradientMid];
+  const balanceCardGradient = isDark
+    ? [colors.cardBackground, colors.surface]
+    : [colors.cardBackground, colors.backgroundSecondary];
+  const promoCardBg = colors.cardBackground;
+  const promoInputBg = isDark ? colors.surface : colors.backgroundSecondary;
+  const backButtonBg = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.9)';
+
   const renderTransaction = ({ item }) => (
     <View style={styles.transactionItem}>
       <View style={styles.transactionIcon}>
-        <Ionicons 
-          name={item.type === 'earned' ? 'add-circle' : 'remove-circle'} 
-          size={20} 
-          color={item.type === 'earned' ? '#4CAF50' : '#ff6b35'} 
+        <Ionicons
+          name={item.type === 'earned' ? 'add-circle' : 'remove-circle'}
+          size={20}
+          color={item.type === 'earned' ? colors.success : colors.primary}
         />
       </View>
       <View style={styles.transactionDetails}>
         <View style={styles.transactionHeader}>
-          <Text style={styles.transactionDescription}>
+          <Text style={[styles.transactionDescription, { color: colors.text }]}>
             {item.description || item.source}
           </Text>
-          <Text style={[
-            styles.transactionAmount,
-            { color: item.type === 'earned' ? '#4CAF50' : '#ff6b35' }
-          ]}>
+          <Text style={[styles.transactionAmount, { color: item.type === 'earned' ? colors.success : colors.primary }]}>
             {item.type === 'earned' ? '+' : '-'}{Math.abs(item.amount)}
           </Text>
         </View>
         <View style={styles.transactionFooter}>
-          <Text style={styles.transactionDate}>
+          <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
             {new Date(item.date).toLocaleDateString()}
           </Text>
-          <Text style={styles.transactionBalance}>
+          <Text style={[styles.transactionBalance, { color: colors.textTertiary }]}>
             Balance: {item.balance_after}
           </Text>
         </View>
@@ -181,31 +190,31 @@ const CreditScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#fafafa', '#f5f5f5']}
+        colors={bgGradient}
         style={styles.backgroundGradient}
       >
         <SafeAreaView style={styles.safeArea}>
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
           >
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
+              <RefreshControl
+                refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#ff6b35"
+                tintColor={colors.primary}
               />
             }
           >
             {/* Header */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.header,
                 {
@@ -214,17 +223,17 @@ const CreditScreen = ({ navigation }) => {
                 }
               ]}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => navigation.goBack()}
-                style={styles.backButton}
+                style={[styles.backButton, { backgroundColor: backButtonBg }]}
               >
-                <Ionicons name="arrow-back" size={24} color="#333" />
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
-              
+
               <View style={styles.headerContent}>
                 <View style={styles.cosmicOrb}>
                   <LinearGradient
-                    colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                    colors={[colors.primary, colors.accent, colors.primary]}
                     style={styles.orbGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -232,14 +241,14 @@ const CreditScreen = ({ navigation }) => {
                     <Ionicons name="diamond" size={32} color="white" />
                   </LinearGradient>
                 </View>
-                
-                <Text style={styles.headerTitle}>Cosmic Credits</Text>
-                <Text style={styles.headerSubtitle}>Fuel your astrological journey</Text>
+
+                <Text style={[styles.headerTitle, { color: colors.text }]}>Cosmic Credits</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Fuel your astrological journey</Text>
               </View>
             </Animated.View>
 
             {/* Current Balance */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.balanceCard,
                 {
@@ -249,33 +258,33 @@ const CreditScreen = ({ navigation }) => {
               ]}
             >
               <LinearGradient
-                colors={['#ffffff', '#f8f9fa']}
+                colors={balanceCardGradient}
                 style={styles.balanceGradient}
               >
                 <View style={styles.balanceContent}>
-                  <Text style={styles.balanceLabel}>Your Balance</Text>
-                  <Text style={styles.balanceAmount}>{credits}</Text>
-                  <Text style={styles.balanceCreditsText}>Credits</Text>
+                  <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Your Balance</Text>
+                  <Text style={[styles.balanceAmount, { color: colors.primary }]}>{credits}</Text>
+                  <Text style={[styles.balanceCreditsText, { color: colors.textTertiary }]}>Credits</Text>
                 </View>
-                
+
                 <View style={styles.balanceDecoration}>
-                  <View style={styles.decorationCircle} />
-                  <View style={[styles.decorationCircle, styles.decorationCircle2]} />
-                  <View style={[styles.decorationCircle, styles.decorationCircle3]} />
+                  <View style={[styles.decorationCircle, { backgroundColor: isDark ? 'rgba(249,115,22,0.08)' : 'rgba(255,107,53,0.05)' }]} />
+                  <View style={[styles.decorationCircle, styles.decorationCircle2, { backgroundColor: isDark ? 'rgba(249,115,22,0.12)' : 'rgba(255,107,53,0.08)' }]} />
+                  <View style={[styles.decorationCircle, styles.decorationCircle3, { backgroundColor: isDark ? 'rgba(249,115,22,0.15)' : 'rgba(255,107,53,0.12)' }]} />
                 </View>
               </LinearGradient>
             </Animated.View>
 
             {/* Promo Code Section */}
             <View style={styles.promoSection}>
-              <Text style={styles.sectionTitle}>Have a Promo Code?</Text>
-              <View style={styles.promoCard}>
-                <View style={styles.promoInputContainer}>
-                  <Ionicons name="ticket" size={20} color="#ff6b35" style={styles.promoIcon} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Have a Promo Code?</Text>
+              <View style={[styles.promoCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
+                <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
+                  <Ionicons name="ticket" size={20} color={colors.primary} style={styles.promoIcon} />
                   <TextInput
-                    style={styles.promoInput}
+                    style={[styles.promoInput, { color: colors.text }]}
                     placeholder="Enter promo code"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={colors.textTertiary}
                     value={promoCode}
                     onChangeText={setPromoCode}
                     autoCapitalize="characters"
@@ -292,7 +301,7 @@ const CreditScreen = ({ navigation }) => {
                   disabled={redeeming}
                 >
                   <LinearGradient
-                    colors={redeeming ? ['#ccc', '#999'] : ['#ff6b35', '#ff8c5a']}
+                    colors={redeeming ? [colors.textTertiary, colors.textSecondary] : [colors.primary, colors.secondary]}
                     style={styles.redeemGradient}
                   >
                     <Text style={styles.redeemText}>
@@ -305,13 +314,13 @@ const CreditScreen = ({ navigation }) => {
 
             {/* Request Credits Section */}
             <View style={styles.requestSection}>
-              <Text style={styles.sectionTitle}>Need More Credits?</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Need More Credits?</Text>
               <TouchableOpacity
                 style={styles.requestButton}
                 onPress={() => navigation.navigate('CreditRequest')}
               >
                 <LinearGradient
-                  colors={['#28a745', '#34ce57']}
+                  colors={[colors.success, '#34ce57']}
                   style={styles.requestGradient}
                 >
                   <Ionicons name="hand-right" size={20} color="white" style={styles.requestIcon} />
@@ -322,21 +331,21 @@ const CreditScreen = ({ navigation }) => {
 
             {/* Transaction History */}
             <View style={styles.historySection}>
-              <Text style={styles.sectionTitle}>Transaction History</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Transaction History</Text>
               {history.length > 0 ? (
-                <View style={styles.historyCard}>
+                <View style={[styles.historyCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
                   {history.map((item, index) => (
                     <View key={index}>
                       {renderTransaction({ item })}
-                      {index < history.length - 1 && <View style={styles.transactionDivider} />}
+                      {index < history.length - 1 && <View style={[styles.transactionDivider, { backgroundColor: colors.cardBorder }]} />}
                     </View>
                   ))}
                 </View>
               ) : (
-                <View style={styles.emptyState}>
-                  <Ionicons name="receipt-outline" size={48} color="#ccc" />
-                  <Text style={styles.emptyStateText}>No transactions yet</Text>
-                  <Text style={styles.emptyStateSubtext}>Your credit history will appear here</Text>
+                <View style={[styles.emptyState, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}>
+                  <Ionicons name="receipt-outline" size={48} color={colors.textTertiary} />
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No transactions yet</Text>
+                  <Text style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>Your credit history will appear here</Text>
                 </View>
               )}
             </View>
@@ -374,7 +383,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -409,12 +417,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#333',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
     fontStyle: 'italic',
   },
   balanceCard: {
@@ -439,19 +445,16 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 8,
     fontWeight: '500',
   },
   balanceAmount: {
     fontSize: 48,
     fontWeight: '800',
-    color: '#ff6b35',
     marginBottom: 4,
   },
   balanceCreditsText: {
     fontSize: 18,
-    color: '#999',
     fontWeight: '600',
   },
   balanceDecoration: {
@@ -464,7 +467,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
     position: 'absolute',
   },
   decorationCircle2: {
@@ -493,12 +495,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#333',
     marginBottom: 8,
   },
   sectionSubtitle: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 20,
     lineHeight: 22,
   },
@@ -530,7 +530,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   promoCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -542,12 +541,10 @@ const styles = StyleSheet.create({
   promoInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     paddingHorizontal: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   promoIcon: {
     marginRight: 12,
@@ -556,7 +553,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#333',
   },
   redeemButton: {
     borderRadius: 12,
@@ -579,7 +575,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   historyCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -608,7 +603,6 @@ const styles = StyleSheet.create({
   transactionDescription: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     flex: 1,
   },
   transactionAmount: {
@@ -622,19 +616,15 @@ const styles = StyleSheet.create({
   },
   transactionDate: {
     fontSize: 14,
-    color: '#666',
   },
   transactionBalance: {
     fontSize: 14,
-    color: '#999',
   },
   transactionDivider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
     marginHorizontal: 16,
   },
   emptyState: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
@@ -647,13 +637,11 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
     marginTop: 16,
     marginBottom: 4,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#999',
     textAlign: 'center',
   },
 });

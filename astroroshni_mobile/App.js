@@ -13,6 +13,7 @@ import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
 import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
+import BirthProfileIntroScreen from './src/components/BirthProfileIntro/BirthProfileIntroScreen';
 import SelectNativeScreen from './src/components/Native/SelectNativeScreen';
 import CreditScreen from './src/credits/CreditScreen';
 import CreditRequestScreen from './src/credits/CreditRequestScreen';
@@ -109,14 +110,16 @@ export default function App() {
             if (localBirthData) {
               setInitialRoute('Home');
             } else {
-              setInitialRoute('SelectNative');
+              // Already logged in, no native selected: land on Home (empty state + CTA)
+              setInitialRoute('Home');
             }
           } else {
-            setInitialRoute('BirthForm');
+            // No charts: land on Home; user can add profile via CTA
+            setInitialRoute('Home');
           }
         } catch (apiError) {
           console.log('API Error on startup:', apiError);
-          setInitialRoute('BirthForm');
+          setInitialRoute('Home');
         }
       } else {
         setInitialRoute('Welcome');
@@ -176,6 +179,11 @@ export default function App() {
           <Stack.Screen 
             name="BirthForm" 
             component={BirthFormScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="BirthProfileIntro" 
+            component={BirthProfileIntroScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

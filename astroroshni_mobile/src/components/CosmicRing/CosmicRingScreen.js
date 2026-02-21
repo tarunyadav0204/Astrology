@@ -173,11 +173,8 @@ export default function CosmicRingScreen({ navigation }) {
         const profiles = await storage.getBirthProfiles();
         if (profiles?.length) birth = profiles.find((p) => p.relation === 'self') || profiles[0];
       }
-      if (!birth?.date) {
-        setBirthChart(null);
-        setFormattedBirthData(null);
-        setTransitData(null);
-        setLoading(false);
+      if (!birth?.date || !birth?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'CosmicRing' });
         return;
       }
       const formatted = {

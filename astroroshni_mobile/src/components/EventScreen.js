@@ -113,10 +113,12 @@ export default function EventScreen({ route }) {
   useEffect(() => {
     const loadBirthData = async () => {
       const birthData = await getBirthDetails();
-      if (birthData?.name) {
-        setNativeName(birthData.name.substring(0, 7));
-        setBirthData(birthData); // Store full birth data for the chip
+      if (!birthData?.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'EventScreen' });
+        return;
       }
+      setNativeName(birthData.name.substring(0, 7));
+      setBirthData(birthData);
     };
     loadBirthData();
   }, []);

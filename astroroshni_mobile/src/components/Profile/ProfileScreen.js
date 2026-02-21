@@ -626,6 +626,7 @@ export default function ProfileScreen({ navigation }) {
         visible={showDashaBrowser} 
         onClose={() => setShowDashaBrowser(false)}
         birthData={birthData}
+        onRequireBirthData={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Profile' })}
       />
     </View>
   );

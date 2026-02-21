@@ -1,4 +1,14 @@
 {
+  "birthProfileIntro": {
+    "title": "Your birth chart powers your experience",
+    "body": "We use your date, time and place of birth to calculate your Vedic chart and personalize insights. You can add or change this anytime in Profile.",
+    "continue": "Continue",
+    "skip": "Skip for now",
+    "skipSubtext": "Explore the app and add your profile later",
+    "emptyStateTitle": "Add your birth profile",
+    "emptyStateBody": "Your date, time and place of birth unlock your Vedic chart, personalized insights, and cosmic guidance. You can add or change this anytime.",
+    "emptyStateCta": "Add birth profile"
+  },
   "menu": {
     "title": "Cosmic Menu",
     "subtitle": "Navigate Your Journey",
@@ -485,6 +495,9 @@
     "sookshmaDasha": "Sookshma Dasha",
     "pranaDasha": "Prana Dasha",
     "browserFor": "Dasha Browser",
+    "browserTitle": "Dasha Browser",
+    "birthDataRequired": "Birth data is required to view dashas.",
+    "addBirthProfileHint": "Add your birth profile from the home screen to continue.",
     "completed": "Completed",
     "remaining": "Remaining",
     "yearShort": "Y",
@@ -515,6 +528,7 @@
     "summary": "Summary",
     "percentCompleted": "{{percentage}}% Completed",
     "currentlyRunning": "Currently Running",
+    "loading": "Loading dashas...",
     "loadingYogini": "Loading Yogini Dasha data...",
     "dataStructureError": "Data structure error. Check console for details.",
     "availableKeys": "Available keys: ",

@@ -36,8 +36,8 @@ export default function SadeSatiScreen({ navigation, route }) {
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
-    if (!birthData) {
-      setLoading(false);
+    if (!birthData?.name) {
+      navigation.replace('BirthProfileIntro', { returnTo: 'SadeSati' });
       return;
     }
     let cancelled = false;

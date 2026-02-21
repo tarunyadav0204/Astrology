@@ -21,7 +21,7 @@ import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KotaChakraScreen = ({ route, navigation }) => {
-  const { birthChartId } = route.params;
+  const { birthChartId } = route.params || {};
   const { colors } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [kotaData, setKotaData] = useState(null);
@@ -34,8 +34,15 @@ const KotaChakraScreen = ({ route, navigation }) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
-    fetchKotaChakra();
-  }, [selectedDate]);
+    if (!birthChartId) {
+      navigation.replace('BirthProfileIntro', { returnTo: 'KotaChakra' });
+      return;
+    }
+  }, [birthChartId, navigation]);
+
+  useEffect(() => {
+    if (birthChartId) fetchKotaChakra();
+  }, [selectedDate, birthChartId]);
 
   const fetchKotaChakra = async () => {
     try {

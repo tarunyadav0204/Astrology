@@ -70,6 +70,10 @@ export default function AnalysisHubScreen({ navigation }) {
   const loadBirthData = async () => {
     try {
       const data = await storage.getBirthDetails();
+      if (!data || !data.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'AnalysisHub' });
+        return;
+      }
       setBirthData(data);
     } catch (error) {
       console.error('Error loading birth data:', error);
