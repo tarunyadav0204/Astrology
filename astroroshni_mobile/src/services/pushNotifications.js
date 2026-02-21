@@ -55,30 +55,30 @@ export async function registerDeviceTokenWithBackend(pushToken) {
     if (__DEV__) console.log('[Push] registerDeviceTokenWithBackend: no token, skip');
     return;
   }
-  try {
-    const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    await nudgeAPI.registerDeviceToken(pushToken.trim(), platform);
-    if (__DEV__) console.log('[Push] Device token registered with backend');
-  } catch (err) {
-    if (__DEV__) console.warn('[Push] Failed to register device token:', err?.response?.status, err?.message);
-    // Don't throw; app should work without push
-  }
+  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+  await nudgeAPI.registerDeviceToken(pushToken.trim(), platform);
+  if (__DEV__) console.log('[Push] Device token registered with backend');
 }
 
 /**
  * Register for push and send token to backend. Call after login or when app
  * opens with an existing session.
  */
+/**
+ * @returns {Promise<{ ok: boolean, message: string }>} ok true if token was sent to backend, message for user/alert
+ */
 export async function registerPushTokenIfLoggedIn() {
   try {
     const pushToken = await registerForPushNotificationsAsync();
-    if (pushToken) {
-      await registerDeviceTokenWithBackend(pushToken);
-    } else if (__DEV__) {
-      console.log('[Push] No push token (permission denied or not a device)');
+    if (!pushToken) {
+      return { ok: false, message: 'Permission denied or not available on this device.' };
     }
+    await registerDeviceTokenWithBackend(pushToken);
+    return { ok: true, message: 'Notifications registered.' };
   } catch (e) {
+    const msg = e?.response?.status === 401 ? 'Session expired. Please log in again.' : (e?.message || 'Failed to register.');
     if (__DEV__) console.warn('[Push] registerPushTokenIfLoggedIn error:', e?.message);
+    return { ok: false, message: msg };
   }
 }
 

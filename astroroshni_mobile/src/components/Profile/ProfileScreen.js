@@ -22,6 +22,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../locales/i18n';
+import { registerPushTokenIfLoggedIn } from '../../services/pushNotifications';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NorthIndianChart from '../Chart/NorthIndianChart';
 
@@ -42,6 +43,7 @@ export default function ProfileScreen({ navigation }) {
   const [loadingDashas, setLoadingDashas] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [language, setLanguage] = useState(i18n.language);
+  const [pushSyncing, setPushSyncing] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -506,6 +508,27 @@ export default function ProfileScreen({ navigation }) {
                   <View style={styles.settingLeft}>
                     <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color="#ffd700" />
                     <Text style={[styles.settingText, { color: colors.text }]}>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+                
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+
+                <TouchableOpacity
+                  style={styles.settingItem}
+                  disabled={pushSyncing}
+                  onPress={async () => {
+                    setPushSyncing(true);
+                    const result = await registerPushTokenIfLoggedIn();
+                    setPushSyncing(false);
+                    Alert.alert(result.ok ? 'Notifications' : 'Notifications', result.message);
+                  }}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="notifications-outline" size={22} color="#ff6b35" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {pushSyncing ? 'Syncing…' : 'Sync push notifications'}
+                    </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
