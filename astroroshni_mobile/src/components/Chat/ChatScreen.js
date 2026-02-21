@@ -125,6 +125,7 @@ export default function ChatScreen({ navigation, route }) {
   const drawerAnim = useRef(new Animated.Value(300)).current;
   const menuScrollViewRef = useRef(null);
   const menuLogoGlow = useRef(new Animated.Value(0)).current;
+  const menuJustClosedAt = useRef(0);
 
   useEffect(() => {
     let animation;
@@ -1670,6 +1671,7 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={styles.menuButton}
                 onPress={() => {
+                  if (Date.now() - menuJustClosedAt.current < 400) return;
                   setShowMenu(true);
                   Animated.spring(drawerAnim, {
                     toValue: 0,
@@ -2113,7 +2115,10 @@ export default function ChatScreen({ navigation, route }) {
               toValue: 300,
               duration: 250,
               useNativeDriver: true,
-            }).start(() => setShowMenu(false));
+            }).start(() => {
+              menuJustClosedAt.current = Date.now();
+              setShowMenu(false);
+            });
           }}
         >
           <TouchableOpacity 
@@ -2124,7 +2129,10 @@ export default function ChatScreen({ navigation, route }) {
                 toValue: 300,
                 duration: 250,
                 useNativeDriver: true,
-              }).start(() => setShowMenu(false));
+              }).start(() => {
+                menuJustClosedAt.current = Date.now();
+                setShowMenu(false);
+              });
             }}
           >
             <Animated.View 
@@ -2656,7 +2664,10 @@ export default function ChatScreen({ navigation, route }) {
                             toValue: 300,
                             duration: 250,
                             useNativeDriver: true,
-                          }).start(() => setShowMenu(false));
+                          }).start(() => {
+                            menuJustClosedAt.current = Date.now();
+                            setShowMenu(false);
+                          });
                         }
                       }}
                     >

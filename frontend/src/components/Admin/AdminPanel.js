@@ -48,6 +48,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [adminSettings, setAdminSettings] = useState([]);
   const [debugLogging, setDebugLogging] = useState(false);
+  const [notifUserId, setNotifUserId] = useState('');
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifBody, setNotifBody] = useState('');
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifResult, setNotifResult] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -73,6 +78,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       // Credit ledger will be loaded by AdminCreditLedger component
     } else if (activeTab === 'settings') {
       fetchAdminSettings();
+    } else if (activeTab === 'notifications') {
+      fetchUsers();
     }
   }, [activeTab, activeSubTab]);
 
@@ -402,6 +409,59 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setDeleteConfirmation(null);
   };
 
+  const handleSendNotification = async () => {
+    const userId = notifUserId ? parseInt(notifUserId, 10) : 0;
+    if (!userId || !notifTitle.trim() || !notifBody.trim()) {
+      const msg = 'Please select a user and enter both title and body.';
+      setNotifResult({ ok: false, message: msg });
+      console.warn('[Admin Notifications] Validation failed:', msg);
+      return;
+    }
+    setNotifSending(true);
+    setNotifResult(null);
+    console.log('[Admin Notifications] Sending to user_id=', userId, 'title=', notifTitle.trim().slice(0, 50));
+    try {
+      const response = await fetch('/api/nudge/admin/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          title: notifTitle.trim().slice(0, 100),
+          body: notifBody.trim().slice(0, 200),
+        }),
+      });
+      let data;
+      try {
+        data = await response.json();
+      } catch (_) {
+        const text = await response.text();
+        console.error('[Admin Notifications] Non-JSON response:', response.status, text?.slice(0, 200));
+        setNotifResult({ ok: false, message: `Server error ${response.status}: ${text?.slice(0, 100) || 'Invalid response'}` });
+        return;
+      }
+      if (!response.ok) {
+        const message = data.detail || data.message || 'Failed to send';
+        console.error('[Admin Notifications] Failed:', response.status, data);
+        setNotifResult({ ok: false, message: typeof message === 'string' ? message : JSON.stringify(message) });
+        return;
+      }
+      console.log('[Admin Notifications] Success:', data);
+      setNotifResult(data);
+      if (data.ok) {
+        setNotifTitle('');
+        setNotifBody('');
+      }
+    } catch (err) {
+      console.error('[Admin Notifications] Request error:', err);
+      setNotifResult({ ok: false, message: err.message || 'Request failed' });
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
   const fetchCreditRequests = async () => {
     try {
       const response = await fetch('/api/credits/requests/all', {
@@ -540,6 +600,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('blog')}
         >
           Blog
+        </button>
+        <button 
+          className={`tab ${activeTab === 'notifications' ? 'active' : ''}`}
+          onClick={() => setActiveTab('notifications')}
+        >
+          Notifications
         </button>
         <button 
           className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
@@ -1181,6 +1247,74 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'blog' && (
           <BlogDashboard />
+        )}
+
+        {activeTab === 'notifications' && (
+          <div className="notifications-admin">
+            <h2>Send Push Notification</h2>
+            <p className="notifications-description">
+              Send a custom push notification to a user&apos;s mobile device. They must have the app installed and have allowed notifications.
+            </p>
+            <div className="notifications-form">
+              <div className="form-field">
+                <label>User</label>
+                <select
+                  value={notifUserId}
+                  onChange={(e) => setNotifUserId(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="">Select user...</option>
+                  {users.map((u) => (
+                    <option key={u.userid} value={u.userid}>
+                      {u.name || 'No name'} ({u.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Title (max 100 chars)</label>
+                <input
+                  type="text"
+                  placeholder="Notification title"
+                  value={notifTitle}
+                  onChange={(e) => setNotifTitle(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+              <div className="form-field">
+                <label>Body (max 200 chars)</label>
+                <textarea
+                  placeholder="Message body"
+                  value={notifBody}
+                  onChange={(e) => setNotifBody(e.target.value)}
+                  maxLength={200}
+                  rows={3}
+                />
+              </div>
+              <div className="form-buttons">
+                <button
+                  type="button"
+                  onClick={handleSendNotification}
+                  disabled={notifSending || !notifUserId || !notifTitle.trim() || !notifBody.trim()}
+                  className="create-btn"
+                >
+                  {notifSending ? 'Sending...' : 'Send Notification'}
+                </button>
+              </div>
+            </div>
+            {notifResult && (
+              <div className={`notif-result ${notifResult.ok ? 'success' : 'error'}`}>
+                {notifResult.ok ? (
+                  <>
+                    <strong>Done.</strong> {notifResult.message}
+                    {notifResult.tokens_found === 0 && ' User has no registered devices.'}
+                  </>
+                ) : (
+                  <strong>{notifResult.message}</strong>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'settings' && (

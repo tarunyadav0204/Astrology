@@ -49,6 +49,10 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
+import {
+  registerPushTokenIfLoggedIn,
+  setupNotificationResponseListener,
+} from './src/services/pushNotifications';
 
 const Stack = createStackNavigator();
 
@@ -57,6 +61,7 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState('Welcome');
   const [initialTheme, setInitialTheme] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const navigationRef = useRef(null);
 
   useEffect(() => {
     bootstrap();
@@ -134,17 +139,30 @@ export default function App() {
     }
   };
 
+  // When app is ready and user is logged in, register push token; always set up notification tap handler
+  useEffect(() => {
+    if (isLoading) return;
+    (async () => {
+      const token = await storage.getAuthToken();
+      if (token) await registerPushTokenIfLoggedIn();
+    })();
+    const cleanup = setupNotificationResponseListener(navigationRef);
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, [isLoading]);
+
   if (isLoading) {
     return <SplashScreen />;
   }
-  
+
   return (
     <SafeAreaProvider>
       <ThemeProvider initialTheme={initialTheme}>
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <ErrorProvider>
             <CreditProvider>
-              <NavigationContainer>
+              <NavigationContainer ref={navigationRef}>
               <GlobalErrorHandler />
               <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
         <Stack.Navigator

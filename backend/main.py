@@ -72,6 +72,7 @@ from yoga_routes import router as yoga_router
 from chat_error_logging import router as chat_error_router
 from kota_chakra.routes import router as kota_chakra_router
 from user_facts.routes import router as user_facts_router
+from nudge_engine.routes import router as nudge_engine_router
 import math
 from datetime import timedelta
 import signal
@@ -284,6 +285,7 @@ app.include_router(chat_error_router, prefix="/api", tags=["chat_errors"])
 app.include_router(kota_chakra_router, prefix="/api")
 app.include_router(user_facts_router, prefix="/api")
 app.include_router(event_prediction_router)
+app.include_router(nudge_engine_router, prefix="/api")
 
 
 

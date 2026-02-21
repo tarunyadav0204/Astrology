@@ -323,6 +323,11 @@ export const chartAPI = {
   shareChart: (chartId, targetUserId) => api.post(getEndpoint('/charts/share'), { chart_id: chartId, target_user_id: targetUserId }),
 };
 
+export const nudgeAPI = {
+  registerDeviceToken: (token, platform) =>
+    api.post(getEndpoint('/nudge/device-token'), { token, platform }),
+};
+
 export const creditAPI = {
   getBalance: () => api.get(getEndpoint('/credits/balance')),
   getHistory: () => api.get(getEndpoint('/credits/history')),

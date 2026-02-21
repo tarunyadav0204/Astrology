@@ -36,16 +36,23 @@ export const COLORS = {
 import { Platform } from 'react-native';
 
 // API Configuration for AstroRoshni
+// Set to true only when testing against local/staging backend (nudge, push, etc.)
+const USE_DEV_API = false;
+// For simulator leave empty (uses localhost/10.0.2.2). For physical device set your machine IP, e.g. 'http://192.168.1.10:8001'
+const DEV_API_HOST = '';
+
 const getApiUrl = () => {
-  // Localhost for testing (only works on simulator/emulator)
+  if (__DEV__ && USE_DEV_API) {
+    if (DEV_API_HOST) return DEV_API_HOST;
+    if (Platform.OS === 'ios') return 'http://localhost:8001';
+    if (Platform.OS === 'android') return 'http://10.0.2.2:8001';
+  }
   // if (Platform.OS === 'ios') {
   //   return 'http://localhost:8001';
   // } else {
   //   return 'http://10.0.2.2:8001';
   // }
-  
-  // Production (works on real devices)
-  return 'https://astroroshni.com'; 
+  return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();
