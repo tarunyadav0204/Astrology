@@ -1006,6 +1006,35 @@ input:checked + .toggle-slider:before {
   font-size: 14px;
 }
 
+.credits-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  justify-content: center;
+  padding: 8px 0;
+  font-size: 12px;
+}
+.credits-chart-legend .credits-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.credits-chart-legend .credits-legend-item:hover {
+  opacity: 0.9;
+}
+.credits-chart-legend .credits-legend-item.hidden {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.credits-chart-legend .credits-legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 900px) {
   .dashboard-charts {
     grid-template-columns: 1fr;

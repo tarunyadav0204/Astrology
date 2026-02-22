@@ -110,6 +110,39 @@ const PRESET_LABELS = {
 
 const COLORS = ['#ff6b35', '#f7931e', '#ffd700', '#4CAF50', '#2196F3', '#9C27B0', '#00BCD4', '#795548', '#607D8B', '#E91E63'];
 
+function toggleSet(set, key) {
+  const next = new Set(set);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
+}
+
+/** Clickable legend: click to add/remove series from chart. getKey(item) returns the key to toggle (dataKey or name). */
+function ClickableLegend({ payload, hidden, onToggle, getKey = (item) => item.dataKey ?? item.value ?? item.name }) {
+  if (!payload?.length) return null;
+  return (
+    <div className="recharts-legend-wrapper credits-chart-legend">
+      {payload.map((entry) => {
+        const key = getKey(entry);
+        const isHidden = key != null && hidden.has(key);
+        return (
+          <span
+            key={key ?? entry.value}
+            role="button"
+            tabIndex={0}
+            className={`credits-legend-item ${isHidden ? 'hidden' : ''}`}
+            onClick={() => key != null && onToggle(key)}
+            onKeyDown={(e) => e.key === 'Enter' && key != null && onToggle(key)}
+          >
+            <span className="credits-legend-color" style={{ backgroundColor: entry.color }} />
+            <span className="credits-legend-label">{entry.value}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AdminCreditsDashboard() {
   const [preset, setPreset] = useState('this_month');
   const [fromDate, setFromDate] = useState('');
@@ -117,6 +150,12 @@ export default function AdminCreditsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [legendHidden, setLegendHidden] = useState({
+    topUsers: new Set(),
+    creditUse: new Set(),
+    transactionCount: new Set(),
+    timeSeries: new Set(),
+  });
 
   useEffect(() => {
     const { from_date, to_date } = preset === 'custom'
@@ -251,17 +290,27 @@ export default function AdminCreditsDashboard() {
                     <XAxis type="number" />
                     <YAxis type="category" dataKey="name" width={78} tick={{ fontSize: 12 }} />
                     <Tooltip />
-                    <Legend />
-                    {activityOrder.map((activityKey) => (
-                      <Bar
-                        key={activityKey}
-                        stackId="stack"
-                        dataKey={activityKey}
-                        name={getActivityLabel(activityKey)}
-                        fill={activityColor[activityKey]}
-                        radius={activityKey === activityOrder[activityOrder.length - 1] ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                      />
-                    ))}
+                    <Legend
+                      content={(props) => (
+                        <ClickableLegend
+                          {...props}
+                          hidden={legendHidden.topUsers}
+                          onToggle={(key) => setLegendHidden((prev) => ({ ...prev, topUsers: toggleSet(prev.topUsers, key) }))}
+                        />
+                      )}
+                    />
+                    {activityOrder.map((activityKey) =>
+                      !legendHidden.topUsers.has(activityKey) ? (
+                        <Bar
+                          key={activityKey}
+                          stackId="stack"
+                          dataKey={activityKey}
+                          name={getActivityLabel(activityKey)}
+                          fill={activityColor[activityKey]}
+                          radius={activityKey === activityOrder[activityOrder.length - 1] ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                        />
+                      ) : null
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -275,7 +324,7 @@ export default function AdminCreditsDashboard() {
                 <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
                     <Pie
-                      data={distribution}
+                      data={distribution.filter((d) => !legendHidden.creditUse.has(d.name))}
                       dataKey="total_credits"
                       nameKey="name"
                       cx="50%"
@@ -283,11 +332,22 @@ export default function AdminCreditsDashboard() {
                       outerRadius={100}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {distribution.map((_, i) => (
+                      {distribution.filter((d) => !legendHidden.creditUse.has(d.name)).map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v) => [v, 'Credits']} />
+                    <Legend
+                      content={(props) => (
+                        <ClickableLegend
+                          {...props}
+                          payload={distribution.map((d, i) => ({ value: d.name, color: COLORS[i % COLORS.length], name: d.name }))}
+                          hidden={legendHidden.creditUse}
+                          onToggle={(key) => setLegendHidden((prev) => ({ ...prev, creditUse: toggleSet(prev.creditUse, key) }))}
+                          getKey={(item) => item.name ?? item.value}
+                        />
+                      )}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -301,7 +361,7 @@ export default function AdminCreditsDashboard() {
                 <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
                     <Pie
-                      data={distribution}
+                      data={distribution.filter((d) => !legendHidden.transactionCount.has(d.name))}
                       dataKey="transaction_count"
                       nameKey="name"
                       cx="50%"
@@ -309,11 +369,22 @@ export default function AdminCreditsDashboard() {
                       outerRadius={100}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {distribution.map((_, i) => (
+                      {distribution.filter((d) => !legendHidden.transactionCount.has(d.name)).map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v) => [v, 'Transactions']} />
+                    <Legend
+                      content={(props) => (
+                        <ClickableLegend
+                          {...props}
+                          payload={distribution.map((d, i) => ({ value: d.name, color: COLORS[i % COLORS.length], name: d.name }))}
+                          hidden={legendHidden.transactionCount}
+                          onToggle={(key) => setLegendHidden((prev) => ({ ...prev, transactionCount: toggleSet(prev.transactionCount, key) }))}
+                          getKey={(item) => item.name ?? item.value}
+                        />
+                      )}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -331,10 +402,24 @@ export default function AdminCreditsDashboard() {
                     <YAxis yAxisId="credits" tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="count" orientation="right" tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Legend />
-                    <Area yAxisId="credits" type="monotone" dataKey="earned" fill="#4CAF50" stroke="#2E7D32" name="Bought" />
-                    <Bar yAxisId="credits" dataKey="spent" fill="#ff6b35" name="Spent" radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="count" type="monotone" dataKey="transaction_count" stroke="#2196F3" strokeWidth={2} name="Transactions" dot={false} />
+                    <Legend
+                      content={(props) => (
+                        <ClickableLegend
+                          {...props}
+                          hidden={legendHidden.timeSeries}
+                          onToggle={(key) => setLegendHidden((prev) => ({ ...prev, timeSeries: toggleSet(prev.timeSeries, key) }))}
+                        />
+                      )}
+                    />
+                    {!legendHidden.timeSeries.has('earned') && (
+                      <Area yAxisId="credits" type="monotone" dataKey="earned" fill="#4CAF50" stroke="#2E7D32" name="Bought" />
+                    )}
+                    {!legendHidden.timeSeries.has('spent') && (
+                      <Bar yAxisId="credits" dataKey="spent" fill="#ff6b35" name="Spent" radius={[4, 4, 0, 0]} />
+                    )}
+                    {!legendHidden.timeSeries.has('transaction_count') && (
+                      <Line yAxisId="count" type="monotone" dataKey="transaction_count" stroke="#2196F3" strokeWidth={2} name="Transactions" dot={false} />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
