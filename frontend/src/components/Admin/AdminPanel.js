@@ -51,6 +51,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
   const [notifBody, setNotifBody] = useState('');
+  const [notifQuestion, setNotifQuestion] = useState('');
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
 
@@ -431,6 +432,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           user_id: userId,
           title: notifTitle.trim().slice(0, 100),
           body: notifBody.trim().slice(0, 200),
+          ...(notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
         }),
       });
       let data;
@@ -453,6 +455,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       if (data.ok) {
         setNotifTitle('');
         setNotifBody('');
+        setNotifQuestion('');
       }
     } catch (err) {
       console.error('[Admin Notifications] Request error:', err);
@@ -1289,6 +1292,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   onChange={(e) => setNotifBody(e.target.value)}
                   maxLength={200}
                   rows={3}
+                />
+              </div>
+              <div className="form-field">
+                <label>Question (optional, max 500 chars)</label>
+                <input
+                  type="text"
+                  placeholder="Pre-fill chat when user taps notification"
+                  value={notifQuestion}
+                  onChange={(e) => setNotifQuestion(e.target.value)}
+                  maxLength={500}
                 />
               </div>
               <div className="form-buttons">

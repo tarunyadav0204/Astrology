@@ -10,6 +10,7 @@ import {
   StatusBar,
   Alert,
   Modal,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -521,7 +522,21 @@ export default function ProfileScreen({ navigation }) {
                     setPushSyncing(true);
                     const result = await registerPushTokenIfLoggedIn();
                     setPushSyncing(false);
-                    Alert.alert(result.ok ? 'Notifications' : 'Notifications', result.message);
+                    if (result.ok) {
+                      Alert.alert('Notifications', result.message);
+                    } else {
+                      const isDenied = result.message.includes('Settings');
+                      Alert.alert(
+                        'Notifications',
+                        result.message,
+                        isDenied
+                          ? [
+                              { text: 'OK', style: 'cancel' },
+                              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+                            ]
+                          : [{ text: 'OK' }]
+                      );
+                    }
                   }}
                 >
                   <View style={styles.settingLeft}>

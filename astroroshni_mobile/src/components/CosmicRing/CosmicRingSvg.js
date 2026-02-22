@@ -87,16 +87,70 @@ function positionOnRing(sign, degree, r = R_PLANET) {
   };
 }
 
+/** Longitude (0–360) to sign (0–11) and degree in sign. */
+function longitudeToSignDegree(longitude) {
+  const lon = parseFloat(longitude) || 0;
+  const sign = Math.floor(lon / 30) % 12;
+  const degree = lon % 30;
+  return { sign, degree };
+}
+
+/** Diamond path (4 points) centered at cx, cy with half-size s. */
+function diamondPath(cx, cy, s) {
+  return `M ${cx} ${cy - s} L ${cx + s} ${cy} L ${cx} ${cy + s} L ${cx - s} ${cy} Z`;
+}
+
+/** Cross/X path centered at cx, cy with half-size s. */
+function crossPath(cx, cy, s) {
+  return `M ${cx - s} ${cy - s} L ${cx + s} ${cy + s} M ${cx + s} ${cy - s} L ${cx - s} ${cy + s}`;
+}
+
+/** Triangle (point up) path centered at cx, cy with half-size s. */
+function trianglePath(cx, cy, s) {
+  return `M ${cx} ${cy - s} L ${cx + s} ${cy + s * 0.6} L ${cx - s} ${cy + s * 0.6} Z`;
+}
+
+/** Square path centered at cx, cy with half-size s. */
+function squarePath(cx, cy, s) {
+  return `M ${cx - s} ${cy - s} L ${cx + s} ${cy - s} L ${cx + s} ${cy + s} L ${cx - s} ${cy + s} Z`;
+}
+
+/** Normalize point to { sign, degree } from longitude or { sign, degree }. */
+function toPosition(point) {
+  if (point == null) return null;
+  if (point.longitude != null) return longitudeToSignDegree(point.longitude);
+  const sign = point.sign ?? 0;
+  const degree = point.degree ?? 0;
+  return { sign, degree };
+}
+
+const SPECIAL_POINT_STYLES = {
+  mrityuBhaga: { color: '#dc2626', shape: 'cross', label: 'Mrityu Bhaga', size: 5 },
+  navamsa64th: { color: '#ea580c', shape: 'triangle', label: '64th N', size: 5 },
+  kharesh: { color: '#b45309', shape: 'square', label: 'Kharesh', size: 5 },
+  yogi: { color: '#16a34a', shape: 'circle', label: 'Yogi', size: 5 },
+  avayogi: { color: '#ca8a04', shape: 'circleOutline', label: 'Avayogi', size: 5 },
+  dagdha: { color: '#7c3aed', shape: 'circle', label: 'Dagdha', size: 5 },
+};
+
 export default function CosmicRingSvg({
   theme = 'dark',
   dateLabel = '—',
   subLabel = 'SIDEREAL LAHIRI',
   planets = [],
   planetColors = {},
+  bhriguBindu = null,
+  pushkaraPlanets = [],
+  mrityuBhagaPoints = [],
+  navamsa64th = null,
+  kharesh = null,
+  yogiPoints = null,
   width = 800,
   height = 800,
 }) {
   const c = THEME_COLORS[theme] || THEME_COLORS.dark;
+  const pushkaraSet = new Set(Array.isArray(pushkaraPlanets) ? pushkaraPlanets : []);
+  const bbPosition = toPosition(bhriguBindu);
 
   return (
     <View style={{ width, height }}>
@@ -236,20 +290,34 @@ export default function CosmicRingSvg({
           const { x, y } = positionOnRing(p.sign, p.degree ?? 0);
           const color = planetColors[p.name] || '#f8fafc';
           const lineStart = positionOnRing(p.sign, p.degree ?? 0, R_INNER + 10);
+          const lineEnd = positionOnRing(p.sign, p.degree ?? 0, R_NAK_LABEL);
           const dy = y > CY ? 14 : -6;
+          const isPushkara = pushkaraSet.has(p.name);
           return (
             <G key={p.name}>
               <Line
                 x1={lineStart.x}
                 y1={lineStart.y}
-                x2={x}
-                y2={y}
+                x2={lineEnd.x}
+                y2={lineEnd.y}
                 stroke={color}
                 strokeWidth={1}
                 strokeDasharray="3 3"
                 opacity={0.6}
               />
               <Circle cx={x} cy={y} r={4} fill={color} />
+              {isPushkara && (
+                <SvgText
+                  x={x}
+                  y={y - 10}
+                  fill={c.nakText}
+                  fontSize={8}
+                  fontWeight="700"
+                  textAnchor="middle"
+                >
+                  PK
+                </SvgText>
+              )}
               <SvgText
                 x={x}
                 y={y + dy}
@@ -260,6 +328,108 @@ export default function CosmicRingSvg({
               >
                 {p.name}
               </SvgText>
+            </G>
+          );
+        })}
+
+        {/* Bhrigu Bindu (destiny point: Moon–Rahu midpoint) */}
+        {bbPosition != null && (
+          <G>
+            <Line
+              x1={positionOnRing(bbPosition.sign, bbPosition.degree, R_INNER + 10).x}
+              y1={positionOnRing(bbPosition.sign, bbPosition.degree, R_INNER + 10).y}
+              x2={positionOnRing(bbPosition.sign, bbPosition.degree, R_PLANET).x}
+              y2={positionOnRing(bbPosition.sign, bbPosition.degree, R_PLANET).y}
+              stroke="#a78bfa"
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
+              opacity={0.8}
+            />
+            <Path
+              d={diamondPath(
+                positionOnRing(bbPosition.sign, bbPosition.degree, R_PLANET).x,
+                positionOnRing(bbPosition.sign, bbPosition.degree, R_PLANET).y,
+                6
+              )}
+              fill="none"
+              stroke="#a78bfa"
+              strokeWidth={1.5}
+              opacity={0.95}
+            />
+            <SvgText
+              x={positionOnRing(bbPosition.sign, bbPosition.degree, R_PLANET).x}
+              y={positionOnRing(bbPosition.sign, bbPosition.degree, R_PLANET).y + 18}
+              fill="#a78bfa"
+              fontSize={9}
+              fontWeight="700"
+              textAnchor="middle"
+            >
+              Bhrigu Bindu
+            </SvgText>
+          </G>
+        )}
+
+        {/* Mrityu Bhaga (death degree) – each afflicted point */}
+        {(Array.isArray(mrityuBhagaPoints) ? mrityuBhagaPoints : []).map((pt, idx) => {
+          const pos = toPosition(pt);
+          if (!pos) return null;
+          const { x, y } = positionOnRing(pos.sign, pos.degree, R_PLANET);
+          const style = SPECIAL_POINT_STYLES.mrityuBhaga;
+          return (
+            <G key={`mb-${idx}`}>
+              <Line x1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).x} y1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).y} x2={x} y2={y} stroke={style.color} strokeWidth={1} strokeDasharray="2 2" opacity={0.7} />
+              <Path d={crossPath(x, y, style.size)} fill="none" stroke={style.color} strokeWidth={1.5} opacity={0.95} />
+              <SvgText x={x} y={y + 16} fill={style.color} fontSize={8} fontWeight="700" textAnchor="middle">{style.label}</SvgText>
+            </G>
+          );
+        })}
+
+        {/* 64th Navamsha (Gandanta point) */}
+        {toPosition(navamsa64th) != null && (() => {
+          const pos = toPosition(navamsa64th);
+          const { x, y } = positionOnRing(pos.sign, pos.degree, R_PLANET);
+          const style = SPECIAL_POINT_STYLES.navamsa64th;
+          return (
+            <G key="64n">
+              <Line x1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).x} y1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).y} x2={x} y2={y} stroke={style.color} strokeWidth={1} strokeDasharray="2 2" opacity={0.7} />
+              <Path d={trianglePath(x, y, style.size)} fill={style.color} opacity={0.9} stroke={style.color} strokeWidth={1} />
+              <SvgText x={x} y={y + 16} fill={style.color} fontSize={8} fontWeight="700" textAnchor="middle">{style.label}</SvgText>
+            </G>
+          );
+        })()}
+
+        {/* Kharesh (22nd Drekkana lord sign) */}
+        {toPosition(kharesh) != null && (() => {
+          const pos = toPosition(kharesh);
+          const { x, y } = positionOnRing(pos.sign, pos.degree, R_PLANET);
+          const style = SPECIAL_POINT_STYLES.kharesh;
+          return (
+            <G key="kharesh">
+              <Line x1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).x} y1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).y} x2={x} y2={y} stroke={style.color} strokeWidth={1} strokeDasharray="2 2" opacity={0.7} />
+              <Path d={squarePath(x, y, style.size)} fill="none" stroke={style.color} strokeWidth={1.5} opacity={0.95} />
+              <SvgText x={x} y={y + 16} fill={style.color} fontSize={8} fontWeight="700" textAnchor="middle">{style.label}</SvgText>
+            </G>
+          );
+        })()}
+
+        {/* Yogi / Avayogi / Dagdha Rashi */}
+        {yogiPoints && [
+          { key: 'yogi', prop: yogiPoints.yogi, style: SPECIAL_POINT_STYLES.yogi },
+          { key: 'avayogi', prop: yogiPoints.avayogi, style: SPECIAL_POINT_STYLES.avayogi },
+          { key: 'dagdha', prop: yogiPoints.dagdha_rashi, style: SPECIAL_POINT_STYLES.dagdha },
+        ].map(({ key, prop, style }) => {
+          const pos = toPosition(prop);
+          if (!pos) return null;
+          const { x, y } = positionOnRing(pos.sign, pos.degree, R_PLANET);
+          return (
+            <G key={key}>
+              <Line x1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).x} y1={positionOnRing(pos.sign, pos.degree, R_INNER + 10).y} x2={x} y2={y} stroke={style.color} strokeWidth={1} strokeDasharray="2 2" opacity={0.7} />
+              {style.shape === 'circleOutline' ? (
+                <Circle cx={x} cy={y} r={style.size} fill="none" stroke={style.color} strokeWidth={1.5} opacity={0.95} />
+              ) : (
+                <Circle cx={x} cy={y} r={style.size} fill={style.color} opacity={0.9} />
+              )}
+              <SvgText x={x} y={y + 16} fill={style.color} fontSize={8} fontWeight="700" textAnchor="middle">{style.label}</SvgText>
             </G>
           );
         })}

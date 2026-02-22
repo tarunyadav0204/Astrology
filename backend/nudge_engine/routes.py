@@ -27,6 +27,7 @@ class AdminSendNotificationRequest(BaseModel):
     user_id: int
     title: str
     body: str
+    question: Optional[str] = None  # optional; when user taps notification, prefill chat input with this
 
 
 @router.post("/scan")
@@ -123,13 +124,16 @@ async def admin_send_notification(
                     "tokens_found": 0,
                     "message": "User has no registered device tokens",
                 }
+            push_data = {"trigger_id": "admin", "cta": "astroroshni://chat"}
+            if body.question and (body.question or "").strip():
+                push_data["question"] = (body.question or "").strip()[:500]
             sent = 0
             for token, platform in tokens:
                 if push_module.send_expo_push(
                     token,
                     title,
                     body_text,
-                    data={"trigger_id": "admin", "cta": "astroroshni://chat"},
+                    data=push_data,
                 ):
                     sent += 1
             channel = "push" if sent else "stored"

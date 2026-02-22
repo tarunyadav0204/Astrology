@@ -9,6 +9,9 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { nudgeAPI } from './api';
 
+// Fallback when Constants.expoConfig.extra.eas.projectId is missing (e.g. some release builds). Must match app.json extra.eas.projectId.
+const EAS_PROJECT_ID_FALLBACK = '8e33070b-ac6c-42e0-a089-bd830019bb1a';
+
 // Optional: show notification when app is in foreground (default is no)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -19,12 +22,12 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Request permission and return Expo push token, or null if denied/unavailable.
- * Must run on a physical device for push to work; simulator often returns null.
+ * Request permission and get Expo push token.
+ * @returns {{ token: string | null, reason: 'ok' | 'not_device' | 'denied' | 'token_failed', errorDetail?: string }}
  */
 export async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
-    return null;
+    return { token: null, reason: 'not_device' };
   }
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
@@ -34,15 +37,24 @@ export async function registerForPushNotificationsAsync() {
       final = status;
     }
     if (final !== 'granted') {
-      return null;
+      return { token: null, reason: 'denied' };
     }
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId ??
+      EAS_PROJECT_ID_FALLBACK;
     const tokenResult = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
-    return tokenResult?.data ?? null;
+    const token = tokenResult?.data ?? null;
+    if (!token) {
+      return { token: null, reason: 'token_failed', errorDetail: 'No token returned' };
+    }
+    return { token, reason: 'ok' };
   } catch (e) {
-    return null;
+    const msg = e?.message ?? String(e);
+    if (__DEV__) console.warn('[Push] registerForPushNotificationsAsync error:', msg);
+    return { token: null, reason: 'token_failed', errorDetail: msg || 'Unknown error' };
   }
 }
 
@@ -69,11 +81,20 @@ export async function registerDeviceTokenWithBackend(pushToken) {
  */
 export async function registerPushTokenIfLoggedIn() {
   try {
-    const pushToken = await registerForPushNotificationsAsync();
-    if (!pushToken) {
-      return { ok: false, message: 'Permission denied or not available on this device.' };
+    const { token, reason, errorDetail } = await registerForPushNotificationsAsync();
+    if (reason !== 'ok' || !token) {
+      const messages = {
+        not_device: 'Push notifications require a physical device. They don\'t work in the simulator.',
+        denied: 'Notifications are turned off. Open Settings → AstroRoshni → Notifications and allow notifications, then try again.',
+        token_failed: 'Could not get notification token. Try again or reinstall the app.',
+      };
+      let message = messages[reason] || messages.token_failed;
+      if (reason === 'token_failed' && errorDetail) {
+        message += ` (${errorDetail})`;
+      }
+      return { ok: false, message };
     }
-    await registerDeviceTokenWithBackend(pushToken);
+    await registerDeviceTokenWithBackend(token);
     return { ok: true, message: 'Notifications registered.' };
   } catch (e) {
     const msg = e?.response?.status === 401 ? 'Session expired. Please log in again.' : (e?.message || 'Failed to register.');
@@ -90,9 +111,13 @@ export function setupNotificationResponseListener(navigationRef) {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content?.data;
     const cta = data?.cta;
+    const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
     try {
       if (navigationRef?.current && (cta === 'astroroshni://chat' || !cta)) {
-        navigationRef.current.navigate('Home');
+        navigationRef.current.navigate('Home', {
+          startChat: true,
+          ...(question && { initialMessage: question }),
+        });
       }
     } catch (e) {
       // ignore

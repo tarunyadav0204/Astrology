@@ -14,7 +14,7 @@ import Icon from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { GestureHandlerRootView, PinchGestureHandler, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useTheme } from '../../context/ThemeContext';
-import CosmicRingSvg from './CosmicRingSvg';
+import CosmicRingSvg, { RASHI_NAMES } from './CosmicRingSvg';
 import DateNavigator from '../Common/DateNavigator';
 import { chartAPI } from '../../services/api';
 import { storage } from '../../services/storage';
@@ -161,6 +161,9 @@ export default function CosmicRingScreen({ navigation }) {
   const [transitDate, setTransitDate] = useState(() => new Date());
   const [transitData, setTransitData] = useState(null);
   const [transitLoading, setTransitLoading] = useState(false);
+  const [sniperPoints, setSniperPoints] = useState(null);
+  const [pushkaraData, setPushkaraData] = useState(null);
+  const [yogiPoints, setYogiPoints] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -190,14 +193,32 @@ export default function CosmicRingScreen({ navigation }) {
       const chartRes = await chartAPI.calculateChartOnly(formatted).then((r) => r?.data).catch(() => null);
       if (chartRes) {
         setBirthChart(chartRes);
+        const chartData = { planets: chartRes.planets, ascendant: chartRes.ascendant };
+        const d9Res = await chartAPI.calculateDivisionalChart(formatted, 9).then((r) => r?.data).catch(() => null);
+        const d9Chart = d9Res?.planets ? { planets: d9Res.planets } : {};
+        Promise.all([
+          chartAPI.calculateSniperPoints(chartData, {}, d9Chart).then((r) => r?.data?.sniper_points).catch(() => null),
+          chartAPI.calculatePushkaraNavamsha(chartData, d9Chart).then((r) => r?.data?.pushkara_analysis).catch(() => null),
+          chartAPI.calculateYogiPoints(formatted).then((r) => r?.data?.yogi_points).catch(() => null),
+        ]).then(([sniper, pushkara, yogi]) => {
+          setSniperPoints(sniper || null);
+          setPushkaraData(pushkara || null);
+          setYogiPoints(yogi || null);
+        });
       } else {
         setBirthChart(null);
+        setSniperPoints(null);
+        setPushkaraData(null);
+        setYogiPoints(null);
       }
     } catch (e) {
       setError(e?.message || 'Failed to load data');
       setBirthChart(null);
       setFormattedBirthData(null);
       setTransitData(null);
+      setSniperPoints(null);
+      setPushkaraData(null);
+      setYogiPoints(null);
     } finally {
       setLoading(false);
     }
@@ -235,6 +256,36 @@ export default function CosmicRingScreen({ navigation }) {
   const todayDateLabel = formatDateLabel(transitDate.toISOString());
 
   const isDark = theme === 'dark';
+
+  const mrityuBhagaPoints = (() => {
+    if (activeTab !== 'birth' || !sniperPoints?.mrityu_bhaga?.has_affliction || !sniperPoints.mrityu_bhaga.afflicted_points?.length || !birthChart) return [];
+    const pts = [];
+    for (const a of sniperPoints.mrityu_bhaga.afflicted_points) {
+      if (a.point === 'Ascendant') {
+        const asc = birthChart.ascendant != null ? parseFloat(birthChart.ascendant) : 0;
+        pts.push({ longitude: asc });
+      } else if (a.planet && birthChart.planets?.[a.planet]) {
+        const sign = birthChart.planets[a.planet].sign != null ? parseInt(birthChart.planets[a.planet].sign, 10) : 0;
+        const degree = parseFloat(a.degree) || 0;
+        pts.push({ longitude: sign * 30 + degree });
+      }
+    }
+    return pts;
+  })();
+
+  const navamsa64thLongitude = (() => {
+    if (activeTab !== 'birth' || !sniperPoints?.navamsa_64th?.danger_sign || sniperPoints.navamsa_64th.error) return null;
+    const idx = RASHI_NAMES.indexOf(sniperPoints.navamsa_64th.danger_sign);
+    if (idx === -1) return null;
+    return { longitude: idx * 30 + 15 };
+  })();
+
+  const khareshLongitude = (() => {
+    if (activeTab !== 'birth' || !sniperPoints?.kharesh?.danger_sign || sniperPoints.kharesh.error) return null;
+    const idx = RASHI_NAMES.indexOf(sniperPoints.kharesh.danger_sign);
+    if (idx === -1) return null;
+    return { longitude: idx * 30 + 15 };
+  })();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -325,6 +376,12 @@ export default function CosmicRingScreen({ navigation }) {
                     subLabel="SIDEREAL LAHIRI"
                     planets={activeTab === 'birth' ? birthPlanets : todayPlanets}
                     planetColors={PLANET_COLORS}
+                    bhriguBindu={activeTab === 'birth' && sniperPoints?.bhrigu_bindu && !sniperPoints.bhrigu_bindu.error ? { longitude: sniperPoints.bhrigu_bindu.longitude } : null}
+                    pushkaraPlanets={activeTab === 'birth' && pushkaraData?.pushkara_planets?.length ? pushkaraData.pushkara_planets.map((p) => p.planet) : []}
+                    mrityuBhagaPoints={activeTab === 'birth' ? mrityuBhagaPoints : []}
+                    navamsa64th={activeTab === 'birth' ? navamsa64thLongitude : null}
+                    kharesh={activeTab === 'birth' ? khareshLongitude : null}
+                    yogiPoints={activeTab === 'birth' ? yogiPoints : null}
                     width={size}
                     height={size}
                   />

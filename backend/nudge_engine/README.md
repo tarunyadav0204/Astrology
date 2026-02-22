@@ -23,16 +23,64 @@ Daily notification engine: scans astrology triggers and sends nudges (stored + p
 
 ## Triggers (current)
 
-- **planet_transit_sign** — Planet enters a new sign (Sun, Mars, Mercury, Jupiter, Venus, Saturn). Uses Swiss Ephemeris, Lahiri ayanamsa; same logic as `transits/routes.get_monthly_transits`.
+- **planet_transit_sign** — Planet enters a new sign (Sun, Mars, Mercury, Jupiter, Venus, Saturn). Uses Swiss Ephemeris, Lahiri ayanamsa.
+- **lunar_phase** — Full Moon (Purnima) or New Moon (Amavasya) day. Sun–Moon elongation at noon UT; one nudge per phase.
+- **planet_retrograde** — Planet turns retrograde or direct (station). Mercury, Venus, Mars, Jupiter, Saturn; compares daily motion vs previous day.
+- **festival** — Hindu festivals on the date (amanta calendar, default India). One nudge per festival; major festivals have higher priority for dedupe.
 
 ## Adding triggers
 
 1. Implement a class in `triggers/` that extends `TriggerBase` and implements `get_events(date) -> List[NudgeEvent]`.
 2. Register it in `trigger_registry.py`.
 
+## Scheduling the daily scan
+
+`POST /api/nudge/scan` has **no auth** (so only expose it on a URL that only your scheduler can reach, or add a secret header).
+
+**Option 1: System cron (server where the backend runs)**
+
+Run once per day (e.g. 9:00 AM server time):
+
+```bash
+0 9 * * * curl -s -X POST "https://astroroshni.com/api/nudge/scan" > /dev/null 2>&1
+```
+
+Add to crontab: `crontab -e` and paste the line. Use your real backend URL.
+
+**Option 2: External cron service**
+
+Use [cron-job.org](https://cron-job.org), [EasyCron](https://www.easycron.com), or similar:
+
+- **URL:** `https://astroroshni.com/api/nudge/scan`
+- **Method:** POST
+- **Schedule:** Daily at the desired time (e.g. 9:00 AM in your timezone)
+
+**Option 3: GitHub Actions (if you host elsewhere)**
+
+Add a workflow that runs on schedule and calls your API (use a secret for the URL or an API key if you add one):
+
+```yaml
+# .github/workflows/nudge-scan.yml
+name: Nudge scan
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 4 AM UTC daily
+  workflow_dispatch:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -X POST "https://astroroshni.com/api/nudge/scan"
+```
+
+**Optional: protect the endpoint**
+
+To avoid random hits triggering the scan, add a secret header (e.g. `X-Cron-Secret: your-secret`) in the route and in your cron request, and reject requests without it.
+
 ## API
 
-- `POST /api/nudge/scan` — Run the scan for today (or `?scan_date=YYYY-MM-DD`). Returns `{ date, events_found, users_targeted, delivered, error? }`.
+- `POST /api/nudge/scan` — Run the scan for today (or `?scan_date=YYYY-MM-DD`). Returns `{ date, events_found, users_targeted, delivered, error? }`. No auth; intended for cron.
 - `POST /api/nudge/device-token` — Register push token (body: `{ token, platform }`). Requires auth.
 - `POST /api/nudge/admin/send` — **Admin only.** Send an arbitrary notification to a user. Body: `{ "user_id": int, "title": str, "body": str }`. Returns `{ ok, sent, tokens_found, message }`. Use from admin UI: select user (by user_id), enter title and body.
 
