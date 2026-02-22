@@ -73,12 +73,9 @@ const FeatureCard = ({ icon, title, description, delay = 0 }) => {
 
 const WelcomeScreen = ({ navigation }) => {
   const logoScale = useRef(new Animated.Value(0)).current;
-  const logoRotate = useRef(new Animated.Value(0)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
   const buttonOpacity = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const scrollY = useRef(new Animated.Value(0)).current;
   
 
   
@@ -99,7 +96,7 @@ const WelcomeScreen = ({ navigation }) => {
     Animated.sequence([
       Animated.timing(logoScale, {
         toValue: 1,
-        duration: 1000,
+        duration: 900,
         useNativeDriver: true,
       }),
       Animated.timing(titleOpacity, {
@@ -118,31 +115,6 @@ const WelcomeScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Continuous logo rotation
-    Animated.loop(
-      Animated.timing(logoRotate, {
-        toValue: 1,
-        duration: 20000,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // Pulsing animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
   const checkAuthStatus = async () => {
@@ -163,89 +135,81 @@ const WelcomeScreen = ({ navigation }) => {
     }
   };
 
-  const rotation = logoRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
-      {/* Cosmic Background */}
+      {/* Cosmic Background — deeper, richer */}
       <LinearGradient
-        colors={['#0a0a23', '#1a1a3a', '#2d1b69', '#4a2c7a']}
+        colors={['#060618', '#0f0f2a', '#1a1a3a', '#252550', '#2d1b69']}
         style={styles.background}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
       />
+      <View style={styles.backgroundGlow} pointerEvents="none" />
 
-
-
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
         scrollEnabled={true}
       >
-        {/* Hero Section */}
+        {/* Hero Section — same logo as Auth Welcome (glow + ring + image) */}
         <View style={styles.heroSection}>
           <Animated.View
             style={[
-              styles.logoContainer,
+              styles.logoWrapper,
               {
+                opacity: logoScale,
                 transform: [
-                  { scale: Animated.multiply(logoScale, pulseAnim) }
+                  {
+                    scale: logoScale.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.6, 1],
+                    }),
+                  },
                 ],
               },
             ]}
           >
-            <View style={styles.logoWrapper}>
-              {/* Rotating cosmic ring */}
-              <Animated.View
-                style={[
-                  styles.cosmicRing,
-                  {
-                    transform: [{ rotate: rotation }]
-                  }
-                ]}
-              >
-                <View style={styles.ringDot} />
-                <View style={[styles.ringDot, styles.ringDot2]} />
-                <View style={[styles.ringDot, styles.ringDot3]} />
-                <View style={[styles.ringDot, styles.ringDot4]} />
-              </Animated.View>
-              
-              {/* App icon inside circular ring - stationary */}
-              <View style={styles.logoCircle}>
-                <Image
-                  source={require('../../../assets/icon.png')}
-                  style={styles.logoCircleImage}
-                  resizeMode="cover"
-                />
-              </View>
+            <View style={styles.logoGlow} />
+            <View style={styles.logoRing} />
+            <View style={styles.logoImageWrap}>
+              <Image
+                source={require('../../../assets/logo.png')}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
             </View>
           </Animated.View>
 
-          <Animated.Text style={[styles.appTitle, { opacity: titleOpacity }]} numberOfLines={1} adjustsFontSizeToFit>
+          <Animated.Text
+            style={[styles.appTitle, { opacity: titleOpacity }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             AstroRoshni
           </Animated.Text>
-          
+          <View style={styles.titleAccent} />
           <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
             <Text style={styles.tagline}>Your Personal Cosmic Guide</Text>
-            <Text style={styles.subtitle}>
-              Ancient Wisdom • Modern Precision
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.8} style={styles.heroCtaWrap}>
+            <Text style={styles.subtitle}>Ancient Wisdom • Modern Precision</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.88}
+              style={styles.heroCtaWrap}
+            >
               <LinearGradient
-                colors={['#FF6B35', '#F7931E', '#FFD700']}
-                style={styles.heroCtaButton}
+                colors={['#ff7b45', '#FF6B35', '#e85a2a']}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroCtaButton}
               >
-                <Text style={styles.heroCtaText} numberOfLines={1} adjustsFontSizeToFit>Begin Your Cosmic Journey</Text>
-                <Text style={styles.buttonIcon}>✨</Text>
+                <Text style={styles.heroCtaText} numberOfLines={1} adjustsFontSizeToFit>
+                  Begin Your Cosmic Journey
+                </Text>
+                <Text style={styles.buttonIcon}>✦</Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -302,15 +266,15 @@ const WelcomeScreen = ({ navigation }) => {
         {/* CTA Section */}
         <View style={styles.ctaSection}>
           <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.8}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.88}>
               <LinearGradient
-                colors={['#FF6B35', '#F7931E', '#FFD700']}
-                style={styles.getStartedButton}
+                colors={['#ff7b45', '#FF6B35', '#e85a2a']}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.getStartedButton}
               >
                 <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>Begin Your Cosmic Journey</Text>
-                <Text style={styles.buttonIcon}>✨</Text>
+                <Text style={styles.buttonIcon}>✦</Text>
               </LinearGradient>
             </TouchableOpacity>
             
@@ -340,7 +304,7 @@ const WelcomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a23',
+    backgroundColor: '#060618',
   },
   background: {
     position: 'absolute',
@@ -350,169 +314,174 @@ const styles = StyleSheet.create({
     bottom: 0,
     pointerEvents: 'none',
   },
-
+  backgroundGlow: {
+    position: 'absolute',
+    top: '15%',
+    left: '50%',
+    marginLeft: -150,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(255, 107, 53, 0.06)',
+    pointerEvents: 'none',
+  },
   scrollView: {
     flex: 1,
     width: '100%',
     height: '100%',
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   heroSection: {
     alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingTop: 100,
-    paddingBottom: 60,
-  },
-  logoContainer: {
-    marginBottom: 30,
+    paddingHorizontal: 36,
+    paddingTop: 72,
+    paddingBottom: 52,
   },
   logoWrapper: {
     position: 'relative',
+    width: 140,
+    height: 140,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 36,
+    overflow: 'visible',
   },
-  cosmicRing: {
+  logoGlow: {
     position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
-    borderStyle: 'dashed',
-  },
-  ringDot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFD700',
-    top: -4,
-    left: 86,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-  },
-  ringDot2: {
-    top: 86,
-    left: 176,
-    backgroundColor: '#FFA500',
-  },
-  ringDot3: {
-    top: 176,
-    left: 86,
-    backgroundColor: '#FF6B35',
-  },
-  ringDot4: {
-    top: 86,
-    left: -4,
-    backgroundColor: '#FFD700',
-  },
-  logoCircle: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a3a',
-    shadowColor: '#FFD700',
+    left: 0,
+    top: 0,
+    backgroundColor: 'rgba(255, 107, 53, 0.25)',
+    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 30,
-    elevation: 15,
+    shadowOpacity: 0.9,
+    shadowRadius: 40,
+    elevation: 8,
   },
-  logoCircleImage: {
-    width: 140,
-    height: 140,
+  logoRing: {
+    position: 'absolute',
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    left: 16,
+    top: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.35)',
+  },
+  logoImageWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(26, 26, 58, 0.5)',
+  },
+  logoImage: {
+    width: 88,
+    height: 88,
   },
   appTitle: {
-    fontSize: width < 375 ? 32 : width < 414 ? 38 : 42,
+    fontSize: width < 375 ? 34 : width < 414 ? 40 : 44,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: width < 375 ? 1 : 2,
+    letterSpacing: width < 375 ? 1.5 : 2.5,
     textAlign: 'center',
-    textShadowColor: 'rgba(255, 215, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
-    marginBottom: 20,
+    textShadowColor: 'rgba(255, 215, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
+    marginBottom: 12,
     flexShrink: 0,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+  },
+  titleAccent: {
+    width: 56,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 215, 0, 0.55)',
+    marginBottom: 24,
   },
   taglineContainer: {
     alignItems: 'center',
   },
   tagline: {
-    fontSize: width < 375 ? 18 : 22,
+    fontSize: width < 375 ? 19 : 22,
     color: '#FFD700',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     fontWeight: '600',
-    letterSpacing: width < 375 ? 0.5 : 1,
+    letterSpacing: 0.8,
     flexShrink: 0,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   subtitle: {
     fontSize: width < 375 ? 14 : 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.82)',
     textAlign: 'center',
-    lineHeight: width < 375 ? 20 : 24,
+    lineHeight: 24,
     fontWeight: '400',
     flexShrink: 0,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+    marginBottom: 4,
   },
   heroCtaWrap: {
-    marginTop: 24,
+    marginTop: 28,
     alignSelf: 'center',
+    maxWidth: 320,
+    width: '100%',
   },
   heroCtaButton: {
-    paddingHorizontal: 28,
-    paddingVertical: 16,
-    borderRadius: 28,
+    paddingHorizontal: 32,
+    paddingVertical: 18,
+    borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    elevation: 12,
   },
   heroCtaText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.5,
-    marginRight: 8,
+    marginRight: 10,
   },
   sectionTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 30,
-    textShadowColor: 'rgba(255, 215, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    marginBottom: 24,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(255, 215, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   trustSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 40,
+    paddingHorizontal: 24,
+    paddingVertical: 36,
   },
   trustPrivacyCard: {
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
-    shadowRadius: 16,
+    shadowRadius: 20,
     elevation: 8,
   },
   trustPrivacyList: {},
   trustPrivacyItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   trustPrivacyIcon: {
     marginRight: 14,
@@ -525,9 +494,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   featuresSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 40,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 36,
+    paddingBottom: 24,
   },
   featuresGrid: {
     flexDirection: 'row',
@@ -535,51 +504,51 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   featureCard: {
-    width: (width - 60) / 2,
-    marginBottom: 20,
-    borderRadius: 20,
+    width: (width - 56) / 2,
+    marginBottom: 18,
+    borderRadius: 22,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
     elevation: 8,
   },
   featureGradient: {
-    padding: 16,
+    padding: 18,
     alignItems: 'center',
     minHeight: 200,
     justifyContent: 'space-between',
   },
   featureIconContainer: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   featureIconGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
   },
   featureIcon: {
-    fontSize: 28,
+    fontSize: 26,
   },
   featureTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   featureDescription: {
     fontSize: 12,
-    color: '#666',
+    color: '#555',
     textAlign: 'center',
     lineHeight: 18,
   },
   ctaSection: {
-    paddingHorizontal: 40,
-    paddingVertical: 60,
+    paddingHorizontal: 36,
+    paddingVertical: 48,
     alignItems: 'center',
   },
   buttonContainer: {
@@ -587,7 +556,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   getStartedButton: {
-    paddingHorizontal: 32,
+    paddingHorizontal: 36,
     paddingVertical: 18,
     borderRadius: 30,
     flexDirection: 'row',
@@ -605,27 +574,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: width < 375 ? 16 : 18,
     fontWeight: '700',
-    marginRight: 8,
+    marginRight: 10,
     letterSpacing: 0.5,
     flexShrink: 1,
   },
   buttonIcon: {
-    fontSize: 20,
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.95)',
   },
   ctaSubtext: {
     alignItems: 'center',
   },
   ctaSubtextSub: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '400',
+    letterSpacing: 0.3,
   },
   secondaryButton: {
     marginTop: 16,
-    borderRadius: 25,
+    borderRadius: 28,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   secondaryButtonGradient: {
     paddingHorizontal: 28,

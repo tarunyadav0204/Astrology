@@ -478,3 +478,84 @@ class CreditService:
                 "created_at": row[10],
             })
         return transactions
+
+    def get_dashboard_stats(self, from_date: str, to_date: str) -> Dict:
+        """
+        Aggregate stats for admin dashboard: top users by activity count,
+        distribution by activity (reference_id), and daily time series.
+        from_date, to_date: YYYY-MM-DD inclusive.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT ct.userid, u.name, u.phone, COUNT(*) AS cnt
+            FROM credit_transactions ct
+            LEFT JOIN users u ON u.userid = ct.userid
+            WHERE ct.transaction_type = 'spent'
+              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+            GROUP BY ct.userid
+            ORDER BY cnt DESC
+            LIMIT 10
+        """, (from_date, to_date))
+        top_users = [
+            {"userid": r[0], "user_name": r[1] or "", "user_phone": r[2] or "", "transaction_count": r[3]}
+            for r in cursor.fetchall()
+        ]
+
+        cursor.execute("""
+            SELECT COALESCE(ct.reference_id, 'other') AS activity,
+                   COUNT(*) AS cnt,
+                   SUM(-ct.amount) AS total_credits
+            FROM credit_transactions ct
+            WHERE ct.transaction_type = 'spent'
+              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+            GROUP BY COALESCE(ct.reference_id, 'other')
+            ORDER BY total_credits DESC
+        """, (from_date, to_date))
+        distribution = [
+            {"activity": r[0], "transaction_count": r[1], "total_credits": r[2] or 0}
+            for r in cursor.fetchall()
+        ]
+
+        cursor.execute("""
+            SELECT date(ct.created_at) AS d,
+                   SUM(CASE WHEN ct.transaction_type IN ('earned', 'refund') THEN ct.amount ELSE 0 END) AS earned,
+                   SUM(CASE WHEN ct.transaction_type = 'spent' THEN -ct.amount ELSE 0 END) AS spent,
+                   COUNT(*) AS transaction_count
+            FROM credit_transactions ct
+            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+            GROUP BY date(ct.created_at)
+            ORDER BY d
+        """, (from_date, to_date))
+        time_series = [
+            {"date": r[0], "earned": r[1] or 0, "spent": r[2] or 0, "transaction_count": r[3]}
+            for r in cursor.fetchall()
+        ]
+
+        cursor.execute("""
+            SELECT
+                SUM(CASE WHEN transaction_type IN ('earned', 'refund') THEN amount ELSE 0 END),
+                SUM(CASE WHEN transaction_type = 'spent' THEN -amount ELSE 0 END),
+                COUNT(*)
+            FROM credit_transactions
+            WHERE date(created_at) >= ? AND date(created_at) <= ?
+        """, (from_date, to_date))
+        row = cursor.fetchone()
+        total_earned = row[0] or 0
+        total_spent = row[1] or 0
+        total_count = row[2] or 0
+
+        conn.close()
+        return {
+            "from_date": from_date,
+            "to_date": to_date,
+            "summary": {
+                "total_earned": total_earned,
+                "total_spent": total_spent,
+                "transaction_count": total_count,
+            },
+            "top_users_by_activity": top_users,
+            "distribution_by_activity": distribution,
+            "time_series": time_series,
+        }

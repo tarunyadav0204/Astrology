@@ -390,3 +390,29 @@ async def get_daily_activity(
         "transactions": transactions,
         "summary": {"total_earned": earned, "total_spent": spent, "count": len(transactions)},
     }
+
+
+@router.get("/admin/dashboard")
+async def get_credits_dashboard(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Dashboard stats for a date range. from_date, to_date: YYYY-MM-DD. Default: this month."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from datetime import date as date_type, timedelta
+    today = date_type.today()
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today.replace(day=1)
+            td = today
+    else:
+        fd = today.replace(day=1)
+        td = today
+    return credit_service.get_dashboard_stats(fd.isoformat(), td.isoformat())

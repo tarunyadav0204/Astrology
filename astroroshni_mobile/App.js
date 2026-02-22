@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, View, ActivityIndicator, Animated } from 'react-native';
@@ -52,6 +52,7 @@ import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
 import {
   registerPushTokenIfLoggedIn,
+  setupNotificationHandler,
   setupNotificationResponseListener,
 } from './src/services/pushNotifications';
 
@@ -152,11 +153,19 @@ export default function App() {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') tryRegisterPush();
     });
-    const cleanup = setupNotificationResponseListener(navigationRef);
+    // Defer notification setup so native bridge is ready (avoids iOS launch crash)
+    const notifCleanupRef = { current: null };
+    const deferMs = Platform.OS === 'ios' ? 500 : 0;
+    const notifSetupTimer = setTimeout(() => {
+      setupNotificationHandler();
+      const cleanup = setupNotificationResponseListener(navigationRef);
+      if (typeof cleanup === 'function') notifCleanupRef.current = cleanup;
+    }, deferMs);
     return () => {
       clearTimeout(delayed);
+      clearTimeout(notifSetupTimer);
       sub?.remove?.();
-      if (typeof cleanup === 'function') cleanup();
+      if (typeof notifCleanupRef.current === 'function') notifCleanupRef.current();
     };
   }, [isLoading]);
 

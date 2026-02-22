@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
+import AdminCreditsDashboard from './AdminCreditsDashboard';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import BlogDashboard from '../Blog/BlogDashboard';
@@ -626,6 +627,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       {activeTab === 'credits' && (
         <div className="admin-subtabs">
           <button 
+            className={`subtab ${activeSubTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('dashboard')}
+          >
+            Dashboard
+          </button>
+          <button 
             className={`subtab ${activeSubTab === 'management' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('management')}
           >
@@ -1155,6 +1162,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'dashboard' && (
+          <AdminCreditsDashboard />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'ledger' && (

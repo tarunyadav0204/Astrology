@@ -2,6 +2,11 @@
  * Push notifications: request permission, get Expo push token, register with backend,
  * and handle notification tap (e.g. open Chat).
  * Requires: npx expo install expo-device expo-notifications expo-constants
+ *
+ * IMPORTANT (iOS): Do not call any Notifications.* at module load time. iOS can crash
+ * if the native notification module is used before the app bridge is ready. All setup
+ * is deferred via setupNotificationHandler() and setupNotificationResponseListener()
+ * called from App.js after mount.
  */
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -12,14 +17,27 @@ import { nudgeAPI } from './api';
 // Fallback when Constants.expoConfig.extra.eas.projectId is missing (e.g. some release builds). Must match app.json extra.eas.projectId.
 const EAS_PROJECT_ID_FALLBACK = '8e33070b-ac6c-42e0-a089-bd830019bb1a';
 
-// Optional: show notification when app is in foreground (default is no)
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+let notificationHandlerSet = false;
+
+/**
+ * Call once after app has mounted (e.g. from App.js useEffect). Required on iOS to avoid
+ * crash from touching Notifications before native bridge is ready.
+ */
+export function setupNotificationHandler() {
+  if (notificationHandlerSet) return;
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    notificationHandlerSet = true;
+  } catch (e) {
+    if (__DEV__) console.warn('[Push] setupNotificationHandler failed:', e?.message);
+  }
+}
 
 /**
  * Request permission and get Expo push token.
