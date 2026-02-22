@@ -209,6 +209,35 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching session details: {str(e)}")
 
+
+@router.get("/admin/chat/analysis-stats")
+async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
+    """Get category counts and FAQ (canonical_question) counts for chat analysis dashboard (admin only)."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT category, COUNT(*) AS count
+            FROM chat_messages
+            WHERE sender = 'user' AND category IS NOT NULL AND trim(category) != ''
+            GROUP BY category
+            ORDER BY count DESC
+        """)
+        by_category = [{"category": row["category"], "count": row["count"]} for row in cursor.fetchall()]
+        cursor.execute("""
+            SELECT canonical_question, COUNT(*) AS count
+            FROM chat_messages
+            WHERE sender = 'user' AND canonical_question IS NOT NULL AND trim(canonical_question) != ''
+            GROUP BY canonical_question
+            ORDER BY count DESC
+        """)
+        by_faq = [{"canonical_question": row["canonical_question"], "count": row["count"]} for row in cursor.fetchall()]
+        conn.close()
+        return {"by_category": by_category, "by_faq": by_faq}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching chat analysis stats: {str(e)}")
+
+
 @router.get("/admin/settings")
 async def get_all_settings(current_user: dict = Depends(require_admin)):
     """Get all admin settings"""

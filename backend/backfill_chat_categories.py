@@ -31,7 +31,7 @@ for env_path in ['.env', os.path.join(os.path.dirname(__file__), '.env')]:
             pass  # GEMINI_API_KEY can be set in the shell instead
         break
 
-import google.generativeai as genai
+# google.generativeai is imported only when running real backfill (not for --dry-run)
 
 # Reuse same category set as live flow
 FAQ_CATEGORIES = frozenset({
@@ -173,6 +173,11 @@ def main():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("❌ GEMINI_API_KEY not set")
+        sys.exit(1)
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        print("❌ google-generativeai not installed. Run: pip3 install google-generativeai")
         sys.exit(1)
     genai.configure(api_key=api_key)
     gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)

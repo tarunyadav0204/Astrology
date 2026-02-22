@@ -1035,6 +1035,45 @@ input:checked + .toggle-slider:before {
   flex-shrink: 0;
 }
 
+.admin-chat-analysis {
+  padding: 0;
+}
+.admin-chat-analysis h2 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  color: #333;
+}
+.admin-chat-analysis-section {
+  margin-bottom: 32px;
+}
+.admin-chat-analysis-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #555;
+}
+.admin-chat-analysis .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-chat-analysis .admin-table th,
+.admin-chat-analysis .admin-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+.admin-chat-analysis .admin-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+.admin-chat-analysis-loading,
+.admin-chat-analysis-error {
+  padding: 24px;
+  color: #666;
+}
+.admin-chat-analysis-error {
+  color: #c00;
+}
+
 @media (max-width: 900px) {
   .dashboard-charts {
     grid-template-columns: 1fr;

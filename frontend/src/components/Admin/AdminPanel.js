@@ -7,6 +7,7 @@ import AdminDailyActivity from './AdminDailyActivity';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
+import AdminChatAnalysis from './AdminChatAnalysis';
 import BlogDashboard from '../Blog/BlogDashboard';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
@@ -689,6 +690,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Chat Feedback
           </button>
+          <button 
+            className={`subtab ${activeSubTab === 'chatAnalysis' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('chatAnalysis')}
+          >
+            Chat Analysis
+          </button>
         </div>
       )}
 
@@ -1267,6 +1274,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'analysis' && activeSubTab === 'feedback' && (
           <ChatFeedback />
+        )}
+
+        {activeTab === 'analysis' && activeSubTab === 'chatAnalysis' && (
+          <AdminChatAnalysis />
         )}
 
         {activeTab === 'errors' && (
