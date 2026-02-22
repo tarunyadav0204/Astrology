@@ -70,6 +70,15 @@ FOLLOW_UP_BLOCK_INSTRUCTION = """
 <div class="follow-up-questions">[Generate 3-4 follow-up questions. Each question MUST be on a new line and start with a hyphen (-). DO NOT wrap each question in its own `<div>` tag.]</div>
 """
 
+# FAQ metadata: LLM must output this exact line at the very end (for categorization + FAQs). Not shown to user.
+FAQ_META_INSTRUCTION = """
+CRITICAL - FAQ METADATA (do not include this line in the main answer the user sees):
+At the very end of your response, after all other content, output exactly one line in this exact format:
+FAQ_META: {"category": "<one of: career, marriage, health, education, progeny, wealth, trading, muhurat, karma, general, other>", "canonical_question": "<short phrase summarizing the question intent for FAQ grouping, e.g. Career change or job prospects, Marriage timing>"}
+- category: use lowercase, one of the listed values.
+- canonical_question: a concise FAQ-style phrase; similar questions should get the same or very similar phrase so they group together.
+"""
+
 # Template A: The Deep Dive (Default)
 # Used for: ANALYZE_TOPIC_POTENTIAL, ANALYZE_ROOT_CAUSE, PREDICT_PERIOD_OUTLOOK
 TEMPLATE_DEEP_DIVE = """
@@ -338,6 +347,7 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     prompt_parts.append(f"{language_instruction}{response_format_instruction}{user_context_instruction}{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}")
     
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
+    prompt_parts.append(FAQ_META_INSTRUCTION.strip())
     
     return "\n\n".join(prompt_parts)
 

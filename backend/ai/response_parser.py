@@ -1,7 +1,7 @@
 import re
 import json
 import html
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 class ResponseParser:
     """Extracts technical terms and glossary from Gemini responses"""
@@ -78,7 +78,35 @@ class ResponseParser:
             print(f"🔍 Using {len(result['terms'])} terms from glossary")
 
         return result
-    
+
+    # Allowed categories for FAQ metadata (must match output_schema FAQ_META_INSTRUCTION)
+    FAQ_CATEGORIES = frozenset({
+        'career', 'marriage', 'health', 'education', 'progeny', 'wealth',
+        'trading', 'muhurat', 'karma', 'general', 'other'
+    })
+
+    @staticmethod
+    def parse_faq_metadata(text: str) -> Tuple[str, Optional[Dict[str, str]]]:
+        """
+        Find FAQ_META: {...} line in text, parse JSON, strip the line from text.
+        Returns (stripped_text, faq_metadata or None). faq_metadata has keys: category, canonical_question.
+        """
+        pattern = re.compile(r'\n?\s*FAQ_META:\s*(\{[^}]+\})\s*$', re.IGNORECASE | re.DOTALL)
+        match = pattern.search(text)
+        if not match:
+            return text, None
+        try:
+            meta = json.loads(match.group(1))
+            category = (meta.get('category') or '').strip().lower()
+            canonical = (meta.get('canonical_question') or '').strip()[:300]
+            if category not in ResponseParser.FAQ_CATEGORIES:
+                category = 'other'
+            faq_metadata = {'category': category, 'canonical_question': canonical or 'Other'}
+            stripped = text[:match.start()].rstrip()
+            return stripped, faq_metadata
+        except (json.JSONDecodeError, TypeError):
+            return text, None
+
     @staticmethod
     def parse_images_in_chat_response(text: str) -> Dict:
         """

@@ -46,6 +46,17 @@ def init_chat_tables():
     except sqlite3.OperationalError:
         pass # Column already exists
     
+    # FAQ / categorization columns (for user messages)
+    for col, typ in [
+        ('category', 'TEXT'),
+        ('canonical_question', 'TEXT'),
+        ('categorized_at', 'TIMESTAMP'),
+    ]:
+        try:
+            cursor.execute(f'ALTER TABLE chat_messages ADD COLUMN {col} {typ}')
+        except sqlite3.OperationalError:
+            pass
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
             message_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -459,10 +470,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         intent = None
         chart_insights = []
     
-    # Start background processing (pass intent to avoid re-classification)
+    # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save)
     background_tasks.add_task(
         process_gemini_response,
-        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent
+        assistant_message_id, session_id, sanitize_text(question), current_user.userid, language, response_style, premium_analysis, birth_details, chat_cost, partnership_mode, partner_birth_details, intent, user_message_id
     )
     
     print(f"🚀 Returning IDs - User: {user_message_id}, Assistant: {assistant_message_id}")
@@ -618,8 +629,40 @@ def get_original_question_for_clarification(session_id, current_message_id, conn
     
     return result[0] if result else None
 
-async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None):
-    """Background task to process Gemini response"""
+
+def get_original_user_message_id_for_faq(session_id: str, assistant_message_id: int, conn):
+    """
+    When the current turn is a user's answer to a clarification, return the message_id of the
+    original user question (so we save category/canonical_question on that, not on the follow-up).
+    Returns None if there was no clarification before this assistant message (i.e. first question).
+    """
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT message_id FROM chat_messages
+        WHERE session_id = ?
+          AND sender = 'assistant'
+          AND message_type = 'clarification'
+          AND message_id < ?
+        ORDER BY message_id DESC
+        LIMIT 1
+    """, (session_id, assistant_message_id))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    clarification_msg_id = row[0]
+    cursor.execute("""
+        SELECT message_id FROM chat_messages
+        WHERE session_id = ?
+          AND sender = 'user'
+          AND message_id < ?
+        ORDER BY message_id DESC
+        LIMIT 1
+    """, (session_id, clarification_msg_id))
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+async def process_gemini_response(message_id: int, session_id: str, question: str, user_id: int, language: str, response_style: str, premium_analysis: bool, birth_details: dict = None, chat_cost: int = 1, partnership_mode: bool = False, partner_birth_details: dict = None, cached_intent: dict = None, user_message_id: int = None):
+    """Background task to process Gemini response. user_message_id: ID of the user message to update with category/canonical_question."""
     import sys
     import os
     import json
@@ -1118,6 +1161,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 
                 if success:
                     print(f"✅ CREDITS DEDUCTED: {chat_cost} credits for user {user_id}")
+                    
+                    # Save category + canonical_question on the *original* user question only (not on clarification answers)
+                    faq_metadata = result.get('faq_metadata')
+                    if faq_metadata and user_message_id:
+                        # If this turn was after a clarification, save FAQ on the original question, not the follow-up
+                        original_user_msg_id = get_original_user_message_id_for_faq(session_id, message_id, conn)
+                        target_message_id = original_user_msg_id if original_user_msg_id else user_message_id
+                        if original_user_msg_id:
+                            print(f"   📋 Clarification flow: saving FAQ on original user message {target_message_id} (not follow-up {user_message_id})")
+                        cursor.execute(
+                            "UPDATE chat_messages SET category = ?, canonical_question = ?, categorized_at = ? WHERE message_id = ?",
+                            (
+                                faq_metadata.get('category') or None,
+                                faq_metadata.get('canonical_question') or None,
+                                datetime.now(),
+                                target_message_id
+                            )
+                        )
+                        print(f"   📋 FAQ saved on user message {target_message_id}: {faq_metadata.get('category')} / {faq_metadata.get('canonical_question', '')[:40]}...")
                     
                     # Get summary image from result if available (store as string, not JSON)
                     summary_image = result.get('summary_image', None)

@@ -274,6 +274,11 @@ class GeminiChatAnalyzer:
                 if native_name and native_name != 'the native':
                     cleaned_text = self._fix_pronoun_usage(cleaned_text, native_name)
             
+            # Parse and strip FAQ_META line (category + canonical_question for dashboard/FAQs)
+            cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
+            if faq_metadata:
+                print(f"   📋 FAQ_META: category={faq_metadata.get('category')}, canonical_question={faq_metadata.get('canonical_question', '')[:50]}...")
+            
             # Ensure response doesn't end abruptly (minimum length check)
             if len(cleaned_text) < 50:
                 return {
@@ -383,6 +388,7 @@ class GeminiChatAnalyzer:
                 'summary_image': summary_image_url,
                 'follow_up_questions': parsed_response.get('follow_up_questions', []),
                 'analysis_steps': parsed_response.get('analysis_steps', []),
+                'faq_metadata': faq_metadata,
                 'raw_response': response_text,
                 'has_transit_request': has_transit_request,
                 'timing': {
