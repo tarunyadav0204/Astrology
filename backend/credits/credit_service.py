@@ -502,6 +502,25 @@ class CreditService:
             {"userid": r[0], "user_name": r[1] or "", "user_phone": r[2] or "", "transaction_count": r[3]}
             for r in cursor.fetchall()
         ]
+        top_userids = {u["userid"] for u in top_users}
+
+        cursor.execute("""
+            SELECT ct.userid, COALESCE(ct.reference_id, 'other') AS activity, COUNT(*) AS cnt
+            FROM credit_transactions ct
+            WHERE ct.transaction_type = 'spent'
+              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+            GROUP BY ct.userid, COALESCE(ct.reference_id, 'other')
+        """, (from_date, to_date))
+        activity_breakdown = {}
+        for row in cursor.fetchall():
+            uid, activity, cnt = row[0], row[1], row[2]
+            if uid in top_userids:
+                if uid not in activity_breakdown:
+                    activity_breakdown[uid] = []
+                activity_breakdown[uid].append({"activity": activity, "count": cnt})
+
+        for u in top_users:
+            u["by_activity"] = activity_breakdown.get(u["userid"], [])
 
         cursor.execute("""
             SELECT COALESCE(ct.reference_id, 'other') AS activity,

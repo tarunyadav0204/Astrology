@@ -42,13 +42,21 @@ function getActivityLabel(activity) {
   return ACTIVITY_LABELS[activity] || activity || 'Other';
 }
 
+/** Format date as local YYYY-MM-DD so API range matches user's calendar. */
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const mo = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${y}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 function getDateRange(preset) {
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth();
   const d = today.getDate();
-  const to = new Date(y, m, d);
   let from;
+  let to = new Date(y, m, d);
 
   switch (preset) {
     case 'this_month':
@@ -58,20 +66,23 @@ function getDateRange(preset) {
       from = new Date(y, m - 2, 1);
       break;
     case 'this_week': {
-      const day = today.getDay();
-      const sun = day === 0 ? 0 : -day;
+      const day = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const daysSinceMonday = day === 0 ? 6 : day - 1;
       from = new Date(today);
-      from.setDate(today.getDate() + sun);
+      from.setDate(today.getDate() - daysSinceMonday);
       from.setHours(0, 0, 0, 0);
       break;
     }
     case 'last_week': {
       const day = today.getDay();
-      const sun = day === 0 ? -7 : -day - 7;
-      from = new Date(today);
-      from.setDate(today.getDate() + sun);
-      from.setHours(0, 0, 0, 0);
-      to.setDate(today.getDate() + (day === 0 ? -1 : -day));
+      const daysSinceMonday = day === 0 ? 6 : day - 1;
+      const thisWeekMonday = new Date(today);
+      thisWeekMonday.setDate(today.getDate() - daysSinceMonday);
+      thisWeekMonday.setHours(0, 0, 0, 0);
+      from = new Date(thisWeekMonday);
+      from.setDate(thisWeekMonday.getDate() - 7);
+      to = new Date(thisWeekMonday);
+      to.setDate(thisWeekMonday.getDate() - 1);
       to.setHours(23, 59, 59, 999);
       break;
     }
@@ -83,8 +94,8 @@ function getDateRange(preset) {
   }
 
   return {
-    from_date: from.toISOString().slice(0, 10),
-    to_date: to.toISOString().slice(0, 10),
+    from_date: toLocalDateStr(from),
+    to_date: toLocalDateStr(to),
   };
 }
 
@@ -157,10 +168,27 @@ export default function AdminCreditsDashboard() {
   }));
   const timeSeries = data?.time_series || [];
 
-  const topUsersChart = topUsers.map((u) => ({
-    name: u.user_name || u.user_phone || `User ${u.userid}`,
-    count: u.transaction_count,
-  }));
+  // Collect activity keys that appear in top users; keep stable order (ACTIVITY_LABELS then rest)
+  const activityKeysInData = new Set();
+  topUsers.forEach((u) => u.by_activity?.forEach(({ activity }) => activityKeysInData.add(activity)));
+  const activityOrder = [
+    ...Object.keys(ACTIVITY_LABELS).filter((a) => activityKeysInData.has(a)),
+    ...[...activityKeysInData].filter((a) => !ACTIVITY_LABELS[a]),
+  ];
+  const activityColor = {};
+  activityOrder.forEach((a, i) => {
+    activityColor[a] = COLORS[i % COLORS.length];
+  });
+
+  const topUsersChart = topUsers.map((u) => {
+    const row = { name: u.user_name || u.user_phone || `User ${u.userid}` };
+    const byActivity = (u.by_activity || []).reduce((acc, { activity, count }) => {
+      acc[activity] = count;
+      return acc;
+    }, {});
+    activityOrder.forEach((a) => (row[a] = byActivity[a] || 0));
+    return row;
+  });
 
   return (
     <div className="credits-dashboard">
@@ -223,7 +251,17 @@ export default function AdminCreditsDashboard() {
                     <XAxis type="number" />
                     <YAxis type="category" dataKey="name" width={78} tick={{ fontSize: 12 }} />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#ff6b35" name="Activities" radius={[0, 4, 4, 0]} />
+                    <Legend />
+                    {activityOrder.map((activityKey) => (
+                      <Bar
+                        key={activityKey}
+                        stackId="stack"
+                        dataKey={activityKey}
+                        name={getActivityLabel(activityKey)}
+                        fill={activityColor[activityKey]}
+                        radius={activityKey === activityOrder[activityOrder.length - 1] ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                      />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -257,6 +295,32 @@ export default function AdminCreditsDashboard() {
               )}
             </div>
 
+            <div className="chart-card">
+              <h3>Transaction count by activity</h3>
+              {distribution.length ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={distribution}
+                      dataKey="transaction_count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {distribution.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => [v, 'Transactions']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="no-data">No activity in this period.</p>
+              )}
+            </div>
+
             <div className="chart-card chart-card-wide">
               <h3>Credits bought vs spent over time</h3>
               {timeSeries.length ? (
@@ -278,18 +342,35 @@ export default function AdminCreditsDashboard() {
               )}
             </div>
 
-            <div className="chart-card">
-              <h3>Spend by activity (credits)</h3>
+            <div className="chart-card chart-card-double">
+              <h3>Spend by activity</h3>
               {distribution.length ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={distribution} margin={{ bottom: 80 }} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="total_credits" fill="#f7931e" name="Credits" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <>
+                  <div className="chart-subsection">
+                    <h4>By amount (credits)</h4>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={distribution} margin={{ bottom: 80 }} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v) => [v, 'Credits']} />
+                        <Bar dataKey="total_credits" fill="#f7931e" name="Credits" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="chart-subsection">
+                    <h4>By count (transactions)</h4>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={distribution} margin={{ bottom: 80 }} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v) => [v, 'Transactions']} />
+                        <Bar dataKey="transaction_count" fill="#2196F3" name="Count" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
               ) : (
                 <p className="no-data">No spend in this period.</p>
               )}

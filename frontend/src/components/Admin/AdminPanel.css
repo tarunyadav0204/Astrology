@@ -975,8 +975,22 @@ input:checked + .toggle-slider:before {
   border: 1px solid #eee;
 }
 
-.dashboard-charts .chart-card-wide {
+.dashboard-charts .chart-card-wide,
+.dashboard-charts .chart-card-double {
   grid-column: 1 / -1;
+}
+
+.dashboard-charts .chart-card-double .chart-subsection {
+  margin-bottom: 24px;
+}
+.dashboard-charts .chart-card-double .chart-subsection:last-child {
+  margin-bottom: 0;
+}
+.dashboard-charts .chart-card-double .chart-subsection h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
 }
 
 .dashboard-charts .chart-card h3 {
