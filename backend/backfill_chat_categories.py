@@ -21,11 +21,14 @@ import sys
 from datetime import datetime
 from typing import List, Tuple
 
-# Load env before importing genai
+# Load .env if python-dotenv is available (optional)
 for env_path in ['.env', os.path.join(os.path.dirname(__file__), '.env')]:
     if os.path.exists(env_path):
-        from dotenv import load_dotenv
-        load_dotenv(env_path)
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(env_path)
+        except ImportError:
+            pass  # GEMINI_API_KEY can be set in the shell instead
         break
 
 import google.generativeai as genai
