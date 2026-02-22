@@ -67,6 +67,7 @@ class FestivalTrigger(TriggerBase):
                     title=f"Today: {name}",
                     body=f"Today is {name}. Ask in chat for significance and remedies.",
                     cta_deep_link=DEFAULT_CTA_DEEP_LINK,
+                    question=f"What is the significance of {name} and any remedies?",
                     priority=priority,
                 )
             )

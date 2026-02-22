@@ -77,6 +77,7 @@ class PlanetTransitSignTrigger(TriggerBase):
                             title=f"{planet_name} enters {sign_name}",
                             body=f"{planet_name} has moved into {sign_name}. Ask in chat how this transit might affect you.",
                             cta_deep_link=DEFAULT_CTA_DEEP_LINK,
+                            question=f"How does {planet_name} in {sign_name} affect me?",
                             priority=0,
                         )
                     )

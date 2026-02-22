@@ -193,6 +193,51 @@
   font-weight: 600;
 }
 
+/* Daily activity view */
+.admin-daily-activity .ledger-panel h2 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.daily-activity-controls {
+  margin-bottom: 16px;
+}
+
+.daily-activity-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.daily-activity-controls input[type="date"] {
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.daily-summary {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.daily-summary .summary-earned { color: #2e7d32; font-weight: 600; }
+.daily-summary .summary-spent { color: #c62828; font-weight: 600; }
+.daily-summary .summary-count { color: #666; }
+
+.type-badge.refund {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
 @media (max-width: 768px) {
   .admin-credit-ledger {
     flex-direction: column;

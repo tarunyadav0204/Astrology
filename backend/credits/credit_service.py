@@ -417,11 +417,11 @@ class CreditService:
         return settings
     
     def get_transaction_history(self, userid: int, limit: int = 50) -> List[Dict]:
-        """Get credit transaction history for user"""
+        """Get credit transaction history for user. reference_id is the activity/feature for spends."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT transaction_type, amount, balance_after, source, description, created_at
+            SELECT transaction_type, amount, balance_after, source, reference_id, description, created_at
             FROM credit_transactions 
             WHERE userid = ? 
             ORDER BY created_at DESC 
@@ -435,9 +435,46 @@ class CreditService:
                 "amount": row[1],
                 "balance_after": row[2],
                 "source": row[3],
-                "description": row[4],
-                "date": row[5]
+                "reference_id": row[4],
+                "description": row[5],
+                "date": row[6]
             })
         
         conn.close()
+        return transactions
+
+    def get_daily_activity(self, target_date: str) -> List[Dict]:
+        """
+        Get all credit transactions for a given date (YYYY-MM-DD) across all users.
+        Returns list with user info and transaction details, ordered by time (newest first).
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ct.id, ct.userid, u.name, u.phone,
+                   ct.transaction_type, ct.amount, ct.balance_after,
+                   ct.source, ct.reference_id, ct.description, ct.created_at
+            FROM credit_transactions ct
+            LEFT JOIN users u ON u.userid = ct.userid
+            WHERE date(ct.created_at) = ?
+            ORDER BY ct.created_at DESC
+        """, (target_date,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        transactions = []
+        for row in rows:
+            transactions.append({
+                "id": row[0],
+                "userid": row[1],
+                "user_name": row[2] or "",
+                "user_phone": row[3] or "",
+                "type": row[4],
+                "amount": row[5],
+                "balance_after": row[6],
+                "source": row[7],
+                "reference_id": row[8],
+                "description": row[9],
+                "created_at": row[10],
+            })
         return transactions

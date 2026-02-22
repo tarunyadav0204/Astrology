@@ -370,3 +370,23 @@ async def get_user_transaction_history(userid: int, current_user: User = Depends
     
     transactions = credit_service.get_transaction_history(userid)
     return {"transactions": transactions}
+
+
+@router.get("/admin/daily-activity")
+async def get_daily_activity(
+    date: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all credit transactions for a given date (YYYY-MM-DD) across all users. Default: today."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from datetime import date as date_type
+    target = date_type.today().isoformat() if not date else date
+    transactions = credit_service.get_daily_activity(target)
+    earned = sum(t["amount"] for t in transactions if t["type"] == "earned" or t["type"] == "refund")
+    spent = sum(-t["amount"] for t in transactions if t["type"] == "spent")
+    return {
+        "date": target,
+        "transactions": transactions,
+        "summary": {"total_earned": earned, "total_spent": spent, "count": len(transactions)},
+    }

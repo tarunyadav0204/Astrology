@@ -13,6 +13,7 @@ class NudgeEvent:
     title: str
     body: str
     cta_deep_link: str = "astroroshni://chat"
+    question: Optional[str] = None  # optional; when user taps notification, prefill chat input with this
     priority: int = 0  # higher = preferred when deduping per user
 
     def __post_init__(self) -> None:

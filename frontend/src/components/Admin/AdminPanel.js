@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
+import AdminDailyActivity from './AdminDailyActivity';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import BlogDashboard from '../Blog/BlogDashboard';
@@ -52,6 +53,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifTitle, setNotifTitle] = useState('');
   const [notifBody, setNotifBody] = useState('');
   const [notifQuestion, setNotifQuestion] = useState('');
+  const [notifNativeId, setNotifNativeId] = useState('');
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
 
@@ -63,7 +65,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       } else if (activeSubTab === 'facts') {
         fetchUserFacts();
       }
-    } else if (activeTab === 'charts') {
+    } else if (activeTab === 'charts' || activeTab === 'notifications') {
       fetchCharts();
     } else if (activeTab === 'credits') {
       if (activeSubTab === 'management') {
@@ -433,6 +435,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           title: notifTitle.trim().slice(0, 100),
           body: notifBody.trim().slice(0, 200),
           ...(notifQuestion.trim() && { question: notifQuestion.trim().slice(0, 500) }),
+          ...(notifNativeId && { native_id: parseInt(notifNativeId, 10) }),
         }),
       });
       let data;
@@ -456,6 +459,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         setNotifTitle('');
         setNotifBody('');
         setNotifQuestion('');
+        setNotifNativeId('');
       }
     } catch (err) {
       console.error('[Admin Notifications] Request error:', err);
@@ -632,6 +636,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('ledger')}
           >
             Ledger
+          </button>
+          <button 
+            className={`subtab ${activeSubTab === 'daily' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('daily')}
+          >
+            Daily
           </button>
           <button 
             className={`subtab ${activeSubTab === 'requests' ? 'active' : ''}`}
@@ -1151,6 +1161,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <AdminCreditLedger />
         )}
 
+        {activeTab === 'credits' && activeSubTab === 'daily' && (
+          <AdminDailyActivity />
+        )}
+
         {activeTab === 'credits' && activeSubTab === 'requests' && (
           <div className="credit-requests-management">
             <h2>Credit Requests</h2>
@@ -1303,6 +1317,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   onChange={(e) => setNotifQuestion(e.target.value)}
                   maxLength={500}
                 />
+              </div>
+              <div className="form-field">
+                <label>For native (optional)</label>
+                <select
+                  value={notifNativeId}
+                  onChange={(e) => setNotifNativeId(e.target.value)}
+                  disabled={loading || !notifUserId}
+                >
+                  <option value="">Any — use user&apos;s current selection</option>
+                  {(charts || [])
+                    .filter((c) => Number(c.userid) === Number(notifUserId))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || 'Unnamed'} (id: {c.id})
+                      </option>
+                    ))}
+                </select>
+                <small className="form-hint">When user taps, app will switch to this native before opening chat.</small>
               </div>
               <div className="form-buttons">
                 <button

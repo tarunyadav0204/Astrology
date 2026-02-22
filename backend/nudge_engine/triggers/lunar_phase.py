@@ -81,6 +81,7 @@ class LunarPhaseTrigger(TriggerBase):
                         title="New Moon today",
                         body="Today is New Moon (Amavasya). A good time for new beginnings. Ask in chat for a lunar insight.",
                         cta_deep_link=DEFAULT_CTA_DEEP_LINK,
+                        question="What does today's New Moon mean for my chart?",
                         priority=1,
                     )
                 )
@@ -96,6 +97,7 @@ class LunarPhaseTrigger(TriggerBase):
                         title="Full Moon today",
                         body="Today is Full Moon (Purnima). A time of culmination and clarity. Ask in chat how it might affect you.",
                         cta_deep_link=DEFAULT_CTA_DEEP_LINK,
+                        question="What does today's Full Moon mean for my chart?",
                         priority=1,
                     )
                 )

@@ -56,11 +56,29 @@ const AdminCreditLedger = () => {
   const getFeatureName = (source, referenceId) => {
     if (source === 'promo_code') return 'Promo Code';
     if (source === 'admin_adjustment') return 'Admin Adjustment';
+    if (source === 'credit_request_approval') return 'Credit Request Approved';
     if (source === 'feature_usage') {
-      if (referenceId === 'chat') return 'Chat Question';
-      if (referenceId === 'marriage_analysis') return 'Marriage Analysis';
-      if (referenceId === 'wealth_analysis') return 'Wealth Analysis';
-      return referenceId;
+      const names = {
+        chat_question: 'Chat Question',
+        marriage_analysis: 'Marriage Analysis',
+        wealth_analysis: 'Wealth Analysis',
+        health_analysis: 'Health Analysis',
+        education_analysis: 'Education Analysis',
+        career_analysis: 'Career Analysis',
+        progeny_analysis: 'Progeny Analysis',
+        trading_daily: 'Trading Daily',
+        trading_calendar: 'Trading Calendar',
+        childbirth_planner: 'Childbirth Planner',
+        vehicle_purchase: 'Vehicle Purchase Muhurat',
+        griha_pravesh: 'Griha Pravesh',
+        gold_purchase: 'Gold Purchase Muhurat',
+        business_opening: 'Business Opening Muhurat',
+        event_timeline: 'Event Timeline',
+        partnership_analysis: 'Partnership Analysis',
+        karma_analysis: 'Karma Analysis',
+        mundane_chat: 'Mundane Chat',
+      };
+      return names[referenceId] || referenceId || 'Feature';
     }
     return source;
   };
@@ -122,7 +140,7 @@ const AdminCreditLedger = () => {
                           </span>
                         </td>
                         <td className="feature-cell">
-                          {transaction.description || getFeatureName(transaction.source, transaction.source)}
+                          {transaction.description || getFeatureName(transaction.source, transaction.reference_id)}
                         </td>
                         <td className={`amount-cell ${transaction.type}`}>
                           {transaction.type === 'earned' ? '+' : ''}{transaction.amount}

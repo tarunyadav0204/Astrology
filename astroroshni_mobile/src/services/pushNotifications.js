@@ -106,13 +106,26 @@ export async function registerPushTokenIfLoggedIn() {
 /**
  * Set up listener for when user taps a notification. navigationRef should be
  * the ref from NavigationContainer so we can navigate to Home (Chat).
+ * If data.native_id is present, sets that native as selected in storage before
+ * opening chat so the question is answered for the correct chart.
  */
 export function setupNotificationResponseListener(navigationRef) {
-  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+  const sub = Notifications.addNotificationResponseReceivedListener(async (response) => {
     const data = response.notification.request.content?.data;
     const cta = data?.cta;
     const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
+    const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
     try {
+      if (nativeId) {
+        const { storage } = require('./storage');
+        const profiles = await storage.getBirthProfiles();
+        const profile = (profiles || []).find(
+          (p) => String(p?.id) === nativeId || String(p?._id) === nativeId
+        );
+        if (profile) {
+          await storage.setBirthDetails(profile);
+        }
+      }
       if (navigationRef?.current && (cta === 'astroroshni://chat' || !cta)) {
         navigationRef.current.navigate('Home', {
           startChat: true,

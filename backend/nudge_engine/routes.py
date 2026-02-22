@@ -28,6 +28,7 @@ class AdminSendNotificationRequest(BaseModel):
     title: str
     body: str
     question: Optional[str] = None  # optional; when user taps notification, prefill chat input with this
+    native_id: Optional[int] = None  # optional; birth_chart id — app will set this native as selected when user taps
 
 
 @router.post("/scan")
@@ -127,6 +128,8 @@ async def admin_send_notification(
             push_data = {"trigger_id": "admin", "cta": "astroroshni://chat"}
             if body.question and (body.question or "").strip():
                 push_data["question"] = (body.question or "").strip()[:500]
+            if body.native_id is not None:
+                push_data["native_id"] = str(body.native_id)
             sent = 0
             for token, platform in tokens:
                 if push_module.send_expo_push(

@@ -30,11 +30,14 @@ def deliver(
                 params_json = json.dumps(ev.params) if ev.params else ""
                 tokens = db.get_device_tokens_for_user(conn, userid)
                 channel = "stored"
+                push_data = {"trigger_id": ev.trigger_id, "cta": ev.cta_deep_link}
+                if ev.question and (ev.question or "").strip():
+                    push_data["question"] = (ev.question or "").strip()[:500]
                 if tokens:
                     for token, platform in tokens:
                         if push_module.send_expo_push(
                             token, ev.title, ev.body,
-                            data={"trigger_id": ev.trigger_id, "cta": ev.cta_deep_link},
+                            data=push_data,
                         ):
                             channel = "push"
                             break

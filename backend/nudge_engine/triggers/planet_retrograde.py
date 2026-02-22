@@ -70,6 +70,7 @@ class PlanetRetrogradeTrigger(TriggerBase):
                             title=f"{planet_name} turns retrograde",
                             body=f"{planet_name} is stationing retrograde today. Ask in chat how this might affect you.",
                             cta_deep_link=DEFAULT_CTA_DEEP_LINK,
+                            question=f"How does {planet_name} retrograde affect me?",
                             priority=1,
                         )
                     )
@@ -86,6 +87,7 @@ class PlanetRetrogradeTrigger(TriggerBase):
                             title=f"{planet_name} turns direct",
                             body=f"{planet_name} is stationing direct today. Ask in chat what this shift may mean for you.",
                             cta_deep_link=DEFAULT_CTA_DEEP_LINK,
+                            question=f"What does {planet_name} turning direct mean for me?",
                             priority=1,
                         )
                     )
