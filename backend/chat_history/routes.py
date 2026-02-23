@@ -360,6 +360,27 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     conn.commit()
     conn.close()
     
+    # Refuse death-related questions without calling Gemini
+    from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
+    if is_death_related(sanitize_text(question)):
+        print(f"🚫 Death-related question detected - returning refusal without analysis")
+        conn = sqlite3.connect('astrology.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+            (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), assistant_message_id)
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "user_message_id": user_message_id,
+            "message_id": assistant_message_id,
+            "status": "completed",
+            "message_type": "answer",
+            "content": REFUSAL_MESSAGE,
+            "chart_insights": [],
+        }
+    
     # Get chart insights from intent router BEFORE starting background task
     chart_insights = []
     try:
@@ -673,8 +694,21 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from credits.credit_service import CreditService
     from ai.intent_router import IntentRouter
     from chat.fact_extractor import FactExtractor
+    from ai.death_query_guard import is_death_related, REFUSAL_MESSAGE
     
     try:
+        # Refuse death-related questions without calling the model
+        if is_death_related(question):
+            print(f"🚫 Death-related question detected in background task - saving refusal")
+            with sqlite3.connect('astrology.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                    (sanitize_text(REFUSAL_MESSAGE), "completed", "answer", datetime.now(), message_id)
+                )
+                conn.commit()
+            return
+        
         # Get birth_chart_id from session
         with sqlite3.connect('astrology.db') as conn:
             cursor = conn.cursor()

@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Modal,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -55,6 +56,7 @@ const CreditScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState(null);
   const [iapReady, setIapReady] = useState(false);
+  const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -69,14 +71,31 @@ const CreditScreen = ({ navigation }) => {
       const { data } = await creditAPI.verifyGooglePlayPurchase(purchaseToken, productId, orderId);
       await fetchBalance();
       await fetchHistory();
-      Alert.alert('Success', data.message + (data.credits_added ? ` ${data.credits_added} credits added.` : ''));
+      const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
+      setPurchaseModal({
+        visible: true,
+        type: isAlreadyCredited ? 'already_credited' : 'success',
+        title: isAlreadyCredited ? 'Already credited' : 'Thank you!',
+        message: isAlreadyCredited
+          ? 'This purchase was already added to your balance. Your credits are safe and ready to use.'
+          : `${data.message || 'Credits added.'}${data.credits_added ? ` ${data.credits_added} credits have been added to your balance.` : ''}`,
+        creditsAdded: data.credits_added || 0,
+      });
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || 'Failed to add credits';
-      Alert.alert('Purchase verification failed', msg);
+      setPurchaseModal({
+        visible: true,
+        type: 'error',
+        title: 'Purchase verification failed',
+        message: msg,
+        creditsAdded: 0,
+      });
     } finally {
       setPurchasingProductId(null);
     }
   };
+
+  const closePurchaseModal = () => setPurchaseModal((prev) => ({ ...prev, visible: false }));
 
   useEffect(() => {
     fetchHistory();
@@ -489,6 +508,51 @@ const CreditScreen = ({ navigation }) => {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Purchase result modal */}
+      <Modal
+        visible={purchaseModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={closePurchaseModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalOverlay}
+          onPress={closePurchaseModal}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.modalContentWrap}>
+            <View style={[styles.purchaseModalCard, { backgroundColor: promoCardBg, borderColor: colors.cardBorder }]}>
+              <View style={[styles.purchaseModalIconWrap, { backgroundColor: purchaseModal.type === 'error' ? (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.12)') : purchaseModal.type === 'already_credited' ? (isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)') : (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.12)') }]}>
+                <Ionicons
+                  name={purchaseModal.type === 'error' ? 'alert-circle' : purchaseModal.type === 'already_credited' ? 'information-circle' : 'checkmark-circle'}
+                  size={48}
+                  color={purchaseModal.type === 'error' ? '#ef4444' : purchaseModal.type === 'already_credited' ? '#3b82f6' : colors.success}
+                />
+              </View>
+              <Text style={[styles.purchaseModalTitle, { color: colors.text }]}>{purchaseModal.title}</Text>
+              <Text style={[styles.purchaseModalMessage, { color: colors.textSecondary }]}>{purchaseModal.message}</Text>
+              {purchaseModal.creditsAdded > 0 && (
+                <View style={[styles.purchaseModalCreditsBadge, { backgroundColor: isDark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.15)' }]}>
+                  <Text style={[styles.purchaseModalCreditsText, { color: colors.success }]}>+{purchaseModal.creditsAdded} credits</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.purchaseModalButtonWrap}
+                onPress={closePurchaseModal}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={purchaseModal.type === 'error' ? [colors.primary, colors.secondary] : [colors.success, '#22c55e']}
+                  style={styles.purchaseModalButton}
+                >
+                  <Text style={styles.purchaseModalButtonText}>Got it</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -813,6 +877,73 @@ const styles = StyleSheet.create({
   emptyStateSubtext: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContentWrap: {
+    width: '100%',
+    maxWidth: 340,
+  },
+  purchaseModalCard: {
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  purchaseModalIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  purchaseModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  purchaseModalMessage: {
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  purchaseModalCreditsBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  purchaseModalCreditsText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  purchaseModalButtonWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  purchaseModalButton: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  purchaseModalButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
   },
 });
 

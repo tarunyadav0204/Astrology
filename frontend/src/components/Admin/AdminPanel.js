@@ -5,6 +5,7 @@ import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
+import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import AdminChatAnalysis from './AdminChatAnalysis';
@@ -657,6 +658,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Requests
           </button>
+          <button 
+            className={`subtab ${activeSubTab === 'playRefund' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('playRefund')}
+          >
+            Google Play refund
+          </button>
         </div>
       )}
 
@@ -1183,8 +1190,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <AdminDailyActivity />
         )}
 
+        {activeTab === 'credits' && activeSubTab === 'playRefund' && (
+          <AdminGooglePlayRefund />
+        )}
+
         {activeTab === 'credits' && activeSubTab === 'requests' && (
-          <div className="credit-requests-management">
+            <div className="credit-requests-management">
             <h2>Credit Requests</h2>
             
             {/* Status Filter */}

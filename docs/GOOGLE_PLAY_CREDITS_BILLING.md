@@ -52,6 +52,43 @@ Without this, the verify endpoint returns 503 and does not grant credits.
 
 - **Idempotency:** The same `order_id` is only credited once (stored in `credit_transactions.reference_id` with `source = 'google_play'`).
 
+- **Customer support / disputes:** For each verified Google Play purchase we store in `credit_transactions.metadata` (JSON):
+  - `purchase_token` – Required by Google Play support to look up the order; use when a user says they were charged but didn’t get credits.
+  - `purchase_time_millis` – Purchase time from Google (milliseconds since epoch) to match bank/Play order history.
+  - `product_id`, `order_id` – Redundant with `reference_id` and `description`, kept in metadata for one-place receipt data.
+
+Support can query the DB for the user’s transaction and use `purchase_token` with the [Play Developer API](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/get) or share with Google support for refund/order lookup. Do not expose `purchase_token` in user-facing APIs.
+
+---
+
+## 3b. Returning payment to the user (refunds)
+
+You don't return money from your app — **Google** does. Your app only needs to **reverse the credits** after a refund so the user doesn't keep the product.
+
+### Step 1: Refund the money (Google)
+
+- **Play Console (recommended):** [Order management](https://play.google.com/console) → find the order by **Order ID** (e.g. `GPA.1234-5678-9012-34567` — same as `credit_transactions.reference_id` for that purchase). Issue a full or partial refund. You can search by order ID or by the user's Google account email.
+- **API:** You can also call the [Google Play Developer API `orders.refund`](https://developers.google.com/android-publisher/api-ref/rest/v3/orders/refund) (needs OAuth and the order ID). Refunds are typically done from Play Console for one-off cases.
+
+### Step 2: Reverse the credits (your backend)
+
+After you've refunded in Play, deduct the credits so the user's balance matches the refund:
+
+- **Admin endpoint:** `POST /api/credits/admin/reverse-google-play-purchase`  
+  **Body:** `{ "userid": 123, "order_id": "GPA.1234-5678-9012-34567" }`  
+  **Auth:** Admin Bearer token.
+
+  The backend finds the original Google Play transaction for that user and order, deducts the same credit amount, and records a reversal transaction. If the user has already spent some of those credits, their balance can go negative (or you can fail and handle manually).
+
+- **Alternative:** If you prefer not to use the endpoint, an admin can deduct credits manually (e.g. via an "admin deduct" tool) and set the description to `Reversal for Google Play order GPA.xxx` for audit.
+
+### Summary
+
+| Step | Where | Action |
+|------|--------|--------|
+| 1. Return money | Google Play Console (or API) | Refund the order (search by order_id from your DB). |
+| 2. Reverse credits | Your backend | Call admin reverse endpoint with `userid` and `order_id`, or deduct manually and note the order_id. |
+
 ---
 
 ## 4. App: react-native-iap (implemented)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import json
 import sqlite3
 from auth import get_current_user, User
 from .credit_service import CreditService
@@ -27,6 +28,13 @@ class UpdatePromoCodeRequest(BaseModel):
     is_active: bool
 
 
+class AdminRefundRequest(BaseModel):
+    userid: int
+    transaction_id: int
+    amount: int
+    comment: Optional[str] = None
+
+
 # Product ID -> credits for Google Play in-app products (must match Play Console)
 GOOGLE_PLAY_PRODUCT_CREDITS = {
     "credits_50": 50,
@@ -37,8 +45,11 @@ GOOGLE_PLAY_PRODUCT_CREDITS = {
 GOOGLE_PLAY_SOURCE = "google_play"
 
 
-def _verify_google_play_purchase(package_name: str, product_id: str, purchase_token: str) -> dict:
-    """Verify purchase with Google Play Developer API. Returns purchase info or raises."""
+PACKAGE_NAME = "com.astroroshni.mobile"
+
+
+def _get_play_service():
+    """Build Android Publisher API service with service account credentials."""
     try:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
@@ -46,7 +57,7 @@ def _verify_google_play_purchase(package_name: str, product_id: str, purchase_to
     except ImportError:
         raise HTTPException(
             status_code=503,
-            detail="Google Play verification not configured (install google-api-python-client and google-auth).",
+            detail="Google Play not configured (install google-api-python-client and google-auth).",
         )
     credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
     if not credentials_path or not os.path.isfile(credentials_path):
@@ -56,14 +67,43 @@ def _verify_google_play_purchase(package_name: str, product_id: str, purchase_to
         )
     scopes = ["https://www.googleapis.com/auth/androidpublisher"]
     credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
-    service = build("androidpublisher", "v3", credentials=credentials)
+    return build("androidpublisher", "v3", credentials=credentials)
+
+
+def _verify_google_play_purchase(package_name: str, product_id: str, purchase_token: str) -> dict:
+    """Verify purchase with Google Play Developer API. Returns purchase info or raises."""
+    service = _get_play_service()
     request = service.purchases().products().get(
         packageName=package_name,
         productId=product_id,
         token=purchase_token,
     )
-    result = request.execute()
-    return result
+    return request.execute()
+
+
+def _refund_google_play_order(package_name: str, order_id: str):
+    """
+    Call Google Play orders.refund API. Returns (True, "Refund succeeded") on success,
+    (True, "Already refunded") if order was already refunded, (False, error_message) on failure.
+    """
+    try:
+        from googleapiclient.errors import HttpError
+    except ImportError:
+        return False, "Google API client not available"
+    try:
+        service = _get_play_service()
+        service.orders().refund(packageName=package_name, orderId=order_id).execute()
+        return True, "Refund succeeded"
+    except HttpError as e:
+        if e.resp.status in (400, 404):
+            content = (e.content or b"").decode("utf-8", errors="ignore")
+            if "refund" in content.lower() or "already" in content.lower() or e.resp.status == 404:
+                return True, "Already refunded"
+        return False, (e.content and e.content.decode("utf-8", errors="ignore")) or str(e)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return False, str(e)
 
 
 class GooglePlayVerifyRequest(BaseModel):
@@ -82,7 +122,6 @@ async def verify_google_play_purchase(
     if product_id not in GOOGLE_PLAY_PRODUCT_CREDITS:
         raise HTTPException(status_code=400, detail=f"Unknown product_id: {product_id}")
     amount = GOOGLE_PLAY_PRODUCT_CREDITS[product_id]
-    package_name = "com.astroroshni.mobile"
     order_id = (request.order_id or "").strip()
     if not order_id:
         raise HTTPException(status_code=400, detail="order_id is required")
@@ -94,7 +133,7 @@ async def verify_google_play_purchase(
 
     try:
         purchase = _verify_google_play_purchase(
-            package_name, product_id, request.purchase_token.strip()
+            PACKAGE_NAME, product_id, request.purchase_token.strip()
         )
     except HTTPException:
         raise
@@ -108,12 +147,21 @@ async def verify_google_play_purchase(
     # Acknowledge if required (some products require acknowledgement)
     # service.purchases().products().acknowledge(...)
 
+    # Store receipt details for customer support / disputes (order_id already in reference_id)
+    purchase_metadata = json.dumps({
+        "purchase_token": purchase.get("purchaseToken") or request.purchase_token.strip(),
+        "purchase_time_millis": purchase.get("purchaseTimeMillis"),
+        "product_id": product_id,
+        "order_id": order_id,
+    })
+
     credit_service.add_credits(
         current_user.userid,
         amount,
         GOOGLE_PLAY_SOURCE,
         reference_id=order_id,
         description=f"Google Play: {product_id}",
+        metadata=purchase_metadata,
     )
     return {"success": True, "message": "Credits added", "credits_added": amount}
 
@@ -300,6 +348,120 @@ async def admin_add_credits(request: dict, current_user: User = Depends(get_curr
     else:
         raise HTTPException(status_code=400, detail="Failed to add credits")
 
+
+@router.post("/admin/refund-credits")
+async def admin_refund_credits(request: AdminRefundRequest, current_user: User = Depends(get_current_user)):
+    """
+    Admin refund of credits to a user, linked to an original transaction.
+    This adds credits back (full or partial) and records a 'refund' transaction.
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Refund amount must be positive")
+
+    conn = sqlite3.connect('astrology.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT userid, amount, source, reference_id, description
+            FROM credit_transactions
+            WHERE id = ?
+            """,
+            (request.transaction_id,),
+        )
+        row = cursor.fetchone()
+        if not row or row[0] != request.userid:
+            raise HTTPException(status_code=404, detail="Original transaction not found for this user")
+
+        original_amount = row[1]
+        source = row[2]
+        reference_id = row[3]
+
+        if abs(request.amount) > abs(original_amount):
+            raise HTTPException(status_code=400, detail="Refund amount cannot exceed original transaction amount")
+
+        comment_parts = [f"Admin refund of {request.amount} credits for tx #{request.transaction_id}"]
+        if request.comment:
+            comment_parts.append(request.comment)
+        description = " - ".join(comment_parts)
+
+        # Use reference_id as feature key for refund_credits
+        feature_key = reference_id or source or "admin_refund"
+        # Close DB before calling service (it opens its own connection)
+        conn.close()
+        credit_service.refund_credits(request.userid, request.amount, feature_key, description)
+        return {"message": "Refund applied", "credits_refunded": request.amount}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@router.post("/admin/reverse-google-play-purchase")
+async def admin_reverse_google_play_purchase(request: dict, current_user: User = Depends(get_current_user)):
+    """Reverse a Google Play credit grant after you have refunded the payment in Play Console. Deducts credits and records a reversal (idempotent per order)."""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    userid = request.get("userid")
+    order_id = (request.get("order_id") or "").strip()
+    amount = request.get("amount")
+    if not userid or not order_id:
+        raise HTTPException(status_code=400, detail="userid and order_id are required")
+    success, result = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
+    if success:
+        return {"message": f"Reversed: {result} credits deducted for order {order_id}", "credits_deducted": result}
+    raise HTTPException(status_code=400, detail=result)
+
+
+@router.post("/admin/google-play-refund")
+async def admin_google_play_refund_full(request: dict, current_user: User = Depends(get_current_user)):
+    """
+    Single refund flow: (1) Refund on Google Play via API, (2) then deduct credits in our DB.
+    Idempotent: if already reversed in DB, returns success without calling Google.
+    Returns both statuses for UI: google_play, astroroshni, credits_deducted.
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    userid = request.get("userid")
+    order_id = (request.get("order_id") or "").strip()
+    amount = request.get("amount")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="order_id is required")
+    if userid is None:
+        raise HTTPException(status_code=400, detail="userid is required")
+    userid = int(userid) if not isinstance(userid, int) else userid
+
+    # Idempotent: already reversed in our DB -> return success without calling Google
+    if credit_service.is_google_play_order_reversed(userid, order_id):
+        return {
+            "google_play": "Already refunded",
+            "astroroshni": "Credits already taken back",
+            "credits_deducted": 0,
+        }
+
+    # 1) Refund on Google Play
+    gp_ok, gp_msg = _refund_google_play_order(PACKAGE_NAME, order_id)
+    if not gp_ok:
+        raise HTTPException(status_code=400, detail=f"Google Play: {gp_msg}")
+
+    # 2) Deduct credits in our DB (atomic after Google success)
+    ok, credits = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
+    if not ok:
+        raise HTTPException(
+            status_code=500,
+            detail="Google Play refund succeeded but AstroRoshni credit reversal failed. Please retry or reverse manually.",
+        )
+    return {
+        "google_play": gp_msg,
+        "astroroshni": "Credits taken back",
+        "credits_deducted": credits,
+    }
+
+
 @router.get("/admin/settings")
 async def get_credit_settings(current_user: User = Depends(get_current_user)):
     if current_user.role != 'admin':
@@ -481,6 +643,79 @@ async def get_daily_activity(
         "date": target,
         "transactions": transactions,
         "summary": {"total_earned": earned, "total_spent": spent, "count": len(transactions)},
+    }
+
+
+@router.get("/admin/search")
+async def search_credit_transactions(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    query: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Search credit transactions across all users with optional date range (YYYY-MM-DD)
+    and wildcard search on user name or phone.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from datetime import date as date_type, timedelta
+    today = date_type.today()
+
+    # Default range: last 30 days
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    else:
+        fd = today - timedelta(days=30)
+        td = today
+
+    transactions = credit_service.search_transactions(fd.isoformat(), td.isoformat(), query)
+    return {"from_date": fd.isoformat(), "to_date": td.isoformat(), "transactions": transactions}
+
+
+@router.get("/admin/google-play-transactions")
+async def get_google_play_transactions(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    query: Optional[str] = None,
+    order_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List Google Play purchases for the refund screen. Date range (YYYY-MM-DD), optional
+    wildcard on user name/phone and order_id. Default range: last 30 days.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from datetime import date as date_type, timedelta
+    today = date_type.today()
+    if from_date and to_date:
+        try:
+            fd = date_type.fromisoformat(from_date)
+            td = date_type.fromisoformat(to_date)
+            if fd > td:
+                fd, td = td, fd
+        except ValueError:
+            fd = today - timedelta(days=30)
+            td = today
+    else:
+        fd = today - timedelta(days=30)
+        td = today
+    transactions = credit_service.get_google_play_transactions(
+        fd.isoformat(), td.isoformat(), query=query, order_id_filter=order_id
+    )
+    return {
+        "from_date": fd.isoformat(),
+        "to_date": td.isoformat(),
+        "transactions": transactions,
     }
 
 

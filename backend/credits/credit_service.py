@@ -1,6 +1,7 @@
+import json
 import sqlite3
-from datetime import datetime
-from typing import Optional, Dict, List
+from datetime import datetime, date, timedelta
+from typing import Optional, Dict, List, Any
 
 class CreditService:
     def __init__(self, db_path: str = 'astrology.db'):
@@ -236,8 +237,8 @@ class CreditService:
         conn.close()
         return found
 
-    def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None) -> bool:
-        """Add credits to user account"""
+    def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:
+        """Add credits to user account. metadata: optional JSON (e.g. Google Play purchase_token, purchase_time for support)."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -251,9 +252,9 @@ class CreditService:
         
         cursor.execute("""
             INSERT INTO credit_transactions 
-            (userid, transaction_type, amount, balance_after, source, reference_id, description)
-            VALUES (?, 'earned', ?, ?, ?, ?, ?)
-        """, (userid, amount, new_balance, source, reference_id, description))
+            (userid, transaction_type, amount, balance_after, source, reference_id, description, metadata)
+            VALUES (?, 'earned', ?, ?, ?, ?, ?, ?)
+        """, (userid, amount, new_balance, source, reference_id, description, metadata))
         
         conn.commit()
         conn.close()
@@ -308,7 +309,65 @@ class CreditService:
         conn.commit()
         conn.close()
         return True
-    
+
+    def is_google_play_order_reversed(self, userid: int, order_id: str) -> bool:
+        """True if we already have a google_play_refund transaction for this user and order_id."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 1 FROM credit_transactions
+            WHERE userid = ? AND source = 'google_play_refund' AND reference_id = ?
+            LIMIT 1
+        """, (userid, order_id))
+        found = cursor.fetchone() is not None
+        conn.close()
+        return found
+
+    def reverse_google_play_purchase(self, userid: int, order_id: str, amount: Optional[int] = None):
+        """
+        Reverse a Google Play credit grant (after refund via Play API or Console).
+        Deducts amount (default: full original) and records a reversal.
+        Idempotent: returns error if order not found or already reversed.
+        Returns: (True, amount_deducted) or (False, error_message).
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT amount FROM credit_transactions
+            WHERE userid = ? AND source = 'google_play' AND reference_id = ? AND transaction_type = 'earned'
+            LIMIT 1
+        """, (userid, order_id))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False, "Order not found or not a Google Play credit transaction"
+        original_amount = row[0]
+        deduct = amount if amount is not None else original_amount
+        if deduct <= 0 or deduct > original_amount:
+            conn.close()
+            return False, "Invalid amount (must be positive and not exceed original)"
+        cursor.execute("""
+            SELECT 1 FROM credit_transactions
+            WHERE userid = ? AND source = 'google_play_refund' AND reference_id = ?
+            LIMIT 1
+        """, (userid, order_id))
+        if cursor.fetchone():
+            conn.close()
+            return False, "This order was already reversed"
+        current_balance = self.get_user_credits(userid)
+        new_balance = current_balance - deduct
+        cursor.execute("""
+            UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?
+        """, (new_balance, userid))
+        cursor.execute("""
+            INSERT INTO credit_transactions
+            (userid, transaction_type, amount, balance_after, source, reference_id, description)
+            VALUES (?, 'spent', ?, ?, 'google_play_refund', ?, ?)
+        """, (userid, -deduct, new_balance, order_id, f"Reversal: Google Play refund for order {order_id}"))
+        conn.commit()
+        conn.close()
+        return True, deduct
+
     def redeem_promo_code(self, userid: int, code: str) -> Dict:
         """Redeem promo code for credits"""
         conn = None
@@ -492,6 +551,120 @@ class CreditService:
                 "created_at": row[10],
             })
         return transactions
+
+    def search_transactions(self, from_date: str, to_date: str, query: Optional[str] = None, limit: int = 500) -> List[Dict]:
+        """
+        Search credit transactions across all users for a date range, with optional
+        wildcard search on user name or phone. Dates are YYYY-MM-DD inclusive.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        sql = """
+            SELECT ct.id, ct.userid, u.name, u.phone,
+                   ct.transaction_type, ct.amount, ct.balance_after,
+                   ct.source, ct.reference_id, ct.description, ct.created_at
+            FROM credit_transactions ct
+            LEFT JOIN users u ON u.userid = ct.userid
+            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+        """
+        params: List[Any] = [from_date, to_date]
+
+        if query:
+            like = f"%{query}%"
+            sql += " AND (u.name LIKE ? OR u.phone LIKE ?)"
+            params.extend([like, like])
+
+        sql += " ORDER BY ct.created_at DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        transactions = []
+        for row in rows:
+            transactions.append({
+                "id": row[0],
+                "userid": row[1],
+                "user_name": row[2] or "",
+                "user_phone": row[3] or "",
+                "type": row[4],
+                "amount": row[5],
+                "balance_after": row[6],
+                "source": row[7],
+                "reference_id": row[8],
+                "description": row[9],
+                "created_at": row[10],
+            })
+        return transactions
+
+    def get_google_play_transactions(
+        self,
+        from_date: str,
+        to_date: str,
+        query: Optional[str] = None,
+        order_id_filter: Optional[str] = None,
+        limit: int = 500,
+    ) -> List[Dict[str, Any]]:
+        """
+        List Google Play credit transactions (source='google_play') with user info,
+        purchase_token from metadata, and status (Credited / Reversed).
+        Reversed = exists a row with source='google_play_refund' and same userid + reference_id.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        sql = """
+            SELECT ct.id, ct.userid, u.name, u.phone,
+                   ct.reference_id, ct.amount, ct.metadata, ct.created_at
+            FROM credit_transactions ct
+            LEFT JOIN users u ON u.userid = ct.userid
+            WHERE ct.source = 'google_play'
+              AND date(ct.created_at) >= ? AND date(ct.created_at) <= ?
+        """
+        params: List[Any] = [from_date, to_date]
+        if query:
+            like = f"%{query}%"
+            sql += " AND (u.name LIKE ? OR u.phone LIKE ?)"
+            params.extend([like, like])
+        if order_id_filter and order_id_filter.strip():
+            sql += " AND ct.reference_id LIKE ?"
+            params.append(f"%{order_id_filter.strip()}%")
+        sql += " ORDER BY ct.created_at DESC LIMIT ?"
+        params.append(limit)
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        order_ids_reversed = set()
+        cursor.execute("""
+            SELECT userid, reference_id FROM credit_transactions
+            WHERE source = 'google_play_refund' AND reference_id IS NOT NULL
+        """)
+        for r in cursor.fetchall():
+            order_ids_reversed.add((r[0], r[1]))
+        conn.close()
+        out = []
+        for row in rows:
+            tx_id, userid, name, phone, order_id, amount, metadata_json, created_at = row
+            purchase_token = ""
+            if metadata_json:
+                try:
+                    meta = json.loads(metadata_json)
+                    purchase_token = meta.get("purchase_token") or ""
+                except Exception:
+                    pass
+            status = "Reversed" if (userid, order_id) in order_ids_reversed else "Credited"
+            out.append({
+                "id": tx_id,
+                "userid": userid,
+                "user_name": name or "",
+                "user_phone": phone or "",
+                "order_id": order_id or "",
+                "purchase_token": purchase_token,
+                "amount": amount,
+                "created_at": created_at,
+                "status": status,
+            })
+        return out
 
     def get_dashboard_stats(self, from_date: str, to_date: str) -> Dict:
         """
