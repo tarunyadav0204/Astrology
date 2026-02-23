@@ -183,7 +183,13 @@ const AdminGooglePlayRefund = () => {
                       <td className="token-cell" title={tx.purchase_token}>{truncateToken(tx.purchase_token)}</td>
                       <td className="amount-cell">+{tx.amount}</td>
                       <td>
-                        <span className={`status-badge status-${tx.status.toLowerCase()}`}>{tx.status}</span>
+                        <span className={`status-badge status-${tx.status.toLowerCase()}`}>
+                          {tx.status === 'Reversed' && tx.reversed_amount != null && tx.reversed_amount > 0
+                            ? tx.reversed_amount < tx.amount
+                              ? `Reversed (${tx.reversed_amount}/${tx.amount})`
+                              : 'Reversed'
+                            : tx.status}
+                        </span>
                       </td>
                       <td>
                         {tx.status === 'Credited' ? (
@@ -232,7 +238,14 @@ const AdminGooglePlayRefund = () => {
             {refundResult && (
               <div className="play-refund-statuses">
                 <p className="status-line"><span className="status-label">Google Play:</span> {refundResult.google_play}</p>
-                <p className="status-line"><span className="status-label">AstroRoshni:</span> {refundResult.astroroshni}{refundResult.credits_deducted != null && refundResult.credits_deducted > 0 ? ` (${refundResult.credits_deducted} credits)` : ''}</p>
+                <p className="status-line">
+                  <span className="status-label">AstroRoshni:</span>{' '}
+                  {refundResult.credits_deducted != null && refundResult.credits_deducted > 0
+                    ? (refundResult.original_amount != null && refundResult.credits_deducted < refundResult.original_amount
+                        ? `Partially reversed: ${refundResult.credits_deducted} of ${refundResult.original_amount} credits taken back`
+                        : `${refundResult.astroroshni} (${refundResult.credits_deducted} credits)`)
+                    : refundResult.astroroshni}
+                </p>
               </div>
             )}
             <div className="play-refund-modal-actions">

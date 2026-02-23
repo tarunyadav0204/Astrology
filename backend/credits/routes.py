@@ -411,10 +411,10 @@ async def admin_reverse_google_play_purchase(request: dict, current_user: User =
     amount = request.get("amount")
     if not userid or not order_id:
         raise HTTPException(status_code=400, detail="userid and order_id are required")
-    success, result = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
+    success, deduct_or_msg, _ = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
     if success:
-        return {"message": f"Reversed: {result} credits deducted for order {order_id}", "credits_deducted": result}
-    raise HTTPException(status_code=400, detail=result)
+        return {"message": f"Reversed: {deduct_or_msg} credits deducted for order {order_id}", "credits_deducted": deduct_or_msg}
+    raise HTTPException(status_code=400, detail=deduct_or_msg)
 
 
 @router.post("/admin/google-play-refund")
@@ -449,7 +449,7 @@ async def admin_google_play_refund_full(request: dict, current_user: User = Depe
         raise HTTPException(status_code=400, detail=f"Google Play: {gp_msg}")
 
     # 2) Deduct credits in our DB (atomic after Google success)
-    ok, credits = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
+    ok, credits, original_amount = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
     if not ok:
         raise HTTPException(
             status_code=500,
@@ -459,6 +459,7 @@ async def admin_google_play_refund_full(request: dict, current_user: User = Depe
         "google_play": gp_msg,
         "astroroshni": "Credits taken back",
         "credits_deducted": credits,
+        "original_amount": original_amount,
     }
 
 

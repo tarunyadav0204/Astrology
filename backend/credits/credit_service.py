@@ -328,7 +328,7 @@ class CreditService:
         Reverse a Google Play credit grant (after refund via Play API or Console).
         Deducts amount (default: full original) and records a reversal.
         Idempotent: returns error if order not found or already reversed.
-        Returns: (True, amount_deducted) or (False, error_message).
+        Returns: (True, amount_deducted, original_amount) or (False, error_message, None).
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -340,12 +340,12 @@ class CreditService:
         row = cursor.fetchone()
         if not row:
             conn.close()
-            return False, "Order not found or not a Google Play credit transaction"
+            return False, "Order not found or not a Google Play credit transaction", None
         original_amount = row[0]
         deduct = amount if amount is not None else original_amount
         if deduct <= 0 or deduct > original_amount:
             conn.close()
-            return False, "Invalid amount (must be positive and not exceed original)"
+            return False, "Invalid amount (must be positive and not exceed original)", None
         cursor.execute("""
             SELECT 1 FROM credit_transactions
             WHERE userid = ? AND source = 'google_play_refund' AND reference_id = ?
@@ -353,7 +353,7 @@ class CreditService:
         """, (userid, order_id))
         if cursor.fetchone():
             conn.close()
-            return False, "This order was already reversed"
+            return False, "This order was already reversed", None
         current_balance = self.get_user_credits(userid)
         new_balance = current_balance - deduct
         cursor.execute("""
@@ -366,7 +366,7 @@ class CreditService:
         """, (userid, -deduct, new_balance, order_id, f"Reversal: Google Play refund for order {order_id}"))
         conn.commit()
         conn.close()
-        return True, deduct
+        return True, deduct, original_amount
 
     def redeem_promo_code(self, userid: int, code: str) -> Dict:
         """Redeem promo code for credits"""
@@ -634,13 +634,15 @@ class CreditService:
         params.append(limit)
         cursor.execute(sql, params)
         rows = cursor.fetchall()
-        order_ids_reversed = set()
+        # (userid, order_id) -> total reversed amount (for partial display)
+        reversed_amounts = {}
         cursor.execute("""
-            SELECT userid, reference_id FROM credit_transactions
+            SELECT userid, reference_id, SUM(ABS(amount)) FROM credit_transactions
             WHERE source = 'google_play_refund' AND reference_id IS NOT NULL
+            GROUP BY userid, reference_id
         """)
         for r in cursor.fetchall():
-            order_ids_reversed.add((r[0], r[1]))
+            reversed_amounts[(r[0], r[1])] = r[2]
         conn.close()
         out = []
         for row in rows:
@@ -652,7 +654,9 @@ class CreditService:
                     purchase_token = meta.get("purchase_token") or ""
                 except Exception:
                     pass
-            status = "Reversed" if (userid, order_id) in order_ids_reversed else "Credited"
+            key = (userid, order_id)
+            reversed_amt = reversed_amounts.get(key, 0)
+            status = "Reversed" if reversed_amt else "Credited"
             out.append({
                 "id": tx_id,
                 "userid": userid,
@@ -663,6 +667,7 @@ class CreditService:
                 "amount": amount,
                 "created_at": created_at,
                 "status": status,
+                "reversed_amount": reversed_amt if reversed_amt else None,
             })
         return out
 
