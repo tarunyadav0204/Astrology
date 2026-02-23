@@ -32,6 +32,18 @@ const GOOGLE_PLAY_PRODUCTS = [
   { id: 'credits_500', credits: 500, label: '500 Credits' },
 ];
 
+const PRODUCT_IDS = GOOGLE_PLAY_PRODUCTS.map((p) => p.id);
+
+// Lazy-load IAP only on Android to avoid iOS/build issues
+let RNIap = null;
+if (Platform.OS === 'android') {
+  try {
+    RNIap = require('react-native-iap');
+  } catch (e) {
+    console.warn('react-native-iap not available:', e?.message);
+  }
+}
+
 const CreditScreen = ({ navigation }) => {
   useAnalytics('CreditScreen');
   const { theme, colors } = useTheme();
@@ -42,10 +54,29 @@ const CreditScreen = ({ navigation }) => {
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState(null);
+  const [iapReady, setIapReady] = useState(false);
+  const purchaseListenerRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollViewRef = useRef(null);
+
+  /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
+  const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
+    if (!purchaseToken || !productId || !orderId) return;
+    setPurchasingProductId(productId);
+    try {
+      const { data } = await creditAPI.verifyGooglePlayPurchase(purchaseToken, productId, orderId);
+      await fetchBalance();
+      await fetchHistory();
+      Alert.alert('Success', data.message + (data.credits_added ? ` ${data.credits_added} credits added.` : ''));
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Failed to add credits';
+      Alert.alert('Purchase verification failed', msg);
+    } finally {
+      setPurchasingProductId(null);
+    }
+  };
 
   useEffect(() => {
     fetchHistory();
@@ -88,6 +119,56 @@ const CreditScreen = ({ navigation }) => {
     
     return unsubscribe;
   }, [navigation]);
+
+  // Google Play IAP: init connection and purchase listener (Android only)
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !RNIap) return;
+    let mounted = true;
+    const initIap = async () => {
+      try {
+        await RNIap.initConnection();
+        if (!mounted) return;
+        await RNIap.flushFailedPurchasesCachedAsPendingAndroid?.();
+        await RNIap.getProducts({ skus: PRODUCT_IDS });
+        if (!mounted) return;
+        setIapReady(true);
+      } catch (e) {
+        if (mounted) setIapReady(false);
+        console.warn('IAP init failed:', e?.message);
+      }
+    };
+    initIap();
+    const updateSub = RNIap.purchaseUpdatedListener(async (purchase) => {
+      try {
+        const token = purchase.purchaseToken ?? purchase.purchaseTokenAndroid;
+        const productId = purchase.productId ?? purchase.productIds?.[0];
+        const orderId = purchase.transactionId ?? purchase.transactionIdAndroid ?? purchase.purchaseToken;
+        if (token && productId && orderId) {
+          await handleGooglePlayPurchaseSuccess(token, productId, orderId);
+          await RNIap.finishTransaction({ purchase, isConsumable: true });
+        }
+      } catch (e) {
+        console.warn('Purchase listener error:', e?.message);
+      }
+    });
+    const errorSub = RNIap.purchaseErrorListener?.((error) => {
+      setPurchasingProductId(null);
+      if (error?.code !== 'E_USER_CANCELLED') {
+        console.warn('Purchase error:', error?.message);
+      }
+    });
+    purchaseListenerRef.current = { updateSub, errorSub };
+    return () => {
+      mounted = false;
+      try {
+        updateSub?.remove?.();
+        errorSub?.remove?.();
+        RNIap.endConnection?.();
+      } catch (e) {
+        console.warn('IAP cleanup:', e?.message);
+      }
+    };
+  }, []);
 
   const fetchHistory = async () => {
     try {
@@ -155,32 +236,25 @@ const CreditScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
-  const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
-    if (!purchaseToken || !productId || !orderId) return;
-    setPurchasingProductId(productId);
+  const handleBuyCreditsPress = async (product) => {
+    if (Platform.OS !== 'android') return;
+    if (!RNIap) {
+      Alert.alert('Not available', 'In-app purchase is not available on this device.');
+      return;
+    }
+    if (!iapReady) {
+      Alert.alert('Loading…', 'Store is loading. Please try again in a moment.');
+      return;
+    }
+    setPurchasingProductId(product.id);
     try {
-      const { data } = await creditAPI.verifyGooglePlayPurchase(purchaseToken, productId, orderId);
-      await fetchBalance();
-      await fetchHistory();
-      Alert.alert('Success', data.message + (data.credits_added ? ` ${data.credits_added} credits added.` : ''));
-    } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to add credits';
-      Alert.alert('Purchase verification failed', msg);
-    } finally {
+      await RNIap.requestPurchase({ skus: [product.id] });
+    } catch (e) {
+      if (e?.code !== 'E_USER_CANCELLED') {
+        Alert.alert('Purchase failed', e?.message ?? 'Could not start purchase. Try again.');
+      }
       setPurchasingProductId(null);
     }
-  };
-
-  const handleBuyCreditsPress = (product) => {
-    if (Platform.OS !== 'android') return;
-    // When react-native-iap is integrated: init connection, requestPurchase(product.id), then in
-    // purchaseUpdatedListener call handleGooglePlayPurchaseSuccess(purchase.purchaseToken, productId, orderId).
-    Alert.alert(
-      'Buy credits',
-      `To enable in-app purchase for ${product.label}, set up Google Play Billing and link react-native-iap. See docs/GOOGLE_PLAY_CREDITS_BILLING.md in the repo.`,
-      [{ text: 'OK' }]
-    );
   };
 
 

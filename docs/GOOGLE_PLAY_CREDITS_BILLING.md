@@ -54,33 +54,21 @@ Without this, the verify endpoint returns 503 and does not grant credits.
 
 ---
 
-## 4. App: wiring react-native-iap (optional)
+## 4. App: react-native-iap (implemented)
 
-The Credit screen already has:
+The Credit screen is wired for in-app purchases on Android:
 
-- A **Buy credits** section (Android only) with product tiles.
-- **`handleGooglePlayPurchaseSuccess(purchaseToken, productId, orderId)`** — call this after a successful purchase; it calls the verify API and refreshes balance/history.
+- **Buy credits** section shows product tiles (50, 100, 250, 500 credits).
+- On load: `initConnection()`, `flushFailedPurchasesCachedAsPendingAndroid()`, `getProducts()`, and `purchaseUpdatedListener` / `purchaseErrorListener` are set up.
+- When the user taps **Buy**, `requestPurchase({ sku: productId })` runs. On success, the listener calls the backend verify API, then `finishTransaction({ purchase, isConsumable: true })`, and refreshes balance/history.
 
-To complete the flow with real purchases:
+**You must rebuild the native app** (IAP does not work in Expo Go):
 
-1. **Install** [react-native-iap](https://github.com/dooboolab-community/react-native-iap):
-   ```bash
-   cd astroroshni_mobile && npx expo install react-native-iap
-   ```
-   Rebuild the native app (`expo run:android` or EAS build); IAP does not work in Expo Go.
+```bash
+cd astroroshni_mobile && npx expo run:android
+```
 
-2. **Product IDs:** Use the same IDs as in Play Console and backend: `credits_50`, `credits_100`, `credits_250`, `credits_500`.
-
-3. **Flow:**
-   - On Credit screen load (Android), optionally init the IAP connection and fetch product details (e.g. prices) with `getProducts()`.
-   - When the user taps **Buy** on a product, call `requestPurchase()` (or the equivalent in your react-native-iap version) with that product ID.
-   - In the purchase success listener (e.g. `purchaseUpdatedListener`), read `purchaseToken`, `productId`, and `orderId` from the purchase object, then call:
-     ```js
-     handleGooglePlayPurchaseSuccess(purchaseToken, productId, orderId);
-     ```
-   - After the backend returns success, call `finishTransaction()` if your IAP library requires it (consumables).
-
-4. **CreditScreen.js** currently shows an alert when **Buy** is pressed, pointing to this doc. Replace that with the IAP init + `requestPurchase` and, in the listener, call `handleGooglePlayPurchaseSuccess` as above.
+Or create a new AAB with EAS and upload to Internal testing / Production.
 
 ---
 
@@ -101,4 +89,4 @@ To complete the flow with real purchases:
 | Google Cloud | Enable Play Developer API; create service account; download JSON key. |
 | Play Console | Invite service account with “View financial data” (and read app info). |
 | Backend | Set `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` to the JSON key path; install `google-api-python-client` and `google-auth`. |
-| App | Optionally add `react-native-iap`, then on purchase success call `handleGooglePlayPurchaseSuccess(purchaseToken, productId, orderId)` and refresh balance/history. |
+| App | `react-native-iap` is integrated; rebuild with `expo run:android` or EAS. |

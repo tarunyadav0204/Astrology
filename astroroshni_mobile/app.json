@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.astroroshni.mobile",
-      "buildNumber": "72",
+      "buildNumber": "73",
       "deploymentTarget": "15.1",
       "newArchEnabled": false,
       "bitcode": false,
@@ -37,7 +37,7 @@
         "backgroundColor": "#f97316"
       },
       "package": "com.astroroshni.mobile",
-      "versionCode": 72,
+      "versionCode": 73,
       "newArchEnabled": false,
       "googleServicesFile": "./android/app/google-services.json",
       "permissions": ["com.android.vending.BILLING"]

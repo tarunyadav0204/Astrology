@@ -59,6 +59,9 @@ source venv/bin/activate
 # Create logs directory if it doesn't exist
 mkdir -p ../logs
 
+# Google Play billing verification (service account JSON path on server)
+export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-/home/tarun_yadav/play-billing-key.json}"
+
 # Start backend with better error handling
 echo "Starting backend..."
 nohup python main.py > ../logs/backend.log 2>&1 &
