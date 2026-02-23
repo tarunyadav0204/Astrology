@@ -47,12 +47,12 @@ const getApiUrl = () => {
     if (Platform.OS === 'ios') return 'http://localhost:8001';
     if (Platform.OS === 'android') return 'http://10.0.2.2:8001';
   }
-  if (Platform.OS === 'ios') {
-    return 'http://localhost:8001';
-  } else {
-    return 'http://10.0.2.2:8001';
-  }
-  // return 'https://astroroshni.com';
+  // if (Platform.OS === 'ios') {
+  //   return 'http://localhost:8001';
+  // } else {
+  //   return 'http://10.0.2.2:8001';
+  // }
+  return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();

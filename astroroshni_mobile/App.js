@@ -50,11 +50,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
-import {
-  registerPushTokenIfLoggedIn,
-  setupNotificationHandler,
-  setupNotificationResponseListener,
-} from './src/services/pushNotifications';
+// Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
 
@@ -141,33 +137,50 @@ export default function App() {
     }
   };
 
-  // When app is ready and user is logged in, register push token; retry on foreground and once after delay
+  // When app is ready and user is logged in, register push token; retry on foreground and once after delay.
+  // On iOS skip loading the notification module entirely to avoid native crash on device (expo-notifications
+  // and/or expo-device can crash when entitlements/APNs config is wrong). Android unchanged.
+  const skipPushOnIos = Platform.OS === 'ios';
   useEffect(() => {
     if (isLoading) return;
+    if (skipPushOnIos) {
+      if (__DEV__) console.warn('[App] Push notifications skipped on iOS (crash workaround).');
+      return;
+    }
+    let notifCleanupRef = null;
+    const deferMs = Platform.OS === 'ios' ? 800 : 100;
+    const notifSetupTimer = setTimeout(() => {
+      try {
+        const pushNotifications = require('./src/services/pushNotifications');
+        pushNotifications.setupNotificationHandler();
+        const cleanup = pushNotifications.setupNotificationResponseListener(navigationRef);
+        if (typeof cleanup === 'function') notifCleanupRef = cleanup;
+      } catch (e) {
+        if (__DEV__) console.warn('[App] Notification setup failed (non-fatal):', e?.message || e);
+      }
+    }, deferMs);
     const tryRegisterPush = async () => {
-      const token = await storage.getAuthToken();
-      if (token) await registerPushTokenIfLoggedIn();
+      try {
+        const token = await storage.getAuthToken();
+        if (!token) return;
+        const pushNotifications = require('./src/services/pushNotifications');
+        await pushNotifications.registerPushTokenIfLoggedIn();
+      } catch (e) {
+        if (__DEV__) console.warn('[App] registerPushToken failed:', e?.message || e);
+      }
     };
     tryRegisterPush();
     const delayed = setTimeout(tryRegisterPush, 3000);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') tryRegisterPush();
     });
-    // Defer notification setup so native bridge is ready (avoids iOS launch crash)
-    const notifCleanupRef = { current: null };
-    const deferMs = Platform.OS === 'ios' ? 500 : 0;
-    const notifSetupTimer = setTimeout(() => {
-      setupNotificationHandler();
-      const cleanup = setupNotificationResponseListener(navigationRef);
-      if (typeof cleanup === 'function') notifCleanupRef.current = cleanup;
-    }, deferMs);
     return () => {
       clearTimeout(delayed);
       clearTimeout(notifSetupTimer);
       sub?.remove?.();
-      if (typeof notifCleanupRef.current === 'function') notifCleanupRef.current();
+      if (typeof notifCleanupRef === 'function') notifCleanupRef();
     };
-  }, [isLoading]);
+  }, [isLoading, skipPushOnIos]);
 
   if (isLoading) {
     return <SplashScreen />;

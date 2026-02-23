@@ -18,7 +18,6 @@ import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
 import { storage } from '../../../services/storage';
 import { useCredits } from '../../../credits/CreditContext';
-import { registerPushTokenIfLoggedIn } from '../../../services/pushNotifications';
 
 export default function PasswordScreen({ 
   formData, 
@@ -109,7 +108,12 @@ export default function PasswordScreen({
         await storage.setAuthToken(response.data.access_token);
         await storage.setUserData(response.data.user);
         await refreshCredits();
-        registerPushTokenIfLoggedIn();
+        if (Platform.OS !== 'ios') {
+          try {
+            const { registerPushTokenIfLoggedIn } = require('../../../services/pushNotifications');
+            registerPushTokenIfLoggedIn();
+          } catch (_) {}
+        }
 
         // Navigate based on self_birth_chart
         if (response.data.self_birth_chart) {

@@ -24,6 +24,14 @@ import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
+// Product IDs for Google Play (must match Play Console and backend GOOGLE_PLAY_PRODUCT_CREDITS)
+const GOOGLE_PLAY_PRODUCTS = [
+  { id: 'credits_50', credits: 50, label: '50 Credits' },
+  { id: 'credits_100', credits: 100, label: '100 Credits' },
+  { id: 'credits_250', credits: 250, label: '250 Credits' },
+  { id: 'credits_500', credits: 500, label: '500 Credits' },
+];
+
 const CreditScreen = ({ navigation }) => {
   useAnalytics('CreditScreen');
   const { theme, colors } = useTheme();
@@ -33,6 +41,7 @@ const CreditScreen = ({ navigation }) => {
   const [redeeming, setRedeeming] = useState(false);
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [purchasingProductId, setPurchasingProductId] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -144,6 +153,34 @@ const CreditScreen = ({ navigation }) => {
     setRefreshing(true);
     await Promise.all([fetchBalance(), fetchHistory()]);
     setRefreshing(false);
+  };
+
+  /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
+  const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
+    if (!purchaseToken || !productId || !orderId) return;
+    setPurchasingProductId(productId);
+    try {
+      const { data } = await creditAPI.verifyGooglePlayPurchase(purchaseToken, productId, orderId);
+      await fetchBalance();
+      await fetchHistory();
+      Alert.alert('Success', data.message + (data.credits_added ? ` ${data.credits_added} credits added.` : ''));
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Failed to add credits';
+      Alert.alert('Purchase verification failed', msg);
+    } finally {
+      setPurchasingProductId(null);
+    }
+  };
+
+  const handleBuyCreditsPress = (product) => {
+    if (Platform.OS !== 'android') return;
+    // When react-native-iap is integrated: init connection, requestPurchase(product.id), then in
+    // purchaseUpdatedListener call handleGooglePlayPurchaseSuccess(purchase.purchaseToken, productId, orderId).
+    Alert.alert(
+      'Buy credits',
+      `To enable in-app purchase for ${product.label}, set up Google Play Billing and link react-native-iap. See docs/GOOGLE_PLAY_CREDITS_BILLING.md in the repo.`,
+      [{ text: 'OK' }]
+    );
   };
 
 
@@ -311,6 +348,31 @@ const CreditScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Buy credits (Google Play) - Android only */}
+            {Platform.OS === 'android' && (
+              <View style={styles.buySection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy Credits</Text>
+                <View style={styles.buyProductGrid}>
+                  {GOOGLE_PLAY_PRODUCTS.map((product) => (
+                    <TouchableOpacity
+                      key={product.id}
+                      style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
+                      onPress={() => handleBuyCreditsPress(product)}
+                      disabled={purchasingProductId === product.id}
+                    >
+                      <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.label}</Text>
+                      <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{product.credits} credits</Text>
+                      <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.buyProductButtonText}>
+                          {purchasingProductId === product.id ? 'Processing…' : 'Buy'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Request Credits Section */}
             <View style={styles.requestSection}>
@@ -506,6 +568,40 @@ const styles = StyleSheet.create({
   promoSection: {
     paddingHorizontal: 20,
     marginBottom: 20,
+  },
+  buySection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  buyProductGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  buyProductCard: {
+    width: (width - 52) / 2 - 6,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  buyProductLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  buyProductCredits: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  buyProductButton: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  buyProductButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   requestSection: {
     paddingHorizontal: 20,

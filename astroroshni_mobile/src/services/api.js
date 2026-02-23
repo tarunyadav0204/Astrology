@@ -341,6 +341,12 @@ export const creditAPI = {
   requestCredits: (amount, reason) => 
     api.post(getEndpoint('/credits/request'), { amount, reason }),
   getMyRequests: () => api.get(getEndpoint('/credits/requests/my')),
+  verifyGooglePlayPurchase: (purchaseToken, productId, orderId) =>
+    api.post(getEndpoint('/credits/google-play/verify'), {
+      purchase_token: purchaseToken,
+      product_id: productId,
+      order_id: orderId,
+    }),
 };
 
 export const panchangAPI = {

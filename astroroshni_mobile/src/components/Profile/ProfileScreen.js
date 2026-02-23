@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   Linking,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -23,7 +24,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../locales/i18n';
-import { registerPushTokenIfLoggedIn } from '../../services/pushNotifications';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NorthIndianChart from '../Chart/NorthIndianChart';
 
@@ -519,23 +519,31 @@ export default function ProfileScreen({ navigation }) {
                   style={styles.settingItem}
                   disabled={pushSyncing}
                   onPress={async () => {
+                    if (Platform.OS === 'ios') {
+                      Alert.alert('Notifications', 'Push notifications are temporarily unavailable on iOS.');
+                      return;
+                    }
                     setPushSyncing(true);
-                    const result = await registerPushTokenIfLoggedIn();
-                    setPushSyncing(false);
-                    if (result.ok) {
-                      Alert.alert('Notifications', result.message);
-                    } else {
-                      const isDenied = result.message.includes('Settings');
-                      Alert.alert(
-                        'Notifications',
-                        result.message,
-                        isDenied
-                          ? [
-                              { text: 'OK', style: 'cancel' },
-                              { text: 'Open Settings', onPress: () => Linking.openSettings() },
-                            ]
-                          : [{ text: 'OK' }]
-                      );
+                    try {
+                      const { registerPushTokenIfLoggedIn } = require('../../services/pushNotifications');
+                      const result = await registerPushTokenIfLoggedIn();
+                      if (result.ok) {
+                        Alert.alert('Notifications', result.message);
+                      } else {
+                        const isDenied = result.message.includes('Settings');
+                        Alert.alert(
+                          'Notifications',
+                          result.message,
+                          isDenied
+                            ? [
+                                { text: 'OK', style: 'cancel' },
+                                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+                              ]
+                            : [{ text: 'OK' }]
+                        );
+                      }
+                    } finally {
+                      setPushSyncing(false);
                     }
                   }}
                 >

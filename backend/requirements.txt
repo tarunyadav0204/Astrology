@@ -17,3 +17,6 @@ timezonefinder==6.2.0
 google-cloud-storage==2.10.0
 Pillow==10.0.1
 replicate==0.15.4
+# Optional: for Google Play in-app purchase verification
+google-api-python-client==2.108.0
+google-auth==2.25.2

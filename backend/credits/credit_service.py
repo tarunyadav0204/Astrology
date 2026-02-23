@@ -222,6 +222,20 @@ class CreditService:
         conn.close()
         return result[0] if result else 0
     
+    def has_transaction_with_reference(self, userid: int, source: str, reference_id: str) -> bool:
+        """Return True if a transaction already exists with this source and reference_id (for idempotency)."""
+        if not reference_id:
+            return False
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM credit_transactions WHERE userid = ? AND source = ? AND reference_id = ? LIMIT 1",
+            (userid, source, reference_id),
+        )
+        found = cursor.fetchone() is not None
+        conn.close()
+        return found
+
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None) -> bool:
         """Add credits to user account"""
         conn = sqlite3.connect(self.db_path)

@@ -128,7 +128,8 @@ export async function registerPushTokenIfLoggedIn() {
  * opening chat so the question is answered for the correct chart.
  */
 export function setupNotificationResponseListener(navigationRef) {
-  const sub = Notifications.addNotificationResponseReceivedListener(async (response) => {
+  try {
+    const sub = Notifications.addNotificationResponseReceivedListener(async (response) => {
     const data = response.notification.request.content?.data;
     const cta = data?.cta;
     const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
@@ -154,5 +155,13 @@ export function setupNotificationResponseListener(navigationRef) {
       // ignore
     }
   });
-  return () => Notifications.removeNotificationSubscription(sub);
+    return () => {
+      try {
+        Notifications.removeNotificationSubscription(sub);
+      } catch (_) {}
+    };
+  } catch (e) {
+    if (__DEV__) console.warn('[Push] setupNotificationResponseListener failed:', e?.message);
+    return () => {};
+  }
 }

@@ -26,6 +26,98 @@ class UpdatePromoCodeRequest(BaseModel):
     max_uses_per_user: int
     is_active: bool
 
+
+# Product ID -> credits for Google Play in-app products (must match Play Console)
+GOOGLE_PLAY_PRODUCT_CREDITS = {
+    "credits_50": 50,
+    "credits_100": 100,
+    "credits_250": 250,
+    "credits_500": 500,
+}
+GOOGLE_PLAY_SOURCE = "google_play"
+
+
+def _verify_google_play_purchase(package_name: str, product_id: str, purchase_token: str) -> dict:
+    """Verify purchase with Google Play Developer API. Returns purchase info or raises."""
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        import os
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Google Play verification not configured (install google-api-python-client and google-auth).",
+        )
+    credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+    if not credentials_path or not os.path.isfile(credentials_path):
+        raise HTTPException(
+            status_code=503,
+            detail="Google Play service account JSON not configured (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON).",
+        )
+    scopes = ["https://www.googleapis.com/auth/androidpublisher"]
+    credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
+    service = build("androidpublisher", "v3", credentials=credentials)
+    request = service.purchases().products().get(
+        packageName=package_name,
+        productId=product_id,
+        token=purchase_token,
+    )
+    result = request.execute()
+    return result
+
+
+class GooglePlayVerifyRequest(BaseModel):
+    purchase_token: str
+    product_id: str
+    order_id: str
+
+
+@router.post("/google-play/verify")
+async def verify_google_play_purchase(
+    request: GooglePlayVerifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Verify a Google Play in-app purchase and grant credits. Idempotent by order_id."""
+    product_id = request.product_id.strip()
+    if product_id not in GOOGLE_PLAY_PRODUCT_CREDITS:
+        raise HTTPException(status_code=400, detail=f"Unknown product_id: {product_id}")
+    amount = GOOGLE_PLAY_PRODUCT_CREDITS[product_id]
+    package_name = "com.astroroshni.mobile"
+    order_id = (request.order_id or "").strip()
+    if not order_id:
+        raise HTTPException(status_code=400, detail="order_id is required")
+    if not request.purchase_token.strip():
+        raise HTTPException(status_code=400, detail="purchase_token is required")
+
+    if credit_service.has_transaction_with_reference(current_user.userid, GOOGLE_PLAY_SOURCE, order_id):
+        return {"success": True, "message": "Already credited", "credits_added": 0}
+
+    try:
+        purchase = _verify_google_play_purchase(
+            package_name, product_id, request.purchase_token.strip()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {str(e)}")
+
+    purchase_state = purchase.get("purchaseState")
+    if purchase_state != 0:  # 0 = Purchased
+        raise HTTPException(status_code=400, detail="Purchase not in completed state")
+    # Optional: check consumptionState if you use consumables (1 = consumed, 0 = yet to consume)
+    # Acknowledge if required (some products require acknowledgement)
+    # service.purchases().products().acknowledge(...)
+
+    credit_service.add_credits(
+        current_user.userid,
+        amount,
+        GOOGLE_PLAY_SOURCE,
+        reference_id=order_id,
+        description=f"Google Play: {product_id}",
+    )
+    return {"success": True, "message": "Credits added", "credits_added": amount}
+
+
 @router.get("/balance")
 async def get_credit_balance(current_user: User = Depends(get_current_user)):
     balance = credit_service.get_user_credits(current_user.userid)
