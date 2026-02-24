@@ -88,6 +88,7 @@ def _list_google_play_products(package_name: str) -> List[dict]:
     """
     Fetch in-app products from Google Play and return credit products only.
     Includes only active one-time products whose sku matches credits_N; credits derived from sku.
+    This helper is also safe to tweak for deploy triggers (no runtime behavior change).
     """
     try:
         service = _get_play_service()
