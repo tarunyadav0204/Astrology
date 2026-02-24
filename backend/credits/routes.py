@@ -134,11 +134,28 @@ def _list_google_play_products(package_name: str) -> List[dict]:
                 credits = _credits_from_product_id(sku)
                 if credits is None:
                     continue
-                listings = p.get("listings") or {}
+
+                # listings can be either a dict keyed by language, or a list of objects
+                listings = p.get("listings") or []
                 default_lang = p.get("defaultLanguage") or "en-US"
-                listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
-                title = (listing.get("title") or sku) if listing else sku
-                description = (listing.get("description") or "") if listing else ""
+                listing = None
+                if isinstance(listings, dict):
+                    listing = (
+                        listings.get(default_lang)
+                        or listings.get("en-US")
+                        or (next(iter(listings.values()), None) if listings else None)
+                    )
+                elif isinstance(listings, list):
+                    # Try to find the default language entry; otherwise take the first
+                    listing = next(
+                        (l for l in listings if isinstance(l, dict) and l.get("languageCode") == default_lang),
+                        None,
+                    )
+                    if listing is None and listings:
+                        listing = listings[0]
+
+                title = (listing.get("title") or sku) if isinstance(listing, dict) else sku
+                description = (listing.get("description") or "") if isinstance(listing, dict) else ""
                 # Price lives under purchaseOptions; we don't need it for now, so just send placeholders.
                 all_products.append({
                     "product_id": sku,
