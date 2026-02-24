@@ -347,6 +347,7 @@ export const creditAPI = {
       product_id: productId,
       order_id: orderId,
     }),
+  getGooglePlayProducts: () => api.get(getEndpoint('/credits/google-play/products')),
 };
 
 export const panchangAPI = {

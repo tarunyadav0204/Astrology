@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import json
+import re
 import sqlite3
 from auth import get_current_user, User
 from .credit_service import CreditService
@@ -10,6 +11,9 @@ from .admin.promo_manager import PromoCodeManager
 router = APIRouter()
 credit_service = CreditService()
 promo_manager = PromoCodeManager()
+
+# Product ID convention for credit packs: credits_N -> N credits (used when fetching from Play or when no map)
+CREDITS_PRODUCT_PATTERN = re.compile(r"^credits_(\d+)$")
 
 class PromoCodeRequest(BaseModel):
     code: str
@@ -35,13 +39,6 @@ class AdminRefundRequest(BaseModel):
     comment: Optional[str] = None
 
 
-# Product ID -> credits for Google Play in-app products (must match Play Console)
-GOOGLE_PLAY_PRODUCT_CREDITS = {
-    "credits_50": 50,
-    "credits_100": 100,
-    "credits_250": 250,
-    "credits_500": 500,
-}
 GOOGLE_PLAY_SOURCE = "google_play"
 
 
@@ -81,6 +78,64 @@ def _verify_google_play_purchase(package_name: str, product_id: str, purchase_to
     return request.execute()
 
 
+def _credits_from_product_id(product_id: str) -> Optional[int]:
+    """Parse product_id per convention credits_N -> N. Returns None if not a credit product."""
+    m = CREDITS_PRODUCT_PATTERN.match((product_id or "").strip())
+    return int(m.group(1)) if m else None
+
+
+def _list_google_play_products(package_name: str) -> List[dict]:
+    """
+    Fetch in-app products from Google Play and return credit products only.
+    Includes only active one-time products whose sku matches credits_N; credits derived from sku.
+    """
+    try:
+        service = _get_play_service()
+        all_products = []
+        token = None
+        while True:
+            request = service.inappproducts().list(packageName=package_name, token=token)
+            resp = request.execute()
+            inappproduct_list = resp.get("inappproduct") or []
+            for p in inappproduct_list:
+                sku = (p.get("sku") or "").strip()
+                status = (p.get("status") or "").lower()
+                purchase_type = (p.get("purchaseType") or "").lower()
+                if status != "active":
+                    continue
+                # One-time managed product (not subscription)
+                if purchase_type not in ("manageduser", "purchasetypeunspecified", ""):
+                    continue
+                credits = _credits_from_product_id(sku)
+                if credits is None:
+                    continue
+                default_price = p.get("defaultPrice") or {}
+                price_micros = default_price.get("priceMicros")
+                price_micros = str(price_micros) if price_micros is not None else "0"
+                price_currency = default_price.get("currency") or "USD"
+                listings = p.get("listings") or {}
+                default_lang = p.get("defaultLanguage") or "en-US"
+                listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
+                title = (listing.get("title") or sku) if listing else sku
+                description = (listing.get("description") or "") if listing else ""
+                all_products.append({
+                    "product_id": sku,
+                    "credits": credits,
+                    "title": title,
+                    "description": description,
+                    "price_micros": price_micros,
+                    "price_currency": price_currency,
+                })
+            token = (resp.get("tokenPagination") or {}).get("nextPageToken")
+            if not token:
+                break
+        return sorted(all_products, key=lambda x: x["credits"])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to list Google Play products: {str(e)}")
+
+
 def _refund_google_play_order(package_name: str, order_id: str):
     """
     Call Google Play orders.refund API. Returns (True, "Refund succeeded") on success,
@@ -112,16 +167,28 @@ class GooglePlayVerifyRequest(BaseModel):
     order_id: str
 
 
+@router.get("/google-play/products")
+async def get_google_play_products(current_user: User = Depends(get_current_user)):
+    """List credit products from Google Play (active in-app products with id convention credits_N)."""
+    try:
+        products = _list_google_play_products(PACKAGE_NAME)
+        return {"products": products}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to fetch products: {str(e)}")
+
+
 @router.post("/google-play/verify")
 async def verify_google_play_purchase(
     request: GooglePlayVerifyRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Verify a Google Play in-app purchase and grant credits. Idempotent by order_id."""
+    """Verify a Google Play in-app purchase and grant credits. Idempotent by order_id. Product ID must follow credits_N convention."""
     product_id = request.product_id.strip()
-    if product_id not in GOOGLE_PLAY_PRODUCT_CREDITS:
-        raise HTTPException(status_code=400, detail=f"Unknown product_id: {product_id}")
-    amount = GOOGLE_PLAY_PRODUCT_CREDITS[product_id]
+    amount = _credits_from_product_id(product_id)
+    if amount is None:
+        raise HTTPException(status_code=400, detail=f"Unknown or invalid product_id (expected credits_N): {product_id}")
     order_id = (request.order_id or "").strip()
     if not order_id:
         raise HTTPException(status_code=400, detail="order_id is required")
@@ -409,9 +476,10 @@ async def admin_reverse_google_play_purchase(request: dict, current_user: User =
     userid = request.get("userid")
     order_id = (request.get("order_id") or "").strip()
     amount = request.get("amount")
+    reason = (request.get("reason") or "").strip() or None
     if not userid or not order_id:
         raise HTTPException(status_code=400, detail="userid and order_id are required")
-    success, deduct_or_msg, _ = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
+    success, deduct_or_msg, _ = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount, reason=reason)
     if success:
         return {"message": f"Reversed: {deduct_or_msg} credits deducted for order {order_id}", "credits_deducted": deduct_or_msg}
     raise HTTPException(status_code=400, detail=deduct_or_msg)
@@ -429,6 +497,7 @@ async def admin_google_play_refund_full(request: dict, current_user: User = Depe
     userid = request.get("userid")
     order_id = (request.get("order_id") or "").strip()
     amount = request.get("amount")
+    reason = (request.get("reason") or "").strip() or None
     if not order_id:
         raise HTTPException(status_code=400, detail="order_id is required")
     if userid is None:
@@ -449,7 +518,7 @@ async def admin_google_play_refund_full(request: dict, current_user: User = Depe
         raise HTTPException(status_code=400, detail=f"Google Play: {gp_msg}")
 
     # 2) Deduct credits in our DB (atomic after Google success)
-    ok, credits, original_amount = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount)
+    ok, credits, original_amount = credit_service.reverse_google_play_purchase(userid, order_id, amount=amount, reason=reason)
     if not ok:
         raise HTTPException(
             status_code=500,

@@ -4,9 +4,9 @@ This doc describes how to enable in-app purchase of credits on Android via Googl
 
 ## Overview
 
-- **Backend:** `POST /api/credits/google-play/verify` verifies a purchase with the Google Play Developer API and grants credits. Idempotent by `order_id` (same order is not credited twice).
-- **App:** Credit screen shows a “Buy credits” section on Android with product tiles (50, 100, 250, 500 credits). After a successful purchase, the app sends `purchase_token`, `product_id`, and `order_id` to the verify endpoint, then refreshes balance and history.
-- **Products:** Backend expects these product IDs and grants the corresponding credits: `credits_50` → 50, `credits_100` → 100, `credits_250` → 250, `credits_500` → 500.
+- **Backend:** `GET /api/credits/google-play/products` fetches active in-app products from Google Play and returns credit products (product IDs following the `credits_N` convention). `POST /api/credits/google-play/verify` verifies a purchase with the Google Play Developer API and grants credits. Idempotent by `order_id` (same order is not credited twice).
+- **App:** Credit screen fetches products from the backend (which in turn lists them from Play), shows a “Buy credits” section on Android, and after a successful purchase sends `purchase_token`, `product_id`, and `order_id` to the verify endpoint.
+- **Products:** Create products in Play Console with **Product ID** format `credits_N` (e.g. `credits_50`, `credits_100`, `credits_250`, `credits_500`). The backend lists only active one-time products whose ID matches this pattern and grants N credits per purchase. You can add or change products in Play Console; the app will show whatever is returned by the API.
 
 ---
 

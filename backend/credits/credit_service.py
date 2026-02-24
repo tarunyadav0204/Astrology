@@ -323,11 +323,12 @@ class CreditService:
         conn.close()
         return found
 
-    def reverse_google_play_purchase(self, userid: int, order_id: str, amount: Optional[int] = None):
+    def reverse_google_play_purchase(self, userid: int, order_id: str, amount: Optional[int] = None, reason: Optional[str] = None):
         """
         Reverse a Google Play credit grant (after refund via Play API or Console).
         Deducts amount (default: full original) and records a reversal.
         Idempotent: returns error if order not found or already reversed.
+        reason: optional note for why the refund was issued (stored in transaction description).
         Returns: (True, amount_deducted, original_amount) or (False, error_message, None).
         """
         conn = sqlite3.connect(self.db_path)
@@ -355,7 +356,15 @@ class CreditService:
             conn.close()
             return False, "This order was already reversed", None
         current_balance = self.get_user_credits(userid)
+        # Only take back up to what the user has left
+        deduct = min(deduct, current_balance)
+        if deduct <= 0:
+            conn.close()
+            return False, "User has no credits left to take back", None
         new_balance = current_balance - deduct
+        desc = f"Reversal: Google Play refund for order {order_id}"
+        if reason and reason.strip():
+            desc = f"{desc}. Reason: {reason.strip()}"
         cursor.execute("""
             UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?
         """, (new_balance, userid))
@@ -363,7 +372,7 @@ class CreditService:
             INSERT INTO credit_transactions
             (userid, transaction_type, amount, balance_after, source, reference_id, description)
             VALUES (?, 'spent', ?, ?, 'google_play_refund', ?, ?)
-        """, (userid, -deduct, new_balance, order_id, f"Reversal: Google Play refund for order {order_id}"))
+        """, (userid, -deduct, new_balance, order_id, desc))
         conn.commit()
         conn.close()
         return True, deduct, original_amount

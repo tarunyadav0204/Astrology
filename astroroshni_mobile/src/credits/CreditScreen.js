@@ -25,16 +25,6 @@ import { useAnalytics } from '../hooks/useAnalytics';
 
 const { width } = Dimensions.get('window');
 
-// Product IDs for Google Play (must match Play Console and backend GOOGLE_PLAY_PRODUCT_CREDITS)
-const GOOGLE_PLAY_PRODUCTS = [
-  { id: 'credits_50', credits: 50, label: '50 Credits' },
-  { id: 'credits_100', credits: 100, label: '100 Credits' },
-  { id: 'credits_250', credits: 250, label: '250 Credits' },
-  { id: 'credits_500', credits: 500, label: '500 Credits' },
-];
-
-const PRODUCT_IDS = GOOGLE_PLAY_PRODUCTS.map((p) => p.id);
-
 // Lazy-load IAP only on Android to avoid iOS/build issues
 let RNIap = null;
 if (Platform.OS === 'android') {
@@ -56,6 +46,8 @@ const CreditScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState(null);
   const [iapReady, setIapReady] = useState(false);
+  const [googlePlayProducts, setGooglePlayProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [purchaseModal, setPurchaseModal] = useState({ visible: false, type: 'success', title: '', message: '', creditsAdded: 0 });
   const purchaseListenerRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -139,16 +131,36 @@ const CreditScreen = ({ navigation }) => {
     return unsubscribe;
   }, [navigation]);
 
-  // Google Play IAP: init connection and purchase listener (Android only)
+  // Fetch Google Play products from backend (Android only)
   useEffect(() => {
-    if (Platform.OS !== 'android' || !RNIap) return;
+    if (Platform.OS !== 'android') return;
+    let mounted = true;
+    const fetchProducts = async () => {
+      setProductsLoading(true);
+      try {
+        const { data } = await creditAPI.getGooglePlayProducts();
+        if (mounted && Array.isArray(data?.products)) setGooglePlayProducts(data.products);
+      } catch (e) {
+        if (mounted) setGooglePlayProducts([]);
+        console.warn('Failed to load Google Play products:', e?.message);
+      } finally {
+        if (mounted) setProductsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  // Google Play IAP: init connection and purchase listener (Android only)
+  const productIds = googlePlayProducts.map((p) => p.product_id);
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !RNIap || productIds.length === 0) return;
     let mounted = true;
     const initIap = async () => {
       try {
         await RNIap.initConnection();
         if (!mounted) return;
         await RNIap.flushFailedPurchasesCachedAsPendingAndroid?.();
-        await RNIap.getProducts({ skus: PRODUCT_IDS });
+        await RNIap.getProducts({ skus: productIds });
         if (!mounted) return;
         setIapReady(true);
       } catch (e) {
@@ -187,7 +199,7 @@ const CreditScreen = ({ navigation }) => {
         console.warn('IAP cleanup:', e?.message);
       }
     };
-  }, []);
+  }, [productIds.join(',')]);
 
   const fetchHistory = async () => {
     try {
@@ -265,9 +277,10 @@ const CreditScreen = ({ navigation }) => {
       Alert.alert('Loading…', 'Store is loading. Please try again in a moment.');
       return;
     }
-    setPurchasingProductId(product.id);
+    const productId = product.product_id || product.id;
+    setPurchasingProductId(productId);
     try {
-      await RNIap.requestPurchase({ skus: [product.id] });
+      await RNIap.requestPurchase({ skus: [productId] });
     } catch (e) {
       if (e?.code !== 'E_USER_CANCELLED') {
         Alert.alert('Purchase failed', e?.message ?? 'Could not start purchase. Try again.');
@@ -442,28 +455,34 @@ const CreditScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Buy credits (Google Play) - Android only */}
+            {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
             {Platform.OS === 'android' && (
               <View style={styles.buySection}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy Credits</Text>
-                <View style={styles.buyProductGrid}>
-                  {GOOGLE_PLAY_PRODUCTS.map((product) => (
-                    <TouchableOpacity
-                      key={product.id}
-                      style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
-                      onPress={() => handleBuyCreditsPress(product)}
-                      disabled={purchasingProductId === product.id}
-                    >
-                      <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.label}</Text>
-                      <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{product.credits} credits</Text>
-                      <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.buyProductButtonText}>
-                          {purchasingProductId === product.id ? 'Processing…' : 'Buy'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {productsLoading ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading products…</Text>
+                ) : googlePlayProducts.length === 0 ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No products available. Check back later.</Text>
+                ) : (
+                  <View style={styles.buyProductGrid}>
+                    {googlePlayProducts.map((product) => (
+                      <TouchableOpacity
+                        key={product.product_id}
+                        style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
+                        onPress={() => handleBuyCreditsPress(product)}
+                        disabled={purchasingProductId === product.product_id}
+                      >
+                        <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || `${product.credits} Credits`}</Text>
+                        <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{product.credits} credits</Text>
+                        <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.buyProductButtonText}>
+                            {purchasingProductId === product.product_id ? 'Processing…' : 'Buy'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
 
@@ -715,6 +734,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  buyProductPlaceholder: {
+    fontSize: 14,
+    paddingVertical: 12,
+    textAlign: 'center',
   },
   buyProductCard: {
     width: (width - 52) / 2 - 6,

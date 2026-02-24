@@ -9,7 +9,7 @@ const AdminGooglePlayRefund = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOrderId, setSearchOrderId] = useState('');
 
-  const [refundModal, setRefundModal] = useState({ open: false, tx: null, amount: '' });
+  const [refundModal, setRefundModal] = useState({ open: false, tx: null, amount: '', reason: '' });
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundError, setRefundError] = useState(null);
   const [refundResult, setRefundResult] = useState(null);
@@ -63,13 +63,13 @@ const AdminGooglePlayRefund = () => {
 
   const openRefundModal = (tx) => {
     if (tx.status !== 'Credited') return;
-    setRefundModal({ open: true, tx, amount: String(tx.amount) });
+    setRefundModal({ open: true, tx, amount: String(tx.amount), reason: '' });
     setRefundError(null);
     setRefundResult(null);
   };
 
   const closeRefundModal = () => {
-    setRefundModal({ open: false, tx: null, amount: '' });
+    setRefundModal({ open: false, tx: null, amount: '', reason: '' });
     setRefundError(null);
     setRefundResult(null);
   };
@@ -96,6 +96,7 @@ const AdminGooglePlayRefund = () => {
           userid: tx.userid,
           order_id: tx.order_id,
           amount,
+          reason: refundModal.reason.trim() || undefined,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -232,6 +233,16 @@ const AdminGooglePlayRefund = () => {
                   disabled={refundSubmitting}
                 />
                 <span className="label-hint">Max {refundModal.tx.amount} (full refund)</span>
+              </label>
+              <label>
+                <span>Reason for refund</span>
+                <textarea
+                  placeholder="e.g. Customer request, duplicate charge…"
+                  rows={3}
+                  value={refundModal.reason}
+                  onChange={(e) => setRefundModal({ ...refundModal, reason: e.target.value })}
+                  disabled={refundSubmitting}
+                />
               </label>
             </div>
             {refundError && <div className="play-refund-error">{refundError}</div>}
