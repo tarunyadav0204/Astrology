@@ -112,8 +112,10 @@ def _list_google_play_products(package_name: str) -> List[dict]:
         session = AuthorizedSession(credentials)
 
         all_products: List[dict] = []
-        base_url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/monetization/onetimeproducts"
-        logger.info("Google Play: listing one-time products via REST monetization.onetimeproducts.list")
+        # Use the new one-time products REST endpoint:
+        # GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{packageName}/oneTimeProducts
+        base_url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/oneTimeProducts"
+        logger.info("Google Play: listing one-time products via REST oneTimeProducts list")
 
         page_token: Optional[str] = None
         while True:
