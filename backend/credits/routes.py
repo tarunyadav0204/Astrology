@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 import json
+import logging
 import re
 import sqlite3
 from auth import get_current_user, User
@@ -11,6 +12,8 @@ from .admin.promo_manager import PromoCodeManager
 router = APIRouter()
 credit_service = CreditService()
 promo_manager = PromoCodeManager()
+
+logger = logging.getLogger(__name__)
 
 # Product ID convention for credit packs: credits_N -> N credits (used when fetching from Play or when no map)
 CREDITS_PRODUCT_PATTERN = re.compile(r"^credits_(\d+)$")
@@ -92,48 +95,97 @@ def _list_google_play_products(package_name: str) -> List[dict]:
     """
     try:
         service = _get_play_service()
-        all_products = []
-        token = None
-        while True:
-            request = service.inappproducts().list(packageName=package_name, token=token)
-            resp = request.execute()
-            inappproduct_list = resp.get("inappproduct") or []
-            for p in inappproduct_list:
-                sku = (p.get("sku") or "").strip()
-                status = (p.get("status") or "").lower()
-                purchase_type = (p.get("purchaseType") or "").lower()
-                if status != "active":
-                    continue
-                # One-time managed product (not subscription)
-                if purchase_type not in ("manageduser", "purchasetypeunspecified", ""):
-                    continue
-                credits = _credits_from_product_id(sku)
-                if credits is None:
-                    continue
-                default_price = p.get("defaultPrice") or {}
-                price_micros = default_price.get("priceMicros")
-                price_micros = str(price_micros) if price_micros is not None else "0"
-                price_currency = default_price.get("currency") or "USD"
-                listings = p.get("listings") or {}
-                default_lang = p.get("defaultLanguage") or "en-US"
-                listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
-                title = (listing.get("title") or sku) if listing else sku
-                description = (listing.get("description") or "") if listing else ""
-                all_products.append({
-                    "product_id": sku,
-                    "credits": credits,
-                    "title": title,
-                    "description": description,
-                    "price_micros": price_micros,
-                    "price_currency": price_currency,
-                })
-            token = (resp.get("tokenPagination") or {}).get("nextPageToken")
-            if not token:
-                break
-        return sorted(all_products, key=lambda x: x["credits"])
+        all_products: List[dict] = []
+
+        # ---- Preferred: new monetization.onetimeproducts.list API ----
+        logger.info("Google Play: listing one-time products via monetization.onetimeproducts.list")
+        try:
+            token = None
+            while True:
+                request = service.monetization().onetimeproducts().list(
+                    packageName=package_name,
+                    pageToken=token,
+                )
+                resp = request.execute()
+                one_time_products = resp.get("oneTimeProducts") or []
+                for p in one_time_products:
+                    sku = (p.get("productId") or "").strip()
+                    credits = _credits_from_product_id(sku)
+                    if credits is None:
+                        continue
+                    listings = p.get("listings") or {}
+                    default_lang = p.get("defaultLanguage") or "en-US"
+                    listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
+                    title = (listing.get("title") or sku) if listing else sku
+                    description = (listing.get("description") or "") if listing else ""
+                    # Price information is nested under purchaseOptions; we don't strictly need it,
+                    # so keep a simple placeholder for now.
+                    price_micros = None
+                    price_currency = None
+                    all_products.append({
+                        "product_id": sku,
+                        "credits": credits,
+                        "title": title,
+                        "description": description,
+                        "price_micros": "0" if price_micros is None else str(price_micros),
+                        "price_currency": price_currency or "USD",
+                    })
+                token = resp.get("nextPageToken")
+                if not token:
+                    break
+        except Exception as e:
+            # If the new monetization API is unavailable or permission-restricted, fall back.
+            logger.warning("Google Play monetization.onetimeproducts.list failed, falling back to inappproducts.list: %s", str(e))
+            all_products = []
+
+        # ---- Fallback: legacy inappproducts.list API ----
+        if not all_products:
+            logger.info("Google Play: falling back to legacy inappproducts.list for product listing")
+            token = None
+            while True:
+                request = service.inappproducts().list(packageName=package_name, token=token)
+                resp = request.execute()
+                inappproduct_list = resp.get("inappproduct") or []
+                for p in inappproduct_list:
+                    sku = (p.get("sku") or "").strip()
+                    status = (p.get("status") or "").lower()
+                    purchase_type = (p.get("purchaseType") or "").lower()
+                    if status != "active":
+                        continue
+                    # One-time managed product (not subscription)
+                    if purchase_type not in ("manageduser", "purchasetypeunspecified", ""):
+                        continue
+                    credits = _credits_from_product_id(sku)
+                    if credits is None:
+                        continue
+                    default_price = p.get("defaultPrice") or {}
+                    price_micros = default_price.get("priceMicros")
+                    price_micros = str(price_micros) if price_micros is not None else "0"
+                    price_currency = default_price.get("currency") or "USD"
+                    listings = p.get("listings") or {}
+                    default_lang = p.get("defaultLanguage") or "en-US"
+                    listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
+                    title = (listing.get("title") or sku) if listing else sku
+                    description = (listing.get("description") or "") if listing else ""
+                    all_products.append({
+                        "product_id": sku,
+                        "credits": credits,
+                        "title": title,
+                        "description": description,
+                        "price_micros": price_micros,
+                        "price_currency": price_currency,
+                    })
+                token = (resp.get("tokenPagination") or {}).get("nextPageToken")
+                if not token:
+                    break
+
+        sorted_products = sorted(all_products, key=lambda x: x["credits"])
+        logger.info("Google Play: listed %d credit products", len(sorted_products))
+        return sorted_products
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Google Play: unexpected error while listing products: %s", str(e))
         raise HTTPException(status_code=503, detail=f"Failed to list Google Play products: {str(e)}")
 
 
