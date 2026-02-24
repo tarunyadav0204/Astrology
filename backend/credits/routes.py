@@ -90,97 +90,68 @@ def _credits_from_product_id(product_id: str) -> Optional[int]:
 def _list_google_play_products(package_name: str) -> List[dict]:
     """
     Fetch in-app products from Google Play and return credit products only.
-    Includes only active one-time products whose sku matches credits_N; credits derived from sku.
-    This helper is also safe to tweak for deploy triggers (no runtime behavior change).
+    Uses the new monetization.onetimeproducts.list endpoint and includes only
+    one-time products whose productId matches credits_N; credits are derived from N.
     """
     try:
-        service = _get_play_service()
+        # Use google-auth directly because the installed google-api-python-client
+        # may not yet expose monetization.onetimeproducts on the discovery stub.
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import AuthorizedSession
+        import os
+
+        credentials_path = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+        if not credentials_path or not os.path.isfile(credentials_path):
+            raise HTTPException(
+                status_code=503,
+                detail="Google Play service account JSON not configured (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON).",
+            )
+
+        scopes = ["https://www.googleapis.com/auth/androidpublisher"]
+        credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=scopes)
+        session = AuthorizedSession(credentials)
+
         all_products: List[dict] = []
+        base_url = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package_name}/monetization/onetimeproducts"
+        logger.info("Google Play: listing one-time products via REST monetization.onetimeproducts.list")
 
-        # ---- Preferred: new monetization.onetimeproducts.list API ----
-        logger.info("Google Play: listing one-time products via monetization.onetimeproducts.list")
-        try:
-            token = None
-            while True:
-                request = service.monetization().onetimeproducts().list(
-                    packageName=package_name,
-                    pageToken=token,
-                )
-                resp = request.execute()
-                one_time_products = resp.get("oneTimeProducts") or []
-                for p in one_time_products:
-                    sku = (p.get("productId") or "").strip()
-                    credits = _credits_from_product_id(sku)
-                    if credits is None:
-                        continue
-                    listings = p.get("listings") or {}
-                    default_lang = p.get("defaultLanguage") or "en-US"
-                    listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
-                    title = (listing.get("title") or sku) if listing else sku
-                    description = (listing.get("description") or "") if listing else ""
-                    # Price information is nested under purchaseOptions; we don't strictly need it,
-                    # so keep a simple placeholder for now.
-                    price_micros = None
-                    price_currency = None
-                    all_products.append({
-                        "product_id": sku,
-                        "credits": credits,
-                        "title": title,
-                        "description": description,
-                        "price_micros": "0" if price_micros is None else str(price_micros),
-                        "price_currency": price_currency or "USD",
-                    })
-                token = resp.get("nextPageToken")
-                if not token:
-                    break
-        except Exception as e:
-            # If the new monetization API is unavailable or permission-restricted, fall back.
-            logger.warning("Google Play monetization.onetimeproducts.list failed, falling back to inappproducts.list: %s", str(e))
-            all_products = []
-
-        # ---- Fallback: legacy inappproducts.list API ----
-        if not all_products:
-            logger.info("Google Play: falling back to legacy inappproducts.list for product listing")
-            token = None
-            while True:
-                request = service.inappproducts().list(packageName=package_name, token=token)
-                resp = request.execute()
-                inappproduct_list = resp.get("inappproduct") or []
-                for p in inappproduct_list:
-                    sku = (p.get("sku") or "").strip()
-                    status = (p.get("status") or "").lower()
-                    purchase_type = (p.get("purchaseType") or "").lower()
-                    if status != "active":
-                        continue
-                    # One-time managed product (not subscription)
-                    if purchase_type not in ("manageduser", "purchasetypeunspecified", ""):
-                        continue
-                    credits = _credits_from_product_id(sku)
-                    if credits is None:
-                        continue
-                    default_price = p.get("defaultPrice") or {}
-                    price_micros = default_price.get("priceMicros")
-                    price_micros = str(price_micros) if price_micros is not None else "0"
-                    price_currency = default_price.get("currency") or "USD"
-                    listings = p.get("listings") or {}
-                    default_lang = p.get("defaultLanguage") or "en-US"
-                    listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
-                    title = (listing.get("title") or sku) if listing else sku
-                    description = (listing.get("description") or "") if listing else ""
-                    all_products.append({
-                        "product_id": sku,
-                        "credits": credits,
-                        "title": title,
-                        "description": description,
-                        "price_micros": price_micros,
-                        "price_currency": price_currency,
-                    })
-                token = (resp.get("tokenPagination") or {}).get("nextPageToken")
-                if not token:
-                    break
+        page_token: Optional[str] = None
+        while True:
+            params = {}
+            if page_token:
+                params["pageToken"] = page_token
+            resp = session.get(base_url, params=params)
+            if resp.status_code == 403:
+                # Surface the body so we can see the exact permission error.
+                logger.error("Google Play: 403 from monetization.onetimeproducts.list: %s", resp.text)
+                raise HTTPException(status_code=403, detail=resp.text)
+            resp.raise_for_status()
+            data = resp.json()
+            for p in data.get("oneTimeProducts", []):
+                sku = (p.get("productId") or "").strip()
+                credits = _credits_from_product_id(sku)
+                if credits is None:
+                    continue
+                listings = p.get("listings") or {}
+                default_lang = p.get("defaultLanguage") or "en-US"
+                listing = listings.get(default_lang) or listings.get("en-US") or next(iter(listings.values()), None) if listings else None
+                title = (listing.get("title") or sku) if listing else sku
+                description = (listing.get("description") or "") if listing else ""
+                # Price lives under purchaseOptions; we don't need it for now, so just send placeholders.
+                all_products.append({
+                    "product_id": sku,
+                    "credits": credits,
+                    "title": title,
+                    "description": description,
+                    "price_micros": "0",
+                    "price_currency": "USD",
+                })
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
 
         sorted_products = sorted(all_products, key=lambda x: x["credits"])
-        logger.info("Google Play: listed %d credit products", len(sorted_products))
+        logger.info("Google Play: listed %d credit products via monetization.onetimeproducts.list", len(sorted_products))
         return sorted_products
     except HTTPException:
         raise
