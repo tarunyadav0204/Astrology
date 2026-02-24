@@ -196,8 +196,11 @@ export const apiService = {
   },
   
   calculateYogi: async (birthData) => {
-    const response = await apiClient.post(getEndpoint('/calculate-yogi'), birthData);
-    return response.data;
+    const response = await apiClient.post(getEndpoint('/yogi-points'), {
+      birth_data: birthData
+    });
+    // Backend returns { success, yogi_points }
+    return response.data?.yogi_points || response.data;
   },
   
   calculatePanchang: async (birthData) => {

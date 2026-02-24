@@ -250,7 +250,12 @@ export const chartAPI = {
         throw error;
       });
   },
-  calculateYogi: (birthData) => api.post(getEndpoint('/calculate-yogi'), birthData),
+  calculateYogi: (birthData) =>
+    api.post(getEndpoint('/yogi-points'), { birth_data: birthData })
+      .then(response => response.data?.yogi_points || response.data)
+      .catch(error => {
+        throw error;
+      }),
   calculateCascadingDashas: (birthData, targetDate) => {
     // console.log('\n' + '='.repeat(60));
     // console.log('🔍 MOBILE: Calling calculateCascadingDashas');

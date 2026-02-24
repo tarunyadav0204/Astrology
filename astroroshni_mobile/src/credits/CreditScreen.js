@@ -418,6 +418,37 @@ const CreditScreen = ({ navigation }) => {
               </LinearGradient>
             </Animated.View>
 
+            {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
+            {Platform.OS === 'android' && (
+              <View style={styles.buySection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy Credits</Text>
+                {productsLoading ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading products…</Text>
+                ) : googlePlayProducts.length === 0 ? (
+                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No products available. Check back later.</Text>
+                ) : (
+                  <View style={styles.buyProductGrid}>
+                    {googlePlayProducts.map((product) => (
+                      <TouchableOpacity
+                        key={product.product_id}
+                        style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
+                        onPress={() => handleBuyCreditsPress(product)}
+                        disabled={purchasingProductId === product.product_id}
+                      >
+                        <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || `${product.credits} Credits`}</Text>
+                        <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{product.credits} credits</Text>
+                        <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.buyProductButtonText}>
+                            {purchasingProductId === product.product_id ? 'Processing…' : 'Buy'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Promo Code Section */}
             <View style={styles.promoSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Have a Promo Code?</Text>
@@ -454,37 +485,6 @@ const CreditScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
-
-            {/* Buy credits (Google Play) - Android only; products fetched from backend/Play */}
-            {Platform.OS === 'android' && (
-              <View style={styles.buySection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy Credits</Text>
-                {productsLoading ? (
-                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading products…</Text>
-                ) : googlePlayProducts.length === 0 ? (
-                  <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>No products available. Check back later.</Text>
-                ) : (
-                  <View style={styles.buyProductGrid}>
-                    {googlePlayProducts.map((product) => (
-                      <TouchableOpacity
-                        key={product.product_id}
-                        style={[styles.buyProductCard, { backgroundColor: promoCardBg, borderWidth: isDark ? 1 : 0, borderColor: colors.cardBorder }]}
-                        onPress={() => handleBuyCreditsPress(product)}
-                        disabled={purchasingProductId === product.product_id}
-                      >
-                        <Text style={[styles.buyProductLabel, { color: colors.text }]}>{product.title || `${product.credits} Credits`}</Text>
-                        <Text style={[styles.buyProductCredits, { color: colors.primary }]}>{product.credits} credits</Text>
-                        <View style={[styles.buyProductButton, { backgroundColor: colors.primary }]}>
-                          <Text style={styles.buyProductButtonText}>
-                            {purchasingProductId === product.product_id ? 'Processing…' : 'Buy'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
 
             {/* Request Credits Section */}
             <View style={styles.requestSection}>

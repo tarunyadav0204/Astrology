@@ -105,7 +105,50 @@ async def process_mundane_response(
     """Background task to process mundane analysis"""
     try:
         print(f"\n📅 Analyzing for Year: {year} (User asked: '{question}')")
-        
+
+        # Build lightweight conversation history (last 3 Q&A) for this mundane session
+        history = []
+        try:
+            with sqlite3.connect('astrology.db') as conn:
+                cursor = conn.cursor()
+                # Fetch all prior messages in this session before the current assistant placeholder
+                cursor.execute(
+                    """
+                    SELECT message_id, sender, content, timestamp
+                    FROM chat_messages
+                    WHERE session_id = ? AND message_id < ?
+                    ORDER BY timestamp ASC, message_id ASC
+                    """,
+                    (session_id, message_id),
+                )
+                rows = cursor.fetchall()
+
+            # Pair user/assistant messages into simple Q&A objects
+            pending_question = None
+            for mid, sender, content, ts in rows:
+                if sender == "user":
+                    # Start a new question; if there was an unanswered one, drop it
+                    pending_question = content or ""
+                elif sender == "assistant" and pending_question:
+                    # Pair this assistant reply with the last user question
+                    history.append(
+                        {
+                            "question": (pending_question or "")[:500],
+                            "response": (content or "")[:500],
+                        }
+                    )
+                    pending_question = None
+
+            # Keep only the last 3 Q&A pairs
+            if len(history) > 3:
+                history = history[-3:]
+
+            print(f"🧵 Mundane history pairs for Gemini: {len(history)}")
+        except Exception as e:
+            # History is optional; log and continue on failure
+            print(f"⚠️ Failed to build mundane history context: {e}")
+            history = []
+
         builder = MundaneContextBuilder()
         context = builder.build_mundane_context(
             country_name=country,
@@ -119,7 +162,7 @@ async def process_mundane_response(
         result = await gemini.generate_chat_response(
             user_question=question,
             astrological_context=context,
-            conversation_history=[],
+            conversation_history=history,
             language='english',
             response_style='detailed'
         )

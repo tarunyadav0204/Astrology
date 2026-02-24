@@ -176,8 +176,9 @@ const NorthIndianChart = ({
   };
 
   const formatDegree = (degree) => {
-    if (typeof degree !== 'number') return '0.00°';
-    return degree.toFixed(2) + '°';
+    if (typeof degree !== 'number') return '0°';
+    // Show whole-degree precision only (no decimals)
+    return Math.round(degree).toString() + '°';
   };
 
   const getPlanetsInHouse = (houseIndex) => {
@@ -193,7 +194,7 @@ const NorthIndianChart = ({
         planetsInHouse.push({
           symbol: t(`planets.${name}`, name.substring(0, 2)),
           name: name,
-          degree: typeof data.degree === 'number' ? data.degree.toFixed(2) : '0.00',
+          degree: typeof data.degree === 'number' ? Math.round(data.degree).toString() : '0',
           longitude: data.longitude || 0,
           nakshatra: getNakshatra(data.longitude || 0),
           shortNakshatra: getShortNakshatra(data.longitude || 0),
@@ -205,7 +206,7 @@ const NorthIndianChart = ({
       planetsInHouse.push({
         symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',
-        degree: typeof planets.InduLagna.degree === 'number' ? planets.InduLagna.degree.toFixed(2) : '0.00',
+        degree: typeof planets.InduLagna.degree === 'number' ? Math.round(planets.InduLagna.degree).toString() : '0',
         longitude: planets.InduLagna.longitude || 0,
         nakshatra: getNakshatra(planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(planets.InduLagna.longitude || 0),
@@ -302,7 +303,7 @@ const NorthIndianChart = ({
           const houseData = getHouseData(houseNumber);
           
           return (
-            <G key={houseNumber} pointerEvents="none">
+            <G key={houseNumber}>
               {highlightHouse === houseNumber && glowAnimation && (
                 <Circle cx={houseData.center.x} cy={houseData.center.y} r="60" fill={getHouseGlowColor(houseNumber)} opacity={glowAnimation} />
               )}
@@ -355,47 +356,56 @@ const NorthIndianChart = ({
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 15;
                   } else if ([3, 4, 5].includes(houseNumber)) {
-                    planetX = houseData.center.x - (houseNumber === 3 ? 5 : 15);
+                    // Slightly shift 3rd house planets right for better centering
+                    planetX = houseData.center.x - (houseNumber === 3 ? 10 : 15);
                     planetY = houseData.center.y + 10;
                   } else if ([6, 7, 8].includes(houseNumber)) {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y + 30;
                   } else if (houseNumber === 9) {
+                    // Slightly more to the left so it sits better in the triangle
                     planetX = houseData.center.x + 10;
-                    planetY = houseData.center.y - 20;
+                    planetY = houseData.center.y - 10;
                   } else if (houseNumber === 10) {
                     planetX = houseData.center.x + 15;
                     planetY = houseData.center.y - 20;
                   } else if (houseNumber === 11) {
+                    // Slightly left so it sits better in the triangle
                     planetX = houseData.center.x + 5;
-                    planetY = houseData.center.y - 15;
+                    planetY = houseData.center.y - 5;
                   } else if (houseNumber === 12) {
                     planetX = houseData.center.x;
-                    planetY = houseData.center.y - 15;
+                    planetY = houseData.center.y - 25;
                   } else if (houseNumber === 2) {
                     planetX = houseData.center.x;
-                    planetY = houseData.center.y - 25;
+                    // Move slightly down so the single planet doesn't hug the top edge
+                    planetY = houseData.center.y - 20;
                   } else {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 10;
                   }
                 } else if (totalPlanets <= 4) {
+                  // Houses 3, 5, 9, 11: Vertical arrangement (single column)
                   if ([3, 5, 9, 11].includes(houseNumber)) {
                     const rowSpacing = 35;
                     if (houseNumber === 3) {
+                      // Move 3rd-house column slightly right
                       planetX = houseData.center.x - 25;
                       planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                     } else if (houseNumber === 5) {
+                      // Lift 5th-house planets so 4-planet stacks sit higher in the triangle
                       planetX = houseData.center.x - 25;
-                      planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
+                      planetY = houseData.center.y - 38 + (pIndex * rowSpacing);
                     } else if (houseNumber === 9) {
-                      planetX = houseData.center.x + 25;
-                      planetY = houseData.center.y - 40 + (pIndex * rowSpacing);
+                      // Move vertical stack a bit left
+                      planetX = houseData.center.x + 30;
+                      planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                     } else if (houseNumber === 11) {
-                      planetX = houseData.center.x + 15;
-                      planetY = houseData.center.y - 55 + (pIndex * rowSpacing);
+                      planetX = houseData.center.x + 25;
+                      planetY = houseData.center.y - 45 + (pIndex * rowSpacing);
                     }
                   } else {
+                    // Other houses: 2-column arrangement
                     const row = Math.floor(pIndex / 2);
                     const col = pIndex % 2;
                     const spacing = 25;
@@ -415,42 +425,46 @@ const NorthIndianChart = ({
                       planetY = houseData.center.y - 25 + (row * rowSpacing);
                     } else if (houseNumber === 12) {
                       planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                      planetY = houseData.center.y - 5 + (row * rowSpacing);
+                      planetY = houseData.center.y - 15 + (row * rowSpacing);
                     } else if (houseNumber === 2) {
+                      // Slightly below original placement to avoid clipping, but not too low
                       planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                      planetY = houseData.center.y - 5 + (row * rowSpacing);
+                      planetY = houseData.center.y - 25 + (row * rowSpacing);
                     } else {
                       planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
                       planetY = houseData.center.y - 25 + (row * rowSpacing);
                     }
                   }
                 } else {
+                  // For 5+ planets - arrange in single column
                   const rowSpacing = 26;
                   
                   if (houseNumber === 1) {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
                   } else if ([3, 4, 5].includes(houseNumber)) {
-                    planetX = houseData.center.x - (houseNumber === 3 ? 15 : 25);
+                    // Move 3rd-house stack slightly right; keep 4/5 as before
+                    planetX = houseData.center.x - (houseNumber === 3 ? 20 : 25);
                     planetY = houseData.center.y + 0 + (pIndex * rowSpacing);
                   } else if ([6, 7, 8].includes(houseNumber)) {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y + 20 + (pIndex * rowSpacing);
                   } else if (houseNumber === 9) {
-                    planetX = houseData.center.x + 15;
-                    planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
+                    // Move single-column stack a bit left
+                    planetX = houseData.center.x + 20;
+                    planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
                   } else if (houseNumber === 10) {
                     planetX = houseData.center.x + 15;
                     planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                   } else if (houseNumber === 11) {
-                    planetX = houseData.center.x + 10;
-                    planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
+                    planetX = houseData.center.x + 15;
+                    planetY = houseData.center.y - 15 + (pIndex * rowSpacing);
                   } else if (houseNumber === 12) {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 5 + (pIndex * rowSpacing);
                   } else if (houseNumber === 2) {
                     planetX = houseData.center.x;
-                    planetY = houseData.center.y - 10 + (pIndex * rowSpacing);
+                    planetY = houseData.center.y - 35 + (pIndex * rowSpacing);
                   } else {
                     planetX = houseData.center.x;
                     planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
@@ -459,9 +473,25 @@ const NorthIndianChart = ({
                 
                 return (
                   <G key={pIndex}>
-                    <SvgText x={planetX} y={planetY - 8} fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")} fill={getPlanetColor(planet)} fontWeight="900" textAnchor="middle">{getPlanetSymbolWithStatus(planet)}</SvgText>
+                    <SvgText 
+                      x={planetX} 
+                      y={planetY - 8} 
+                      fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")} 
+                      fill={cosmicTheme ? "rgba(255, 255, 255, 0.95)" : getPlanetColor(planet)}
+                      fontWeight="900"
+                      textAnchor="middle"
+                      onPress={() => handlePlanetPress(planet)}>
+                      {getPlanetSymbolWithStatus(planet)}
+                    </SvgText>
                     {showDegreeNakshatra && (
-                      <SvgText x={planetX} y={planetY + 8} fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} fill={cosmicTheme ? (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)") : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666")} fontWeight="500" textAnchor="middle">
+                      <SvgText 
+                        x={planetX} 
+                        y={planetY + 8} 
+                        fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"} 
+                        fill={cosmicTheme ? "rgba(255, 255, 255, 0.7)" : "#666"}
+                        fontWeight="500"
+                        textAnchor="middle"
+                        onPress={() => handlePlanetPress(planet)}>
                         {planet.formattedDegree} {planet.shortNakshatra}
                       </SvgText>
                     )}

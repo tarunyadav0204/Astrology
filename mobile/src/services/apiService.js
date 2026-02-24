@@ -94,15 +94,18 @@ class ApiService {
 
   async calculateYogi(birthData) {
     try {
-      const response = await this.api.post('/calculate-yogi', {
-        name: birthData.name,
-        date: birthData.date,
-        time: birthData.time,
-        latitude: parseFloat(birthData.latitude),
-        longitude: parseFloat(birthData.longitude),
-        timezone: birthData.timezone || 'UTC',
+      const response = await this.api.post('/yogi-points', {
+        birth_data: {
+          name: birthData.name,
+          date: birthData.date,
+          time: birthData.time,
+          latitude: parseFloat(birthData.latitude),
+          longitude: parseFloat(birthData.longitude),
+          timezone: birthData.timezone || 'UTC',
+        },
       });
-      return response.data;
+      // Backend returns { success, yogi_points }
+      return response.data?.yogi_points || response.data;
     } catch (error) {
       console.error('Error calculating yogi:', error);
       throw new Error('Failed to calculate yogi');
