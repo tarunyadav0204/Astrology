@@ -90,19 +90,28 @@
   padding: 15px;
   border-bottom: 1px solid #f0f0f0;
   background: #fff3e0;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
-.session-header h3 {
+.session-back {
+  display: none;
+}
+
+.session-header-title {
   margin: 0;
   color: #d84315;
+  flex: 1;
+  text-align: center;
 }
 
-.session-header button {
+.session-close {
   background: none;
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
   color: #666;
+  padding: 4px 8px;
 }
 
 .messages-container {
@@ -184,16 +193,122 @@
   font-style: italic;
 }
 
+/* Mobile: master–detail so the full message is visible */
 @media (max-width: 768px) {
+  .admin-chat-history {
+    padding: 12px;
+  }
+
+  .admin-chat-history h2 {
+    font-size: 1.25rem;
+    margin-bottom: 12px;
+  }
+
   .admin-chat-content {
     flex-direction: column;
     height: auto;
+    min-height: 70vh;
+    border-radius: 12px;
   }
-  
-  .users-list, .sessions-list {
+
+  .users-list,
+  .sessions-list {
     flex: none;
-    max-height: 200px;
+    max-height: 280px;
     border-right: none;
     border-bottom: 1px solid #f0f0f0;
+  }
+
+  .sessions-list h3 {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+
+  .session-card {
+    padding: 12px;
+  }
+
+  .session-user {
+    font-size: 0.9rem;
+  }
+
+  .session-preview {
+    font-size: 0.8rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* When a session is selected, hide list and show only conversation */
+  .admin-chat-content.has-selection .sessions-list {
+    display: none;
+  }
+
+  .admin-chat-content.has-selection .session-details {
+    flex: 1;
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-chat-content.has-selection .messages-container {
+    flex: 1;
+    min-height: 0;
+    padding: 12px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Session header on mobile: prominent back button */
+  .session-back {
+    display: inline-flex;
+    align-items: center;
+    background: #ff6b35;
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .session-header-title {
+    font-size: 0.95rem;
+    text-align: center;
+  }
+
+  .session-close {
+    font-size: 1.75rem;
+    padding: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Full-width, readable messages on mobile */
+  .message-content {
+    max-width: 100%;
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 1rem;
+    line-height: 1.6;
+    box-sizing: border-box;
+  }
+
+  .message.user .message-content {
+    max-width: 95%;
+  }
+
+  .message-content h3 {
+    font-size: 1.05rem;
+    margin: 12px 0 6px 0;
+  }
+
+  .message {
+    margin-bottom: 16px;
   }
 }

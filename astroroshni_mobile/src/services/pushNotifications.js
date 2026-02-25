@@ -137,10 +137,34 @@ export function setupNotificationResponseListener(navigationRef) {
     try {
       if (nativeId) {
         const { storage } = require('./storage');
-        const profiles = await storage.getBirthProfiles();
-        const profile = (profiles || []).find(
+        const { chartAPI } = require('./api');
+        let profiles = await storage.getBirthProfiles();
+        let profile = (profiles || []).find(
           (p) => String(p?.id) === nativeId || String(p?._id) === nativeId
         );
+        if (!profile) {
+          try {
+            const res = await chartAPI.getExistingCharts();
+            const apiCharts = res?.data?.charts || [];
+            const chart = apiCharts.find(
+              (c) => String(c?.id) === nativeId || String(c?._id) === nativeId
+            );
+            if (chart) {
+              profile = {
+                id: chart.id ?? chart._id,
+                name: chart.name,
+                date: chart.date,
+                time: chart.time,
+                place: chart.place,
+                latitude: chart.latitude,
+                longitude: chart.longitude,
+                gender: chart.gender,
+                relation: chart.relation,
+                isSelf: chart.relation === 'self',
+              };
+            }
+          } catch (_) {}
+        }
         if (profile) {
           await storage.setBirthDetails(profile);
         }

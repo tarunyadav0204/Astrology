@@ -449,20 +449,20 @@ export default function ChatScreen({ navigation, route }) {
       navigation.setParams({ resetToGreeting: undefined });
     }
     
-    // Handle start chat param
+    // Handle start chat param (e.g. from notification tap). Refresh birth data from storage
+    // first so the notification's native_id selection is applied, then open chat.
     if (route.params?.startChat) {
       const initialMsg = route.params?.initialMessage;
       navigation.setParams({ startChat: undefined, initialMessage: undefined });
-      
-      // Use the same logic as greeting option select for question action
-      handleGreetingOptionSelect({ action: 'question' });
-      
-      // Set initial message after a delay to ensure chat is ready
-      if (initialMsg) {
+      (async () => {
+        await checkBirthData();
         setTimeout(() => {
-          setInputText(initialMsg);
-        }, 500);
-      }
+          handleGreetingOptionSelect({ action: 'question' });
+          if (initialMsg) {
+            setInputText(initialMsg);
+          }
+        }, 150);
+      })();
     }
     
     // Handle mundane mode param

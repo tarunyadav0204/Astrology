@@ -39,7 +39,7 @@
       "package": "com.astroroshni.mobile",
       "versionCode": 76,
       "newArchEnabled": false,
-      "googleServicesFile": "./android/app/google-services.json",
+      "googleServicesFile": "./google-services.json",
       "permissions": ["com.android.vending.BILLING"]
     },
     "web": {
@@ -58,7 +58,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/android-notification-icon.jpg",
+          "icon": "./assets/android-notification-icon.png",
           "color": "#f97316"
         }
       ],

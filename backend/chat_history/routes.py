@@ -447,10 +447,18 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             # Planet transit nudges (e.g. "How will Mars's transit into Aquarius on 2026-03-15 affect me...")
             if "transit into" in q_lower and "affect me" in q_lower:
                 is_notification_question = True
-            # Lunar phase nudges
-            if "what does today's new moon mean for my chart?" in q_lower:
+            # Planet retrograde / direct nudges
+            if "retrograde" in q_lower and "affect me" in q_lower:
                 is_notification_question = True
-            if "what does today's full moon mean for my chart?" in q_lower:
+            if "turning direct" in q_lower and "affect me" in q_lower:
+                is_notification_question = True
+            # Lunar phase nudges
+            if "new moon" in q_lower and "affect me" in q_lower:
+                is_notification_question = True
+            if "full moon" in q_lower and "affect me" in q_lower:
+                is_notification_question = True
+            # Festival nudges
+            if "festival" in q_lower and "remedies" in q_lower:
                 is_notification_question = True
         
         # Force READY if clarification limit reached, partnership mode, or notification-originated question

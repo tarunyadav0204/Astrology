@@ -88,6 +88,12 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace 'com.astroroshni.mobile'
+    flavorDimensions += "store"
+    productFlavors {
+        play {
+            dimension "store"
+        }
+    }
     defaultConfig {
         applicationId 'com.astroroshni.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
@@ -96,9 +102,6 @@ android {
         versionName "1.1.6"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
-
-        // react-native-iap has "store" dimension (play vs amazon); we use Google Play only
-        missingDimensionStrategy 'store', 'play'
     }
     signingConfigs {
         debug {
@@ -107,23 +110,15 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        release {
-            // Release keystore is configured via gradle.properties so secrets are not in source control
-            if (project.hasProperty('ASTRO_UPLOAD_STORE_FILE')) {
-                storeFile file(ASTRO_UPLOAD_STORE_FILE)
-                storePassword ASTRO_UPLOAD_STORE_PASSWORD
-                keyAlias ASTRO_UPLOAD_KEY_ALIAS
-                keyPassword ASTRO_UPLOAD_KEY_PASSWORD
-            }
-        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Uses the release keystore configured in gradle.properties
-            signingConfig signingConfigs.release
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

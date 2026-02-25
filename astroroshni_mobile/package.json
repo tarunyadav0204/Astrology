@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "web": "npx expo start --web",
     "generate-ios-icon": "node scripts/generate-ios-icon-with-background.js",
+    "ensure-notification-icon": "node scripts/ensure-notification-icon-png.js",
     "clean-cache": "rm -rf node_modules/.cache/metro node_modules/.cache/expo",
     "postinstall": "patch-package"
   },

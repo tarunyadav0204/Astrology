@@ -108,7 +108,7 @@ const AdminChatHistory = () => {
     <div className="admin-chat-history">
       <h2>User Chat History</h2>
       
-      <div className="admin-chat-content">
+      <div className={`admin-chat-content ${selectedSession ? 'has-selection' : ''}`}>
         <div className="sessions-list">
           <h3>All Chat Sessions</h3>
           {loading ? (
@@ -135,8 +135,11 @@ const AdminChatHistory = () => {
         {selectedSession && (
           <div className="session-details">
             <div className="session-header">
-              <h3>Session Details</h3>
-              <button onClick={() => setSelectedSession(null)}>×</button>
+              <button type="button" className="session-back" onClick={() => setSelectedSession(null)} aria-label="Back to sessions">
+                ← Back to sessions
+              </button>
+              <h3 className="session-header-title">Session</h3>
+              <button type="button" className="session-close" onClick={() => setSelectedSession(null)} aria-label="Close">×</button>
             </div>
             
             <div className="messages-container">
