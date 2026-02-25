@@ -440,8 +440,21 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             state_row = cursor.fetchone()
             clarification_count = state_row[0] if state_row else 0
         
-        # Force ready if clarification limit reached
-        force_ready_for_limit = partnership_mode or clarification_count >= 1
+        # Detect notification-originated questions to avoid clarification loops
+        q_lower = (question or "").strip().lower()
+        is_notification_question = False
+        if q_lower:
+            # Planet transit nudges (e.g. "How will Mars's transit into Aquarius on 2026-03-15 affect me...")
+            if "transit into" in q_lower and "affect me" in q_lower:
+                is_notification_question = True
+            # Lunar phase nudges
+            if "what does today's new moon mean for my chart?" in q_lower:
+                is_notification_question = True
+            if "what does today's full moon mean for my chart?" in q_lower:
+                is_notification_question = True
+        
+        # Force READY if clarification limit reached, partnership mode, or notification-originated question
+        force_ready_for_limit = partnership_mode or clarification_count >= 1 or is_notification_question
         
         intent_router = IntentRouter()
         intent = await intent_router.classify_intent(question, [], user_facts, clarification_count=clarification_count, language=language, force_ready=force_ready_for_limit, d1_chart=d1_chart)

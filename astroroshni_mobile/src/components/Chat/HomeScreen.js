@@ -4011,15 +4011,24 @@ const styles = StyleSheet.create({
   // Bottom Tabs Styles
   bottomTabs: {
     flexDirection: 'row',
-    height: 75,
-    paddingBottom: 20,
-    paddingTop: 8,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     zIndex: 10000,
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        height: 75,
+        paddingTop: 8,
+        paddingBottom: 20,
+      },
+      android: {
+        height: 56,
+        paddingTop: 6,
+        paddingBottom: 4,
+      },
+    }),
   },
   tabItem: {
     flex: 1,
