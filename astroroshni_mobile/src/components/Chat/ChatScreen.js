@@ -1627,7 +1627,7 @@ export default function ChatScreen({ navigation, route }) {
                   {birthData ? (
                     <NativeSelectorChip
                       birthData={birthData}
-                      onPress={() => navigation.navigate('SelectNative', { returnTo: 'Chat' })}
+                      onPress={() => navigation.navigate('SelectNative', { returnTo: 'Home' })}
                       maxLength={8}
                       showIcon={false}
                       style={styles.headerNativeChip}

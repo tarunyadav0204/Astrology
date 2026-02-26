@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar, View, ActivityIndicator, Animated } from 'react-native';
+import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 import i18n from './src/locales/i18n';
 
@@ -50,6 +51,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
 import { storage } from './src/services/storage';
 import SplashScreen from './src/components/SplashScreen';
+import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 // Push notifications: imported lazily in useEffect to avoid touching native module at launch (reduces iOS device crash risk).
 
 const Stack = createStackNavigator();
@@ -58,6 +60,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Welcome');
   const [initialTheme, setInitialTheme] = useState(null);
+  const [forceUpdateInfo, setForceUpdateInfo] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const navigationRef = useRef(null);
 
@@ -88,6 +91,42 @@ export default function App() {
 
   const SPLASH_MIN_MS = 3000;
 
+  const checkForceUpdate = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}${getEndpoint('/app/config')}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const minAndroid = Number(data?.min_android_version_code || 0);
+      const minIos = Number(data?.min_ios_build_number || 0);
+
+      if (Platform.OS === 'android') {
+        const current = Number(Constants.expoConfig?.android?.versionCode || 0);
+        if (minAndroid && current && current < minAndroid) {
+          setForceUpdateInfo({
+            platform: 'android',
+            currentVersion: current,
+            minVersion: minAndroid,
+          });
+        }
+      } else if (Platform.OS === 'ios') {
+        const current = Number(Constants.expoConfig?.ios?.buildNumber || 0);
+        if (minIos && current && current < minIos) {
+          setForceUpdateInfo({
+            platform: 'ios',
+            currentVersion: current,
+            minVersion: minIos,
+          });
+        }
+      }
+    } catch (e) {
+      // If config fetch fails, do not block app usage.
+      if (__DEV__) {
+        console.warn('[App] Failed to fetch app config for version gate:', e?.message || e);
+      }
+    }
+  };
+
   const bootstrap = async () => {
     const start = Date.now();
     try {
@@ -96,6 +135,9 @@ export default function App() {
       setInitialTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark');
 
       loadSavedLanguage();
+
+      // Check if this build is still allowed by backend config.
+      await checkForceUpdate();
 
       const authToken = await storage.getAuthToken();
 
@@ -182,8 +224,53 @@ export default function App() {
     };
   }, [isLoading, skipPushOnIos]);
 
+  const handleUpdatePress = () => {
+    try {
+      if (Platform.OS === 'android') {
+        const pkg = Constants.expoConfig?.android?.package || 'com.astroroshni.mobile';
+        const playUrl = `https://play.google.com/store/apps/details?id=${pkg}`;
+        Linking.openURL(playUrl);
+      } else if (Platform.OS === 'ios') {
+        // TODO: replace with actual App Store URL for AstroRoshni
+        const appStoreUrl = 'https://astroroshni.com';
+        Linking.openURL(appStoreUrl);
+      }
+    } catch (e) {
+      if (__DEV__) {
+        console.warn('[App] Failed to open store URL:', e?.message || e);
+      }
+    }
+  };
+
   if (isLoading) {
     return <SplashScreen />;
+  }
+
+  if (forceUpdateInfo) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffedd5" />
+        <View style={{ flex: 1, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 12, textAlign: 'center', color: '#7c2d12' }}>
+            Update required
+          </Text>
+          <Text style={{ fontSize: 15, textAlign: 'center', color: '#7c2d12', marginBottom: 24 }}>
+            A new version of AstroRoshni is available. Please update the app to continue.
+          </Text>
+          <TouchableOpacity
+            onPress={handleUpdatePress}
+            style={{
+              backgroundColor: '#f97316',
+              borderRadius: 999,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>Update app</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaProvider>
+    );
   }
 
   return (

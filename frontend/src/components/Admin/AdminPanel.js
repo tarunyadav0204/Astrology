@@ -52,6 +52,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [adminSettings, setAdminSettings] = useState([]);
   const [debugLogging, setDebugLogging] = useState(false);
+  const [androidMinVersion, setAndroidMinVersion] = useState('');
+  const [iosMinVersion, setIosMinVersion] = useState('');
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
   const [notifBody, setNotifBody] = useState('');
@@ -98,6 +100,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setAdminSettings(data.settings || []);
       const debugSetting = data.settings.find(s => s.key === 'debug_logging_enabled');
       setDebugLogging(debugSetting?.value === 'true');
+      const androidMin = data.settings.find(s => s.key === 'min_android_version_code');
+      const iosMin = data.settings.find(s => s.key === 'min_ios_build_number');
+      setAndroidMinVersion(androidMin?.value ?? '');
+      setIosMinVersion(iosMin?.value ?? '');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
     }
@@ -124,6 +130,47 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       }
     } catch (error) {
       console.error('Error updating debug logging:', error);
+    }
+  };
+
+  const handleSaveAppVersionConfig = async () => {
+    const token = localStorage.getItem('token');
+    const androidValue = androidMinVersion?.toString().trim();
+    const iosValue = iosMinVersion?.toString().trim();
+
+    const payloads = [];
+    if (androidValue !== '') {
+      payloads.push({
+        key: 'min_android_version_code',
+        value: androidValue,
+        description: 'Minimum required Android versionCode for mobile app',
+      });
+    }
+    if (iosValue !== '') {
+      payloads.push({
+        key: 'min_ios_build_number',
+        value: iosValue,
+        description: 'Minimum required iOS build number for mobile app',
+      });
+    }
+
+    try {
+      await Promise.all(
+        payloads.map((p) =>
+          fetch(`/api/admin/settings/${p.key}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(p),
+          })
+        )
+      );
+      alert('App version config saved. Users below these versions will be forced to update.');
+    } catch (error) {
+      console.error('Error saving app version config:', error);
+      alert('Failed to save app version config.');
     }
   };
 
@@ -1414,6 +1461,45 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   />
                   <span className="toggle-slider"></span>
                 </label>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>App Version Config</h3>
+              <p className="settings-hint">
+                Set the minimum allowed app versions. Users on older builds will see a blocking “Update required” screen.
+                Leave a field empty to disable the gate for that platform.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Android min versionCode</strong>
+                  <p>Current Google Play versionCode to require or higher (e.g. 77).</p>
+                </div>
+                <input
+                  type="number"
+                  value={androidMinVersion}
+                  onChange={(e) => setAndroidMinVersion(e.target.value)}
+                  placeholder="e.g. 77"
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>iOS min build number</strong>
+                  <p>Current App Store build number to require or higher (e.g. 77).</p>
+                </div>
+                <input
+                  type="number"
+                  value={iosMinVersion}
+                  onChange={(e) => setIosMinVersion(e.target.value)}
+                  placeholder="e.g. 77"
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button type="button" className="create-btn" onClick={handleSaveAppVersionConfig}>
+                  Save App Version Config
+                </button>
               </div>
             </div>
           </div>

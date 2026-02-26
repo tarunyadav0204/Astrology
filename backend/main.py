@@ -38,6 +38,7 @@ from app.kp.routes.kp_routes import router as kp_router
 from career_analysis.career_router import router as career_router
 from career_analysis.career_ai_router import router as career_ai_router
 from panchang.panchang_routes import router as panchang_router
+from utils.admin_settings import get_setting
 from panchang.muhurat_routes import router as muhurat_router
 from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
@@ -137,6 +138,11 @@ except ImportError:
     import psutil
 
 
+# App version gating – defaults from environment, but can be overridden from admin settings.
+MIN_ANDROID_VERSION_CODE = int(os.getenv("MIN_ANDROID_VERSION_CODE", "0"))
+MIN_IOS_BUILD_NUMBER = int(os.getenv("MIN_IOS_BUILD_NUMBER", "0"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle (replaces on_event)."""
@@ -178,6 +184,45 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=422,
         content={"detail": exc.errors()}
+    )
+
+
+class AppConfigResponse(BaseModel):
+    """Lightweight config for mobile apps (e.g. min supported versions)."""
+
+    min_android_version_code: int
+    min_ios_build_number: int
+
+
+@app.get("/api/app/config", response_model=AppConfigResponse)
+async def get_app_config() -> AppConfigResponse:
+    """
+    Configuration for mobile apps. Used to enforce minimum app versions.
+
+    Values come from admin_settings first (set via admin UI), with environment
+    variables used only as a fallback default:
+      - admin_settings.min_android_version_code or MIN_ANDROID_VERSION_CODE
+      - admin_settings.min_ios_build_number or MIN_IOS_BUILD_NUMBER
+
+    Set values to 0 (or leave unset) to disable forced updates.
+    """
+    # Read from admin_settings if present, otherwise fall back to env defaults
+    android_setting = get_setting("min_android_version_code")
+    ios_setting = get_setting("min_ios_build_number")
+
+    try:
+      min_android = int(android_setting) if android_setting is not None else MIN_ANDROID_VERSION_CODE
+    except ValueError:
+      min_android = MIN_ANDROID_VERSION_CODE
+
+    try:
+      min_ios = int(ios_setting) if ios_setting is not None else MIN_IOS_BUILD_NUMBER
+    except ValueError:
+      min_ios = MIN_IOS_BUILD_NUMBER
+
+    return AppConfigResponse(
+        min_android_version_code=min_android,
+        min_ios_build_number=min_ios,
     )
 
 # Configure timeout for long-running requests (Gemini AI takes 30-60 seconds)

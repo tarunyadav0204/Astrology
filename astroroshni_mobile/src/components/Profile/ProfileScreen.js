@@ -488,7 +488,7 @@ export default function ProfileScreen({ navigation }) {
                     if (birthData?.id) {
                       navigation.navigate('Facts', { birthChartId: birthData.id, nativeName: birthData.name });
                     } else {
-                      Alert.alert('Birth Data Required', 'Please connect your birth chart to manage facts.');
+                      navigation.navigate('Facts');
                     }
                   }}
                   color="#e91e63"
