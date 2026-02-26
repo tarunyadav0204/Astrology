@@ -6,6 +6,12 @@ import { StatusBar, View, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { initCrashReporting, setupGlobalJSErrorHandler, identifyUser } from './src/services/crashReporting';
+import ErrorBoundary from './src/components/ErrorBoundary';
+
+initCrashReporting();
+setupGlobalJSErrorHandler();
+
 import i18n from './src/locales/i18n';
 
 import WelcomeScreen from './src/components/Welcome/WelcomeScreen';
@@ -101,6 +107,13 @@ export default function App() {
 
       if (authToken) {
         try {
+          const userData = await AsyncStorage.getItem('userData');
+          if (userData) {
+            const parsed = JSON.parse(userData);
+            identifyUser(parsed.userid, { name: parsed.name, phone: parsed.phone });
+          }
+        } catch (_) {}
+        try {
           const { chartAPI } = require('./src/services/api');
           const response = await Promise.race([
             chartAPI.getExistingCharts(),
@@ -187,6 +200,7 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
     <SafeAreaProvider>
       <ThemeProvider initialTheme={initialTheme}>
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
@@ -392,5 +406,6 @@ export default function App() {
         </Animated.View>
       </ThemeProvider>
     </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

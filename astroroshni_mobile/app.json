@@ -48,13 +48,15 @@
     "extra": {
       "eas": {
         "projectId": "8e33070b-ac6c-42e0-a089-bd830019bb1a"
-      }
+      },
+      "sentryDsn": ""
     },
     "runtimeVersion": "1.1.6",
     "updates": {
       "url": "https://u.expo.dev/8e33070b-ac6c-42e0-a089-bd830019bb1a"
     },
     "plugins": [
+      "@sentry/react-native/expo",
       [
         "expo-notifications",
         {

@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT } from '../utils/constants';
 import { Alert } from 'react-native';
+import { reportError, addBreadcrumb } from './crashReporting';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -35,6 +36,7 @@ api.interceptors.response.use(
   async (error) => {
     // Network error (no internet or backend down)
     if (!error.response && error.message === 'Network Error') {
+      addBreadcrumb('Network error', 'api', { url: error.config?.url });
       if (errorHandlerCallback) {
         errorHandlerCallback({
           type: 'network',
@@ -46,6 +48,7 @@ api.interceptors.response.use(
 
     // Backend timeout
     if (error.code === 'ECONNABORTED') {
+      reportError(error, { type: 'timeout', url: error.config?.url });
       if (errorHandlerCallback) {
         errorHandlerCallback({
           type: 'timeout',
@@ -57,6 +60,7 @@ api.interceptors.response.use(
 
     // Backend down (5xx errors)
     if (error.response?.status >= 500) {
+      reportError(error, { type: 'server', status: error.response?.status, url: error.config?.url });
       if (errorHandlerCallback) {
         errorHandlerCallback({
           type: 'server',
