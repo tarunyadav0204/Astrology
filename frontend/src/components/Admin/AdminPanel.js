@@ -1390,7 +1390,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'blog' && (
-          <BlogDashboard />
+          <BlogDashboard embeddedInAdmin />
         )}
 
         {activeTab === 'notifications' && (

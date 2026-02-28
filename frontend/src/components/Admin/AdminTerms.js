@@ -336,9 +336,9 @@ const AdminTerms = () => {
                       term.definition
                     )}
                   </td>
-                  <td>
+                  <td className="terms-actions-cell">
                     {editingId === term.term_id ? (
-                      <div>
+                      <div className="terms-action-buttons">
                         <button
                           onClick={() => saveEdit(term.term_id)}
                           className="save-btn"
@@ -353,7 +353,7 @@ const AdminTerms = () => {
                         </button>
                       </div>
                     ) : (
-                      <div>
+                      <div className="terms-action-buttons">
                         <button
                           onClick={() => startEdit(term)}
                           className="edit-btn"

@@ -78,9 +78,6 @@ const AdminChatPerformance = () => {
           🔄 Refresh
         </button>
       </div>
-      <p className="chat-performance-description">
-        One row per assistant answer: user, question, response preview, native (birth chart), intent router time, total duration.
-      </p>
       <div className="performance-filters">
         <label htmlFor="duration-filter">Duration:</label>
         <select

@@ -4,7 +4,7 @@ import NavigationHeader from '../Shared/NavigationHeader';
 import BlogEditor from './BlogEditor';
 import './BlogDashboard.css';
 
-const BlogDashboard = () => {
+const BlogDashboard = ({ embeddedInAdmin = false }) => {
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showEditor, setShowEditor] = useState(false);
@@ -84,7 +84,7 @@ const BlogDashboard = () => {
 
     return (
         <>
-            <NavigationHeader />
+            {!embeddedInAdmin && <NavigationHeader />}
             <div className="blog-dashboard">
             <div className="dashboard-header">
                 <h1>Blog Management</h1>
