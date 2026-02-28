@@ -511,3 +511,99 @@ async def get_all_user_facts(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching facts: {str(e)}")
+
+
+@router.get("/admin/chat-performance")
+async def get_chat_performance(
+    page: int = 1,
+    per_page: int = 20,
+    current_user: dict = Depends(require_admin)
+):
+    """Paginated chat performance: assistant answers with user, question, response preview, native, intent ms, duration."""
+    if per_page < 1 or per_page > 100:
+        per_page = 20
+    if page < 1:
+        page = 1
+    offset = (page - 1) * per_page
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Count assistant answers (completed, with content)
+        cursor.execute("""
+            SELECT COUNT(*) FROM chat_messages cm
+            WHERE cm.sender = 'assistant' AND cm.status = 'completed'
+            AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
+        """)
+        total = cursor.fetchone()[0]
+        # Optional columns language, intent_router_ms may not exist on older DBs
+        try:
+            cursor.execute("PRAGMA table_info(chat_messages)")
+            cols = [r[1] for r in cursor.fetchall()]
+            has_language = 'language' in cols
+            has_intent_ms = 'intent_router_ms' in cols
+        except Exception:
+            has_language = has_intent_ms = False
+        sel = """
+            SELECT cm.message_id, cm.content, cm.started_at, cm.completed_at,
+                   cs.session_id, u.name as user_name, u.phone as user_phone,
+                   bc.name as native_name,
+                   (SELECT content FROM chat_messages m2
+                    WHERE m2.session_id = cm.session_id AND m2.sender = 'user' AND m2.message_id < cm.message_id
+                    ORDER BY m2.message_id DESC LIMIT 1) as user_question
+        """
+        if has_language:
+            sel += ", cm.language"
+        if has_intent_ms:
+            sel += ", cm.intent_router_ms"
+        sel += """
+            FROM chat_messages cm
+            JOIN chat_sessions cs ON cs.session_id = cm.session_id
+            LEFT JOIN users u ON u.userid = cs.user_id
+            LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+            WHERE cm.sender = 'assistant' AND cm.status = 'completed'
+            AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
+            ORDER BY cm.message_id DESC
+            LIMIT ? OFFSET ?
+        """
+        cursor.execute(sel, (per_page, offset))
+        rows = cursor.fetchall()
+        items = []
+        for row in rows:
+            row_dict = dict(row)
+            content = row_dict.get('content') or ''
+            preview = content[:300].strip() + ('…' if len(content) > 300 else '')
+            user_question = row_dict.get('user_question') or ''
+            uq_preview = user_question[:150].strip() + ('…' if len(user_question) > 150 else '')
+            started = row_dict.get('started_at')
+            completed = row_dict.get('completed_at')
+            duration_seconds = None
+            if started and completed:
+                try:
+                    s = datetime.fromisoformat(started.replace('Z', '+00:00')) if isinstance(started, str) else started
+                    c = datetime.fromisoformat(completed.replace('Z', '+00:00')) if isinstance(completed, str) else completed
+                    duration_seconds = round((c - s).total_seconds(), 2)
+                except Exception:
+                    pass
+            items.append({
+                'message_id': row_dict['message_id'],
+                'user_name': row_dict.get('user_name') or '—',
+                'user_phone': row_dict.get('user_phone') or '—',
+                'user_question': uq_preview,
+                'response_preview': preview,
+                'native_name': row_dict.get('native_name') or '—',
+                'intent_router_ms': row_dict.get('intent_router_ms') if has_intent_ms else None,
+                'duration_seconds': duration_seconds,
+                'completed_at': row_dict.get('completed_at'),
+            })
+        conn.close()
+        return {
+            'items': items,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page if per_page else 0,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching chat performance: {str(e)}")

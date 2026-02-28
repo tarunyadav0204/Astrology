@@ -17,7 +17,10 @@ class ChatErrorLog(BaseModel):
 
 @router.post("/chat/log-error")
 async def log_chat_error_endpoint(error_log: ChatErrorLog, current_user = Depends(get_current_user)):
-    """Log chat errors for developer monitoring"""
+    """Log chat errors for developer monitoring.
+    Note: Requires auth; if the client error is due to 401/expired token or network,
+    this request may fail and the error will not be stored. Backend errors are logged
+    in process_gemini_response and gemini_chat_analyzer."""
     from utils.error_logger import log_chat_error
     
     error = Exception(error_log.error_message)

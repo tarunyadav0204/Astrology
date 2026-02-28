@@ -1,0 +1,142 @@
+.chat-performance-container {
+  padding: 20px;
+}
+
+.chat-performance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.chat-performance-header h2 {
+  margin: 0;
+  color: #333;
+}
+
+.chat-performance-description {
+  color: #666;
+  font-size: 0.95em;
+  margin-bottom: 20px;
+}
+
+.performance-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.performance-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.performance-table th,
+.performance-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.performance-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.performance-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.cell-user {
+  max-width: 140px;
+}
+
+.user-name {
+  display: block;
+  font-weight: 500;
+}
+
+.user-phone {
+  display: block;
+  font-size: 0.85em;
+  color: #666;
+}
+
+.cell-question,
+.cell-preview {
+  max-width: 280px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.cell-native {
+  max-width: 120px;
+}
+
+.cell-intent,
+.cell-duration {
+  white-space: nowrap;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #3498db;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  color: #666;
+  font-size: 14px;
+}
+
+.loading,
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+  font-size: 1.05em;
+}
+
+.refresh-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

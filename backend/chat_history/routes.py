@@ -57,6 +57,16 @@ def init_chat_tables():
         except sqlite3.OperationalError:
             pass
     
+    # Chat performance: language and intent router timing
+    for col, typ in [
+        ('language', 'TEXT'),
+        ('intent_router_ms', 'REAL'),
+    ]:
+        try:
+            cursor.execute(f'ALTER TABLE chat_messages ADD COLUMN {col} {typ}')
+        except sqlite3.OperationalError:
+            pass
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
             message_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -633,6 +643,30 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         print(f"❌ [STATUS ERROR] messageId: {message_id}, error: {str(e)}, total_time: {total_time:.3f}s")
         import traceback
         traceback.print_exc()
+        # Log to admin so status-check failures (DB/500) are visible
+        try:
+            from utils.error_logger import log_chat_error
+            conn2 = sqlite3.connect('astrology.db')
+            cur = conn2.cursor()
+            cur.execute('''
+                SELECT cs.user_id, cm.session_id FROM chat_messages cm
+                JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                WHERE cm.message_id = ?
+            ''', (message_id,))
+            row = cur.fetchone()
+            if row:
+                user_id, sid = row[0], row[1]
+                cur.execute('SELECT content FROM chat_messages WHERE session_id = ? AND sender = ? ORDER BY message_id DESC LIMIT 1', (sid, 'user'))
+                qrow = cur.fetchone()
+                question = (qrow[0][:500] if qrow else None) or f"(message_id: {message_id})"
+                conn2.close()
+                log_chat_error(user_id, 'Unknown', '', e, question, None, 'backend')
+            else:
+                conn2.close()
+                err = Exception(f"Status check failed for message_id {message_id}: {e}")
+                log_chat_error(None, 'Unknown', '', err, f"message_id: {message_id}", None, 'backend')
+        except Exception as log_err:
+            print(f"⚠️ Failed to log status error: {log_err}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 def get_original_question_for_clarification(session_id, current_message_id, conn):
@@ -843,6 +877,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         # === INTENT ROUTING ===
         import time
         routing_start = time.time()
+        intent_router_ms = None  # set after intent when not partnership_mode
         
         intent = {'status': 'READY', 'mode': 'birth', 'category': 'general', 'extracted_context': {}}  # Default
         
@@ -932,6 +967,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             print(f"{'='*80}\n")
             
             intent = await intent_router.classify_intent(combined_question, history, user_facts, language=language, force_ready=force_ready)
+            intent_router_ms = round((time.time() - routing_start) * 1000, 1)
             
             # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
@@ -974,8 +1010,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 with sqlite3.connect('astrology.db') as conn:
                     cursor = conn.cursor()
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
-                        (sanitize_text(intent.get('clarification_question', 'Could you provide more details?')), "completed", "clarification", datetime.now(), message_id)
+                        "UPDATE chat_messages SET content = ?, status = ?, message_type = ?, completed_at = ?, language = ?, intent_router_ms = ? WHERE message_id = ?",
+                        (sanitize_text(intent.get('clarification_question', 'Could you provide more details?')), "completed", "clarification", datetime.now(), language, intent_router_ms, message_id)
                     )
                     
                     # Update conversation state
@@ -1252,7 +1288,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     follow_up_questions = result.get('follow_up_questions', [])
                     
                     cursor.execute(
-                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, follow_up_questions = ?, status = ?, message_type = ?, completed_at = ? WHERE message_id = ?",
+                        "UPDATE chat_messages SET content = ?, terms = ?, glossary = ?, images = ?, follow_up_questions = ?, status = ?, message_type = ?, completed_at = ?, language = ?, intent_router_ms = ? WHERE message_id = ?",
                         (
                             sanitize_text(result['response']), 
                             json.dumps(terms),
@@ -1262,17 +1298,33 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             "completed", 
                             "answer", 
                             datetime.now(), 
+                            language,
+                            intent_router_ms,
                             message_id
                         )
                     )
                 else:
                     print(f"❌ CREDIT DEDUCTION FAILED for user {user_id}")
+                    try:
+                        from utils.error_logger import log_chat_error
+                        credit_err = Exception("Credit deduction failed")
+                        username = (birth_details or {}).get('name', 'Unknown')
+                        log_chat_error(user_id, username, '', credit_err, question, birth_details, 'backend')
+                    except Exception:
+                        pass
                     cursor.execute(
                         "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
                         ("failed", "Credit deduction failed. Please try again.", datetime.now(), message_id)
                     )
             else:
                 error_msg = result.get('error', 'Unable to process your request at this time. Please try again.')
+                try:
+                    from utils.error_logger import log_chat_error
+                    err = Exception(error_msg)
+                    username = (birth_details or {}).get('name', 'Unknown')
+                    log_chat_error(user_id, username, '', err, question, birth_details, 'backend')
+                except Exception:
+                    pass
                 cursor.execute(
                     "UPDATE chat_messages SET status = ?, error_message = ?, completed_at = ? WHERE message_id = ?",
                     ("failed", error_msg, datetime.now(), message_id)
@@ -1289,9 +1341,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 print(f"❌ Fact extraction error: {e}")
         
     except Exception as e:
-        # Handle any errors with user-friendly message
+        # Handle any errors with user-friendly message and log to admin error list
         user_friendly_error = "I'm having trouble analyzing your chart right now. Please try again in a moment."
-        
+        try:
+            from utils.error_logger import log_chat_error
+            username = (birth_details or {}).get('name', 'Unknown')
+            log_chat_error(user_id, username, '', e, question, birth_details, 'backend')
+        except Exception as log_err:
+            print(f"⚠️ Failed to log error to chat_error_logs: {log_err}")
         with sqlite3.connect('astrology.db') as conn:
             cursor = conn.cursor()
             cursor.execute(

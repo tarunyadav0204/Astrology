@@ -358,54 +358,18 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           .replace(/&amp;/g, '&')
           .replace(/&#39;/g, "'")
           .replace(/&nbsp;/g, ' ')
-          .replace(/<[^>]*>/g, '')
+          .replace(/<(?!\/?tooltip(?:\s|>))[^>]*>/gi, '') // preserve <tooltip> and </tooltip>
           .replace(/Quick Answer\s*:?/g, '')
           .replace(/^\s*:?\s*/, '')
           .replace(/^\n*:/, '')
           .replace(/^\s*:\s*/, '')
           .trim();
         
-        // Process markdown formatting in card content
-        const renderCardContent = (text) => {
-          const boldRegex = /\*\*(.*?)\*\*/gs;
-          const parts = text.split(boldRegex);
-          
-          return parts.map((part, index) => {
-            if (index % 2 === 1) { // Bold text
-              return (
-                <Text key={`card-bold-${index}`} style={[styles.cardText, { fontWeight: '700' }]}>
-                  {part}
-                </Text>
-              );
-            } else if (part) {
-              // Handle italics
-              const italicRegex = /\*(.*?)\*/gs;
-              const italicParts = part.split(italicRegex);
-              
-              return italicParts.map((italicPart, italicIndex) => {
-                if (italicIndex % 2 === 1) { // Italic text
-                  return (
-                    <Text key={`card-italic-${index}-${italicIndex}`} style={[styles.cardText, { fontStyle: 'italic' }]}>
-                      {italicPart}
-                    </Text>
-                  );
-                } else if (italicPart) {
-                  return (
-                    <Text key={`card-text-${index}-${italicIndex}`} style={styles.cardText}>
-                      {italicPart}
-                    </Text>
-                  );
-                }
-                return null;
-              });
-            }
-            return null;
-          });
-        };
-        
+        const quickKey = currentIndex;
+        currentIndex += 1;
         elements.push(
           <TouchableOpacity 
-            key={`quick-${currentIndex++}`} 
+            key={`quick-${quickKey}`} 
             activeOpacity={0.95}
             style={styles.quickAnswerWrapper}
           >
@@ -442,15 +406,16 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                   <View style={styles.titleUnderline} />
                 </View>
               </View>
-              <Text style={styles.cardText}>
-                {renderCardContent(cardContent)}
-              </Text>
+              <View style={styles.cardText}>
+                {renderTextWithBold(cardContent, quickKey * 1000, message.role, styles.cardText)}
+              </View>
               
               {/* Decorative sparkle */}
               <Text style={styles.sparkleIcon}>✨</Text>
             </LinearGradient>
           </TouchableOpacity>
         );
+        currentIndex += 100;
       } else if (item.type === 'final') {
         let cardContent = item.match[1]
           .replace(/&lt;/g, '<')
@@ -459,54 +424,18 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           .replace(/&amp;/g, '&')
           .replace(/&#39;/g, "'")
           .replace(/&nbsp;/g, ' ')
-          .replace(/<[^>]*>/g, '')
+          .replace(/<(?!\/?tooltip(?:\s|>))[^>]*>/gi, '') // preserve <tooltip> and </tooltip>
           .replace(/Final Thoughts\s*:?/g, '')
           .replace(/^\s*:?\s*/, '')
           .replace(/^\n*:/, '')
           .replace(/^\s*:\s*/, '')
           .trim();
         
-        // Process markdown formatting in card content
-        const renderCardContent = (text) => {
-          const boldRegex = /\*\*(.*?)\*\*/gs;
-          const parts = text.split(boldRegex);
-          
-          return parts.map((part, index) => {
-            if (index % 2 === 1) { // Bold text
-              return (
-                <Text key={`card-bold-${index}`} style={[styles.cardText, { fontWeight: '700' }]}>
-                  {part}
-                </Text>
-              );
-            } else if (part) {
-              // Handle italics
-              const italicRegex = /\*(.*?)\*/gs;
-              const italicParts = part.split(italicRegex);
-              
-              return italicParts.map((italicPart, italicIndex) => {
-                if (italicIndex % 2 === 1) { // Italic text
-                  return (
-                    <Text key={`card-italic-${index}-${italicIndex}`} style={[styles.cardText, { fontStyle: 'italic' }]}>
-                      {italicPart}
-                    </Text>
-                  );
-                } else if (italicPart) {
-                  return (
-                    <Text key={`card-text-${index}-${italicIndex}`} style={styles.cardText}>
-                      {italicPart}
-                    </Text>
-                  );
-                }
-                return null;
-              });
-            }
-            return null;
-          });
-        };
-        
+        const finalKey = currentIndex;
+        currentIndex += 100;
         elements.push(
           <TouchableOpacity 
-            key={`final-${currentIndex++}`}
+            key={`final-${finalKey}`}
             activeOpacity={0.95}
             style={styles.finalThoughtsWrapper}
           >
@@ -533,9 +462,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                   <View style={[styles.titleUnderline, { backgroundColor: '#4169E1' }]} />
                 </View>
               </View>
-              <Text style={styles.cardText}>
-                {renderCardContent(cardContent)}
-              </Text>
+              <View style={styles.cardText}>
+                {renderTextWithBold(cardContent, finalKey * 1000, message.role, styles.cardText)}
+              </View>
               <Text style={[styles.sparkleIcon, { color: '#4169E1' }]}>📜</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -560,9 +489,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                 {/* Header */}
                 <View style={styles.tableHeaderRow}>
                   {headerRow.map((header, idx) => (
-                    <Text key={`th-${idx}`} style={[styles.tableHeaderCell, { flex: 1 }]}>
-                      {header.replace(/\*\*/g, '')}
-                    </Text>
+                    <View key={`th-${idx}`} style={[styles.tableHeaderCell, { flex: 1 }]}>
+                      {renderTextWithBold(header, 2000 + idx, message.role, styles.tableHeaderCell)}
+                    </View>
                   ))}
                 </View>
                 {/* Rows */}
@@ -572,9 +501,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                   return (
                     <View key={`tr-${rowIdx}`} style={styles.tableRow}>
                       {cells.map((cell, cellIdx) => (
-                        <Text key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCell, { flex: 1 }]}>
-                          {cell.replace(/\*\*/g, '')}
-                        </Text>
+                        <View key={`td-${rowIdx}-${cellIdx}`} style={[styles.tableCell, { flex: 1 }]}>
+                          {renderTextWithBold(cell, 2000 + rowIdx * 100 + cellIdx, message.role, styles.tableCell)}
+                        </View>
                       ))}
                     </View>
                   );
@@ -597,8 +526,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     return elements;
   };
   
-  const renderTextWithBold = (text, startIndex, role) => {
+  const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
     const elements = [];
+    const textStyle = baseTextStyle ? [styles.regularText, baseTextStyle, message.role === 'user' && styles.userText] : [styles.regularText, message.role === 'user' && styles.userText];
     
     // Handle tooltip tags first
     const tooltipRegex = /<tooltip data-term="([^"]+)" data-definition="([^"]+)">([^<]+)<\/tooltip>/g;
@@ -615,7 +545,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           <Text
             key={`tooltip-${startIndex}-${i}`}
             onPress={() => setTooltipModal({ show: true, term: part, definition: definition })}
-            style={styles.tooltipText}
+            style={[styles.tooltipText, baseTextStyle]}
           >
             {part} ⓘ
           </Text>
@@ -632,6 +562,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                 key={`bold-${startIndex}-${i}-${boldIndex}`} 
                 style={[
                   styles.boldText,
+                  baseTextStyle,
                   message.role === 'user' && styles.userText,
                   message.role === 'user' && { fontWeight: '700' }
                 ]}
@@ -651,6 +582,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                     key={`italic-${startIndex}-${i}-${boldIndex}-${italicIndex}`} 
                     style={[
                       styles.regularText, 
+                      baseTextStyle,
                       { fontStyle: 'italic' },
                       message.role === 'user' && styles.userText
                     ]}
@@ -662,10 +594,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                 elements.push(
                   <Text 
                     key={`text-${startIndex}-${i}-${boldIndex}-${italicIndex}`} 
-                    style={[
-                      styles.regularText,
-                      message.role === 'user' && styles.userText
-                    ]}
+                    style={textStyle}
                   >
                     {italicPart}
                   </Text>
@@ -680,10 +609,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     return elements.length > 0 ? [
       <Text 
         key={`line-${startIndex}`} 
-        style={[
-          styles.regularText,
-          message.role === 'user' && styles.userText
-        ]}
+        style={textStyle}
       >
         {elements}
       </Text>
@@ -852,6 +778,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       if (part.match(/<h3>(.*?)<\/h3>/)) {
         listCounter = 0; // Reset counter for new section
         let headerText = part.replace(/<h3>(.*?)<\/h3>/, '$1');
+        headerText = headerText.replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
         const symbol = getHeaderSymbol(headerText);
         elements.push(
@@ -862,7 +789,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         );
       } else if (part.match(/^##\s+(.+)$/m) || part.match(/^###\s+(.+)$/m)) {
         listCounter = 0; // Reset counter for new section
-        let headerText = part.replace(/^##\s+(.+)$/m, '$1').replace(/^###\s+(.+)$/m, '$1');
+        let headerText = part.replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
         const symbol = getHeaderSymbol(headerText);
         elements.push(
@@ -872,7 +799,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         );
       } else if (part.match(/^####\s+(.+)$/m)) {
-        let headerText = part.replace(/^####\s+(.+)$/m, '$1');
+        let headerText = part.replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
         const symbol = getHeaderSymbol(headerText);
         elements.push(
@@ -999,7 +926,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     if (role === 'user') {
       return (
         <LinearGradient
-          colors={['#dcf0ff', '#bae6fd']}
+          colors={['#fffef5', '#fffae6']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[

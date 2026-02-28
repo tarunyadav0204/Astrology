@@ -4029,14 +4029,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Platform.select({
       ios: {
-        height: 75,
-        paddingTop: 8,
-        paddingBottom: 20,
+        height: 80,
+        paddingTop: 0,
+        paddingBottom: 0,
       },
       android: {
-        height: 60,
-        paddingTop: 6,
-        paddingBottom: 8,
+        height: 70,
+        paddingTop: 0,
+        paddingBottom: 0,
       },
     }),
   },

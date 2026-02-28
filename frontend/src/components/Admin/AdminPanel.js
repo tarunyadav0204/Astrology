@@ -8,6 +8,7 @@ import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
+import AdminChatPerformance from './AdminChatPerformance';
 import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
 import BlogDashboard from '../Blog/BlogDashboard';
@@ -658,6 +659,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('errors')}
         >
           Errors
+        </button>
+        <button 
+          className={`tab ${activeTab === 'performance' ? 'active' : ''}`}
+          onClick={() => setActiveTab('performance')}
+        >
+          Chat Performance
         </button>
         <button 
           className={`tab ${activeTab === 'blog' ? 'active' : ''}`}
@@ -1347,6 +1354,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'errors' && (
           <ChatErrors />
+        )}
+
+        {activeTab === 'performance' && (
+          <AdminChatPerformance />
         )}
 
         {activeTab === 'terms' && (

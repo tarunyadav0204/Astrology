@@ -58,7 +58,6 @@ export default function ChatScreen({ navigation, route }) {
   const { theme, colors, getCardElevation } = useTheme();
   const { credits, partnershipCost, fetchBalance } = useCredits();
   const insets = useSafeAreaInsets();
-  const quickActionsBottomInset = Platform.OS === 'android' ? insets.bottom : insets.bottom;
   
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
@@ -1099,7 +1098,20 @@ export default function ChatScreen({ navigation, route }) {
         
       } catch (error) {
         console.error('❌ Polling error:', error);
-        
+        // Log to backend for admin error list (non-timeout polling failures)
+        if (error.name !== 'AbortError') {
+          try {
+            const { chatErrorAPI } = require('../../services/api');
+            await chatErrorAPI.logError(
+              error.name || 'PollingError',
+              error.message || 'Poll failed',
+              userQuestion || `messageId: ${messageId}`,
+              error.stack
+            );
+          } catch (logErr) {
+            console.error('Failed to log polling error:', logErr);
+          }
+        }
         // Show user-friendly error message based on error type
         let userMessage = 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.';
         
@@ -1562,7 +1574,7 @@ export default function ChatScreen({ navigation, route }) {
       >
       <SafeAreaView
         style={styles.safeArea}
-        edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['top']}
+        edges={['top']}
       >
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
@@ -2020,7 +2032,7 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Quick Actions Bar */}
         {!showGreeting && (
-          <View style={[styles.quickActionsBar, { paddingBottom: quickActionsBottomInset }]}>
+          <View style={styles.quickActionsBar}>
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}
@@ -3402,7 +3414,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 0,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 8,
   },
   quickActionButton: {
     alignItems: 'center',
