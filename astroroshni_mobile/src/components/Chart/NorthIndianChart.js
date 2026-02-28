@@ -477,7 +477,7 @@ const NorthIndianChart = ({
                       x={planetX} 
                       y={planetY - 8} 
                       fontSize={showKarakas ? (totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : "11") : (totalPlanets > 4 ? "10" : totalPlanets > 2 ? "12" : "14")} 
-                      fill={cosmicTheme ? "rgba(255, 255, 255, 0.95)" : getPlanetColor(planet)}
+                      fill={getPlanetColor(planet)}
                       fontWeight="900"
                       textAnchor="middle"
                       onPress={() => handlePlanetPress(planet)}>

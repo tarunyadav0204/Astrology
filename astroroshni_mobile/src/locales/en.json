@@ -1,12 +1,12 @@
 {
   "birthProfileIntro": {
-    "title": "Your birth chart powers your experience",
-    "body": "We use your date, time and place of birth to calculate your Vedic chart and personalize insights. You can add or change this anytime in Profile.",
+    "title": "Let’s set up your birth profile",
+    "body": "This takes less than a minute. Your date, time and place of birth power all your charts, dashas and personalized insights across AstroRoshni. You can update these details anytime from Profile.",
     "continue": "Continue",
     "skip": "Skip for now",
     "skipSubtext": "Explore the app and add your profile later",
-    "emptyStateTitle": "Add your birth profile",
-    "emptyStateBody": "Your date, time and place of birth unlock your Vedic chart, personalized insights, and cosmic guidance. You can add or change this anytime.",
+    "emptyStateTitle": "Welcome to AstroRoshni",
+    "emptyStateBody": "To unlock the full AstroRoshni experience, we first need your birth details. Almost every feature is personalized to a native's birth chart, so please add your date, time and place of birth. You can change this anytime.",
     "emptyStateCta": "Add birth profile"
   },
   "menu": {
@@ -37,7 +37,7 @@
     "dasha": "Dasha",
     "partnership": "Partnership",
     "partner": "Partner",
-    "history": "Chat History"
+    "history": "History"
   },
   "chartTypes": {
     "lagna": {
@@ -112,8 +112,8 @@
   "chartScreen": {
     "loadingText": "Calculating Cosmic Alignments...",
     "loadingSubtext": "Reading planetary positions",
-    "emptyTitle": "No Chart Data",
-    "emptyText": "Please add birth details to view charts",
+    "emptyTitle": "Welcome to AstroRoshni",
+    "emptyText": "Add a birth profile to unlock your charts and personalized insights.",
     "transit": "Transit",
     "dasha": "Dasha",
     "karakas": "Karakas",
@@ -191,7 +191,21 @@
     "lightTheme": "Light Theme",
     "darkTheme": "Dark Theme",
     "editBirthDetails": "Edit Birth Details",
+    "aboutApp": "About AstroRoshni",
     "logout": "Logout"
+  },
+  "about": {
+    "title": "About AstroRoshni",
+    "version": "Version {{version}}",
+    "versionWithCode": "Version {{version}} (code {{code}})",
+    "versionWithBuild": "Version {{version}} (build {{build}})",
+    "description": "AstroRoshni combines Vedic astrology with intelligent guidance to help you understand your life path, timing, and hidden potentials.",
+    "legalHeading": "Legal & Policies",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "supportHeading": "Support",
+    "contactSupport": "Contact support",
+    "visitWebsite": "Visit website"
   },
   "languageModal": {
     "title": "Select Language",

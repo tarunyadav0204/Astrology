@@ -46,6 +46,8 @@ import NakshatraCalendarScreen from './src/components/NakshatraCalendar/Nakshatr
 import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
 import GlobalErrorHandler from './src/components/GlobalErrorHandler';
 import ErrorOverlay from './src/components/ErrorOverlay';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import AboutScreen from './src/components/About/AboutScreen';
 import { CreditProvider } from './src/credits/CreditContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { ErrorProvider } from './src/context/ErrorContext';
@@ -279,6 +281,7 @@ export default function App() {
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <ErrorProvider>
             <CreditProvider>
+              <ErrorBoundary>
               <NavigationContainer ref={navigationRef}>
               <GlobalErrorHandler />
               <StatusBar barStyle="dark-content" backgroundColor="#ff6b35" />
@@ -442,6 +445,11 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen 
+            name="About" 
+            component={AboutScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
             name="Shadbala" 
             component={ShadbalaScreen}
             options={{ headerShown: false }}
@@ -474,6 +482,7 @@ export default function App() {
         </Stack.Navigator>
         <ErrorOverlay />
         </NavigationContainer>
+        </ErrorBoundary>
       </CreditProvider>
       </ErrorProvider>
         </Animated.View>

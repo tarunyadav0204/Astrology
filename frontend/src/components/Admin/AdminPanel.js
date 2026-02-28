@@ -9,6 +9,7 @@ import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import AdminChatAnalysis from './AdminChatAnalysis';
+import AdminTerms from './AdminTerms';
 import BlogDashboard from '../Blog/BlogDashboard';
 import NavigationHeader from '../Shared/NavigationHeader';
 import './AdminPanel.css';
@@ -645,6 +646,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           }}
         >
           Analysis
+        </button>
+        <button 
+          className={`tab ${activeTab === 'terms' ? 'active' : ''}`}
+          onClick={() => setActiveTab('terms')}
+        >
+          Terms
         </button>
         <button 
           className={`tab ${activeTab === 'errors' ? 'active' : ''}`}
@@ -1340,6 +1347,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'errors' && (
           <ChatErrors />
+        )}
+
+        {activeTab === 'terms' && (
+          <AdminTerms />
         )}
 
         {activeTab === 'blog' && (

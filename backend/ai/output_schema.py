@@ -60,11 +60,7 @@ Tone: Balanced, honest, solution-oriented. Highlight both strengths and growth a
 # --------------------------------------------------------------------------------------
 
 # Reusable template components to reduce duplication
-GLOSSARY_BLOCK_INSTRUCTION = """
-GLOSSARY_START
-[JSON block of all <term> definitions]
-GLOSSARY_END
-"""
+GLOSSARY_BLOCK_INSTRUCTION = ""  # Glossary is now handled entirely by backend term matcher
 
 FOLLOW_UP_BLOCK_INSTRUCTION = """
 <div class="follow-up-questions">[Generate 3-4 follow-up questions. Each question MUST be on a new line and start with a hyphen (-). DO NOT wrap each question in its own `<div>` tag.]</div>
@@ -101,7 +97,6 @@ Your response MUST follow this exact sequence. The subsection headers under "Ast
 
 ### 🚨 FORMATTING RULES
 - [HEADERS]: Use ### for main headers, #### for subsections.
-- [TECH-TERMS]: Wrap all in <term id="key">Term</term>.
 """
 
 # Template B: Event Prediction Timeline
@@ -231,11 +226,11 @@ def get_response_schema_for_mode(mode: str, premium_analysis: bool = False) -> s
     if mode.upper() not in ['DEV_EVENT_LOG', 'LIFESPAN_EVENT_TIMING']:
         # Ensure there's a newline before appending
         schema_with_common_blocks = base_schema.strip() + "\n"
-        schema_with_common_blocks += GLOSSARY_BLOCK_INSTRUCTION + "\n"
+        # Only attach follow-up questions block; glossary is injected by backend
         schema_with_common_blocks += FOLLOW_UP_BLOCK_INSTRUCTION
     else:
-        # Dev log and Lifespan only get the glossary
-        schema_with_common_blocks = base_schema.strip() + "\n" + GLOSSARY_BLOCK_INSTRUCTION
+        # Dev log and Lifespan: keep base schema as-is
+        schema_with_common_blocks = base_schema.strip()
 
     # Optional: Append instructions for premium features
     image_instructions = ""

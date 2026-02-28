@@ -508,7 +508,9 @@ export default function ProfileScreen({ navigation }) {
                 <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
                   <View style={styles.settingLeft}>
                     <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color="#ffd700" />
-                    <Text style={[styles.settingText, { color: colors.text }]}>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</Text>
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {theme === 'dark' ? t('profile.darkTheme', 'Light Theme') : t('profile.lightTheme', 'Dark Theme')}
+                    </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
@@ -561,7 +563,21 @@ export default function ProfileScreen({ navigation }) {
                 <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('BirthForm', { editProfile: birthData })}>
                   <View style={styles.settingLeft}>
                     <Ionicons name="person-outline" size={22} color="#ff6b35" />
-                    <Text style={[styles.settingText, { color: colors.text }]}>Edit Birth Details</Text>
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.editBirthDetails', 'Edit Birth Details')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={[styles.settingDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]} />
+
+                <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('About')}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="information-circle-outline" size={22} color="#3b82f6" />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.aboutApp', 'About AstroRoshni')}
+                    </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>

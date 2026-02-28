@@ -316,10 +316,17 @@ export default function ChartScreen({ navigation, route }) {
             <View style={{ flex: 1 }}>
               <ScrollView 
                 style={{ flex: 1 }} 
-                contentContainerStyle={{ paddingBottom: 120 }}
+                contentContainerStyle={{ flexGrow: 1 }}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.mainContent}>
+                <View 
+                  style={[
+                    styles.mainContent,
+                    theme === 'dark' 
+                      ? { backgroundColor: '#1a0033' } 
+                      : { backgroundColor: '#fff5f0' }
+                  ]}
+                >
                   <View style={styles.chartAndNavContainer}>
                     <PanGestureHandler 
                       onGestureEvent={onGestureEvent}
@@ -341,7 +348,10 @@ export default function ChartScreen({ navigation, route }) {
                         >
                           <LinearGradient
                             colors={theme === 'dark' ? ['#1a0033', '#2d1b4e'] : ['#ffffff', '#fff5f0']}
-                            style={styles.captureGradient}
+                            style={[
+                              styles.captureGradient,
+                              { paddingBottom: (insets.bottom || 16) + 80 }
+                            ]}
                           >
                             <View style={styles.chartArea}>
                               <View style={styles.chartWrapper}>

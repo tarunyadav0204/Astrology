@@ -198,7 +198,21 @@
     "partnershipOn": "साझेदारी चालू",
     "partnershipOff": "साझेदारी बंद",
     "credits": "क्रेडिट्स",
-    "logout": "लॉग आउट"
+    "logout": "लॉग आउट",
+    "aboutApp": "AstroRoshni के बारे में"
+  },
+  "about": {
+    "title": "AstroRoshni के बारे में",
+    "version": "संस्करण {{version}}",
+    "versionWithCode": "संस्करण {{version}} (कोड {{code}})",
+    "versionWithBuild": "संस्करण {{version}} (बिल्ड {{build}})",
+    "description": "AstroRoshni वैदिक ज्योतिष और बुद्धिमान मार्गदर्शन को मिलाकर आपके जीवन पथ, समय और छिपी संभावनाओं को समझने में मदद करता है।",
+    "legalHeading": "कानूनी और नीतियाँ",
+    "privacyPolicy": "गोपनीयता नीति",
+    "termsOfService": "उपयोग की शर्तें",
+    "supportHeading": "सहायता",
+    "contactSupport": "सपोर्ट से संपर्क करें",
+    "visitWebsite": "वेबसाइट देखें"
   },
   "home": {
     "greeting": {

@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -47,7 +47,8 @@ import { useTranslation } from 'react-i18next';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
-const cardWidth = screenWidth * 0.22;
+// Width for Chart Essence dasha chips (wider so text fits comfortably)
+const cardWidth = screenWidth * 0.3;
 const fontSize = isSmallScreen ? 11 : 13;
 const smallFontSize = isSmallScreen ? 9 : 10;
 
@@ -56,6 +57,8 @@ export default function ChatScreen({ navigation, route }) {
   useAnalytics('ChatScreen');
   const { theme, colors, getCardElevation } = useTheme();
   const { credits, partnershipCost, fetchBalance } = useCredits();
+  const insets = useSafeAreaInsets();
+  const quickActionsBottomInset = Platform.OS === 'android' ? insets.bottom : insets.bottom;
   
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
@@ -1557,11 +1560,14 @@ export default function ChatScreen({ navigation, route }) {
         }
         style={styles.gradientBg}
       >
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['top']}
+      >
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
         {/* Header */}
         <View style={styles.headerContainer}>
@@ -1796,12 +1802,14 @@ export default function ChatScreen({ navigation, route }) {
                           const endDate = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
                           return (
                             <TouchableOpacity 
-                              style={[styles.dashaChip, { 
-                                backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
-                                borderColor: planetColor,
-                                borderWidth: 2,
-                                elevation: getCardElevation(3),
-                              }]}
+                              style={[
+                                styles.dashaChip,
+                                {
+                                  backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
+                                  borderColor: planetColor,
+                                  borderWidth: 2,
+                                },
+                              ]}
                               onPress={() => setShowDashaBrowser(true)}
                               activeOpacity={0.8}
                             >
@@ -1898,7 +1906,6 @@ export default function ChatScreen({ navigation, route }) {
                 styles.inputBarGradient,
                 {
                   borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)',
-                  elevation: getCardElevation(5),
                 }
               ]}
             >
@@ -2013,7 +2020,7 @@ export default function ChatScreen({ navigation, route }) {
 
         {/* Quick Actions Bar */}
         {!showGreeting && (
-          <View style={styles.quickActionsBar}>
+          <View style={[styles.quickActionsBar, { paddingBottom: quickActionsBottomInset }]}>
             <TouchableOpacity 
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}

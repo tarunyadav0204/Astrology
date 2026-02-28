@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../context/ThemeContext';
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 
@@ -17,6 +18,7 @@ const SouthIndianChart = ({
 }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
+  const { theme, colors } = useTheme();
   
   const lastDataRef = useRef(null);
 
@@ -82,6 +84,26 @@ const SouthIndianChart = ({
     return degree.toFixed(2) + '°';
   };
 
+  const getPlanetStatus = (planetName, signIndex) => {
+    if (!chartData || !chartData.planets) return 'normal';
+    if (['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna'].includes(planetName)) return 'normal';
+    const exaltationSigns = { Sun: 0, Moon: 1, Mars: 9, Mercury: 5, Jupiter: 3, Venus: 11, Saturn: 6 };
+    const debilitationSigns = { Sun: 6, Moon: 7, Mars: 3, Mercury: 11, Jupiter: 9, Venus: 5, Saturn: 0 };
+    if (exaltationSigns[planetName] === signIndex) return 'exalted';
+    if (debilitationSigns[planetName] === signIndex) return 'debilitated';
+    return 'normal';
+  };
+
+  const getPlanetColor = (planetName, signIndex) => {
+    const status = getPlanetStatus(planetName, signIndex);
+    if (status === 'exalted') return '#22c55e';      // green
+    if (status === 'debilitated') return '#ef4444';  // red
+    // Normal planets: theme-aware
+    return theme === 'dark'
+      ? (colors.text || '#ffffff')
+      : '#333';
+  };
+
   const getPlanetsInSign = (signIndex) => {
     if (!chartData.planets || signIndex === -1) return [];
     const planetsInSign = [];
@@ -109,6 +131,10 @@ const SouthIndianChart = ({
           }
         }
         
+        const status = getPlanetStatus(name, signIndex);
+        if (status === 'exalted') symbol += '↑';
+        if (status === 'debilitated') symbol += '↓';
+
         planetsInSign.push({
           symbol: symbol,
           name: name,
@@ -169,7 +195,13 @@ const SouthIndianChart = ({
         <Rect 
           x="1.5" y="1.5" width="337" height="337" 
           fill="none" 
-          stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} 
+          stroke={
+            cosmicTheme
+              ? "rgba(255, 107, 53, 0.9)"
+              : theme === 'dark'
+                ? (colors.cardBorder || 'rgba(148, 163, 184, 0.8)')
+                : "#ff6f00"
+          }
           strokeWidth="3"
           rx={cosmicTheme ? "16" : "0"}
           ry={cosmicTheme ? "16" : "0"}
@@ -177,22 +209,80 @@ const SouthIndianChart = ({
 
         <G clipPath="url(#southChartClip)" pointerEvents="none">
           {/* Grid lines */}
-          <Line x1="85" y1="0" x2="85" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="170" y1="0" x2="170" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="255" y1="0" x2="255" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="85" y1="255" x2="85" y2="340" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="170" y1="255" x2="170" y2="340" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="255" y1="255" x2="255" y2="340" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="0" y1="85" x2="85" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="0" y1="170" x2="85" y2="170" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="0" y1="255" x2="85" y2="255" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="255" y1="85" x2="340" y2="85" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="255" y1="170" x2="340" y2="170" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="255" y1="255" x2="340" y2="255" stroke={cosmicTheme ? "rgba(255, 138, 101, 0.6)" : "#ff8a65"} strokeWidth="2"/>
-          <Line x1="0" y1="85" x2="340" y2="85" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
-          <Line x1="0" y1="255" x2="340" y2="255" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
-          <Line x1="85" y1="0" x2="85" y2="340" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
-          <Line x1="255" y1="0" x2="255" y2="340" stroke={cosmicTheme ? "rgba(255, 107, 53, 0.9)" : "#ff6f00"} strokeWidth="3"/>
+          {[
+            { x1: 85, y1: 0, x2: 85, y2: 85 },
+            { x1: 170, y1: 0, x2: 170, y2: 85 },
+            { x1: 255, y1: 0, x2: 255, y2: 85 },
+            { x1: 85, y1: 255, x2: 85, y2: 340 },
+            { x1: 170, y1: 255, x2: 170, y2: 340 },
+            { x1: 255, y1: 255, x2: 255, y2: 340 },
+            { x1: 0, y1: 85, x2: 85, y2: 85 },
+            { x1: 0, y1: 170, x2: 85, y2: 170 },
+            { x1: 0, y1: 255, x2: 85, y2: 255 },
+            { x1: 255, y1: 85, x2: 340, y2: 85 },
+            { x1: 255, y1: 170, x2: 340, y2: 170 },
+            { x1: 255, y1: 255, x2: 340, y2: 255 },
+          ].map((p, idx) => (
+            <Line
+              key={idx}
+              x1={p.x1}
+              y1={p.y1}
+              x2={p.x2}
+              y2={p.y2}
+              stroke={
+                cosmicTheme
+                  ? "rgba(255, 138, 101, 0.6)"
+                  : theme === 'dark'
+                    ? 'rgba(148, 163, 184, 0.6)'
+                    : "#ff8a65"
+              }
+              strokeWidth="2"
+            />
+          ))}
+          <Line
+            x1="0" y1="85" x2="340" y2="85"
+            stroke={
+              cosmicTheme
+                ? "rgba(255, 107, 53, 0.9)"
+                : theme === 'dark'
+                  ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
+                  : "#ff6f00"
+            }
+            strokeWidth="3"
+          />
+          <Line
+            x1="0" y1="255" x2="340" y2="255"
+            stroke={
+              cosmicTheme
+                ? "rgba(255, 107, 53, 0.9)"
+                : theme === 'dark'
+                  ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
+                  : "#ff6f00"
+            }
+            strokeWidth="3"
+          />
+          <Line
+            x1="85" y1="0" x2="85" y2="340"
+            stroke={
+              cosmicTheme
+                ? "rgba(255, 107, 53, 0.9)"
+                : theme === 'dark'
+                  ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
+                  : "#ff6f00"
+            }
+            strokeWidth="3"
+          />
+          <Line
+            x1="255" y1="0" x2="255" y2="340"
+            stroke={
+              cosmicTheme
+                ? "rgba(255, 107, 53, 0.9)"
+                : theme === 'dark'
+                  ? (colors.cardBorder || 'rgba(148, 163, 184, 0.9)')
+                  : "#ff6f00"
+            }
+            strokeWidth="3"
+          />
         </G>
 
         {/* Grid cells */}
@@ -214,7 +304,11 @@ const SouthIndianChart = ({
                 x={pos.x + 8} 
                 y={pos.y + 18} 
                 fontSize="12" 
-                fill={houseNumber === 1 ? "#e91e63" : "#333"} 
+                fill={
+                  houseNumber === 1
+                    ? (theme === 'dark' ? (colors.primary || '#e91e63') : '#e91e63')
+                    : (theme === 'dark' ? (colors.text || '#e5e7eb') : '#333')
+                }
                 fontWeight={houseNumber === 1 ? "900" : "bold"}
                 pointerEvents="none">
                 {houseNumber}
@@ -253,7 +347,7 @@ const SouthIndianChart = ({
                     x={pos.x + pos.width / 2} 
                     y={pos.y + 20 + (pIndex * 20)} 
                     fontSize={showKarakas ? "10" : "12"} 
-                    fill="#333"
+                    fill={getPlanetColor(planet.name, pos.sign)}
                     fontWeight="bold"
                     textAnchor="middle">
                     {planet.symbol}
@@ -263,7 +357,7 @@ const SouthIndianChart = ({
                       x={pos.x + pos.width / 2} 
                       y={pos.y + 31 + (pIndex * 20)} 
                       fontSize="8" 
-                      fill="#666"
+                      fill={theme === 'dark' ? (colors.textSecondary || 'rgba(148, 163, 184, 0.9)') : "#666"}
                       fontWeight="500"
                       textAnchor="middle">
                       {planet.formattedDegree} {planet.shortNakshatra}
@@ -314,7 +408,6 @@ const SouthIndianChart = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
     width: '100%',
     aspectRatio: 1,
   },

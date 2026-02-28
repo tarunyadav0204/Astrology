@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
+import storage from '../../services/storage';
 import { useTranslation } from 'react-i18next';
 
 export default function BirthProfileIntroScreen({ navigation, route }) {
@@ -29,10 +30,21 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
           chartAPI.getExistingCharts(),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000)),
         ]);
-        if (mounted && response?.data?.charts?.length > 0) setHasCharts(true);
-        else if (mounted) setHasCharts(false);
+        const apiCharts = response?.data?.charts || [];
+
+        if (apiCharts.length > 0) {
+          if (mounted) setHasCharts(true);
+        } else {
+          const localProfiles = await storage.getBirthProfiles();
+          if (mounted) setHasCharts((localProfiles || []).length > 0);
+        }
       } catch (e) {
-        if (mounted) setHasCharts(false);
+        try {
+          const localProfiles = await storage.getBirthProfiles();
+          if (mounted) setHasCharts((localProfiles || []).length > 0);
+        } catch {
+          if (mounted) setHasCharts(false);
+        }
       } finally {
         if (mounted) setLoading(false);
       }

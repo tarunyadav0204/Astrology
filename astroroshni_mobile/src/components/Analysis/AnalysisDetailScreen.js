@@ -561,13 +561,22 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       if (!birthData?.name) {
         return;
       }
-      const key = `analysis_${analysisType}_${birthData.name}`;
-      
-      // Debug: List all keys
-      const allKeys = await AsyncStorage.getAllKeys();
-      const analysisKeys = allKeys.filter(k => k.startsWith('analysis_'));
-      
-      const stored = await AsyncStorage.getItem(key);
+      const idKey = birthData?.id != null ? `analysis_${analysisType}_id_${birthData.id}` : null;
+      const legacyKey = `analysis_${analysisType}_${birthData.name}`;
+
+      // Prefer id-based key (stable per chart), but migrate legacy name-based key if found.
+      let stored = null;
+      if (idKey) {
+        stored = await AsyncStorage.getItem(idKey);
+      }
+      if (!stored) {
+        stored = await AsyncStorage.getItem(legacyKey);
+        if (stored && idKey) {
+          // Migrate legacy cache to id-based key for future lookups.
+          await AsyncStorage.setItem(idKey, stored);
+        }
+      }
+
       if (stored) {
         const parsedData = JSON.parse(stored);
         setAnalysisResult(parsedData);
@@ -583,11 +592,14 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       if (!birthData?.name) {
         return;
       }
-      const key = `analysis_${analysisType}_${birthData.name}`;
-      
+      const key =
+        birthData?.id != null
+          ? `analysis_${analysisType}_id_${birthData.id}`
+          : `analysis_${analysisType}_${birthData.name}`;
+
       await AsyncStorage.setItem(key, JSON.stringify(data));
       
-      // Verify save
+      // Verify save (best-effort; no UX impact)
       const saved = await AsyncStorage.getItem(key);
       if (saved) {
       } else {
@@ -611,9 +623,12 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     // Clear cached analysis
     try {
       if (birthData?.name) {
-        const key = `analysis_${analysisType}_${birthData.name}`;
-        await AsyncStorage.removeItem(key);
-        // console.log('🗑️ Cleared cached analysis:', key);
+        const idKey = birthData?.id != null ? `analysis_${analysisType}_id_${birthData.id}` : null;
+        const legacyKey = `analysis_${analysisType}_${birthData.name}`;
+        if (idKey) {
+          await AsyncStorage.removeItem(idKey);
+        }
+        await AsyncStorage.removeItem(legacyKey);
       }
     } catch (error) {
       console.error('❌ Failed to clear cache:', error);

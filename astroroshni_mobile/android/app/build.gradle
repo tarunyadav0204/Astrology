@@ -98,12 +98,19 @@ android {
         applicationId 'com.astroroshni.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 77
+        versionCode 78
         versionName "1.1.6"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     signingConfigs {
+        release {
+            // Keystore downloaded from Expo/EAS
+            storeFile file('../Keystores/astroroshni-upload.jks')
+            storePassword '792c1fe4e2888e35a58004a65085f058'
+            keyAlias '59d5781c2ebd860a663344766af9027c'
+            keyPassword '691315db30cbd48e92789867bf602c0f'
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -116,9 +123,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

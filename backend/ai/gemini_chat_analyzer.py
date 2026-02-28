@@ -328,22 +328,20 @@ class GeminiChatAnalyzer:
             else:
                 print(f"📊 PERFORMANCE SUMMARY - FIRST CALL: Total={total_request_time:.1f}s, Gemini={gemini_total_time:.1f}s")
             
-            # Parse response for terms, glossary, and summary image
+            # Parse response for images / follow-ups / analysis steps
             parsed_response = ResponseParser.parse_images_in_chat_response(cleaned_text)
-            
+
+            # Resolve terms & glossary using our own glossary_terms table
+            from ai.term_matcher import find_terms_in_text
+            matched_term_ids, matched_glossary = find_terms_in_text(parsed_response['content'], language=language)
+
             print(f"\n🔍 RESPONSE PARSER DEBUG:")
-            print(f"   Terms found: {parsed_response['terms']}")
-            if isinstance(parsed_response['glossary'], dict):
-                print(f"   Glossary keys: {list(parsed_response['glossary'].keys())}")
-            else:
-                print(f"   Glossary type error: {type(parsed_response['glossary'])}, value: {parsed_response['glossary']}")
-                # Fix the glossary if it's not a dict
-                parsed_response['glossary'] = {}
+            print(f"   Matched terms from glossary_terms: {matched_term_ids}")
             print(f"   Summary image prompt exists: {bool(parsed_response.get('summary_image_prompt'))}")
             if parsed_response.get('summary_image_prompt'):
                 print(f"   Summary image prompt preview: {parsed_response.get('summary_image_prompt', '')[:100]}...")
             print(f"   Content preview: {parsed_response['content'][:200]}...")
-            
+
             # Generate summary image if prompt exists
             summary_image_url = None
             if self.flux_service and premium_analysis and parsed_response.get('summary_image_prompt'):
@@ -383,8 +381,8 @@ class GeminiChatAnalyzer:
             return {
                 'success': True,
                 'response': parsed_response['content'],
-                'terms': parsed_response['terms'],
-                'glossary': parsed_response['glossary'],
+                'terms': matched_term_ids,
+                'glossary': matched_glossary,
                 'summary_image': summary_image_url,
                 'follow_up_questions': parsed_response.get('follow_up_questions', []),
                 'analysis_steps': parsed_response.get('analysis_steps', []),

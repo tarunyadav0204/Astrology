@@ -6,17 +6,29 @@ import json
 from datetime import datetime
 from auth import get_current_user
 
+
 class AdminSetting(BaseModel):
     key: str
     value: str
     description: Optional[str] = None
+
+
+class GlossaryTerm(BaseModel):
+    term_id: str
+    display_text: str
+    definition: str
+    language: Optional[str] = "english"
+    aliases: Optional[List[str]] = None
+
 
 def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
+
 router = APIRouter()
+
 
 def get_db_connection():
     conn = sqlite3.connect('astrology.db')
@@ -250,6 +262,163 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
         return {"settings": settings}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")
+
+
+@router.get("/admin/terms")
+async def get_glossary_terms(
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    current_user: dict = Depends(require_admin),
+):
+    """Get glossary terms (for chat glossary) with optional search and pagination."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        where_clause = ""
+        params: List[Any] = []
+        if search:
+            where_clause = "WHERE term_id LIKE ? OR display_text LIKE ?"
+            like = f"%{search}%"
+            params.extend([like, like])
+
+        # Total count
+        cursor.execute(
+            f"SELECT COUNT(*) AS total FROM glossary_terms {where_clause}",
+            params,
+        )
+        total = cursor.fetchone()["total"]
+
+        offset = (page - 1) * limit
+        cursor.execute(
+            f"""
+            SELECT term_id, display_text, definition, language, COALESCE(aliases, '[]') AS aliases_json
+            FROM glossary_terms
+            {where_clause}
+            ORDER BY term_id ASC
+            LIMIT ? OFFSET ?
+            """,
+            params + [limit, offset],
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        terms: List[Dict[str, Any]] = []
+        for row in rows:
+            try:
+                aliases = json.loads(row["aliases_json"]) if row["aliases_json"] else []
+                if not isinstance(aliases, list):
+                    aliases = []
+            except Exception:
+                aliases = []
+            terms.append(
+                {
+                    "term_id": row["term_id"],
+                    "display_text": row["display_text"],
+                    "definition": row["definition"],
+                    "language": row["language"],
+                    "aliases": aliases,
+                }
+            )
+
+        return {
+            "terms": terms,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "has_more": offset + limit < total,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching terms: {str(e)}")
+
+
+@router.post("/admin/terms")
+async def create_glossary_term(
+    term: GlossaryTerm, current_user: dict = Depends(require_admin)
+):
+    """Create or overwrite a glossary term."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        aliases_json = json.dumps(term.aliases or [])
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO glossary_terms (term_id, display_text, definition, language, aliases)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                term.term_id.strip(),
+                term.display_text.strip(),
+                term.definition.strip(),
+                term.language or "english",
+                aliases_json,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {"message": "Term saved", "term_id": term.term_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving term: {str(e)}")
+
+
+@router.put("/admin/terms/{term_id}")
+async def update_glossary_term(
+    term_id: str, term: GlossaryTerm, current_user: dict = Depends(require_admin)
+):
+    """Update an existing glossary term."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        aliases_json = json.dumps(term.aliases or [])
+        cursor.execute(
+            """
+            UPDATE glossary_terms
+            SET display_text = ?, definition = ?, language = ?, aliases = ?
+            WHERE term_id = ?
+            """,
+            (
+                term.display_text.strip(),
+                term.definition.strip(),
+                term.language or "english",
+                aliases_json,
+                term_id,
+            ),
+        )
+        if cursor.rowcount == 0:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Term not found")
+        conn.commit()
+        conn.close()
+        return {"message": "Term updated", "term_id": term_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating term: {str(e)}")
+
+
+@router.delete("/admin/terms/{term_id}")
+async def delete_glossary_term(
+    term_id: str, current_user: dict = Depends(require_admin)
+):
+    """Delete a glossary term."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM glossary_terms WHERE term_id = ?", (term_id,))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        if deleted == 0:
+            raise HTTPException(status_code=404, detail="Term not found")
+        return {"message": "Term deleted", "term_id": term_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting term: {str(e)}")
 
 @router.put("/admin/settings/{key}")
 async def update_setting(key: str, setting: AdminSetting, current_user: dict = Depends(require_admin)):

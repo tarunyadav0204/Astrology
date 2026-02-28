@@ -78,6 +78,17 @@ def init_chat_tables():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON chat_sessions (created_at)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages (session_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_status ON chat_messages (status)')
+
+    # Glossary terms table for centralized term/definition management
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS glossary_terms (
+            term_id TEXT PRIMARY KEY,
+            display_text TEXT NOT NULL,
+            definition TEXT NOT NULL,
+            language TEXT DEFAULT 'english',
+            aliases TEXT
+        )
+    ''')
     
     conn.commit()
     conn.close()

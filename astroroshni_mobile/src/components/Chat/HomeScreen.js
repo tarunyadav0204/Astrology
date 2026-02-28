@@ -526,13 +526,13 @@ const loadHomeData = async (nativeData = null) => {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-            {panchangData && (
+            {panchangData?.sunrise_sunset && (
               <View style={[styles.emptyStatePanchang, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                 <Text style={[styles.emptyStatePanchangTitle, { color: colors.text }]}>
                   {t('home.panchang.title', 'Today’s Panchang')}
                 </Text>
                 <Text style={[styles.emptyStatePanchangSub, { color: colors.textSecondary }]}>
-                  {panchangData?.sunrise_sunset ? `${t('common.sunrise', 'Sunrise')}: ${panchangData.sunrise_sunset.sunrise || '—'} • ${t('common.sunset', 'Sunset')}: ${panchangData.sunrise_sunset.sunset || '—'}` : t('home.panchang.loading', 'Loading…')}
+                  {`${t('common.sunrise', 'Sunrise')}: ${panchangData.sunrise_sunset.sunrise || '—'} • ${t('common.sunset', 'Sunset')}: ${panchangData.sunrise_sunset.sunset || '—'}`}
                 </Text>
               </View>
             )}
@@ -1922,7 +1922,11 @@ const loadHomeData = async (nativeData = null) => {
           end={{ x: 0, y: 1 }}
         />
         {Platform.OS === 'ios' && (
-          <BlurView intensity={theme === 'dark' ? 20 : 60} style={StyleSheet.absoluteFill} tint={theme === 'dark' ? 'dark' : 'light'} />
+          <BlurView
+            intensity={theme === 'dark' ? 20 : 60}
+            style={StyleSheet.absoluteFill}
+            tint={theme === 'dark' ? 'dark' : 'light'}
+          />
         )}
         
         <TouchableOpacity 
@@ -2028,6 +2032,12 @@ function OptionCard({ option, index, onOptionSelect }) {
     : option.id === 'ashtakvarga'
     ? ['#9C27B0', '#E91E63']
     : ['#ff6b35', '#ff8c5a'];
+
+  // Glass gradient for the card background – same look on iOS and Android
+  const cardGlassGradientColors =
+    theme === 'dark'
+      ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
+      : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)'];
   
   return (
     <View 
@@ -2038,9 +2048,7 @@ function OptionCard({ option, index, onOptionSelect }) {
         activeOpacity={0.9}
       >
         <LinearGradient
-          colors={theme === 'dark' 
-            ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
-            : ['rgba(251, 146, 60, 0.2)', 'rgba(249, 115, 22, 0.1)']}
+          colors={cardGlassGradientColors}
           style={[styles.optionGradient, androidLightCardFixStyle]}
         >
           <View style={styles.optionIconContainer}>
@@ -2472,7 +2480,8 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
       },
       android: {
-        elevation: 4,
+        // Elevation is applied per-card via getCardElevation to avoid light-theme white shadow artifacts
+        backgroundColor: 'transparent',
       },
     }),
   },
@@ -3956,7 +3965,8 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
       },
       android: {
-        elevation: 4,
+        // Elevation handled via androidLightCardFixStyle to avoid white box artifacts
+        backgroundColor: 'transparent',
       },
     }),
   },
@@ -4024,9 +4034,9 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
       },
       android: {
-        height: 56,
+        height: 60,
         paddingTop: 6,
-        paddingBottom: 4,
+        paddingBottom: 8,
       },
     }),
   },

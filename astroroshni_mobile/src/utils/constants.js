@@ -47,12 +47,12 @@ const getApiUrl = () => {
     if (Platform.OS === 'ios') return 'http://localhost:8001';
     if (Platform.OS === 'android') return 'http://10.0.2.2:8001';
   }
-  // if (Platform.OS === 'ios') {
-  //   return 'http://localhost:8001';
-  // } else {
-  //   return 'http://10.0.2.2:8001';
-  // }
-  return 'https://astroroshni.com';
+  if (Platform.OS === 'ios') {
+    return 'http://localhost:8001';
+  } else {
+    return 'http://10.0.2.2:8001';
+  }
+  // return 'https://astroroshni.com';
 };
 
 export const API_BASE_URL = getApiUrl();
@@ -71,6 +71,12 @@ export const LANGUAGES = [
   { code: 'telugu', name: 'తెలుగు', flag: '🇮🇳' },
   { code: 'gujarati', name: 'ગુજરાતી', flag: '🇮🇳' },
   { code: 'tamil', name: 'தமிழ்', flag: '🇮🇳' },
+  { code: 'marathi', name: 'मराठी', flag: '🇮🇳' },
+  { code: 'german', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'french', name: 'Français', flag: '🇫🇷' },
+  { code: 'russian', name: 'Русский', flag: '🇷🇺' },
+  { code: 'chinese', name: '中文', flag: '🇨🇳' },
+  { code: 'mandarin', name: '普通话', flag: '🇨🇳' },
 ];
 
 export const LANGUAGE_STORAGE_KEY = 'user_language';
