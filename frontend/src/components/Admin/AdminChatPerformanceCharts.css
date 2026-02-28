@@ -1,0 +1,60 @@
+.chat-performance-charts {
+  padding: 20px;
+}
+
+.charts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.charts-header h2 {
+  margin: 0;
+  color: #333;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.chart-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1em;
+  color: #333;
+}
+
+.chart-card .no-data,
+.charts-error,
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+}
+
+.charts-error {
+  color: #e74c3c;
+}
+
+.refresh-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

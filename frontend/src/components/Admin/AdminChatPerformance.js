@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import './AdminChatPerformance.css';
 
+const DURATION_OPTIONS = [
+  { value: 'all', label: 'All durations' },
+  { value: '<30s', label: 'Less than 30 sec' },
+  { value: '30-60s', label: '30–60 sec' },
+  { value: '60-90s', label: '60–90 sec' },
+  { value: '90-120s', label: '90–120 sec' },
+  { value: '2-3min', label: '2–3 min' },
+  { value: '3-4min', label: '3–4 min' },
+  { value: '4-5min', label: '4–5 min' },
+  { value: '>5min', label: 'Greater than 5 min' },
+];
+
 const AdminChatPerformance = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -8,16 +20,19 @@ const AdminChatPerformance = () => {
   const [perPage] = useState(20);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [durationBucket, setDurationBucket] = useState('all');
 
   useEffect(() => {
     fetchPage();
-  }, [page]);
+  }, [page, durationBucket]);
 
   const fetchPage = async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+      if (durationBucket && durationBucket !== 'all') params.set('duration_bucket', durationBucket);
       const response = await fetch(
-        `/api/admin/chat-performance?page=${page}&per_page=${perPage}`,
+        `/api/admin/chat-performance?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -50,6 +65,11 @@ const AdminChatPerformance = () => {
     return `${Number(ms).toFixed(0)} ms`;
   };
 
+  const onDurationChange = (e) => {
+    setDurationBucket(e.target.value);
+    setPage(1);
+  };
+
   return (
     <div className="chat-performance-container">
       <div className="chat-performance-header">
@@ -61,6 +81,21 @@ const AdminChatPerformance = () => {
       <p className="chat-performance-description">
         One row per assistant answer: user, question, response preview, native (birth chart), intent router time, total duration.
       </p>
+      <div className="performance-filters">
+        <label htmlFor="duration-filter">Duration:</label>
+        <select
+          id="duration-filter"
+          value={durationBucket}
+          onChange={onDurationChange}
+          className="duration-select"
+        >
+          {DURATION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {loading ? (
         <div className="loading">Loading…</div>

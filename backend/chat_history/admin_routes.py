@@ -513,27 +513,64 @@ async def get_all_user_facts(
         raise HTTPException(status_code=500, detail=f"Error fetching facts: {str(e)}")
 
 
+# Duration bucket keys and (min_sec, max_sec) for list filter. max_sec None = no upper bound.
+DURATION_BUCKETS_LIST = [
+    ("<30s", 0, 30),
+    ("30-60s", 30, 60),
+    ("60-90s", 60, 90),
+    ("90-120s", 90, 120),
+    ("2-3min", 120, 180),
+    ("3-4min", 180, 240),
+    ("4-5min", 240, 300),
+    (">5min", 300, None),
+]
+
+
 @router.get("/admin/chat-performance")
 async def get_chat_performance(
     page: int = 1,
     per_page: int = 20,
+    duration_bucket: Optional[str] = None,
     current_user: dict = Depends(require_admin)
 ):
-    """Paginated chat performance: assistant answers with user, question, response preview, native, intent ms, duration."""
+    """Paginated chat performance: assistant answers with user, question, response preview, native, intent ms, duration. Optional duration_bucket: <30s, 30-60s, 60-90s, 90-120s, 2-3min, 3-4min, 4-5min, >5min."""
     if per_page < 1 or per_page > 100:
         per_page = 20
     if page < 1:
         page = 1
     offset = (page - 1) * per_page
+    duration_filter = None
+    if duration_bucket and duration_bucket != "all":
+        for key, lo, hi in DURATION_BUCKETS_LIST:
+            if key == duration_bucket:
+                duration_filter = (lo, hi)
+                break
     try:
+        from encryption_utils import EncryptionManager
+        try:
+            encryption = EncryptionManager()
+        except Exception:
+            encryption = None
         conn = get_db_connection()
         cursor = conn.cursor()
-        # Count assistant answers (completed, with content)
-        cursor.execute("""
-            SELECT COUNT(*) FROM chat_messages cm
-            WHERE cm.sender = 'assistant' AND cm.status = 'completed'
+        base_where = """
+            cm.sender = 'assistant' AND cm.status = 'completed'
             AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
-        """)
+        """
+        duration_where = ""
+        count_params = []
+        if duration_filter:
+            lo, hi = duration_filter
+            duration_where = " AND cm.started_at IS NOT NULL AND cm.completed_at IS NOT NULL"
+            duration_where += " AND (julianday(cm.completed_at) - julianday(cm.started_at)) * 86400 >= ?"
+            count_params.append(lo)
+            if hi is not None:
+                duration_where += " AND (julianday(cm.completed_at) - julianday(cm.started_at)) * 86400 < ?"
+                count_params.append(hi)
+        cursor.execute(f"""
+            SELECT COUNT(*) FROM chat_messages cm
+            WHERE {base_where}{duration_where}
+        """, count_params)
         total = cursor.fetchone()[0]
         # Optional columns language, intent_router_ms may not exist on older DBs
         try:
@@ -555,17 +592,16 @@ async def get_chat_performance(
             sel += ", cm.language"
         if has_intent_ms:
             sel += ", cm.intent_router_ms"
-        sel += """
+        sel += f"""
             FROM chat_messages cm
             JOIN chat_sessions cs ON cs.session_id = cm.session_id
             LEFT JOIN users u ON u.userid = cs.user_id
             LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-            WHERE cm.sender = 'assistant' AND cm.status = 'completed'
-            AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
+            WHERE {base_where}{duration_where}
             ORDER BY cm.message_id DESC
             LIMIT ? OFFSET ?
         """
-        cursor.execute(sel, (per_page, offset))
+        cursor.execute(sel, count_params + [per_page, offset])
         rows = cursor.fetchall()
         items = []
         for row in rows:
@@ -584,13 +620,21 @@ async def get_chat_performance(
                     duration_seconds = round((c - s).total_seconds(), 2)
                 except Exception:
                     pass
+            raw_native = row_dict.get('native_name')
+            if raw_native and encryption:
+                try:
+                    native_name = encryption.decrypt(raw_native)
+                except Exception:
+                    native_name = raw_native
+            else:
+                native_name = raw_native or '—'
             items.append({
                 'message_id': row_dict['message_id'],
                 'user_name': row_dict.get('user_name') or '—',
                 'user_phone': row_dict.get('user_phone') or '—',
                 'user_question': uq_preview,
                 'response_preview': preview,
-                'native_name': row_dict.get('native_name') or '—',
+                'native_name': native_name,
                 'intent_router_ms': row_dict.get('intent_router_ms') if has_intent_ms else None,
                 'duration_seconds': duration_seconds,
                 'completed_at': row_dict.get('completed_at'),
@@ -607,3 +651,93 @@ async def get_chat_performance(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching chat performance: {str(e)}")
+
+
+# Duration buckets for charts: (label, min_seconds, max_seconds). max_seconds None = no upper bound.
+DURATION_BUCKETS = [
+    ("<30s", 0, 30),
+    ("30-60s", 30, 60),
+    ("60-90s", 60, 90),
+    ("90-120s", 90, 120),
+    ("2-3 min", 120, 180),
+    ("3-4 min", 180, 240),
+    ("4-5 min", 240, 300),
+    (">5 min", 300, None),
+]
+
+
+@router.get("/admin/chat-performance/stats")
+async def get_chat_performance_stats(
+    limit: int = 5000,
+    current_user: dict = Depends(require_admin)
+):
+    """Aggregated duration bucket counts (overall and by user) for Charts tab."""
+    if limit < 1 or limit > 20000:
+        limit = 5000
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT cm.message_id, cm.started_at, cm.completed_at,
+                   COALESCE(u.name, u.phone, 'Unknown') as user_name, u.phone as user_phone
+            FROM chat_messages cm
+            JOIN chat_sessions cs ON cs.session_id = cm.session_id
+            LEFT JOIN users u ON u.userid = cs.user_id
+            WHERE cm.sender = 'assistant' AND cm.status = 'completed'
+            AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
+            AND cm.started_at IS NOT NULL AND cm.completed_at IS NOT NULL
+            ORDER BY cm.message_id DESC
+            LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
+
+    def duration_seconds(started, completed):
+        if not started or not completed:
+            return None
+        try:
+            s = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+            c = datetime.fromisoformat(str(completed).replace("Z", "+00:00"))
+            return (c - s).total_seconds()
+        except Exception:
+            return None
+
+    def bucket_for(sec):
+        if sec is None:
+            return None
+        for label, lo, hi in DURATION_BUCKETS:
+            if hi is None:
+                if sec >= lo:
+                    return label
+            elif lo <= sec < hi:
+                return label
+        return None
+
+    # Overall counts per bucket
+    bucket_counts = {label: 0 for label, _, _ in DURATION_BUCKETS}
+    # By user: { user_key: { bucket: count } }
+    user_buckets = {}
+
+    for row in rows:
+        r = dict(row)
+        sec = duration_seconds(r.get("started_at"), r.get("completed_at"))
+        b = bucket_for(sec)
+        if b is None:
+            continue
+        bucket_counts[b] = bucket_counts.get(b, 0) + 1
+        user_key = (r.get("user_name") or "Unknown", r.get("user_phone") or "")
+        if user_key not in user_buckets:
+            user_buckets[user_key] = {label: 0 for label, _, _ in DURATION_BUCKETS}
+        user_buckets[user_key][b] = user_buckets[user_key].get(b, 0) + 1
+
+    buckets = [{"name": label, "count": bucket_counts[label]} for label, _, _ in DURATION_BUCKETS]
+    by_user = []
+    for (uname, uphone), counts in user_buckets.items():
+        by_user.append({
+            "user_name": uname,
+            "user_phone": uphone or "",
+            "buckets": [{"name": label, "count": counts.get(label, 0)} for label, _, _ in DURATION_BUCKETS],
+        })
+    return {"buckets": buckets, "by_user": by_user}

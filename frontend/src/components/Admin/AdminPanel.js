@@ -9,6 +9,7 @@ import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
 import AdminChatPerformance from './AdminChatPerformance';
+import AdminChatPerformanceCharts from './AdminChatPerformanceCharts';
 import AdminChatAnalysis from './AdminChatAnalysis';
 import AdminTerms from './AdminTerms';
 import BlogDashboard from '../Blog/BlogDashboard';
@@ -631,6 +632,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           Chat History
         </button>
         <button 
+          className={`tab ${activeTab === 'performance' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('performance');
+            setActiveSubTab('list');
+          }}
+        >
+          Chat Performance
+        </button>
+        <button 
           className={`tab ${activeTab === 'credits' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('credits');
@@ -659,12 +669,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('errors')}
         >
           Errors
-        </button>
-        <button 
-          className={`tab ${activeTab === 'performance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('performance')}
-        >
-          Chat Performance
         </button>
         <button 
           className={`tab ${activeTab === 'blog' ? 'active' : ''}`}
@@ -763,6 +767,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('chatAnalysis')}
           >
             Chat Analysis
+          </button>
+        </div>
+      )}
+
+      {/* Chat Performance Sub-tabs */}
+      {activeTab === 'performance' && (
+        <div className="admin-subtabs">
+          <button 
+            className={`subtab ${activeSubTab === 'list' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('list')}
+          >
+            List
+          </button>
+          <button 
+            className={`subtab ${activeSubTab === 'charts' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('charts')}
+          >
+            Charts
           </button>
         </div>
       )}
@@ -1356,8 +1378,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <ChatErrors />
         )}
 
-        {activeTab === 'performance' && (
+        {activeTab === 'performance' && activeSubTab === 'list' && (
           <AdminChatPerformance />
+        )}
+        {activeTab === 'performance' && activeSubTab === 'charts' && (
+          <AdminChatPerformanceCharts />
         )}
 
         {activeTab === 'terms' && (

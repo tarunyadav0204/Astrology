@@ -17,7 +17,34 @@
 .chat-performance-description {
   color: #666;
   font-size: 0.95em;
+  margin-bottom: 12px;
+}
+
+.performance-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 20px;
+}
+
+.performance-filters label {
+  font-weight: 600;
+  color: #333;
+}
+
+.performance-filters .duration-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 180px;
+  background: white;
+  cursor: pointer;
+}
+
+.performance-filters .duration-select:focus {
+  outline: none;
+  border-color: #3498db;
 }
 
 .performance-table-wrap {
@@ -53,11 +80,13 @@
 
 .cell-user {
   max-width: 140px;
+  color: #000;
 }
 
 .user-name {
   display: block;
   font-weight: 500;
+  color: #000;
 }
 
 .user-phone {
