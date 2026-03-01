@@ -98,7 +98,7 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
         sessions = []
         for row in cursor.fetchall():
             native_name = None
-            raw = row.get('native_name_raw')
+            raw = row['native_name_raw'] if row['native_name_raw'] is not None else None
             if raw:
                 try:
                     native_name = enc.decrypt(raw)
@@ -175,7 +175,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
         
         if session_row:
             native_name = None
-            raw_name = session_row.get('native_name_raw')
+            raw_name = session_row['native_name_raw'] if session_row['native_name_raw'] is not None else None
             if raw_name:
                 try:
                     from encryption_utils import EncryptionManager
