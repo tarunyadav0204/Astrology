@@ -195,17 +195,21 @@ export default function ChatHistoryScreen({ navigation }) {
       
       if (response.ok) {
         const sessionData = await response.json();
-        // Map API response fields to expected message format
+        // Map API response; native_name comes from DB (session + each message)
         const mappedMessages = (sessionData.messages || []).map(msg => ({
           messageId: msg.message_id,
           role: msg.sender,
           content: msg.content,
           timestamp: msg.timestamp,
-          id: `${msg.message_id}_${msg.timestamp}` // Fallback ID
+          id: `${msg.message_id}_${msg.timestamp}`,
+          native_name: msg.native_name ?? sessionData.native_name ?? session.native_name ?? null,
+          terms: msg.terms,
+          glossary: msg.glossary,
+          images: msg.images,
         }));
         
-        navigation.navigate('ChatView', { 
-          session: { ...session, messages: mappedMessages }
+        navigation.navigate('ChatView', {
+          session: { ...session, native_name: sessionData.native_name ?? session.native_name, messages: mappedMessages }
         });
       } else {
         Alert.alert('Error', 'Failed to load chat messages');

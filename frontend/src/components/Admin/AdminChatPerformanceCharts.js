@@ -18,6 +18,7 @@ const BUCKET_ORDER = ['<30s', '30-60s', '60-90s', '90-120s', '2-3 min', '3-4 min
 export default function AdminChatPerformanceCharts() {
   const [buckets, setBuckets] = useState([]);
   const [byUser, setByUser] = useState([]);
+  const [slowByHour, setSlowByHour] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -36,10 +37,12 @@ export default function AdminChatPerformanceCharts() {
       const data = await response.json();
       setBuckets(data.buckets || []);
       setByUser(data.by_user || []);
+      setSlowByHour(data.slow_by_hour || []);
     } catch (e) {
       setError(e.message);
       setBuckets([]);
       setByUser([]);
+      setSlowByHour([]);
     } finally {
       setLoading(false);
     }
@@ -93,6 +96,27 @@ export default function AdminChatPerformanceCharts() {
       <div className="charts-header">
         <h2>📊 Chat Performance – Duration</h2>
         <button onClick={fetchStats} className="refresh-btn">🔄 Refresh</button>
+      </div>
+
+      <div className="chart-card">
+        <h3>Slow responses (&gt;2 min) by time of day</h3>
+        <p className="chart-subtitle">When did responses take more than 2 minutes? (by hour when response completed)</p>
+        {slowByHour.length ? (
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart
+              data={slowByHour}
+              margin={{ top: 16, right: 24, left: 24, bottom: 24 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="hour_label" tick={{ fontSize: 11 }} interval={1} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="count" name="Slow responses (>2 min)" fill="#e74c3c" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="no-data">No slow responses in this sample.</p>
+        )}
       </div>
 
       <div className="chart-card">

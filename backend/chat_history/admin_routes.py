@@ -75,9 +75,10 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get new system sessions with last activity time
+        # Get new system sessions with last activity time and birth chart name
         cursor.execute("""
-            SELECT cs.session_id, cs.user_id, cs.created_at, u.name, u.phone,
+            SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, u.name, u.phone,
+                   bc.name as native_name_raw,
                    (SELECT content FROM chat_messages 
                     WHERE session_id = cs.session_id 
                     AND sender = 'user' 
@@ -87,13 +88,22 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                    'new' as system_type
             FROM chat_sessions cs
             LEFT JOIN users u ON cs.user_id = u.userid
+            LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
             ORDER BY cs.created_at DESC
             LIMIT 500
         """)
         
+        from encryption_utils import EncryptionManager
+        enc = EncryptionManager()
         sessions = []
         for row in cursor.fetchall():
-            # Use last_activity if available, otherwise created_at
+            native_name = None
+            raw = row.get('native_name_raw')
+            if raw:
+                try:
+                    native_name = enc.decrypt(raw)
+                except Exception:
+                    native_name = raw
             display_time = row['last_activity'] if row['last_activity'] else row['created_at']
             sessions.append({
                 'session_id': row['session_id'],
@@ -102,7 +112,8 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
                 'user_phone': row['phone'] or 'No phone',
                 'created_at': display_time,
                 'preview': row['preview'][:100] + '...' if row['preview'] and len(row['preview']) > 100 else row['preview'],
-                'system_type': row['system_type']
+                'system_type': row['system_type'],
+                'native_name': native_name
             })
         
         # Get old system conversations with created_at instead of updated_at
@@ -148,16 +159,31 @@ async def get_all_chat_history(current_user: dict = Depends(require_admin)):
 
 @router.get("/admin/chat/session/{session_id}")
 async def get_session_details(session_id: str, current_user: dict = Depends(require_admin)):
-    """Get detailed messages for a specific session (admin only)"""
+    """Get detailed messages for a specific session (admin only). Includes native_name (birth chart name) for the session."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # First try new system
-        cursor.execute("SELECT * FROM chat_sessions WHERE session_id = ?", (session_id,))
-        session = cursor.fetchone()
+        # First try new system: get session and join birth_charts for native_name
+        cursor.execute("""
+            SELECT cs.session_id, cs.user_id, cs.created_at, cs.birth_chart_id, bc.name as native_name_raw
+            FROM chat_sessions cs
+            LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+            WHERE cs.session_id = ?
+        """, (session_id,))
+        session_row = cursor.fetchone()
         
-        if session:
+        if session_row:
+            native_name = None
+            raw_name = session_row.get('native_name_raw')
+            if raw_name:
+                try:
+                    from encryption_utils import EncryptionManager
+                    enc = EncryptionManager()
+                    native_name = enc.decrypt(raw_name)
+                except Exception:
+                    native_name = raw_name
+            
             cursor.execute("""
                 SELECT sender, content, timestamp 
                 FROM chat_messages 
@@ -170,14 +196,16 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                 messages.append({
                     'sender': row['sender'],
                     'content': row['content'],
-                    'timestamp': row['timestamp']
+                    'timestamp': row['timestamp'],
+                    'native_name': native_name
                 })
             
             conn.close()
             return {
-                "session_id": session['session_id'],
-                "user_id": session['user_id'],
-                "created_at": session['created_at'],
+                "session_id": session_row['session_id'],
+                "user_id": session_row['user_id'],
+                "created_at": session_row['created_at'],
+                "native_name": native_name,
                 "messages": messages
             }
         
@@ -188,6 +216,8 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
         if legacy_conv:
             try:
                 conv_data = json.loads(legacy_conv['conversation_data'])
+                birth_data = conv_data.get('birth_data', {})
+                legacy_native_name = birth_data.get('name') or None
                 messages = []
                 
                 for msg in conv_data.get('messages', []):
@@ -195,14 +225,16 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                         messages.append({
                             'sender': 'user',
                             'content': msg['question'],
-                            'timestamp': msg.get('timestamp', legacy_conv['updated_at'])
+                            'timestamp': msg.get('timestamp', legacy_conv['updated_at']),
+                            'native_name': legacy_native_name
                         })
                     
                     if msg.get('response'):
                         messages.append({
                             'sender': 'assistant',
                             'content': msg['response'],
-                            'timestamp': msg.get('timestamp', legacy_conv['updated_at'])
+                            'timestamp': msg.get('timestamp', legacy_conv['updated_at']),
+                            'native_name': legacy_native_name
                         })
                 
                 conn.close()
@@ -210,6 +242,7 @@ async def get_session_details(session_id: str, current_user: dict = Depends(requ
                     "session_id": session_id,
                     "user_id": "legacy",
                     "created_at": legacy_conv['updated_at'],
+                    "native_name": legacy_native_name,
                     "messages": messages
                 }
             except Exception:
@@ -740,4 +773,34 @@ async def get_chat_performance_stats(
             "user_phone": uphone or "",
             "buckets": [{"name": label, "count": counts.get(label, 0)} for label, _, _ in DURATION_BUCKETS],
         })
-    return {"buckets": buckets, "by_user": by_user}
+
+    # Slow responses (>2 min) by hour of day (when completed_at occurred)
+    SLOW_THRESHOLD_SEC = 120
+    hour_labels = [
+        "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
+        "12pm", "1pm", "2pm", "3pm", "4pm", "5pm", "6pm", "7pm", "8pm", "9pm", "10pm", "11pm",
+    ]
+    slow_by_hour = {h: 0 for h in range(24)}
+    for row in rows:
+        r = dict(row)
+        sec = duration_seconds(r.get("started_at"), r.get("completed_at"))
+        if sec is None or sec < SLOW_THRESHOLD_SEC:
+            continue
+        completed = r.get("completed_at")
+        if not completed:
+            continue
+        try:
+            if isinstance(completed, str):
+                dt = datetime.fromisoformat(completed.replace("Z", "+00:00"))
+            else:
+                dt = completed
+            hour = dt.hour
+            slow_by_hour[hour] = slow_by_hour.get(hour, 0) + 1
+        except Exception:
+            pass
+    slow_by_hour_list = [
+        {"hour": h, "hour_label": hour_labels[h], "count": slow_by_hour[h]}
+        for h in range(24)
+    ]
+
+    return {"buckets": buckets, "by_user": by_user, "slow_by_hour": slow_by_hour_list}

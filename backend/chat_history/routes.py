@@ -225,41 +225,52 @@ async def get_chat_history(page: int = 1, limit: int = 20, current_user = Depend
 
 @router.get("/session/{session_id}")
 async def get_chat_session(session_id: str, current_user = Depends(get_current_user)):
-    """Get full conversation for a session"""
+    """Get full conversation for a session. Includes native_name (birth chart name) from DB for the session."""
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    
-    # Verify session belongs to user
-    cursor.execute(
-        "SELECT user_id FROM chat_sessions WHERE session_id = ?",
-        (session_id,)
-    )
-    session = cursor.fetchone()
-    
-    if not session or session[0] != current_user.userid:
+    cursor.row_factory = sqlite3.Row
+
+    # Get session and birth chart name (same as admin / chat performance: native_name lives in DB per session)
+    cursor.execute("""
+        SELECT cs.user_id, cs.birth_chart_id, bc.name as native_name_raw
+        FROM chat_sessions cs
+        LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+        WHERE cs.session_id = ?
+    """, (session_id,))
+    session_row = cursor.fetchone()
+
+    if not session_row or session_row["user_id"] != current_user.userid:
         conn.close()
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
+    native_name = None
+    raw_name = session_row["native_name_raw"] if session_row["native_name_raw"] else None
+    if raw_name:
+        try:
+            from encryption_utils import EncryptionManager
+            enc = EncryptionManager()
+            native_name = enc.decrypt(raw_name)
+        except Exception:
+            native_name = raw_name
+
     cursor.execute('''
         SELECT message_id, sender, content, timestamp, terms, glossary, images
         FROM chat_messages
         WHERE session_id = ?
         ORDER BY timestamp ASC
     ''', (session_id,))
-    
     messages = cursor.fetchall()
     conn.close()
-    
+
     conversation = []
     for msg in messages:
         message_data = {
             "message_id": msg[0],
             "sender": msg[1],
             "content": msg[2],
-            "timestamp": msg[3]
+            "timestamp": msg[3],
+            "native_name": native_name,
         }
-        
-        # Add terms and glossary if they exist
         if msg[4]:  # terms
             try:
                 message_data["terms"] = json.loads(msg[4])
@@ -267,7 +278,6 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["terms"] = []
         else:
             message_data["terms"] = []
-            
         if msg[5]:  # glossary
             try:
                 message_data["glossary"] = json.loads(msg[5])
@@ -275,8 +285,6 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["glossary"] = []
         else:
             message_data["glossary"] = []
-            
-        # Add images if they exist
         if len(msg) > 6 and msg[6]:  # images
             try:
                 message_data["images"] = json.loads(msg[6])
@@ -284,10 +292,9 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
                 message_data["images"] = []
         else:
             message_data["images"] = []
-            
         conversation.append(message_data)
-    
-    return {"session_id": session_id, "messages": conversation}
+
+    return {"session_id": session_id, "native_name": native_name, "messages": conversation}
 
 @router.post("/ask")
 async def ask_question_async(request: dict, background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):

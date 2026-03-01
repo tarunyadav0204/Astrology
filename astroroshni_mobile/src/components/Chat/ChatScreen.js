@@ -1003,17 +1003,21 @@ export default function ChatScreen({ navigation, route }) {
 
           const showFinalMessage = () => {
             setMessagesWithStorage(prev => {
-              const updated = prev.map(msg => 
-                msg.messageId === messageId 
-                  ? { 
-                      ...msg, 
-                      content: status.content || 'Response received but content is empty', 
+              const processingMsg = prev.find(m => m.messageId === messageId);
+              const userMsg = processingMsg?.userMessageId ? prev.find(m => m.id === processingMsg.userMessageId) : null;
+              const chartName = userMsg?.native_name || null;
+              const updated = prev.map(msg =>
+                msg.messageId === messageId
+                  ? {
+                      ...msg,
+                      content: status.content || 'Response received but content is empty',
                       isTyping: false,
                       terms: status.terms || [],
                       glossary: status.glossary || {},
                       message_type: status.message_type || 'answer',
                       summary_image: status.summary_image || null,
-                      follow_up_questions: status.follow_up_questions || []
+                      follow_up_questions: status.follow_up_questions || [],
+                      native_name: chartName,
                     }
                   : msg
               );
@@ -1192,13 +1196,15 @@ export default function ChatScreen({ navigation, route }) {
     
     // Remove test message code
 
-    // Add user message immediately
+    // Add user message immediately (include chart name for badge)
     const userMessageId = Date.now().toString();
+    const chartName = partnershipMode ? nativeChart?.name : birthData?.name;
     const userMessage = {
       id: userMessageId,
       content: messageText,
       role: 'user',
       timestamp: new Date().toISOString(),
+      native_name: chartName || null,
     };
     
     // Track chat message sent event

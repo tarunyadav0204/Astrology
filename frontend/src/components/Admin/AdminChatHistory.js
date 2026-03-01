@@ -125,6 +125,9 @@ const AdminChatHistory = () => {
                 <div className="session-user">
                   <strong>{session.user_name || 'Unknown'}</strong> ({session.user_phone})
                 </div>
+                {session.native_name && (
+                  <div className="session-card-native">Chart: {session.native_name}</div>
+                )}
                 <div className="session-date">{formatDate(session.created_at)}</div>
                 <div className="session-preview">{session.preview || 'Chat session'}</div>
               </div>
@@ -138,7 +141,12 @@ const AdminChatHistory = () => {
               <button type="button" className="session-back" onClick={() => setSelectedSession(null)} aria-label="Back to sessions">
                 ← Back to sessions
               </button>
-              <h3 className="session-header-title">Session</h3>
+              <h3 className="session-header-title">
+                Session
+                {selectedSession.native_name && (
+                  <span className="session-native-name"> · {selectedSession.native_name}</span>
+                )}
+              </h3>
               <button type="button" className="session-close" onClick={() => setSelectedSession(null)} aria-label="Close">×</button>
             </div>
             
@@ -149,8 +157,13 @@ const AdminChatHistory = () => {
                     className="message-content"
                     dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
                   />
-                  <div className="message-time">
-                    {new Date(message.timestamp).toLocaleTimeString()}
+                  <div className="message-meta">
+                    {message.native_name && (
+                      <span className="message-native-badge" title="Birth chart / Native">{message.native_name}</span>
+                    )}
+                    <span className="message-time">
+                      {new Date(message.timestamp).toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
               ))}

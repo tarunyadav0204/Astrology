@@ -23,9 +23,11 @@ import { COLORS, API_BASE_URL, getEndpoint, VOICE_CONFIG } from '../../utils/con
 import { generatePDF, sharePDFOnWhatsApp } from '../../utils/pdfGenerator';
 import { textToSpeech } from '../../utils/textToSpeech';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart }) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
@@ -262,28 +264,31 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
       .replace(/\n\s*#+\s*\n/g, '\n')
       .replace(/#+\s*$/, '');
     
-    // Process term tooltips FIRST, after HTML entity decoding
+    // Process term tooltips FIRST, after HTML entity decoding (only first occurrence per term per message)
     if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
+      const wrappedTermIds = new Set();
       // First try to find existing <term> tags
       let termCount = 0;
       formatted = formatted.replace(/<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi, (match, termId, termText) => {
         const normalizedId = termId.toLowerCase().trim();
         if (message.glossary[normalizedId]) {
+          if (wrappedTermIds.has(normalizedId)) return termText;
+          wrappedTermIds.add(normalizedId);
           termCount++;
-          const definition = message.glossary[normalizedId].replace(/"/g, '&quot;');
-          return `<tooltip data-term="${normalizedId}" data-definition="${definition}">${termText}</tooltip>`;
+          return `<tooltip data-term="${normalizedId}">${termText}</tooltip>`;
         }
         return termText;
       });
       
-      // If no tags found, auto-wrap terms from glossary keys
+      // If no tags found, auto-wrap terms from glossary keys (first occurrence only per term)
       if (termCount === 0) {
         Object.keys(message.glossary).forEach(termKey => {
-          const definition = message.glossary[termKey].replace(/"/g, '&quot;');
-          // Create case-insensitive regex for the term
           const termPattern = new RegExp(`\\b(${termKey.replace(/[()]/g, '\\$&')})\\b`, 'gi');
           formatted = formatted.replace(termPattern, (match) => {
-            return `<tooltip data-term="${termKey}" data-definition="${definition}">${match}</tooltip>`;
+            const key = termKey.toLowerCase();
+            if (wrappedTermIds.has(key)) return match;
+            wrappedTermIds.add(key);
+            return `<tooltip data-term="${termKey}">${match}</tooltip>`;
           });
         });
       }
@@ -308,6 +313,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');
     formatted = formatted.replace(/<div class="final-thoughts-card">(.*?)<\/div>/gs, '<finalthoughts>$1</finalthoughts>');
     
+    // Strip markdown header hashes from start of every line so #### / ### / ## never appear in UI
+    formatted = formatted.replace(/^#+\s*(.*)$/gm, '$1');
+    
     return formatted;
   };
 
@@ -315,6 +323,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     const elements = [];
     let currentIndex = 0;
     let lastIndex = 0;
+    const wrappedTermsInRender = new Set(); // first occurrence per term only (for line-level <term> fallback)
     
     // Handle all special sections
     const sections = [
@@ -528,19 +537,20 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   
   const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
     const elements = [];
+    // Strip markdown header hashes so #### / ### / ## never show (e.g. in table cells or paragraph text)
+    text = (text || '').replace(/^#+\s*/, '').replace(/\s+#+\s+/g, ' ').trim();
     const textStyle = baseTextStyle ? [styles.regularText, baseTextStyle, message.role === 'user' && styles.userText] : [styles.regularText, message.role === 'user' && styles.userText];
     
-    // Handle tooltip tags first
-    const tooltipRegex = /<tooltip data-term="([^"]+)" data-definition="([^"]+)">([^<]+)<\/tooltip>/g;
+    // Handle tooltip tags first (data-term only; definition looked up from glossary to avoid attribute escaping issues)
+    const tooltipRegex = /<tooltip data-term="([^"]+)">([^<]+)<\/tooltip>/g;
     const parts = text.split(tooltipRegex);
     
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      // Don't skip empty parts here as it breaks the index-based logic (i % 4)
-      
-      if (i % 4 === 3) { // Tooltip text
-        const definition = parts[i - 1]?.replace(/&quot;/g, '"') || '';
-        
+      // Parts: [textBefore, termId, innerText, textAfter, termId, innerText, ...] so i % 3 === 2 is innerText, i % 3 === 1 is termId
+      if (i % 3 === 2) { // Tooltip inner text (term display)
+        const termId = parts[i - 1];
+        const definition = (message.glossary && message.glossary[termId]) ? message.glossary[termId] : '';
         elements.push(
           <Text
             key={`tooltip-${startIndex}-${i}`}
@@ -550,7 +560,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             {part} ⓘ
           </Text>
         );
-      } else if (i % 4 === 0 && part) { // Regular text
+      } else if (i % 3 === 0 && part) { // Regular text
         // Handle markdown bold formatting
         const boldRegex = /\*\*(.*?)\*\*/gs;
         const boldParts = part.split(boldRegex);
@@ -799,7 +809,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         );
       } else if (part.match(/^####\s+(.+)$/m)) {
-        let headerText = part.replace(/^#+\s*/, '').trim();
+        let headerText = part.split('\n')[0].replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
         const symbol = getHeaderSymbol(headerText);
         elements.push(
@@ -875,8 +885,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               </View>
             );
           } else {
-            // Process markdown formatting first
-            let processedLine = trimmedLine
+            // Strip markdown header hashes so #### / ### / ## never show in paragraph text (leading or mid-line)
+            let processedLine = trimmedLine.replace(/^#+\s*/, '').replace(/\s+#+\s+/g, ' ').trim();
+            if (!processedLine) continue;
+            processedLine = processedLine
               .replace(/&lt;/g, '<')
               .replace(/&gt;/g, '>')
               .replace(/&quot;/g, '"')
@@ -884,13 +896,15 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               .replace(/&#39;/g, "'")
               .replace(/&nbsp;/g, ' ');
             
-            // Process tooltips after HTML entity decoding
+            // Process tooltips after HTML entity decoding (first occurrence per term only)
             if (message.terms && message.glossary) {
               processedLine = processedLine.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
-                if (message.glossary[termId]) {
-                  return `<tooltip data-term="${termId}" data-definition="${message.glossary[termId].replace(/"/g, '&quot;')}">${termText}</tooltip>`;
+                const key = termId.toLowerCase().trim();
+                if (message.glossary[termId] && !wrappedTermsInRender.has(key)) {
+                  wrappedTermsInRender.add(key);
+                  return `<tooltip data-term="${termId}">${termText}</tooltip>`;
                 }
-                return match;
+                return message.glossary[termId] ? termText : match;
               });
             }
             
@@ -922,6 +936,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const formattedContent = formatContent(message.content);
   const renderedElements = renderFormattedText(formattedContent);
 
+  const chartName = message.native_name || null;
+
   const BubbleWrapper = ({ children, role, isPartnership, isClarification, timestamp }) => {
     if (role === 'user') {
       return (
@@ -945,6 +961,12 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
             <Ionicons name="person" size={10} color="#fff" style={styles.userIcon} />
             <Text style={styles.userLabel}>{t('chat.you', 'You')}</Text>
           </LinearGradient>
+            {chartName ? (
+              <View style={[styles.chartNameBadge, styles.chartNameBadgeUser]}>
+                <Ionicons name="calendar-outline" size={10} color="#1e3a8a" />
+                <Text style={styles.chartNameBadgeTextUser} numberOfLines={1}>{chartName}</Text>
+              </View>
+            ) : null}
           </View>
           {children}
           <Text style={[styles.timestamp, { color: 'rgba(30, 58, 138, 0.5)' }]}>
@@ -993,6 +1015,12 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               {isClarification ? t('chat.inquiry', 'AstroRoshni Inquiry') : t('chat.verified', 'AstroRoshni Verified')}
             </Text>
           </LinearGradient>
+            {chartName ? (
+              <View style={[styles.chartNameBadge, styles.chartNameBadgeAssistant]}>
+                <Ionicons name="calendar-outline" size={10} color="#7c2d12" />
+                <Text style={styles.chartNameBadgeTextAssistant} numberOfLines={1}>{chartName}</Text>
+              </View>
+            ) : null}
             {message.isTyping && (
               <View style={styles.typingIndicatorBadge}>
                 <Text style={styles.typingIndicatorText}>Analyzing Chart...</Text>
@@ -1087,6 +1115,15 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
                 </TouchableOpacity>
               );
             }).filter(Boolean)}
+          </View>
+        )}
+
+        {/* Hint when analysis timed out: tell user to tap refresh or check Chat History */}
+        {message.showRestartButton && (
+          <View style={styles.timeoutHint}>
+            <Text style={styles.timeoutHintText}>
+              {t('chat.timeoutHint', 'Tap the refresh icon below to check again, or find your response later in Chat History.')}
+            </Text>
           </View>
         )}
 
@@ -1252,10 +1289,10 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         >
           <Animated.View style={styles.tooltipModalContent}>
             <LinearGradient
-              colors={Platform.OS === 'android' 
-                ? ['rgba(0, 0, 0, 0.9)', 'rgba(20, 20, 20, 0.85)'] 
+              colors={theme === 'dark'
+                ? ['rgba(0, 0, 0, 0.9)', 'rgba(20, 20, 20, 0.85)']
                 : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 248, 240, 0.95)']}
-              style={styles.tooltipGradient}
+              style={[styles.tooltipGradient, { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 107, 53, 0.1)' }]}
             >
               <View style={styles.tooltipHeader}>
                 <View style={styles.tooltipIconCircle}>
@@ -1265,7 +1302,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               </View>
               
               <ScrollView style={styles.tooltipScrollView} showsVerticalScrollIndicator={false}>
-                <Text style={styles.tooltipModalDefinition}>{tooltipModal.definition}</Text>
+                <Text style={[styles.tooltipModalDefinition, { color: theme === 'dark' ? '#ecf0f1' : '#2c3e50' }]}>{tooltipModal.definition}</Text>
               </ScrollView>
 
               <TouchableOpacity
@@ -1360,6 +1397,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   userBadge: {
     flexDirection: 'row',
@@ -1382,6 +1421,35 @@ const styles = StyleSheet.create({
     color: '#fff',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  chartNameBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    gap: 4,
+    maxWidth: 140,
+  },
+  chartNameBadgeUser: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  chartNameBadgeAssistant: {
+    backgroundColor: 'rgba(255, 107, 53, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.25)',
+  },
+  chartNameBadgeTextUser: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#1e3a8a',
+  },
+  chartNameBadgeTextAssistant: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#7c2d12',
   },
   imageContainer: {
     marginBottom: 15,
@@ -1821,7 +1889,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: 'rgba(255, 107, 53, 0.3)',
     textDecorationLine: 'underline',
-    textDecorationStyle: 'dashed',
+    textDecorationStyle: Platform.OS === 'ios' ? 'solid' : 'dashed',
     overflow: 'hidden',
   },
   tooltipModalOverlay: {
@@ -1846,7 +1914,6 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 107, 53, 0.1)',
   },
   tooltipHeader: {
     flexDirection: 'row',
@@ -1879,7 +1946,6 @@ const styles = StyleSheet.create({
   tooltipModalDefinition: {
     fontSize: 15,
     lineHeight: 22,
-    color: Platform.OS === 'android' ? '#ecf0f1' : '#2c3e50',
   },
   tooltipModalClose: {
     backgroundColor: '#ff6b35',
@@ -2033,6 +2099,21 @@ const styles = StyleSheet.create({
     color: '#6A1B9A',
     fontWeight: '600',
     lineHeight: 16,
+  },
+  timeoutHint: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff6b35',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  timeoutHintText: {
+    fontSize: 12,
+    color: '#7c2d12',
+    fontWeight: '600',
+    lineHeight: 18,
   },
   imageModalOverlay: {
     flex: 1,

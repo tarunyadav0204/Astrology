@@ -23,9 +23,15 @@
 }
 
 .chart-card h3 {
-  margin: 0 0 16px 0;
+  margin: 0 0 8px 0;
   font-size: 1.1em;
   color: #333;
+}
+
+.chart-card .chart-subtitle {
+  margin: 0 0 16px 0;
+  font-size: 0.9em;
+  color: #666;
 }
 
 .chart-card .no-data,

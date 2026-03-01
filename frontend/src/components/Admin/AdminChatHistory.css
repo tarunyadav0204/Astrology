@@ -56,6 +56,16 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+.session-card-native {
+  font-size: 0.8rem;
+  color: #7c2d12;
+  margin-bottom: 4px;
+}
+
+.session-card.active .session-card-native {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .session-date {
   font-weight: 600;
   font-size: 0.9rem;
@@ -103,6 +113,12 @@
   color: #d84315;
   flex: 1;
   text-align: center;
+}
+
+.session-native-name {
+  font-weight: 600;
+  color: #7c2d12;
+  font-size: 0.95em;
 }
 
 .session-close {
@@ -173,11 +189,27 @@
   font-style: italic;
 }
 
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+  padding: 0 5px;
+  flex-wrap: wrap;
+}
+
+.message-native-badge {
+  font-size: 0.7rem;
+  color: #7c2d12;
+  background: rgba(255, 107, 53, 0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
 .message-time {
   font-size: 0.7rem;
   color: #999;
-  margin-top: 5px;
-  padding: 0 5px;
 }
 
 .loading {
