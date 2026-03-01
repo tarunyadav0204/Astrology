@@ -564,9 +564,11 @@ async def get_chat_performance(
     page: int = 1,
     per_page: int = 20,
     duration_bucket: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     current_user: dict = Depends(require_admin)
 ):
-    """Paginated chat performance: assistant answers with user, question, response preview, native, intent ms, duration. Optional duration_bucket: <30s, 30-60s, 60-90s, 90-120s, 2-3min, 3-4min, 4-5min, >5min."""
+    """Paginated chat performance. Optional duration_bucket and start_date/end_date (YYYY-MM-DD) to filter by completed_at."""
     if per_page < 1 or per_page > 100:
         per_page = 20
     if page < 1:
@@ -600,9 +602,13 @@ async def get_chat_performance(
             if hi is not None:
                 duration_where += " AND (julianday(cm.completed_at) - julianday(cm.started_at)) * 86400 < ?"
                 count_params.append(hi)
+        date_where = ""
+        if start_date and end_date:
+            date_where = " AND date(cm.completed_at) >= date(?) AND date(cm.completed_at) <= date(?)"
+            count_params.extend([start_date, end_date])
         cursor.execute(f"""
             SELECT COUNT(*) FROM chat_messages cm
-            WHERE {base_where}{duration_where}
+            WHERE {base_where}{duration_where}{date_where}
         """, count_params)
         total = cursor.fetchone()[0]
         # Optional columns language, intent_router_ms may not exist on older DBs
@@ -630,7 +636,7 @@ async def get_chat_performance(
             JOIN chat_sessions cs ON cs.session_id = cm.session_id
             LEFT JOIN users u ON u.userid = cs.user_id
             LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
-            WHERE {base_where}{duration_where}
+            WHERE {base_where}{duration_where}{date_where}
             ORDER BY cm.message_id DESC
             LIMIT ? OFFSET ?
         """
@@ -702,15 +708,22 @@ DURATION_BUCKETS = [
 @router.get("/admin/chat-performance/stats")
 async def get_chat_performance_stats(
     limit: int = 5000,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     current_user: dict = Depends(require_admin)
 ):
-    """Aggregated duration bucket counts (overall and by user) for Charts tab."""
+    """Aggregated duration bucket counts (overall and by user) for Charts tab. Optional start_date/end_date (YYYY-MM-DD)."""
     if limit < 1 or limit > 20000:
         limit = 5000
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
+        date_where = ""
+        params = [limit]
+        if start_date and end_date:
+            date_where = " AND date(cm.completed_at) >= date(?) AND date(cm.completed_at) <= date(?)"
+            params = [start_date, end_date, limit]
+        cursor.execute(f"""
             SELECT cm.message_id, cm.started_at, cm.completed_at,
                    COALESCE(u.name, u.phone, 'Unknown') as user_name, u.phone as user_phone
             FROM chat_messages cm
@@ -719,9 +732,10 @@ async def get_chat_performance_stats(
             WHERE cm.sender = 'assistant' AND cm.status = 'completed'
             AND (cm.message_type = 'answer' OR (cm.content IS NOT NULL AND cm.content != ''))
             AND cm.started_at IS NOT NULL AND cm.completed_at IS NOT NULL
+            {date_where}
             ORDER BY cm.message_id DESC
             LIMIT ?
-        """, (limit,))
+        """, params)
         rows = cursor.fetchall()
         conn.close()
     except Exception as e:

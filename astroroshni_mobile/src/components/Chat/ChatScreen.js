@@ -455,9 +455,38 @@ export default function ChatScreen({ navigation, route }) {
     // first so the notification's native_id selection is applied, then open chat.
     if (route.params?.startChat) {
       const initialMsg = route.params?.initialMessage;
-      navigation.setParams({ startChat: undefined, initialMessage: undefined });
+      const responseReadySessionId = route.params?.responseReadySessionId;
+      navigation.setParams({ startChat: undefined, initialMessage: undefined, responseReadySessionId: undefined });
       (async () => {
         await checkBirthData();
+        if (responseReadySessionId) {
+          try {
+            const token = await AsyncStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE_URL}${getEndpoint(`/chat-v2/session/${responseReadySessionId}`)}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const msgs = (data.messages || []).map((m) => ({
+                messageId: m.message_id,
+                role: m.sender,
+                content: m.content || '',
+                timestamp: m.timestamp,
+                id: `${m.message_id}_${m.timestamp}`,
+                native_name: m.native_name ?? data.native_name ?? null,
+                terms: m.terms,
+                glossary: m.glossary,
+                images: m.images,
+              }));
+              setSessionId(responseReadySessionId);
+              setMessagesWithStorage(msgs);
+              setShowGreeting(false);
+              return;
+            }
+          } catch (err) {
+            if (__DEV__) console.warn('[Chat] Fetch session for push failed:', err?.message);
+          }
+        }
         setTimeout(() => {
           handleGreetingOptionSelect({ action: 'question' });
           if (initialMsg) {

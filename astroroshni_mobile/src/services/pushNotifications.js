@@ -170,9 +170,11 @@ export function setupNotificationResponseListener(navigationRef) {
         }
       }
       if (navigationRef?.current && (cta === 'astroroshni://chat' || !cta)) {
+        const sessionId = data?.session_id != null ? String(data.session_id).trim() : null;
         navigationRef.current.navigate('Home', {
           startChat: true,
           ...(question && { initialMessage: question }),
+          ...(sessionId && { responseReadySessionId: sessionId }),
         });
       }
     } catch (e) {

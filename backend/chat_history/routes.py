@@ -1346,6 +1346,27 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 await fact_extractor.extract_facts(question, result['response'], birth_chart_id)
             except Exception as e:
                 print(f"❌ Fact extraction error: {e}")
+
+        # Push notification when response is ready (user may have left the app)
+        if result.get('success'):
+            try:
+                from nudge_engine import db as nudge_db
+                from nudge_engine import push as push_module
+                conn_nudge = nudge_db.get_conn()
+                try:
+                    nudge_db.init_nudge_tables(conn_nudge)
+                    tokens = nudge_db.get_device_tokens_for_user(conn_nudge, user_id)
+                    for token, _platform in tokens:
+                        push_module.send_expo_push(
+                            token,
+                            "Your AstroRoshni response is ready",
+                            "Tap to view your analysis.",
+                            data={"cta": "astroroshni://chat", "session_id": session_id},
+                        )
+                finally:
+                    conn_nudge.close()
+            except Exception as push_err:
+                print(f"Push (response ready) failed: {push_err}")
         
     except Exception as e:
         # Handle any errors with user-friendly message and log to admin error list

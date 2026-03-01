@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -15,22 +15,53 @@ const COLORS = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'
 
 const BUCKET_ORDER = ['<30s', '30-60s', '60-90s', '90-120s', '2-3 min', '3-4 min', '4-5 min', '>5 min'];
 
+function getPeriodDates(period, customStart, customEnd) {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${y}-${m}-${d}`;
+  if (period === 'today') return { start_date: todayStr, end_date: todayStr };
+  if (period === 'custom') {
+    if (!customStart || !customEnd) return { start_date: '', end_date: '' };
+    return { start_date: customStart, end_date: customEnd };
+  }
+  const start = new Date(today);
+  if (period === 'week') start.setDate(today.getDate() - 6);
+  if (period === 'month') start.setDate(1);
+  if (period === 'ytd') start.setMonth(0), start.setDate(1);
+  const sy = start.getFullYear();
+  const sm = String(start.getMonth() + 1).padStart(2, '0');
+  const sd = String(start.getDate()).padStart(2, '0');
+  return { start_date: `${sy}-${sm}-${sd}`, end_date: todayStr };
+}
+
 export default function AdminChatPerformanceCharts() {
   const [buckets, setBuckets] = useState([]);
   const [byUser, setByUser] = useState([]);
   const [slowByHour, setSlowByHour] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [period, setPeriod] = useState('month');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+
+  const { start_date, end_date } = useMemo(
+    () => getPeriodDates(period, customStart, customEnd),
+    [period, customStart, customEnd]
+  );
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [start_date, end_date]);
 
   const fetchStats = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/chat-performance/stats?limit=5000', {
+      const params = new URLSearchParams({ limit: '5000' });
+      if (start_date && end_date) params.set('start_date', start_date), params.set('end_date', end_date);
+      const response = await fetch(`/api/admin/chat-performance/stats?${params.toString()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       if (!response.ok) throw new Error('Failed to fetch stats');
@@ -96,6 +127,47 @@ export default function AdminChatPerformanceCharts() {
       <div className="charts-header">
         <h2>📊 Chat Performance – Duration</h2>
         <button onClick={fetchStats} className="refresh-btn">🔄 Refresh</button>
+      </div>
+      <div className="performance-filters performance-filters-period charts-period">
+        <span className="filter-label">Period:</span>
+        <div className="period-buttons">
+          {['today', 'week', 'month', 'ytd', 'custom'].map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={`period-btn ${period === p ? 'active' : ''}`}
+              onClick={() => setPeriod(p)}
+            >
+              {p === 'today' && 'Today'}
+              {p === 'week' && 'This week'}
+              {p === 'month' && 'This month'}
+              {p === 'ytd' && 'YTD'}
+              {p === 'custom' && 'Custom'}
+            </button>
+          ))}
+        </div>
+        {period === 'custom' && (
+          <div className="custom-date-row">
+            <label>
+              From
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="date-input"
+              />
+            </label>
+            <label>
+              To
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="date-input"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="chart-card">
