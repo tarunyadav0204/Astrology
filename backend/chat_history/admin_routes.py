@@ -1,10 +1,27 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 import sqlite3
 import json
 from datetime import datetime
 from auth import get_current_user
+
+# YYYY-MM-DD for date filters (today / this month)
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _normalize_date_range(
+    start_date: Optional[str], end_date: Optional[str]
+) -> Tuple[Optional[str], Optional[str]]:
+    """Return (start, end) as YYYY-MM-DD if both valid; else (None, None)."""
+    if not start_date or not end_date:
+        return None, None
+    s = (start_date or "").strip()
+    e = (end_date or "").strip()
+    if not DATE_RE.match(s) or not DATE_RE.match(e) or s > e:
+        return None, None
+    return s, e
 
 
 class AdminSetting(BaseModel):
@@ -603,9 +620,11 @@ async def get_chat_performance(
                 duration_where += " AND (julianday(cm.completed_at) - julianday(cm.started_at)) * 86400 < ?"
                 count_params.append(hi)
         date_where = ""
-        if start_date and end_date:
-            date_where = " AND date(cm.completed_at) >= date(?) AND date(cm.completed_at) <= date(?)"
-            count_params.extend([start_date, end_date])
+        sdate, edate = _normalize_date_range(start_date, end_date)
+        if sdate and edate:
+            # Use date prefix (YYYY-MM-DD) so filtering works for both date and datetime stored values
+            date_where = " AND cm.completed_at IS NOT NULL AND substr(cm.completed_at, 1, 10) >= ? AND substr(cm.completed_at, 1, 10) <= ?"
+            count_params.extend([sdate, edate])
         cursor.execute(f"""
             SELECT COUNT(*) FROM chat_messages cm
             WHERE {base_where}{duration_where}{date_where}
@@ -720,9 +739,10 @@ async def get_chat_performance_stats(
         cursor = conn.cursor()
         date_where = ""
         params = [limit]
-        if start_date and end_date:
-            date_where = " AND date(cm.completed_at) >= date(?) AND date(cm.completed_at) <= date(?)"
-            params = [start_date, end_date, limit]
+        sdate, edate = _normalize_date_range(start_date, end_date)
+        if sdate and edate:
+            date_where = " AND cm.completed_at IS NOT NULL AND substr(cm.completed_at, 1, 10) >= ? AND substr(cm.completed_at, 1, 10) <= ?"
+            params = [sdate, edate, limit]
         cursor.execute(f"""
             SELECT cm.message_id, cm.started_at, cm.completed_at,
                    COALESCE(u.name, u.phone, 'Unknown') as user_name, u.phone as user_phone

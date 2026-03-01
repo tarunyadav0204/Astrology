@@ -279,30 +279,53 @@ export default function BirthFormScreen({ navigation, route }) {
 
   const searchPlaces = async (query) => {
     try {
-      // Use hybrid cache strategy
-      const results = await locationCache.searchLocations(query, async (q) => {
-        // Photon API fallback
+      const queryTrimmed = query.trim();
+      if (queryTrimmed.length < 2) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      // 1) Backend Google Places autocomplete (optional; keep key server-side)
+      let googleSuggestions = [];
+      try {
+        const autocompleteUrl = `${API_BASE_URL}/api/places/autocomplete?q=${encodeURIComponent(queryTrimmed)}`;
+        const res = await fetch(autocompleteUrl, { method: 'GET' });
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.suggestions || [];
+          const ts = Date.now();
+          googleSuggestions = list.map((s, i) => ({
+            id: `google_${ts}_${i}`,
+            name: s.description || '',
+            place_id: s.place_id,
+            source: 'google',
+            latitude: null,
+            longitude: null
+          })).filter(p => p.name);
+        }
+      } catch (e) {
+        console.warn('Places autocomplete (backend) failed:', e?.message);
+      }
+
+      // 2) Hybrid cache: major cities → cache → Photon
+      const cacheResults = await locationCache.searchLocations(queryTrimmed, async (q) => {
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10`;
         const response = await fetch(url);
         const json = await response.json();
         const data = json.features || [];
-        
         const timestamp = Date.now();
         return data.map((item, index) => {
           const coords = item.geometry?.coordinates || [0, 0];
           const properties = item.properties || {};
           const parts = [];
-          
           const city = properties.city || properties.name;
           const state = properties.state;
           const country = properties.country;
-          
           if (city) parts.push(city);
           if (state && state !== city) parts.push(state);
           if (country) parts.push(country);
-          
           const name = parts.length > 0 ? parts.join(', ') : properties.name || 'Unknown';
-          
           return {
             id: `photon_${timestamp}_${index}`,
             name,
@@ -311,13 +334,18 @@ export default function BirthFormScreen({ navigation, route }) {
           };
         });
       });
-      
-      // Remove duplicates
-      const uniquePlaces = results.filter((place, index, self) =>
-        index === self.findIndex(p => p.name === place.name)
-      );
-      
-      setSuggestions(uniquePlaces.slice(0, 5));
+
+      // Merge: Google first, then cache results; dedupe by name
+      const combined = [...googleSuggestions];
+      for (const p of cacheResults) {
+        if (!combined.some(c => c.name === p.name)) {
+          combined.push({ ...p, source: p.source || 'cache' });
+        }
+        if (combined.length >= 10) break;
+      }
+      const uniquePlaces = combined.slice(0, 10);
+
+      setSuggestions(uniquePlaces);
       setShowSuggestions(true);
     } catch (error) {
       console.error('Location search error:', error);
@@ -326,16 +354,37 @@ export default function BirthFormScreen({ navigation, route }) {
 
 
 
-  const handlePlaceSelect = (place) => {
+  const handlePlaceSelect = async (place) => {
     setShowSuggestions(false);
     setSuggestions([]);
+    setTimeout(() => Keyboard.dismiss(), 100);
+
+    // Google suggestion: has place_id but no coords until we fetch details
+    if (place.place_id && (place.latitude == null || place.longitude == null)) {
+      try {
+        const detailsUrl = `${API_BASE_URL}/api/places/details?place_id=${encodeURIComponent(place.place_id)}`;
+        const res = await fetch(detailsUrl, { method: 'GET' });
+        if (res.ok) {
+          const data = await res.json();
+          setFormData(prev => ({
+            ...prev,
+            place: data.name || data.formattedAddress || place.name,
+            latitude: data.latitude,
+            longitude: data.longitude
+          }));
+          return;
+        }
+      } catch (e) {
+        console.warn('Place details fetch failed:', e?.message);
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       place: place.name,
       latitude: place.latitude,
       longitude: place.longitude
     }));
-    setTimeout(() => Keyboard.dismiss(), 100);
   };
 
   const validateStep = () => {
@@ -656,19 +705,22 @@ export default function BirthFormScreen({ navigation, route }) {
                         }}
                       />
                       {showSuggestions && suggestions.length > 0 && (
-                        <ScrollView 
+                        <ScrollView
                           style={[styles.suggestionsList, { backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)', borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)', elevation: getCardElevation(10) }]}
+                          contentContainerStyle={styles.suggestionsListContent}
                           keyboardShouldPersistTaps="always"
                           nestedScrollEnabled={true}
+                          showsVerticalScrollIndicator={true}
+                          bounces={false}
                         >
-                          {suggestions.map(suggestion => (
+                          {suggestions.map((suggestion) => (
                             <TouchableOpacity
                               key={suggestion.id}
                               style={[styles.suggestionItem, { borderBottomColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }]}
                               onPress={() => handlePlaceSelect(suggestion)}
                               activeOpacity={0.7}
                             >
-                              <Text style={[styles.suggestionText, { color: colors.text }]}>📍 {suggestion.name}</Text>
+                              <Text style={[styles.suggestionText, { color: colors.text }]} numberOfLines={2}>📍 {suggestion.name}</Text>
                             </TouchableOpacity>
                           ))}
                         </ScrollView>
@@ -1050,12 +1102,12 @@ const styles = StyleSheet.create({
     bottom: '100%',
     left: 0,
     right: 0,
+    height: 220,
     borderRadius: 12,
     marginBottom: 8,
     overflow: 'hidden',
     borderWidth: 1,
     zIndex: 1001,
-    maxHeight: 200,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1064,6 +1116,10 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
       },
     }),
+  },
+  suggestionsListContent: {
+    flexGrow: 1,
+    paddingBottom: 8,
   },
   suggestionItem: {
     padding: 16,

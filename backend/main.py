@@ -57,6 +57,7 @@ from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
 from progeny.progeny_routes import router as progeny_router
 from routes.mundane_routes import router as mundane_router
+from routes.places_routes import router as places_router
 from trading_routes import router as trading_router
 from routes.financial_routes import router as financial_router
 from yogini_dasha_routes import router as yogini_dasha_router
@@ -341,6 +342,7 @@ app.include_router(kota_chakra_router, prefix="/api")
 app.include_router(user_facts_router, prefix="/api")
 app.include_router(event_prediction_router)
 app.include_router(nudge_engine_router, prefix="/api")
+app.include_router(places_router, prefix="/api")
 
 
 
