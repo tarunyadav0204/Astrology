@@ -122,6 +122,95 @@ export async function registerPushTokenIfLoggedIn() {
 }
 
 /**
+ * Process a notification response and navigate to Home (Chat).
+ * - Native-specific event (data.native_id present): set that native in storage, then open chat.
+ * - Global event (no native_id): prefer the birth chart marked as "self"; only if none, keep existing selected native. Then open chat.
+ * Used by both the tap listener and cold-start handling.
+ * @param {{ notification: { request: { content?: { data?: object } } } }} response - from addNotificationResponseReceivedListener or getLastNotificationResponseAsync
+ * @param {React.RefObject} navigationRef - ref from NavigationContainer
+ */
+async function processNotificationResponse(response, navigationRef) {
+  const data = response?.notification?.request?.content?.data;
+  if (!data) return;
+  const cta = data?.cta;
+  const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
+  const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
+  const { storage } = require('./storage');
+  const { chartAPI } = require('./api');
+  try {
+    if (nativeId) {
+      // Native-specific event: switch to the chart this notification is for
+      let profiles = await storage.getBirthProfiles();
+      let profile = (profiles || []).find(
+        (p) => String(p?.id) === nativeId || String(p?._id) === nativeId
+      );
+      if (!profile) {
+        try {
+          const res = await chartAPI.getExistingCharts();
+          const apiCharts = res?.data?.charts || [];
+          const chart = apiCharts.find(
+            (c) => String(c?.id) === nativeId || String(c?._id) === nativeId
+          );
+          if (chart) {
+            profile = {
+              id: chart.id ?? chart._id,
+              name: chart.name,
+              date: chart.date,
+              time: chart.time,
+              place: chart.place,
+              latitude: chart.latitude,
+              longitude: chart.longitude,
+              gender: chart.gender,
+              relation: chart.relation,
+              isSelf: chart.relation === 'self',
+            };
+          }
+        } catch (_) {}
+      }
+      if (profile) {
+        await storage.setBirthDetails(profile);
+      }
+    } else {
+      // Global event: prefer "self" chart so chat uses the user's own chart; only if no self, keep existing native
+      const profiles = await storage.getBirthProfiles();
+      const selfProfile = (profiles || []).find(
+        (p) => p?.relation === 'self' || p?.isSelf === true
+      );
+      if (selfProfile) {
+        await storage.setBirthDetails(selfProfile);
+      }
+      // else: leave current selected native unchanged (getBirthDetails stays as is)
+    }
+    if (navigationRef?.current && (cta === 'astroroshni://chat' || !cta)) {
+      const sessionId = data?.session_id != null ? String(data.session_id).trim() : null;
+      navigationRef.current.navigate('Home', {
+        startChat: true,
+        ...(question && { initialMessage: question }),
+        ...(sessionId && { responseReadySessionId: sessionId }),
+      });
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[Push] processNotificationResponse error:', e?.message);
+  }
+}
+
+/**
+ * Handle notification tap when app was killed (cold start). The system delivers the tap
+ * before our listener is registered; Expo stores it as the "last notification response".
+ * Call this once after the navigator is ready (e.g. from App.js with a short delay).
+ */
+export async function handleColdStartNotificationResponse(navigationRef) {
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    if (response && navigationRef?.current) {
+      await processNotificationResponse(response, navigationRef);
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[Push] handleColdStartNotificationResponse failed:', e?.message);
+  }
+}
+
+/**
  * Set up listener for when user taps a notification. navigationRef should be
  * the ref from NavigationContainer so we can navigate to Home (Chat).
  * If data.native_id is present, sets that native as selected in storage before
@@ -130,57 +219,8 @@ export async function registerPushTokenIfLoggedIn() {
 export function setupNotificationResponseListener(navigationRef) {
   try {
     const sub = Notifications.addNotificationResponseReceivedListener(async (response) => {
-    const data = response.notification.request.content?.data;
-    const cta = data?.cta;
-    const question = data?.question && String(data.question).trim() ? String(data.question).trim() : undefined;
-    const nativeId = data?.native_id != null ? String(data.native_id).trim() : null;
-    try {
-      if (nativeId) {
-        const { storage } = require('./storage');
-        const { chartAPI } = require('./api');
-        let profiles = await storage.getBirthProfiles();
-        let profile = (profiles || []).find(
-          (p) => String(p?.id) === nativeId || String(p?._id) === nativeId
-        );
-        if (!profile) {
-          try {
-            const res = await chartAPI.getExistingCharts();
-            const apiCharts = res?.data?.charts || [];
-            const chart = apiCharts.find(
-              (c) => String(c?.id) === nativeId || String(c?._id) === nativeId
-            );
-            if (chart) {
-              profile = {
-                id: chart.id ?? chart._id,
-                name: chart.name,
-                date: chart.date,
-                time: chart.time,
-                place: chart.place,
-                latitude: chart.latitude,
-                longitude: chart.longitude,
-                gender: chart.gender,
-                relation: chart.relation,
-                isSelf: chart.relation === 'self',
-              };
-            }
-          } catch (_) {}
-        }
-        if (profile) {
-          await storage.setBirthDetails(profile);
-        }
-      }
-      if (navigationRef?.current && (cta === 'astroroshni://chat' || !cta)) {
-        const sessionId = data?.session_id != null ? String(data.session_id).trim() : null;
-        navigationRef.current.navigate('Home', {
-          startChat: true,
-          ...(question && { initialMessage: question }),
-          ...(sessionId && { responseReadySessionId: sessionId }),
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-  });
+      await processNotificationResponse(response, navigationRef);
+    });
     return () => {
       try {
         Notifications.removeNotificationSubscription(sub);

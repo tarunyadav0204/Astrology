@@ -192,6 +192,7 @@ export default function App() {
       return;
     }
     let notifCleanupRef = null;
+    let coldStartTimerRef = null;
     const deferMs = Platform.OS === 'ios' ? 800 : 100;
     const notifSetupTimer = setTimeout(() => {
       try {
@@ -199,6 +200,11 @@ export default function App() {
         pushNotifications.setupNotificationHandler();
         const cleanup = pushNotifications.setupNotificationResponseListener(navigationRef);
         if (typeof cleanup === 'function') notifCleanupRef = cleanup;
+        // When app was killed and opened by notification tap, the tap is not delivered to the listener.
+        // Check for last notification response after nav is ready (cold start).
+        coldStartTimerRef = setTimeout(() => {
+          pushNotifications.handleColdStartNotificationResponse(navigationRef).catch(() => {});
+        }, 600);
       } catch (e) {
         if (__DEV__) console.warn('[App] Notification setup failed (non-fatal):', e?.message || e);
       }
@@ -221,6 +227,7 @@ export default function App() {
     return () => {
       clearTimeout(delayed);
       clearTimeout(notifSetupTimer);
+      if (coldStartTimerRef != null) clearTimeout(coldStartTimerRef);
       sub?.remove?.();
       if (typeof notifCleanupRef === 'function') notifCleanupRef();
     };

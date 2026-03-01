@@ -29,7 +29,17 @@ class DashaCalculator:
         self.PLANET_ORDER = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury']
     
     def calculate_current_dashas(self, birth_data: Dict, current_date: datetime = None) -> Dict[str, Any]:
-        """Calculate current dasha periods using accurate Vimshottari method"""
+        """Calculate current dasha periods using accurate Vimshottari method.
+
+        Returns a dict with:
+          - mahadasha: dict with 'planet' (str); optionally 'start'/'end' (ISO date str or None).
+          - antardasha: dict with 'planet' (str); optionally 'start'/'end' (ISO date str or None).
+          - pratyantardasha, sookshma, prana: dict with 'planet' only (unchanged).
+          - maha_dashas: list of {planet, start, end, years} (start/end are datetime; unchanged).
+
+        Backward compatibility: All consumers should use .get('planet'), .get('start'), .get('end').
+        The 'start' and 'end' keys on mahadasha/antardasha are additive; code that only reads 'planet' is unchanged.
+        """
         if current_date is None:
             current_date = datetime.now()
             
@@ -163,9 +173,20 @@ class DashaCalculator:
             # Calculate current prana
             current_prana = self._calculate_prana(current_maha, current_antar, current_pratyantar, current_sookshma, current_date)
             
+            # Include start/end dates for current MD and AD so chat uses authoritative dates (no guessing)
+            def _date_str(dt):
+                return dt.strftime('%Y-%m-%d') if hasattr(dt, 'strftime') else str(dt)
             return {
-                'mahadasha': {'planet': current_maha['planet']},
-                'antardasha': {'planet': current_antar['planet']},
+                'mahadasha': {
+                    'planet': current_maha['planet'],
+                    'start': _date_str(current_maha['start']),
+                    'end': _date_str(current_maha['end']),
+                },
+                'antardasha': {
+                    'planet': current_antar['planet'],
+                    'start': _date_str(current_antar['start']),
+                    'end': _date_str(current_antar['end']),
+                },
                 'pratyantardasha': {'planet': current_pratyantar['planet']},
                 'sookshma': {'planet': current_sookshma['planet']},
                 'prana': {'planet': current_prana['planet']},
@@ -179,12 +200,12 @@ class DashaCalculator:
             # import traceback
             # print(f"Traceback: {traceback.format_exc()}")
             return {
-                'mahadasha': {'planet': 'Sun'},
-                'antardasha': {'planet': 'Moon'},
+                'mahadasha': {'planet': 'Sun', 'start': None, 'end': None},
+                'antardasha': {'planet': 'Moon', 'start': None, 'end': None},
                 'pratyantardasha': {'planet': 'Mars'},
                 'sookshma': {'planet': 'Mercury'},
                 'prana': {'planet': 'Jupiter'},
-                'maha_dashas': [],  # Add this for cascading dasha compatibility
+                'maha_dashas': [],
                 'moon_nakshatra': 1,
                 'moon_lord': 'Sun'
             }

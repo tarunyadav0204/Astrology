@@ -121,6 +121,16 @@ COMPLIANCE_RULES = """
 [COMP-1] PD_CHECK: Mention Pratyantardasha lord. [COMP-2] VARGOTTAMA_VERIFY: D1_sign==D9_sign. [COMP-3] ASPECT_VERIFY: Use sign_aspects mapping only. [COMP-4] VARSHPHAL_CHECK: Mention Muntha & Mudda Dasha. [COMP-5] SUBSECTION_HEADERS: Use ####. [COMP-6] PARASHARI_ADAPTIVE: Adapt dasha depth to time period. [COMP-7] PERIOD_PRIORITY: Prioritize period_dasha_activations for short-term. [COMP-8] TRANSIT_REFERENCE: Use transit_activations data.
 """
 
+# 9b. DASHA DATES – MATCH TIMEFRAME, THEN USE ONLY PROVIDED DATES
+DASHA_DATES_SOVEREIGNTY = """
+[DASHA-DATES] CRITICAL – Timeframe first, then authority:
+1) MATCH THE QUESTION'S TIMEFRAME: Use the dasha data that covers the period the user asked about. Do NOT use current_dashas for past or future questions—that would mislead you to state today's dashas instead of the period they asked about.
+   - Questions about "current", "now", "today", "this period", or present life: use current_dashas .
+   - Questions about a specific future or past year/range, or "in 2027", "next year", "Oct 2026–Mar 2027": use unified_dasha_timeline.vimshottari_periods, requested_dasha_summary.vimshottari_sequence or .all_five_levels_sequence (these are computed for the requested period). For each transit in transit_activations, use the dasha periods that fall within that activation's start_date/end_date (from unified_dasha_timeline or requested_dasha_summary).
+   - Short-term (daily/weekly/monthly): use period_dasha_activations when present.
+2) DATES ARE AUTHORITATIVE ONLY FROM CONTEXT: Whatever source you chose above, use ONLY the start/end dates given there. Do NOT infer or substitute dates from general knowledge or typical dasha lengths. Example: If the relevant context says Mars-Ketu runs May 2026–October 2026, state exactly that—never substitute October 2026–March 2027 or any other range. The native's birth data determines exact dates; your role is to report and interpret them, not replace them.
+"""
+
 # 11. HOUSE SIGNIFICATIONS REFERENCE
 HOUSE_SIGNIFICATIONS = """
 [HOUSES]: 1=Self, 2=Wealth, 3=Effort, 4=Home, 5=Creativity, 6=Health/Conflict, 7=Partners, 8=Transformation, 9=Fortune, 10=Career, 11=Gains, 12=Losses. [SYNTHESIS-RULE] Predict events by combining activated house meanings. Be specific.
@@ -316,7 +326,7 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
 
     # Always add citations, memory, compliance, and data rules
-    instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY + "\n" + COMPLIANCE_RULES + "\n" + HOUSE_SIGNIFICATIONS + "\n" + BHAVAM_BHAVESH_RULES + "\n" + DATA_SOVEREIGNTY + "\n" + PERSONAL_CONSULTATION_RULES + "\n" + HOLISTIC_SYNTHESIS_RULE
+    instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY + "\n" + COMPLIANCE_RULES + "\n" + DASHA_DATES_SOVEREIGNTY + "\n" + HOUSE_SIGNIFICATIONS + "\n" + BHAVAM_BHAVESH_RULES + "\n" + DATA_SOVEREIGNTY + "\n" + PERSONAL_CONSULTATION_RULES + "\n" + HOLISTIC_SYNTHESIS_RULE
     
     return instruction
 
