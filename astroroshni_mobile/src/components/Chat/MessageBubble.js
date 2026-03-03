@@ -313,8 +313,9 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');
     formatted = formatted.replace(/<div class="final-thoughts-card">(.*?)<\/div>/gs, '<finalthoughts>$1</finalthoughts>');
     
-    // Strip markdown header hashes from start of every line so #### / ### / ## never appear in UI
-    formatted = formatted.replace(/^#+\s*(.*)$/gm, '$1');
+    // Normalize over-duplicated markdown header hashes while keeping a single header marker
+    // Example: "#### #### Health" -> "#### Health" so our header parsing still works
+    formatted = formatted.replace(/^(#{2,6})(?:\s+\1)+\s*(.*)$/gm, (_match, hashes, rest) => `${hashes} ${rest}`);
     
     return formatted;
   };

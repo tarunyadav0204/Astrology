@@ -314,6 +314,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     question = request.get("question")
     birth_details = request.get("birth_details")
     client_request_id = request.get("client_request_id")
+    mode = request.get("mode")  # e.g. "lab" for Chart Lab (educational) mode
     
     if not session_id or not question or not birth_details:
         raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
@@ -539,9 +540,22 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         force_ready_for_limit = partnership_mode or clarification_count >= 1 or is_notification_question
         
         intent_router = IntentRouter()
-        intent = await intent_router.classify_intent(question, [], user_facts, clarification_count=clarification_count, language=language, force_ready=force_ready_for_limit, d1_chart=d1_chart)
+        intent = await intent_router.classify_intent(
+            question,
+            [],
+            user_facts,
+            clarification_count=clarification_count,
+            language=language,
+            force_ready=force_ready_for_limit,
+            d1_chart=d1_chart
+        )
         chart_insights = intent.get('chart_insights', [])
         print(f"📊 Got {len(chart_insights)} chart insights from intent router")
+        
+        # Mark Lab / educational mode explicitly on intent so downstream
+        # prompt builder can switch to teaching-focused instructions.
+        if mode == 'lab':
+            intent['lab_mode'] = True
         
         # Handle clarification immediately - do NOT start background task
         if intent.get('status') == 'CLARIFY':

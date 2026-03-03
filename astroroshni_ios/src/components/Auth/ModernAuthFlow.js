@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, Animated, Dimensions, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -147,8 +147,9 @@ export default function ModernAuthFlow({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <LinearGradient
-        colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']}
+        colors={['#ffffff', '#f8f8f8', '#f5f5f5']}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea}>

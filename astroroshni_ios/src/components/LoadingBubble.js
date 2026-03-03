@@ -98,6 +98,20 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
     }, [hasChartInsights, chartInsights]);
 
     const isDarkMode = theme === 'dark';
+    const isClassic = theme === 'classic';
+
+    const bubbleGradientColors = isClassic
+        ? ['#ffffff', '#f5f5f5']
+        : (Platform.OS === 'android'
+            ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)']
+            : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']);
+    const bubbleBorderColor = isClassic ? (colors.cardBorder || 'rgba(0,0,0,0.22)') : 'rgba(255, 215, 0, 0.15)';
+    const bubbleStyle = isClassic ? { borderColor: bubbleBorderColor, shadowColor: '#000', shadowOpacity: 0.08, backgroundColor: 'transparent' } : {};
+    const titleColor = isClassic ? (colors.text || '#000') : (isDarkMode ? '#ffd700' : '#ff6b35');
+    const textColor = isClassic ? (colors.text || '#000') : (isDarkMode ? '#fff' : '#1a1a1a');
+    const subtextColor = isClassic ? (colors.textSecondary || '#666') : (isDarkMode ? 'rgba(255, 255, 255, 0.85)' : '#4b5563');
+    const dotColor = isClassic ? (colors.textTertiary || '#999') : '#ff6b35';
+    const chartPreviewColor = isClassic ? (colors.textSecondary || '#666') : '#ff6b35';
 
     if (hasChartInsights && chartData) {
         const currentInsight = chartInsights[currentIndex];
@@ -106,15 +120,13 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
             return (
                 <View style={styles.container}>
                     <LinearGradient
-                        colors={Platform.OS === 'android' 
-                            ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] 
-                            : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']}
+                        colors={bubbleGradientColors}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={styles.welcomeBubble}
+                        style={[styles.welcomeBubble, { borderColor: bubbleBorderColor }, bubbleStyle]}
                     >
-                        <Text style={[styles.welcomeTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
-                        <Text style={[styles.welcomeSubtext, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>{t('chat.preparingInsights', 'Preparing your cosmic insights...')}</Text>
+                        <Text style={[styles.welcomeTitle, isClassic && { textShadowColor: 'transparent' }, { color: titleColor }]}>☀️ AstroRoshni</Text>
+                        <Text style={[styles.welcomeSubtext, { color: textColor }]}>{t('chat.preparingInsights', 'Preparing your cosmic insights...')}</Text>
                     </LinearGradient>
                 </View>
             );
@@ -123,14 +135,12 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
         return (
             <View style={styles.container} ref={chartContainerRef}>
                 <LinearGradient
-                    colors={Platform.OS === 'android' 
-                        ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] 
-                        : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']}
+                    colors={bubbleGradientColors}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.chartBubble}
+                    style={[styles.chartBubble, { borderColor: bubbleBorderColor }, bubbleStyle]}
                 >
-                    <Text style={[styles.chartTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
+                    <Text style={[styles.chartTitle, isClassic && { textShadowColor: 'transparent' }, { color: titleColor }]}>☀️ AstroRoshni</Text>
                     
                     <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
                         <NorthIndianChart 
@@ -142,7 +152,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                         />
                     </Animated.View>
                     
-                    <Animated.Text style={[styles.insightText, { color: isDarkMode ? '#fff' : '#1a1a1a', opacity: fadeAnim }]}>
+                    <Animated.Text style={[styles.insightText, { color: textColor, opacity: fadeAnim }]}>
                         {currentInsight.message}
                     </Animated.Text>
                 </LinearGradient>
@@ -153,15 +163,13 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={Platform.OS === 'android' 
-                    ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] 
-                    : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 215, 0, 0.1)', 'rgba(255, 107, 53, 0.15)']}
+                colors={bubbleGradientColors}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.welcomeBubble}
+                style={[styles.welcomeBubble, { borderColor: bubbleBorderColor }, bubbleStyle]}
             >
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <View style={styles.logoContainer}>
+                    <View style={[styles.logoContainer, isClassic && { backgroundColor: 'rgba(0,0,0,0.06)', shadowColor: '#000', shadowOpacity: 0.12 }]}>
                         <Image 
                             source={require('../../assets/logo.png')}
                             style={styles.logoImage}
@@ -170,36 +178,36 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                     </View>
                 </Animated.View>
                 
-                <Text style={[styles.welcomeTitle, { color: theme === 'dark' ? '#ffd700' : '#ff6b35' }]}>AstroRoshni</Text>
+                <Text style={[styles.welcomeTitle, isClassic && { textShadowColor: 'transparent' }, { color: titleColor }]}>AstroRoshni</Text>
                 
                 <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerStar}>✨</Text>
-                    <View style={styles.dividerLine} />
+                    <View style={[styles.dividerLine, isClassic && { backgroundColor: bubbleBorderColor }]} />
+                    <Text style={[styles.dividerStar, isClassic && { color: subtextColor }]}>✨</Text>
+                    <View style={[styles.dividerLine, isClassic && { backgroundColor: bubbleBorderColor }]} />
                 </View>
                 
-                <Text style={[styles.welcomeMessage, { color: theme === 'dark' ? '#fff' : '#1a1a1a' }]}>
+                <Text style={[styles.welcomeMessage, { color: textColor }]}>
                     {t('chat.thankYou', 'Thank you for reaching out to AstroRoshni with your question.')}
                 </Text>
                 
-                <Text style={[styles.welcomeSubtext, { color: theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : '#4b5563' }]}>
+                <Text style={[styles.welcomeSubtext, { color: subtextColor }]}>
                     {t('chat.deeplyAnalyzing', 'I am deeply analyzing your celestial chart to provide you with the most accurate insights. This sacred process takes a moment...')}
                 </Text>
                 
                 <View style={styles.cosmicDots}>
-                    <Animated.View style={[styles.dot, { 
+                    <Animated.View style={[styles.dot, { backgroundColor: dotColor }, { 
                         opacity: shimmerAnim.interpolate({
                             inputRange: [0, 0.33, 0.66, 1],
                             outputRange: [0.3, 1, 0.3, 0.3]
                         })
                     }]} />
-                    <Animated.View style={[styles.dot, { 
+                    <Animated.View style={[styles.dot, { backgroundColor: dotColor }, { 
                         opacity: shimmerAnim.interpolate({
                             inputRange: [0, 0.33, 0.66, 1],
                             outputRange: [0.3, 0.3, 1, 0.3]
                         })
                     }]} />
-                    <Animated.View style={[styles.dot, { 
+                    <Animated.View style={[styles.dot, { backgroundColor: dotColor }, { 
                         opacity: shimmerAnim.interpolate({
                             inputRange: [0, 0.33, 0.66, 1],
                             outputRange: [0.3, 0.3, 0.3, 1]
@@ -207,7 +215,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                     }]} />
                 </View>
                 
-                <Text style={styles.chartPreview}>
+                <Text style={[styles.chartPreview, { color: chartPreviewColor }]}>
                     {t('chat.fascinatingInsights', 'Meanwhile, let me show you some fascinating insights about your chart...')}
                 </Text>
             </LinearGradient>

@@ -9,8 +9,6 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-
 const { width } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
@@ -129,14 +127,9 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
             onPress={handleSignIn}
             activeOpacity={0.9}
           >
-            <LinearGradient
-              colors={['#ff7b45', '#ff6b35', '#e85a2a']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.buttonGradient}
-            >
+            <View style={[styles.buttonGradient, styles.primaryButtonInner]}>
               <Text style={styles.primaryButtonText}>Sign In</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -195,12 +188,12 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     left: 0,
     top: 0,
-    backgroundColor: 'rgba(255, 107, 53, 0.25)',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 40,
-    elevation: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
   },
   logoRing: {
     position: 'absolute',
@@ -210,14 +203,14 @@ const styles = StyleSheet.create({
     left: 16,
     top: 16,
     borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.35)',
+    borderColor: 'rgba(0, 0, 0, 0.12)',
   },
   logoImageWrap: {
     width: 88,
     height: 88,
     borderRadius: 44,
     overflow: 'hidden',
-    backgroundColor: 'rgba(26, 26, 58, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   logoImage: {
     width: 88,
@@ -232,24 +225,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: width < 375 ? 30 : 38,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#000000',
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 2,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
   },
   subtitleLine: {
     width: 48,
     height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 215, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     marginBottom: 14,
   },
   subtitle: {
     fontSize: width < 375 ? 16 : 18,
-    color: 'rgba(255, 255, 255, 0.88)',
+    color: '#666666',
     textAlign: 'center',
     fontWeight: '400',
     letterSpacing: 0.8,
@@ -263,17 +253,20 @@ const styles = StyleSheet.create({
   primaryButton: {
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
   buttonGradient: {
     paddingVertical: 18,
     paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  primaryButtonInner: {
+    backgroundColor: '#000000',
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -285,17 +278,17 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: 'rgba(0, 0, 0, 0.22)',
   },
   secondaryButtonInner: {
     paddingVertical: 16,
     paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'transparent',
   },
   secondaryButtonText: {
-    color: 'rgba(255, 255, 255, 0.95)',
+    color: '#333333',
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.3,
@@ -315,13 +308,13 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 215, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   dot1: { opacity: 0.5 },
   dot2: { opacity: 0.8 },
   dot3: { opacity: 0.5 },
   footerText: {
-    color: 'rgba(255, 255, 255, 0.55)',
+    color: '#666666',
     fontSize: 13,
     fontWeight: '400',
     letterSpacing: 0.5,

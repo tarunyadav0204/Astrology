@@ -66,9 +66,9 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <LinearGradient
-        colors={['#0a0a23', '#1a1a3a', '#2d1b69', '#4a2c7a']}
+        colors={['#ffffff', '#f8f8f8', '#f5f5f5']}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -76,7 +76,7 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.content}>
           <View style={styles.iconWrap}>
-            <Ionicons name="planet-outline" size={56} color="#FFD700" />
+            <Ionicons name="planet-outline" size={56} color="#000000" />
           </View>
           <Text style={styles.title}>
             {t('birthProfileIntro.title', 'Your birth chart powers your experience')}
@@ -86,21 +86,16 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
           </Text>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#FFD700" style={styles.loader} />
+            <ActivityIndicator size="large" color="#000000" style={styles.loader} />
           ) : (
             <>
               <TouchableOpacity onPress={handleContinue} activeOpacity={0.85} style={styles.primaryWrap}>
-                <LinearGradient
-                  colors={['#FF6B35', '#F7931E', '#FFD700']}
-                  style={styles.primaryButton}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
+                <View style={styles.primaryButton}>
                   <Text style={styles.primaryText}>
                     {t('birthProfileIntro.continue', 'Continue')}
                   </Text>
                   <Text style={styles.primaryIcon}>✨</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleSkip} activeOpacity={0.7} style={styles.skipWrap}>
@@ -122,7 +117,7 @@ export default function BirthProfileIntroScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a23',
+    backgroundColor: '#ffffff',
   },
   safe: {
     flex: 1,
@@ -138,7 +133,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -146,7 +141,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 16,
     paddingHorizontal: 8,
@@ -154,7 +149,7 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 16,
     lineHeight: 24,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#666666',
     textAlign: 'center',
     marginBottom: 32,
     paddingHorizontal: 8,
@@ -173,11 +168,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
+    backgroundColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
   primaryText: {
     fontSize: 18,
@@ -187,6 +183,7 @@ const styles = StyleSheet.create({
   },
   primaryIcon: {
     fontSize: 20,
+    color: '#FFFFFF',
   },
   skipWrap: {
     alignItems: 'center',
@@ -194,11 +191,11 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#333333',
     marginBottom: 4,
   },
   skipSubtext: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#666666',
   },
 });

@@ -61,7 +61,8 @@ export default function ChatScreen({ navigation, route }) {
   const { credits, partnershipCost, fetchBalance } = useCredits();
   const insets = useSafeAreaInsets();
   
-  // Mundane mode state
+  // Lab / Mundane mode state
+  const [isLabMode, setIsLabMode] = useState(false);
   const [isMundane, setIsMundane] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [selectedYear, setSelectedYear] = useState(YEARS[0]);
@@ -337,13 +338,13 @@ export default function ChatScreen({ navigation, route }) {
   ];
 
   const suggestions = [
-    "What does my birth chart say about my career?",
-    "When is a good time for marriage?",
-    "What are my health vulnerabilities?",
-    "Tell me about my current dasha period",
-    "What do the current transits mean for me?",
-    "Show me significant periods in my life",
-    "What are my strengths and weaknesses?"
+    "How do we read the 10th house in Vedic astrology?",
+    "How does D9 combine with D1 in the method?",
+    "What are yogas and how do we identify them from positions?",
+    "What is the step-by-step order to analyze a D1 chart?",
+    "How do we interpret a planet in exaltation in a house?",
+    "Which house lords rule what in this chart?",
+    "How do we read planets in different houses in Vedic method?"
   ];
 
   const getSignName = (signNumber) => {
@@ -368,18 +369,23 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const getPlanetColor = (planetName) => {
-    const colors = {
-      'Sun': '#ff6b35',
-      'Moon': '#e0e0e0',
-      'Mars': '#d32f2f',
-      'Mercury': '#4caf50',
-      'Jupiter': '#ffd700',
-      'Venus': '#e91e63',
-      'Saturn': '#2196f3',
-      'Rahu': '#9e9e9e',
-      'Ketu': '#795548',
+    // In classic mode, keep dashas neutral (use theme colors),
+    // otherwise fall back to legacy per‑planet colors.
+    if (isClassic) {
+      return colors.surface;
+    }
+    const palette = {
+      Sun: '#ff6b35',
+      Moon: '#e0e0e0',
+      Mars: '#d32f2f',
+      Mercury: '#4caf50',
+      Jupiter: '#ffd700',
+      Venus: '#e91e63',
+      Saturn: '#2196f3',
+      Rahu: '#9e9e9e',
+      Ketu: '#795548',
     };
-    return colors[planetName] || '#ffffff';
+    return palette[planetName] || '#ffffff';
   };
 
   const loadChartData = async (birth) => {
@@ -721,8 +727,22 @@ export default function ChatScreen({ navigation, route }) {
           }
         ]
       );
+    } else if (option.action === 'lab') {
+      // Chart Lab: educational, research-focused analysis using the native's chart
+      setIsLabMode(true);
+      setIsMundane(false);
+      setShowGreeting(false);
+      const nativeName = birthData?.name || 'there';
+      const labWelcome = {
+        id: Date.now().toString(),
+        content: `🧪 Welcome to Chart Lab, ${nativeName}!\n\nWe use your chart to practice the Vedic method: houses, planets, divisional charts, yogas—the system, not predictions.\n\nYou can ask things like:\n\n• How do we read the D1 chart step by step in the classical order?\n• What does the 10th house mean in Vedic astrology and how is it read here?\n• How does D9 combine with D1 in the method?\n• Which yogas can we identify from planetary positions and house lords in this chart?\n\nI focus on the rules and the method, not specific events or dates.`,
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+      };
+      setMessagesWithStorage([labWelcome]);
     } else if (option.action === 'mundane') {
       setIsMundane(true);
+      setIsLabMode(false);
       setShowGreeting(false);
       const welcomeMsg = {
         id: Date.now().toString(),
@@ -786,7 +806,7 @@ export default function ChatScreen({ navigation, route }) {
         
         const welcomeMessage = {
           id: Date.now().toString(),
-          content: t('chat.welcomeMessage', "🌟 Welcome {{name}}! I'm here to help you understand your birth chart and provide astrological insights.\n\nFeel free to ask me anything about:\n\n• Personality traits and characteristics\n• Career and professional guidance\n• Relationships and compatibility\n• Health and wellness insights\n• Timing for important decisions\n• Current planetary transits\n• Strengths and areas for growth\n\nWhat would you like to explore first?", { name: nativeName }),
+          content: t('chat.welcomeMessage', "📐 Welcome {{name}}! Here we apply the Vedic method to your chart: houses, planets, divisional charts (D1, D9), and yogas—no predictions, just the system.\n\nYou can ask method-style questions, for example:\n\n• What is the 10th house in Vedic astrology and how do we read it in a chart?\n• How does the D9 (navamsa) combine with D1 in the classical method?\n• How do we identify yogas from planetary positions and house lords?\n• What are the steps to analyze a chart in Vedic order (lagna, planets, houses, dashas)?\n• Which planets rule which houses in this chart and what does that mean?\n• How do we interpret a planet in exaltation vs debilitation in a given house?\n\nAsk about the rules and the method—I'll use your chart as the example.", { name: nativeName }),
           role: 'assistant',
           timestamp: new Date().toISOString(),
         };
@@ -1371,6 +1391,11 @@ export default function ChatScreen({ navigation, route }) {
         })
       };
       
+      // Astrology-only app or Chart Lab: tell backend to use teacher/educational instructions (no prediction style)
+      if (IS_ASTROLOGY_ONLY || isLabMode) {
+        requestBody.mode = 'lab';
+      }
+      
 
       
       console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()}`);
@@ -1586,7 +1611,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const renderMessage = ({ item }) => (
-    <MessageBubble message={item} language={language} />
+    <MessageBubble message={item} language={language} isLabMode={isLabMode} />
   );
 
   const renderSuggestion = ({ item }) => (
@@ -1603,11 +1628,13 @@ export default function ChatScreen({ navigation, route }) {
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
       <LinearGradient
         colors={
-          theme === 'dark'
-            ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
-            : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]
+          isClassic
+            ? [colors.background, colors.backgroundSecondary]
+            : theme === 'dark'
+              ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, '#ea580c']
+              : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]
         }
-        style={styles.gradientBg}
+        style={[styles.gradientBg, isClassic && { backgroundColor: colors.background }]}
       >
       <SafeAreaView
         style={styles.safeArea}
@@ -1805,10 +1832,21 @@ export default function ChatScreen({ navigation, route }) {
             {birthData && (
               <View style={styles.signsContainer}>
                 <LinearGradient
-                  colors={Platform.OS === 'android'
-                    ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
-                    : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
-                  style={styles.signsGradient}
+                  colors={
+                    isClassic
+                      ? [colors.surface, colors.backgroundSecondary]
+                      : Platform.OS === 'android'
+                        ? (theme === 'dark'
+                            ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.1)']
+                            : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.1)'])
+                        : (theme === 'dark'
+                            ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
+                            : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])
+                  }
+                  style={[
+                    styles.signsGradient,
+                    isClassic && { borderColor: colors.cardBorder }
+                  ]}
                 >
                   <Text style={[styles.signsTitle, { color: colors.text }]}>✨ {t('chat.chartEssence', "{{name}}'s Chart Essence", { name: birthData.name })}</Text>
                   <View style={styles.signsRow}>
@@ -1857,16 +1895,29 @@ export default function ChatScreen({ navigation, route }) {
                             <TouchableOpacity 
                               style={[
                                 styles.dashaChip,
-                                {
-                                  backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
-                                  borderColor: planetColor,
-                                  borderWidth: 2,
-                                },
+                                isClassic
+                                  ? {
+                                      backgroundColor: colors.surface,
+                                      borderColor: colors.cardBorder,
+                                      borderWidth: 1,
+                                    }
+                                  : {
+                                      backgroundColor: theme === 'dark' ? planetColor + '40' : planetColor + '60',
+                                      borderColor: planetColor,
+                                      borderWidth: 2,
+                                    },
                               ]}
                               onPress={() => setShowDashaBrowser(true)}
                               activeOpacity={0.8}
                             >
-                              <Text style={[styles.dashaChipPlanet, { color: theme === 'dark' ? planetColor : '#1a1a1a' }]}>{t(`home.planet_names.${dasha.planet}`, dasha.planet)}</Text>
+                              <Text
+                                style={[
+                                  styles.dashaChipPlanet,
+                                  { color: isClassic ? colors.text : (theme === 'dark' ? planetColor : '#1a1a1a') }
+                                ]}
+                              >
+                                {t(`home.planet_names.${dasha.planet}`, dasha.planet)}
+                              </Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{startDate}</Text>
                               <Text style={[styles.dashaChipDates, { color: colors.textSecondary }]}>{endDate}</Text>
                             </TouchableOpacity>
@@ -1903,7 +1954,15 @@ export default function ChatScreen({ navigation, route }) {
               return (
                 <View key={item.id}>
                   <View ref={isLastMessage ? lastMessageRef : null}>
-                    <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} onRestart={restartPolling} />
+                    <MessageBubble
+                      message={item}
+                      language={language}
+                      onFollowUpClick={setInputText}
+                      partnership={partnershipMode}
+                      onDelete={handleDeleteMessage}
+                      onRestart={restartPolling}
+                      isLabMode={isLabMode}
+                    />
                   </View>
                   <FeedbackComponent 
                     message={item} 
@@ -1935,10 +1994,24 @@ export default function ChatScreen({ navigation, route }) {
                   onPress={() => setInputText(item)}
                 >
                   <LinearGradient
-                    colors={['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']}
-                    style={styles.suggestionChipGradient}
+                    colors={
+                      isClassic
+                        ? [colors.surface, colors.backgroundSecondary]
+                        : ['rgba(255, 107, 53, 0.15)', 'rgba(255, 107, 53, 0.05)']
+                    }
+                    style={[
+                      styles.suggestionChipGradient,
+                      isClassic && { borderColor: colors.cardBorder }
+                    ]}
                   >
-                    <Text style={[styles.suggestionChipText, { color: colors.text }]}>{item}</Text>
+                    <Text
+                      style={[
+                        styles.suggestionChipText,
+                        { color: colors.text }
+                      ]}
+                    >
+                      {item}
+                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
               ))}
@@ -1952,7 +2025,7 @@ export default function ChatScreen({ navigation, route }) {
         {!showGreeting && (
           <View style={styles.unifiedInputContainer}>
             <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
+                      colors={isClassic ? ['#ffffff', '#ffffff'] : (Platform.OS === 'android'
                         ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.1)'] : ['rgba(249, 115, 22, 0.08)', 'rgba(249, 115, 22, 0.04)'])
                         : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)']))}
               style={[
@@ -2260,9 +2333,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2292,9 +2365,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2324,9 +2397,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2356,9 +2429,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2388,9 +2461,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2420,9 +2493,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2451,9 +2524,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2484,9 +2557,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2516,9 +2589,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2550,9 +2623,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2583,9 +2656,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2617,9 +2690,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2651,9 +2724,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2685,9 +2758,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2748,9 +2821,9 @@ export default function ChatScreen({ navigation, route }) {
                     >
                       <LinearGradient
                         colors={partnershipMode 
-                          ? (isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)']))
-                          : (isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android' 
-                            ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                          ? (isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android' ? ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.15)'] : ['rgba(147, 51, 234, 0.3)', 'rgba(147, 51, 234, 0.1)']))
+                          : (isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android' 
+                            ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
                             : (theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.2)', 'rgba(249, 115, 22, 0.1)'])))}
                         style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                       >
@@ -2783,9 +2856,9 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : (Platform.OS === 'android'
-                        ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : (Platform.OS === 'android'
+                        ? (theme === 'dark' ? ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.07)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
+                        : (theme === 'dark' ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.09)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']))}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -2816,7 +2889,7 @@ export default function ChatScreen({ navigation, route }) {
                     }}
                   >
                     <LinearGradient
-                      colors={isClassic ? [colors.surface, colors.backgroundSecondary] : ['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
+                      colors={isClassic ? ['#ffffff', '#f5f5f5'] : ['rgba(255, 59, 48, 0.2)', 'rgba(255, 59, 48, 0.1)']}
                       style={[styles.menuGradient, { borderColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(249, 115, 22, 0.3)') }]}
                     >
                       <View style={styles.menuIconContainer}>
@@ -3735,6 +3808,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },

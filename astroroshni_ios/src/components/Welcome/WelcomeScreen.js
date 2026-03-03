@@ -52,21 +52,15 @@ const FeatureCard = ({ icon, title, description, delay = 0 }) => {
         }
       ]}
     >
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
-        style={styles.featureGradient}
-      >
+      <View style={styles.featureGradient}>
         <View style={styles.featureIconContainer}>
-          <LinearGradient
-            colors={['#ff6b35', '#ffd700']}
-            style={styles.featureIconGradient}
-          >
+          <View style={styles.featureIconGradient}>
             <Text style={styles.featureIcon}>{icon}</Text>
-          </LinearGradient>
+          </View>
         </View>
         <Text style={styles.featureTitle}>{title}</Text>
         <Text style={styles.featureDescription}>{description}</Text>
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 };
@@ -137,11 +131,11 @@ const WelcomeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      {/* Cosmic Background — deeper, richer */}
+      {/* White theme background */}
       <LinearGradient
-        colors={['#060618', '#0f0f2a', '#1a1a3a', '#252550', '#2d1b69']}
+        colors={['#ffffff', '#f8f8f8', '#f5f5f5']}
         style={styles.background}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 1 }}
@@ -200,17 +194,12 @@ const WelcomeScreen = ({ navigation }) => {
               activeOpacity={0.88}
               style={styles.heroCtaWrap}
             >
-              <LinearGradient
-                colors={['#ff7b45', '#FF6B35', '#e85a2a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.heroCtaButton}
-              >
+              <View style={styles.heroCtaButton}>
                 <Text style={styles.heroCtaText} numberOfLines={1} adjustsFontSizeToFit>
                   Begin Your Cosmic Journey
                 </Text>
                 <Text style={styles.buttonIcon}>✦</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -218,10 +207,7 @@ const WelcomeScreen = ({ navigation }) => {
         {/* Trust & Privacy — single merged section */}
         <View style={styles.trustSection}>
           <Text style={styles.sectionTitle}>Trust & Privacy</Text>
-          <LinearGradient
-            colors={['rgba(255, 255, 255, 0.95)', 'rgba(248, 249, 250, 0.95)']}
-            style={styles.trustPrivacyCard}
-          >
+          <View style={styles.trustPrivacyCard}>
             <View style={styles.trustPrivacyList}>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="lock-closed" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
@@ -244,7 +230,7 @@ const WelcomeScreen = ({ navigation }) => {
                 <Text style={styles.trustPrivacyText}>Free to start — no credit card required</Text>
               </View>
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* Features Section */}
@@ -266,16 +252,11 @@ const WelcomeScreen = ({ navigation }) => {
         {/* CTA Section */}
         <View style={styles.ctaSection}>
           <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.88}>
-              <LinearGradient
-                colors={['#ff7b45', '#FF6B35', '#e85a2a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.getStartedButton}
-              >
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.88} style={styles.getStartedButtonWrap}>
+              <View style={styles.getStartedButton}>
                 <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit>Begin Your Cosmic Journey</Text>
                 <Text style={styles.buttonIcon}>✦</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
             
             {/* <TouchableOpacity 
@@ -304,7 +285,7 @@ const WelcomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#060618',
+    backgroundColor: '#ffffff',
   },
   background: {
     position: 'absolute',
@@ -322,7 +303,7 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    backgroundColor: 'rgba(255, 107, 53, 0.06)',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
     pointerEvents: 'none',
   },
   scrollView: {
@@ -355,12 +336,12 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     left: 0,
     top: 0,
-    backgroundColor: 'rgba(255, 107, 53, 0.25)',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 40,
-    elevation: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
   },
   logoRing: {
     position: 'absolute',
@@ -370,14 +351,14 @@ const styles = StyleSheet.create({
     left: 16,
     top: 16,
     borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.35)',
+    borderColor: 'rgba(0, 0, 0, 0.12)',
   },
   logoImageWrap: {
     width: 88,
     height: 88,
     borderRadius: 44,
     overflow: 'hidden',
-    backgroundColor: 'rgba(26, 26, 58, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   logoImage: {
     width: 88,
@@ -386,12 +367,9 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: width < 375 ? 34 : width < 414 ? 40 : 44,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#000000',
     letterSpacing: width < 375 ? 1.5 : 2.5,
     textAlign: 'center',
-    textShadowColor: 'rgba(255, 215, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 12,
     marginBottom: 12,
     flexShrink: 0,
     paddingHorizontal: 12,
@@ -400,7 +378,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 215, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
     marginBottom: 24,
   },
   taglineContainer: {
@@ -408,7 +386,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: width < 375 ? 19 : 22,
-    color: '#FFD700',
+    color: '#333333',
     textAlign: 'center',
     marginBottom: 8,
     fontWeight: '600',
@@ -418,7 +396,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: width < 375 ? 14 : 16,
-    color: 'rgba(255, 255, 255, 0.82)',
+    color: '#666666',
     textAlign: 'center',
     lineHeight: 24,
     fontWeight: '400',
@@ -439,11 +417,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.55,
-    shadowRadius: 20,
-    elevation: 12,
+    backgroundColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
   heroCtaText: {
     fontSize: 17,
@@ -455,13 +434,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 24,
     letterSpacing: 0.5,
-    textShadowColor: 'rgba(255, 215, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
   },
   trustSection: {
     paddingHorizontal: 24,
@@ -471,11 +447,14 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   trustPrivacyList: {},
   trustPrivacyItem: {
@@ -519,6 +498,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 200,
     justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
   },
   featureIconContainer: {
     marginBottom: 14,
@@ -529,6 +510,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
   featureIcon: {
     fontSize: 26,
@@ -555,6 +537,10 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
+  getStartedButtonWrap: {
+    marginBottom: 20,
+    minWidth: 280,
+  },
   getStartedButton: {
     paddingHorizontal: 36,
     paddingVertical: 18,
@@ -562,13 +548,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 12,
-    marginBottom: 20,
-    minWidth: 280,
+    backgroundColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
   buttonText: {
     color: '#FFFFFF',
@@ -587,7 +572,7 @@ const styles = StyleSheet.create({
   },
   ctaSubtextSub: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#666666',
     fontWeight: '400',
     letterSpacing: 0.3,
   },

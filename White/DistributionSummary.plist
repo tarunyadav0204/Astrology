@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AstroRoshni.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>71</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>2BF3F6CBA26CC853DD34EDDF20C6C5BEF1B9989E</string>
+				<key>dateExpires</key>
+				<string>13/11/26</string>
+				<key>type</key>
+				<string>Apple Development</string>
+			</dict>
+			<key>embeddedBinaries</key>
+			<array>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>0.12.0</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>2BF3F6CBA26CC853DD34EDDF20C6C5BEF1B9989E</string>
+						<key>dateExpires</key>
+						<string>13/11/26</string>
+						<key>type</key>
+						<string>Apple Development</string>
+					</dict>
+					<key>name</key>
+					<string>hermes.framework</string>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>7RCQ9WCKKN</string>
+						<key>name</key>
+						<string>Tarun Yadav</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>0.12.0</string>
+				</dict>
+			</array>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>7RCQ9WCKKN.com.astroroshni.mobile</string>
+				<key>aps-environment</key>
+				<string>development</string>
+				<key>com.apple.developer.team-identifier</key>
+				<string>7RCQ9WCKKN</string>
+				<key>get-task-allow</key>
+				<true/>
+			</dict>
+			<key>name</key>
+			<string>AstroRoshni.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>558b5bb2-b167-4ea8-ae4a-e53d5f7f9bf4</string>
+				<key>dateExpires</key>
+				<string>24/02/27</string>
+				<key>name</key>
+				<string>iOS Team Provisioning Profile: com.astroroshni.mobile</string>
+			</dict>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>7RCQ9WCKKN</string>
+				<key>name</key>
+				<string>Tarun Yadav</string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.1.2</string>
+		</dict>
+	</array>
+</dict>
+</plist>

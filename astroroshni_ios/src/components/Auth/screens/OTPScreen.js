@@ -11,7 +11,6 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
@@ -129,7 +128,7 @@ export default function OTPScreen({
           style={styles.backButton}
           onPress={() => navigateToScreen('phone', 'back')}
         >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          <Ionicons name="arrow-back" size={24} color="#000000" />
         </TouchableOpacity>
 
         <View style={styles.content}>
@@ -168,7 +167,7 @@ export default function OTPScreen({
             <TextInput
               style={styles.input}
               placeholder="Enter 6-digit OTP"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              placeholderTextColor="#999999"
               value={formData.otpCode}
               onChangeText={(value) => updateFormData('otpCode', value.replace(/[^0-9]/g, ''))}
               keyboardType="numeric"
@@ -208,15 +207,12 @@ export default function OTPScreen({
             onPress={handleVerifyOTP}
             disabled={!isValid || loading}
           >
-            <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-              style={styles.buttonGradient}
-            >
+            <View style={[styles.buttonGradient, !isValid && { backgroundColor: '#999999' }]}>
               <Text style={styles.buttonText}>
                 {loading ? 'Verifying...' : 'Verify OTP'}
               </Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </Animated.View>
         </View>
@@ -238,7 +234,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 20,
@@ -259,13 +255,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     marginBottom: 12,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#666666',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -275,21 +271,21 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
     paddingHorizontal: 16,
     paddingVertical: 4,
   },
   inputValid: {
     borderColor: '#4CAF50',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
   },
   input: {
     flex: 1,
     fontSize: 24,
-    color: '#ffffff',
+    color: '#000000',
     paddingVertical: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -304,12 +300,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   resendText: {
-    color: '#ff6b35',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '600',
   },
   resendDisabled: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#999999',
   },
   buttonContainer: {
     marginTop: 40,
@@ -318,11 +314,11 @@ const styles = StyleSheet.create({
   verifyButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -333,6 +329,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 18,
     gap: 8,
+    backgroundColor: '#000000',
   },
   buttonText: {
     color: '#ffffff',

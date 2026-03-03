@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 
@@ -65,12 +64,9 @@ export default function WelcomeAfterRegistrationScreen({
         >
           {/* Success Icon */}
           <View style={styles.iconContainer}>
-            <LinearGradient
-              colors={['#ff6b35', '#ffd700', '#ff6b35']}
-              style={styles.iconGradient}
-            >
+            <View style={styles.iconGradient}>
               <Text style={styles.successIcon}>🎉</Text>
-            </LinearGradient>
+            </View>
           </View>
 
           {/* Welcome Message */}
@@ -104,13 +100,10 @@ export default function WelcomeAfterRegistrationScreen({
             style={styles.createChartButton}
             onPress={handleCreateBirthChart}
           >
-            <LinearGradient
-              colors={['#ff6b35', '#ff8c5a']}
-              style={styles.buttonGradient}
-            >
+            <View style={styles.buttonGradient}>
               <Text style={styles.buttonText}>Create My Birth Chart</Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           {/* Skip Option */}
@@ -143,11 +136,11 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     marginBottom: 32,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
   },
   iconGradient: {
     width: '100%',
@@ -155,8 +148,9 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 0, 0, 0.12)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   successIcon: {
     fontSize: 56,
@@ -164,16 +158,13 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   welcomeSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#666666',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 40,
@@ -185,12 +176,12 @@ const styles = StyleSheet.create({
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   featureIcon: {
     fontSize: 24,
@@ -198,7 +189,7 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#000000',
     fontWeight: '500',
     flex: 1,
   },
@@ -206,11 +197,11 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
     marginBottom: 16,
   },
   buttonGradient: {
@@ -219,6 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 18,
     gap: 8,
+    backgroundColor: '#000000',
   },
   buttonText: {
     color: '#ffffff',
@@ -230,7 +222,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   skipText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#666666',
     fontSize: 16,
     fontWeight: '500',
   },

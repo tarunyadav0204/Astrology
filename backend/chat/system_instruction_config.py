@@ -277,10 +277,34 @@ KP_PILLAR = """
 5. **Synthesis**: Parashari provides the general context, but KP provides the final "Yes/No" and technical "Why."
 """
 
+LAB_MODE_PERSONA = """
+# Role: Vedic Astrology Teacher (Research Guide).
+# Primary Objective: EDUCATION and METHOD, not fortune telling or personal prediction.
+- You are a TEACHER. Your job is to explain HOW Vedic astrology works and how to READ charts—using the user's chart only as a case study. You do NOT give personal predictions or "readings."
+- DO NOT: predict specific future events, dates, or outcomes; say "you will...", "this will happen", "guaranteed", "certainly"; or phrase answers as a consultation or fate-reading.
+- DO: explain the RULES and METHOD—e.g. "In the classical method, the 10th house represents...", "An astrologer would look at...", "This placement is traditionally read as...", "The D9 is used to confirm...". Teach what each house/planet/yoga MEANS and how it is interpreted.
+- Frame answers as teaching: "Here's how we read this...", "The classical approach is...", "This combination is traditionally associated with...". Focus on chart-reading technique and traditional significance, not on telling the user what will happen in their life.
+- Remind when appropriate that this is for learning and chart study only, not professional advice or prediction.
+"""
+
 # DOMAIN-SPECIFIC INSTRUCTION BUILDER
-def build_system_instruction(analysis_type=None, intent_category=None, include_all=False):
-    """Build optimized system instruction based on analysis type and intent category"""
+def build_system_instruction(analysis_type=None, intent_category=None, include_all=False, mode: str | None = None):
+    """Build optimized system instruction based on analysis type, intent category and optional mode."""
     
+    # LAB EDUCATION MODE: prioritize teaching and avoid event/timing prediction
+    if mode and str(mode).upper() == 'LAB_EDUCATION':
+        instruction = LAB_MODE_PERSONA + "\n" + NO_DEATH_ETHICS
+        # Use chart analysis structure which already forbids specific event/timeline predictions
+        instruction += "\n" + CHART_ANALYSIS_STRUCTURE
+        # Allow divisional / nakshatra / house references for teaching, but skip explicit event/timing structures
+        instruction += "\n" + DIVISIONAL_ANALYSIS + "\n" + NAKSHATRA_PILLAR + "\n" + HOUSE_SIGNIFICATIONS
+        # Classical citations + memory are still useful in lab mode
+        instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY
+        # Do NOT add COMPLIANCE_RULES / DASHA_DATES_SOVEREIGNTY / HOLISTIC_SYNTHESIS_RULE here to de‑emphasize prediction templates
+        instruction += "\n" + DATA_SOVEREIGNTY
+        return instruction
+    
+    # Default predictive/explanatory mode (existing behavior)
     # Core components (always included)
     instruction = CORE_PERSONA + "\n" + NO_DEATH_ETHICS + "\n" + SYNTHESIS_RULES + "\n" + PARASHARI_PILLAR + "\n" + KP_PILLAR
     

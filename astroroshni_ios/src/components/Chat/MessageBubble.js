@@ -25,9 +25,10 @@ import { textToSpeech } from '../../utils/textToSpeech';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, isLabMode = false }) {
   const { t } = useTranslation();
-  const { theme } = useTheme();
+  const { theme, colors } = useTheme();
+  const isClassic = theme === 'classic';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const isPartnership = partnership || message.partnership_mode;
@@ -942,7 +943,7 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
     if (role === 'user') {
       return (
         <LinearGradient
-          colors={['#fffef5', '#fffae6']}
+          colors={isClassic ? [colors.surface, colors.backgroundSecondary] : ['#fffef5', '#fffae6']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
@@ -953,23 +954,23 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         >
           <View style={styles.userHeader}>
             <LinearGradient
-              colors={['#3b82f6', '#60a5fa']}
+              colors={isClassic ? [colors.textSecondary, colors.textTertiary] : ['#3b82f6', '#60a5fa']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.userBadge}
             >
-            <Ionicons name="person" size={10} color="#fff" style={styles.userIcon} />
+            <Ionicons name="person" size={10} color={isClassic ? colors.background : '#fff'} style={styles.userIcon} />
             <Text style={styles.userLabel}>{t('chat.you', 'You')}</Text>
           </LinearGradient>
             {chartName ? (
-              <View style={[styles.chartNameBadge, styles.chartNameBadgeUser]}>
-                <Ionicons name="calendar-outline" size={10} color="#1e3a8a" />
+              <View style={[styles.chartNameBadge, styles.chartNameBadgeUser, isClassic && { backgroundColor: colors.surface }]}>
+                <Ionicons name="calendar-outline" size={10} color={isClassic ? colors.text : '#1e3a8a'} />
                 <Text style={styles.chartNameBadgeTextUser} numberOfLines={1}>{chartName}</Text>
               </View>
             ) : null}
           </View>
           {children}
-          <Text style={[styles.timestamp, { color: 'rgba(30, 58, 138, 0.5)' }]}>
+          <Text style={[styles.timestamp, { color: isClassic ? colors.textSecondary : 'rgba(30, 58, 138, 0.5)' }]}>
             {new Date(timestamp).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit'
@@ -1005,19 +1006,19 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
         {message.role === 'assistant' && (
           <View style={styles.assistantHeader}>
             <LinearGradient
-              colors={['#ff6b35', '#ff8c5a']}
+              colors={isClassic ? [colors.surface, colors.cardBackground] : ['#ff6b35', '#ff8c5a']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.verifiedBadge}
             >
-            <Ionicons name="checkmark-circle" size={12} color="#fff" style={styles.verifiedIcon} />
-            <Text style={styles.assistantLabel}>
+            <Ionicons name="checkmark-circle" size={12} color={isClassic ? colors.text : '#fff'} style={styles.verifiedIcon} />
+            <Text style={[styles.assistantLabel, isClassic && { color: colors.text }]}>
               {isClarification ? t('chat.inquiry', 'AstroRoshni Inquiry') : t('chat.verified', 'AstroRoshni Verified')}
             </Text>
           </LinearGradient>
             {chartName ? (
-              <View style={[styles.chartNameBadge, styles.chartNameBadgeAssistant]}>
-                <Ionicons name="calendar-outline" size={10} color="#7c2d12" />
+              <View style={[styles.chartNameBadge, styles.chartNameBadgeAssistant, isClassic && { backgroundColor: colors.surface }]}>
+                <Ionicons name="calendar-outline" size={10} color={isClassic ? colors.text : '#7c2d12'} />
                 <Text style={styles.chartNameBadgeTextAssistant} numberOfLines={1}>{chartName}</Text>
               </View>
             ) : null}
@@ -1029,18 +1030,38 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
         
-        {/* Beta Notice for Timeline Predictions */}
+        {/* Beta / Lab Notice */}
         {message.role === 'assistant' && !isClarification && (
-          <View style={styles.betaNotice}>
-            <Text style={styles.betaNoticeText}>{t('chat.betaNotice', '⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.')}</Text>
+          <View style={[styles.betaNotice, isClassic && { backgroundColor: colors.surface }]}>
+            <Text style={[styles.betaNoticeText, isClassic && { color: colors.text }]}>
+              {isLabMode
+                ? t(
+                    'chat.labBetaNotice',
+                    '🧪 LAB MODE: This Chart Lab conversation is for learning and research. Treat all interpretations as educational examples, not fortune telling.'
+                  )
+                : t(
+                    'chat.betaNotice',
+                    '⚠️ BETA: Timeline predictions are experimental. Use logic and discretion.'
+                  )
+              }
+            </Text>
           </View>
         )}
         
         {/* Legal Disclaimer */}
         {message.role === 'assistant' && !isClarification && (
-          <View style={styles.disclaimerNotice}>
-            <Text style={styles.disclaimerNoticeText}>
-              {t('chat.disclaimerNotice', '⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.')}
+          <View style={[styles.disclaimerNotice, isClassic && { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.disclaimerNoticeText, isClassic && { color: colors.textSecondary }]}>
+              {isLabMode
+                ? t(
+                    'chat.labDisclaimer',
+                    '📚 EDUCATIONAL USE ONLY: Chart Lab is designed to teach astrology using your chart as a case study. It does not provide medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.'
+                  )
+                : t(
+                    'chat.disclaimerNotice',
+                    '⚖️ DISCLAIMER: Astrology is a probabilistic tool for guidance. Not a substitute for medical, legal, financial, or mental health advice. Consult qualified professionals for important decisions.'
+                  )
+              }
             </Text>
           </View>
         )}

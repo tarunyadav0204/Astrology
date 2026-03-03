@@ -255,9 +255,12 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     """
     Builds the final, consolidated prompt for the Gemini AI.
     """
-    # Get the mode directly from the intent context, it's the source of truth.
-    # The 'mode' parameter can be unreliable if reset in the call stack.
-    intent_mode = context.get('intent', {}).get('mode', mode)
+    # Get the mode directly from the intent context when available.
+    intent_block = context.get('intent', {}) or {}
+    intent_mode = intent_block.get('mode', mode)
+    # Lab mode override: when intent carries an explicit lab flag, force LAB_EDUCATION
+    if intent_block.get('lab_mode'):
+        intent_mode = 'LAB_EDUCATION'
     
     # Handle None or empty intent_mode
     if not intent_mode:
@@ -319,7 +322,7 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
         elif intent_mode.upper() == 'LIFESPAN_EVENT_TIMING':
             analysis_type_from_intent = 'LIFESPAN_EVENT_TIMING'
             
-        system_instruction = build_system_instruction(analysis_type=analysis_type_from_intent, intent_category=intent_category)
+        system_instruction = build_system_instruction(analysis_type=analysis_type_from_intent, intent_category=intent_category, mode=intent_mode)
 
     prompt_parts = []
     

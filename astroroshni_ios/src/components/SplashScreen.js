@@ -42,23 +42,23 @@ const SplashScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0033" />
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradientBg}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <LinearGradient colors={['#ffffff', '#f8f8f8', '#f5f5f5']} style={styles.gradientBg}>
         <SafeAreaView style={styles.safeArea}>
           <Animated.View style={[styles.content, {opacity: fadeAnim, transform: [{translateY: slideAnim}]}]}>
             <Animated.View style={[styles.logoContainer, {
                 shadowOpacity: glowAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.6, 1],
+                    outputRange: [0.15, 0.3],
                 }),
                 shadowRadius: glowAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [12, 20],
+                    outputRange: [8, 16],
                 }),
                 transform: [{
                     scale: glowAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [1, 1.1],
+                        outputRange: [1, 1.05],
                     })
                 }]
             }]}>
@@ -97,12 +97,12 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     marginBottom: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   logoImage: {
     width: 100,
@@ -112,16 +112,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 40,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   subtitle: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#666666',
     textAlign: 'center',
     lineHeight: 24,
   },

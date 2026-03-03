@@ -502,6 +502,18 @@ const loadHomeData = async (nativeData = null) => {
             contentContainerStyle={[styles.content, styles.emptyStateContent]}
             showsVerticalScrollIndicator={false}
           >
+            {/* What is AstroRoshni - educational tagline (visible first on open) */}
+            <View style={[styles.taglineCard, isLightOrClassic && { backgroundColor: isClassic ? colors.cardBackground : colors.surface, borderColor: colors.cardBorder }]}>
+              <View style={[styles.taglineIconWrap, isClassic && { backgroundColor: 'rgba(0,0,0,0.06)' }]}>
+                <Icon name="calculator-outline" size={28} color={isClassic ? colors.text : (colors.accent || '#FFD700')} />
+              </View>
+              <Text style={[styles.taglineTitle, { color: colors.text }]}>
+                {t('home.whatIsAstroroshni.title', 'What is AstroRoshni?')}
+              </Text>
+              <Text style={[styles.taglineBody, { color: colors.textSecondary }]}>
+                {t('home.whatIsAstroroshni.body', 'A Vedic mathematical tool that uses Swiss Ephemeris to compute the positions of the Sun, Moon, and planets at any time and place. Learn how ancient Vedic cosmic mathematics maps these positions into charts and their traditional meaning—for study and chart reading only.')}
+              </Text>
+            </View>
             <View style={[styles.emptyStateCard, isLightOrClassic && { backgroundColor: isClassic ? colors.cardBackground : colors.surface, borderColor: colors.cardBorder }]}>
               <View style={[styles.emptyStateIconWrap, isClassic && { backgroundColor: 'rgba(0,0,0,0.06)' }]}>
                 <Icon name="planet-outline" size={48} color={isClassic ? colors.text : (colors.accent || '#FFD700')} />
@@ -778,6 +790,18 @@ const loadHomeData = async (nativeData = null) => {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
+        {/* What is AstroRoshni - educational tagline (visible first on open) */}
+        <View style={[styles.taglineCard, isLightOrClassic && { backgroundColor: isClassic ? colors.cardBackground : colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={[styles.taglineIconWrap, isClassic && { backgroundColor: 'rgba(0,0,0,0.06)' }]}>
+            <Icon name="calculator-outline" size={28} color={isClassic ? colors.text : (colors.accent || '#FFD700')} />
+          </View>
+          <Text style={[styles.taglineTitle, { color: colors.text }]}>
+            {t('home.whatIsAstroroshni.title', 'What is AstroRoshni?')}
+          </Text>
+          <Text style={[styles.taglineBody, { color: colors.textSecondary }]}>
+            {t('home.whatIsAstroroshni.body', 'A Vedic mathematical tool that uses Swiss Ephemeris to compute the positions of the Sun, Moon, and planets at any time and place. Learn how ancient Vedic cosmic mathematics maps these positions into charts and their traditional meaning—for study and chart reading only.')}
+          </Text>
+        </View>
         {/* Header with Native Selector & Big 3 Dashboard - Integrated into ScrollView */}
         <View style={styles.header}>
           <View style={[styles.headerDashboard, androidLightCardFixStyle, headerCardStyle, useGlass && { overflow: 'hidden', padding: 0 }]}>
@@ -1119,9 +1143,9 @@ const loadHomeData = async (nativeData = null) => {
             </TouchableOpacity>
           )}
 
-          {/* Astrology Tools Section */}
+          {/* Vedic Calculators Section */}
           <View style={styles.toolsSection}>
-            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '🔧 Astrology Tools')}</Text>
+            <Text style={[styles.toolsSectionTitle, { color: colors.text }]}>{t('home.sections.astrologyTools', '📐 Vedic Calculators')}</Text>
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
@@ -1989,6 +2013,7 @@ const loadHomeData = async (nativeData = null) => {
         
         {!IS_ASTROLOGY_ONLY && (
           <>
+            {/* Standard predictive chat (if enabled in this build) */}
             <TouchableOpacity 
               style={styles.tabItem} 
               onPress={() => onOptionSelect({ action: 'question' })}
@@ -2003,6 +2028,24 @@ const loadHomeData = async (nativeData = null) => {
               </View>
               <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'ask' ? '600' : '500' }]}>
                 {t('home.tabs.ask', 'Ask')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Lab tab: educational Chart Lab mode */}
+            <TouchableOpacity 
+              style={styles.tabItem} 
+              onPress={() => onOptionSelect({ action: 'lab' })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.tabIconContainer}>
+                <Icon 
+                  name="flask-outline" 
+                  size={22} 
+                  color={activeTab === 'lab' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+                />
+              </View>
+              <Text style={[styles.tabLabel, { color: activeTab === 'lab' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'lab' ? '600' : '500' }]}>
+                {t('home.tabs.lab', 'Lab')}
               </Text>
             </TouchableOpacity>
 
@@ -2023,6 +2066,26 @@ const loadHomeData = async (nativeData = null) => {
               </Text>
             </TouchableOpacity>
           </>
+        )}
+
+        {/* In astrology-only iOS build, still expose the educational Lab tab */}
+        {IS_ASTROLOGY_ONLY && (
+          <TouchableOpacity 
+            style={styles.tabItem} 
+            onPress={() => onOptionSelect({ action: 'lab' })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.tabIconContainer}>
+              <Icon 
+                name="flask-outline" 
+                size={22} 
+                color={activeTab === 'lab' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary)} 
+              />
+            </View>
+            <Text style={[styles.tabLabel, { color: activeTab === 'lab' ? (theme === 'dark' ? '#ffffff' : colors.primary) : (theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary), fontWeight: activeTab === 'lab' ? '600' : '500' }]}>
+              {t('home.tabs.lab', 'Lab')}
+            </Text>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity 
@@ -2444,6 +2507,33 @@ const styles = StyleSheet.create({
   emptyStateContent: {
     paddingTop: 40,
     paddingHorizontal: 24,
+  },
+  taglineCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginBottom: 20,
+  },
+  taglineIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  taglineTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  taglineBody: {
+    fontSize: 14,
+    lineHeight: 22,
+    opacity: 0.95,
   },
   emptyStateCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -3086,7 +3176,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   
-  // Astrology Tools Section
+  // Vedic Calculators Section
   toolsSection: {
     marginBottom: 24,
   },

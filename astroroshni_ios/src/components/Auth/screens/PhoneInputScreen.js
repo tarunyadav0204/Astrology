@@ -12,7 +12,6 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI } from '../../../services/api';
@@ -142,7 +141,7 @@ export default function PhoneInputScreen({
         style={styles.backButton}
         onPress={() => navigateToScreen('welcome', 'back')}
       >
-        <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        <Ionicons name="arrow-back" size={24} color="#000000" />
       </TouchableOpacity>
 
       <View style={styles.content}>
@@ -178,12 +177,12 @@ export default function PhoneInputScreen({
               onPress={() => setShowCountryPicker(true)}
             >
               <Text style={styles.countryText}>{selectedCountry.flag} {selectedCountry.code}</Text>
-              <Ionicons name="chevron-down" size={16} color="rgba(255, 255, 255, 0.7)" style={{ marginLeft: 4 }} />
+              <Ionicons name="chevron-down" size={16} color="#666666" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
             <TextInput
               style={styles.input}
               placeholder="Phone Number"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              placeholderTextColor="#999999"
               value={formData.phone}
               onChangeText={(value) => updateFormData('phone', value.replace(/[^0-9]/g, ''))}
               keyboardType="phone-pad"
@@ -209,15 +208,12 @@ export default function PhoneInputScreen({
             onPress={handleContinue}
             disabled={!isValid || loading}
           >
-            <LinearGradient
-              colors={isValid ? ['#ff6b35', '#ff8c5a'] : ['#666', '#444']}
-              style={styles.buttonGradient}
-            >
+            <View style={[styles.buttonGradient, !isValid && styles.buttonGradientDisabled]}>
               <Text style={styles.buttonText}>
                 {loading ? 'Checking...' : 'Continue'}
               </Text>
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -245,7 +241,7 @@ export default function PhoneInputScreen({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Country</Text>
               <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
-                <Ionicons name="close" size={24} color="#ffffff" />
+                <Ionicons name="close" size={24} color="#000000" />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -286,7 +282,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 20,
@@ -306,13 +302,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
     marginBottom: 12,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#666666',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -322,37 +318,37 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
     paddingHorizontal: 16,
     paddingVertical: 4,
   },
   inputValid: {
     borderColor: '#4CAF50',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
   },
   countryCode: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingRight: 12,
     borderRightWidth: 1,
-    borderRightColor: 'rgba(255, 255, 255, 0.2)',
+    borderRightColor: 'rgba(0, 0, 0, 0.15)',
     marginRight: 12,
   },
   countryText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#000000',
     fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '70%',
@@ -364,19 +360,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000',
   },
   countryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
   },
   countryFlag: {
     fontSize: 28,
@@ -387,18 +383,18 @@ const styles = StyleSheet.create({
   },
   countryName: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#000000',
     fontWeight: '600',
     marginBottom: 2,
   },
   countryCodeText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#666666',
   },
   input: {
     flex: 1,
     fontSize: 18,
-    color: '#ffffff',
+    color: '#000000',
     paddingVertical: 16,
     fontWeight: '500',
   },
@@ -408,11 +404,11 @@ const styles = StyleSheet.create({
   continueButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -423,6 +419,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 18,
     gap: 8,
+    backgroundColor: '#000000',
+  },
+  buttonGradientDisabled: {
+    backgroundColor: '#999999',
   },
   buttonText: {
     color: '#ffffff',
@@ -434,11 +434,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#666666',
     fontSize: 14,
   },
   footerLink: {
-    color: '#ff6b35',
+    color: '#000000',
     fontWeight: '600',
   },
 });
