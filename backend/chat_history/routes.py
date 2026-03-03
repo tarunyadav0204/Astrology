@@ -66,6 +66,12 @@ def init_chat_tables():
             cursor.execute(f'ALTER TABLE chat_messages ADD COLUMN {col} {typ}')
         except sqlite3.OperationalError:
             pass
+
+    # Idempotency support: client_request_id to de-duplicate /chat-v2/ask calls
+    try:
+        cursor.execute('ALTER TABLE chat_messages ADD COLUMN client_request_id TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
@@ -307,6 +313,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     session_id = request.get("session_id")
     question = request.get("question")
     birth_details = request.get("birth_details")
+    client_request_id = request.get("client_request_id")
     
     if not session_id or not question or not birth_details:
         raise HTTPException(status_code=422, detail="Missing required fields: session_id, question, and birth_details")
@@ -367,6 +374,45 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     if not session or session[0] != current_user.userid:
         conn.close()
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Idempotency: if this client_request_id was already processed for this session,
+    # return the existing assistant/user message IDs instead of creating duplicates.
+    if client_request_id:
+        cursor.execute(
+            """
+            SELECT message_id
+            FROM chat_messages
+            WHERE session_id = ? AND sender = 'assistant' AND client_request_id = ?
+            ORDER BY message_id DESC
+            LIMIT 1
+            """,
+            (session_id, client_request_id),
+        )
+        existing = cursor.fetchone()
+        if existing:
+            assistant_message_id = existing[0]
+            # Find the most recent user message before this assistant message in the same session
+            cursor.execute(
+                """
+                SELECT message_id
+                FROM chat_messages
+                WHERE session_id = ? AND sender = 'user' AND message_id < ?
+                ORDER BY message_id DESC
+                LIMIT 1
+                """,
+                (session_id, assistant_message_id),
+            )
+            user_row = cursor.fetchone()
+            user_message_id = user_row[0] if user_row else None
+            conn.close()
+            return {
+                "user_message_id": user_message_id,
+                "message_id": assistant_message_id,
+                "status": "processing",
+                "message_type": "answer",
+                "chart_insights": [],
+                "loading_messages": [],
+            }
     
     # Save user question (sanitized)
     cursor.execute(
@@ -377,10 +423,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     user_message_id = cursor.lastrowid
     print(f"💾 User message saved with ID: {user_message_id}")
     
-    # Create processing assistant message
+    # Create processing assistant message (track client_request_id for idempotency)
     cursor.execute(
-        "INSERT INTO chat_messages (session_id, sender, content, status, started_at) VALUES (?, ?, ?, ?, ?)",
-        (session_id, "assistant", "", "processing", datetime.now())
+        "INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (session_id, "assistant", "", "processing", datetime.now(), client_request_id)
     )
     
     assistant_message_id = cursor.lastrowid

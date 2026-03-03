@@ -25,7 +25,7 @@ import { textToSpeech } from '../../utils/textToSpeech';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
-export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart }) {
+export default function MessageBubble({ message, language, onFollowUpClick, partnership, onDelete, onRestart, onSendRetry }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -1118,8 +1118,8 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           </View>
         )}
 
-        {/* Hint when analysis timed out: tell user to tap refresh or check Chat History */}
-        {message.showRestartButton && (
+        {/* Hint when analysis timed out or send failed: tell user to tap refresh or retry */}
+        {(message.showRestartButton || message.showSendRetryButton) && (
           <View style={styles.timeoutHint}>
             <Text style={styles.timeoutHintText}>
               {t('chat.timeoutHint', 'Tap the refresh icon below to check again, or find your response later in Chat History.')}
@@ -1134,6 +1134,15 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
               <TouchableOpacity
                 style={[styles.actionButton, styles.restartButton]}
                 onPress={() => onRestart && onRestart(message.messageId)}
+              >
+                <Ionicons name="refresh" size={16} color="#ff6b35" />
+              </TouchableOpacity>
+            )}
+            {/* Retry send button for initial network failures (no messageId yet) */}
+            {message.showSendRetryButton && !message.messageId && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restartButton]}
+                onPress={() => onSendRetry && onSendRetry(message)}
               >
                 <Ionicons name="refresh" size={16} color="#ff6b35" />
               </TouchableOpacity>

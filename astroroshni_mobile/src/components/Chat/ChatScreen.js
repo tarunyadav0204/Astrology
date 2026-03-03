@@ -1209,6 +1209,133 @@ export default function ChatScreen({ navigation, route }) {
     pollForResponse(messageId, null, sessionId, userMessage?.content || '', true);
   };
 
+  const sendChatRequestWithRetry = async ({
+    messageText,
+    currentSessionId,
+    processingMessageId,
+    userMessageId,
+    clientRequestId,
+  }) => {
+    const token = await AsyncStorage.getItem('authToken');
+
+    const attemptSend = async (attempt = 1) => {
+      try {
+        const requestBody = {
+          session_id: currentSessionId,
+          question: messageText,
+          language: language || 'english',
+          response_style: 'detailed',
+          premium_analysis: isPremiumAnalysis,
+          native_name: partnershipMode ? nativeChart?.name : birthData?.name,
+          birth_details: partnershipMode ? {
+            name: nativeChart.name,
+            date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
+            time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
+            latitude: parseFloat(nativeChart.latitude),
+            longitude: parseFloat(nativeChart.longitude),
+            place: nativeChart.place || '',
+            gender: nativeChart.gender || ''
+          } : {
+            name: birthData.name,
+            date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+            time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+            latitude: parseFloat(birthData.latitude),
+            longitude: parseFloat(birthData.longitude),
+            place: birthData.place || '',
+            gender: birthData.gender || ''
+          },
+          // Partnership mode fields
+          partnership_mode: partnershipMode,
+          ...(partnershipMode && partnerChart && {
+            partner_name: partnerChart.name,
+            partner_date: typeof partnerChart.date === 'string' ? partnerChart.date.split('T')[0] : partnerChart.date,
+            partner_time: typeof partnerChart.time === 'string' ? partnerChart.time.split('T')[1]?.slice(0, 5) || partnerChart.time : partnerChart.time,
+            partner_place: partnerChart.place || '',
+            partner_latitude: parseFloat(partnerChart.latitude),
+            partner_longitude: parseFloat(partnerChart.longitude),
+            partner_gender: partnerChart.gender || ''
+          }),
+          client_request_id: clientRequestId,
+        };
+
+        console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()} (attempt ${attempt})`);
+
+        const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log(`📡 [API RESPONSE] Received response at: ${new Date().toISOString()}, status: ${response.status}`);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights } = result;
+
+        console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+        console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
+        console.log(`🏠 [CHART INSIGHTS] Received ${chart_insights?.length || 0} chart insights from backend`);
+
+        if (!assistantMessageId) {
+          throw new Error('No message ID received from server');
+        }
+
+        // Use dynamic loading messages from backend if available
+        if (loading_messages && loading_messages.length > 0) {
+          setDynamicLoadingMessages(loading_messages);
+        }
+
+        console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
+
+        // Start polling IMMEDIATELY before state updates to avoid delay
+        pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
+
+        // Update user message with real DB ID (async, non-blocking)
+        if (user_message_id) {
+          setMessagesWithStorage(prev => {
+            const updated = prev.map(msg => {
+              if (msg.id === userMessageId) {
+                const updatedMsg = { ...msg, messageId: user_message_id };
+                return updatedMsg;
+              }
+              return msg;
+            });
+            return updated;
+          });
+        }
+
+        // Update processing message with messageId and chart insights
+        setMessagesWithStorage(prev => {
+          const updated = prev.map(msg => {
+            if (msg.id === processingMessageId) {
+              const updatedMsg = { ...msg, messageId: assistantMessageId, chartInsights: chart_insights, showSendRetryButton: false };
+              return updatedMsg;
+            }
+            return msg;
+          });
+          return updated;
+        });
+      } catch (error) {
+        // Only auto-retry for network-level errors
+        if ((error.message?.includes('Network') || error.message?.includes('fetch')) && attempt < 3) {
+          console.warn(`⚠️ Network error on attempt ${attempt}, retrying...`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          return attemptSend(attempt + 1);
+        }
+        throw error;
+      }
+    };
+
+    await attemptSend();
+  };
+
   const sendMessage = async (messageText = inputText) => {
     if (!messageText.trim() || !birthData) {
       return;
@@ -1247,6 +1374,7 @@ export default function ChatScreen({ navigation, route }) {
     const loadingMessages = getLoadingMessages(messageText);
 
     // Add processing message immediately
+    const clientRequestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const processingMessageId = Date.now() + '_processing';
     const processingMessage = {
       id: processingMessageId,
@@ -1255,6 +1383,8 @@ export default function ChatScreen({ navigation, route }) {
       timestamp: new Date().toISOString(),
       isTyping: true,
       userMessageId: userMessageId,
+      clientRequestId,
+      failedQuestion: messageText,
     };
     
     setMessagesWithStorage(prev => {
@@ -1331,109 +1461,13 @@ export default function ChatScreen({ navigation, route }) {
         setIsTyping(false);
         return;
       }
-      
-      const requestBody = {
-        session_id: currentSessionId,
-        question: messageText,
-        language: language || 'english',
-        response_style: 'detailed',
-        premium_analysis: isPremiumAnalysis,
-        native_name: partnershipMode ? nativeChart?.name : birthData?.name,
-        birth_details: partnershipMode ? {
-          name: nativeChart.name,
-          date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
-          time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
-          latitude: parseFloat(nativeChart.latitude),
-          longitude: parseFloat(nativeChart.longitude),
-          place: nativeChart.place || '',
-          gender: nativeChart.gender || ''
-        } : {
-          name: birthData.name,
-          date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
-          time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
-          latitude: parseFloat(birthData.latitude),
-          longitude: parseFloat(birthData.longitude),
-          place: birthData.place || '',
-          gender: birthData.gender || ''
-        },
-        // Partnership mode fields
-        partnership_mode: partnershipMode,
-        ...(partnershipMode && partnerChart && {
-          partner_name: partnerChart.name,
-          partner_date: typeof partnerChart.date === 'string' ? partnerChart.date.split('T')[0] : partnerChart.date,
-          partner_time: typeof partnerChart.time === 'string' ? partnerChart.time.split('T')[1]?.slice(0, 5) || partnerChart.time : partnerChart.time,
-          partner_place: partnerChart.place || '',
-          partner_latitude: parseFloat(partnerChart.latitude),
-          partner_longitude: parseFloat(partnerChart.longitude),
-          partner_gender: partnerChart.gender || ''
-        })
-      };
-      
 
-      
-      console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()}`);
-      
-      const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log(`📡 [API RESPONSE] Received response at: ${new Date().toISOString()}, status: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-      const { user_message_id, message_id: assistantMessageId, loading_messages, chart_insights } = result;
-
-      console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
-      console.log(`📊 [LOADING MESSAGES] Received ${loading_messages?.length || 0} dynamic messages from backend`);
-      console.log(`🏠 [CHART INSIGHTS] Received ${chart_insights?.length || 0} chart insights from backend`);
-
-      if (!assistantMessageId) {
-        throw new Error('No message ID received from server');
-      }
-
-      // Use dynamic loading messages from backend if available
-      if (loading_messages && loading_messages.length > 0) {
-        setDynamicLoadingMessages(loading_messages);
-      }
-
-      console.log(`🚀 [POLLING START] Starting polling for messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
-      
-      // Start polling IMMEDIATELY before state updates to avoid delay
-      pollForResponse(assistantMessageId, processingMessageId, currentSessionId, messageText);
-
-      // Update user message with real DB ID (async, non-blocking)
-      if (user_message_id) {
-        setMessagesWithStorage(prev => {
-          const updated = prev.map(msg => {
-            if (msg.id === userMessageId) {
-              const updatedMsg = { ...msg, messageId: user_message_id };
-              return updatedMsg;
-            }
-            return msg;
-          });
-          return updated;
-        });
-      }
-
-      // Update processing message with messageId and chart insights
-      setMessagesWithStorage(prev => {
-        const updated = prev.map(msg => {
-          if (msg.id === processingMessageId) {
-            const updatedMsg = { ...msg, messageId: assistantMessageId, chartInsights: chart_insights };
-            return updatedMsg;
-          }
-          return msg;
-        });
-        return updated;
+      await sendChatRequestWithRetry({
+        messageText,
+        currentSessionId,
+        processingMessageId,
+        userMessageId,
+        clientRequestId,
       });
 
     } catch (error) {
@@ -1464,10 +1498,80 @@ export default function ChatScreen({ navigation, route }) {
         userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
       }
       
-      // Replace processing message with error
+      // Replace processing message with error and show retry button
       setMessagesWithStorage(prev => prev.map(msg => 
         msg.id === processingMessageId 
-          ? { ...msg, content: userMessage, isTyping: false }
+          ? { ...msg, content: userMessage, isTyping: false, showSendRetryButton: true, failedQuestion: messageText }
+          : msg
+      ));
+      setLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const handleSendRetry = async (failedMessage) => {
+    const { clientRequestId, userMessageId, failedQuestion } = failedMessage || {};
+    if (!clientRequestId || !failedQuestion) {
+      return;
+    }
+
+    setLoading(true);
+    setIsTyping(true);
+
+    // Reset the failed message to typing state
+    setMessagesWithStorage(prev => prev.map(msg =>
+      msg.id === failedMessage.id
+        ? { ...msg, isTyping: true, showSendRetryButton: false }
+        : msg
+    ));
+
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = await createSession();
+      if (!currentSessionId) {
+        setLoading(false);
+        setIsTyping(false);
+        return;
+      }
+    }
+
+    try {
+      await sendChatRequestWithRetry({
+        messageText: failedQuestion,
+        currentSessionId,
+        processingMessageId: failedMessage.id,
+        userMessageId,
+        clientRequestId,
+      });
+    } catch (error) {
+      console.error('❌ Error retrying message:', error);
+
+      // Log error to backend for developer monitoring
+      try {
+        const { chatErrorAPI } = require('../../services/api');
+        await chatErrorAPI.logError(
+          error.name || 'ChatRetryError',
+          error.message || 'Unknown retry error',
+          failedQuestion,
+          error.stack
+        );
+      } catch (logError) {
+        console.error('Failed to log retry error:', logError);
+      }
+
+      // Show user-friendly error message based on error type
+      let userMessage = 'I apologize, but I\'m still having trouble sending your question. Please check your connection and try again.';
+      if (error.message?.includes('DeadlineExceeded') || error.message?.includes('504') || error.message?.includes('timeout')) {
+        userMessage = 'Your question is quite complex and is taking longer than usual to analyze. Please try asking a more specific question or try again later.';
+      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+        userMessage = 'I\'m having trouble connecting right now. Please check your internet connection and try again.';
+      } else if (error.message?.includes('HTTP 500')) {
+        userMessage = 'I\'m experiencing some technical difficulties. Please try again in a few moments.';
+      }
+
+      setMessagesWithStorage(prev => prev.map(msg =>
+        msg.id === failedMessage.id
+          ? { ...msg, content: userMessage, isTyping: false, showSendRetryButton: true, failedQuestion }
           : msg
       ));
       setLoading(false);
@@ -1897,7 +2001,15 @@ export default function ChatScreen({ navigation, route }) {
               return (
                 <View key={item.id}>
                   <View ref={isLastMessage ? lastMessageRef : null}>
-                    <MessageBubble message={item} language={language} onFollowUpClick={setInputText} partnership={partnershipMode} onDelete={handleDeleteMessage} onRestart={restartPolling} />
+                    <MessageBubble
+                      message={item}
+                      language={language}
+                      onFollowUpClick={setInputText}
+                      partnership={partnershipMode}
+                      onDelete={handleDeleteMessage}
+                      onRestart={restartPolling}
+                      onSendRetry={handleSendRetry}
+                    />
                   </View>
                   <FeedbackComponent 
                     message={item} 
