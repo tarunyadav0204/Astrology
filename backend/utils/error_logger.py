@@ -5,7 +5,16 @@ import sqlite3
 import json
 import traceback
 
-def log_chat_error(user_id, username, phone, error, user_question, birth_data=None, error_source='backend'):
+def log_chat_error(
+    user_id,
+    username,
+    phone,
+    error,
+    user_question,
+    birth_data=None,
+    error_source='backend',
+    error_type: str | None = None,
+):
     """
     Log chat error to database
     
@@ -32,29 +41,36 @@ def log_chat_error(user_id, username, phone, error, user_question, birth_data=No
         
         conn = sqlite3.connect('astrology.db')
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        # Prefer an explicit error_type string when provided (e.g. from mobile),
+        # otherwise fall back to the Python exception class name.
+        resolved_error_type = error_type or type(error).__name__
+
+        cursor.execute(
+            """
             INSERT INTO chat_error_logs 
             (user_id, username, phone, error_type, error_message, user_question, 
              stack_trace, platform, error_source, birth_data_context)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id,
-            username,
-            phone,
-            type(error).__name__,
-            str(error),
-            user_question,
-            stack_trace,
-            error_source,
-            error_source,
-            birth_context
-        ))
+            """,
+            (
+                user_id,
+                username,
+                phone,
+                resolved_error_type,
+                str(error),
+                user_question,
+                stack_trace,
+                error_source,
+                error_source,
+                birth_context,
+            ),
+        )
         
         conn.commit()
         conn.close()
-        
-        print(f"🚨 ERROR LOGGED: {type(error).__name__} for user {username}")
+
+        print(f"🚨 ERROR LOGGED: {resolved_error_type} for user {username}")
         return True
         
     except Exception as log_error:

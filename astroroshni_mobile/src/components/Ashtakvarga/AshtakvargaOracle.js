@@ -10,6 +10,7 @@ import {
   StatusBar,
   Clipboard,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -163,6 +164,33 @@ export default function AshtakvargaOracle({ navigation }) {
     }
   };
 
+  const normalizeBirthForApi = (birth) => {
+    let dateStr = birth.date;
+    if (dateStr && typeof dateStr === 'string') {
+      if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+      else if (dateStr.length === 10 && dateStr[4] === '-' && dateStr[7] === '-') {
+        // already YYYY-MM-DD
+      } else {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+      }
+    }
+    let timeStr = birth.time;
+    if (timeStr && typeof timeStr === 'string' && timeStr.includes(':')) {
+      const parts = timeStr.split(':');
+      timeStr = parts.length >= 2 ? `${String(parseInt(parts[0], 10)).padStart(2, '0')}:${String(parseInt(parts[1], 10)).padStart(2, '0')}` : timeStr;
+    }
+    return {
+      name: birth.name || 'User',
+      date: dateStr || birth.date,
+      time: timeStr || birth.time,
+      latitude: Number(birth.latitude),
+      longitude: Number(birth.longitude)
+    };
+  };
+
   const fetchAshtakvargaData = async (birth, date = null) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -171,8 +199,8 @@ export default function AshtakvargaOracle({ navigation }) {
         throw new Error('Missing authentication token or birth data');
       }
       
-      // Compare dates properly - check if selected date matches birth date
-      const birthDate = new Date(birth.date);
+      const birthNorm = normalizeBirthForApi(birth);
+      const birthDate = new Date(birthNorm.date);
       const selectedDate = date || birthDate;
       
       // Compare only date parts (ignore time)
@@ -181,13 +209,7 @@ export default function AshtakvargaOracle({ navigation }) {
                         birthDate.getDate() === selectedDate.getDate();
       
       const requestBody = {
-        birth_data: {
-          name: birth.name,
-          date: birth.date,
-          time: birth.time,
-          latitude: birth.latitude,
-          longitude: birth.longitude
-        },
+        birth_data: birthNorm,
         chart_type: isSameDate ? 'lagna' : 'transit'
       };
       
@@ -207,13 +229,20 @@ export default function AshtakvargaOracle({ navigation }) {
       if (response.ok) {
         const data = await response.json();
         setOracleData(data);
-        
+
         // Store birth chart data for comparison if this is birth chart
         if (isSameDate) {
           setBirthOracleData(data);
         }
       } else {
-        throw new Error(`Failed to fetch ashtakvarga data: ${response.status}`);
+        let message = `Failed to fetch ashtakvarga data: ${response.status}`;
+        try {
+          const errBody = await response.json();
+          if (errBody?.detail) {
+            message += ` - ${typeof errBody.detail === 'string' ? errBody.detail : JSON.stringify(errBody.detail)}`;
+          }
+        } catch (_) {}
+        throw new Error(message);
       }
     } catch (error) {
       console.error('Error fetching ashtakvarga data:', error);
@@ -427,55 +456,58 @@ export default function AshtakvargaOracle({ navigation }) {
           </ScrollView>
         </View>
 
-        <View style={styles.lifePredictionsContainer}>
-          <TouchableOpacity 
-            style={[styles.lifePredictionsButton, loadingLifePredictions && styles.loadingButton]}
-            onPress={generateLifePredictions}
-            disabled={loadingLifePredictions}
-          >
-            <LinearGradient
-              colors={loadingLifePredictions ? ['#2c3e50', '#34495e', '#5d6d7e'] : ['#8e44ad', '#9b59b6', '#af7ac5']}
-              style={styles.lifePredictionsGradient}
+        {/* Generate Life Predictions hidden on iOS for App Store compliance */}
+        {Platform.OS !== 'ios' && (
+          <View style={styles.lifePredictionsContainer}>
+            <TouchableOpacity 
+              style={[styles.lifePredictionsButton, loadingLifePredictions && styles.loadingButton]}
+              onPress={generateLifePredictions}
+              disabled={loadingLifePredictions}
             >
-              {loadingLifePredictions ? (
-                <View style={styles.loadingContent}>
-                  <Animated.View 
-                    style={[
-                      styles.loadingIconContainer,
-                      {
-                        transform: [{
-                          rotate: loadingRotateAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0deg', '360deg']
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <Text style={styles.lifePredictionsIcon}>✨</Text>
-                  </Animated.View>
-                  <Text style={styles.lifePredictionsText}>
-                    Consulting Dots of Destiny...
-                  </Text>
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${loadingProgress}%` }]} />
+              <LinearGradient
+                colors={loadingLifePredictions ? ['#2c3e50', '#34495e', '#5d6d7e'] : ['#8e44ad', '#9b59b6', '#af7ac5']}
+                style={styles.lifePredictionsGradient}
+              >
+                {loadingLifePredictions ? (
+                  <View style={styles.loadingContent}>
+                    <Animated.View 
+                      style={[
+                        styles.loadingIconContainer,
+                        {
+                          transform: [{
+                            rotate: loadingRotateAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '360deg']
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      <Text style={styles.lifePredictionsIcon}>✨</Text>
+                    </Animated.View>
+                    <Text style={styles.lifePredictionsText}>
+                      Consulting Dots of Destiny...
+                    </Text>
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${loadingProgress}%` }]} />
+                      </View>
+                      <Text style={styles.progressText}>{Math.round(loadingProgress)}%</Text>
                     </View>
-                    <Text style={styles.progressText}>{Math.round(loadingProgress)}%</Text>
                   </View>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.lifePredictionsIcon}>🌟</Text>
-                  <Text style={styles.lifePredictionsText}>
-                    Generate Life Predictions
-                  </Text>
-                  <Text style={styles.lifePredictionsSubtext}>Vinay Aditya's Methodology</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+                ) : (
+                  <>
+                    <Text style={styles.lifePredictionsIcon}>🌟</Text>
+                    <Text style={styles.lifePredictionsText}>
+                      Generate Life Predictions
+                    </Text>
+                    <Text style={styles.lifePredictionsSubtext}>Vinay Aditya's Methodology</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     );
   };

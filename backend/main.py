@@ -2707,53 +2707,58 @@ async def calculate_sub_dashas(request: dict):
 
 @app.post("/api/calculate-ashtakavarga")
 async def calculate_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
-    from calculators.ashtakavarga import AshtakavargaCalculator
-    
-    birth_data = BirthData(**request['birth_data'])
-    chart_type = request.get('chart_type', 'lagna')
-    
-    if chart_type == 'transit':
-        # For transit charts, use current transit positions
-        transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
-        # Parse ISO datetime string to date if needed
-        if 'T' in transit_date:
-            transit_date = transit_date.split('T')[0]
-        transit_request = TransitRequest(
-            birth_data=birth_data,
-            transit_date=transit_date
-        )
-        chart_data = await calculate_transits(transit_request)
-    else:
-        # For birth charts (lagna, navamsa), use birth positions - DON'T SAVE TO DATABASE
-        from calculators.chart_calculator import ChartCalculator
-        calculator = ChartCalculator({})
-        chart_data = calculator.calculate_chart(birth_data, 'mean')
-    
-    calculator = AshtakavargaCalculator(birth_data, chart_data)
-    
-    sarva = calculator.calculate_sarvashtakavarga()
-    analysis = calculator.get_ashtakavarga_analysis(chart_type)
-    
-    # Format Ashtakvarga data for chart display
-    chart_ashtakavarga = {}
-    ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data.get('ascendant') else 0
-    
-    for sign_num in range(12):
-        house_num = ((sign_num - ascendant_sign) % 12) + 1
-        bindus = sarva['sarvashtakavarga'].get(str(sign_num), 0)
-        chart_ashtakavarga[str(house_num)] = {
-            'bindus': bindus,
-            'sign': sign_num,
-            'strength': 'Strong' if bindus >= 30 else 'Weak' if bindus <= 25 else 'Moderate'
+    import traceback
+    try:
+        from calculators.ashtakavarga import AshtakavargaCalculator
+
+        birth_data = BirthData(**request['birth_data'])
+        chart_type = request.get('chart_type', 'lagna')
+
+        if chart_type == 'transit':
+            # For transit charts, use current transit positions
+            transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
+            # Parse ISO datetime string to date if needed
+            if isinstance(transit_date, str) and 'T' in transit_date:
+                transit_date = transit_date.split('T')[0]
+            transit_request = TransitRequest(
+                birth_data=birth_data,
+                transit_date=transit_date
+            )
+            chart_data = await calculate_transits(transit_request)
+        else:
+            # For birth charts (lagna, navamsa), use birth positions - DON'T SAVE TO DATABASE
+            from calculators.chart_calculator import ChartCalculator
+            calculator = ChartCalculator({})
+            chart_data = calculator.calculate_chart(birth_data, 'mean')
+
+        calculator = AshtakavargaCalculator(birth_data, chart_data)
+
+        sarva = calculator.calculate_sarvashtakavarga()
+        analysis = calculator.get_ashtakavarga_analysis(chart_type)
+
+        # Format Ashtakvarga data for chart display
+        chart_ashtakavarga = {}
+        ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data.get('ascendant') else 0
+
+        for sign_num in range(12):
+            house_num = ((sign_num - ascendant_sign) % 12) + 1
+            bindus = sarva['sarvashtakavarga'].get(str(sign_num), 0)
+            chart_ashtakavarga[str(house_num)] = {
+                'bindus': bindus,
+                'sign': sign_num,
+                'strength': 'Strong' if bindus >= 30 else 'Weak' if bindus <= 25 else 'Moderate'
+            }
+
+        return {
+            "ashtakavarga": sarva,
+            "analysis": analysis,
+            "chart_type": chart_type,
+            "chart_data": chart_data,  # Include chart_data for oracle calculations
+            "chart_ashtakavarga": chart_ashtakavarga  # Formatted for chart widget
         }
-    
-    return {
-        "ashtakavarga": sarva,
-        "analysis": analysis,
-        "chart_type": chart_type,
-        "chart_data": chart_data,  # Include chart_data for oracle calculations
-        "chart_ashtakavarga": chart_ashtakavarga  # Formatted for chart widget
-    }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Ashtakavarga calculation failed: {type(e).__name__}: {str(e)}")
 
 @app.post("/api/ashtakavarga/transit-analysis")
 async def get_transit_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):

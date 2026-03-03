@@ -1,0 +1,422 @@
+.jaimini-home {
+  padding: 16px;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Current Summary Card */
+.current-summary {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.current-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.current-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.today-date {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.period-info {
+  margin-bottom: 16px;
+}
+
+.period-main {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.period-details {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.chakra-badge {
+  background: #3498db;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.chakra-badge.chakra-1 { background: #3498db; }
+.chakra-badge.chakra-2 { background: #e74c3c; }
+
+.direction-arrow {
+  font-size: 16px;
+  color: #7f8c8d;
+}
+
+.progress-section {
+  margin-top: 12px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #ecf0f1;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+/* Section Headers */
+.section {
+  margin-bottom: 24px;
+}
+
+.section h4 {
+  margin: 0 0 12px 0;
+  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Mahadasha Row */
+.maha-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scroll-behavior: smooth;
+}
+
+.maha-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.maha-scroll::-webkit-scrollbar-track {
+  background: #ecf0f1;
+  border-radius: 2px;
+}
+
+.maha-scroll::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 2px;
+}
+
+.maha-chip {
+  min-width: 110px;
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.maha-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.maha-chip.selected {
+  border-color: #3498db;
+  background: #ebf3fd;
+}
+
+.maha-chip.current {
+  border-color: #2ecc71;
+  background: #eafaf1;
+}
+
+.maha-chip.chakra-1 {
+  border-left: 4px solid #3498db;
+}
+
+.maha-chip.chakra-2 {
+  border-left: 4px solid #e74c3c;
+}
+
+.chip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sign-name {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.chip-header .chakra-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.chip-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.years {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.chip-dates {
+  font-size: 11px;
+  color: #95a5a6;
+  line-height: 1.2;
+}
+
+.cycle-indicator {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #f39c12;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.maha-chip {
+  position: relative;
+}
+
+/* Antardasha Row */
+.antar-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+.antar-chip {
+  min-width: 80px;
+  background: white;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #ecf0f1;
+  text-align: center;
+}
+
+.antar-chip:hover {
+  background: #f8f9fa;
+  border-color: #bdc3c7;
+}
+
+.antar-chip.current {
+  background: #eafaf1;
+  border-color: #2ecc71;
+}
+
+.antar-name {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.antar-duration {
+  font-size: 11px;
+  color: #7f8c8d;
+  margin-bottom: 4px;
+}
+
+.antar-dates {
+  font-size: 10px;
+  color: #95a5a6;
+}
+
+/* Bottom Sheet */
+.bottom-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bottom-sheet {
+  background: white;
+  width: 100%;
+  max-height: 70vh;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #ecf0f1;
+  background: #f8f9fa;
+}
+
+.sheet-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #7f8c8d;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close-btn:hover {
+  background: #ecf0f1;
+}
+
+.sheet-content {
+  padding: 20px;
+  max-height: calc(70vh - 80px);
+  overflow-y: auto;
+}
+
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section h4 {
+  margin: 0 0 8px 0;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detail-section p {
+  margin: 4px 0;
+  color: #34495e;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.detail-section ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.detail-section li {
+  color: #34495e;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+/* Strength Bar */
+.strength-bar {
+  width: 100%;
+  height: 8px;
+  background: #ecf0f1;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.strength-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
+  transition: width 0.3s ease;
+}
+
+/* Keywords */
+.keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.keyword-tag {
+  background: #ecf0f1;
+  color: #2c3e50;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #7f8c8d;
+  font-size: 16px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .jaimini-home {
+    padding: 12px;
+  }
+  
+  .current-summary {
+    padding: 16px;
+  }
+  
+  .maha-chip {
+    min-width: 100px;
+    padding: 10px;
+  }
+  
+  .antar-chip {
+    min-width: 70px;
+    padding: 8px;
+  }
+}

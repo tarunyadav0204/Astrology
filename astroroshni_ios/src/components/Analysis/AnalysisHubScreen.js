@@ -1,0 +1,538 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  Image,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme } from '../../context/ThemeContext';
+import { useCredits } from '../../credits/CreditContext';
+import { pricingAPI } from '../../services/api';
+import { storage } from '../../services/storage';
+import NativeSelectorChip from '../Common/NativeSelectorChip';
+import { useAnalytics } from '../../hooks/useAnalytics';
+
+const { width } = Dimensions.get('window');
+
+export default function AnalysisHubScreen({ navigation }) {
+  useAnalytics('AnalysisHubScreen');
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
+  const { credits } = useCredits();
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(50));
+  const [logoGlow] = useState(new Animated.Value(0));
+  const [pricing, setPricing] = useState({});
+  const [loadingPricing, setLoadingPricing] = useState(true);
+  const [birthData, setBirthData] = useState(null);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoGlow, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+    
+    fetchPricing();
+    loadBirthData();
+  }, []);
+  
+  const loadBirthData = async () => {
+    try {
+      const data = await storage.getBirthDetails();
+      if (!data || !data.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'AnalysisHub' });
+        return;
+      }
+      setBirthData(data);
+    } catch (error) {
+      console.error('Error loading birth data:', error);
+    }
+  };
+  
+  const fetchPricing = async () => {
+    try {
+      const response = await pricingAPI.getAnalysisPricing();
+      if (response.data && response.data.pricing) {
+        setPricing(response.data.pricing);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pricing:', error);
+      // Use default pricing if API fails
+      setPricing({
+        career: 10,
+        wealth: 5,
+        health: 5,
+        marriage: 5,
+        education: 5,
+        progeny: 15
+      });
+    } finally {
+      setLoadingPricing(false);
+    }
+  };
+
+  const getAnalysisTypes = () => {
+    const baseTypes = [
+      {
+        id: 'career',
+        title: 'Career Analysis',
+        subtitle: 'Professional success & opportunities',
+        icon: '💼',
+        gradient: ['#6366F1', '#8B5CF6'],
+        description: 'Discover your career potential, ideal industries, and professional timing with AI-powered insights'
+      },
+      {
+        id: 'wealth',
+        title: 'Wealth Analysis',
+        subtitle: 'Financial prospects & opportunities',
+        icon: '💰',
+        gradient: ['#FFD700', '#FF8C00'],
+        description: 'Discover your financial potential, investment timing, and wealth accumulation patterns'
+      },
+      {
+        id: 'health',
+        title: 'Health Analysis',
+        subtitle: 'Wellness insights & precautions',
+        icon: '🏥',
+        gradient: ['#32CD32', '#228B22'],
+        description: 'Understand health vulnerabilities, body constitution, and preventive measures'
+      },
+      {
+        id: 'marriage',
+        title: 'Marriage Analysis',
+        subtitle: 'Relationship compatibility & timing',
+        icon: '💕',
+        gradient: ['#FF69B4', '#DC143C'],
+        description: 'Explore relationship patterns, marriage timing, and partner compatibility'
+      },
+      {
+        id: 'education',
+        title: 'Education Analysis',
+        subtitle: 'Learning path & career guidance',
+        icon: '🎓',
+        gradient: ['#4169E1', '#1E90FF'],
+        description: 'Identify educational strengths, career paths, and learning opportunities'
+      },
+      {
+        id: 'progeny',
+        title: 'Progeny Analysis',
+        subtitle: 'Children & family expansion',
+        icon: '👶',
+        gradient: ['#FF69B4', '#FFB6C1'],
+        description: 'Explore fertility potential, timing for children, and family expansion insights'
+      }
+    ];
+    
+    return baseTypes.map(type => ({
+      ...type,
+      cost: pricing[type.id] || 0
+    }));
+  };
+
+  const handleAnalysisSelect = (analysisType) => {
+    if (credits < analysisType.cost) {
+      navigation.navigate('Credits');
+      return;
+    }
+    
+    navigation.navigate('AnalysisDetail', { 
+      analysisType: analysisType.id,
+      title: analysisType.title,
+      cost: analysisType.cost
+    });
+  };
+
+  const screenGradientColors = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary, colors.primary];
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+              onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <View style={styles.headerCenter}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Life Analysis</Text>
+              {birthData && (
+                <NativeSelectorChip 
+                  birthData={birthData}
+                  onPress={() => navigation.navigate('SelectNative')}
+                  maxLength={15}
+                  style={[styles.nativeChip, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface }]}
+                  textStyle={[styles.nativeChipText, { color: colors.textSecondary }]}
+                  showIcon={false}
+                />
+              )}
+            </View>
+            <TouchableOpacity style={styles.creditButton} onPress={() => navigation.navigate('Credits')}>
+              <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.creditGradient}>
+                <Text style={[styles.creditText, { color: '#fff' }]}>💳 {credits}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <Animated.View 
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Hero Section */}
+              <View style={styles.heroSection}>
+                <Animated.View style={[styles.logoContainer, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface }, {
+                  shadowOpacity: logoGlow.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 1],
+                  }),
+                  shadowRadius: logoGlow.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 20],
+                  }),
+                  transform: [{
+                    scale: logoGlow.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.05],
+                    })
+                  }]
+                }]}>
+                  <Image 
+                    source={require('../../../assets/logo.png')}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
+                <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Your Life's Mysteries</Text>
+                <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                  Deep astrological insights into the four pillars of life
+                </Text>
+              </View>
+
+              {/* Analysis Cards */}
+              <View style={styles.analysisGrid}>
+                {getAnalysisTypes().map((analysis, index) => (
+                  <Animated.View
+                    key={analysis.id}
+                    style={[
+                      styles.analysisCard,
+                      {
+                        opacity: fadeAnim,
+                        transform: [{
+                          translateY: slideAnim.interpolate({
+                            inputRange: [0, 50],
+                            outputRange: [0, 50 + (index * 20)],
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <TouchableOpacity
+                      onPress={() => handleAnalysisSelect(analysis)}
+                      style={styles.cardTouchable}
+                    >
+                      <LinearGradient
+                        colors={isDark ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                        style={[styles.cardGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                      >
+                        <View style={styles.cardHeader}>
+                          <View style={styles.iconContainer}>
+                            <LinearGradient colors={analysis.gradient} style={[styles.iconGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }]}>
+                              <Text style={styles.cardIcon}>{analysis.icon}</Text>
+                            </LinearGradient>
+                          </View>
+                          <View style={[styles.costBadge, { backgroundColor: colors.primary }]}>
+                            <Text style={[styles.costText, { color: '#fff' }]}>{analysis.cost} credits</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.cardTitle, { color: colors.text }]}>{analysis.title}</Text>
+                        <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{analysis.subtitle}</Text>
+                        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{analysis.description}</Text>
+                        <View style={styles.cardFooter}>
+                          <Text style={[styles.exploreText, { color: colors.primary }]}>Explore Now</Text>
+                          <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+
+              <View style={styles.infoSection}>
+                <LinearGradient
+                  colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                  style={[styles.infoCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                >
+                  <Text style={[styles.infoTitle, { color: colors.text }]}>✨ Premium Analysis Features</Text>
+                  <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    • Detailed astrological calculations{'\n'}
+                    • Personalized remedies & suggestions{'\n'}
+                    • Timing predictions & favorable periods{'\n'}
+                    • Interactive Q&A format{'\n'}
+                    • Follow-up questions for deeper insights
+                  </Text>
+                </LinearGradient>
+              </View>
+            </ScrollView>
+          </Animated.View>
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  gradientBg: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  nativeChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  nativeChipText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  creditButton: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  creditGradient: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  creditText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  content: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 30,
+  },
+  heroSection: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  logoImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  analysisGrid: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  analysisCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  cardTouchable: {
+    width: '100%',
+  },
+  cardGradient: {
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  cardIcon: {
+    fontSize: 28,
+  },
+  costBadge: {
+    backgroundColor: 'rgba(255, 107, 53, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  costText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 12,
+    fontWeight: '500',
+  },
+  cardDescription: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  exploreText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+  },
+  infoSection: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+  },
+  infoCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 20,
+  },
+});

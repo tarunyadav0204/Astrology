@@ -938,6 +938,10 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
         if not date_str or not time_str:
             raise ValueError("Missing date or time in birth_data")
         
+        # Normalize date to YYYY-MM-DD (accept ISO datetime e.g. 2026-03-01T16:40:44.425Z from clients)
+        if isinstance(date_str, str) and 'T' in date_str:
+            date_str = date_str.split('T')[0]
+        
         try:
             year, month, day = map(int, date_str.split('-'))
             time_parts = time_str.split(':')

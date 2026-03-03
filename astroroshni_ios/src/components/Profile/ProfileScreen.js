@@ -1,0 +1,887 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  StatusBar,
+  Alert,
+  Modal,
+  Linking,
+  Platform,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Rect, Line, Polygon } from 'react-native-svg';
+import { COLORS, LANGUAGES } from '../../utils/constants';
+import { storage } from '../../services/storage';
+import { useCredits } from '../../credits/CreditContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../locales/i18n';
+import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
+import NorthIndianChart from '../Chart/NorthIndianChart';
+
+const { width } = Dimensions.get('window');
+
+export default function ProfileScreen({ navigation }) {
+  const { t } = useTranslation();
+  useAnalytics('ProfileScreen');
+  const { theme, toggleTheme, colors } = useTheme();
+  const isClassic = theme === 'classic';
+  const { credits } = useCredits();
+  const [userData, setUserData] = useState(null);
+  const [birthData, setBirthData] = useState(null);
+  const [stats, setStats] = useState({ totalChats: 0, chartsViewed: 0, daysActive: 0 });
+  const [chartData, setChartData] = useState(null);
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [showDashaBrowser, setShowDashaBrowser] = useState(false);
+  const [dashaData, setDashaData] = useState(null);
+  const [loadingDashas, setLoadingDashas] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [language, setLanguage] = useState(i18n.language);
+  const [pushSyncing, setPushSyncing] = useState(false);
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    loadUserData();
+    startAnimations();
+    const loadLanguage = async () => {
+      const savedLanguage = await storage.getLanguage();
+      if (savedLanguage) {
+        setLanguage(savedLanguage);
+        i18n.changeLanguage(savedLanguage);
+      }
+    }
+    loadLanguage();
+    
+    // Add focus listener to reload data when returning to screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUserData();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
+
+  const startAnimations = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 20000,
+        useNativeDriver: true,
+      })
+    ).start();
+  };
+
+  const loadUserData = async () => {
+    try {
+      const user = await storage.getUserData();
+      setUserData(user);
+      
+      // Fetch user's self birth chart from API
+      const { authAPI } = require('../../services/api');
+      const response = await authAPI.getSelfBirthChart();
+      
+      
+      if (response.data.has_self_chart) {
+        const birthDataWithId = {
+          ...response.data,
+          id: response.data.birth_chart_id // Ensure id is included
+        };
+        setBirthData(birthDataWithId);
+        // DO NOT update local storage - this would change the selected native
+        // The ProfileScreen should only display the self chart, not change selection
+        setStats({
+          totalChats: 24,
+          chartsViewed: 12,
+          daysActive: 7,
+        });
+        loadChartData(birthDataWithId);
+        loadDashaData(birthDataWithId);
+      } else {
+        // User hasn't set their own birth details
+        setBirthData(null);
+      }
+    } catch (error) {
+      setBirthData(null);
+    }
+  };
+  
+  const loadChartData = async (birth) => {
+    try {
+      setLoadingChart(true);
+      const formattedData = {
+        ...birth,
+        date: typeof birth.date === 'string' ? birth.date.split('T')[0] : birth.date,
+        time: typeof birth.time === 'string' ? birth.time.split('T')[1]?.slice(0, 5) || birth.time : birth.time,
+        latitude: parseFloat(birth.latitude),
+        longitude: parseFloat(birth.longitude),
+      };
+      
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.calculateChartOnly(formattedData);
+      setChartData(response.data);
+    } catch (error) {
+      // Chart data loading failed
+    } finally {
+      setLoadingChart(false);
+    }
+  };
+
+  const getSignName = (signNumber) => {
+    const signs = {
+      0: 'Aries', 1: 'Taurus', 2: 'Gemini', 3: 'Cancer',
+      4: 'Leo', 5: 'Virgo', 6: 'Libra', 7: 'Scorpio',
+      8: 'Sagittarius', 9: 'Capricorn', 10: 'Aquarius', 11: 'Pisces'
+    };
+    return signs[signNumber] || signNumber;
+  };
+  
+  const getSignIcon = (signNumber) => {
+    const icons = {
+      0: '♈', 1: '♉', 2: '♊', 3: '♋',
+      4: '♌', 5: '♍', 6: '♎', 7: '♏',
+      8: '♐', 9: '♑', 10: '♒', 11: '♓'
+    };
+    return icons[signNumber] || '⭐';
+  };
+
+  const getPlanetColor = (planetName) => {
+    const colors = {
+      'Sun': '#ff6b35',
+      'Moon': '#e0e0e0',
+      'Mars': '#d32f2f',
+      'Mercury': '#4caf50',
+      'Jupiter': '#ffd700',
+      'Venus': '#e91e63',
+      'Saturn': '#2196f3',
+      'Rahu': '#9e9e9e',
+      'Ketu': '#795548',
+    };
+    return colors[planetName] || '#ffffff';
+  };
+
+  const loadDashaData = async (birth) => {
+    try {
+      setLoadingDashas(true);
+      const targetDate = new Date().toISOString().split('T')[0];
+      
+      const formattedBirthData = {
+        name: birth.name,
+        date: birth.date.includes('T') ? birth.date.split('T')[0] : birth.date,
+        time: birth.time.includes('T') ? new Date(birth.time).toTimeString().slice(0, 5) : birth.time,
+        latitude: parseFloat(birth.latitude),
+        longitude: parseFloat(birth.longitude),
+        location: birth.place || 'Unknown'
+      };
+      
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
+      
+      if (response.data && !response.data.error) {
+        setDashaData(response.data);
+      }
+    } catch (error) {
+      // Dasha data loading failed
+    } finally {
+      setLoadingDashas(false);
+    }
+  };
+
+  const handleLanguageChange = async (newLanguage) => {
+    i18n.changeLanguage(newLanguage);
+    setLanguage(newLanguage);
+    await storage.setLanguage(newLanguage);
+    setShowLanguageModal(false);
+  };
+
+  const getZodiacSign = (date) => {
+    if (!date) return '♈';
+    const month = new Date(date).getMonth() + 1;
+    const day = new Date(date).getDate();
+    
+    if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return '♈';
+    if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return '♉';
+    if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return '♊';
+    if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return '♋';
+    if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return '♌';
+    if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return '♍';
+    if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return '♎';
+    if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return '♏';
+    if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return '♐';
+    if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return '♑';
+    if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return '♒';
+    return '♓';
+  };
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const StatCard = ({ icon, value, label, color }) => {
+    const cardColor = isClassic ? colors.textSecondary : color;
+    return (
+      <Animated.View style={[styles.statCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        <LinearGradient
+          colors={isClassic ? [colors.surface, colors.backgroundSecondary] : [color + '20', color + '10']}
+          style={[styles.statGradient, isClassic && { borderWidth: 1, borderColor: colors.cardBorder }]}
+        >
+          <Text style={[styles.statIcon, { color: cardColor }]}>{icon}</Text>
+          <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+        </LinearGradient>
+      </Animated.View>
+    );
+  };
+
+  const ActionButton = ({ icon, label, onPress, color = COLORS.accent }) => {
+    const btnColor = isClassic ? colors.primary : color;
+    const textColor = isClassic ? colors.background : COLORS.white;
+    return (
+      <TouchableOpacity style={[styles.actionButton, isClassic && { borderWidth: 1, borderColor: colors.cardBorder }]} onPress={onPress}>
+        <LinearGradient
+          colors={isClassic ? [colors.surface, colors.backgroundSecondary] : [color, color + 'dd']}
+          style={styles.actionGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.actionContent}>
+            <Ionicons name={icon} size={20} color={textColor} />
+            <Text style={[styles.actionLabel, { color: textColor }]}>{label}</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle={isClassic ? 'dark-content' : 'light-content'} backgroundColor={isClassic ? colors.background : '#1a0033'} translucent={false} />
+      <LinearGradient
+        colors={isClassic ? [colors.background, colors.backgroundSecondary] : (theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart])}
+        style={styles.gradient}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, isClassic && { backgroundColor: colors.surface }]}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>My Profile</Text>
+            <View style={[styles.editButton, isClassic && { backgroundColor: colors.surface }]} />
+          </View>
+
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View style={[styles.profileHeader, { opacity: fadeAnim }]}>
+              <View style={styles.avatarContainer}>
+                <Animated.View style={[styles.zodiacRing, { transform: [{ rotate: spin }] }]}>
+                  <LinearGradient
+                    colors={isClassic ? [colors.textSecondary, colors.textTertiary, colors.textSecondary] : ['#ff6b35', '#ffd700', '#ff6b35']}
+                    style={styles.ringGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                </Animated.View>
+                <View style={[styles.avatar, isClassic && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.avatarText, isClassic && { color: colors.text }]}>
+                    {chartData ? (() => {
+                      const signIndex = chartData?.houses?.[0]?.sign || 0;
+                      return getSignIcon(signIndex);
+                    })() : (loadingChart ? '⏳' : getZodiacSign(birthData?.date))}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.userName, { color: colors.text }]}>{userData?.name || 'User'}</Text>
+              <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>
+                {birthData?.date ? new Date(birthData.date).toLocaleDateString('en-US', { 
+                  month: 'long', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                }) : 'Birth date not set'}
+              </Text>
+              {birthData?.time && (
+                <Text style={[styles.userSubtitle, { color: colors.textSecondary }]}>🕐 {birthData.time}</Text>
+              )}
+              {!birthData?.date && (
+                <TouchableOpacity 
+                  style={[styles.connectChartButton, isClassic && { borderWidth: 1, borderColor: colors.cardBorder }]}
+                  onPress={() => navigation.navigate('SelectNative', { fromProfile: true })}
+                >
+                  <LinearGradient
+                    colors={isClassic ? [colors.surface, colors.backgroundSecondary] : ['#ff6b35', '#ff8c5a']}
+                    style={styles.connectChartGradient}
+                  >
+                    <Text style={[styles.connectChartText, isClassic && { color: colors.text }]}>📊 Connect Chart to Profile</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+              {birthData?.place && (
+                <Text style={[styles.userLocation, { color: colors.textSecondary }]}>📍 {birthData.place}</Text>
+              )}
+            </Animated.View>
+
+            <Animated.View style={[styles.creditsCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }, isClassic && { borderWidth: 1, borderColor: colors.cardBorder }]}>
+              <LinearGradient
+                colors={isClassic ? [colors.surface, colors.backgroundSecondary] : ['#ff6b35', '#ff8c5a', '#ffab7a']}
+                style={styles.creditsGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.creditsContent}>
+                  <View>
+                    <Text style={[styles.creditsLabel, isClassic && { color: colors.textSecondary }]}>Available Credits</Text>
+                    <Text style={[styles.creditsValue, isClassic && { color: colors.text }]}>{credits}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={[styles.addCreditsButton, isClassic && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                    onPress={() => navigation.navigate('Credits')}
+                  >
+                    <Text style={[styles.addCreditsText, isClassic && { color: colors.text }]}>+ Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+
+            <View style={styles.statsGrid}>
+              <StatCard icon="💬" value={stats.totalChats} label="Chats" color="#4a90e2" />
+              <StatCard icon="📊" value={stats.chartsViewed} label="Charts" color="#9c27b0" />
+              <StatCard icon="🔥" value={stats.daysActive} label="Days" color="#ff6b35" />
+            </View>
+
+            <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>✨ Birth Chart Essence</Text>
+              <View style={[styles.chartSummaryCard, isClassic && { borderWidth: 1, borderColor: colors.cardBorder }]}>
+                <LinearGradient
+                  colors={isClassic ? [colors.cardBackground, colors.backgroundSecondary] : (theme === 'dark' ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)'])}
+                  style={styles.chartSummaryGradient}
+                >
+                  <TouchableOpacity 
+                    style={[styles.miniChart, isClassic && { backgroundColor: colors.surface }]}
+                    onPress={() => {
+                      if (birthData) {
+                        navigation.navigate('Chart', { birthData });
+                      } else {
+                        navigation.navigate('Home');
+                      }
+                    }}
+                  >
+                    <Svg width="48" height="48" viewBox="0 0 48 48" style={{ marginBottom: 8 }}>
+                      {/* Outer square */}
+                      <Rect x="2" y="2" width="44" height="44" fill="none" stroke={isClassic ? colors.text : '#ff6b35'} strokeWidth="2" />
+                      {/* Inner diamond */}
+                      <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={isClassic ? colors.textSecondary : '#ffd700'} strokeWidth="1.5" />
+                      {/* Diagonal lines creating triangular houses */}
+                      <Line x1="2" y1="2" x2="46" y2="46" stroke={isClassic ? colors.textTertiary : '#ff8a65'} strokeWidth="1" />
+                      <Line x1="46" y1="2" x2="2" y2="46" stroke={isClassic ? colors.textTertiary : '#ff8a65'} strokeWidth="1" />
+                    </Svg>
+                    <Text style={[styles.miniChartText, { color: colors.text }]}>View Full Chart</Text>
+                  </TouchableOpacity>
+                  
+                  <View style={styles.chartDetails}>
+                    <View style={styles.chartDetailRow}>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>☀️ Sun Sign</Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Sun?.sign)} ${getSignName(chartData?.planets?.Sun?.sign)}`}</Text>
+                    </View>
+                    <View style={styles.chartDetailRow}>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>🌙 Moon Sign</Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.planets?.Moon?.sign)} ${getSignName(chartData?.planets?.Moon?.sign)}`}</Text>
+                    </View>
+                    <View style={styles.chartDetailRow}>
+                      <Text style={[styles.chartDetailLabel, { color: colors.textSecondary }]}>⬆️ Ascendant</Text>
+                      <Text style={[styles.chartDetailValue, { color: colors.text }]}>{loadingChart ? 'Calculating...' : `${getSignIcon(chartData?.houses?.[0]?.sign)} ${getSignName(chartData?.houses?.[0]?.sign)}`}</Text>
+                    </View>
+                  </View>
+                  
+                  {/* Current Running Dashas */}
+                  <View style={[styles.dashasContainer, { borderTopColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)') }]}>
+                    <Text style={[styles.dashasTitle, { color: colors.textSecondary }]}>Current Running Dashas</Text>
+                    <View style={styles.dashasRow}>
+                      {loadingDashas ? (
+                        <Text style={[styles.dashasLoading, isClassic && { color: colors.textTertiary }]}>Loading...</Text>
+                      ) : (
+                        [
+                          { level: 'Maha', data: dashaData?.maha_dashas?.find(d => d.current) },
+                          { level: 'Antar', data: dashaData?.antar_dashas?.find(d => d.current) },
+                          { level: 'Pratyantar', data: dashaData?.pratyantar_dashas?.find(d => d.current) },
+                          { level: 'Sookshma', data: dashaData?.sookshma_dashas?.find(d => d.current) },
+                          { level: 'Prana', data: dashaData?.prana_dashas?.find(d => d.current) }
+                        ].map((dasha, index) => {
+                          const planetColor = isClassic ? colors.text : getPlanetColor(dasha.data?.planet);
+                          return (
+                            <View key={index} style={[styles.dashaChip, { borderColor: planetColor, backgroundColor: isClassic ? colors.surface : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)') }]}>
+                              <Text style={[styles.dashaLevel, { color: colors.textSecondary }]}>{dasha.level}</Text>
+                              <Text style={[styles.dashaPlanet, { color: planetColor }]}>
+                                {dasha.data?.planet || '...'}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      )}
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>⚡ Quick Actions</Text>
+              <View style={styles.actionsGrid}>
+                <ActionButton 
+                  icon="chatbubbles" 
+                  label={t('profile.quickActions.newChat')} 
+                  onPress={() => navigation.navigate('Home', { startChat: true })}
+                  color="#4a90e2"
+                />
+                <ActionButton 
+                  icon="pie-chart" 
+                  label={t('profile.quickActions.viewChart')} 
+                  onPress={() => {
+                    if (birthData) {
+                      navigation.navigate('Chart', { birthData });
+                    } else {
+                      navigation.navigate('Home');
+                    }
+                  }}
+                  color="#9c27b0"
+                />
+                <ActionButton 
+                  icon="time" 
+                  label={t('profile.quickActions.dashas')} 
+                  onPress={() => {
+                    if (birthData) {
+                      setShowDashaBrowser(true);
+                    } else {
+                      // Show message that birth data is needed
+                      Alert.alert('Birth Data Required', 'Please connect your birth chart to view dashas.');
+                    }
+                  }}
+                  color="#ff6b35"
+                />
+                <ActionButton 
+                  icon="calendar" 
+                  label={t('profile.quickActions.history')} 
+                  onPress={() => navigation.navigate('ChatHistory')}
+                  color="#4caf50"
+                />
+                <ActionButton 
+                  icon="list" 
+                  label={t('profile.quickActions.myFacts')} 
+                  onPress={() => {
+                    if (birthData?.id) {
+                      navigation.navigate('Facts', { birthChartId: birthData.id, nativeName: birthData.name });
+                    } else {
+                      navigation.navigate('Facts');
+                    }
+                  }}
+                  color="#e91e63"
+                />
+                <ActionButton 
+                  icon="language" 
+                  label={t('profile.quickActions.language')} 
+                  onPress={() => setShowLanguageModal(true)}
+                  color="#2196f3"
+                />
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>⚙️ Settings</Text>
+              <View style={[styles.settingsCard, { backgroundColor: isClassic ? colors.cardBackground : (theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'), borderWidth: isClassic ? 1 : 0, borderColor: isClassic ? colors.cardBorder : undefined }]}>
+                <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color={isClassic ? colors.text : '#ffd700'} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {theme === 'dark' ? t('profile.darkTheme', 'Light Theme') : t('profile.lightTheme', 'Dark Theme')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+                
+                <View style={[styles.settingDivider, { backgroundColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)') }]} />
+
+                <TouchableOpacity
+                  style={styles.settingItem}
+                  disabled={pushSyncing}
+                  onPress={async () => {
+                    if (Platform.OS === 'ios') {
+                      Alert.alert('Notifications', 'Push notifications are temporarily unavailable on iOS.');
+                      return;
+                    }
+                    setPushSyncing(true);
+                    try {
+                      const { registerPushTokenIfLoggedIn } = require('../../services/pushNotifications');
+                      const result = await registerPushTokenIfLoggedIn();
+                      if (result.ok) {
+                        Alert.alert('Notifications', result.message);
+                      } else {
+                        const isDenied = result.message.includes('Settings');
+                        Alert.alert(
+                          'Notifications',
+                          result.message,
+                          isDenied
+                            ? [
+                                { text: 'OK', style: 'cancel' },
+                                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+                              ]
+                            : [{ text: 'OK' }]
+                        );
+                      }
+                    } finally {
+                      setPushSyncing(false);
+                    }
+                  }}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="notifications-outline" size={22} color={isClassic ? colors.text : '#ff6b35'} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {pushSyncing ? 'Syncing…' : 'Sync push notifications'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+                
+                <View style={[styles.settingDivider, { backgroundColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)') }]} />
+                
+                <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('BirthForm', { editProfile: birthData })}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="person-outline" size={22} color={isClassic ? colors.text : '#ff6b35'} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.editBirthDetails', 'Edit Birth Details')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={[styles.settingDivider, { backgroundColor: isClassic ? colors.cardBorder : (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)') }]} />
+
+                <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('About')}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="information-circle-outline" size={22} color={isClassic ? colors.text : '#3b82f6'} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>
+                      {t('profile.aboutApp', 'About AstroRoshni')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            <TouchableOpacity 
+              style={[
+                styles.logoutButton, 
+                isClassic ? { backgroundColor: colors.surface, borderColor: colors.cardBorder } : { 
+                  backgroundColor: theme === 'dark' ? 'rgba(220, 38, 38, 0.2)' : 'rgba(248, 113, 113, 0.15)', 
+                  borderColor: theme === 'dark' ? 'rgba(248, 113, 113, 0.6)' : 'rgba(220, 38, 38, 0.5)' 
+                }
+              ]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Account',
+                  'This will permanently delete your account and associated data. This action cannot be undone.\n\nAre you sure you want to continue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { API_BASE_URL, getEndpoint } = require('../../utils/constants');
+                          const token = await storage.getAuthToken();
+                          const res = await fetch(`${API_BASE_URL}${getEndpoint('/user/account')}`, {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                          });
+                          if (!res.ok) {
+                            const text = await res.text();
+                            console.log('Delete account failed:', res.status, text);
+                            Alert.alert('Error', 'Failed to delete account. Please try again.');
+                            return;
+                          }
+                          await storage.clearAll();
+                          navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Login' }],
+                          });
+                        } catch (err) {
+                          console.error('Delete account error', err);
+                          Alert.alert('Error', 'Something went wrong while deleting your account. Please try again.');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={[styles.logoutText, isClassic && { color: colors.text }]}>🗑️ Delete Account & Data</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.logoutButton, isClassic ? { backgroundColor: colors.surface, borderColor: colors.cardBorder } : { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.2)' : 'rgba(255, 107, 53, 0.15)', borderColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.5)' : 'rgba(255, 107, 53, 0.4)' }]}
+              onPress={async () => {
+                await storage.clearAll();
+                navigation.navigate('Login');
+              }}
+            >
+              <Text style={[styles.logoutText, isClassic && { color: colors.text }]}>🚪 Logout</Text>
+            </TouchableOpacity>
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+      
+      <Modal
+        visible={showLanguageModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🌐 {t('languageModal.title')}</Text>
+            {LANGUAGES.map((lang) => (
+              <TouchableOpacity
+                key={lang.code}
+                style={[
+                  styles.languageOption,
+                  language === lang.code && styles.languageOptionSelected
+                ]}
+                onPress={() => handleLanguageChange(lang.code)}
+              >
+                <Text style={styles.languageText}>
+                  {lang.flag} {lang.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowLanguageModal(false)}
+            >
+              <Text style={styles.modalCloseText}>{t('languageModal.close')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <CascadingDashaBrowser 
+        visible={showDashaBrowser} 
+        onClose={() => setShowDashaBrowser(false)}
+        birthData={birthData}
+        onRequireBirthData={() => navigation.navigate('BirthProfileIntro', { returnTo: 'Profile' })}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  safeArea: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
+  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '700' },
+  editButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  profileHeader: { alignItems: 'center', marginTop: 20, marginBottom: 30 },
+  avatarContainer: { position: 'relative', marginBottom: 16 },
+  zodiacRing: { position: 'absolute', width: 120, height: 120, borderRadius: 60, top: -10, left: -10 },
+  ringGradient: { width: '100%', height: '100%', borderRadius: 60, opacity: 0.3 },
+  avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255, 255, 255, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255, 255, 255, 0.3)' },
+  avatarText: { fontSize: 48 },
+  userName: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  userSubtitle: { fontSize: 14, marginBottom: 4 },
+  userLocation: { fontSize: 13 },
+  creditsCard: { marginBottom: 24, borderRadius: 20, overflow: 'hidden', shadowColor: '#ff6b35', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  creditsGradient: { padding: 24 },
+  creditsContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  creditsLabel: { fontSize: 14, color: 'rgba(255, 255, 255, 0.9)', marginBottom: 4 },
+  creditsValue: { fontSize: 36, fontWeight: '700', color: COLORS.white },
+  addCreditsButton: { backgroundColor: 'rgba(255, 255, 255, 0.25)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
+  addCreditsText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 12 },
+  statCard: { flex: 1, borderRadius: 16, overflow: 'hidden' },
+  statGradient: { padding: 16, alignItems: 'center' },
+  statIcon: { fontSize: 32, marginBottom: 8 },
+  statValue: { fontSize: 24, fontWeight: '700', color: COLORS.white, marginBottom: 4 },
+  statLabel: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)' },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
+  chartSummaryCard: { borderRadius: 16, overflow: 'hidden' },
+  chartSummaryGradient: { padding: 20 },
+  miniChart: { alignItems: 'center', marginBottom: 20, paddingVertical: 20, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
+  miniChartIcon: { width: 48, height: 48, marginBottom: 8 },
+  miniChartIcon: { fontSize: 48, marginBottom: 8 },
+  miniChartText: { fontSize: 14, fontWeight: '600' },
+  chartDetails: { gap: 12 },
+  chartDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  chartDetailLabel: { fontSize: 14 },
+  chartDetailValue: { fontSize: 14, fontWeight: '600' },
+  dashasContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dashasTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  dashasRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  dashasLoading: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+  },
+  dashaChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+    minWidth: 50,
+  },
+  dashaLevel: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+  },
+  dashaPlanet: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  actionButton: { width: (width - 52) / 2, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  actionGradient: { padding: 12, justifyContent: 'center' },
+  actionContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  actionLabel: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
+  settingsCard: { borderRadius: 16, padding: 4 },
+  settingItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+  settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingText: { fontSize: 16, fontWeight: '500' },
+  settingValue: { fontSize: 14, color: 'rgba(255, 255, 255, 0.6)' },
+  settingDivider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', marginHorizontal: 16 },
+  logoutButton: { backgroundColor: 'rgba(255, 107, 53, 0.2)', borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.5)', borderRadius: 16, padding: 16, alignItems: 'center', marginTop: 12 },
+  logoutText: { color: '#ff6b35', fontSize: 16, fontWeight: '700' },
+  bottomSpacer: { height: 20 },
+  connectChartButton: {
+    marginTop: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  connectChartGradient: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  connectChartText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 24,
+    padding: 24,
+    width: '88%',
+    maxHeight: '75%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.accent,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  languageOption: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: COLORS.lightGray,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  languageOptionSelected: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: COLORS.accent,
+  },
+  languageText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.black,
+  },
+  modalCloseButton: {
+    backgroundColor: COLORS.accent,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalCloseText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+});

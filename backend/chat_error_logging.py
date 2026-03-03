@@ -22,10 +22,11 @@ async def log_chat_error_endpoint(error_log: ChatErrorLog, current_user = Depend
     this request may fail and the error will not be stored. Backend errors are logged
     in process_gemini_response and gemini_chat_analyzer."""
     from utils.error_logger import log_chat_error
-    
+
+    # Create a simple Exception instance; we record the logical error type
+    # separately instead of mutating the built-in Exception class.
     error = Exception(error_log.error_message)
-    error.__class__.__name__ = error_log.error_type
-    
+
     success = log_chat_error(
         current_user.userid,
         current_user.name,
@@ -33,7 +34,8 @@ async def log_chat_error_endpoint(error_log: ChatErrorLog, current_user = Depend
         error,
         error_log.user_question,
         None,
-        'mobile'
+        'mobile',
+        error_log.error_type,
     )
     
     return {"success": success}

@@ -1,0 +1,1 @@
+// Minimal polyfills for React Native

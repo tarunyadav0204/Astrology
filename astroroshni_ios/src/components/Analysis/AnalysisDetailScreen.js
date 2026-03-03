@@ -1,0 +1,1866 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Animated,
+  BackHandler,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
+import { useCredits } from '../../credits/CreditContext';
+import { storage } from '../../services/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cleanupStorage } from '../../services/storageCleanup';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import { trackAstrologyEvent } from '../../utils/analytics';
+
+export default function AnalysisDetailScreen({ route, navigation }) {
+  useAnalytics('AnalysisDetailScreen');
+  const { theme, colors } = useTheme();
+  const isDark = theme === 'dark';
+  const { analysisType, title, cost } = route.params;
+  const { credits, fetchBalance } = useCredits();
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [birthData, setBirthData] = useState(null);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [expandedItems, setExpandedItems] = useState({});
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [analysisFocus, setAnalysisFocus] = useState('first_child');
+  const [childrenCount, setChildrenCount] = useState(0);
+  const [rotateAnim] = useState(new Animated.Value(0));
+  const [pulseAnim] = useState(new Animated.Value(1));
+  const [glowAnim] = useState(new Animated.Value(0));
+  const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
+
+  useEffect(() => {
+    checkBirthData();
+    cleanupStorage();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+    
+    // Handle back button to go to Home screen (greeting state)
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      navigation.navigate('Home', { resetToGreeting: true });
+      return true;
+    });
+    
+    return () => backHandler.remove();
+  }, []);
+
+  useEffect(() => {
+    if (birthData) {
+      loadStoredAnalysis();
+    }
+  }, [birthData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // console.log('🔄 [DEBUG] Screen focused, reloading birth data...');
+      // Reload birth data when screen comes into focus (after gender update)
+      checkBirthData();
+      if (birthData) {
+        // console.log('🔄 [DEBUG] Birth data exists, loading stored analysis...');
+        loadStoredAnalysis();
+      }
+    });
+    
+    return unsubscribe;
+  }, [navigation, birthData]);
+
+  const checkBirthData = async () => {
+    try {
+      const savedBirthData = await storage.getBirthDetails();
+      if (!savedBirthData || !savedBirthData.name) {
+        navigation.replace('BirthProfileIntro', { returnTo: 'AnalysisDetail' });
+        return;
+      }
+      if (savedBirthData && savedBirthData.name) {
+        // console.log('✅ [DEBUG] checkBirthData: Valid birth data found');
+        // console.log('👤 [DEBUG] checkBirthData: Name:', savedBirthData.name);
+        // console.log('⚧️ [DEBUG] checkBirthData: Gender:', savedBirthData.gender);
+        // console.log('📅 [DEBUG] checkBirthData: Date:', savedBirthData.date);
+        // console.log('🕐 [DEBUG] checkBirthData: Time:', savedBirthData.time);
+        // console.log('📍 [DEBUG] checkBirthData: Place:', savedBirthData.place);
+        // console.log('🌍 [DEBUG] checkBirthData: Coordinates:', savedBirthData.latitude, savedBirthData.longitude);
+        setBirthData(savedBirthData);
+      }
+    } catch (error) {
+      console.error('❌ [DEBUG] checkBirthData: Error loading birth data:', error);
+      navigation.replace('BirthProfileIntro', { returnTo: 'AnalysisDetail' });
+    }
+  };
+
+  const startAnalysis = async (forceRegenerate) => {
+    // Ensure forceRegenerate is a boolean
+    const shouldForceRegenerate = forceRegenerate === true;
+    // console.log('🔄 Force regenerate (cleaned):', shouldForceRegenerate);
+    
+    // --- PROGENY VALIDATION BLOCK ---
+    if (analysisType === 'progeny') {
+      if ((analysisFocus === 'next_child' || analysisFocus === 'parenting') && childrenCount === 0) {
+        Alert.alert(
+          'Missing Information', 
+          'Please select how many children you currently have.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+    // ----------------------------
+    
+    if (!birthData) {
+      Alert.alert('Error', 'Birth data not available');
+      return;
+    }
+
+    if (credits < cost) {
+      Alert.alert('Insufficient Credits', `You need ${cost} credits for this analysis.`, [
+        { text: 'Get Credits', onPress: () => navigation.navigate('Credits') },
+        { text: 'Cancel', style: 'cancel' }
+      ]);
+      return;
+    }
+
+    setLoading(true);
+    
+    // Start loading animations
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    ).start();
+    
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+    
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+    
+    const loadingMessages = [
+      '🔮 Analyzing your birth chart...',
+      '⭐ Consulting the cosmic energies...',
+      '📊 Calculating planetary positions...',
+      '🌟 Interpreting astrological patterns...',
+      '✨ Preparing your personalized insights...',
+      '🌙 Reading lunar influences...',
+      '☀️ Examining solar aspects...',
+      '♃ Studying Jupiter blessings...',
+      '♀ Analyzing Venus placements...',
+      '♂ Checking Mars energy...',
+      '☿ Decoding Mercury messages...',
+      '♄ Understanding Saturn lessons...',
+      '🐉 Exploring Rahu-Ketu axis...',
+      '🏠 Examining house strengths...',
+      '🔄 Calculating dasha periods...',
+      '🎯 Identifying key yogas...',
+      '🌊 Flowing through nakshatras...',
+      '⚖️ Balancing planetary forces...',
+      '🎭 Unveiling karmic patterns...',
+      '🗝️ Unlocking hidden potentials...'
+    ];
+    
+    let messageIndex = 0;
+    setLoadingMessage(loadingMessages[0]);
+    
+    const messageInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % loadingMessages.length;
+      setLoadingMessage(loadingMessages[messageIndex]);
+    }, 3000);
+    
+    try {
+      const fixedBirthData = { ...birthData };
+      
+      // console.log('🔧 [DEBUG] Original birth data:', JSON.stringify(birthData, null, 2));
+      // console.log('⚧️ [DEBUG] Original gender:', birthData?.gender);
+      
+      if (fixedBirthData.date && fixedBirthData.date.includes('T')) {
+        fixedBirthData.date = fixedBirthData.date.split('T')[0];
+      }
+      
+      if (fixedBirthData.time && fixedBirthData.time.includes('T')) {
+        const timeDate = new Date(fixedBirthData.time);
+        fixedBirthData.time = timeDate.toTimeString().slice(0, 5);
+      }
+      
+      // console.log('🔧 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
+      // console.log('⚧️ [DEBUG] Fixed gender:', fixedBirthData?.gender);
+
+      const requestBody = {
+        ...fixedBirthData,
+        language: 'english',
+        response_style: 'detailed',
+        force_regenerate: shouldForceRegenerate,
+        ...(analysisType === 'progeny' && {
+          analysis_focus: analysisFocus,
+          children_count: childrenCount
+        })
+      };
+      
+      // Track analysis request
+      trackAstrologyEvent.analysisRequested(analysisType);
+      
+      // console.log('🚀 [DEBUG] Starting analysis:', analysisType);
+      // console.log('📊 [DEBUG] Fixed birth data:', JSON.stringify(fixedBirthData, null, 2));
+      // console.log('📊 [DEBUG] Full request body:', JSON.stringify(requestBody, null, 2));
+      // console.log('⚧️ [DEBUG] Gender in request:', requestBody.gender);
+      // console.log('🔄 [DEBUG] Force regenerate:', shouldForceRegenerate);
+
+      const token = await AsyncStorage.getItem('authToken');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      };
+
+      // Career and progeny use /ai-insights endpoint, others use /analyze
+      const endpoint = (analysisType === 'career' || analysisType === 'progeny') ? `/${analysisType}/ai-insights` : `/${analysisType}/analyze`;
+      const fullUrl = `${API_BASE_URL}${getEndpoint(endpoint)}`;
+      // console.log('🌐 API URL:', fullUrl);
+      
+      // console.log('🌐 [DEBUG] Making API request to:', fullUrl);
+      // console.log('📤 [DEBUG] Request headers:', JSON.stringify(headers, null, 2));
+      // console.log('📤 [DEBUG] Request body being sent:', JSON.stringify(requestBody, null, 2));
+      
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
+      });
+      
+      // console.log('📥 [DEBUG] Response status:', response.status);
+      // console.log('📥 [DEBUG] Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [DEBUG] API Error Response:', errorText);
+        console.error('❌ [DEBUG] Response status:', response.status);
+        throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      // console.log('📥 Response received, length:', responseText.length);
+      // console.log('📥 First 500 chars:', responseText.substring(0, 500));
+      // console.log('📥 Last 200 chars:', responseText.substring(responseText.length - 200));
+      
+      const lines = responseText.split('\n').filter(line => line.trim());
+      // console.log('📊 Total lines:', lines.length);
+      let fullContent = '';
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          let data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          if (data && data.length > 0) {
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.status === 'error' && parsed.error_code === 'GENDER_REQUIRED') {
+                
+                Alert.alert(
+                  'Gender Required',
+                  parsed.message || 'Gender is required for progeny analysis. Please update your profile to continue.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Update Profile', 
+                      onPress: async () => {
+                        // Get chart ID from backend and navigate to birth form
+                        try {
+                          const { authAPI } = require('../../services/api');
+                          const response = await authAPI.getSelfBirthChart();
+                          const chartId = response.data?.chart_id;
+                          // console.log('🔍 [DEBUG] Got chart ID for update:', chartId);
+                          
+                          navigation.navigate('BirthForm', { 
+                            updateGender: true,
+                            chartId: chartId
+                          });
+                        } catch (error) {
+                          console.log('❌ [DEBUG] Failed to get chart ID:', error);
+                          // Navigate without chart ID as fallback
+                          navigation.navigate('BirthForm', { updateGender: true });
+                        }
+                      }
+                    }
+                  ]
+                );
+                return;
+              } else if (parsed.status === 'chunk') {
+                fullContent += parsed.response || '';
+              } else if (parsed.status === 'complete') {
+                
+                // Handle nested response structure
+                let analysisData = null;
+                
+                // Try direct analysis key
+                if (parsed.data && parsed.data.analysis) {
+                  analysisData = parsed.data.analysis;
+                }
+                
+                if (analysisData) {
+                  
+                  // Ensure terms and glossary are merged into the final object
+                  const finalResult = {
+                    ...analysisData,
+                    // Safely extract terms/glossary from wherever they might be hiding
+                    terms: analysisData.terms || parsed.data[`${analysisType}_analysis`]?.terms || parsed.data.terms || [],
+                    glossary: analysisData.glossary || parsed.data[`${analysisType}_analysis`]?.glossary || parsed.data.glossary || {}
+                  };
+
+                  setAnalysisResult(finalResult);
+                  await saveAnalysis(finalResult);
+                  if (!parsed.cached) {
+                    fetchBalance();
+                  }
+                  return;
+                } else {
+                  fullContent = parsed.response || '';
+                }
+                break;
+              } else if (parsed.content) {
+                fullContent += parsed.content;
+              }
+            } catch (parseError) {
+              console.error('❌ Parse error:', parseError.message);
+              console.error('❌ Failed data (first 200 chars):', data.substring(0, 200));
+              console.error('❌ Failed data (last 200 chars):', data.substring(data.length - 200));
+            }
+          }
+        }
+      }
+
+      if (fullContent && typeof fullContent === 'string' && fullContent.trim()) {
+        try {
+          let cleanContent = fullContent.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+          
+          // Remove markdown code blocks more thoroughly
+          cleanContent = cleanContent.replace(/```json\s*/gi, '').replace(/```\s*$/gm, '').replace(/^```\s*/gm, '').replace(/```$/gm, '');
+          
+          // Try to extract JSON from the content
+          const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const analysisData = JSON.parse(jsonMatch[0]);
+            setAnalysisResult(analysisData);
+            await saveAnalysis(analysisData);
+            fetchBalance();
+            return;
+          }
+          
+          // If no JSON found, try parsing the entire cleaned content
+          try {
+            const analysisData = JSON.parse(cleanContent.trim());
+            // Ensure terms and glossary are included
+            const enrichedData = {
+              ...analysisData,
+              terms: analysisData.terms || [],
+              glossary: analysisData.glossary || {}
+            };
+            setAnalysisResult(enrichedData);
+            await saveAnalysis(enrichedData);
+            fetchBalance();
+            return;
+          } catch (directParseError) {
+            // If direct parsing fails, create a simple structure
+            const htmlContent = cleanContent.replace(/<[^>]*>/g, '').trim();
+            const simpleResult = {
+              quick_answer: htmlContent.substring(0, 500) + (htmlContent.length > 500 ? '...' : ''),
+              detailed_analysis: [{
+                question: `${analysisType.charAt(0).toUpperCase() + analysisType.slice(1)} Analysis`,
+                answer: htmlContent
+              }],
+              terms: [],
+              glossary: {}
+            };
+            setAnalysisResult(simpleResult);
+            await saveAnalysis(simpleResult);
+            fetchBalance();
+          }
+        } catch (jsonError) {
+          console.error('❌ JSON parsing failed:', jsonError);
+          throw new Error('Failed to parse analysis results');
+        }
+      } else {
+        throw new Error('Empty response received');
+      }
+
+    } catch (error) {
+
+      let errorMessage = 'Analysis failed. Please try again.';
+      
+      if (error.message?.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message?.includes('storage')) {
+        errorMessage = 'Storage error. Please restart the app.';
+      } else if (error.message?.includes('Empty response')) {
+        errorMessage = 'Server returned empty response. Please try again.';
+      } else if (error.message?.includes('Analysis failed: 404')) {
+        errorMessage = 'Analysis service not found. Please contact support.';
+      } else if (error.message?.includes('Analysis failed: 500')) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
+      setLoadingMessage('');
+      clearInterval(messageInterval);
+      // Stop animations
+      rotateAnim.stopAnimation();
+      pulseAnim.stopAnimation();
+      glowAnim.stopAnimation();
+    }
+  };
+
+  const toggleExpanded = (index) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const formatTextWithBold = (text, isFinalThoughts = false, terms = null, glossary = null) => {
+    if (!text) return null;
+    
+    // 1. Clean HTML entities and common tags
+    let processedText = text
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;/g, "'")
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?p>/gi, '')
+      .replace(/<li>/gi, '• ')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<\/?ul>/gi, '\n')
+      .replace(/<\/?strong>/gi, '**');
+    
+    // 2. Step One: Convert <term> tags to unique internal markers
+    if (terms && glossary) {
+      processedText = processedText.replace(/<term id="([^"]+)">([^<]+)<\/term>/g, (match, termId, termText) => {
+        if (glossary[termId]) {
+          // Use a delimiter that won't conflict with standard regex characters
+          return `###TERM_START###${termId}###TERM_MID###${termText}###TERM_END###`;
+        }
+        return termText;
+      });
+    }
+
+    // 3. Process Paragraphs
+    const paragraphs = processedText.split('\n\n');
+    
+    return paragraphs.map((paragraph, pIndex) => {
+      let cleanPara = paragraph.trim();
+      if (!cleanPara) return null;
+
+      // 4. Step Two: Refined Regex to handle underscores safely
+      // We use [^#]+ to capture everything except our delimiter
+      cleanPara = cleanPara.replace(/###TERM_START###([^#]+)###TERM_MID###([^#]+)###TERM_END###/g, (match, termId, termText) => {
+        return `__CLICKABLE_TERM__${termId}__TEXT__${termText}__END__`;
+      });
+
+      const parts = [];
+      let currentIndex = 0;
+
+      // 5. Final Regex for Rendering - Fixed to handle underscores in term IDs
+      const termRegex = /__CLICKABLE_TERM__(.*?)__TEXT__(.*?)__END__/g;
+      const boldRegex = /\*\*(.*?)\*\*/gs;
+      const allMatches = [];
+
+      let match;
+      while ((match = termRegex.exec(cleanPara)) !== null) {
+        allMatches.push({ type: 'term', start: match.index, end: termRegex.lastIndex, termId: match[1], text: match[2] });
+      }
+      
+      while ((match = boldRegex.exec(cleanPara)) !== null) {
+        // Avoid overlap with terms
+        if (!allMatches.some(t => match.index >= t.start && match.index < t.end)) {
+          allMatches.push({ type: 'bold', start: match.index, end: boldRegex.lastIndex, text: match[1] });
+        }
+      }
+
+      allMatches.sort((a, b) => a.start - b.start);
+
+      // 6. Assembly (colors from theme)
+      const bodyColor = colors.text;
+      const termColor = colors.accent;
+      const finalBoldColor = isDark ? '#1a0033' : colors.text;
+      allMatches.forEach((m, i) => {
+        if (m.start > currentIndex) {
+          parts.push(<Text key={`text-${i}`} style={{ color: bodyColor }}>{cleanPara.substring(currentIndex, m.start)}</Text>);
+        }
+        if (m.type === 'term') {
+          parts.push(
+            <Text 
+              key={`term-${i}`} 
+              style={{ color: isFinalThoughts ? finalBoldColor : termColor, textDecorationLine: 'underline', fontWeight: '700' }}
+              onPress={() => setTooltipModal({ show: true, term: m.text, definition: glossary[m.termId] })}
+            >
+              {m.text}
+            </Text>
+          );
+        } else {
+          parts.push(<Text key={`bold-${i}`} style={{ fontWeight: 'bold', color: isFinalThoughts ? finalBoldColor : termColor }}>{m.text}</Text>);
+        }
+        currentIndex = m.end;
+      });
+
+      if (currentIndex < cleanPara.length) {
+        parts.push(<Text key="tail" style={{ color: bodyColor }}>{cleanPara.substring(currentIndex)}</Text>);
+      }
+
+      return <Text key={pIndex} style={{marginBottom: 10}}>{parts}</Text>;
+    });
+  };
+
+  const loadStoredAnalysis = async () => {
+    try {
+      if (!birthData?.name) {
+        return;
+      }
+      const idKey = birthData?.id != null ? `analysis_${analysisType}_id_${birthData.id}` : null;
+      const legacyKey = `analysis_${analysisType}_${birthData.name}`;
+
+      // Prefer id-based key (stable per chart), but migrate legacy name-based key if found.
+      let stored = null;
+      if (idKey) {
+        stored = await AsyncStorage.getItem(idKey);
+      }
+      if (!stored) {
+        stored = await AsyncStorage.getItem(legacyKey);
+        if (stored && idKey) {
+          // Migrate legacy cache to id-based key for future lookups.
+          await AsyncStorage.setItem(idKey, stored);
+        }
+      }
+
+      if (stored) {
+        const parsedData = JSON.parse(stored);
+        setAnalysisResult(parsedData);
+      } else {
+      }
+    } catch (error) {
+
+    }
+  };
+
+  const saveAnalysis = async (data) => {
+    try {
+      if (!birthData?.name) {
+        return;
+      }
+      const key =
+        birthData?.id != null
+          ? `analysis_${analysisType}_id_${birthData.id}`
+          : `analysis_${analysisType}_${birthData.name}`;
+
+      await AsyncStorage.setItem(key, JSON.stringify(data));
+      
+      // Verify save (best-effort; no UX impact)
+      const saved = await AsyncStorage.getItem(key);
+      if (saved) {
+      } else {
+
+      }
+    } catch (error) {
+
+    }
+  };
+
+  const regenerateAnalysis = () => {
+    setShowRegenerateModal(true);
+  };
+
+  const confirmRegenerate = async () => {
+    setShowRegenerateModal(false);
+    
+    // Track regeneration
+    trackAstrologyEvent.analysisRequested(`${analysisType}_regenerate`);
+    
+    // Clear cached analysis
+    try {
+      if (birthData?.name) {
+        const idKey = birthData?.id != null ? `analysis_${analysisType}_id_${birthData.id}` : null;
+        const legacyKey = `analysis_${analysisType}_${birthData.name}`;
+        if (idKey) {
+          await AsyncStorage.removeItem(idKey);
+        }
+        await AsyncStorage.removeItem(legacyKey);
+      }
+    } catch (error) {
+      console.error('❌ Failed to clear cache:', error);
+    }
+    
+    setAnalysisResult(null);
+    // Use setTimeout to ensure state updates before calling
+    setTimeout(() => {
+      startAnalysis(true);
+    }, 100);
+  };
+
+  const downloadPDF = async () => {
+    try {
+      Alert.alert(
+        'Download PDF',
+        `Generate ${title} report for ${birthData.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Generate', onPress: generatePDF }
+        ]
+      );
+    } catch (error) {
+
+      Alert.alert('Error', 'Failed to download PDF. Please try again.');
+    }
+  };
+
+  const generatePDF = async () => {
+    try {
+      // Track PDF generation
+      trackAstrologyEvent.pdfGenerated(analysisType);
+      
+      const htmlContent = `
+        <html>
+          <head>
+            <style>
+              body { font-family: 'Arial', sans-serif; margin: 40px; color: #333; line-height: 1.6; }
+              .header { text-align: center; margin-bottom: 40px; border-bottom: 3px solid #ff6b35; padding-bottom: 20px; }
+              .title { font-size: 28px; font-weight: bold; color: #4a2c6d; margin-bottom: 10px; }
+              .subtitle { font-size: 16px; color: #666; margin: 5px 0; }
+              .section { margin-bottom: 30px; }
+              .section-title { font-size: 20px; font-weight: bold; color: #ff6b35; margin-bottom: 15px; border-left: 4px solid #ff6b35; padding-left: 15px; }
+              .quick-answer { background: linear-gradient(135deg, #f8f9fa, #e9ecef); padding: 20px; border-radius: 10px; border-left: 5px solid #4a2c6d; }
+              .question { font-weight: bold; font-size: 16px; color: #4a2c6d; margin: 20px 0 10px 0; }
+              .answer { margin-bottom: 15px; text-align: justify; }
+              .key-points { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; }
+              .key-point { margin: 8px 0; padding-left: 20px; position: relative; }
+              .key-point:before { content: '•'; color: #ff6b35; font-weight: bold; position: absolute; left: 0; }
+              .final-thoughts { background: linear-gradient(135deg, #fff3e0, #ffe0b2); padding: 20px; border-radius: 10px; border: 2px solid #ff6b35; }
+              .bold { font-weight: bold; color: #4a2c6d; }
+              .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">${title} Analysis</div>
+              <div class="subtitle">Personalized Report for ${birthData.name}</div>
+              <div class="subtitle">Generated on ${new Date().toLocaleDateString()}</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">✨ Quick Insights</div>
+              <div class="quick-answer">${analysisResult.quick_answer?.replace(/<[^>]*>/g, '').replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>') || 'No quick answer available'}</div>
+            </div>
+            
+            ${analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) ? `
+              <div class="section">
+                <div class="section-title">📊 Detailed Analysis</div>
+                ${analysisResult.detailed_analysis.map(item => `
+                  <div class="question">${item.question}</div>
+                  <div class="answer">${item.answer?.replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>') || ''}</div>
+                  ${item.key_points ? `
+                    <div class="key-points">
+                      <strong>Key Points:</strong>
+                      ${item.key_points.map(point => `<div class="key-point">${point}</div>`).join('')}
+                    </div>
+                  ` : ''}
+                `).join('')}
+              </div>
+            ` : ''}
+            
+            ${analysisResult.final_thoughts ? `
+              <div class="section">
+                <div class="section-title">🌟 Final Thoughts</div>
+                <div class="final-thoughts">${analysisResult.final_thoughts.replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>')}</div>
+              </div>
+            ` : ''}
+            
+            <div class="footer">
+              This analysis is based on Vedic astrology principles and is for guidance purposes.
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+
+      Alert.alert('Error', 'Failed to generate PDF. Please try again.');
+    }
+  };
+
+  const getAnalysisIcon = () => {
+    switch (analysisType) {
+      case 'career': return '💼';
+      case 'wealth': return '💰';
+      case 'health': return '🏥';
+      case 'marriage': return '💕';
+      case 'education': return '🎓';
+      case 'progeny': return '👶';
+      default: return '🔮';
+    }
+  };
+
+  const getAnalysisGradient = () => {
+    switch (analysisType) {
+      case 'career': return ['#6366F1', '#8B5CF6'];
+      case 'wealth': return ['#FFD700', '#FF8C00'];
+      case 'health': return ['#32CD32', '#228B22'];
+      case 'marriage': return ['#FF69B4', '#DC143C'];
+      case 'education': return ['#4169E1', '#1E90FF'];
+      case 'progeny': return ['#FF69B4', '#FFB6C1'];
+      default: return ['#ff6b35', '#ff8c5a'];
+    }
+  };
+
+  const screenGradientColors = isDark
+    ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary]
+    : [colors.background, colors.backgroundSecondary, colors.backgroundTertiary, colors.primary];
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+              onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <View style={styles.headerTitleContainer}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
+              {birthData?.name && (
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>for {birthData.name.length > 15 ? birthData.name.substring(0, 15) + '...' : birthData.name}</Text>
+              )}
+            </View>
+            <View style={styles.headerRight}>
+              {analysisResult && (
+                <TouchableOpacity 
+                  style={[styles.regenerateButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+                  onPress={regenerateAnalysis}
+                >
+                  <Ionicons name="refresh" size={20} color={colors.text} />
+                </TouchableOpacity>
+              )}
+              {analysisResult && (
+                <TouchableOpacity 
+                  style={[styles.pdfButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+                  onPress={downloadPDF}
+                >
+                  <Ionicons name="download" size={20} color={colors.text} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={styles.creditButton}
+                onPress={() => navigation.navigate('Credits')}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.secondary]}
+                  style={styles.creditGradient}
+                >
+                  <Text style={[styles.creditText, { color: '#fff' }]}>💳 {credits}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+            {!analysisResult ? (
+              <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                <View style={styles.previewSection}>
+                  <View style={styles.analysisIcon}>
+                    <LinearGradient
+                      colors={getAnalysisGradient()}
+                      style={styles.iconGradient}
+                    >
+                      <Text style={styles.iconText}>{getAnalysisIcon()}</Text>
+                    </LinearGradient>
+                  </View>
+                  <Text style={[styles.analysisTitle, { color: colors.text }]}>{title}</Text>
+                  <Text style={[styles.analysisDescription, { color: colors.textSecondary }]}>
+                    Get comprehensive insights into your {analysisType} prospects with detailed astrological analysis
+                  </Text>
+                </View>
+
+                {/* Progeny Focus Selector - only show when no existing analysis */}
+                {analysisType === 'progeny' && !analysisResult && (
+                  <View style={styles.focusSection}>
+                    <Text style={[styles.focusTitle, { color: colors.text }]}>What is your primary focus today?</Text>
+                    
+                    <TouchableOpacity
+                      style={[styles.focusOption, analysisFocus === 'first_child' && styles.focusOptionSelected]}
+                      onPress={() => {
+                        if (!loading) {
+                          setAnalysisFocus('first_child');
+                          setChildrenCount(0);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <LinearGradient
+                        colors={analysisFocus === 'first_child' ? ['#FF69B4', '#FFB6C1'] : (isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground])}
+                        style={[styles.focusOptionGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                      >
+                        <Text style={styles.focusIcon}>👶</Text>
+                        <View style={styles.focusTextContainer}>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Planning First Child</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Fertility & Timing</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.focusOption, analysisFocus === 'next_child' && styles.focusOptionSelected]}
+                      onPress={() => {
+                        if (!loading) {
+                          setAnalysisFocus('next_child');
+                          if (childrenCount === 0) setChildrenCount(1);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <LinearGradient
+                        colors={analysisFocus === 'next_child' ? ['#FF69B4', '#FFB6C1'] : (isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground])}
+                        style={[styles.focusOptionGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                      >
+                        <Text style={styles.focusIcon}>👨‍👩‍👧</Text>
+                        <View style={styles.focusTextContainer}>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Have Children, Planning More</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Sibling Timing & Fertility</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.focusOption, analysisFocus === 'parenting' && styles.focusOptionSelected]}
+                      onPress={() => {
+                        if (!loading) {
+                          setAnalysisFocus('parenting');
+                          if (childrenCount === 0) setChildrenCount(1);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      <LinearGradient
+                        colors={analysisFocus === 'parenting' ? ['#FF69B4', '#FFB6C1'] : (isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground])}
+                        style={[styles.focusOptionGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                      >
+                        <Text style={styles.focusIcon}>🧘</Text>
+                        <View style={styles.focusTextContainer}>
+                          <Text style={[styles.focusOptionTitle, { color: colors.text }]}>Parenting & Well-being</Text>
+                          <Text style={[styles.focusOptionSubtitle, { color: colors.textSecondary }]}>Relationship with existing children</Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
+                      <View style={[styles.childrenCountSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.surface, borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}>
+                        <Text style={[styles.childrenCountTitle, { color: colors.text }]}>Number of children you have:</Text>
+                        <View style={styles.childrenCountButtons}>
+                          {[1, 2, 3, 4, 5].map(count => (
+                            <TouchableOpacity
+                              key={count}
+                              style={[styles.countButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBackground, borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }, childrenCount === count && styles.countButtonSelected]}
+                              onPress={() => !loading && setChildrenCount(count)}
+                              disabled={loading}
+                            >
+                              <Text style={[styles.countButtonText, { color: colors.textSecondary }, childrenCount === count && styles.countButtonTextSelected]}>
+                                {count}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {loading ? (
+                  <View style={styles.loadingSection}>
+                    <Animated.View style={[styles.cosmicLoadingOrb, {
+                      transform: [{ rotate: rotateAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg']
+                      }) }]
+                    }]}>
+                      <LinearGradient
+                        colors={['#ff6b35', '#ffd700', '#ff6b35']}
+                        style={styles.loadingOrbGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                      >
+                        <Animated.Text style={[styles.loadingOrbIcon, {
+                          transform: [{ scale: pulseAnim }]
+                        }]}>☸️</Animated.Text>
+                      </LinearGradient>
+                    </Animated.View>
+                    <Animated.View style={[styles.loadingGlow, {
+                      opacity: glowAnim,
+                      transform: [{ scale: glowAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1.2]
+                      }) }]
+                    }]} />
+                    <Text style={[styles.loadingTitle, { color: colors.text }]}>Analyzing Your Cosmic Blueprint</Text>
+                    <Text style={[styles.loadingMessage, { color: colors.textSecondary }]}>{loadingMessage}</Text>
+                    <View style={styles.loadingDots}>
+                      <Animated.View style={[styles.dot, { backgroundColor: colors.accent, opacity: pulseAnim }]} />
+                      <Animated.View style={[styles.dot, { backgroundColor: colors.accent, opacity: pulseAnim.interpolate({
+                        inputRange: [0.8, 1, 1.2],
+                        outputRange: [0.3, 1, 0.3]
+                      }) }]} />
+                      <Animated.View style={[styles.dot, { backgroundColor: colors.accent, opacity: pulseAnim.interpolate({
+                        inputRange: [0.6, 1, 1.4],
+                        outputRange: [0.3, 1, 0.3]
+                      }) }]} />
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.startButton}
+                    onPress={startAnalysis}
+                    disabled={loading || credits < cost}
+                  >
+                    <LinearGradient
+                      colors={getAnalysisGradient()}
+                      style={styles.startGradient}
+                    >
+                      <Text style={[styles.startButtonText, { color: '#fff' }]}>
+                        Start Analysis ({cost} credits)
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+
+                {credits < cost && (
+                  <TouchableOpacity 
+                    style={[styles.lowCreditBanner, { backgroundColor: isDark ? 'rgba(255, 107, 53, 0.2)' : colors.surface, borderColor: isDark ? 'rgba(255, 107, 53, 0.3)' : colors.cardBorder }]}
+                    onPress={() => navigation.navigate('Credits')}
+                  >
+                    <Text style={[styles.lowCreditText, { color: colors.text }]}>💳 Get more credits to continue</Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            ) : (
+              <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                <View style={styles.quickAnswerSection}>
+                  <LinearGradient
+                    colors={isDark ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                    style={[styles.quickAnswerCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                  >
+                    <Text style={[styles.quickAnswerTitle, { color: colors.text }]}>✨ Quick Insights</Text>
+                    <Text style={[styles.quickAnswerText, { color: colors.textSecondary }]}>{formatTextWithBold(analysisResult.quick_answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                  </LinearGradient>
+                </View>
+
+                {analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) && (
+                  <View style={styles.detailedSection}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>📋 Detailed Analysis</Text>
+                    {analysisResult.detailed_analysis.map((item, index) => (
+                      <View key={index} style={styles.analysisItem}>
+                        <TouchableOpacity
+                          style={styles.analysisHeader}
+                          onPress={() => toggleExpanded(index)}
+                        >
+                          <LinearGradient
+                            colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                            style={[styles.analysisHeaderGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                          >
+                            <Text style={[styles.questionText, { color: colors.text }]}>{item.question}</Text>
+                            <Ionicons 
+                              name={expandedItems[index] ? "chevron-up" : "chevron-down"} 
+                              size={20} 
+                              color={colors.textSecondary} 
+                            />
+                          </LinearGradient>
+                        </TouchableOpacity>
+                        
+                        {expandedItems[index] && (
+                          <View style={[styles.answerSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.cardBackground }]}>
+                            <Text style={[styles.answerText, { color: colors.textSecondary }]}>{formatTextWithBold(item.answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                            {item.key_points && item.key_points.length > 0 && (
+                              <View style={styles.keyPointsSection}>
+                                <Text style={[styles.keyPointsTitle, { color: colors.text }]}>Key Points:</Text>
+                                {item.key_points.map((point, pointIndex) => (
+                                  <Text key={pointIndex} style={[styles.keyPoint, { color: colors.textSecondary }]}>• {formatTextWithBold(point, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                                ))}
+                              </View>
+                            )}
+                            {item.astrological_basis && (
+                              <View style={styles.basisSection}>
+                                <Text style={[styles.basisTitle, { color: colors.text }]}>Astrological Basis:</Text>
+                                <Text style={[styles.basisText, { color: colors.textTertiary }]}>{formatTextWithBold(item.astrological_basis, false, analysisResult.terms, analysisResult.glossary)}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {analysisResult.final_thoughts && (
+                  <View style={styles.finalSection}>
+                    <LinearGradient
+                      colors={getAnalysisGradient()}
+                      style={[styles.finalCard, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : colors.cardBorder }]}
+                    >
+                      <Text style={[styles.finalTitle, { color: colors.text }]}>🌟 Final Thoughts</Text>
+                      <View style={styles.finalTextContainer}>
+                        {formatTextWithBold(analysisResult.final_thoughts, true, analysisResult.terms, analysisResult.glossary)}
+                      </View>
+                    </LinearGradient>
+                  </View>
+                )}
+
+                {analysisResult.follow_up_questions && Array.isArray(analysisResult.follow_up_questions) && (
+                  <View style={styles.followUpSection}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>💭 Explore Further</Text>
+                    {analysisResult.follow_up_questions.map((question, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.followUpButton}
+                        onPress={() => navigation.navigate('Home')}
+                      >
+                        <LinearGradient
+                          colors={isDark ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'] : [colors.surface, colors.cardBackground]}
+                          style={[styles.followUpGradient, { borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.cardBorder }]}
+                        >
+                          <Text style={[styles.followUpText, { color: colors.text }]}>{question}</Text>
+                          <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </Animated.View>
+
+          {/* Regenerate Modal */}
+          {showRegenerateModal && (
+            <View style={styles.modalOverlay}>
+              <ScrollView contentContainerStyle={styles.modalScrollContainer}>
+                <View style={styles.modalContainer}>
+                  <LinearGradient
+                    colors={isDark ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)'] : [colors.cardBackground, colors.backgroundSecondary]}
+                    style={styles.modalContent}
+                  >
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>🔄 Regenerate Analysis</Text>
+                    <Text style={[styles.modalText, { color: colors.textSecondary }]}>
+                      This will create a fresh {title.toLowerCase()} analysis with new insights.
+                    </Text>
+                    
+                    {/* Progeny Focus Selector in Modal */}
+                    {analysisType === 'progeny' && (
+                      <View style={styles.modalFocusSection}>
+                        <Text style={[styles.modalFocusTitle, { color: colors.text }]}>Update your focus:</Text>
+                        
+                        <TouchableOpacity
+                          style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'first_child' && styles.modalFocusOptionSelected]}
+                          onPress={() => {
+                            setAnalysisFocus('first_child');
+                            setChildrenCount(0);
+                          }}
+                        >
+                          <Text style={styles.modalFocusIcon}>👶</Text>
+                          <View style={styles.modalFocusTextContainer}>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Planning First Child</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Fertility & Timing</Text>
+                          </View>
+                          {analysisFocus === 'first_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'next_child' && styles.modalFocusOptionSelected]}
+                          onPress={() => setAnalysisFocus('next_child')}
+                        >
+                          <Text style={styles.modalFocusIcon}>👨‍👩‍👧</Text>
+                          <View style={styles.modalFocusTextContainer}>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Have Children, Planning More</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Sibling Timing & Fertility</Text>
+                          </View>
+                          {analysisFocus === 'next_child' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.modalFocusOption, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, analysisFocus === 'parenting' && styles.modalFocusOptionSelected]}
+                          onPress={() => setAnalysisFocus('parenting')}
+                        >
+                          <Text style={styles.modalFocusIcon}>🧘</Text>
+                          <View style={styles.modalFocusTextContainer}>
+                            <Text style={[styles.modalFocusOptionTitle, { color: colors.text }]}>Parenting & Well-being</Text>
+                            <Text style={[styles.modalFocusOptionSubtitle, { color: colors.textSecondary }]}>Relationship with existing children</Text>
+                          </View>
+                          {analysisFocus === 'parenting' && <Ionicons name="checkmark-circle" size={20} color="#FF69B4" />}
+                        </TouchableOpacity>
+
+                        {(analysisFocus === 'next_child' || analysisFocus === 'parenting') && (
+                          <View style={[styles.modalChildrenCountSection, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.surface }]}>
+                            <Text style={[styles.modalChildrenCountTitle, { color: colors.text }]}>Number of children you have:</Text>
+                            <View style={styles.modalChildrenCountButtons}>
+                              {[1, 2, 3, 4, 5].map(count => (
+                                <TouchableOpacity
+                                  key={count}
+                                  style={[styles.modalCountButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, childrenCount === count && styles.modalCountButtonSelected]}
+                                  onPress={() => setChildrenCount(count)}
+                                >
+                                  <Text style={[styles.modalCountButtonText, { color: colors.textSecondary }, childrenCount === count && styles.modalCountButtonTextSelected]}>
+                                    {count}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    
+                    <View style={[styles.modalCreditInfo, { backgroundColor: colors.surface }]}>
+                      <Text style={[styles.modalCreditText, { color: colors.text }]}>💳 Credits to be charged: {cost}</Text>
+                      <Text style={[styles.modalBalanceText, { color: colors.textSecondary }]}>Current balance: {credits}</Text>
+                    </View>
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        style={[styles.modalCancelButton, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : colors.surface }]}
+                        onPress={() => setShowRegenerateModal(false)}
+                      >
+                        <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.modalConfirmButton}
+                        onPress={confirmRegenerate}
+                      >
+                        <LinearGradient
+                          colors={getAnalysisGradient()}
+                          style={styles.modalConfirmGradient}
+                        >
+                          <Text style={[styles.modalConfirmText, { color: '#fff' }]}>Regenerate</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </LinearGradient>
+                </View>
+              </ScrollView>
+            </View>
+          )}
+        </SafeAreaView>
+      </LinearGradient>
+      
+      {/* Tooltip Modal */}
+      {tooltipModal.show && (
+        <View style={styles.tooltipModalOverlay}>
+          <View style={styles.tooltipModalContainer}>
+            <LinearGradient
+              colors={isDark ? ['rgba(26, 0, 51, 0.95)', 'rgba(77, 44, 109, 0.95)'] : [colors.cardBackground, colors.backgroundSecondary]}
+              style={styles.tooltipModalContent}
+            >
+              <Text style={[styles.tooltipModalTitle, { color: colors.accent }]}>{tooltipModal.term}</Text>
+              <Text style={[styles.tooltipModalText, { color: colors.textSecondary }]}>{tooltipModal.definition}</Text>
+              <TouchableOpacity
+                style={styles.tooltipModalButton}
+                onPress={() => setTooltipModal({ show: false, term: '', definition: '' })}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.secondary]}
+                  style={styles.tooltipModalButtonGradient}
+                >
+                  <Text style={styles.tooltipModalButtonText}>Close</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  gradientBg: { flex: 1 },
+  safeArea: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  creditButton: { borderRadius: 16, overflow: 'hidden' },
+  creditGradient: { paddingHorizontal: 10, paddingVertical: 6 },
+  creditText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+  content: { flex: 1 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 30 },
+  previewSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  analysisIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 20,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  iconText: { fontSize: 40 },
+  analysisTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  analysisDescription: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  startButton: {
+    marginHorizontal: 20,
+    marginVertical: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  startGradient: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 8,
+    textAlign: 'center',
+    flex: 1,
+  },
+  loadingSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    position: 'relative',
+  },
+  cosmicLoadingOrb: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 30,
+    shadowColor: '#ff6b35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  loadingOrbGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  loadingOrbIcon: {
+    fontSize: 50,
+  },
+  loadingGlow: {
+    position: 'absolute',
+    top: 20,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 107, 53, 0.3)',
+    zIndex: -1,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loadingMessage: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  loadingDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffd700',
+  },
+  lowCreditBanner: {
+    marginHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 107, 53, 0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+  },
+  lowCreditText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  quickAnswerSection: { paddingHorizontal: 20, paddingVertical: 20 },
+  quickAnswerCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  quickAnswerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
+  quickAnswerText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 22,
+  },
+  detailedSection: { paddingHorizontal: 20 },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  analysisItem: { marginBottom: 12, borderRadius: 12, overflow: 'hidden' },
+  analysisHeader: { borderRadius: 12, overflow: 'hidden' },
+  analysisHeaderGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  questionText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginRight: 12,
+  },
+  answerSection: { backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: 16 },
+  answerText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  keyPointsSection: { marginBottom: 12 },
+  keyPointsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  keyPoint: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  basisSection: { marginTop: 8 },
+  basisTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  basisText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  finalSection: { paddingHorizontal: 20, paddingVertical: 20 },
+  finalCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  finalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+  },
+  finalText: { fontSize: 15, color: '#333', lineHeight: 22 },
+  finalTextContainer: {
+    color: '#333',
+  },
+  followUpSection: { paddingHorizontal: 20, paddingBottom: 20 },
+  followUpButton: { marginBottom: 8, borderRadius: 12, overflow: 'hidden' },
+  followUpGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  followUpText: {
+    flex: 1,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginRight: 12,
+  },
+  boldYellowText: {
+    fontWeight: 'bold',
+    color: '#FFD700',
+  },
+  boldDarkText: {
+    fontWeight: 'bold',
+    color: '#1a0033',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  regenerateButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdfButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  modalCreditInfo: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    width: '100%',
+  },
+  modalCreditText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalBalanceText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalCancelButton: {
+    flex: 0.8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalCancelText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  modalConfirmButton: {
+    flex: 1.2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  modalConfirmGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  modalConfirmText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    numberOfLines: 1,
+  },
+  
+  // Progeny Focus Selector Styles
+  focusSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  focusTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  focusOption: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  focusOptionSelected: {
+    shadowColor: '#FF69B4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  focusOptionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  focusIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  focusTextContainer: {
+    flex: 1,
+  },
+  focusOptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  focusOptionSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  childrenCountSection: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  childrenCountTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  childrenCountButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  countButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  countButtonSelected: {
+    backgroundColor: '#FF69B4',
+    borderColor: '#FFB6C1',
+  },
+  countButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  countButtonTextSelected: {
+    color: '#ffffff',
+  },
+  
+  // Modal Focus Selector Styles
+  modalScrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  modalFocusSection: {
+    marginVertical: 20,
+    width: '100%',
+  },
+  modalFocusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalFocusOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalFocusOptionSelected: {
+    backgroundColor: 'rgba(255, 105, 180, 0.2)',
+    borderColor: '#FF69B4',
+  },
+  modalFocusIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  modalFocusTextContainer: {
+    flex: 1,
+  },
+  modalFocusOptionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  modalFocusOptionSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  modalChildrenCountSection: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+  },
+  modalChildrenCountTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalChildrenCountButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  modalCountButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  modalCountButtonSelected: {
+    backgroundColor: '#FF69B4',
+    borderColor: '#FFB6C1',
+  },
+  modalCountButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  modalCountButtonTextSelected: {
+    color: '#ffffff',
+  },
+  
+  // Tooltip Modal Styles
+  tooltipModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  tooltipModalContainer: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    maxWidth: 350,
+  },
+  tooltipModalContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  tooltipModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFD700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  tooltipModalText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  tooltipModalButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  tooltipModalButtonGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  tooltipModalButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+});

@@ -1,0 +1,543 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Share,
+  StatusBar,
+  Animated,
+  Dimensions,
+  Platform,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from '@expo/vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MessageBubble from './MessageBubble';
+import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
+
+const { width } = Dimensions.get('window');
+
+export default function ChatViewScreen({ route, navigation }) {
+  const { theme, colors, getCardElevation } = useTheme();
+  const { session } = route.params;
+  const [messages, setMessages] = useState(session.messages || []);
+  
+  const handleDeleteMessage = (messageId) => {
+    setMessages(prev => prev.filter(msg => msg.messageId !== messageId));
+  };
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('📅 TIMESTAMP DEBUG:');
+    console.log('Session created_at:', session.created_at);
+    console.log('Session created_at type:', typeof session.created_at);
+    
+    const firstMsg = messages.find(m => m.sender === 'user');
+    if (firstMsg) {
+      console.log('First user message timestamp:', firstMsg.timestamp);
+      console.log('First user message timestamp type:', typeof firstMsg.timestamp);
+      
+      const date = new Date(firstMsg.timestamp);
+      console.log('Parsed Date object:', date);
+      console.log('Date.toString():', date.toString());
+      console.log('Date.toISOString():', date.toISOString());
+      console.log('Date.toLocaleString():', date.toLocaleString());
+      console.log('Date.toLocaleTimeString():', date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
+      console.log('Device timezone offset (minutes):', new Date().getTimezoneOffset());
+    }
+    
+    console.log('All messages:', JSON.stringify(messages, null, 2));
+  }, []);
+  
+  // Count conversation pairs (question + answer = 1 conversation)
+  const conversationCount = Math.floor(messages.filter(m => m.sender === 'user').length);
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const starAnims = useRef([...Array(15)].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    starAnims.forEach((anim, index) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 150),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    });
+  }, []);
+
+  const getRelativeTime = (date) => {
+    const now = new Date();
+    const then = new Date(date);
+    const diffMs = now - then;
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return then.toLocaleDateString();
+  };
+
+  const shareChat = async () => {
+    try {
+      if (!Array.isArray(messages) || messages.length === 0) {
+        Alert.alert('No Messages', 'There are no messages to share.');
+        return;
+      }
+      
+      const chatText = messages
+        .map(msg => `${msg.role === 'user' ? 'You' : 'AstroRoshni'}: ${msg.content}`)
+        .join('\n\n');
+      
+      await Share.share({
+        message: `🔮 AstroRoshni Chat - ${new Date(session.created_at || Date.now()).toLocaleDateString()}\n\n${chatText}\n\nShared from AstroRoshni App`,
+      });
+    } catch (error) {
+
+    }
+  };
+
+  const continueConversation = () => {
+    navigation.navigate('Home');
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} translucent={false} />
+      <LinearGradient colors={theme === 'dark' ? [colors.gradientStart, colors.gradientMid, colors.gradientEnd, colors.primary] : [colors.gradientStart, colors.gradientStart, colors.gradientStart, colors.gradientStart]} style={styles.gradient}>
+        
+        {/* Twinkling Stars */}
+        {starAnims.map((anim, index) => {
+          const top = Math.random() * 100;
+          const left = Math.random() * 100;
+          return (
+            <Animated.View
+              key={index}
+              style={[
+                styles.star,
+                {
+                  top: `${top}%`,
+                  left: `${left}%`,
+                  opacity: anim,
+                },
+              ]}
+            >
+              <Text style={styles.starText}>✨</Text>
+            </Animated.View>
+          );
+        })}
+
+        <SafeAreaView style={styles.safeArea}>
+          
+          {/* Header */}
+          <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Icon name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            
+            <View style={styles.headerInfo}>
+              <View style={styles.headerIconContainer}>
+                <LinearGradient
+                  colors={['#ff6b35', '#ff8c5a']}
+                  style={styles.headerIconGradient}
+                >
+                  <Text style={styles.headerIcon}>💬</Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.headerTextContainer}>
+                {session.native_name && (
+                  <Text style={[styles.nativeName, { color: colors.text }]}>{session.native_name}</Text>
+                )}
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                  {getRelativeTime(session.created_at)}
+                </Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                  {conversationCount} {conversationCount === 1 ? 'conversation' : 'conversations'}
+                </Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity style={styles.shareButton} onPress={shareChat}>
+              <Icon name="share-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Info Card */}
+          <Animated.View style={[
+            styles.infoCard,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+              elevation: getCardElevation(5),
+            }
+          ]}>
+            <LinearGradient
+              colors={theme === 'dark' ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(249, 115, 22, 0.15)', 'rgba(249, 115, 22, 0.08)']}
+              style={styles.infoGradient}
+            >
+              <View style={styles.infoItem}>
+                <Icon name="calendar-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  {(() => {
+                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const timestamp = firstMsg?.timestamp || session.created_at;
+                    // Backend sends UTC time without 'Z', so append it
+                    const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+                    return new Date(utcTimestamp).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    });
+                  })()}
+                </Text>
+              </View>
+              <View style={styles.infoDivider} />
+              <View style={styles.infoItem}>
+                <Icon name="time-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  {(() => {
+                    const firstMsg = messages.find(m => m.sender === 'user');
+                    const timestamp = firstMsg?.timestamp || session.created_at;
+                    console.log('🕐 Raw timestamp from backend:', timestamp);
+                    // Backend sends UTC time without 'Z', so append it
+                    const utcTimestamp = timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+                    console.log('🕐 Converted to UTC format:', utcTimestamp);
+                    const date = new Date(utcTimestamp);
+                    console.log('🕐 Parsed Date (local):', date.toString());
+                    const timeStr = date.toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    console.log('🕐 Final formatted time:', timeStr);
+                    return timeStr;
+                  })()}
+                </Text>
+              </View>
+              <View style={styles.infoDivider} />
+              <View style={styles.infoItem}>
+                <Icon name="chatbubbles-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>{conversationCount}</Text>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+
+          {/* Messages */}
+          <ScrollView 
+            style={styles.messagesContainer}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {Array.isArray(messages) && messages.length > 0 ? (
+              messages.map((message, index) => {
+                const MessageCard = () => {
+                  const msgAnim = useRef(new Animated.Value(0)).current;
+
+                  useEffect(() => {
+                    Animated.spring(msgAnim, {
+                      toValue: 1,
+                      delay: index * 100,
+                      tension: 50,
+                      friction: 7,
+                      useNativeDriver: true,
+                    }).start();
+                  }, []);
+
+                  return (
+                    <Animated.View
+                      style={{
+                        opacity: msgAnim,
+                        transform: [
+                          {
+                            translateY: msgAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [30, 0],
+                            }),
+                          },
+                        ],
+                      }}
+                    >
+                      <MessageBubble 
+                        message={message} 
+                        language="english"
+                        onDelete={handleDeleteMessage}
+                      />
+                    </Animated.View>
+                  );
+                };
+
+                return <MessageCard key={`${message.timestamp}_${index}`} />;
+              })
+            ) : (
+              <Animated.View style={[styles.emptyState, { opacity: fadeAnim }]}>
+                <Text style={styles.emptyIcon}>💬</Text>
+                <Text style={styles.emptyText}>No messages to display</Text>
+              </Animated.View>
+            )}
+          </ScrollView>
+
+          {/* Floating Action Buttons */}
+          <Animated.View style={[styles.floatingButtons, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <TouchableOpacity style={[styles.floatingButtonSecondary, { elevation: getCardElevation(5) }]} onPress={shareChat}>
+              <LinearGradient
+                colors={['rgba(255, 107, 53, 0.6)', 'rgba(255, 140, 90, 0.5)']}
+                style={styles.floatingButtonGradient}
+              >
+                <Icon name="share-outline" size={20} color={colors.text} />
+                <Text style={styles.floatingButtonText}>Share</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity style={[styles.floatingButtonPrimary, { elevation: getCardElevation(8) }]} onPress={continueConversation}>
+                <LinearGradient
+                  colors={['#ff6b35', '#ff8c5a']}
+                  style={styles.floatingButtonGradient}
+                >
+                  <Icon name="chatbubbles" size={20} color={colors.text} />
+                  <Text style={styles.floatingButtonTextPrimary}>Continue Chat</Text>
+                  <Icon name="arrow-forward" size={20} color={colors.text} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  safeArea: { flex: 1 },
+  star: { position: 'absolute' },
+  starText: { fontSize: 10 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+  },
+  headerIconContainer: {
+    marginRight: 12,
+  },
+  headerIconGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  headerIcon: { fontSize: 22 },
+  headerTextContainer: { flex: 1 },
+  nativeName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.white,
+    marginBottom: 2,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
+  },
+  shareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
+  },
+  infoGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+  },
+  infoDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  messagesContainer: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+  messagesContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 100,
+    flexGrow: 1,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  floatingButtons: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  floatingButtonSecondary: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
+  },
+  floatingButtonPrimary: {
+    flex: 2,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#ff6b35',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 12,
+      },
+      android: {
+        // elevation set dynamically
+      },
+    }),
+  },
+  floatingButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 8,
+  },
+  floatingButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  floatingButtonTextPrimary: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+});

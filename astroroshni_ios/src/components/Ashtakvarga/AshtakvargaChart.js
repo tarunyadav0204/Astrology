@@ -1,0 +1,108 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
+
+const AshtakvargaChart = ({ chartData, ashtakvargaData, birthAshtakvargaData, onHousePress, cosmicTheme = true }) => {
+  const { theme, colors } = useTheme();
+  
+  const getBinduColor = (bindus) => {
+    if (bindus >= 30) return '#81C784'; // Strong - Darker Green
+    if (bindus <= 25) return '#E57373'; // Weak - Darker Red
+    return '#FFB74D'; // Moderate - Darker Orange
+  };
+
+  const getSignName = (signIndex) => {
+    const signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+                  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    return signs[signIndex] || 'Unknown';
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.grid}>
+        {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
+          const ashtakvargaHouseData = ashtakvargaData?.[houseNumber.toString()];
+          const bindus = ashtakvargaHouseData?.bindus || 0;
+          const signIndex = ashtakvargaHouseData?.sign || 0;
+          const signName = getSignName(signIndex);
+          const binduColor = getBinduColor(bindus);
+          
+          // Calculate difference from birth chart if available
+          const birthBindus = birthAshtakvargaData?.[houseNumber.toString()]?.bindus || 0;
+          const difference = birthAshtakvargaData ? bindus - birthBindus : null;
+          
+          return (
+            <TouchableOpacity
+              key={houseNumber}
+              style={[styles.houseBox, { backgroundColor: binduColor, borderWidth: 1, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(249,115,22,0.3)' }]}
+              onPress={() => onHousePress?.(houseNumber, bindus, signName)}
+            >
+              <Text style={[styles.houseNumber, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{houseNumber}</Text>
+              <View style={styles.bindusRow}>
+                <Text style={[styles.bindus, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{bindus}</Text>
+                {difference !== null && difference !== 0 && (
+                  <Text style={[styles.difference, { color: theme === 'dark' ? '#FFFFFF' : '#1a1a1a' }]}>
+                    ({difference > 0 ? '+' : ''}{difference})
+                  </Text>
+                )}
+              </View>
+              <Text style={[styles.signName, { color: theme === 'dark' ? 'white' : '#1a1a1a' }]}>{signName}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 10,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  houseBox: {
+    width: '28%',
+    aspectRatio: 1,
+    margin: '2%',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  houseNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  bindusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  bindus: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginRight: 4,
+  },
+  difference: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  signName: {
+    fontSize: 10,
+    color: 'white',
+    textAlign: 'center',
+  },
+});
+
+export default AshtakvargaChart;

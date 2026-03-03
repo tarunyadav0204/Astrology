@@ -80,10 +80,11 @@ class ChartCalculator(BaseCalculator):
         # Correction = Calculated - Target = 8.4513 - 8.4519 = -0.0006
         D1_CORRECTION = -0.0006
         
-        # DON'T adjust day - let julday() handle it
-        year = int(birth_data.date.split('-')[0])
-        month = int(birth_data.date.split('-')[1])
-        day = int(birth_data.date.split('-')[2])
+        # Normalize date to YYYY-MM-DD (accept ISO datetime e.g. 2026-03-01T16:40:44.425Z from clients)
+        date_str = str(birth_data.date).split('T')[0] if birth_data.date else ''
+        year = int(date_str.split('-')[0])
+        month = int(date_str.split('-')[1])
+        day = int(date_str.split('-')[2])
         
         print(f"DEBUG: Local time: {hour}, UTC time: {utc_hour}, Timezone offset: {tz_offset}, Coordinates: ({birth_data.latitude}, {birth_data.longitude})")
         print(f"DEBUG: Using date: {year}-{month:02d}-{day:02d} with UTC hour: {utc_hour}")
