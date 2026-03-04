@@ -302,14 +302,26 @@ async def get_chat_analysis_stats(current_user: dict = Depends(require_admin)):
 
 @router.get("/admin/settings")
 async def get_all_settings(current_user: dict = Depends(require_admin)):
-    """Get all admin settings"""
+    """Get all admin settings plus Gemini model options and current model IDs."""
     try:
+        from utils.admin_settings import (
+            _ensure_admin_settings_table,
+            GEMINI_MODEL_OPTIONS,
+            get_gemini_chat_model,
+            get_gemini_premium_model,
+        )
         conn = get_db_connection()
+        _ensure_admin_settings_table(conn)
         cursor = conn.cursor()
         cursor.execute("SELECT key, value, description FROM admin_settings")
         settings = [{"key": row["key"], "value": row["value"], "description": row["description"]} for row in cursor.fetchall()]
         conn.close()
-        return {"settings": settings}
+        return {
+            "settings": settings,
+            "gemini_model_options": [{"value": v, "label": l} for v, l in GEMINI_MODEL_OPTIONS],
+            "gemini_chat_model": get_gemini_chat_model(),
+            "gemini_premium_model": get_gemini_premium_model(),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")
 
@@ -474,7 +486,9 @@ async def delete_glossary_term(
 async def update_setting(key: str, setting: AdminSetting, current_user: dict = Depends(require_admin)):
     """Update admin setting"""
     try:
+        from utils.admin_settings import _ensure_admin_settings_table
         conn = get_db_connection()
+        _ensure_admin_settings_table(conn)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT OR REPLACE INTO admin_settings (key, value, description, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",

@@ -50,48 +50,53 @@ class GeminiChatAnalyzer:
             print(f"   Image generation will be disabled")
             self.flux_service = None
         
-        # Standard models (try in order of preference)
-        model_names = [
-            'models/gemini-3-flash-preview',
-            'models/gemini-2.5-flash',
-        ]
+        from utils.admin_settings import get_gemini_chat_model, get_gemini_premium_model, GEMINI_MODEL_OPTIONS
+        
+        config_gen_config = genai.GenerationConfig(
+            temperature=0,
+            top_p=0.95,
+            top_k=40
+        )
+        self._gen_config = config_gen_config
+        self._model_cache = {}  # model_name -> GenerativeModel; resolved per request from admin settings
         self.model = None
         self.premium_model = None
         
-        # Initialize standard model
-        for model_name in model_names:
+        # Fallback models at startup (used if per-request model fails)
+        preferred_standard = get_gemini_chat_model()
+        fallback_standard = [preferred_standard] + [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != preferred_standard]
+        for model_name in fallback_standard:
             try:
-                self.model = genai.GenerativeModel(
-                    model_name,
-                    generation_config=genai.GenerationConfig(
-                        temperature=0,
-                        top_p=0.95,
-                        top_k=40
-                    )
-                )
-                print(f"✅ Initialized standard model: {model_name}")
+                self.model = genai.GenerativeModel(model_name, generation_config=config_gen_config)
+                print(f"✅ Initialized fallback standard model: {model_name}")
                 break
             except Exception as e:
                 print(f"⚠️ Model {model_name} not available: {e}")
                 continue
         
-        # Initialize premium model (Gemini 3 Flash Preview)
+        preferred_premium = get_gemini_premium_model()
         try:
-            self.premium_model = genai.GenerativeModel(
-                'models/gemini-3-flash-preview',
-                generation_config=genai.GenerationConfig(
-                    temperature=0,
-                    top_p=0.95,
-                    top_k=40
-                )
-            )
-            print(f"✅ Initialized premium model: gemini-3-flash-preview")
+            self.premium_model = genai.GenerativeModel(preferred_premium, generation_config=config_gen_config)
+            print(f"✅ Initialized fallback premium model: {preferred_premium}")
         except Exception as e:
-            print(f"⚠️ Premium model not available, using standard: {e}")
+            print(f"⚠️ Premium model {preferred_premium} not available, using standard: {e}")
             self.premium_model = self.model
         
         if not self.model:
             raise ValueError("No available Gemini model found")
+    
+    def _get_model(self, premium_analysis: bool):
+        """Resolve model from admin settings for this request (no server restart needed)."""
+        from utils.admin_settings import get_gemini_chat_model, get_gemini_premium_model
+        name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
+        if name in self._model_cache:
+            return self._model_cache[name]
+        try:
+            self._model_cache[name] = genai.GenerativeModel(name, generation_config=self._gen_config)
+            return self._model_cache[name]
+        except Exception as e:
+            print(f"⚠️ Model {name} not available ({e}), using fallback")
+            return self.premium_model if premium_analysis and self.premium_model else self.model
     
     async def generate_chat_response(self, user_question: str, astrological_context: Dict[str, Any], conversation_history: List[Dict] = None, language: str = 'english', response_style: str = 'detailed', user_context: Dict = None, premium_analysis: bool = False, mode: str = 'default') -> Dict[str, Any]:
         """Generate chat response using astrological context - ASYNC VERSION"""
@@ -179,15 +184,18 @@ class GeminiChatAnalyzer:
         
         gemini_start_time = time.time()
         try:
-            # Select model
-            selected_model = self.premium_model if premium_analysis and self.premium_model else self.model
-            model_type = "Premium (Gemini 3.0 Flash)" if premium_analysis and self.premium_model else "Standard"
+            # Resolve model from admin settings (no server restart needed)
+            selected_model = self._get_model(premium_analysis)
+            model_type = "Premium" if premium_analysis else "Standard"
+            model_name = selected_model._model_name if hasattr(selected_model, "_model_name") else "Unknown"
             
+            # Always log which Gemini model is being used for this request
+            print(f"🧠 Gemini chat model: {model_name} ({model_type}, premium_analysis={premium_analysis})")
             
             if debug_logging:
                 print(f"\n=== CALLING GEMINI API (ASYNC) ===")
                 print(f"Analysis Type: {model_type}")
-                print(f"Model: {selected_model._model_name if hasattr(selected_model, '_model_name') else 'Unknown'}")
+                print(f"Model: {model_name}")
                 print(f"Prompt length: {len(prompt)} characters")
                 
                 # Log full prompt

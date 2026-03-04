@@ -74,12 +74,12 @@ const WelcomeScreen = ({ navigation }) => {
 
   
   const features = [
-    { icon: '📊', title: 'Live Birth Charts', description: 'North & South Indian styles with real-time calculations' },
-    { icon: '🔮', title: 'Life Analysis Suite', description: 'Wealth, Health, Marriage & Education insights' },
-    { icon: '⏰', title: 'Real-Time Transits', description: 'Current planetary positions affecting you now' },
-    { icon: '💬', title: 'Chat with Cosmos', description: 'Ask anything, get instant astrological guidance' },
-    { icon: '⊞', title: 'Ashtakvarga Oracle', description: 'Unlock planetary strength secrets for precise predictions' },
-    { icon: '🌀', title: 'Multi-Dasha System', description: 'Vimshottari, Yogini, Char & Kalachakra timing mastery' },
+    { icon: '📊', title: 'Birth Chart Diagrams', description: 'North & South Indian layouts with precise Swiss-Ephemeris calculations' },
+    { icon: '📐', title: 'Vedic Calculators', description: 'Explore houses, divisional charts, and classical combinations as structured formulas' },
+    { icon: '🧭', title: 'Dasha & Period Viewers', description: 'See how traditional time-period tables are constructed in Vedic chart methods' },
+    { icon: '📚', title: 'Concept Library', description: 'Step-by-step explanations of houses, planets, and key chart building blocks' },
+    { icon: '⊞', title: 'Ashtakavarga Tables', description: 'Visualize point-based strength grids used in Vedic chart mathematics' },
+    { icon: '🧪', title: 'Chart Lab Mode', description: 'Use your chart as a worked example to practice reading techniques' },
   ];
 
   useEffect(() => {
@@ -187,8 +187,8 @@ const WelcomeScreen = ({ navigation }) => {
           </Animated.Text>
           <View style={styles.titleAccent} />
           <Animated.View style={[styles.taglineContainer, { opacity: subtitleOpacity }]}>
-            <Text style={styles.tagline}>Your Personal Cosmic Guide</Text>
-            <Text style={styles.subtitle}>Ancient Wisdom • Modern Precision</Text>
+            <Text style={styles.tagline}>Learn Vedic cosmic mathematics</Text>
+            <Text style={styles.subtitle}>Use your birth chart as a case study to understand classical chart diagrams and calculations.</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.88}
@@ -223,7 +223,7 @@ const WelcomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="ribbon" size={20} color="#FF6B35" style={styles.trustPrivacyIcon} />
-                <Text style={styles.trustPrivacyText}>Rooted in traditional Vedic astrology</Text>
+                <Text style={styles.trustPrivacyText}>Rooted in traditional Vedic chart methods</Text>
               </View>
               <View style={styles.trustPrivacyItem}>
                 <Ionicons name="gift" size={20} color="#4CAF50" style={styles.trustPrivacyIcon} />
@@ -235,7 +235,7 @@ const WelcomeScreen = ({ navigation }) => {
 
         {/* Features Section */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Unlock Cosmic Insights</Text>
+          <Text style={styles.sectionTitle}>Explore Vedic Chart Tools</Text>
           <View style={styles.featuresGrid}>
             {features.map((feature, index) => (
               <FeatureCard

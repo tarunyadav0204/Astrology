@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Animated } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -10,9 +10,11 @@ import { storage } from '../../services/storage';
 import { yogaAPI } from '../../services/api';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 
-const YogaScreen = ({ navigation }) => {
+const YogaScreen = () => {
+    const navigation = useNavigation();
     const { t } = useTranslation();
     const { theme, colors } = useTheme();
+    const isClassic = theme === 'classic';
     const [yogas, setYogas] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentNative, setCurrentNative] = useState(null);
@@ -182,9 +184,11 @@ const YogaScreen = ({ navigation }) => {
             style={[styles.yogaCard, { opacity: fadeAnim }]}
         >
             <LinearGradient
-                colors={theme === 'dark' 
-                    ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
-                    : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)']}
+                colors={isClassic
+                    ? [colors.cardBackground, colors.cardBackground]
+                    : (theme === 'dark'
+                        ? ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)']
+                        : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])}
                 style={styles.yogaCardGradient}
             >
                 <View style={styles.yogaHeader}>
@@ -230,34 +234,32 @@ const YogaScreen = ({ navigation }) => {
     const renderCategory = (category, yogaList) => {
         const isExpanded = expandedCategories.has(category);
         const yogaCount = Array.isArray(yogaList) ? yogaList.length : 0;
-        
+
         if (yogaCount === 0) return null;
 
         return (
-            <View key={category} style={styles.categoryCard}>
+            <View key={category} style={[styles.categoryCard, isClassic && { borderColor: colors.cardBorder, shadowOpacity: 0.12 }]}>
                 <TouchableOpacity 
                     onPress={() => toggleCategory(category)}
                     activeOpacity={0.8}
                 >
                     <LinearGradient
-                        colors={getCategoryGradient(category)}
+                        colors={isClassic ? [colors.cardBackground, colors.cardBackground] : getCategoryGradient(category)}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={styles.categoryHeader}
+                        style={[styles.categoryHeader, isClassic && { borderBottomColor: 'rgba(0, 0, 0, 0.08)' }]}
                     >
                         <View style={styles.categoryTitleRow}>
                             <Text style={styles.categoryIcon}>{getCategoryIcon(category)}</Text>
                             <View style={styles.categoryTitleContainer}>
-                                <Text style={styles.categoryTitle}>
-                                    {t(`yogas.${category}`, category.replace(/_/g, ' ').toUpperCase())}
-                                </Text>
-                                <Text style={styles.categoryCount}>{yogaCount} Yoga{yogaCount > 1 ? 's' : ''}</Text>
+                                <Text style={[styles.categoryTitle, isClassic && { color: colors.text }]}>{t('yogas.' + category, category.replace(/_/g, ' ').toUpperCase())}</Text>
+                                <Text style={[styles.categoryCount, isClassic && { color: colors.textSecondary }]}>{yogaCount} Yoga{yogaCount > 1 ? 's' : ''}</Text>
                             </View>
                         </View>
                         <Ionicons 
                             name={isExpanded ? 'chevron-up' : 'chevron-down'} 
                             size={24} 
-                            color="#fff" 
+                            color={isClassic ? colors.textSecondary : '#fff'} 
                         />
                     </LinearGradient>
                 </TouchableOpacity>
@@ -266,43 +268,7 @@ const YogaScreen = ({ navigation }) => {
                     <View style={[styles.yogasListContainer, { backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.9)' }]}>
                         {yogaList.map((yoga, index) => (
                             <View key={index} style={styles.yogaItem}>
-                                <View style={styles.yogaItemHeader}>
-                                    <Text style={[styles.yogaName, { color: colors.text }]}>{yoga.name}</Text>
-                                    {yoga.strength && (
-                                        <View style={[styles.strengthBadge, { backgroundColor: getStrengthColor(yoga.strength) + '20', borderColor: getStrengthColor(yoga.strength) }]}>
-                                            <Text style={[styles.strengthText, { color: getStrengthColor(yoga.strength) }]}>
-                                                {yoga.strength}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                                
-                                <Text style={[styles.yogaDescription, { color: colors.textSecondary }]}>
-                                    {yoga.description}
-                                </Text>
-                                
-                                {yoga.planets && yoga.planets.length > 0 && (
-                                    <View style={styles.planetsContainer}>
-                                        <Text style={[styles.planetsLabel, { color: colors.textSecondary }]}>Planets:</Text>
-                                        <View style={styles.planetChips}>
-                                            {yoga.planets.map((planet, idx) => (
-                                                <View key={idx} style={[styles.planetChip, { backgroundColor: colors.primary + '20' }]}>
-                                                    <Text style={[styles.planetText, { color: colors.primary }]}>{planet}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    </View>
-                                )}
-                                
-                                {yoga.houses && yoga.houses.length > 0 && (
-                                    <View style={styles.housesContainer}>
-                                        <Text style={[styles.housesLabel, { color: colors.textSecondary }]}>Houses:</Text>
-                                        <Text style={[styles.housesText, { color: colors.text }]}>
-                                            {yoga.houses.join(', ')}
-                                        </Text>
-                                    </View>
-                                )}
-                                
+                                {renderYogaCard(yoga, index)}
                                 {index < yogaList.length - 1 && (
                                     <View style={[styles.yogaDivider, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)' }]} />
                                 )}
@@ -314,35 +280,19 @@ const YogaScreen = ({ navigation }) => {
         );
     };
 
-    if (loading) {
-        return (
-            <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-                <LinearGradient
-                    colors={theme === 'dark' 
-                        ? ['#1a0033', '#2d1b4e', '#4a2c6d']
-                        : ['#fefcfb', '#fef7f0', '#fed7d7']}
-                    style={styles.loadingGradient}
-                >
-                    <ActivityIndicator size="large" color={colors.primary} />
-                    <Text style={[styles.loadingText, { color: colors.text }]}>
-                        Analyzing Yogas...
-                    </Text>
-                </LinearGradient>
-            </View>
-        );
-    }
-
     return (
         <View style={{ flex: 1 }}>
             <LinearGradient
-                colors={theme === 'dark' 
-                    ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']
-                    : ['#fefcfb', '#fef7f0', '#fed7d7', '#fefcfb']}
+                colors={isClassic
+                    ? [colors.background, colors.backgroundSecondary, colors.backgroundSecondary, colors.background]
+                    : (theme === 'dark'
+                        ? ['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']
+                        : ['#fefcfb', '#fef7f0', '#fed7d7', '#fefcfb'])}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, isClassic && { backgroundColor: 'rgba(0, 0, 0, 0.06)' }] }>
                             <Ionicons name="arrow-back" size={24} color={colors.text} />
                         </TouchableOpacity>
                         <Text style={[styles.headerTitle, { color: colors.text }]}>🌟 Yogas</Text>
@@ -361,10 +311,12 @@ const YogaScreen = ({ navigation }) => {
                         <Animated.View style={{ opacity: fadeAnim }}>
                             <View style={styles.introCard}>
                                 <LinearGradient
-                                    colors={theme === 'dark'
-                                        ? ['rgba(255, 215, 0, 0.15)', 'rgba(255, 107, 53, 0.1)']
-                                        : ['rgba(249, 115, 22, 0.15)', 'rgba(236, 72, 153, 0.1)']}
-                                    style={styles.introGradient}
+                                    colors={isClassic
+                                        ? [colors.cardBackground, colors.cardBackground]
+                                        : (theme === 'dark'
+                                            ? ['rgba(255, 215, 0, 0.15)', 'rgba(255, 107, 53, 0.1)']
+                                            : ['rgba(249, 115, 22, 0.15)', 'rgba(236, 72, 153, 0.1)'])}
+                                    style={[styles.introGradient, isClassic && { borderColor: colors.cardBorder }]}
                                 >
                                     <Text style={[styles.introTitle, { color: colors.text }]}>
                                         Your Astrological Yogas

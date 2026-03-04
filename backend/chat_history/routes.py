@@ -600,6 +600,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         intent = None
         chart_insights = []
     
+    # Normalize: ensure chart_insights is a list of valid objects only; no placeholders
+    if not isinstance(chart_insights, list):
+        chart_insights = []
+    else:
+        chart_insights = [x for x in chart_insights if isinstance(x, dict) and x.get("house_number") and x.get("message")]
+    
     # Start background processing (pass intent to avoid re-classification; user_message_id for FAQ/category save)
     background_tasks.add_task(
         process_gemini_response,

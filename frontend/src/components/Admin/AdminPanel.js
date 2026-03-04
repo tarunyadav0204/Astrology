@@ -57,6 +57,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [debugLogging, setDebugLogging] = useState(false);
   const [androidMinVersion, setAndroidMinVersion] = useState('');
   const [iosMinVersion, setIosMinVersion] = useState('');
+  const [geminiModelOptions, setGeminiModelOptions] = useState([]);
+  const [geminiChatModel, setGeminiChatModel] = useState('');
+  const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
+  const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
   const [notifBody, setNotifBody] = useState('');
@@ -107,8 +111,57 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       const iosMin = data.settings.find(s => s.key === 'min_ios_build_number');
       setAndroidMinVersion(androidMin?.value ?? '');
       setIosMinVersion(iosMin?.value ?? '');
+      setGeminiModelOptions(data.gemini_model_options || []);
+      setGeminiChatModel(data.gemini_chat_model || '');
+      setGeminiPremiumModel(data.gemini_premium_model || '');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
+    }
+  };
+
+  const handleSaveGeminiModels = async () => {
+    setGeminiModelsSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const [chatRes, premiumRes] = await Promise.all([
+        fetch('/api/admin/settings/gemini_chat_model', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            key: 'gemini_chat_model',
+            value: geminiChatModel,
+            description: 'Gemini model for standard chat',
+          }),
+        }),
+        fetch('/api/admin/settings/gemini_premium_model', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            key: 'gemini_premium_model',
+            value: geminiPremiumModel,
+            description: 'Gemini model for premium chat',
+          }),
+        }),
+      ]);
+      if (!chatRes.ok || !premiumRes.ok) {
+        const chatErr = await chatRes.json().catch(() => ({}));
+        const premiumErr = await premiumRes.json().catch(() => ({}));
+        console.error('Save failed:', chatErr, premiumErr);
+        alert('Failed to save: ' + (chatErr.detail || premiumRes.detail || 'check console'));
+        return;
+      }
+      alert('Gemini models saved. New chat requests will use the selected models immediately.');
+    } catch (error) {
+      console.error('Error saving Gemini models:', error);
+      alert('Failed to save Gemini models.');
+    } finally {
+      setGeminiModelsSaving(false);
     }
   };
 
@@ -1492,6 +1545,48 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'settings' && (
           <div className="admin-settings">
             <h2>System Settings</h2>
+
+            <div className="settings-section">
+              <h3>Gemini Models</h3>
+              <p className="settings-hint">
+                Choose which Gemini models to use for chat. Standard is used for regular conversations; premium is used for premium analysis. Changes apply to new requests immediately.
+              </p>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Chat model (standard)</strong>
+                  <p>Model for standard astrological chat.</p>
+                </div>
+                <select
+                  value={geminiChatModel}
+                  onChange={(e) => setGeminiChatModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Premium model</strong>
+                  <p>Model for premium / deeper analysis.</p>
+                </div>
+                <select
+                  value={geminiPremiumModel}
+                  onChange={(e) => setGeminiPremiumModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-buttons" style={{ marginTop: '12px' }}>
+                <button type="button" className="create-btn" onClick={handleSaveGeminiModels} disabled={geminiModelsSaving}>
+                  {geminiModelsSaving ? 'Saving…' : 'Save Gemini Models'}
+                </button>
+              </div>
+            </div>
             
             <div className="settings-section">
               <h3>Debug & Logging</h3>

@@ -17,6 +17,7 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
     const hasScrolled = useRef(false);
 
     const hasChartInsights = chartInsights && Array.isArray(chartInsights) && chartInsights.length > 0;
+    const hasChartData = chartData && (chartData.planets || chartData.houses);
 
     useEffect(() => {
         if (hasChartInsights && !hasScrolled.current && chartContainerRef.current && scrollViewRef?.current) {
@@ -99,10 +100,10 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
 
     const isDarkMode = theme === 'dark';
 
-    if (hasChartInsights && chartData) {
+    if (hasChartInsights) {
         const currentInsight = chartInsights[currentIndex];
         
-        if (!currentInsight || !currentInsight.house_number) {
+        if (!currentInsight || !currentInsight.message) {
             return (
                 <View style={styles.container}>
                     <LinearGradient
@@ -132,15 +133,17 @@ const LoadingBubble = ({ chartInsights, chartData, scrollViewRef }) => {
                 >
                     <Text style={[styles.chartTitle, { color: isDarkMode ? '#ffd700' : '#ff6b35' }]}>☀️ AstroRoshni</Text>
                     
-                    <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
-                        <NorthIndianChart 
-                            chartData={chartData}
-                            showDegreeNakshatra={false}
-                            highlightHouse={currentInsight.house_number}
-                            glowAnimation={glowAnim}
-                            hideInstructions={true}
-                        />
-                    </Animated.View>
+                    {hasChartData && (
+                        <Animated.View style={[styles.chartContainer, { opacity: fadeAnim }]}>
+                            <NorthIndianChart 
+                                chartData={chartData}
+                                showDegreeNakshatra={false}
+                                highlightHouse={currentInsight.house_number}
+                                glowAnimation={glowAnim}
+                                hideInstructions={true}
+                            />
+                        </Animated.View>
+                    )}
                     
                     <Animated.Text style={[styles.insightText, { color: isDarkMode ? '#fff' : '#1a1a1a', opacity: fadeAnim }]}>
                         {currentInsight.message}

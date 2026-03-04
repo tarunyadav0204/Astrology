@@ -12,7 +12,29 @@ class IntentRouter:
     def __init__(self):
         api_key = os.getenv('GEMINI_API_KEY')
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-2.5-flash')
+        from utils.admin_settings import get_gemini_chat_model
+        self._gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
+        self._model_cache = {}
+        model_name = get_gemini_chat_model()
+        try:
+            self.model = genai.GenerativeModel(model_name, generation_config=self._gen_config)
+            print(f"✅ Intent router fallback model: {model_name}")
+        except Exception as e:
+            print(f"⚠️ Intent router model {model_name} not available ({e}), trying default")
+            self.model = genai.GenerativeModel('models/gemini-2.5-flash', generation_config=self._gen_config)
+
+    def _get_model(self):
+        """Resolve standard chat model from admin settings (no server restart needed)."""
+        from utils.admin_settings import get_gemini_chat_model
+        name = get_gemini_chat_model()
+        if name in self._model_cache:
+            return self._model_cache[name]
+        try:
+            self._model_cache[name] = genai.GenerativeModel(name, generation_config=self._gen_config)
+            return self._model_cache[name]
+        except Exception as e:
+            print(f"⚠️ Intent router model {name} not available ({e}), using fallback")
+            return self.model
         
     async def classify_intent(self, user_question: str, chat_history: list = None, user_facts: dict = None, clarification_count: int = 0, language: str = 'english', force_ready: bool = False, d1_chart: dict = None) -> Dict[str, str]:
         """
@@ -230,14 +252,16 @@ Set appropriate mode, category, and divisional_charts based on the question cont
         Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family
         """
         
+        model = self._get_model()
+        model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
         print(f"\n📤 INTENT ROUTER REQUEST:")
-        print(f"Model: {self.model._model_name if hasattr(self.model, '_model_name') else 'Unknown'}")
+        print(f"Model: {model_name}")
         print(f"Prompt length: {len(prompt)} characters")
         
         try:
             gemini_start = time.time()
             
-            response = await self.model.generate_content_async(prompt)
+            response = await model.generate_content_async(prompt)
             gemini_time = time.time() - gemini_start
             
             cleaned = response.text.replace('```json', '').replace('```', '').strip()
@@ -262,18 +286,13 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                 result['needs_transits'] = result['context_type'] in ['birth', 'annual'] and any(word in user_question.lower() for word in ['when', 'timing', 'period', 'year', '2025', '2026', '2027'])
             if 'divisional_charts' not in result:
                 result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
-            if 'chart_insights' not in result or not result['chart_insights']:
-                result['chart_insights'] = [
-                    {"house_number": 1, "message": "Analyzing your ascendant and personality", "highlight_type": "ascendant"},
-                    {"house_number": 10, "message": "Examining career and public image", "highlight_type": "planets"}
-                ]
-            
-            # Ensure chart_insights is a list, not null
-            if result.get('chart_insights') is None:
-                result['chart_insights'] = [
-                    {"house_number": 1, "message": "Analyzing your ascendant and personality", "highlight_type": "ascendant"},
-                    {"house_number": 10, "message": "Examining career and public image", "highlight_type": "planets"}
-                ]
+            # Only keep chart_insights when the model returned a valid list of insight objects
+            raw_insights = result.get('chart_insights')
+            if isinstance(raw_insights, list) and raw_insights:
+                valid = [x for x in raw_insights if isinstance(x, dict) and x.get('house_number') and x.get('message')]
+                result['chart_insights'] = valid
+            else:
+                result['chart_insights'] = []
             
             if result.get('needs_transits') and 'transit_request' not in result:
                 result['transit_request'] = {
@@ -299,6 +318,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                 return {
                     "status": "READY", "extracted_context": {}, "mode": "PREDICT_DAILY", "context_type": "birth", "category": "general", "needs_transits": True,
                     "divisional_charts": ["D1", "D9"],
+                    "chart_insights": [],
                     "transit_request": {
                         "startYear": current_year, "endYear": current_year,
                         "yearMonthMap": {str(current_year): [current_month]}
@@ -308,6 +328,7 @@ Set appropriate mode, category, and divisional_charts based on the question cont
                 return {
                     "status": "READY", "extracted_context": {}, "mode": "PREDICT_EVENT_TIMING", "context_type": "birth", "category": "timing", "needs_transits": True,
                     "divisional_charts": ["D1", "D9"],
+                    "chart_insights": [],
                     "transit_request": {
                         "startYear": current_year, "endYear": current_year + 2,
                         "yearMonthMap": {str(y): ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] for y in range(current_year, current_year + 3)}
@@ -316,7 +337,8 @@ Set appropriate mode, category, and divisional_charts based on the question cont
             else:
                 return {
                     "status": "READY", "extracted_context": {}, "mode": "ANALYZE_PERSONALITY", "context_type": "birth", "category": "general", "needs_transits": False,
-                    "divisional_charts": ["D1", "D9"]
+                    "divisional_charts": ["D1", "D9"],
+                    "chart_insights": [],
                 }
     
     def _get_default_divisional_charts(self, category: str) -> list:

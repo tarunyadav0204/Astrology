@@ -107,7 +107,7 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
         >
           <Text style={styles.title}>AstroRoshni</Text>
           <View style={styles.subtitleLine} />
-          <Text style={styles.subtitle}>Unlock Your Cosmic Journey</Text>
+          <Text style={styles.subtitle}>Learn Vedic chart methods</Text>
         </Animated.View>
 
         <Animated.View
@@ -150,7 +150,7 @@ export default function WelcomeScreen({ navigateToScreen, setIsLogin }) {
           <View style={[styles.dot, styles.dot2]} />
           <View style={[styles.dot, styles.dot3]} />
         </View>
-        <Text style={styles.footerText}>Your cosmic insights await</Text>
+        <Text style={styles.footerText}>Practice reading Vedic chart diagrams</Text>
       </View>
     </ScrollView>
   );

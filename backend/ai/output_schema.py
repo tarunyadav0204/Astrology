@@ -301,6 +301,16 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
 
     language_instruction = f"LANGUAGE: Respond in {language}.\n\n"
     
+    elaborate_instruction = """
+CRITICAL - RESPONSE LENGTH & DEPTH (NON-NEGOTIABLE):
+Your full response MUST be at least 12,000 characters. Short or summary-style answers are FORBIDDEN.
+- If your draft is under 12,000 characters, you MUST expand every section: add more planetary reasoning, more house significations, more timing detail, more remedies, and more practical guidance until the total length exceeds 12,000 characters.
+- Expand Astrological Analysis with full explanations for each point; mention house lordships, placements, aspects, and classical references.
+- Quick Answer and Key Insights must be comprehensive (multiple sentences and bullets), not minimal.
+- Nakshatra Insights, Timing & Guidance, and Divisional Chart Analysis must be fully developed.
+- Prioritize depth and clarity. Users expect detailed, thorough astrological guidance. Output at least 12,000 characters.
+"""
+    
     # Use the new centralized schema selection function, using the reliable intent_mode
     response_format_instruction = get_response_schema_for_mode(intent_mode, premium_analysis=premium_analysis)
     
@@ -342,7 +352,7 @@ def build_final_prompt(user_question: str, context: dict, history: list, languag
     prompt_parts.append(time_context)
     
     prompt_parts.append(system_instruction)
-    prompt_parts.append(f"{language_instruction}{response_format_instruction}{user_context_instruction}{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}")
+    prompt_parts.append(f"{language_instruction}{elaborate_instruction}{response_format_instruction}{user_context_instruction}{VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}")
     
     prompt_parts.append(f"{history_text}\nCURRENT QUESTION: {user_question}")
     prompt_parts.append(FAQ_META_INSTRUCTION.strip())
