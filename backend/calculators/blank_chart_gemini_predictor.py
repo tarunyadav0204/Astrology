@@ -45,25 +45,20 @@ class BlankChartGeminiPredictor:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
             
-            # Try different model versions in order of preference (same as chat analyzer)
-            model_names = [
-                'models/gemini-3-pro-preview',  # Premium model first
-                'models/gemini-2.5-flash'
-            ]
-            
-            for model_name in model_names:
+            from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
+            preferred = get_gemini_analysis_model()
+            fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != preferred]
+            for model_name in [preferred] + fallbacks:
                 try:
                     self.model = genai.GenerativeModel(model_name)
-                    logger.info(f"✅ Initialized Gemini model: {model_name}")
-                    print(f"✅ Initialized Gemini model: {model_name}")
+                    logger.info(f"✅ Blank chart predictor using: {model_name}")
+                    print(f"✅ Blank chart predictor using: {model_name}")
                     return
                 except Exception as e:
                     logger.warning(f"⚠️ Model {model_name} not available: {e}")
                     print(f"⚠️ Model {model_name} not available: {e}")
                     continue
-            
-            if not self.model:
-                raise ValueError("No available Gemini model found")
+            raise ValueError("No available Gemini model found")
                 
         except ImportError as e:
             logger.error(f"Failed to import google.generativeai: {e}")

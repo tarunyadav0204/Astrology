@@ -15,7 +15,8 @@ class KarmaGeminiAnalyzer:
     
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-3-pro-preview')
+        from utils.admin_settings import get_gemini_analysis_model
+        self.model = genai.GenerativeModel(get_gemini_analysis_model())
     
     def analyze_karma(self, chart_data: Dict[str, Any], divisional_charts: Dict[str, Any] = None, native_name: str = None, log_request: bool = False) -> Dict[str, Any]:
         """Generate complete karma analysis with AI interpretation"""

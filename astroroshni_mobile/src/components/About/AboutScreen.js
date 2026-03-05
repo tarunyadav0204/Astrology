@@ -82,7 +82,7 @@ export default function AboutScreen({ navigation }) {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('about.supportHeading', 'Support')}</Text>
           <TouchableOpacity
             style={styles.rowItem}
-            onPress={() => handleOpenUrl('mailto:support@astroroshni.com?subject=AstroRoshni%20Support')}
+            onPress={() => handleOpenUrl('mailto:help@astroroshni.com?subject=AstroRoshni%20Support')}
           >
             <Text style={[styles.rowText, { color: colors.text }]}>{t('about.contactSupport', 'Contact support')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />

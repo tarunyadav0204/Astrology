@@ -13,7 +13,8 @@ class StructuredAnalysisAnalyzer:
         if not api_key:
             raise ValueError("GEMINI_API_KEY not set")
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
+        from utils.admin_settings import get_gemini_analysis_model
+        self.model = genai.GenerativeModel(get_gemini_analysis_model())
 
     async def generate_structured_report(self, question: str, context: Dict, language: str = 'english') -> Dict:
         """Generates a strict JSON report with interactive term tags."""

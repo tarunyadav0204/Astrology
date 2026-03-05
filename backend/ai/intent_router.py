@@ -20,8 +20,9 @@ class IntentRouter:
             self.model = genai.GenerativeModel(model_name, generation_config=self._gen_config)
             print(f"✅ Intent router fallback model: {model_name}")
         except Exception as e:
+            from utils.admin_settings import DEFAULT_GEMINI_CHAT_MODEL
             print(f"⚠️ Intent router model {model_name} not available ({e}), trying default")
-            self.model = genai.GenerativeModel('models/gemini-2.5-flash', generation_config=self._gen_config)
+            self.model = genai.GenerativeModel(DEFAULT_GEMINI_CHAT_MODEL, generation_config=self._gen_config)
 
     def _get_model(self):
         """Resolve standard chat model from admin settings (no server restart needed)."""

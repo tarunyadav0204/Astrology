@@ -181,8 +181,11 @@ def main():
         sys.exit(1)
     genai.configure(api_key=api_key)
     gen_config = genai.GenerationConfig(temperature=0, top_p=0.95, top_k=40)
+    from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
+    model_name = get_gemini_analysis_model()
+    fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
     model = None
-    for name in ["models/gemini-2.5-flash", "models/gemini-2.0-flash"]:
+    for name in [model_name] + fallbacks:
         try:
             model = genai.GenerativeModel(name, generation_config=gen_config)
             print(f"✅ Using model: {name}")

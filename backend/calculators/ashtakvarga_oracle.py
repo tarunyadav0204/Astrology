@@ -21,7 +21,8 @@ class AshtakvargaOracle:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        from utils.admin_settings import get_gemini_analysis_model
+        self.model = genai.GenerativeModel(get_gemini_analysis_model())
         
         # Sign names for reference
         self.sign_names = [

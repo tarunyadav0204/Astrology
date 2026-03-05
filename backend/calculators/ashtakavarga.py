@@ -361,7 +361,8 @@ class AshtakavargaCalculator:
                 return {"error": "Gemini API key not configured"}
             
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            from utils.admin_settings import get_gemini_analysis_model
+            model = genai.GenerativeModel(get_gemini_analysis_model())
             
             # Prepare comprehensive data payload
             sarva = self.calculate_sarvashtakavarga()
@@ -439,7 +440,7 @@ Provide predictions in this JSON format:
             # Generate predictions with error logging
             print(f"🔮 Calling Gemini API for life predictions...")
             print(f"📊 Prompt length: {len(prompt)} characters")
-            print(f"🎯 Model: gemini-2.5-flash")
+            print(f"🎯 Model: {get_gemini_analysis_model()}")
             print(f"📤 REQUEST PROMPT:\n{prompt[:1000]}...")
             
             response = model.generate_content(prompt)
@@ -489,7 +490,7 @@ Provide predictions in this JSON format:
             elif "api key" in str(e).lower() or "authentication" in str(e).lower():
                 error_msg = "API authentication failed. Please check configuration."
             elif "model" in str(e).lower() or "not found" in str(e).lower():
-                error_msg = f"Model gemini-2.5-flash not available: {str(e)}"
+                error_msg = f"Gemini model not available: {str(e)}"
             else:
                 error_msg = f"Gemini prediction generation failed: {str(e)}"
             

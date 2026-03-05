@@ -14,8 +14,9 @@ GEMINI_MODEL_OPTIONS = [
     ("models/gemini-2.0-flash-lite-001", "Gemini 2.0 Flash Lite (Stable)"),
 ]
 
-DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-2.5-flash"
-DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3-flash-preview"
+DEFAULT_GEMINI_CHAT_MODEL = "models/gemini-3.1-flash-lite-preview"
+DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
+DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite-preview"
 
 
 def _ensure_admin_settings_table(conn: sqlite3.Connection) -> None:
@@ -58,6 +59,14 @@ def get_gemini_premium_model() -> str:
     if value and value.strip():
         return value.strip()
     return DEFAULT_GEMINI_PREMIUM_MODEL
+
+
+def get_gemini_analysis_model() -> str:
+    """Model ID for analysis features (health, wealth, career, karma, physical, etc.). From admin_settings or default."""
+    value = get_setting("gemini_analysis_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_GEMINI_ANALYSIS_MODEL
 
 
 def is_debug_logging_enabled() -> bool:

@@ -20,7 +20,8 @@ class FactExtractor:
             return
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
+        from utils.admin_settings import get_gemini_analysis_model
+        self.model = genai.GenerativeModel(get_gemini_analysis_model())
     
     async def extract_facts(self, question: str, response: str, birth_chart_id: int):
         """Extract facts from Q&A pair and store them"""

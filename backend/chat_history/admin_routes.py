@@ -309,6 +309,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             GEMINI_MODEL_OPTIONS,
             get_gemini_chat_model,
             get_gemini_premium_model,
+            get_gemini_analysis_model,
         )
         conn = get_db_connection()
         _ensure_admin_settings_table(conn)
@@ -321,6 +322,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_model_options": [{"value": v, "label": l} for v, l in GEMINI_MODEL_OPTIONS],
             "gemini_chat_model": get_gemini_chat_model(),
             "gemini_premium_model": get_gemini_premium_model(),
+            "gemini_analysis_model": get_gemini_analysis_model(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching settings: {str(e)}")

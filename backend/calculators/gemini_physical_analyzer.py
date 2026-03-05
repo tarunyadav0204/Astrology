@@ -31,24 +31,18 @@ class GeminiPhysicalAnalyzer:
             raise ValueError("GEMINI_API_KEY environment variable not set")
         
         genai.configure(api_key=api_key)
-        
-        # Use the same model selection logic as chat analyzer
-        model_names = [
-            'models/gemini-2.5-flash',
-            'models/gemini-1.5-flash',
-            'models/gemini-flash-latest'
-        ]
-        
+        from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
+        model_name = get_gemini_analysis_model()
+        fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != model_name]
         self.model = None
-        for model_name in model_names:
+        for name in [model_name] + fallbacks:
             try:
-                self.model = genai.GenerativeModel(model_name)
-                logging.info(f"✅ Initialized Gemini model: {model_name}")
+                self.model = genai.GenerativeModel(name)
+                logging.info(f"✅ Physical analyzer using: {name}")
                 break
             except Exception as e:
-                logging.warning(f"⚠️ Model {model_name} not available: {e}")
+                logging.warning(f"⚠️ Model {name} not available: {e}")
                 continue
-        
         if not self.model:
             raise ValueError("No available Gemini model found")
     

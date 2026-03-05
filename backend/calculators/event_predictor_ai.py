@@ -20,21 +20,24 @@ class EventPredictor:
         self.dasha_calc = dasha_calculator
         self.ashtakavarga_cls = ashtakavarga_calculator_cls
         
-        # Initialize Gemini safely
+        # Initialize Gemini safely (use admin-configured model)
         self.model = None
         api_key = os.getenv('GEMINI_API_KEY')
         if api_key:
             genai.configure(api_key=api_key)
             try:
-                self.model = genai.GenerativeModel('models/gemini-3-flash-preview')
-                print("✅ EventPredictor using models/gemini-3-flash-preview")
-            except:
-                try:
-                    self.model = genai.GenerativeModel('models/gemini-2.5-flash')
-                    print("✅ EventPredictor using Gemini 2.5 Flash (fallback)")
-                except:
-                    self.model = genai.GenerativeModel('gemini-pro')
-                    print("✅ EventPredictor using Gemini Pro (fallback)")
+                from utils.admin_settings import get_gemini_analysis_model, GEMINI_MODEL_OPTIONS
+                name = get_gemini_analysis_model()
+                fallbacks = [m[0] for m in GEMINI_MODEL_OPTIONS if m[0] != name]
+                for model_name in [name] + fallbacks:
+                    try:
+                        self.model = genai.GenerativeModel(model_name)
+                        print(f"✅ EventPredictor using {model_name}")
+                        break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
 
     async def predict_yearly_events(self, birth_data: Dict, year: int) -> Dict[str, Any]:
         try:

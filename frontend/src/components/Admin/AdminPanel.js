@@ -60,6 +60,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiModelOptions, setGeminiModelOptions] = useState([]);
   const [geminiChatModel, setGeminiChatModel] = useState('');
   const [geminiPremiumModel, setGeminiPremiumModel] = useState('');
+  const [geminiAnalysisModel, setGeminiAnalysisModel] = useState('');
   const [geminiModelsSaving, setGeminiModelsSaving] = useState(false);
   const [notifUserId, setNotifUserId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
@@ -68,6 +69,88 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [notifNativeId, setNotifNativeId] = useState('');
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult, setNotifResult] = useState(null);
+  const [redditDrafts, setRedditDrafts] = useState([]);
+  const [redditDraftsLoading, setRedditDraftsLoading] = useState(false);
+  const [redditCollecting, setRedditCollecting] = useState(false);
+  const [redditCollectResult, setRedditCollectResult] = useState(null);
+  const [redditEditingId, setRedditEditingId] = useState(null);
+  const [redditEditMarkdown, setRedditEditMarkdown] = useState('');
+
+  const fetchRedditDrafts = async () => {
+    setRedditDraftsLoading(true);
+    try {
+      const res = await fetch('/api/admin/reddit/answers/drafts?limit=50', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      const data = await res.json();
+      setRedditDrafts(data.drafts || []);
+    } catch (e) {
+      console.error('Fetch Reddit drafts failed:', e);
+      setRedditDrafts([]);
+    } finally {
+      setRedditDraftsLoading(false);
+    }
+  };
+
+  const runRedditCollect = async () => {
+    setRedditCollecting(true);
+    setRedditCollectResult(null);
+    try {
+      const res = await fetch('/api/admin/reddit/collect?days_back=7&limit_per_sub=100', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRedditCollectResult(data);
+        fetchRedditDrafts();
+      } else {
+        setRedditCollectResult({ error: data.detail || 'Collect failed' });
+      }
+    } catch (e) {
+      setRedditCollectResult({ error: e.message || 'Request failed' });
+    } finally {
+      setRedditCollecting(false);
+    }
+  };
+
+  const approveRedditAnswer = async (answerId, editedMarkdown) => {
+    try {
+      const res = await fetch(`/api/admin/reddit/answers/${answerId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ edited_markdown: editedMarkdown }),
+      });
+      if (res.ok) {
+        setRedditEditingId(null);
+        fetchRedditDrafts();
+      } else {
+        const d = await res.json();
+        alert(d.detail || 'Approve failed');
+      }
+    } catch (e) {
+      alert(e.message || 'Request failed');
+    }
+  };
+
+  const rejectRedditAnswer = async (answerId) => {
+    if (!window.confirm('Reject this draft? It will not be posted.')) return;
+    try {
+      const res = await fetch(`/api/admin/reddit/answers/${answerId}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      if (res.ok) {
+        setRedditEditingId(null);
+        fetchRedditDrafts();
+      }
+    } catch (e) {
+      alert(e.message || 'Request failed');
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -93,6 +176,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       // Credit ledger will be loaded by AdminCreditLedger component
     } else if (activeTab === 'settings') {
       fetchAdminSettings();
+    } else if (activeTab === 'reddit') {
+      fetchRedditDrafts();
     } else if (activeTab === 'notifications') {
       fetchUsers();
     }
@@ -114,6 +199,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiModelOptions(data.gemini_model_options || []);
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
+      setGeminiAnalysisModel(data.gemini_analysis_model || '');
     } catch (error) {
       console.error('Error fetching admin settings:', error);
     }
@@ -123,7 +209,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setGeminiModelsSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const [chatRes, premiumRes] = await Promise.all([
+      const [chatRes, premiumRes, analysisRes] = await Promise.all([
         fetch('/api/admin/settings/gemini_chat_model', {
           method: 'PUT',
           headers: {
@@ -148,15 +234,28 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Gemini model for premium chat',
           }),
         }),
+        fetch('/api/admin/settings/gemini_analysis_model', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            key: 'gemini_analysis_model',
+            value: geminiAnalysisModel,
+            description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
+          }),
+        }),
       ]);
-      if (!chatRes.ok || !premiumRes.ok) {
+      if (!chatRes.ok || !premiumRes.ok || !analysisRes.ok) {
         const chatErr = await chatRes.json().catch(() => ({}));
         const premiumErr = await premiumRes.json().catch(() => ({}));
-        console.error('Save failed:', chatErr, premiumErr);
-        alert('Failed to save: ' + (chatErr.detail || premiumRes.detail || 'check console'));
+        const analysisErr = await analysisRes.json().catch(() => ({}));
+        console.error('Save failed:', chatErr, premiumErr, analysisErr);
+        alert('Failed to save: ' + (chatErr.detail || premiumErr.detail || analysisErr.detail || 'check console'));
         return;
       }
-      alert('Gemini models saved. New chat requests will use the selected models immediately.');
+      alert('Gemini models saved. New requests will use the selected models immediately.');
     } catch (error) {
       console.error('Error saving Gemini models:', error);
       alert('Failed to save Gemini models.');
@@ -734,6 +833,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           onClick={() => setActiveTab('notifications')}
         >
           Notifications
+        </button>
+        <button 
+          className={`tab ${activeTab === 'reddit' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reddit')}
+        >
+          Reddit
         </button>
         <button 
           className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
@@ -1542,6 +1647,85 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         )}
 
+        {activeTab === 'reddit' && (
+          <div className="admin-settings">
+            <h2>Reddit Outreach</h2>
+            <div className="settings-section">
+              <h3>Collect questions</h3>
+              <p className="settings-hint">
+                Fetch recent posts from astrology subreddits (last 7 days). Requires REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT in backend .env.
+              </p>
+              <div className="form-buttons" style={{ marginBottom: 12 }}>
+                <button type="button" className="create-btn" onClick={runRedditCollect} disabled={redditCollecting}>
+                  {redditCollecting ? 'Collecting…' : 'Run collector (last 7 days)'}
+                </button>
+              </div>
+              {redditCollectResult && (
+                <div style={{ padding: 12, background: redditCollectResult.error ? '#fff0f0' : '#f0f8f0', borderRadius: 8, marginTop: 8 }}>
+                  {redditCollectResult.error ? (
+                    <strong>Error:</strong>
+                  ) : null}
+                  {redditCollectResult.error ? ` ${redditCollectResult.error}` : null}
+                  {redditCollectResult.ok && (
+                    <>Collected {redditCollectResult.collected} posts, {redditCollectResult.with_birth_data} with birth data.</>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="settings-section">
+              <h3>Draft answers (human review)</h3>
+              <p className="settings-hint">Review and approve or reject draft answers before they are posted to Reddit.</p>
+              {redditDraftsLoading ? (
+                <p>Loading drafts…</p>
+              ) : redditDrafts.length === 0 ? (
+                <p>No draft answers to review.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {redditDrafts.map((d) => (
+                    <div key={d.answer_id} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fafafa' }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <strong>r/{d.subreddit}</strong>
+                        {d.url && (
+                          <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 8 }}>Open post</a>
+                        )}
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <strong>Question:</strong>
+                        <div style={{ whiteSpace: 'pre-wrap', marginTop: 4, padding: 8, background: '#fff', borderRadius: 4 }}>{d.title || '(no title)'}{(d.body || '').slice(0, 500)}{(d.body && d.body.length > 500) ? '…' : ''}</div>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <strong>Draft answer:</strong>
+                        {redditEditingId === d.answer_id ? (
+                          <div style={{ marginTop: 4 }}>
+                            <textarea
+                              value={redditEditMarkdown}
+                              onChange={(e) => setRedditEditMarkdown(e.target.value)}
+                              rows={8}
+                              style={{ width: '100%', padding: 8, borderRadius: 4 }}
+                            />
+                            <div style={{ marginTop: 8 }}>
+                              <button type="button" className="create-btn" onClick={() => approveRedditAnswer(d.answer_id, redditEditMarkdown)}>Approve &amp; save</button>
+                              <button type="button" style={{ marginLeft: 8 }} onClick={() => { setRedditEditingId(null); setRedditEditMarkdown(''); }}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ whiteSpace: 'pre-wrap', marginTop: 4, padding: 8, background: '#fff', borderRadius: 4 }}>{(d.draft_markdown || '').slice(0, 1500)}{(d.draft_markdown && d.draft_markdown.length > 1500) ? '…' : ''}</div>
+                        )}
+                      </div>
+                      {redditEditingId !== d.answer_id && (
+                        <div>
+                          <button type="button" className="create-btn" onClick={() => { setRedditEditingId(d.answer_id); setRedditEditMarkdown(d.draft_markdown || ''); }}>Edit &amp; approve</button>
+                          <button type="button" style={{ marginLeft: 8 }} onClick={() => rejectRedditAnswer(d.answer_id)}>Reject</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'settings' && (
           <div className="admin-settings">
             <h2>System Settings</h2>
@@ -1549,7 +1733,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             <div className="settings-section">
               <h3>Gemini Models</h3>
               <p className="settings-hint">
-                Choose which Gemini models to use for chat. Standard is used for regular conversations; premium is used for premium analysis. Changes apply to new requests immediately.
+                Choose which Gemini models to use. Chat (standard/premium) for conversations; Analysis for health, wealth, career, karma, physical, events, etc. Changes apply to new requests immediately.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
@@ -1568,12 +1752,27 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Premium model</strong>
-                  <p>Model for premium / deeper analysis.</p>
+                  <strong>Chat model (premium)</strong>
+                  <p>Model for premium / deeper chat analysis.</p>
                 </div>
                 <select
                   value={geminiPremiumModel}
                   onChange={(e) => setGeminiPremiumModel(e.target.value)}
+                  style={{ minWidth: '280px' }}
+                >
+                  {geminiModelOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <strong>Analysis model</strong>
+                  <p>Model for health, wealth, career, karma, physical, event predictor, blank chart, ashtakavarga, fact extraction, etc.</p>
+                </div>
+                <select
+                  value={geminiAnalysisModel}
+                  onChange={(e) => setGeminiAnalysisModel(e.target.value)}
                   style={{ minWidth: '280px' }}
                 >
                   {geminiModelOptions.map((opt) => (
