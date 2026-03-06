@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,6 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
-  Animated,
-  PanResponder,
   Modal,
   TextInput,
   ActivityIndicator,
@@ -24,83 +22,17 @@ import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 
-const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMore, getZodiacSign, theme, colors }) => {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const [isRevealed, setIsRevealed] = useState(false);
-
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 50;
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      if (gestureState.dx < 0) {
-        translateX.setValue(Math.max(gestureState.dx, -120));
-      }
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      if (gestureState.dx < -60) {
-        Animated.spring(translateX, {
-          toValue: -80,
-          useNativeDriver: true,
-        }).start();
-        setIsRevealed(true);
-      } else {
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-        setIsRevealed(false);
-      }
-    },
-  });
-
-  const closeSwipe = () => {
-    Animated.spring(translateX, {
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
-    setIsRevealed(false);
-  };
-
+const ProfileCard = ({ profile, selectedProfile, onSelect, onMore, getZodiacSign, theme, colors }) => {
   return (
     <View style={styles.profileWrapper}>
-      {isRevealed && (
-        <View style={styles.swipeActions} pointerEvents="box-none">
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.editButton]}
-            activeOpacity={0.7}
-            onPress={() => { 
-              closeSwipe(); 
-              onEdit(profile); 
-            }}
-          >
-            <Ionicons name="pencil" size={20} color={COLORS.white} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.moreButton]}
-            activeOpacity={0.7}
-            onPress={() => { closeSwipe(); onMore(profile); }}
-          >
-            <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.white} />
-          </TouchableOpacity>
-        </View>
-      )}
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={[styles.profileCard, { transform: [{ translateX }] }]}
-      >
+      <View style={styles.profileCard}>
         <TouchableOpacity
           style={[
             styles.cardTouchable,
             selectedProfile === profile.name && styles.selectedCard
           ]}
-          onPress={() => {
-            if (isRevealed) {
-              closeSwipe();
-            } else {
-              onSelect(profile);
-            }
-          }}
+          onPress={() => onSelect(profile)}
+          activeOpacity={0.8}
         >
           <LinearGradient
             colors={
@@ -108,7 +40,7 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
                 ? ['rgba(255, 107, 53, 0.3)', 'rgba(255, 107, 53, 0.1)']
                 : Platform.OS === 'android'
                   ? (theme === 'dark' ? ['rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.2)'] : ['rgba(249, 115, 22, 0.1)', 'rgba(249, 115, 22, 0.05)'])
-                  : theme === 'dark' 
+                  : theme === 'dark'
                     ? ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']
                     : ['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.15)']
             }
@@ -141,16 +73,23 @@ const SwipeableProfileCard = ({ profile, selectedProfile, onSelect, onEdit, onMo
                 </View>
               </View>
               <View style={styles.profileRight}>
+                <TouchableOpacity
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  onPress={() => onMore(profile)}
+                  style={[styles.menuButton, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.06)' }]}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
+                </TouchableOpacity>
                 {selectedProfile === profile.name ? (
-                  <Ionicons name="checkmark-circle" size={24} color="#ff6b35" />
+                  <Ionicons name="checkmark-circle" size={24} color="#ff6b35" style={styles.cardCheck} />
                 ) : (
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} style={styles.cardChevron} />
                 )}
               </View>
             </View>
           </LinearGradient>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     </View>
   );
 };
@@ -469,15 +408,12 @@ export default function SelectNativeScreen({ navigation, route }) {
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {returnTo === 'ChildbirthPlanner' ? 'Select mother\'s chart' : returnTo === 'KarmaAnalysis' ? 'Select native for karma analysis' : 'Choose a profile for astrological analysis'}
             </Text>
-            <Text style={[styles.instructionText, { color: colors.textSecondary }]}>👈 Swipe left for options</Text>
-
             {profiles.map((profile) => (
-              <SwipeableProfileCard
+              <ProfileCard
                 key={profile.id}
                 profile={profile}
                 selectedProfile={selectedProfile}
                 onSelect={selectProfile}
-                onEdit={handleEdit}
                 onMore={handleMore}
                 getZodiacSign={getZodiacSign}
                 theme={theme}
@@ -521,8 +457,21 @@ export default function SelectNativeScreen({ navigation, route }) {
           <View style={[styles.bottomSheet, { backgroundColor: theme === 'dark' ? '#2d1b4e' : COLORS.white }]}>
             <View style={styles.bottomSheetHandle} />
             <Text style={[styles.bottomSheetTitle, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Options</Text>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
+              style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
+              onPress={() => {
+                closeBottomSheet();
+                if (selectedProfileForMenu) {
+                  handleEdit(selectedProfileForMenu);
+                }
+              }}
+            >
+              <Ionicons name="pencil" size={22} color="#4CAF50" />
+              <Text style={[styles.bottomSheetItemText, { color: theme === 'dark' ? colors.text : '#1a1a1a' }]}>Edit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.bottomSheetItem, { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5' }]}
               onPress={() => {
                 closeBottomSheet();
@@ -695,13 +644,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  instructionText: {
-    fontSize: 12,
-    textAlign: 'center',
     marginBottom: 24,
-    fontStyle: 'italic',
   },
   profileWrapper: {
     position: 'relative',
@@ -715,28 +658,6 @@ const styles = StyleSheet.create({
   cardTouchable: {
     borderRadius: 16,
     overflow: 'hidden',
-  },
-  swipeActions: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  actionButton: {
-    width: 40,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  editButton: {
-    backgroundColor: '#4CAF50',
-  },
-  moreButton: {
-    backgroundColor: '#9c27b0',
   },
   modalOverlay: {
     flex: 1,
@@ -952,7 +873,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   profileRight: {
-    marginLeft: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  cardCheck: {
+    marginLeft: 0,
+  },
+  cardChevron: {
+    marginLeft: 0,
   },
   emptyState: {
     alignItems: 'center',

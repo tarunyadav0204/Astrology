@@ -1,0 +1,245 @@
+.admin-user-credit-management {
+  padding: 20px;
+}
+
+.admin-user-credit-management h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+}
+
+.admin-user-credit-management .section-hint {
+  margin: 0 0 16px 0;
+  color: #555;
+  font-size: 14px;
+}
+
+.admin-user-credit-management .filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-user-credit-management .search-field {
+  min-width: 200px;
+}
+
+.admin-user-credit-management .search-field input {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.admin-user-credit-management .toggle-with-credits {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.admin-user-credit-management .loading-row {
+  padding: 20px;
+  color: #666;
+}
+
+.admin-user-credit-management .users-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-user-credit-management .users-credits-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-user-credit-management .users-credits-table th,
+.admin-user-credit-management .users-credits-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.admin-user-credit-management .users-credits-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+}
+
+.admin-user-credit-management .users-credits-table .credits-cell {
+  font-weight: 600;
+  color: #007bff;
+}
+
+.admin-user-credit-management .actions-cell {
+  white-space: nowrap;
+}
+
+.admin-user-credit-management .btn-add,
+.admin-user-credit-management .btn-remove {
+  padding: 6px 12px;
+  margin-right: 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+}
+
+.admin-user-credit-management .btn-add {
+  background: #28a745;
+  color: #fff;
+}
+
+.admin-user-credit-management .btn-add:hover {
+  background: #218838;
+}
+
+.admin-user-credit-management .btn-remove {
+  background: #dc3545;
+  color: #fff;
+}
+
+.admin-user-credit-management .btn-remove:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.admin-user-credit-management .btn-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+  background: #f8f9fa;
+  font-size: 14px;
+}
+
+.pagination-info {
+  color: #495057;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination-btn {
+  padding: 6px 14px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pagination-page {
+  color: #495057;
+}
+
+/* Modal */
+.adjust-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.adjust-modal {
+  background: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 320px;
+  max-width: 90vw;
+}
+
+.adjust-modal h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+}
+
+.adjust-modal .current-balance {
+  margin: 0 0 16px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.adjust-modal .form-field {
+  margin-bottom: 14px;
+}
+
+.adjust-modal .form-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.adjust-modal .form-field input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.adjust-modal .modal-message {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.adjust-modal .modal-message.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.adjust-modal .modal-message.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.adjust-modal .modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.adjust-modal .cancel-btn {
+  padding: 8px 16px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.adjust-modal .cancel-btn:hover {
+  background: #f8f9fa;
+}

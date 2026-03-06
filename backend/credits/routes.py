@@ -459,6 +459,32 @@ async def admin_add_credits(request: dict, current_user: User = Depends(get_curr
         raise HTTPException(status_code=400, detail="Failed to add credits")
 
 
+@router.post("/admin/adjust-credits")
+async def admin_adjust_credits(request: dict, current_user: User = Depends(get_current_user)):
+    """Add or remove credits (amount positive = add, negative = remove). Partial credits allowed."""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    userid = request.get("userid")
+    amount = request.get("amount")
+    description = request.get("description", "").strip() or "Admin adjustment"
+    if userid is None:
+        raise HTTPException(status_code=400, detail="userid is required")
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="amount must be an integer")
+    if amount == 0:
+        raise HTTPException(status_code=400, detail="amount must be non-zero")
+    success = credit_service.admin_adjust_credits(userid, amount, description)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Adjustment failed (e.g. not enough credits to deduct)",
+        )
+    action = "added" if amount > 0 else "removed"
+    return {"message": f"Successfully {action} {abs(amount)} credits for user {userid}"}
+
+
 @router.post("/admin/refund-credits")
 async def admin_refund_credits(request: AdminRefundRequest, current_user: User = Depends(get_current_user)):
     """
@@ -626,6 +652,32 @@ async def get_education_cost():
     cost = credit_service.get_credit_setting('education_analysis_cost')
     return {"cost": cost}
 
+@router.get("/settings/career-cost")
+async def get_career_cost():
+    cost = credit_service.get_credit_setting('career_analysis_cost')
+    return {"cost": cost}
+
+@router.get("/settings/progeny-cost")
+async def get_progeny_cost():
+    cost = credit_service.get_credit_setting('progeny_analysis_cost')
+    return {"cost": cost}
+
+@router.get("/settings/analysis-pricing")
+async def get_analysis_pricing():
+    """Same source as deduction: all analysis costs from credit_settings."""
+    return {
+        "pricing": {
+            "career": credit_service.get_credit_setting("career_analysis_cost"),
+            "wealth": credit_service.get_credit_setting("wealth_analysis_cost"),
+            "health": credit_service.get_credit_setting("health_analysis_cost"),
+            "marriage": credit_service.get_credit_setting("marriage_analysis_cost"),
+            "education": credit_service.get_credit_setting("education_analysis_cost"),
+            "progeny": credit_service.get_credit_setting("progeny_analysis_cost"),
+            "childbirth": credit_service.get_credit_setting("childbirth_planner_cost"),
+            "trading": credit_service.get_credit_setting("trading_daily_cost"),
+        }
+    }
+
 @router.get("/settings/premium-chat-cost")
 async def get_premium_chat_cost():
     cost = credit_service.get_credit_setting('premium_chat_cost')
@@ -705,30 +757,47 @@ async def get_credit_stats(current_user: User = Depends(get_current_user)):
     return stats
 
 @router.get("/admin/users")
-async def get_all_users_with_credits(current_user: User = Depends(get_current_user)):
+async def get_all_users_with_credits(
+    search: Optional[str] = None,
+    with_credits_only: Optional[bool] = None,
+    page: Optional[int] = 1,
+    limit: Optional[int] = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """List users with credit balance. search: filter by name/phone; with_credits_only: only users with credits > 0; page/limit for pagination."""
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+    page = max(1, page or 1)
+    limit = max(1, min(100, limit or 50))
+    offset = (page - 1) * limit
+
     conn = sqlite3.connect('astrology.db')
     cursor = conn.cursor()
-    cursor.execute("""
+    base = """
         SELECT u.userid, u.name, u.phone, COALESCE(uc.credits, 0) as credits
         FROM users u
         LEFT JOIN user_credits uc ON u.userid = uc.userid
-        ORDER BY u.name
-    """)
-    
-    users = []
-    for row in cursor.fetchall():
-        users.append({
-            "userid": row[0],
-            "name": row[1],
-            "phone": row[2],
-            "credits": row[3]
-        })
-    
+        WHERE 1=1
+    """
+    params = []
+    if search and search.strip():
+        q = f"%{search.strip()}%"
+        base += " AND (u.name LIKE ? OR u.phone LIKE ?)"
+        params.extend([q, q])
+    if with_credits_only:
+        base += " AND COALESCE(uc.credits, 0) > 0"
+
+    cursor.execute("SELECT COUNT(*) FROM (" + base + ") _", params)
+    total = cursor.fetchone()[0]
+
+    query = base + " ORDER BY u.name LIMIT ? OFFSET ?"
+    cursor.execute(query, params + [limit, offset])
+    users = [
+        {"userid": row[0], "name": row[1], "phone": row[2], "credits": row[3]}
+        for row in cursor.fetchall()
+    ]
     conn.close()
-    return {"users": users}
+    return {"users": users, "total": total, "page": page, "limit": limit}
 
 @router.get("/admin/user-history/{userid}")
 async def get_user_transaction_history(userid: int, current_user: User = Depends(get_current_user)):

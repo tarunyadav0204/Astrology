@@ -287,6 +287,36 @@ class CreditService:
         conn.close()
         return True
     
+    def admin_adjust_credits(self, userid: int, amount: int, description: str = None) -> bool:
+        """Admin adjustment: add (amount > 0) or deduct (amount < 0) credits. Records source 'admin_adjustment'."""
+        if amount == 0:
+            return True
+        if amount > 0:
+            return self.add_credits(userid, amount, 'admin_adjustment', None, description or "Admin adjustment")
+        # amount < 0: deduct
+        abs_amount = -amount
+        current_balance = self.get_user_credits(userid)
+        if current_balance < abs_amount:
+            return False
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        new_balance = current_balance - abs_amount
+        cursor.execute("""
+            UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?
+        """, (new_balance, userid))
+        if cursor.rowcount == 0:
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_credits (userid, credits, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+            """, (userid, new_balance))
+        cursor.execute("""
+            INSERT INTO credit_transactions
+            (userid, transaction_type, amount, balance_after, source, reference_id, description)
+            VALUES (?, 'spent', ?, ?, 'admin_adjustment', NULL, ?)
+        """, (userid, -abs_amount, new_balance, description or "Admin deduction"))
+        conn.commit()
+        conn.close()
+        return True
+
     def refund_credits(self, userid: int, amount: int, feature: str, description: str = None) -> bool:
         """Refund credits to user account"""
         conn = sqlite3.connect(self.db_path)

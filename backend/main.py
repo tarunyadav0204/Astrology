@@ -4624,64 +4624,10 @@ async def get_gati_meanings():
         }
 
 @app.get("/api/analysis-pricing")
-async def get_analysis_pricing():
-    """Get pricing for different analysis types"""
-    try:
-        conn = sqlite3.connect('astrology.db')
-        cursor = conn.cursor()
-        
-        # Check if analysis_pricing table exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='analysis_pricing'")
-        if not cursor.fetchone():
-            # Create table if it doesn't exist
-            cursor.execute('''
-                CREATE TABLE analysis_pricing (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    analysis_type TEXT UNIQUE NOT NULL,
-                    credits INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Insert default pricing
-            default_pricing = [
-                ('career', 10),
-                ('wealth', 5),
-                ('health', 5),
-                ('marriage', 5),
-                ('education', 5),
-                ('progeny', 15)
-            ]
-            
-            for analysis_type, credits in default_pricing:
-                cursor.execute(
-                    "INSERT INTO analysis_pricing (analysis_type, credits) VALUES (?, ?)",
-                    (analysis_type, credits)
-                )
-            
-            conn.commit()
-        
-        # Fetch current pricing
-        cursor.execute("SELECT analysis_type, credits FROM analysis_pricing")
-        pricing_data = cursor.fetchall()
-        conn.close()
-        
-        pricing = {}
-        for analysis_type, credits in pricing_data:
-            pricing[analysis_type] = credits
-        
-        return {"pricing": pricing}
-        
-    except Exception as e:
-        return {"error": f"Failed to fetch pricing: {str(e)}", "pricing": {
-            "career": 10,
-            "wealth": 5,
-            "health": 5,
-            "marriage": 5,
-            "education": 5,
-            "progeny": 15
-        }}
+async def get_analysis_pricing_redirect():
+    """Redirect to credits module so app uses same API as deduction."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/credits/settings/analysis-pricing", status_code=307)
 
 @app.post("/api/ashtakavarga/complete-oracle")
 async def get_complete_ashtakavarga_oracle(request: dict, current_user: User = Depends(get_current_user)):

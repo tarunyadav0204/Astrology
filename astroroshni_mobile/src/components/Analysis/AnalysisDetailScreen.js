@@ -28,8 +28,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   useAnalytics('AnalysisDetailScreen');
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
-  const { analysisType, title, cost } = route.params;
+  const { analysisType, title, cost: costFromParams } = route.params;
   const { credits, fetchBalance } = useCredits();
+  const [cost, setCost] = useState(costFromParams ?? 5);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -52,15 +53,30 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       duration: 600,
       useNativeDriver: true,
     }).start();
-    
-    // Handle back button to go to Home screen (greeting state)
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       navigation.navigate('Home', { resetToGreeting: true });
       return true;
     });
-    
     return () => backHandler.remove();
   }, []);
+
+  useEffect(() => {
+    const costPath = {
+      career: '/credits/settings/career-cost',
+      wealth: '/credits/settings/wealth-cost',
+      health: '/credits/settings/health-cost',
+      marriage: '/credits/settings/marriage-cost',
+      education: '/credits/settings/education-cost',
+      progeny: '/credits/settings/progeny-cost',
+    }[analysisType];
+    if (!costPath) return;
+    let cancelled = false;
+    fetch(`${API_BASE_URL}${getEndpoint(costPath)}`)
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled && data?.cost != null) setCost(Number(data.cost)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [analysisType]);
 
   useEffect(() => {
     if (birthData) {

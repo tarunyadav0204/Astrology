@@ -5,6 +5,7 @@ import AdminChatHistory from './AdminChatHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
+import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
@@ -870,6 +871,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             Ledger
           </button>
           <button 
+            className={`subtab ${activeSubTab === 'userCredits' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('userCredits')}
+          >
+            User Credit Management
+          </button>
+          <button 
             className={`subtab ${activeSubTab === 'daily' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('daily')}
           >
@@ -1425,6 +1432,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'credits' && activeSubTab === 'ledger' && (
           <AdminCreditLedger />
+        )}
+
+        {activeTab === 'credits' && activeSubTab === 'userCredits' && (
+          <AdminUserCreditManagement />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'daily' && (

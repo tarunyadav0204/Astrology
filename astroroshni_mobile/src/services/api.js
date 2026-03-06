@@ -419,7 +419,7 @@ export const marriageAPI = {
 };
 
 export const pricingAPI = {
-  getAnalysisPricing: () => api.get(getEndpoint('/analysis-pricing')),
+  getAnalysisPricing: () => api.get(getEndpoint('/credits/settings/analysis-pricing')),
 };
 
 export const lifeEventsAPI = {

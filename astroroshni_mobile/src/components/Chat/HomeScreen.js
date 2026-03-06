@@ -224,10 +224,12 @@ const loadHomeData = async (nativeData = null) => {
       setChartData(null);
       setDashData(null);
       
-      // Load pricing first
+      // Load pricing from same API as deduction (credits/settings/analysis-pricing)
       try {
         const pricingResponse = await pricingAPI.getAnalysisPricing();
-        if (pricingResponse?.data) {
+        if (pricingResponse?.data?.pricing) {
+          setPricing(pricingResponse.data.pricing);
+        } else if (pricingResponse?.data && typeof pricingResponse.data.career !== 'undefined') {
           setPricing(pricingResponse.data);
         }
       } catch (pricingError) {
@@ -666,7 +668,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '💼', 
       description: t('home.analysis.career.description', 'Professional success & opportunities'),
       gradient: ['#6366F1', '#8B5CF6'],
-      cost: pricing.career_analysis || 10
+      cost: pricing.career ?? 12
     },
     { 
       id: 'wealth', 
@@ -674,7 +676,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '💰', 
       description: t('home.analysis.wealth.description', 'Financial prospects & opportunities'),
       gradient: ['#0EA5E9', '#38BDF8'],
-      cost: pricing.wealth_analysis || 5
+      cost: pricing.wealth ?? 5
     },
     { 
       id: 'marriage', 
@@ -682,7 +684,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '💕', 
       description: t('home.analysis.marriage.description', 'Relationship compatibility & timing'),
       gradient: ['#FF69B4', '#DC143C'],
-      cost: pricing.marriage_analysis || 5
+      cost: pricing.marriage ?? 3
     },
     { 
       id: 'health', 
@@ -690,7 +692,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '🏥', 
       description: t('home.analysis.health.description', 'Wellness insights & precautions'),
       gradient: ['#32CD32', '#228B22'],
-      cost: pricing.health_analysis || 5
+      cost: pricing.health ?? 3
     },
     { 
       id: 'education', 
@@ -698,7 +700,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '🎓', 
       description: t('home.analysis.education.description', 'Learning path & career guidance'),
       gradient: ['#4169E1', '#1E90FF'],
-      cost: pricing.education_analysis || 5
+      cost: pricing.education ?? 3
     },
     { 
       id: 'progeny', 
@@ -706,7 +708,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '👨‍👩‍👧‍👦', 
       description: t('home.analysis.progeny.description', 'Fertility potential & family expansion'),
       gradient: ['#FF69B4', '#FF1493'],
-      cost: pricing.progeny_analysis || 15
+      cost: pricing.progeny ?? 15
     },
     { 
       id: 'trading', 
@@ -714,7 +716,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '📈', 
       description: t('home.analysis.trading.description', 'Stock market predictions & timing'),
       gradient: ['#FFD700', '#FF8C00'],
-      cost: 5
+      cost: pricing.trading ?? 5
     },
     { 
       id: 'financial', 
@@ -730,7 +732,7 @@ const loadHomeData = async (nativeData = null) => {
       icon: '🤱', 
       description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'),
       gradient: ['#FF69B4', '#FF1493'],
-      cost: pricing.childbirth_planner || 8
+      cost: pricing.childbirth ?? 8
     },
     { 
       id: 'muhurat', 
